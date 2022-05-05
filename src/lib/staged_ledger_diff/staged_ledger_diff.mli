@@ -29,43 +29,35 @@ module At_most_one : sig
 end
 
 module Pre_diff_two : sig
-  type ('a, 'b) t =
-    { completed_works : 'a list
-    ; commands : 'b list
-    ; coinbase : Coinbase.Fee_transfer.t At_most_two.t
-    ; internal_command_balances :
-        Transaction_status.Internal_command_balance_data.t list
-    }
-  [@@deriving compare, sexp, yojson]
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type ('a, 'b) t =
+        { completed_works : 'a list
+        ; commands : 'b list
+        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_two.Stable.V1.t
+        }
+      [@@deriving compare, sexp, yojson]
+    end
+  end]
 
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
-
-  module Stable : sig
-    module V1 : sig
-      type ('a, 'b) t [@@deriving compare, sexp, yojson, bin_io, version]
-    end
-  end
-  with type ('a, 'b) V1.t = ('a, 'b) t
 end
 
 module Pre_diff_one : sig
-  type ('a, 'b) t =
-    { completed_works : 'a list
-    ; commands : 'b list
-    ; coinbase : Coinbase.Fee_transfer.t At_most_one.t
-    ; internal_command_balances :
-        Transaction_status.Internal_command_balance_data.t list
-    }
-  [@@deriving compare, sexp, yojson]
+  [%%versioned:
+  module Stable : sig
+    module V2 : sig
+      type ('a, 'b) t =
+        { completed_works : 'a list
+        ; commands : 'b list
+        ; coinbase : Coinbase.Fee_transfer.Stable.V1.t At_most_one.Stable.V1.t
+        }
+      [@@deriving compare, sexp, yojson]
+    end
+  end]
 
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
-
-  module Stable : sig
-    module V1 : sig
-      type ('a, 'b) t [@@deriving compare, sexp, yojson, bin_io, version]
-    end
-  end
-  with type ('a, 'b) V1.t = ('a, 'b) t
 end
 
 module Pre_diff_with_at_most_two_coinbase : sig

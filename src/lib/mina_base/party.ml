@@ -37,6 +37,16 @@ module Call_type = struct
     end
   end]
 
+  let to_string = function Call -> "call" | Delegate_call -> "delegate_call"
+
+  let of_string = function
+    | "call" ->
+        Call
+    | "delegate_call" ->
+        Delegate_call
+    | s ->
+        failwithf "Invalid call type: %s" s ()
+
   let quickcheck_generator =
     Quickcheck.Generator.map Bool.quickcheck_generator ~f:(function
       | false ->
@@ -774,6 +784,43 @@ module Body = struct
     ; account_precondition = Account_precondition.Nonce t.nonce
     ; use_full_commitment = true
     ; caller = Token_id.default
+    }
+
+  let to_fee_payer_exn (t : t) : Fee_payer.t =
+    let { public_key
+        ; token_id = _
+        ; update
+        ; balance_change
+        ; increment_nonce = _
+        ; events
+        ; sequence_events
+        ; call_data = _
+        ; call_depth = _
+        ; protocol_state_precondition
+        ; account_precondition
+        ; use_full_commitment = _
+        ; caller = _
+        } =
+      t
+    in
+    let fee =
+      Currency.Fee.of_uint64
+        (balance_change.magnitude |> Currency.Amount.to_uint64)
+    in
+    let nonce =
+      match account_precondition with
+      | Nonce nonce ->
+          Mina_numbers.Account_nonce.of_uint32 nonce
+      | Full _ | Accept ->
+          failwith "Expected a nonce for fee payer account precondition"
+    in
+    { public_key
+    ; update
+    ; fee
+    ; events
+    ; sequence_events
+    ; protocol_state_precondition
+    ; nonce
     }
 
   module Checked = struct

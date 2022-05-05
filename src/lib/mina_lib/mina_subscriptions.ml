@@ -121,117 +121,155 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               .state_hash
           in
           (let path, log = !precomputed_block_writer in
-           let precomputed_block =
-             let open Mina_transition in
-             lazy
-               (let scheduled_time = Block_time.now time_controller in
-                let precomputed_block =
-                  new_block |> External_transition.Validated.erase |> fst
-                  |> With_hash.data
-                  |> External_transition.Precomputed_block
-                     .of_external_transition ~scheduled_time
-                in
-                External_transition.Precomputed_block.to_yojson
-                  precomputed_block)
-           in
-           if upload_blocks_to_gcloud then (
-             [%log info] "log" ;
-             let json = Yojson.Safe.to_string (Lazy.force precomputed_block) in
-             let network =
-               match Core.Sys.getenv "NETWORK_NAME" with
-               | Some network ->
-                   Some network
-               | _ ->
+           match Broadcast_pipe.Reader.peek transition_frontier with
+           | None ->
+               [%log warn]
+                 "Transition frontier not available when creating precomputed \
+                  block"
+           | Some tf -> (
+               let state_hash =
+                 let block_with_hash, _ = new_block in
+                 (With_hash.hash block_with_hash).state_hash
+               in
+               match Transition_frontier.find tf state_hash with
+               | None ->
                    [%log warn]
-                     "NETWORK_NAME environment variable not set. Must be set \
-                      to use upload_blocks_to_gcloud" ;
-                   None
-             in
-             let bucket =
-               match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
-               | Some bucket ->
-                   Some bucket
-               | _ ->
-                   [%log warn]
-                     "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not set. \
-                      Must be set to use upload_blocks_to_gcloud" ;
-                   None
-             in
-             match (gcloud_keyfile, network, bucket) with
-             | Some _, Some network, Some bucket ->
-                 let hash_string = State_hash.to_base58_check hash in
-                 let height =
-                   Mina_transition.External_transition.Validated
-                   .blockchain_length new_block
-                   |> Mina_numbers.Length.to_string
-                 in
-                 let name =
-                   sprintf "%s-%s-%s.json" network height hash_string
-                 in
-                 (* TODO: Use a pipe to queue this if these are building up *)
-                 don't_wait_for
-                   ( Mina_metrics.(
-                       Gauge.inc_one
-                         Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks) ;
-                     let tmp_file =
-                       Core.Filename.temp_file ~in_dir:"/tmp"
-                         "upload_block_file" ""
+                     "Could not find new block in transition frontier, can't \
+                      create precomputed block"
+               | Some breadcrumb ->
+                   let precomputed_block =
+                     let open Mina_transition in
+                     lazy
+                       (let scheduled_time = Block_time.now time_controller in
+                        let precomputed_block =
+                          let staged_ledger =
+                            Transition_frontier.Breadcrumb.staged_ledger
+                              breadcrumb
+                          in
+                          let block =
+                            let block_with_hash, _ =
+                              External_transition.Validated.erase new_block
+                            in
+                            With_hash.data block_with_hash
+                            |> External_transition.decompose
+                          in
+                          External_transition.Precomputed_block.of_block ~logger
+                            ~constraint_constants ~staged_ledger ~scheduled_time
+                            block
+                        in
+                        External_transition.Precomputed_block.to_yojson
+                          precomputed_block)
+                   in
+                   if upload_blocks_to_gcloud then (
+                     [%log info] "log" ;
+                     let json =
+                       Yojson.Safe.to_string (Lazy.force precomputed_block)
                      in
-                     let f = Stdlib.open_out tmp_file in
-                     fprintf f "%s" json ;
-                     Stdlib.close_out f ;
-                     let command =
-                       Printf.sprintf "gsutil cp -n %s gs://%s/%s" tmp_file
-                         bucket name
+                     let network =
+                       match Core.Sys.getenv "NETWORK_NAME" with
+                       | Some network ->
+                           Some network
+                       | _ ->
+                           [%log warn]
+                             "NETWORK_NAME environment variable not set. Must \
+                              be set to use upload_blocks_to_gcloud" ;
+                           None
                      in
-                     let%map output =
-                       (* This double-wrapping of [try_with]s is protection
-                          against both immediate exceptions in process setup
-                          and exceptions in the 'deferred' part of setup.
-                          We also attach 'tags' to the errors below, so that we
-                          we have information about which of these different
-                          kinds of exception were seen, if any.
-                       *)
-                       Deferred.Or_error.try_with_join ~here:[%here] (fun () ->
-                           Or_error.try_with (fun () ->
-                               Async.Process.run () ~prog:"bash"
-                                 ~args:[ "-c"; command ]
-                               |> Deferred.Result.map_error
-                                    ~f:(Error.tag ~tag:__LOC__))
-                           |> Result.map_error ~f:(Error.tag ~tag:__LOC__)
-                           |> Deferred.return |> Deferred.Or_error.join)
+                     let bucket =
+                       match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
+                       | Some bucket ->
+                           Some bucket
+                       | _ ->
+                           [%log warn]
+                             "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable \
+                              not set. Must be set to use \
+                              upload_blocks_to_gcloud" ;
+                           None
                      in
-                     ( match output with
-                     | Ok _result ->
-                         ()
-                     | Error e ->
-                         [%log warn]
-                           ~metadata:
-                             [ ("error", Error_json.error_to_yojson e)
-                             ; ("command", `String command)
-                             ]
-                           "Uploading block to gcloud with command $command \
-                            failed: $error" ) ;
-                     Sys.remove tmp_file ;
-                     Mina_metrics.(
-                       Gauge.dec_one
-                         Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks)
-                   )
-             | _ ->
-                 () ) ;
-           Option.iter path ~f:(fun (`Path path) ->
-               Out_channel.with_file ~append:true path ~f:(fun out_channel ->
-                   Out_channel.output_lines out_channel
-                     [ Yojson.Safe.to_string (Lazy.force precomputed_block) ])) ;
-           [%log info] "Saw block with state hash $state_hash"
-             ~metadata:
-               (let state_hash_data =
-                  [ ("state_hash", `String (State_hash.to_base58_check hash)) ]
-                in
-                if is_some log then
-                  state_hash_data
-                  @ [ ("precomputed_block", Lazy.force precomputed_block) ]
-                else state_hash_data)) ;
+                     match (gcloud_keyfile, network, bucket) with
+                     | Some _, Some network, Some bucket ->
+                         let hash_string = State_hash.to_base58_check hash in
+                         let height =
+                           Mina_transition.External_transition.Validated
+                           .blockchain_length new_block
+                           |> Mina_numbers.Length.to_string
+                         in
+                         let name =
+                           sprintf "%s-%s-%s.json" network height hash_string
+                         in
+                         (* TODO: Use a pipe to queue this if these are building up *)
+                         don't_wait_for
+                           ( Mina_metrics.(
+                               Gauge.inc_one
+                                 Block_latency.Upload_to_gcloud
+                                 .upload_to_gcloud_blocks) ;
+                             let tmp_file =
+                               Core.Filename.temp_file ~in_dir:"/tmp"
+                                 "upload_block_file" ""
+                             in
+                             let f = Stdlib.open_out tmp_file in
+                             fprintf f "%s" json ;
+                             Stdlib.close_out f ;
+                             let command =
+                               Printf.sprintf "gsutil cp -n %s gs://%s/%s"
+                                 tmp_file bucket name
+                             in
+                             let%map output =
+                               (* This double-wrapping of [try_with]s is protection
+                                  against both immediate exceptions in process setup
+                                  and exceptions in the 'deferred' part of setup.
+                                  We also attach 'tags' to the errors below, so that we
+                                  we have information about which of these different
+                                  kinds of exception were seen, if any.
+                               *)
+                               Deferred.Or_error.try_with_join ~here:[%here]
+                                 (fun () ->
+                                   Or_error.try_with (fun () ->
+                                       Async.Process.run () ~prog:"bash"
+                                         ~args:[ "-c"; command ]
+                                       |> Deferred.Result.map_error
+                                            ~f:(Error.tag ~tag:__LOC__))
+                                   |> Result.map_error
+                                        ~f:(Error.tag ~tag:__LOC__)
+                                   |> Deferred.return |> Deferred.Or_error.join)
+                             in
+                             ( match output with
+                             | Ok _result ->
+                                 ()
+                             | Error e ->
+                                 [%log warn]
+                                   ~metadata:
+                                     [ ("error", Error_json.error_to_yojson e)
+                                     ; ("command", `String command)
+                                     ]
+                                   "Uploading block to gcloud with command \
+                                    $command failed: $error" ) ;
+                             Sys.remove tmp_file ;
+                             Mina_metrics.(
+                               Gauge.dec_one
+                                 Block_latency.Upload_to_gcloud
+                                 .upload_to_gcloud_blocks) )
+                     | _ ->
+                         () ) ;
+                   Option.iter path ~f:(fun (`Path path) ->
+                       Out_channel.with_file ~append:true path
+                         ~f:(fun out_channel ->
+                           Out_channel.output_lines out_channel
+                             [ Yojson.Safe.to_string
+                                 (Lazy.force precomputed_block)
+                             ])) ;
+                   [%log info] "Saw block with state hash $state_hash"
+                     ~metadata:
+                       (let state_hash_data =
+                          [ ( "state_hash"
+                            , `String (State_hash.to_base58_check hash) )
+                          ]
+                        in
+                        if is_some log then
+                          state_hash_data
+                          @ [ ("precomputed_block", Lazy.force precomputed_block)
+                            ]
+                        else state_hash_data) )) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block

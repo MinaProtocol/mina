@@ -1691,9 +1691,9 @@ module Types = struct
                   | Signed_command c ->
                       let status =
                         match t.status with
-                        | Applied _ ->
+                        | Applied ->
                             Command_status.Applied
-                        | Failed (e, _) ->
+                        | Failed e ->
                             Command_status.Included_but_failed e
                       in
                       Some
@@ -1713,9 +1713,9 @@ module Types = struct
                   | Parties parties ->
                       let status =
                         match t.status with
-                        | Applied _ ->
+                        | Applied ->
                             Command_status.Applied
-                        | Failed (e, _) ->
+                        | Failed e ->
                             Command_status.Included_but_failed e
                       in
                       Some
@@ -3103,9 +3103,9 @@ module Mutations = struct
                       in
                       let (status : Types.Command_status.t) =
                         match status with
-                        | Applied _ ->
+                        | Applied ->
                             Applied
-                        | Failed (failure, _balance_data) ->
+                        | Failed failure ->
                             Included_but_failed failure
                       in
                       ( { data = with_hash; status }
