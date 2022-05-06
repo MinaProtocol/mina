@@ -1405,7 +1405,10 @@ module Circuit = struct
   let generate_keypair (type w p) (c : (w, p) Circuit_main.t) :
       keypair_class Js.t =
     let main, spec = main_and_input c in
-    let cs = Impl.constraint_system ~exposing:spec (fun x -> main x) in
+    let cs =
+      Impl.constraint_system ~exposing:spec
+        ~return_typ:Snark_params.Tick.Typ.unit (fun x -> main x)
+    in
     let kp = Impl.Keypair.generate cs in
     new%js keypair_constr kp
 
@@ -1414,8 +1417,8 @@ module Circuit = struct
     let main, spec = main_and_input c in
     let pk = Keypair.pk kp in
     let p =
-      Impl.generate_witness_conv
-        ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
+      Impl.generate_witness_conv ~return_typ:Snark_params.Tick.Typ.unit
+        ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } () ->
           Backend.Proof.create pk ~auxiliary:auxiliary_inputs
             ~primary:public_inputs)
         spec (main ~w:priv) pub
