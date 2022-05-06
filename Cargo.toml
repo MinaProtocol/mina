@@ -6,11 +6,12 @@
 members = [
     "_build/default/src/lib/crypto/kimchi_bindings/stubs",
     "_build/default/src/lib/crypto/kimchi_bindings/stubs/binding_generation",
+    "_build/default/src/lib/crypto/kimchi_bindings/wasm",
 ]
 exclude = [
     "_build/default/src/lib/crypto/proof-systems",
-    "_build/default/src/lib/crypto/kimchi_bindings/wasm",
-    "src/lib/crypto/kimchi_bindings/wasm"
+    "src/lib/crypto/kimchi_bindings/wasm",
+    "_build/default/src/external/wasm-bindgen-rayon",
 ]
 
 [profile.release]
