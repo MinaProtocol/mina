@@ -24,8 +24,11 @@ let tick_shifts, tock_shifts =
   ( mk Kimchi_bindings.Protocol.VerifierIndex.Fp.shifts
   , mk Kimchi_bindings.Protocol.VerifierIndex.Fq.shifts )
 
-let wrap_domains =
-  { Domains.h = Pow_2_roots_of_unity 15
+let wrap_domains ~proofs_verified =
+  let h =
+    match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
+  in
+  { Domains.h = Pow_2_roots_of_unity h
   ; x =
       Pow_2_roots_of_unity
         (let (T (typ, _)) = Impls.Wrap.input () in
