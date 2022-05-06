@@ -312,6 +312,7 @@ module type Transaction_pool_diff_intf = sig
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | Fee_payer_account_not_found
     [@@deriving sexp, yojson]
 
     val to_string_hum : t -> string

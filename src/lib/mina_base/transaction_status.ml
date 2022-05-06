@@ -19,9 +19,10 @@ module Failure = struct
         | Source_insufficient_balance
         | Source_minimum_balance_violation
         | Receiver_already_exists
-        | Not_token_owner
-        | Mismatched_token_permissions
+        | Token_owner_not_caller
         | Overflow
+        | Global_excess_overflow
+        | Local_excess_overflow
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
@@ -37,6 +38,7 @@ module Failure = struct
         | Update_not_permitted_voting_for
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
+        | Fee_payer_must_be_signed
         | Account_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
@@ -48,7 +50,9 @@ module Failure = struct
   end]
 
   module Collection = struct
-    type display = (int * t list) list [@@deriving to_yojson]
+    (* bin_io used to archive extensional blocks, doesn't need versioning *)
+    type display = (int * Stable.Latest.t list) list
+    [@@deriving equal, yojson, sexp, bin_io_unversioned]
 
     [%%versioned
     module Stable = struct
@@ -108,12 +112,14 @@ module Failure = struct
         "Source_minimum_balance_violation"
     | Receiver_already_exists ->
         "Receiver_already_exists"
-    | Not_token_owner ->
-        "Not_token_owner"
-    | Mismatched_token_permissions ->
-        "Mismatched_token_permissions"
+    | Token_owner_not_caller ->
+        "Token_owner_not_caller"
     | Overflow ->
         "Overflow"
+    | Global_excess_overflow ->
+        "Global_excess_overflow"
+    | Local_excess_overflow ->
+        "Local_excess_overflow"
     | Signed_command_on_zkapp_account ->
         "Signed_command_on_zkapp_account"
     | Zkapp_account_not_present ->
@@ -144,6 +150,8 @@ module Failure = struct
         "Parties_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
         "Fee_payer_nonce_must_increase"
+    | Fee_payer_must_be_signed ->
+        "Fee_payer_must_be_signed"
     | Account_precondition_unsatisfied ->
         "Account_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
@@ -170,12 +178,14 @@ module Failure = struct
         Ok Source_minimum_balance_violation
     | "Receiver_already_exists" ->
         Ok Receiver_already_exists
-    | "Not_token_owner" ->
-        Ok Not_token_owner
-    | "Mismatched_token_permissions" ->
-        Ok Mismatched_token_permissions
+    | "Token_owner_not_caller" ->
+        Ok Token_owner_not_caller
     | "Overflow" ->
         Ok Overflow
+    | "Global_excess_overflow" ->
+        Ok Global_excess_overflow
+    | "Local_excess_overflow" ->
+        Ok Local_excess_overflow
     | "Signed_command_on_zkapp_account" ->
         Ok Signed_command_on_zkapp_account
     | "Zkapp_account_not_present" ->
@@ -206,6 +216,8 @@ module Failure = struct
         Ok Parties_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
         Ok Fee_payer_nonce_must_increase
+    | "Fee_payer_must_be_signed" ->
+        Ok Fee_payer_must_be_signed
     | "Account_precondition_unsatisfied" ->
         Ok Account_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
@@ -215,7 +227,7 @@ module Failure = struct
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
     | _ ->
-        Error "Signed_command_status.Failure.of_string: Unknown value"
+        Error "Transaction_status.Failure.of_string: Unknown value"
 
   let%test_unit "of_string(to_string) roundtrip" =
     for i = failure_min to failure_max do
@@ -244,12 +256,15 @@ module Failure = struct
         "The source account requires a minimum balance"
     | Receiver_already_exists ->
         "Attempted to create an account that already exists"
-    | Not_token_owner ->
-        "The source account does not own the token"
-    | Mismatched_token_permissions ->
-        "The permissions for this token do not match those in the command"
+    | Token_owner_not_caller ->
+        "A party used a non-default token but its caller was not the token \
+         owner"
     | Overflow ->
         "The resulting balance is too large to store"
+    | Global_excess_overflow ->
+        "The resulting global fee excess is too large to store"
+    | Local_excess_overflow ->
+        "The resulting local fee excess is too large to store"
     | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
     | Zkapp_account_not_present ->
@@ -291,6 +306,8 @@ module Failure = struct
          full commitment if the authorization is a signature"
     | Fee_payer_nonce_must_increase ->
         "Fee payer party must increment its nonce"
+    | Fee_payer_must_be_signed ->
+        "Fee payer party must have a valid signature"
     | Account_precondition_unsatisfied ->
         "The party's account precondition unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
@@ -301,157 +318,12 @@ module Failure = struct
         "Fee excess from parties transaction more than the transaction fees"
 end
 
-module Balance_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { fee_payer_balance : Currency.Balance.Stable.V1.t option
-        ; source_balance : Currency.Balance.Stable.V1.t option
-        ; receiver_balance : Currency.Balance.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let empty =
-    { fee_payer_balance = None; source_balance = None; receiver_balance = None }
-end
-
-module Coinbase_balance_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { coinbase_receiver_balance : Currency.Balance.Stable.V1.t
-        ; fee_transfer_receiver_balance : Currency.Balance.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let of_balance_data_exn
-      { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
-    ( match source_balance with
-    | Some _ ->
-        failwith
-          "Unexpected source balance for Coinbase_balance_data.of_balance_data"
-    | None ->
-        () ) ;
-    let coinbase_receiver_balance =
-      match fee_payer_balance with
-      | Some balance ->
-          balance
-      | None ->
-          failwith
-            "Missing fee-payer balance for \
-             Coinbase_balance_data.of_balance_data"
-    in
-    { coinbase_receiver_balance
-    ; fee_transfer_receiver_balance = receiver_balance
-    }
-
-  let to_balance_data
-      { coinbase_receiver_balance; fee_transfer_receiver_balance } =
-    { Balance_data.fee_payer_balance = Some coinbase_receiver_balance
-    ; source_balance = None
-    ; receiver_balance = fee_transfer_receiver_balance
-    }
-end
-
-module Fee_transfer_balance_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { receiver1_balance : Currency.Balance.Stable.V1.t
-        ; receiver2_balance : Currency.Balance.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let of_balance_data_exn
-      { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
-    ( match source_balance with
-    | Some _ ->
-        failwith
-          "Unexpected source balance for \
-           Fee_transfer_balance_data.of_balance_data"
-    | None ->
-        () ) ;
-    let receiver1_balance =
-      match fee_payer_balance with
-      | Some balance ->
-          balance
-      | None ->
-          failwith
-            "Missing fee-payer balance for \
-             Fee_transfer_balance_data.of_balance_data"
-    in
-    { receiver1_balance; receiver2_balance = receiver_balance }
-
-  let to_balance_data { receiver1_balance; receiver2_balance } =
-    { Balance_data.fee_payer_balance = Some receiver1_balance
-    ; source_balance = None
-    ; receiver_balance = receiver2_balance
-    }
-end
-
-module Internal_command_balance_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        | Coinbase of Coinbase_balance_data.Stable.V1.t
-        | Fee_transfer of Fee_transfer_balance_data.Stable.V1.t
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
-module Auxiliary_data = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        { fee_payer_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        ; receiver_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let empty =
-    { fee_payer_account_creation_fee_paid = None
-    ; receiver_account_creation_fee_paid = None
-    }
-end
-
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t =
-      | Applied of Auxiliary_data.Stable.V2.t * Balance_data.Stable.V1.t
-      | Failed of Failure.Collection.Stable.V1.t * Balance_data.Stable.V1.t
+    type t = Applied | Failed of Failure.Collection.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
   end
 end]
-
-let balance_data = function
-  | Applied (_, balances) | Failed (_, balances) ->
-      balances

@@ -424,11 +424,11 @@ let%test_module "account timing check" =
               with
               | Ok txn_applied ->
                   ( match With_status.status txn_applied.common.user_command with
-                  | Applied _ ->
+                  | Applied ->
                       ()
-                  | Failed (failures, _balance_data) ->
+                  | Failed failuress ->
                       failwithf "Transaction failed: %s"
-                        ( List.map (List.concat failures) ~f:(fun failure ->
+                        ( List.map (List.concat failuress) ~f:(fun failure ->
                               Transaction_status.Failure.to_string failure)
                         |> String.concat ~sep:"," )
                         () ) ;
@@ -815,54 +815,11 @@ let%test_module "account timing check" =
                   then failwithf "Unexpected transaction error: %s" err_str ()))
 
     (* zkApps with timings *)
-
-    (* Mina_ledger.Ledger.copy does not actually copy *)
-    let copy_ledger (ledger : Mina_ledger.Ledger.t) =
-      let ledger_copy =
-        Mina_ledger.Ledger.create ~depth:(Mina_ledger.Ledger.depth ledger) ()
-      in
-      let accounts = Mina_ledger.Ledger.to_list ledger in
-      List.iter accounts ~f:(fun account ->
-          let pk = Account.public_key account in
-          let token = Account.token account in
-          let account_id = Account_id.create pk token in
-          match
-            Mina_ledger.Ledger.get_or_create_account ledger_copy account_id
-              account
-          with
-          | Ok (`Added, _loc) ->
-              ()
-          | Ok (`Existed, _loc) ->
-              failwithf
-                "When creating ledger, account with public key %s and token %s \
-                 already existed"
-                (Signature_lib.Public_key.Compressed.to_string pk)
-                (Token_id.to_string token) ()
-          | Error err ->
-              failwithf
-                "When creating ledger, error adding account with public key %s \
-                 and token %s: %s"
-                (Signature_lib.Public_key.Compressed.to_string pk)
-                (Token_id.to_string token) (Error.to_string_hum err) ()) ;
-      ledger_copy
-
     let apply_zkapp_commands_at_slot ledger slot (partiess : Parties.t list) =
-      let state_body, state_view = state_body_and_view_at_slot slot in
+      let state_body, _state_view = state_body_and_view_at_slot slot in
       Async.Deferred.List.iter partiess ~f:(fun parties ->
-          let ledger_copy = copy_ledger ledger in
-          match
-            Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
-              ~state_view ledger parties
-          with
-          | Ok (_parties_applied, (local_state, _amount)) ->
-              let failure_statuses =
-                local_state.failure_status_tbl |> List.concat
-              in
-              assert (List.is_empty failure_statuses) ;
-              Transaction_snark_tests.Util.check_parties_with_merges_exn
-                ~state_body ~apply:false ledger_copy [ parties ]
-          | Error err ->
-              failwithf "Transaction failed: %s" (Error.to_string_hum err) ())
+          Transaction_snark_tests.Util.check_parties_with_merges_exn ~state_body
+            ledger [ parties ])
       |> Fn.flip Async.upon (fun () -> ())
 
     let check_zkapp_failure expected_failure = function
@@ -879,11 +836,11 @@ let%test_module "account timing check" =
             local_state.failure_status_tbl |> List.concat
           in
           match With_status.status parties_undo.command with
-          | Applied _ ->
+          | Applied ->
               failwithf "Expected transaction failure: %s"
                 (Transaction_status.Failure.to_string expected_failure)
                 ()
-          | Failed (failuress, _balances) ->
+          | Failed failuress ->
               let failures = List.concat failuress in
               if
                 not
@@ -953,6 +910,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1021,6 +980,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1099,6 +1060,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1184,6 +1147,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1268,6 +1233,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1341,6 +1308,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1415,6 +1384,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1493,6 +1464,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -1565,6 +1538,8 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
             }
           in
           Transaction_snark.For_tests.multiple_transfers parties_spec

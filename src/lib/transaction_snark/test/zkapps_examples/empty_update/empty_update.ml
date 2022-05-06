@@ -64,6 +64,7 @@ let deploy_party_body : Party.Body.t =
             }
       }
   ; account_precondition = Accept
+  ; caller = Token_id.default
   ; use_full_commitment = true
   }
 
@@ -85,19 +86,14 @@ let memo = Signed_command_memo.empty
 let transaction_commitment : Parties.Transaction_commitment.t =
   (* TODO: This is a pain. *)
   let other_parties_hash = Parties.Call_forest.hash ps in
-  let protocol_state_predicate_hash =
-    Zkapp_precondition.Protocol_state.digest protocol_state_precondition
-  in
-  let memo_hash = Signed_command_memo.hash memo in
   Parties.Transaction_commitment.create ~other_parties_hash
-    ~protocol_state_predicate_hash ~memo_hash
 
 let fee_payer =
   (* TODO: This is a pain. *)
   { Party.Fee_payer.body =
       { Party.Body.Fee_payer.dummy with
         public_key = pk_compressed
-      ; balance_change = Currency.Fee.(of_int 100)
+      ; fee = Currency.Fee.(of_int 100)
       ; protocol_state_precondition
       }
   ; authorization = Signature.dummy
@@ -105,8 +101,9 @@ let fee_payer =
 
 let full_commitment =
   (* TODO: This is a pain. *)
-  Parties.Transaction_commitment.with_fee_payer transaction_commitment
-    ~fee_payer_hash:(Party.digest (Party.of_fee_payer fee_payer))
+  Parties.Transaction_commitment.create_complete transaction_commitment
+    ~memo_hash:(Signed_command_memo.hash memo)
+    ~fee_payer_hash:(Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
 
 (* TODO: Make this better. *)
 let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
@@ -123,10 +120,11 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
         fee_payer
   in
   let other_parties =
-    List.map other_parties ~f:(function
-      | { body = { public_key; use_full_commitment; _ }
-        ; authorization = Signature _
-        } as party
+    Parties.Call_forest.map other_parties ~f:(function
+      | ({ body = { public_key; use_full_commitment; _ }
+         ; authorization = Signature _
+         } as party :
+          Party.t)
         when Public_key.Compressed.equal public_key pk_compressed ->
           let commitment =
             if use_full_commitment then full_commitment
@@ -134,7 +132,7 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
           in
           { party with
             authorization =
-              Signature
+              Control.Signature
                 (Schnorr.Chunked.sign sk
                    (Random_oracle.Input.Chunked.field commitment))
           }
@@ -144,7 +142,14 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
   { fee_payer; other_parties; memo }
 
 let parties : Parties.t =
-  sign_all { fee_payer; other_parties = [ deploy_party; party ]; memo }
+  sign_all
+    { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
+    ; other_parties =
+        Parties.Call_forest.of_parties_list [ deploy_party; party ]
+          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+        |> Parties.Call_forest.accumulate_hashes'
+    ; memo
+    }
 
 let () =
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -154,4 +159,4 @@ let () =
              Currency.Balance.(
                Option.value_exn (add_amount zero (Currency.Amount.of_int 500))))
       in
-      apply_parties ledger [ parties ])
+      ignore (apply_parties ledger [ parties ] : Sparse_ledger.t))

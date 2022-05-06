@@ -6,7 +6,7 @@ open Zkapp_basic
 
 module Events = struct
   module Event = struct
-    (* Arbitrary hash input, encoding determined by the snapp's developer. *)
+    (* Arbitrary hash input, encoding determined by the zkApp's developer. *)
     type t = Field.t array
 
     let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
@@ -136,6 +136,8 @@ type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool) t_ =
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       ( Zkapp_state.Value.Stable.V1.t
@@ -153,6 +155,20 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t =
+  ( Zkapp_state.Value.t
+  , (Side_loaded_verification_key.t, F.t) With_hash.t option
+  , Mina_numbers.Zkapp_version.t
+  , F.t
+  , Mina_numbers.Global_slot.t
+  , bool )
+  Poly.t
+[@@deriving sexp, equal, compare, hash, yojson]
+
+let () =
+  let _f : unit -> (t, Stable.Latest.t) Type_equal.t = fun () -> Type_equal.T in
+  ()
 
 open Pickles_types
 
