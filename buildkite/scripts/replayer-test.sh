@@ -32,8 +32,7 @@ service postgresql start
 
 echo "Populating archive database"
 cd ~postgres
-echo "CREATE DATABASE archive;" | su postgres -c psql
-su postgres -c "pg_restore -d archive" < $TEST_DIR/archive_db.bin
+su postgres -c psql < $TEST_DIR/archive_db.sql
 echo "ALTER USER postgres PASSWORD '$PGPASSWORD';" | su postgres -c psql
 cd /workdir
 
