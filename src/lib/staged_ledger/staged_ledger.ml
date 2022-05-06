@@ -999,7 +999,7 @@ module T = struct
 
   let forget_prediff_info ((a : Transaction.Valid.t With_status.t list), b, c, d)
       =
-    ((a :> Transaction.t With_status.t list), b, c, d)
+    (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
   [%%if feature_zkapps]
 
@@ -1315,7 +1315,7 @@ module T = struct
       let budget =
         Or_error.map2
           (sum_fees (Sequence.to_list uc_seq) ~f:(fun t ->
-               User_command.fee (t.data :> User_command.t)))
+               User_command.fee (User_command.forget_check t.data)))
           (sum_fees
              (List.filter
                 ~f:(fun (k, _) ->
@@ -1396,7 +1396,7 @@ module T = struct
       let open Or_error.Let_syntax in
       let payment_fees =
         sum_fees (Sequence.to_list t.commands_rev) ~f:(fun t ->
-            User_command.fee (t.data :> User_command.t))
+            User_command.(fee (forget_check t.data)))
       in
       let prover_fee_others =
         Public_key.Compressed.Map.fold t.fee_transfers ~init:(Ok Fee.zero)
@@ -1527,7 +1527,7 @@ module T = struct
             match t.budget with
             | Ok b ->
                 option "Fee insufficient"
-                  (Fee.sub b (User_command.fee (uc.data :> User_command.t)))
+                  (Fee.sub b User_command.(fee (forget_check uc.data)))
             | _ ->
                 rebudget new_t
           in
@@ -1615,7 +1615,7 @@ module T = struct
           check_constraints_and_update ~constraint_constants resources'
             (Option.value_map uc_opt ~default:log ~f:(fun uc ->
                  Diff_creation_log.discard_command `No_space
-                   (uc.data :> User_command.t)
+                   (User_command.forget_check uc.data)
                    log))
       else
         (* insufficient budget; reduce the cost*)
@@ -1632,7 +1632,7 @@ module T = struct
       check_constraints_and_update ~constraint_constants resources'
         (Option.value_map uc_opt ~default:log ~f:(fun uc ->
              Diff_creation_log.discard_command `No_work
-               (uc.data :> User_command.t)
+               (User_command.forget_check uc.data)
                log))
 
   let one_prediff ~constraint_constants cw_seq ts_seq ~receiver ~add_coinbase
@@ -1882,10 +1882,89 @@ module T = struct
               match
                 O1trace.sync_thread "validate_transaction_against_staged_ledger"
                   (fun () ->
+                    let get_verification_keys account_ids =
+                      List.fold_until account_ids ~init:Account_id.Map.empty
+                        ~f:(fun acc id ->
+                          let get_vk () =
+                            let open Option.Let_syntax in
+                            let%bind loc =
+                              Transaction_validator.Hashless_ledger
+                              .location_of_account validating_ledger id
+                            in
+                            let%bind account =
+                              Transaction_validator.Hashless_ledger.get
+                                validating_ledger loc
+                            in
+                            let%bind zkapp = account.zkapp in
+                            let%map vk = zkapp.verification_key in
+                            vk.hash
+                          in
+                          match get_vk () with
+                          | Some vk ->
+                              Continue
+                                (Account_id.Map.update acc id ~f:(fun _ -> vk))
+                          | None ->
+                              [%log error]
+                                ~metadata:
+                                  [ ("account_id", Account_id.to_yojson id) ]
+                                "Staged_ledger_diff creation: Verification key \
+                                 not found for party with proof authorization \
+                                 and account_id $account_id" ;
+                              Stop Account_id.Map.empty)
+                        ~finish:Fn.id
+                    in
+                    let valid_proofs () =
+                      match txn with
+                      | Parties p ->
+                          let%map checked_verification_keys =
+                            Account_id.Map.of_alist_or_error p.verification_keys
+                          in
+                          let current_verification_keys =
+                            get_verification_keys
+                              (Account_id.Map.keys checked_verification_keys)
+                          in
+                          if
+                            Account_id.Map.equal
+                              Parties.Valid.Verification_key_hash.equal
+                              checked_verification_keys
+                              current_verification_keys
+                          then true
+                          else (
+                            [%log error]
+                              ~metadata:
+                                [ ( "checked_verification_keys"
+                                  , [%to_yojson:
+                                      ( Account_id.t
+                                      * Parties.Valid.Verification_key_hash.t )
+                                      list]
+                                      (Account_id.Map.to_alist
+                                         checked_verification_keys) )
+                                ; ( "current_verification_keys"
+                                  , [%to_yojson:
+                                      ( Account_id.t
+                                      * Parties.Valid.Verification_key_hash.t )
+                                      list]
+                                      (Account_id.Map.to_alist
+                                         current_verification_keys) )
+                                ]
+                              "Staged_ledger_diff creation: Verifcation keys \
+                               used for verifying proofs \
+                               $checked_verification_keys and verification \
+                               keys in the ledger $current_verification_keys \
+                               don't match" ;
+                            false )
+                      | _ ->
+                          Ok true
+                    in
+                    let%bind valid_proofs = valid_proofs () in
+                    let%bind () =
+                      if valid_proofs then Ok ()
+                      else Or_error.errorf "Verification key mismatch"
+                    in
                     Transaction_validator.apply_transaction
                       ~constraint_constants validating_ledger
                       ~txn_state_view:current_state_view
-                      (Command (txn :> User_command.t)))
+                      (Command (User_command.forget_check txn)))
               with
               | Error e ->
                   [%log error]
@@ -2117,7 +2196,7 @@ let%test_module "staged ledger tests" =
             let%bind _ =
               Ledger.apply_transaction ~constraint_constants test_ledger
                 ~txn_state_view:(dummy_state_view ())
-                (Command (cmd :> User_command.t))
+                (Command (User_command.forget_check cmd))
             in
             apply_cmds cmds
       in
@@ -2350,8 +2429,8 @@ let%test_module "staged ledger tests" =
                   (List.map (Staged_ledger_diff.commands diff)
                      ~f:(fun { With_status.data; _ } -> data))
                   ( Sequence.take cmds_this_iter cmds_applied_this_iter
-                    |> Sequence.to_list
-                    :> User_command.t list )
+                  |> Sequence.map ~f:User_command.forget_check
+                  |> Sequence.to_list )
             | None ->
                 () ) ;
             let coinbase_cost = coinbase_cost diff in
@@ -2403,6 +2482,7 @@ let%test_module "staged ledger tests" =
       let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
           | Parties parties, fee_payer_keypair, keymap ->
+              let parties = Parties.forget parties in
               let memo_hash = Signed_command_memo.hash parties.memo in
               let fee_payer_hash =
                 Party.of_fee_payer parties.fee_payer
@@ -2477,6 +2557,10 @@ let%test_module "staged ledger tests" =
                   fee_payer = fee_payer_with_valid_signature
                 ; other_parties = other_parties_with_valid_signatures
                 }
+              in
+              let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                    parties') =
+                Parties.to_valid_unsafe parties'
               in
               User_command.Parties parties'
           | Signed_command _, _, _ ->
@@ -2738,7 +2822,7 @@ let%test_module "staged ledger tests" =
                     let cmds_this_iter =
                       cmds_this_iter |> Sequence.to_list
                       |> List.map ~f:(fun cmd ->
-                             { With_status.data = (cmd :> User_command.t)
+                             { With_status.data = User_command.forget_check cmd
                              ; status =
                                  Applied
                                    ( Transaction_status.Auxiliary_data.empty

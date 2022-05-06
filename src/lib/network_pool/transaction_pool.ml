@@ -1898,6 +1898,10 @@ let%test_module _ =
               Mina_generators.Parties_generators.gen_parties_from ~succeed:true
                 ~keymap ~fee_payer_keypair ~ledger ()
             in
+            let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                  parties) =
+              Parties.to_valid_unsafe parties
+            in
             User_command.Parties parties
           in
           go (n + 1) (cmd :: cmds)
@@ -2170,6 +2174,9 @@ let%test_module _ =
         }
       in
       let parties = Transaction_snark.For_tests.multiple_transfers test_spec in
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it parties) =
+        Parties.to_valid_unsafe parties
+      in
       User_command.Parties parties
 
     let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount ()

@@ -2186,11 +2186,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ~f:(fun varying -> { Transaction_applied.previous_hash; varying })
 
   let merkle_root_after_parties_exn ~constraint_constants ~txn_state_view ledger
-      payment =
+      (valid_parties : Parties.Valid.t) =
     let applied, _ =
       Or_error.ok_exn
         (apply_parties_unchecked ~constraint_constants
-           ~state_view:txn_state_view ledger payment)
+           ~state_view:txn_state_view ledger
+           (Parties.forget valid_parties))
     in
     let root = merkle_root ledger in
     Or_error.ok_exn (undo_parties ~constraint_constants ledger applied) ;

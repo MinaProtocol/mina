@@ -629,7 +629,11 @@ module Wire = struct
   module Valid = struct
     module Stable = Stable
 
-    type t = Stable.Latest.t
+    type t =
+      { parties : Stable.Latest.t
+      ; verification_keys :
+          Zkapp_basic.F.Stable.Latest.t Account_id.Map.t option
+      }
   end
 
   let check_depths (t : t) =
@@ -827,7 +831,10 @@ module Verifiable = struct
       type t =
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
-            Pickles.Side_loaded.Verification_key.Stable.V2.t option
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
             Call_forest.With_hashes.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
@@ -905,10 +912,43 @@ let weight (parties : t) : int =
     ]
 
 module Valid = struct
-  module Stable = Stable
+  module S = Stable
 
-  type t = Stable.Latest.t
+  module Verification_key_hash = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Zkapp_basic.F.Stable.V1.t
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    [%%define_locally Stable.Latest.(equal)]
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { parties : S.V1.t
+        ; verification_keys :
+            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
 end
+
+let forget (t : Valid.t) : t = t.parties
+
+let to_valid_unsafe (t : t) :
+    [> `If_this_is_used_it_should_have_a_comment_justifying_it of Valid.t ] =
+  `If_this_is_used_it_should_have_a_comment_justifying_it
+    { Valid.parties = t; verification_keys = [] }
 
 include Codable.Make_base58_check (Stable.Latest)
 

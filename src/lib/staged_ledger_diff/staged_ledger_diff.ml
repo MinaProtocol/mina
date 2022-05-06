@@ -375,7 +375,10 @@ let forget_pre_diff_with_at_most_two
       With_valid_signatures_and_proofs.pre_diff_with_at_most_two_coinbase) :
     Pre_diff_with_at_most_two_coinbase.t =
   { completed_works = forget_cw pre_diff.completed_works
-  ; commands = (pre_diff.commands :> User_command.t With_status.t list)
+  ; commands =
+      List.map
+        ~f:(With_status.map ~f:User_command.forget_check)
+        pre_diff.commands
   ; coinbase = pre_diff.coinbase
   ; internal_command_balances = pre_diff.internal_command_balances
   }
@@ -384,7 +387,10 @@ let forget_pre_diff_with_at_most_one
     (pre_diff :
       With_valid_signatures_and_proofs.pre_diff_with_at_most_one_coinbase) =
   { Pre_diff_one.completed_works = forget_cw pre_diff.completed_works
-  ; commands = (pre_diff.commands :> User_command.t With_status.t list)
+  ; commands =
+      List.map
+        ~f:(With_status.map ~f:User_command.forget_check)
+        pre_diff.commands
   ; coinbase = pre_diff.coinbase
   ; internal_command_balances = pre_diff.internal_command_balances
   }

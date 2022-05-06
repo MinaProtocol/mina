@@ -93,20 +93,32 @@ let check :
                         return
                           (`Missing_verification_key
                             [ Account_id.public_key @@ Party.account_id p ])
-                    | Some vk ->
+                    | Some (vk : _ With_hash.t) ->
                         let stmt =
                           { Zkapp_statement.Poly.transaction = commitment
                           ; at_party = (at_party :> Snark_params.Tick.Field.t)
                           }
                         in
-                        Some (vk, stmt, pi) ))
+                        Some (vk.data, stmt, pi) ))
           in
           let v : User_command.Valid.t =
-            User_command.Poly.Parties
+            let verification_keys =
+              List.fold parties_with_hashes_list ~init:Account_id.Map.empty
+                ~f:(fun acc ((p, vk_opt), _) ->
+                  Option.value_map vk_opt ~default:acc ~f:(fun vk ->
+                      Account_id.Map.update acc (Party.account_id p)
+                        ~f:(fun _ -> With_hash.hash vk)))
+            in
+            let parties =
               { Parties.fee_payer
               ; other_parties =
                   Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
               ; memo
+              }
+            in
+            User_command.Poly.Parties
+              { Parties.Valid.parties
+              ; verification_keys = Account_id.Map.to_alist verification_keys
               }
           in
           match valid_assuming with

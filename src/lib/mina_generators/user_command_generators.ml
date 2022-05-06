@@ -107,6 +107,9 @@ let parties_with_ledger () =
   let%bind parties =
     Parties_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
   in
+  let (`If_this_is_used_it_should_have_a_comment_justifying_it parties) =
+    Parties.to_valid_unsafe parties
+  in
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
 

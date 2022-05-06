@@ -3294,7 +3294,7 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     Transaction_protocol_state.transaction transaction_in_block
   in
   let state_body = Transaction_protocol_state.block_data transaction_in_block in
-  match to_preunion (transaction :> Transaction.t) with
+  match to_preunion (Transaction.forget transaction) with
   | `Parties _ ->
       failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
@@ -3342,8 +3342,8 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     handler =
   match
     to_preunion
-      ( Transaction_protocol_state.transaction transaction_in_block
-        :> Transaction.t )
+      (Transaction.forget
+         (Transaction_protocol_state.transaction transaction_in_block))
   with
   | `Parties _ ->
       failwith "Called non-party transaction with parties transaction"
