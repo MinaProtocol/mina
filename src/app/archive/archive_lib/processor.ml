@@ -91,7 +91,6 @@ module Token = struct
         assert (Token_id.(equal default) token_id) ;
         Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
           ~table_name ~cols:(Fields.names, typ)
-          ~nullable_cols:[ "owner_public_key_id"; "owner_token_id" ]
           (module Conn)
           { value; owner_public_key_id = None; owner_token_id = None }
     | Some acct_id ->
@@ -807,29 +806,10 @@ module Zkapp_account_precondition = struct
       | _ ->
           None
     in
-    (* can't use Mina_caqti.select_insert_into_cols because of NULLs
-       TODO: either handle NULLs there, or add new combinators that do so
-    *)
-    match%bind
-      Conn.find_opt
-        (Caqti_request.find_opt typ Caqti_type.int
-           (sprintf
-              {sql| SELECT id FROM %s
-                 WHERE kind = $1
-                 AND (precondition_account_id = $2 OR (precondition_account_id IS NULL AND $2 IS NULL))
-                 AND (nonce = $3 OR (nonce IS NULL AND $3 IS NULL))
-           |sql}
-              table_name))
-        { kind; precondition_account_id; nonce }
-    with
-    | Some id ->
-        return id
-    | None ->
-        Conn.find
-          (Caqti_request.find typ Caqti_type.int
-             (Mina_caqti.insert_into_cols ~table_name ~returning:"id"
-                ~cols:Fields.names ()))
-          { kind; precondition_account_id; nonce }
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      { kind; precondition_account_id; nonce }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -2334,7 +2314,6 @@ module Block_and_zkapp_command = struct
           ; "failure_reasons_ids"
           ]
         , typ )
-      ~nullable_cols:[ "failure_reasons_ids" ]
       ~tannot:(function "status" -> Some "user_command_status" | _ -> None)
       (module Conn)
       { block_id; zkapp_command_id; sequence_no; status; failure_reasons_ids }
