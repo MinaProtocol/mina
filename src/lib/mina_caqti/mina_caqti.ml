@@ -199,21 +199,41 @@ let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
 
 (* `select_cols ~select:"s0" ~table_name:"t0" ~cols:["col0";"col1";...] ()`
    creates the string
-   `"SELECT s0 FROM t0 WHERE col0 = ? AND col1 = ? AND..."`.
+   `"SELECT s0 FROM t0 WHERE col0 = $1 AND col1 = $2 AND..."`.
+
    The optional `tannot` function maps column names to type annotations.
 
-   N.B. The equalities will not hold if either the column value or the compared
-        value is NULL
- *)
+   The optional `nullable_cols` is a list of columns that may have NULLs.
+   For a column `col` appearing in that list, in the WHERE clause, the generated
+   comparison is of the form
+     `(col = $n OR (col IS NULL AND $n IS NULL))`
+*)
+
 let select_cols ~(select : string) ~(table_name : string)
-    ?(tannot : string -> string option = Fn.const None) ~(cols : string list) ()
-    : string =
-  List.map cols ~f:(fun col ->
-      let annot =
-        match tannot col with None -> "" | Some tannot -> "::" ^ tannot
-      in
-      sprintf "%s = ?%s" col annot)
-  |> String.concat ~sep:" AND "
+    ?(tannot : string -> string option = Fn.const None)
+    ?(nullable_cols : string list option) ~(cols : string list) () : string =
+  let where_checks =
+    match nullable_cols with
+    | None ->
+        (* common case *)
+        List.mapi cols ~f:(fun ndx col ->
+            let param = ndx + 1 in
+            let annot =
+              match tannot col with None -> "" | Some tannot -> "::" ^ tannot
+            in
+            sprintf "%s = $%d%s" col param annot)
+    | Some nullables ->
+        List.mapi cols ~f:(fun ndx col ->
+            let param = ndx + 1 in
+            let annot =
+              match tannot col with None -> "" | Some tannot -> "::" ^ tannot
+            in
+            if List.mem nullables col ~equal:String.equal then
+              sprintf "(%s = $%d%s OR (%s IS NULL AND $%d IS NULL))" col param
+                annot col param
+            else sprintf "%s = $%d%s" col param annot)
+  in
+  where_checks |> String.concat ~sep:" AND "
   |> sprintf "SELECT %s FROM %s WHERE %s" select table_name
 
 (* `select_cols_from_id ~table_name:"t0" ~cols:["col0";"col1";...]`
@@ -241,17 +261,15 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     (String.concat ~sep:", " cols)
     values returning
 
-(* N.B.: Do not use if any of the values to be inserted are NULLs
-   See note in `select_cols`
-*)
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
-    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
-    (module Conn : CONNECTION) (value : 'cols) =
+    ~(table_name : string) ?tannot ?nullable_cols
+    ~(cols : string list * 'cols Caqti_type.t) (module Conn : CONNECTION)
+    (value : 'cols) =
   let open Deferred.Result.Let_syntax in
   Conn.find_opt
     ( Caqti_request.find_opt (snd cols) (snd select)
-    @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
-    )
+    @@ select_cols ~select:(fst select) ~table_name ?tannot ?nullable_cols
+         ~cols:(fst cols) () )
     value
   >>= function
   | Some id ->
