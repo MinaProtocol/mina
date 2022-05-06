@@ -285,7 +285,7 @@ module type S = sig
        * ( ( Stack_frame.value
            , Stack_frame.value list
            , Token_id.t
-           , Amount.t
+           , Amount.Signed.t
            , ledger
            , bool
            , unit
@@ -318,7 +318,7 @@ module type S = sig
              * ( Stack_frame.value
                , Stack_frame.value list
                , Token_id.t
-               , Amount.t
+               , Amount.Signed.t
                , ledger
                , bool
                , unit
@@ -1601,7 +1601,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ; transaction_commitment = ()
         ; full_transaction_commitment = ()
         ; token_id = Token_id.default
-        ; excess = Currency.Amount.zero
+        ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger
         ; success = true
         ; failure_status_tbl = []
