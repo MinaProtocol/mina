@@ -643,8 +643,11 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                              ~default:wrap_domains ~f:(function
                              | `Compiled d ->
                                  d.wrap_domains
-                             | `Side_loaded _ ->
-                                 Common.wrap_domains)
+                             | `Side_loaded d ->
+                                 Common.wrap_domains
+                                   ~proofs_verified:
+                                     ( d.permanent.max_proofs_verified
+                                     |> Nat.Add.n |> Nat.to_int ))
                        end)
                    in
                    M.f rule.Inductive_rule.prevs

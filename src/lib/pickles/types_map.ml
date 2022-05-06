@@ -69,6 +69,7 @@ module Side_loaded = struct
       | _ ->
           failwithf "Side_loaded.to_basic: Expected `In_prover (%s)" __LOC__ ()
     in
+    let proofs_verified = Nat.to_int (Nat.Add.n max_proofs_verified) in
     let wrap_vk = Option.value_exn ~here:[%here] wrap_vk in
     { Basic.max_proofs_verified
     ; wrap_vk
@@ -76,7 +77,7 @@ module Side_loaded = struct
     ; var_to_field_elements
     ; typ
     ; branches
-    ; wrap_domains = Common.wrap_domains
+    ; wrap_domains = Common.wrap_domains ~proofs_verified
     ; wrap_key
     }
 end
@@ -189,7 +190,7 @@ module For_step = struct
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key = index.wrap_index
-    ; wrap_domains = Common.wrap_domains
+    ; wrap_domains = Common.wrap_domains ~proofs_verified:(Nat.to_int branches)
     ; step_domains = `Side_loaded index.step_domains
     ; max_width = Some index.max_width
     }

@@ -205,7 +205,9 @@ module Stable = struct
       let of_repr
           ({ Repr.Stable.V2.step_data; max_width; wrap_index = c } :
             R.Stable.V2.t) : t =
-        let d = Common.wrap_domains.h in
+        let d =
+          (Common.wrap_domains ~proofs_verified:(Width.to_int max_width)).h
+        in
         let log2_size = Import.Domain.log2_size d in
         let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
         (* we only compute the wrap_vk if the srs can be loaded *)
