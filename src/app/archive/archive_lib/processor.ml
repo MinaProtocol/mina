@@ -2254,6 +2254,7 @@ module Zkapp_party_failures = struct
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name
+      ~tannot:(function "failures" -> Some "text[]" | _ -> None)
       ~cols:([ "index"; "failures" ], typ)
       (module Conn)
       { index; failures }
