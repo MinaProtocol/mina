@@ -229,11 +229,8 @@ struct
                       }
                   }
               ; me_only =
-                  Common.hash_dlog_me_only Max_proofs_verified.n
-                    { old_bulletproof_challenges =
-                        (* TODO: Get rid of this padding *)
-                        Vector.extend_exn prev_challenges Max_proofs_verified.n
-                          Dummy.Ipa.Wrap.challenges_computed
+                  Common.hash_dlog_me_only Local_max_proofs_verified.n
+                    { old_bulletproof_challenges = prev_challenges
                     ; challenge_polynomial_commitment =
                         statement.proof_state.me_only
                           .challenge_polynomial_commitment
