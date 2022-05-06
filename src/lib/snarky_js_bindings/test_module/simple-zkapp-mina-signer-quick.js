@@ -6,7 +6,6 @@ import {
   State,
   PrivateKey,
   SmartContract,
-  compile,
   deploy,
   isReady,
   shutdown,
@@ -48,7 +47,7 @@ let zkappAddress = zkappKey.toPublicKey();
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
 let verificationKey = await cached(
-  async () => (await compile(SimpleZkapp, zkappAddress)).verificationKey
+  async () => (await SimpleZkapp.compile(zkappAddress)).verificationKey
 );
 toc();
 
@@ -85,7 +84,7 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign deploy transaction (snarkyjs, for consistency check)");
-let signedDeploySnarkyJs = await signFeePayer(partiesJsonDeploy, feePayerKey, {
+let signedDeploySnarkyJs = signFeePayer(partiesJsonDeploy, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });

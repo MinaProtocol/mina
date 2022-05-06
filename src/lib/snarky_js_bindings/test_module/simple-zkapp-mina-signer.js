@@ -6,9 +6,8 @@ import {
   State,
   PrivateKey,
   SmartContract,
-  compile,
+  Mina,
   deploy,
-  call,
   isReady,
   shutdown,
   signFeePayer,
@@ -47,34 +46,26 @@ let zkappAddress = zkappKey.toPublicKey();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
-let { verificationKey, provers } = await compile(SimpleZkapp, zkappAddress);
+await SimpleZkapp.compile(zkappAddress);
 toc();
 
 // deploy transaction
 tic("create deploy transaction");
-let partiesJsonDeploy = await deploy(SimpleZkapp, {
-  zkappKey,
-  verificationKey,
-});
+let partiesJsonDeploy = await deploy(SimpleZkapp, { zkappKey });
 toc();
 
 // update transaction
 tic("create update transaction (with proof)");
-let partiesJsonUpdate = await call(
-  SimpleZkapp,
-  zkappAddress,
-  "update",
-  [Field(3)],
-  provers
-);
+let partiesJsonUpdate = await Mina.transaction(() =>
+  new SimpleZkapp(zkappAddress).update(Field(3))
+)
+  .then((tx) => tx.prove())
+  .then((tx) => tx.toJSON());
 toc();
 
 // PART 2: mina-signer
 let client = new Client({ network: "testnet" });
-
-// TODO create new random sender keypair (with mina-signer, in string format)
-let feePayerKey = "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
-let feePayerAddress = client.derivePublicKey(feePayerKey);
+let { privateKey: feePayerKey, publicKey: feePayerAddress } = client.genKeys();
 
 // sign deploy txn
 tic("sign deploy transaction");
@@ -94,7 +85,7 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign deploy transaction (snarkyjs, for consistency check)");
-let signedDeploySnarkyJs = await signFeePayer(partiesJsonDeploy, feePayerKey, {
+let signedDeploySnarkyJs = signFeePayer(partiesJsonDeploy, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
@@ -124,7 +115,7 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign update transaction (snarkyjs, for consistency check)");
-let signedUpdateSnarkyJs = await signFeePayer(partiesJsonUpdate, feePayerKey, {
+let signedUpdateSnarkyJs = signFeePayer(partiesJsonUpdate, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
