@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Signature_lib
 
@@ -43,6 +44,8 @@ module type External_transition_common_intf = sig
     -> t
     -> Transaction.t With_status.t list
 
+  val account_ids_accessed : t -> Account_id.t list
+
   val commands : t -> User_command.t With_status.t list
 
   val payments : t -> Signed_command.t With_status.t list
@@ -68,7 +71,7 @@ module type External_transition_base_intf = sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
-      module V1 : sig
+      module V2 : sig
         type nonrec t = t [@@deriving sexp]
       end
     end]
@@ -99,6 +102,8 @@ module type S = sig
       ; staged_ledger_diff : Staged_ledger_diff.t
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+      ; accounts_accessed : (int * Account.t) list
+      ; accounts_created : (Account_id.t * Currency.Fee.t) list
       }
     [@@deriving sexp, yojson]
 
@@ -106,23 +111,29 @@ module type S = sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
-      module V1 : sig
+      module V2 : sig
         type nonrec t = t =
           { scheduled_time : Block_time.Stable.V1.t
-          ; protocol_state : Protocol_state.Value.Stable.V1.t
-          ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-          ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+          ; protocol_state : Protocol_state.Value.Stable.V2.t
+          ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
+          ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
           ; delta_transition_chain_proof :
               Frozen_ledger_hash.Stable.V1.t
               * Frozen_ledger_hash.Stable.V1.t list
+          ; accounts_accessed : (int * Account.Stable.V2.t) list
+          ; accounts_created :
+              (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
           }
-
-        val to_latest : t -> t
       end
     end]
 
-    val of_external_transition :
-      scheduled_time:Block_time.Time.t -> external_transition -> t
+    val of_block :
+         logger:Logger.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> scheduled_time:Block_time.Time.t
+      -> staged_ledger:Staged_ledger.t
+      -> Block.t
+      -> t
   end
 
   module Validation : sig
@@ -316,19 +327,8 @@ module type S = sig
     module Stable : sig
       [@@@no_toplevel_latest_type]
 
-      module V2 : sig
+      module V3 : sig
         type nonrec t = t [@@deriving compare, equal, sexp, to_yojson]
-      end
-
-      module V1 : sig
-        type t = (Block.t, State_hash.t) With_hash.t * Validation.fully_valid
-        [@@deriving compare, equal, sexp, to_yojson]
-
-        val to_latest : t -> V2.t
-
-        val of_v2 : V2.t -> t
-
-        val state_hash : t -> State_hash.t
       end
     end]
 

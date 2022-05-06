@@ -3,12 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
-open Crypto_params
-
-[%%endif]
+open Snark_params
 
 [%%versioned
 module Stable = struct
@@ -25,6 +20,8 @@ module Stable = struct
 
     let to_base58_check (memo : t) : string = Base58_check.encode memo
 
+    let of_base58_check (s : string) : t Or_error.t = Base58_check.decode s
+
     let of_base58_check_exn (s : string) : t = Base58_check.decode_exn s
 
     module T = struct
@@ -40,7 +37,8 @@ module Stable = struct
 end]
 
 [%%define_locally
-Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
+Stable.Latest.
+  (to_yojson, of_yojson, to_base58_check, of_base58_check, of_base58_check_exn)]
 
 exception Too_long_user_memo_input
 
@@ -51,7 +49,7 @@ let max_digestible_string_length = 1000
 (* 0th byte is a tag to distinguish digests from other data
    1st byte is length, always 32 for digests
    bytes 2 to 33 are data, 0-right-padded if length is less than 32
- *)
+*)
 
 let digest_tag = '\x00'
 
@@ -165,7 +163,7 @@ let of_raw_exn = function
   | Digest base58_check ->
       of_base58_check_exn base58_check
   | Bytes str ->
-      create_from_string_exn str
+      of_base58_check_exn str
 
 let fold_bits t =
   { Fold_lib.Fold.fold =
@@ -181,6 +179,15 @@ let fold_bits t =
   }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
+
+let gen =
+  Quickcheck.Generator.map String.quickcheck_generator
+    ~f:create_by_digesting_string_exn
+
+let hash memo =
+  Random_oracle.hash ~init:Hash_prefix.zkapp_memo
+    (Random_oracle.Legacy.pack_input
+       (Random_oracle_input.Legacy.bitstring (to_bits memo)))
 
 let to_plaintext (memo : t) : string Or_error.t =
   if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))
@@ -208,7 +215,7 @@ module Typ = Tick.Typ
 
 (* the code below is much the same as in Random_oracle.Digest; tag and length bytes
    make it a little different
- *)
+*)
 
 module Checked = struct
   type unchecked = t
@@ -231,6 +238,10 @@ let typ : (Checked.t, t) Typ.t =
     ~back:(fun bs -> (Blake2.bits_to_string bs :> t))
 
 [%%endif]
+
+let deriver obj =
+  Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~to_string:to_base58_check
+    ~of_string:of_base58_check_exn
 
 let%test_module "user_command_memo" =
   ( module struct
@@ -273,12 +284,19 @@ let%test_module "user_command_memo" =
         | _ ->
             assert false
       in
+      let (Typ typ) = typ in
       let memo_var =
-        Snarky_backendless.Typ_monads.Store.run (typ.store memo) (fun x ->
-            Snarky_backendless.Cvar.Constant x)
+        memo |> typ.value_to_fields
+        |> (fun (arr, aux) ->
+             ( Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+             , aux ))
+        |> typ.var_of_fields
       in
       let memo_read =
-        Snarky_backendless.Typ_monads.Read.run (typ.read memo_var) read_constant
+        memo_var |> typ.var_to_fields
+        |> (fun (arr, aux) ->
+             (Array.map arr ~f:(fun x -> read_constant x), aux))
+        |> typ.value_of_fields
       in
       [%test_eq: string] memo memo_read
 

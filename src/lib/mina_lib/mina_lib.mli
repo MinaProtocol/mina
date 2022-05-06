@@ -8,7 +8,7 @@ open Signature_lib
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
-module Subscriptions = Coda_subscriptions
+module Subscriptions = Mina_subscriptions
 
 type t
 
@@ -29,7 +29,7 @@ exception Offline_shutdown
 
 val time_controller : t -> Block_time.Controller.t
 
-val subscription : t -> Coda_subscriptions.t
+val subscription : t -> Mina_subscriptions.t
 
 val daemon_start_time : Time_ns.t
 
@@ -103,6 +103,13 @@ val add_full_transactions :
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
+val add_snapp_transactions :
+     t
+  -> Parties.t list
+  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
+
 val get_account : t -> Account_id.t -> Account.t option Participating_state.T.t
 
 val get_inferred_nonce_from_transaction_pool_and_ledger :
@@ -112,7 +119,7 @@ val active_or_bootstrapping : t -> unit Participating_state.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
-val best_ledger : t -> Ledger.t Participating_state.t
+val best_ledger : t -> Mina_ledger.Ledger.t Participating_state.t
 
 val root_length : t -> int Participating_state.t
 
@@ -136,9 +143,9 @@ val validated_transitions :
 module Root_diff : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t =
-        { commands : User_command.Stable.V1.t With_status.Stable.V1.t list
+        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
         ; root_length : int
         }
     end
@@ -180,7 +187,7 @@ val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 
-val subscriptions : t -> Coda_subscriptions.t
+val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
   t -> External_transition.Initial_validated.t Broadcast_pipe.Reader.t
@@ -195,3 +202,5 @@ val config : t -> Config.t
 val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
+
+val verifier : t -> Verifier.t

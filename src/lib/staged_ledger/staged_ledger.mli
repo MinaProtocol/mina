@@ -1,14 +1,16 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 open Signature_lib
+module Ledger = Mina_ledger.Ledger
 
 type t [@@deriving sexp]
 
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp]
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
@@ -91,23 +93,21 @@ val create_exn :
 val of_scan_state_and_ledger :
      logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> statement_check:[ `Full | `Partial ]
   -> verifier:Verifier.t
-  -> snarked_ledger_hash:Frozen_ledger_hash.t
-  -> snarked_next_available_token:Token_id.t
+  -> snarked_registers:Mina_state.Registers.Value.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
-  -> t Or_error.t Deferred.t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> t Deferred.Or_error.t
 
 val of_scan_state_and_ledger_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> snarked_ledger_hash:Frozen_ledger_hash.t
-  -> snarked_next_available_token:Token_id.t
+  -> snarked_registers:Mina_state.Registers.Value.t
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
-  -> t Or_error.t Deferred.t
+  -> t Deferred.Or_error.t
 
 val replace_ledger_exn : t -> Ledger.t -> t
 
@@ -125,7 +125,7 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -143,7 +143,7 @@ val apply_diff_unchecked :
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -166,7 +166,7 @@ val create_diff :
   -> t
   -> coinbase_receiver:Public_key.Compressed.t
   -> logger:Logger.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
@@ -178,15 +178,9 @@ val create_diff :
 
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
-  -> epoch_ledger:Mina_base.Sparse_ledger.t
+  -> epoch_ledger:Mina_ledger.Sparse_ledger.t
   -> global_slot:Mina_numbers.Global_slot.t
   -> bool
-
-val statement_exn :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> statement_check:[ `Full | `Partial ]
-  -> t
-  -> [ `Non_empty of Transaction_snark.Statement.t | `Empty ] Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t
@@ -194,6 +188,17 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
   -> verifier:Verifier.t
   -> scan_state:Scan_state.t
   -> snarked_ledger:Ledger.t
+  -> snarked_local_state:Mina_state.Local_state.t
+  -> expected_merkle_root:Ledger_hash.t
+  -> pending_coinbases:Pending_coinbase.t
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> t Or_error.t Deferred.t
+
+val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> scan_state:Scan_state.t
+  -> snarked_ledger:Ledger.t
+  -> snarked_local_state:Mina_state.Local_state.t
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
@@ -202,10 +207,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> ( Transaction.t
-     , Transaction_witness.t
-     , Ledger_proof.t )
-     Snark_work_lib.Work.Single.Spec.t
+  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t
@@ -218,3 +220,9 @@ val check_commands :
   -> User_command.t list
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t
+
+(** account ids created in the latest block, taken from the previous_empty_accounts
+    in the latest and next-to-latest trees of the scan state
+*)
+val latest_block_accounts_created :
+  t -> previous_block_state_hash:State_hash.t -> Account_id.t list

@@ -391,17 +391,21 @@ AS combo GROUP BY combo.pk_id
           Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.((+) one) nonce)))
   end
 
+  (* TODO: either address will have to include a token id, or we pass the
+     token id separately, make it optional and use the default token if omitted
+  *)
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
     let open Deferred.Result.Let_syntax in
     let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn address in
-    match%bind Archive_lib.Processor.Public_key.find_opt (module Conn) pk |>
-                     Errors.Lift.sql ~context:"Finding public key" with
+    let account_id = Mina_base.Account_id.create pk Mina_base.Token_id.default in
+    match%bind Archive_lib.Processor.Account_identifiers.find_opt (module Conn) account_id |>
+                     Errors.Lift.sql ~context:"Finding account identifier" with
     | None -> Deferred.Result.fail (Errors.create @@ `Account_not_found address)
-    | Some _ ->
+    | Some account_identifier_id ->
       let%bind timing_info_opt =
-        Archive_lib.Processor.Timing_info.find_by_pk_opt
+        Archive_lib.Processor.Timing_info.find_by_account_identifier_id_opt
           (module Conn)
-          pk
+          account_identifier_id
         |> Errors.Lift.sql ~context:"Finding timing info"
       in
       (* First find the block referenced by the block identifier. Then find the latest block no later than it that has a
@@ -647,7 +651,7 @@ module Balance = struct
           | None ->
               Amount_of.mina
           | Some token_id ->
-              Amount_of.token token_id )
+              Amount_of.token (`Token_id token_id) )
             total_balance
         in
         let locked_balance =

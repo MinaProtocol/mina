@@ -21,13 +21,11 @@
    integers
    base_quickcheck
    core_kernel.uuid
-   core
-   async
-   async.async_rpc
-   async_rpc_kernel
-   async_unix
    ;; local libraries
    run_in_thread
+   kimchi_backend_common
+   kimchi_backend.pasta
+   mina_base.import
    sgn
    pickles_types
    blake2
@@ -50,6 +48,9 @@
    crypto_params
    debug_assert
    fold_lib
+   fields_derivers.zkapps
+   fields_derivers.json
+   fields_derivers.graphql
    one_or_two
    outside_hash_image
    quickcheck_lib
@@ -61,34 +62,15 @@
    data_hash_lib
    pickles.backend
    mina_signature_kind
+   mina_base.util
+   kimchi_backend
    hex
    snark_bits
-   snarky_integer
-   pasta
-   zexe_backend
-   network_peer
-   bitstring_lib
-   mina_metrics
-   o1trace
-   merkle_ledger
-   merkle_mask
-   syncable_ledger
-   merkle_address
-   rocksdb
-   rocks
-   key_value_database
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_snarky ppx_here ppx_coda ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord
+  (pps ppx_annot ppx_snarky ppx_here ppx_coda ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord ppx_deriving.make 
        ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
  ))
  (instrumentation (backend bisect_ppx))
  (synopsis "Snarks and friends necessary for keypair generation"))
-
-(rule
- (targets sample_keypairs.ml sample_keypairs.json)
- (deps
-  (:< gen/gen.exe))
- (action
-  (run %{<} %{targets})))

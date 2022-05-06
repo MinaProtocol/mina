@@ -20,6 +20,7 @@
    signature_lib
    mina_base
    mina_numbers
+   mina_base.import
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_deriving_yojson ppx_jane ppx_deriving.make)))
