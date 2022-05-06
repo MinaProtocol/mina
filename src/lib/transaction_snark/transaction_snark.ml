@@ -1624,7 +1624,7 @@ module Base = struct
           ( Stack_frame.t
           , Call_stack.t
           , Token_id.t
-          , Amount.t
+          , Amount.Signed.t
           , Ledger_hash.var * Sparse_ledger.t V.t
           , Bool.t
           , Transaction_commitment.t

@@ -1474,7 +1474,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ( Stack_frame.t
         , Call_stack.t
         , Token_id.t
-        , Amount.t
+        , Amount.Signed.t
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
