@@ -484,19 +484,6 @@ module Account = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field, 'bool) t =
-          { balance : 'balance
-          ; nonce : 'nonce
-          ; receipt_chain_hash : 'receipt_chain_hash
-          ; delegate : 'pk
-          ; state : 'field Zkapp_state.V.Stable.V1.t
-          ; sequence_state : 'field
-          ; proved_state : 'bool
-          }
-        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
-      end
-
       module V1 = struct
         type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field) t =
           { balance : 'balance
@@ -515,14 +502,15 @@ module Account = struct
   module Stable = struct
     module V2 = struct
       type t =
-        ( Balance.Stable.V1.t Numeric.Stable.V1.t
-        , Account_nonce.Stable.V1.t Numeric.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        , F.Stable.V1.t Eq_data.Stable.V1.t
-        , bool Eq_data.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, equal, yojson, hash, compare]
+        { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
+        ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
+        ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
+        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; sequence_state : F.Stable.V1.t Eq_data.Stable.V1.t
+        ; proved_state : bool Eq_data.Stable.V1.t
+        }
+      [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -577,7 +565,7 @@ module Account = struct
       Or_ignore.gen field_gen
     in
     let%map proved_state = Or_ignore.gen Quickcheck.Generator.bool in
-    { Poly.balance
+    { balance
     ; nonce
     ; receipt_chain_hash
     ; delegate
@@ -601,15 +589,15 @@ module Account = struct
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
-    Poly.Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
       ~delegate:!.(Or_ignore.deriver public_key)
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
       ~sequence_state:!.(Or_ignore.deriver field)
       ~proved_state:!.(Or_ignore.deriver bool)
-    |> finish "AccountPrecondition" ~t_toplevel_annots:Poly.t_toplevel_annots
+    |> finish "AccountPrecondition" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let b = Balance.of_int 1000 in
@@ -654,13 +642,15 @@ module Account = struct
 
   module Checked = struct
     type t =
-      ( Balance.var Numeric.Checked.t
-      , Account_nonce.Checked.t Numeric.Checked.t
-      , Receipt.Chain_hash.var Hash.Checked.t
-      , Public_key.Compressed.var Eq_data.Checked.t
-      , Field.Var.t Eq_data.Checked.t
-      , Boolean.var Eq_data.Checked.t )
-      Poly.Stable.Latest.t
+      { balance : Balance.var Numeric.Checked.t
+      ; nonce : Account_nonce.Checked.t Numeric.Checked.t
+      ; receipt_chain_hash : Receipt.Chain_hash.var Hash.Checked.t
+      ; delegate : Public_key.Compressed.var Eq_data.Checked.t
+      ; state : Field.Var.t Eq_data.Checked.t Zkapp_state.V.t
+      ; sequence_state : Field.Var.t Eq_data.Checked.t
+      ; proved_state : Boolean.var Eq_data.Checked.t
+      }
+    [@@deriving hlist]
 
     let to_input
         ({ balance
@@ -740,7 +730,6 @@ module Account = struct
   end
 
   let typ () : (Checked.t, Stable.Latest.t) Typ.t =
-    let open Poly.Stable.Latest in
     let open Leaf_typs in
     Typ.of_hlistable
       [ balance
@@ -752,8 +741,8 @@ module Account = struct
           ~ignore:(Lazy.force Zkapp_account.Sequence_events.empty_hash)
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
       ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let check
       ({ balance
