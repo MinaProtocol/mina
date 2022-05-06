@@ -14,6 +14,11 @@ Mina, this is the right file!
 Building Mina can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
+If you are already a Nix user, or are comfortable installing Nix, it
+can be an easy way to build Mina locally. See
+[nix/README.md](./nix/README.md) for more information and
+instructions.
+
 Currently, Mina builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/MinaProtocol/coda/issues/962).
 
 The short version:
