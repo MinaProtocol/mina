@@ -11,7 +11,7 @@ let dir_exists dir =
 let remove_dir dir =
   let%bind _ =
     Monitor.try_with ~here:[%here] (fun () ->
-        Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] ())
+        Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () )
   in
   Deferred.unit
 
@@ -25,8 +25,8 @@ let rec rmrf path =
       if [%equal: [ `Yes | `No | `Unknown ]] (Core.Sys.file_exists path) `Yes
       then Core.Sys.remove path
 
-let try_finally ~(f : unit -> 'a Deferred.t)
-    ~(finally : unit -> unit Deferred.t) =
+let try_finally ~(f : unit -> 'a Deferred.t) ~(finally : unit -> unit Deferred.t)
+    =
   try_with f
   >>= function
   | Ok x ->

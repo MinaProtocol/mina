@@ -18,7 +18,8 @@ let generic map ~h ~max_degree : _ Dlog_plonk_types.Evals.t =
   let t_bound = map h ~f:(fun h -> Common.max_quot_size_int h) in
   Dlog_plonk_types.Evals.map
     ~f:(fun v ->
-      map v ~f:(fun x -> Int.round_up x ~to_multiple_of:max_degree / max_degree))
+      map v ~f:(fun x -> Int.round_up x ~to_multiple_of:max_degree / max_degree)
+      )
     { l = h; r = h; o = h; z = h; t = t_bound; f = h; sigma1 = h; sigma2 = h }
 
 let of_domains { Domains.h; _ } ~max_degree : int Dlog_plonk_types.Evals.t =

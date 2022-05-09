@@ -20,7 +20,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
             corrupted_privkey
               (Error.createf
                  "%s exists and it is not a directory, can't store files there"
-                 dn))
+                 dn ) )
     with
     | Ok x ->
         return x
@@ -44,7 +44,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
             Deferred.Result.return ()
           else if not parent_exists then
             Deferred.return (Error (`Parent_directory_does_not_exist dn))
-          else Deferred.Result.return ())
+          else Deferred.Result.return () )
     with
     | Ok x ->
         Deferred.return x
@@ -57,7 +57,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
   let open Deferred.Let_syntax in
   match%bind
     Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
-        f path)
+        f path )
   with
   | Ok x ->
       Deferred.Result.return x
@@ -102,7 +102,7 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
         (sprintf
            "insecure permissions on `%s`. They should be 0600, they are %o\n\
             Hint: chmod 600 %s\n"
-           path (st.perm land 0o777) path)
+           path (st.perm land 0o777) path )
     else None
   in
   let dn = Filename.dirname path in
@@ -113,7 +113,7 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
         (sprintf
            "insecure permissions on `%s`. They should be 0700, they are %o\n\
             Hint: chmod 700 %s\n"
-           dn (st.perm land 0o777) dn)
+           dn (st.perm land 0o777) dn )
     else None
   in
   let%bind () =
@@ -133,7 +133,7 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
     | Error e ->
         Deferred.return
           (Privkey_error.corrupted_privkey
-             (Error.createf "couldn't parse %s: %s" path e))
+             (Error.createf "couldn't parse %s: %s" path e) )
   in
   let%bind password = lift (Lazy.force password) in
   Deferred.return (Secret_box.decrypt ~password sb)

@@ -50,7 +50,7 @@ module Stable = struct
         f
           (c ~protocol_state ~protocol_state_proof ~delta_block_chain_proof
              ~body_reference ?proposed_protocol_version_opt
-             ?current_protocol_version ())
+             ?current_protocol_version () )
 
       let create ~protocol_state ~protocol_state_proof ~delta_block_chain_proof
           ~body_reference ?proposed_protocol_version_opt

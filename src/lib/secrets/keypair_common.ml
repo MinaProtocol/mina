@@ -59,7 +59,7 @@ struct
               read_privkey
                 ( lazy
                   (Password.read_hidden_line ~error_help_message:""
-                     "Private-key password: ") )
+                     "Private-key password: " ) )
             in
             let rec read_until_correct () =
               match%bind read_file () with

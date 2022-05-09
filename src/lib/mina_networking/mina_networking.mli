@@ -283,31 +283,31 @@ val create :
   -> sinks:Sinks.t
   -> get_some_initial_peers:
        (   Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
-        -> Rpcs.Get_some_initial_peers.response Deferred.t)
+        -> Rpcs.Get_some_initial_peers.response Deferred.t )
   -> get_staged_ledger_aux_and_pending_coinbases_at_hash:
        (   Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
            Envelope.Incoming.t
         -> Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response
-           Deferred.t)
+           Deferred.t )
   -> answer_sync_ledger_query:
        (   Rpcs.Answer_sync_ledger_query.query Envelope.Incoming.t
-        -> Rpcs.Answer_sync_ledger_query.response Deferred.t)
+        -> Rpcs.Answer_sync_ledger_query.response Deferred.t )
   -> get_ancestry:
        (   Rpcs.Get_ancestry.query Envelope.Incoming.t
-        -> Rpcs.Get_ancestry.response Deferred.t)
+        -> Rpcs.Get_ancestry.response Deferred.t )
   -> get_best_tip:
        (   Rpcs.Get_best_tip.query Envelope.Incoming.t
-        -> Rpcs.Get_best_tip.response Deferred.t)
+        -> Rpcs.Get_best_tip.response Deferred.t )
   -> get_node_status:
        (   Rpcs.Get_node_status.query Envelope.Incoming.t
-        -> Rpcs.Get_node_status.response Deferred.t)
+        -> Rpcs.Get_node_status.response Deferred.t )
   -> get_transition_chain_proof:
        (   Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_chain_proof.response Deferred.t)
+        -> Rpcs.Get_transition_chain_proof.response Deferred.t )
   -> get_transition_chain:
        (   Rpcs.Get_transition_chain.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_chain.response Deferred.t)
+        -> Rpcs.Get_transition_chain.response Deferred.t )
   -> get_transition_knowledge:
        (   Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_knowledge.response Deferred.t)
+        -> Rpcs.Get_transition_knowledge.response Deferred.t )
   -> t Deferred.t

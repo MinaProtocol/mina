@@ -195,7 +195,7 @@ module Parser = struct
         | Some base ->
             access base <|> return base
         | None ->
-            access Ast.value_this)
+            access Ast.value_this )
     <?> "value_exp"
 
   let cmp_exp =
@@ -206,7 +206,7 @@ module Parser = struct
               [ lift2 List.cons (string {|\/|}) inner
               ; char '/' *> return []
               ; lift2 List.cons (take 1) inner
-              ])
+              ] )
         >>| String.concat ~sep:""
       in
       char '/' *> commit *> inner
@@ -220,7 +220,7 @@ module Parser = struct
          ; pad ws (stringc "!=") *> value_exp >>| Fn.flip Ast.cmp_neq
          ; pad ws (stringc "in") *> value_exp >>| Fn.flip Ast.cmp_in
          ; pad ws (stringc "match") *> regex >>| Fn.flip Ast.cmp_match
-         ])
+         ] )
     <* commit <?> "cmp_exp"
 
   let bool_exp =
@@ -239,7 +239,7 @@ module Parser = struct
             ; stringc "||" *> return Ast.bool_or
             ]
         in
-        infix main (pad ws infix_op))
+        infix main (pad ws infix_op) )
     <?> "bool_exp"
 
   let parser = ws *> bool_exp <* ws <* end_of_input
@@ -253,7 +253,7 @@ module Parser = struct
           | _ ->
               err
         in
-        sprintf "invalid syntax (%s)" msg)
+        sprintf "invalid syntax (%s)" msg )
 end
 
 module Interpreter = struct
@@ -319,11 +319,11 @@ module Interpreter = struct
             | `List items ->
                 List.exists items ~f:(Yojson.Safe.equal scalar)
             | _ ->
-                (* TODO: filter warnings *) false)
+                (* TODO: filter warnings *) false )
         |> Option.value ~default:false
     | Cmp_match (x, regex) ->
         Option.map (interpret_value_exp json x) ~f:(fun value ->
-            match value with `String str -> Re2.matches regex str | _ -> false)
+            match value with `String str -> Re2.matches regex str | _ -> false )
         |> Option.value ~default:false
 
   let rec interpret_bool_exp json = function

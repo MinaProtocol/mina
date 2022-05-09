@@ -717,8 +717,7 @@ module Base = struct
                 | Error err ->
                     let open Mina_base in
                     Transaction_status.Failure.equal
-                      (Transaction_logic.timing_error_to_user_command_status
-                         err)
+                      (Transaction_logic.timing_error_to_user_command_status err)
                       Transaction_status.Failure
                       .Source_minimum_balance_violation
               in
@@ -1029,13 +1028,13 @@ module Base = struct
     let%bind `Underflow underflow, proposed_balance_int =
       make_checked (fun () ->
           Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
-            txn_amount_int)
+            txn_amount_int )
     in
     (* underflow indicates insufficient balance *)
     let%bind () = balance_check (Boolean.not underflow) in
     let%bind sufficient_timed_balance =
       make_checked (fun () ->
-          Snarky_integer.Integer.(gte ~m proposed_balance_int curr_min_balance))
+          Snarky_integer.Integer.(gte ~m proposed_balance_int curr_min_balance) )
     in
     let%bind () =
       let%bind ok = Boolean.(any [ not is_timed; sufficient_timed_balance ]) in
@@ -1043,7 +1042,7 @@ module Base = struct
     in
     let%bind is_timed_balance_zero =
       make_checked (fun () ->
-          Snarky_integer.Integer.equal ~m curr_min_balance zero_int)
+          Snarky_integer.Integer.equal ~m curr_min_balance zero_int )
     in
     (* if current min balance is zero, then timing becomes untimed *)
     let%bind is_untimed = Boolean.((not is_timed) ||| is_timed_balance_zero) in
@@ -1125,7 +1124,7 @@ module Base = struct
           respond
             (Provide
                (Option.value_map (Snapp_command.fee_payment c)
-                  ~default:Signature.dummy ~f:(fun p -> p.signature)))
+                  ~default:Signature.dummy ~f:(fun p -> p.signature) ) )
       | Account_signature `One ->
           respond (Provide sig1)
       | Account_signature `Two ->
@@ -1155,7 +1154,7 @@ module Base = struct
 
     let check_fee ~(excess : Amount.Signed.var) ~token_id
         ~(other_fee_payer_opt :
-           (_, Other_fee_payer.Payload.Checked.t) Flagged_option.t) =
+           (_, Other_fee_payer.Payload.Checked.t) Flagged_option.t ) =
       let open Impl in
       let ( ! ) = run_checked in
       (* Either
@@ -1194,7 +1193,7 @@ module Base = struct
         exists Snapp_account.typ ~request:(fun () -> Snapp_account which)
       in
       with_label __LOC__ (fun () ->
-          Field.Assert.equal (fst a.snapp) (Snapp_account.Checked.digest s)) ;
+          Field.Assert.equal (fst a.snapp) (Snapp_account.Checked.digest s) ) ;
       { a with snapp = s }
 
     let apply_body
@@ -1205,8 +1204,8 @@ module Base = struct
          ; update = { app_state; delegate; verification_key; permissions }
          ; delta
          } :
-          Snapp_command.Party.Body.Checked.t) (a : Account.Checked.Unhashed.t) :
-        Account.var * _ =
+          Snapp_command.Party.Body.Checked.t ) (a : Account.Checked.Unhashed.t)
+        : Account.var * _ =
       let open Impl in
       let r = ref [] in
       let update_authorized (type a) perm ~is_keep
@@ -1238,7 +1237,7 @@ module Base = struct
                 (Boolean.Assert.any [ ok; is_receiver ])
             in
             check_timing ~balance_check ~timed_balance_check ~account:a
-              ~txn_amount:delta.magnitude ~txn_global_slot))
+              ~txn_amount:delta.magnitude ~txn_global_slot) )
       in
       let timing =
         !(Account.Timing.if_ is_receiver ~then_:a.timing ~else_:timing)
@@ -1248,7 +1247,7 @@ module Base = struct
         with_label __LOC__ (fun () ->
             update_authorized
               (Permissions.Auth_required.Checked.if_ is_receiver
-                 ~then_:a.permissions.receive ~else_:a.permissions.send)
+                 ~then_:a.permissions.receive ~else_:a.permissions.send )
               ~is_keep:!Amount.Signed.(Checked.(equal (constant zero) delta))
               ~updated:
                 (let balance, `Overflow failed1 =
@@ -1260,18 +1259,17 @@ module Base = struct
                  | `Maybe is_new ->
                      let fee =
                        Amount.Checked.of_fee
-                         (Fee.var_of_t
-                            constraint_constants.account_creation_fee)
+                         (Fee.var_of_t constraint_constants.account_creation_fee)
                      in
                      let balance_when_new, `Underflow failed2 =
                        !(Balance.Checked.sub_amount_flagged balance fee)
                      in
                      let res =
                        !(Balance.Checked.if_ is_new ~then_:balance_when_new
-                           ~else_:balance)
+                           ~else_:balance )
                      in
                      let failed = Boolean.(failed1 ||| (is_new &&& failed2)) in
-                     `Flagged (res, failed)))
+                     `Flagged (res, failed) ) )
       in
       let snapp =
         let app_state =
@@ -1280,21 +1278,21 @@ module Base = struct
                 ~is_keep:
                   (Boolean.all
                      (List.map (Vector.to_list app_state)
-                        ~f:Set_or_keep.Checked.is_keep))
+                        ~f:Set_or_keep.Checked.is_keep ) )
                 ~updated:
                   (`Ok
                     (Vector.map2 app_state a.snapp.app_state
-                       ~f:(Set_or_keep.Checked.set_or_keep ~if_:Field.if_))))
+                       ~f:(Set_or_keep.Checked.set_or_keep ~if_:Field.if_) ) ) )
         in
         Option.iter tag ~f:(fun t ->
-            Pickles.Side_loaded.in_circuit t a.snapp.verification_key.data) ;
+            Pickles.Side_loaded.in_circuit t a.snapp.verification_key.data ) ;
         let verification_key =
           update_authorized a.permissions.set_verification_key
             ~is_keep:(Set_or_keep.Checked.is_keep verification_key)
             ~updated:
               (`Ok
                 (Set_or_keep.Checked.set_or_keep ~if_:Field.if_ verification_key
-                   (Lazy.force a.snapp.verification_key.hash)))
+                   (Lazy.force a.snapp.verification_key.hash) ) )
         in
         let snapp' = { Snapp_account.verification_key; app_state } in
         let r =
@@ -1324,8 +1322,8 @@ module Base = struct
             (`Ok
               (Set_or_keep.Checked.set_or_keep
                  ~if_:(fun b ~then_ ~else_ ->
-                   !(Public_key.Compressed.Checked.if_ b ~then_ ~else_))
-                 delegate a.delegate))
+                   !(Public_key.Compressed.Checked.if_ b ~then_ ~else_) )
+                 delegate a.delegate ) )
       in
       let permissions =
         update_authorized a.permissions.set_permissions
@@ -1333,7 +1331,7 @@ module Base = struct
           ~updated:
             (`Ok
               (Set_or_keep.Checked.set_or_keep ~if_:Permissions.Checked.if_
-                 permissions a.permissions))
+                 permissions a.permissions ) )
       in
       ( { a with balance; snapp; delegate; permissions; timing }
       , `proof_must_verify proof_must_verify )
@@ -1383,7 +1381,7 @@ module Base = struct
           ~filter:(fun acct ->
             Account_id.Checked.(
               equal fee_payer_id (create acct.public_key acct.token_id))
-            >>= Boolean.Assert.is_true)
+            >>= Boolean.Assert.is_true )
           ~f:(fun () account ->
             Set_once.set_exn actual_fee_payer_nonce_and_rch [%here]
               (account.nonce, account.receipt_chain_hash) ;
@@ -1391,7 +1389,7 @@ module Base = struct
               let%bind authorized =
                 make_checked (fun () ->
                     Permissions.Auth_required.Checked.eval_no_proof
-                      ~signature_verifies account.permissions.send)
+                      ~signature_verifies account.permissions.send )
               in
               (* It's ok for this signature to fail if there is no separate fee payer.
                  Their control will be checked independently. *)
@@ -1403,7 +1401,8 @@ module Base = struct
                    Account.Nonce.Checked.equal fee_payer_nonce account.nonce
                  in
                  (* If there is not a separate fee payer, its nonce is checked elsewhere *)
-                 Boolean.(Assert.any [ nonce_matches; not fee_payer_is_other ]))
+                 Boolean.(Assert.any [ nonce_matches; not fee_payer_is_other ])
+                )
             in
             let%bind next_nonce = Account.Nonce.Checked.succ account.nonce in
             let%bind receipt_chain_hash =
@@ -1423,7 +1422,7 @@ module Base = struct
                      (Boolean.Assert.is_true ok)
                  in
                  check_timing ~balance_check ~timed_balance_check ~account
-                   ~txn_amount ~txn_global_slot)
+                   ~txn_amount ~txn_global_slot )
             in
             let%map balance =
               [%with_label "Check payer balance"]
@@ -1440,7 +1439,7 @@ module Base = struct
             ; timing
             ; permissions = account.permissions
             ; snapp = account.snapp
-            })
+            } )
       in
       (root, Set_once.get_exn actual_fee_payer_nonce_and_rch [%here])
 
@@ -1456,7 +1455,7 @@ module Base = struct
       let ( ! ) = Impl.run_checked in
       let updated =
         !(Receipt.Chain_hash.Checked.cons (Snapp_command payload_digest)
-            account.receipt_chain_hash)
+            account.receipt_chain_hash )
       in
       let shouldn't_update =
         shouldn't_update_nonce_and_rch ~is_fee_payer ~should_step
@@ -1466,7 +1465,7 @@ module Base = struct
         nonce = !(Account.Nonce.Checked.succ_if account.nonce should_update)
       ; receipt_chain_hash =
           !(Receipt.Chain_hash.Checked.if_ shouldn't_update
-              ~then_:account.receipt_chain_hash ~else_:updated)
+              ~then_:account.receipt_chain_hash ~else_:updated )
       }
 
     module Check_predicate = struct
@@ -1500,7 +1499,7 @@ module Base = struct
         ~is_new ~which ~tag ~(body : Snapp_command.Party.Body.Checked.t)
         ~self_predicate ~other_predicate
         ~(*         ~(other_predicate : Snapp_predicate.Other.Checked.t) *)
-        check_auth =
+         check_auth =
       let open Impl in
       let ( ! ) = run_checked in
       let proof_must_verify = Set_once.create () in
@@ -1517,7 +1516,7 @@ module Base = struct
                 (Amount.Signed.Checked.of_unsigned
                    !(Amount.Checked.if_ is_fee_payer
                        ~then_:(Amount.Checked.of_fee fee)
-                       ~else_:(Amount.var_of_t Amount.zero))))
+                       ~else_:(Amount.var_of_t Amount.zero) ) ) )
         }
       in
       let root =
@@ -1537,7 +1536,7 @@ module Base = struct
                      apply_body body account ~constraint_constants ~is_new ~tag
                        ~txn_global_slot ~add_check ~check_auth:(fun t ->
                          with_label __LOC__ (fun () ->
-                             check_auth t ~signature_verifies))
+                             check_auth t ~signature_verifies ) )
                    in
                    Set_once.set_exn proof_must_verify [%here] must_verify ;
                    let account =
@@ -1549,7 +1548,7 @@ module Base = struct
                            ~then_:fee_payer_receipt_chain_hash
                            ~else_:account.receipt_chain_hash
                        in
-                       { account with nonce; receipt_chain_hash })
+                       { account with nonce; receipt_chain_hash } )
                    in
                    List.iter
                      ~f:(add_check ?label:(Some __LOC__))
@@ -1558,7 +1557,7 @@ module Base = struct
                      ~f:(add_check ?label:(Some __LOC__))
                      (other_predicate account) ;
                    update_nonce_and_rch ~payload_digest ~is_fee_payer
-                     ~should_step:`Yes ~account:account')))
+                     ~should_step:`Yes ~account:account' ) ) )
       in
       (root, Set_once.get_exn proof_must_verify [%here])
 
@@ -1575,7 +1574,7 @@ module Base = struct
       let fee_token_l =
         !(Token_id.Checked.if_ fee_excess_zero
             ~then_:Token_id.(var_of_t default)
-            ~else_:fee_token)
+            ~else_:fee_token )
       in
       { Fee_excess.fee_token_l
       ; fee_excess_l = Fee.Signed.Checked.of_unsigned fee
@@ -1585,7 +1584,7 @@ module Base = struct
 
     let determine_fee_payer ~token_id
         ~(other_fee_payer_opt :
-           (_, Other_fee_payer.Payload.Checked.t) Flagged_option.t)
+           (_, Other_fee_payer.Payload.Checked.t) Flagged_option.t )
         ~(body1 : Snapp_command.Party.Body.Checked.t)
         ~(body2 : Snapp_command.Party.Body.Checked.t) =
       let open Impl in
@@ -1601,12 +1600,12 @@ module Base = struct
         !(Account_id.Checked.if_ fee_payer_is_other
             ~then_:
               (Account_id.Checked.create other_fee_payer_opt.data.pk
-                 other_fee_payer_opt.data.token_id)
+                 other_fee_payer_opt.data.token_id )
             ~else_:
               (Account_id.Checked.create
                  !(Public_key.Compressed.Checked.if_ account1_is_sender
-                     ~then_:body1.pk ~else_:body2.pk)
-                 token_id))
+                     ~then_:body1.pk ~else_:body2.pk )
+                 token_id ) )
       in
       ( account1_is_fee_payer
       , account2_is_fee_payer
@@ -1618,7 +1617,7 @@ module Base = struct
       let finished = ref false in
       ( (fun ?label:_ x ->
           if finished.contents then failwith "finished"
-          else r := x :: r.contents)
+          else r := x :: r.contents )
       , fun () ->
           finished := true ;
           Impl.Boolean.all r.contents )
@@ -1660,9 +1659,9 @@ module Base = struct
           !(Amount.Signed.Checked.add s1.body1.data.delta s1.body2.data.delta)
         in
         let ({ token_id; other_fee_payer_opt } as comp
-              : _ Snapp_statement.Complement.Two_proved.Poly.t) =
+              : _ Snapp_statement.Complement.Two_proved.Poly.t ) =
           exists Snapp_statement.Complement.Two_proved.typ ~request:(fun () ->
-              Two_complement)
+              Two_complement )
         in
         (* Check fee *)
         check_fee ~excess ~token_id ~other_fee_payer_opt ;
@@ -1678,12 +1677,12 @@ module Base = struct
         let fee =
           !(Fee.Checked.if_ fee_payer_is_other
               ~then_:other_fee_payer_opt.data.fee
-              ~else_:(Amount.Checked.to_fee excess))
+              ~else_:(Amount.Checked.to_fee excess) )
         in
         let payload : Snapp_command.Payload.Digested.Checked.t =
           Two_proved
             (Snapp_statement.Complement.Two_proved.Checked.complete comp ~one:s1
-               ~two:s2)
+               ~two:s2 )
         in
         let payload_digest =
           Snapp_command.Payload.Digested.Checked.digest payload
@@ -1697,23 +1696,23 @@ module Base = struct
               ~shifted:(module S)
               ~root ~fee ~fee_payer_is_other ~fee_payer_id
               ~fee_payer_nonce:other_fee_payer_opt.data.nonce ~payload_digest
-              ~txn_global_slot)
+              ~txn_global_slot )
         in
         let add_check, checks_succeeded = create_checker () in
         add_check
           (Snapp_predicate.Protocol_state.Checked.check
-             s1.predicate.data.protocol_state_predicate curr_state) ;
+             s1.predicate.data.protocol_state_predicate curr_state ) ;
         add_check
           (Snapp_predicate.Protocol_state.Checked.check
-             s2.predicate.data.protocol_state_predicate curr_state) ;
+             s2.predicate.data.protocol_state_predicate curr_state ) ;
         add_check
           (Snapp_predicate.Eq_data.(check_checked (Tc.public_key ()))
              s1.predicate.data.fee_payer
-             (Account_id.Checked.public_key fee_payer_id)) ;
+             (Account_id.Checked.public_key fee_payer_id) ) ;
         add_check
           (Snapp_predicate.Eq_data.(check_checked (Tc.public_key ()))
              s2.predicate.data.fee_payer
-             (Account_id.Checked.public_key fee_payer_id)) ;
+             (Account_id.Checked.public_key fee_payer_id) ) ;
         let modify =
           modify ~constraint_constants
             ~shifted:(module S)
@@ -1737,7 +1736,7 @@ module Base = struct
         in
         let root =
           !(Frozen_ledger_hash.if_ (checks_succeeded ()) ~then_:root
-              ~else_:root_after_fee_payer)
+              ~else_:root_after_fee_payer )
         in
         let fee_excess = compute_fee_excess ~fee ~fee_payer_id in
         !((* TODO: s.pending_coinbase_stack_state assertion *)
@@ -1749,7 +1748,7 @@ module Base = struct
               (* TODO: These should maybe be able to create tokens *)
             ; Token_id.Checked.Assert.equal s.next_available_token_after
                 s.next_available_token_before
-            ]) ;
+            ] ) ;
         (proof1_must_verify (), proof2_must_verify ())
 
       let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
@@ -1758,7 +1757,7 @@ module Base = struct
         ; main =
             (fun [ t1; t2 ] x ->
               let s1, s2 = main t1 t2 ~constraint_constants x in
-              [ s1; s2 ])
+              [ s1; s2 ] )
         ; main_value = (fun _ _ -> [ true; true ])
         }
     end
@@ -1789,9 +1788,9 @@ module Base = struct
              ; second_ends_empty
              ; account2_nonce
              } as comp
-              : _ Snapp_statement.Complement.One_proved.Poly.t) =
+              : _ Snapp_statement.Complement.One_proved.Poly.t ) =
           exists Snapp_statement.Complement.One_proved.typ ~request:(fun () ->
-              One_complement)
+              One_complement )
         in
         (* Check fee *)
         check_fee ~excess ~token_id ~other_fee_payer_opt ;
@@ -1807,12 +1806,11 @@ module Base = struct
         let fee =
           !(Fee.Checked.if_ fee_payer_is_other
               ~then_:other_fee_payer_opt.data.fee
-              ~else_:(Amount.Checked.to_fee excess))
+              ~else_:(Amount.Checked.to_fee excess) )
         in
         let payload : Snapp_command.Payload.Digested.Checked.t =
           One_proved
-            (Snapp_statement.Complement.One_proved.Checked.complete comp
-               ~one:s1)
+            (Snapp_statement.Complement.One_proved.Checked.complete comp ~one:s1)
         in
         let payload_digest =
           Snapp_command.Payload.Digested.Checked.digest payload
@@ -1825,16 +1823,16 @@ module Base = struct
               ~shifted:(module S)
               ~root:s.source ~fee ~fee_payer_is_other ~fee_payer_id
               ~fee_payer_nonce:other_fee_payer_opt.data.nonce ~payload_digest
-              ~txn_global_slot)
+              ~txn_global_slot )
         in
         let add_check1, checks_succeeded1 = create_checker () in
         add_check1
           (Snapp_predicate.Protocol_state.Checked.check
-             s1.predicate.data.protocol_state_predicate curr_state) ;
+             s1.predicate.data.protocol_state_predicate curr_state ) ;
         add_check1
           (Snapp_predicate.Eq_data.(check_checked (Tc.public_key ()))
              s1.predicate.data.fee_payer
-             (Account_id.Checked.public_key fee_payer_id)) ;
+             (Account_id.Checked.public_key fee_payer_id) ) ;
         let root_after_account1, proof1_must_verify =
           modify ~constraint_constants ~fee
             ~shifted:(module S)
@@ -1861,7 +1859,7 @@ module Base = struct
                   ~signature_verifies
               in
               ( Boolean.(res ||| second_starts_empty)
-              , `proof_must_verify Boolean.true_ ))
+              , `proof_must_verify Boolean.true_ ) )
             ~is_new:(`Maybe second_starts_empty)
             ~is_fee_payer:account2_is_fee_payer ~which:`Two ~tag:snapp2_tag
             ~body:s1.body2.data
@@ -1879,11 +1877,11 @@ module Base = struct
           !(if_ second_ends_empty
               ~then_:
                 !(if_ checks_succeeded1 ~then_:root_after_account1
-                    ~else_:root_after_fee_payer)
+                    ~else_:root_after_fee_payer )
               ~else_:
                 !(if_
                     Boolean.(checks_succeeded1 &&& checks_succeeded2)
-                    ~then_:root_after_account2 ~else_:root_after_fee_payer))
+                    ~then_:root_after_account2 ~else_:root_after_fee_payer ) )
         in
         let fee_excess = compute_fee_excess ~fee ~fee_payer_id in
         !((* TODO: s.pending_coinbase_stack_state assertion *)
@@ -1895,7 +1893,7 @@ module Base = struct
               (* TODO: These should maybe be able to create tokens *)
             ; Token_id.Checked.Assert.equal s.next_available_token_after
                 s.next_available_token_before
-            ]) ;
+            ] ) ;
         proof1_must_verify ()
 
       let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
@@ -1904,7 +1902,7 @@ module Base = struct
         ; main =
             (fun [ t1 ] x ->
               let s1 = main t1 ~constraint_constants x in
-              [ s1 ])
+              [ s1 ] )
         ; main_value = (fun _ _ -> [ true ])
         }
     end
@@ -1917,7 +1915,7 @@ module Base = struct
         let ( ! ) = run_checked in
         let payload =
           exists Snapp_command.Payload.Zero_proved.typ ~request:(fun () ->
-              Zero_complement)
+              Zero_complement )
         in
         let ({ token_id
              ; other_fee_payer_opt
@@ -1926,7 +1924,7 @@ module Base = struct
              ; second_starts_empty
              ; second_ends_empty
              }
-              : Snapp_command.Payload.Zero_proved.Checked.t) =
+              : Snapp_command.Payload.Zero_proved.Checked.t ) =
           payload
         in
         let state_body =
@@ -1954,7 +1952,7 @@ module Base = struct
         let fee =
           !(Fee.Checked.if_ fee_payer_is_other
               ~then_:other_fee_payer_opt.data.fee
-              ~else_:(Amount.Checked.to_fee excess))
+              ~else_:(Amount.Checked.to_fee excess) )
         in
         let payload_digest =
           Snapp_command.Payload.(
@@ -1969,7 +1967,7 @@ module Base = struct
               ~shifted:(module S)
               ~root:s.source ~fee ~fee_payer_is_other ~fee_payer_id
               ~fee_payer_nonce:other_fee_payer_opt.data.nonce ~payload_digest
-              ~txn_global_slot)
+              ~txn_global_slot )
         in
         let add_check1, checks_succeeded1 = create_checker () in
         let root_after_account1, _ =
@@ -1986,8 +1984,8 @@ module Base = struct
                 { a with
                   nonce =
                     !(Account.Nonce.Checked.if_ account1_is_fee_payer
-                        ~then_:fee_payer_nonce ~else_:a.nonce)
-                })
+                        ~then_:fee_payer_nonce ~else_:a.nonce )
+                } )
             ~other_predicate:(fun _ -> [])
         in
         let add_check2, checks_succeeded2 = create_checker () in
@@ -2003,7 +2001,7 @@ module Base = struct
                   ~signature_verifies
               in
               ( Boolean.(res ||| second_starts_empty)
-              , `proof_must_verify Boolean.true_ ))
+              , `proof_must_verify Boolean.true_ ) )
             ~is_new:(`Maybe second_starts_empty)
             ~is_fee_payer:account2_is_fee_payer ~which:`Two ~tag:snapp2_tag
             ~body:two.body
@@ -2012,8 +2010,8 @@ module Base = struct
                 { a with
                   nonce =
                     !(Account.Nonce.Checked.if_ account2_is_fee_payer
-                        ~then_:fee_payer_nonce ~else_:a.nonce)
-                })
+                        ~then_:fee_payer_nonce ~else_:a.nonce )
+                } )
             ~other_predicate:(fun _ -> [])
         in
         (* No deleting accounts for now. *)
@@ -2026,21 +2024,21 @@ module Base = struct
           !(if_ second_ends_empty
               ~then_:
                 !(if_ checks_succeeded1 ~then_:root_after_account1
-                    ~else_:root_after_fee_payer)
+                    ~else_:root_after_fee_payer )
               ~else_:
                 !(if_
                     Boolean.(checks_succeeded1 &&& checks_succeeded2)
-                    ~then_:root_after_account2 ~else_:root_after_fee_payer))
+                    ~then_:root_after_account2 ~else_:root_after_fee_payer ) )
         in
         let fee_excess = compute_fee_excess ~fee ~fee_payer_id in
         (* TODO: s.pending_coinbase_stack_state assertion *)
         !(Frozen_ledger_hash.assert_equal root s.target) ;
         !(Currency.Amount.Checked.assert_equal s.supply_increase
-            Currency.Amount.(var_of_t zero)) ;
+            Currency.Amount.(var_of_t zero) ) ;
         !(Fee_excess.assert_equal_checked s.fee_excess fee_excess) ;
         (* TODO: These should maybe be able to create tokens *)
         !(Token_id.Checked.Assert.equal s.next_available_token_after
-            s.next_available_token_before)
+            s.next_available_token_before )
 
       let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
         { identifier = "snapp-zero-proved"
@@ -2048,7 +2046,7 @@ module Base = struct
         ; main =
             (fun [] x ->
               let () = main ~constraint_constants x in
-              [])
+              [] )
         ; main_value = (fun _ _ -> [])
         }
     end
@@ -2078,7 +2076,7 @@ module Base = struct
       [%with_label "Fee-payer must sign the transaction"]
         ((* TODO: Enable multi-sig. *)
          Public_key.Compressed.Checked.Assert.equal signer_pk
-           payload.common.fee_payer_pk)
+           payload.common.fee_payer_pk )
     in
     (* Compute transaction kind. *)
     let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
@@ -2110,12 +2108,12 @@ module Base = struct
         [ [%with_label
             "Token_locked value is compatible with the transaction kind"]
             (Boolean.Assert.any
-               [ Boolean.not payload.body.token_locked; is_create_account ])
+               [ Boolean.not payload.body.token_locked; is_create_account ] )
         ; [%with_label "Token_locked cannot be used with the default token"]
             (Boolean.Assert.any
                [ Boolean.not payload.body.token_locked
                ; Boolean.not token_default
-               ])
+               ] )
         ]
     in
     let%bind () =
@@ -2131,7 +2129,7 @@ module Base = struct
                   ; is_mint_tokens
                   ; is_stake_delegation
                   ; is_fee_transfer
-                  ])
+                  ] )
            ; (* TODO: Remove this check and update the transaction snark once we
                 have an exchange rate mechanism. See issue #4447.
              *)
@@ -2148,7 +2146,7 @@ module Base = struct
                   ; is_mint_tokens
                     (* TODO: Enable this when fees in tokens are enabled. *)
                     (*; is_fee_transfer*)
-                  ])
+                  ] )
            ; [%with_label
                "Token is non-default or command allows default token"]
                Boolean.(
@@ -2160,7 +2158,7 @@ module Base = struct
                    ; is_fee_transfer
                    ; is_coinbase
                    ])
-           ])
+           ] )
     in
     let current_global_slot =
       Mina_state.Protocol_state.Body.consensus_state state_body
@@ -2272,7 +2270,7 @@ module Base = struct
               Boolean.(equal_source ||| equal_source_with_state)
             in
             Boolean.Assert.all
-              [ correct_coinbase_target_stack; valid_init_state ]))
+              [ correct_coinbase_target_stack; valid_init_state ] ) )
     in
     (* Interrogate failure cases. This value is created without constraints;
        the failures should be checked against potential failures to ensure
@@ -2305,7 +2303,7 @@ module Base = struct
          assert_r1cs
            (predicate_failed :> Field.Var.t)
            (is_user_command :> Field.Var.t)
-           (user_command_failure.predicate_failed :> Field.Var.t))
+           (user_command_failure.predicate_failed :> Field.Var.t) )
     in
     let account_creation_amount =
       Amount.Checked.of_fee
@@ -2351,7 +2349,7 @@ module Base = struct
                     Account.Nonce.Checked.equal nonce account.nonce
                   in
                   Boolean.Assert.any
-                    [ Boolean.not is_user_command; nonce_matches ])
+                    [ Boolean.not is_user_command; nonce_matches ] )
              in
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
@@ -2396,7 +2394,7 @@ module Base = struct
                     Amount.Signed.create ~magnitude ~sgn:Sgn.Checked.neg
                   in
                   Amount.Signed.Checked.(
-                    add fee_payer_amount account_creation_fee))
+                    add fee_payer_amount account_creation_fee) )
              in
              let txn_global_slot = current_global_slot in
              let%bind `Min_balance _, timing =
@@ -2416,7 +2414,7 @@ module Base = struct
                       (Boolean.Assert.is_true ok)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount ~txn_global_slot)
+                    ~txn_amount ~txn_global_slot )
              in
              let%bind balance =
                [%with_label "Check payer balance"]
@@ -2446,7 +2444,7 @@ module Base = struct
              ; timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             }))
+             } ) )
     in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
@@ -2471,7 +2469,7 @@ module Base = struct
              ~then_:(Amount.Checked.of_fee fee)
              ~else_:(Amount.var_of_t Amount.zero)
          in
-         Amount.Checked.sub base_amount coinbase_receiver_fee)
+         Amount.Checked.sub base_amount coinbase_receiver_fee )
     in
     let receiver_overflow = ref Boolean.false_ in
     let%bind root_after_receiver_update =
@@ -2496,7 +2494,7 @@ module Base = struct
              let%bind () =
                [%with_label "Receiver existence failure matches predicted"]
                  (Boolean.Assert.( = ) is_empty_failure
-                    user_command_failure.receiver_not_present)
+                    user_command_failure.receiver_not_present )
              in
              let%bind () =
                [%with_label "Receiver creation failure matches predicted"]
@@ -2504,7 +2502,7 @@ module Base = struct
                     Boolean.((not is_empty_and_writeable) &&& is_create_account)
                   in
                   Boolean.Assert.( = ) is_nonempty_creating
-                    user_command_failure.receiver_exists)
+                    user_command_failure.receiver_exists )
              in
              let is_empty_and_writeable =
                (* is_empty_and_writable && not is_empty_failure *)
@@ -2538,10 +2536,10 @@ module Base = struct
                             transfers.
                        *)
                        Boolean.Assert.( = ) token_should_not_create
-                         token_cannot_create)
+                         token_cannot_create )
                   in
                   Boolean.Assert.( = ) token_cannot_create
-                    user_command_failure.token_cannot_create)
+                    user_command_failure.token_cannot_create )
              in
              let%bind balance =
                (* [receiver_increase] will be zero in the stake delegation
@@ -2561,7 +2559,7 @@ module Base = struct
                    [%with_label
                      "Receiver creation fee failure matches predicted"]
                      (Boolean.Assert.( = ) underflow
-                        user_command_failure.amount_insufficient_to_create)
+                        user_command_failure.amount_insufficient_to_create )
                  in
                  Currency.Amount.Checked.if_ user_command_fails
                    ~then_:Amount.(var_of_t zero)
@@ -2636,7 +2634,7 @@ module Base = struct
              ; timing = account.timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             }))
+             } ) )
     in
     let%bind user_command_fails =
       Boolean.(!receiver_overflow ||| user_command_fails)
@@ -2661,7 +2659,7 @@ module Base = struct
              let%bind () =
                [%with_label "Check source presence failure matches predicted"]
                  (Boolean.Assert.( = ) is_empty_and_writeable
-                    user_command_failure.source_not_present)
+                    user_command_failure.source_not_present )
              in
              let%bind () =
                [%with_label
@@ -2682,7 +2680,8 @@ module Base = struct
                      else
                        num_failures = num_failures
                   *)
-                  assert_r1cs not_fee_payer_is_source num_failures num_failures)
+                  assert_r1cs not_fee_payer_is_source num_failures num_failures
+                 )
              in
              let%bind amount =
                (* Only payments should affect the balance at this stage. *)
@@ -2697,7 +2696,7 @@ module Base = struct
                       "Check source balance failure matches predicted"]
                       (Boolean.Assert.( = ) ok
                          (Boolean.not
-                            user_command_failure.source_insufficient_balance))
+                            user_command_failure.source_insufficient_balance ) )
                   in
                   let timed_balance_check ok =
                     [%with_label
@@ -2710,10 +2709,10 @@ module Base = struct
                                    .source_insufficient_balance)
                        in
                        Boolean.Assert.( = ) not_ok
-                         user_command_failure.source_bad_timing)
+                         user_command_failure.source_bad_timing )
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:amount ~txn_global_slot)
+                    ~txn_amount:amount ~txn_global_slot )
              in
              let%bind balance, `Underflow underflow =
                Balance.Checked.sub_amount_flagged account.balance amount
@@ -2724,7 +2723,7 @@ module Base = struct
                *)
                [%with_label "Check source balance failure matches predicted"]
                  (Boolean.Assert.( = ) underflow
-                    user_command_failure.source_insufficient_balance)
+                    user_command_failure.source_insufficient_balance )
              in
              let%bind () =
                [%with_label "Check not_token_owner failure matches predicted"]
@@ -2741,7 +2740,7 @@ module Base = struct
                   in
                   Boolean.(
                     Assert.( = ) (not token_owner_ok)
-                      user_command_failure.not_token_owner))
+                      user_command_failure.not_token_owner) )
              in
              let%bind () =
                [%with_label "Check that token_auth failure matches predicted"]
@@ -2762,7 +2761,7 @@ module Base = struct
                         ])
                   in
                   Boolean.Assert.( = ) token_auth_failed
-                    user_command_failure.token_auth)
+                    user_command_failure.token_auth )
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
@@ -2784,7 +2783,7 @@ module Base = struct
              ; timing
              ; permissions = account.permissions
              ; snapp = account.snapp
-             }))
+             } ) )
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee
@@ -2816,7 +2815,7 @@ module Base = struct
                    [ not is_fee_transfer; not fee_transfer_excess_overflowed ])
            in
            Signed.Checked.if_ is_fee_transfer ~then_:fee_transfer_excess
-             ~else_:user_command_excess)
+             ~else_:user_command_excess )
     in
     let%bind supply_increase =
       Amount.Checked.if_ is_coinbase ~then_:payload.body.amount
@@ -2912,7 +2911,7 @@ module Base = struct
     ; main =
         (fun [] x ->
           Run.run_checked (main ~constraint_constants x) ;
-          [])
+          [] )
     ; main_value = (fun [] _ -> [])
     }
 
@@ -2956,7 +2955,7 @@ module Merge = struct
   let%snarkydef main
       ([ s1; s2 ] :
         (Statement.With_sok.var * (Statement.With_sok.var * _))
-        Pickles_types.Hlist.HlistId.t) (s : Statement.With_sok.Checked.t) =
+        Pickles_types.Hlist.HlistId.t ) (s : Statement.With_sok.Checked.t) =
     let%bind fee_excess =
       Fee_excess.combine_checked s1.Statement.fee_excess s2.Statement.fee_excess
     in
@@ -2971,7 +2970,7 @@ module Merge = struct
                ( s2.pending_coinbase_stack_state.source
                , s2.pending_coinbase_stack_state.target )
          in
-         Boolean.Assert.is_true valid_pending_coinbase_stack_transition)
+         Boolean.Assert.is_true valid_pending_coinbase_stack_transition )
     in
     let%bind supply_increase =
       Amount.Checked.add s1.supply_increase s2.supply_increase
@@ -3004,7 +3003,7 @@ module Merge = struct
     ; main =
         (fun ps x ->
           Run.run_checked (main ps x) ;
-          [ b; b ])
+          [ b; b ] )
     ; main_value = (fun _ _ -> [ prev_should_verify; prev_should_verify ])
     }
 end
@@ -3036,9 +3035,9 @@ let system ~proof_level ~constraint_constants =
         ~name:"transaction-snark"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants)
+             constraint_constants )
         ~choices:(fun ~self ->
-          [ Base.rule ~constraint_constants; Merge.rule ~proof_level self ]))
+          [ Base.rule ~constraint_constants; Merge.rule ~proof_level self ] ) )
 
 module Verification = struct
   module type S = sig
@@ -3132,9 +3131,9 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
                  (let open Checked in
                  exists Statement.With_sok.typ
                    ~compute:(As_prover.return statement)
-                 >>= Base.main ~constraint_constants))
-              handler)
-           ())
+                 >>= Base.main ~constraint_constants) )
+              handler )
+           () )
       : unit * unit )
 
 let command_to_proofs (p : Snapp_command.t) :
@@ -3154,7 +3153,7 @@ let command_to_proofs (p : Snapp_command.t) :
           ; body1 = p.data.body
           ; body2 = Snapp_command.Party.Body.dummy
           }
-        , proof_exn p.authorization ))
+        , proof_exn p.authorization ) )
   in
   match p with
   | Signed_empty _ ->
@@ -3201,7 +3200,7 @@ let check_snapp_command ?(preeval = false) ~constraint_constants ~sok_message
     match command_to_statements t with
     | [] ->
         Impl.make_checked (fun () ->
-            Base.Snapp_command.Zero_proved.main ~constraint_constants s)
+            Base.Snapp_command.Zero_proved.main ~constraint_constants s )
     | [ s1 ] ->
         let%bind s1 =
           exists Snapp_statement.typ ~compute:(As_prover.return s1)
@@ -3210,7 +3209,7 @@ let check_snapp_command ?(preeval = false) ~constraint_constants ~sok_message
             let (_ : Boolean.var) =
               Base.Snapp_command.One_proved.main ~constraint_constants s1 s
             in
-            ())
+            () )
     | [ s1; s2 ] ->
         let%bind s1 = exists Snapp_statement.typ ~compute:(As_prover.return s1)
         and s2 = exists Snapp_statement.typ ~compute:(As_prover.return s2) in
@@ -3218,13 +3217,13 @@ let check_snapp_command ?(preeval = false) ~constraint_constants ~sok_message
             let (_ : Boolean.var * Boolean.var) =
               Base.Snapp_command.Two_proved.main ~constraint_constants s1 s2 s
             in
-            ())
+            () )
   in
   ignore
     ( Or_error.ok_exn
         (run_and_check
            (handle (Checked.map ~f:As_prover.return comp) handler)
-           ())
+           () )
       : unit * unit )
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
@@ -3319,7 +3318,7 @@ let generate_snapp_command_witness ?(preeval = false) ~constraint_constants
       let main x =
         handle
           (make_checked (fun () ->
-               Base.Snapp_command.Zero_proved.main ~constraint_constants x))
+               Base.Snapp_command.Zero_proved.main ~constraint_constants x ) )
           handler
       in
       generate_auxiliary_input [ Statement.With_sok.typ ] () main statement
@@ -3330,7 +3329,8 @@ let generate_snapp_command_witness ?(preeval = false) ~constraint_constants
              exists Snapp_statement.typ ~compute:(As_prover.return s1)
            in
            make_checked (fun () ->
-               Base.Snapp_command.One_proved.main s1 ~constraint_constants x))
+               Base.Snapp_command.One_proved.main s1 ~constraint_constants x )
+          )
           handler
       in
       generate_auxiliary_input [ Statement.With_sok.typ ] () main statement
@@ -3344,7 +3344,8 @@ let generate_snapp_command_witness ?(preeval = false) ~constraint_constants
              exists Snapp_statement.typ ~compute:(As_prover.return s2)
            in
            make_checked (fun () ->
-               Base.Snapp_command.Two_proved.main s1 s2 ~constraint_constants x))
+               Base.Snapp_command.Two_proved.main s1 s2 ~constraint_constants x )
+          )
           handler
       in
       generate_auxiliary_input [ Statement.With_sok.typ ] () main statement
@@ -3381,7 +3382,7 @@ let verify (ts : (t * _) list) ~key =
     List.for_all ts ~f:(fun ({ statement; _ }, message) ->
         Sok_message.Digest.equal
           (Sok_message.digest message)
-          statement.sok_digest)
+          statement.sok_digest )
   then
     Pickles.verify
       (module Nat.N2)
@@ -3399,7 +3400,7 @@ let constraint_system_digests ~constraint_constants () =
               let open Tick in
               let%bind x1 = exists Statement.With_sok.typ in
               let%bind x2 = exists Statement.With_sok.typ in
-              main [ x1; x2 ] x)) )
+              main [ x1; x2 ] x )) )
   ; ( "transaction-base"
     , digest
         Base.(
@@ -3430,7 +3431,7 @@ struct
   let verify ts =
     if
       List.for_all ts ~f:(fun (p, m) ->
-          Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest)
+          Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest )
     then
       Proof.verify
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
@@ -3454,7 +3455,7 @@ struct
       base []
         ~handler:
           (Base.transaction_union_handler handler transaction state_body
-             init_stack)
+             init_stack )
         s
     in
     { statement = s; proof }
@@ -3520,7 +3521,7 @@ struct
         transaction =
           Command
             (Signed_command
-               (Transaction_protocol_state.transaction user_command_in_block))
+               (Transaction_protocol_state.transaction user_command_in_block) )
       }
       handler
 
@@ -3547,7 +3548,7 @@ struct
     if
       not
         (Token_id.( = ) t12.next_available_token_after
-           t23.next_available_token_before)
+           t23.next_available_token_before )
     then
       failwithf
         !"Transaction_snark.merge: t12.next_available_token_befre <> \
@@ -3562,7 +3563,7 @@ struct
       |> Option.value_map ~f:Or_error.return
            ~default:
              (Or_error.errorf
-                "Transaction_snark.merge: Supply change amount overflow")
+                "Transaction_snark.merge: Supply change amount overflow" )
       |> Async.return
     in
     let s : Statement.With_sok.t =
@@ -3661,7 +3662,7 @@ let%test_module "transaction_snark" =
                ; receiver_pk
                ; token_id = token
                ; amount = Amount.of_int amt
-               })
+               } )
       in
       let signature =
         Signed_command.sign_payload fee_payer.private_key payload
@@ -3738,7 +3739,7 @@ let%test_module "transaction_snark" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           of_user_command ~sok_digest ~source ~target ~init_stack
             ~pending_coinbase_stack_state ~next_available_token_before
-            ~next_available_token_after user_command_in_block handler)
+            ~next_available_token_after user_command_in_block handler )
 
     (*
                 ~proposer:
@@ -3773,7 +3774,7 @@ let%test_module "transaction_snark" =
           ~fee_transfer:
             (Some
                (Coinbase.Fee_transfer.create ~receiver_pk:other
-                  ~fee:constraint_constants.account_creation_fee))
+                  ~fee:constraint_constants.account_creation_fee ) )
         |> Or_error.ok_exn
       in
       let transaction = Transaction.Coinbase cb in
@@ -3809,7 +3810,7 @@ let%test_module "transaction_snark" =
             ~constraint_constants
             ~sok_message:
               (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
-                 ~prover:Public_key.Compressed.empty)
+                 ~prover:Public_key.Compressed.empty )
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
             ~next_available_token_before:(Ledger.next_available_token ledger)
@@ -3818,15 +3819,15 @@ let%test_module "transaction_snark" =
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~snapp_account1:None ~snapp_account2:None)
+            ~snapp_account1:None ~snapp_account2:None )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
-          coinbase_test state_body ~carryforward:false)
+          coinbase_test state_body ~carryforward:false )
 
     let%test_unit "coinbase with carry-forward state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
-          coinbase_test state_body ~carryforward:true)
+          coinbase_test state_body ~carryforward:true )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -3837,7 +3838,7 @@ let%test_module "transaction_snark" =
                 ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
-                    account) ;
+                    account ) ;
               let t1 =
                 user_command_with_wallet wallets ~sender:1 ~receiver:0
                   8_000_000_000
@@ -3846,7 +3847,7 @@ let%test_module "transaction_snark" =
                   Account.Nonce.zero
                   (Signed_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:Signed_command_memo.max_digestible_string_length))
+                        ~len:Signed_command_memo.max_digestible_string_length ) )
               in
               let current_global_slot =
                 Mina_state.Protocol_state.Body.consensus_state state_body
@@ -3887,7 +3888,7 @@ let%test_module "transaction_snark" =
                 ~pending_coinbase_stack_state ~next_available_token_before
                 ~next_available_token_after
                 { transaction = t1; block_data = state_body }
-                (unstage @@ Sparse_ledger.handler sparse_ledger)))
+                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let signed_signed ~wallets i j =
       let full_amount = 8_000_000_000 in
@@ -3946,7 +3947,7 @@ let%test_module "transaction_snark" =
                 ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
-                    account) ;
+                    account ) ;
               let t1 =
                 let i, j = (1, 2) in
                 signed_signed ~wallets i j
@@ -3960,7 +3961,7 @@ let%test_module "transaction_snark" =
                   ~txn_state_view t1
               in
               let hash_post = Ledger.merkle_root ledger in
-              [%test_eq: Field.t] hash_pre hash_post))
+              [%test_eq: Field.t] hash_pre hash_post ) )
 
     let%test_unit "signed_signed" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -3970,7 +3971,7 @@ let%test_module "transaction_snark" =
                 ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
-                    account) ;
+                    account ) ;
               let i, j = (1, 2) in
               let t1 = signed_signed ~wallets i j in
               let txn_state_view =
@@ -4010,7 +4011,7 @@ let%test_module "transaction_snark" =
                 ~target ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state ~next_available_token_before
                 ~next_available_token_after ~snapp_account1 ~snapp_account2 t1
-                (unstage @@ Sparse_ledger.handler sparse_ledger)))
+                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee = Fee.to_int constraint_constants.account_creation_fee
 
@@ -4043,7 +4044,7 @@ let%test_module "transaction_snark" =
                   ~consensus_state:consensus_state_at_slot
                   ~constants:
                     (Protocol_constants_checked.value_of_t
-                       Genesis_constants.compiled.protocol))
+                       Genesis_constants.compiled.protocol ))
                 .body
             in
             let state_body_hash =
@@ -4112,7 +4113,7 @@ let%test_module "transaction_snark" =
           let memo =
             Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:Signed_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length )
           in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let _, ucs =
@@ -4130,7 +4131,7 @@ let%test_module "transaction_snark" =
                         ~fee_token:Token_id.default ~token:Token_id.default
                         amount (Fee.of_int txn_fee) nonce memo
                     in
-                    (Account.Nonce.succ nonce, txns @ [ uc ]))
+                    (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
               Ledger.create_new_account_exn ledger
                 (Account.identifier sender.account)
@@ -4138,19 +4139,19 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter ucs ~f:(fun uc ->
                     test_transaction ~constraint_constants ledger
-                      (Transaction.Command (Signed_command uc)))
+                      (Transaction.Command (Signed_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance
                     (Account.identifier receiver.account)
                     ((amount * txns_per_receiver) - account_fee)
-                    ledger) ;
+                    ledger ) ;
               check_balance
                 (Account.identifier sender.account)
                 ( Balance.to_int sender.account.balance
                 - (amount + txn_fee) * txns_per_receiver * List.length receivers
                 )
-                ledger))
+                ledger ) )
 
     let%test_unit "account creation fee - fee transfers" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4172,20 +4173,20 @@ let%test_module "transaction_snark" =
                              Fee_transfer.Single.create
                                ~receiver_pk:receiver.account.public_key
                                ~fee:(Currency.Fee.of_int fee)
-                               ~fee_token:receiver.account.token_id)
+                               ~fee_token:receiver.account.token_id )
                     in
-                    txns @ [ ft ])
+                    txns @ [ ft ] )
               in
               let () =
                 List.iter fts ~f:(fun ft ->
                     let txn = Transaction.Fee_transfer ft in
-                    test_transaction ~constraint_constants ledger txn)
+                    test_transaction ~constraint_constants ledger txn )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance
                     (Account.identifier receiver.account)
                     ((fee * txns_per_receiver) - account_fee)
-                    ledger)))
+                    ledger ) ) )
 
     let%test_unit "account creation fee - coinbase" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4203,7 +4204,7 @@ let%test_module "transaction_snark" =
                   List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
                       Coinbase.Fee_transfer.create
                         ~receiver_pk:other.account.public_key
-                        ~fee:constraint_constants.account_creation_fee)
+                        ~fee:constraint_constants.account_creation_fee )
                 in
                 List.fold ~init:(fts, []) (List.init coinbase_count ~f:Fn.id)
                   ~f:(fun (fts, cbs) _ ->
@@ -4214,7 +4215,7 @@ let%test_module "transaction_snark" =
                         ~fee_transfer:(List.hd fts)
                       |> Or_error.ok_exn
                     in
-                    (Option.value ~default:[] (List.tl fts), cb :: cbs))
+                    (Option.value ~default:[] (List.tl fts), cb :: cbs) )
               in
               Ledger.create_new_account_exn ledger
                 (Account.identifier dummy_account.account)
@@ -4222,7 +4223,7 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter cbs ~f:(fun cb ->
                     let txn = Transaction.Coinbase cb in
-                    test_transaction ~constraint_constants ledger txn)
+                    test_transaction ~constraint_constants ledger txn )
               in
               let fees = fee * ft_count in
               check_balance
@@ -4231,7 +4232,7 @@ let%test_module "transaction_snark" =
                 ledger ;
               check_balance
                 (Account.identifier other.account)
-                (fees - account_fee) ledger))
+                (fees - account_fee) ledger ) )
 
     module Pc_with_init_stack = struct
       type t =
@@ -4252,11 +4253,11 @@ let%test_module "transaction_snark" =
               Array.iter wallets ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
-                    account) ;
+                    account ) ;
               let memo =
                 Signed_command_memo.create_by_digesting_string_exn
                   (Test_util.arbitrary_string
-                     ~len:Signed_command_memo.max_digestible_string_length)
+                     ~len:Signed_command_memo.max_digestible_string_length )
               in
               let t1 =
                 user_command_with_wallet wallets ~sender:0 ~receiver:1
@@ -4288,8 +4289,8 @@ let%test_module "transaction_snark" =
                        *)
                        Signed_command.accounts_accessed
                          ~next_available_token:next_available_token1
-                         (Signed_command.forget_check t))
-                     [ t1; t2 ])
+                         (Signed_command.forget_check t) )
+                     [ t1; t2 ] )
               in
               let init_stack1 = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_state1 =
@@ -4391,12 +4392,12 @@ let%test_module "transaction_snark" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof13 =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    merge ~sok_digest proof12 proof23)
+                    merge ~sok_digest proof12 proof23 )
                 |> Or_error.ok_exn
               in
               Async.Thread_safe.block_on_async (fun () ->
-                  Proof.verify [ (proof13.statement, proof13.proof) ])
-              |> Result.ok_exn))
+                  Proof.verify [ (proof13.statement, proof13.proof) ] )
+              |> Result.ok_exn ) )
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
               carryforward the state from a previous transaction t0 in b1" =
@@ -4468,12 +4469,12 @@ let%test_module "transaction_snark" =
         | None ->
             Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:Signed_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length )
       in
       Array.iter accounts ~f:(fun account ->
           Ledger.create_new_account_exn ledger
             (Account.identifier account)
-            account) ;
+            account ) ;
       let get_account aid =
         Option.bind
           (Ledger.location_of_account ledger aid)
@@ -4559,7 +4560,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.equal accounts.(1).balance source_account.balance) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "transfer non-default tokens to an existing account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4606,8 +4607,7 @@ let%test_module "transaction_snark" =
                 accounts.(2).balance |> add_amount amount
               in
               assert (
-                Balance.equal receiver_account.balance expected_receiver_balance
-              )))
+                Balance.equal receiver_account.balance expected_receiver_balance ) ) )
 
     let%test_unit "insufficient account creation fee for non-default token \
                    transfer" =
@@ -4647,7 +4647,7 @@ let%test_module "transaction_snark" =
               let expected_source_balance = accounts.(1).balance in
               assert (
                 Balance.equal source_account.balance expected_source_balance ) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "insufficient source balance for non-default token transfer" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4684,7 +4684,7 @@ let%test_module "transaction_snark" =
               let expected_source_balance = accounts.(1).balance in
               assert (
                 Balance.equal source_account.balance expected_source_balance ) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "transfer non-existing source" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4716,7 +4716,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Option.is_none source_account) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "payment predicate failure" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4753,7 +4753,7 @@ let%test_module "transaction_snark" =
               let expected_source_balance = accounts.(1).balance in
               assert (
                 Balance.equal source_account.balance expected_source_balance ) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "delegation predicate failure" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4779,7 +4779,8 @@ let%test_module "transaction_snark" =
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Stake_delegation
                      (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk }))
+                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
@@ -4793,7 +4794,7 @@ let%test_module "transaction_snark" =
                 Public_key.Compressed.equal
                   (Option.value_exn source_account.delegate)
                   source_pk ) ;
-              assert (Option.is_some receiver_account)))
+              assert (Option.is_some receiver_account) ) )
 
     let%test_unit "delegation delegatee does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4815,7 +4816,8 @@ let%test_module "transaction_snark" =
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Stake_delegation
                      (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk }))
+                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
@@ -4829,7 +4831,7 @@ let%test_module "transaction_snark" =
                 Public_key.Compressed.equal
                   (Option.value_exn source_account.delegate)
                   source_pk ) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "delegation delegator does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4854,7 +4856,8 @@ let%test_module "transaction_snark" =
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Stake_delegation
                      (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk }))
+                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let expected_fee_payer_balance =
@@ -4864,7 +4867,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Option.is_none source_account) ;
-              assert (Option.is_some receiver_account)))
+              assert (Option.is_some receiver_account) ) )
 
     let%test_unit "timed account - transactions" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4877,7 +4880,7 @@ let%test_module "transaction_snark" =
           let memo =
             Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:Signed_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length )
           in
           let balance = Balance.of_int 100_000_000_000_000 in
           let initial_minimum_balance = Balance.of_int 80_000_000_000_000 in
@@ -4913,7 +4916,7 @@ let%test_module "transaction_snark" =
                         amount (Fee.of_int txn_fee) ~fee_token:Token_id.default
                         ~token:Token_id.default nonce memo
                     in
-                    (Account.Nonce.succ nonce, txns @ [ uc ]))
+                    (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
               Ledger.create_new_account_exn ledger
                 (Account.identifier sender.account)
@@ -4921,19 +4924,19 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter ucs ~f:(fun uc ->
                     test_transaction ~constraint_constants ~txn_global_slot
-                      ledger (Transaction.Command (Signed_command uc)))
+                      ledger (Transaction.Command (Signed_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance
                     (Account.identifier receiver.account)
                     ((amount * txns_per_receiver) - account_fee)
-                    ledger) ;
+                    ledger ) ;
               check_balance
                 (Account.identifier sender.account)
                 ( Balance.to_int sender.account.balance
                 - (amount + txn_fee) * txns_per_receiver * List.length receivers
                 )
-                ledger))
+                ledger ) )
 
     let%test_unit "create own new token" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4954,7 +4957,7 @@ let%test_module "transaction_snark" =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Create_new_token
-                     { token_owner_pk; disable_new_accounts = false })
+                     { token_owner_pk; disable_new_accounts = false } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -4969,7 +4972,7 @@ let%test_module "transaction_snark" =
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
                 Token_permissions.equal token_owner_account.token_permissions
-                  (Token_owned { disable_new_accounts = false }) )))
+                  (Token_owned { disable_new_accounts = false }) ) ) )
 
     let%test_unit "create new token for a different pk" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4990,7 +4993,7 @@ let%test_module "transaction_snark" =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Create_new_token
-                     { token_owner_pk; disable_new_accounts = false })
+                     { token_owner_pk; disable_new_accounts = false } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5005,7 +5008,7 @@ let%test_module "transaction_snark" =
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
                 Token_permissions.equal token_owner_account.token_permissions
-                  (Token_owned { disable_new_accounts = false }) )))
+                  (Token_owned { disable_new_accounts = false }) ) ) )
 
     let%test_unit "create new token for a different pk new accounts disabled" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5026,7 +5029,7 @@ let%test_module "transaction_snark" =
                 test_user_command_with_accounts ~constraint_constants ~ledger
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Create_new_token
-                     { token_owner_pk; disable_new_accounts = true })
+                     { token_owner_pk; disable_new_accounts = true } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5041,7 +5044,7 @@ let%test_module "transaction_snark" =
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
                 Token_permissions.equal token_owner_account.token_permissions
-                  (Token_owned { disable_new_accounts = true }) )))
+                  (Token_owned { disable_new_accounts = true }) ) ) )
 
     let%test_unit "create own new token account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5073,7 +5076,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5090,7 +5093,7 @@ let%test_module "transaction_snark" =
               assert (Option.is_none receiver_account.delegate) ;
               assert (
                 Token_permissions.equal receiver_account.token_permissions
-                  (Not_owned { account_disabled = false }) )))
+                  (Not_owned { account_disabled = false }) ) ) )
 
     let%test_unit "create new token account for a different pk" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5122,7 +5125,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5139,7 +5142,7 @@ let%test_module "transaction_snark" =
               assert (Option.is_none receiver_account.delegate) ;
               assert (
                 Token_permissions.equal receiver_account.token_permissions
-                  (Not_owned { account_disabled = false }) )))
+                  (Not_owned { account_disabled = false }) ) ) )
 
     let%test_unit "create new token account for a different pk in a locked \
                    token" =
@@ -5172,7 +5175,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5189,7 +5192,7 @@ let%test_module "transaction_snark" =
               assert (Option.is_none receiver_account.delegate) ;
               assert (
                 Token_permissions.equal receiver_account.token_permissions
-                  (Not_owned { account_disabled = false }) )))
+                  (Not_owned { account_disabled = false }) ) ) )
 
     let%test_unit "create new own locked token account in a locked token" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5221,7 +5224,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = true
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5238,7 +5241,7 @@ let%test_module "transaction_snark" =
               assert (Option.is_none receiver_account.delegate) ;
               assert (
                 Token_permissions.equal receiver_account.token_permissions
-                  (Not_owned { account_disabled = true }) )))
+                  (Not_owned { account_disabled = true }) ) ) )
 
     let%test_unit "create new token account fails for locked token, non-owner \
                    fee-payer" =
@@ -5271,7 +5274,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5282,7 +5285,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "create new locked token account fails for unlocked token, \
                    non-owner fee-payer" =
@@ -5315,7 +5318,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = true
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5326,7 +5329,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "create new token account fails if account exists" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5359,7 +5362,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5372,7 +5375,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
-              assert (Balance.(equal zero) receiver_account.balance)))
+              assert (Balance.(equal zero) receiver_account.balance) ) )
 
     let%test_unit "create new token account fails if receiver is token owner" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5404,7 +5407,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5417,7 +5420,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
-              assert (Balance.(equal zero) receiver_account.balance)))
+              assert (Balance.(equal zero) receiver_account.balance) ) )
 
     let%test_unit "create new token account fails if claimed token owner \
                    doesn't own the token" =
@@ -5447,7 +5450,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let token_owner_account = Option.value_exn token_owner_account in
@@ -5459,7 +5462,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "create new token account fails if claimed token owner is \
                    also the account creation target and does not exist" =
@@ -5485,7 +5488,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk = fee_payer_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               (* No account creation fee: the command fails. *)
@@ -5496,7 +5499,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Option.is_none token_owner_account) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "create new token account works for default token" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5523,7 +5526,7 @@ let%test_module "transaction_snark" =
                      ; token_id
                      ; receiver_pk
                      ; account_disabled = false
-                     })
+                     } )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let receiver_account = Option.value_exn receiver_account in
@@ -5540,7 +5543,7 @@ let%test_module "transaction_snark" =
                   (Option.value_exn receiver_account.delegate) ) ;
               assert (
                 Token_permissions.equal receiver_account.token_permissions
-                  (Not_owned { account_disabled = false }) )))
+                  (Not_owned { account_disabled = false }) ) ) )
 
     let%test_unit "mint tokens in owner's account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5584,8 +5587,7 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (
-                Balance.equal expected_receiver_balance receiver_account.balance
-              )))
+                Balance.equal expected_receiver_balance receiver_account.balance ) ) )
 
     let%test_unit "mint tokens in another pk's account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5631,11 +5633,9 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (
-                Balance.equal accounts.(1).balance token_owner_account.balance
-              ) ;
+                Balance.equal accounts.(1).balance token_owner_account.balance ) ;
               assert (
-                Balance.equal expected_receiver_balance receiver_account.balance
-              )))
+                Balance.equal expected_receiver_balance receiver_account.balance ) ) )
 
     let%test_unit "mint tokens fails if the claimed token owner is not the \
                    token owner" =
@@ -5676,10 +5676,9 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (
-                Balance.equal accounts.(1).balance token_owner_account.balance
-              ) ;
+                Balance.equal accounts.(1).balance token_owner_account.balance ) ;
               assert (
-                Balance.equal accounts.(2).balance receiver_account.balance )))
+                Balance.equal accounts.(2).balance receiver_account.balance ) ) )
 
     let%test_unit "mint tokens fails if the token owner account is not present"
         =
@@ -5719,7 +5718,7 @@ let%test_module "transaction_snark" =
                   expected_fee_payer_balance ) ;
               assert (Option.is_none token_owner_account) ;
               assert (
-                Balance.equal accounts.(1).balance receiver_account.balance )))
+                Balance.equal accounts.(1).balance receiver_account.balance ) ) )
 
     let%test_unit "mint tokens fails if the fee-payer does not have permission \
                    to mint" =
@@ -5763,10 +5762,9 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (
-                Balance.equal accounts.(1).balance token_owner_account.balance
-              ) ;
+                Balance.equal accounts.(1).balance token_owner_account.balance ) ;
               assert (
-                Balance.equal accounts.(2).balance receiver_account.balance )))
+                Balance.equal accounts.(2).balance receiver_account.balance ) ) )
 
     let%test_unit "mint tokens fails if the receiver account is not present" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5807,16 +5805,15 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (
-                Balance.equal accounts.(1).balance token_owner_account.balance
-              ) ;
-              assert (Option.is_none receiver_account)))
+                Balance.equal accounts.(1).balance token_owner_account.balance ) ;
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "unchanged timings for fee transfers and coinbase" =
       Test_util.with_randomness 123456789 (fun () ->
           let receivers =
             Array.init 2 ~f:(fun _ ->
                 Public_key.of_private_key_exn (Private_key.create ())
-                |> Public_key.compress)
+                |> Public_key.compress )
           in
           let timed_account pk =
             let account_id = Account_id.create pk Token_id.default in
@@ -5869,12 +5866,12 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               List.iter [ timed_account1; timed_account2 ] ~f:(fun acc ->
                   Ledger.create_new_account_exn ledger (Account.identifier acc)
-                    acc) ;
+                    acc ) ;
               (* well over the vesting period, the timing field shouldn't change*)
               let txn_global_slot = Global_slot.of_int 100 in
               List.iter transactions ~f:(fun txn ->
                   test_transaction ~txn_global_slot ~constraint_constants ledger
-                    txn)))
+                    txn ) ) )
   end )
 
 let%test_module "account timing check" =
@@ -5914,7 +5911,7 @@ let%test_module "account timing check" =
       let snarky_bools =
         List.map bools ~f:(fun b ->
             let open Tick.Boolean in
-            if b then true_ else false_)
+            if b then true_ else false_ )
       in
       let bitstring_lsb =
         Bitstring_lib.Bitstring.Lsb_first.of_list snarky_bools
@@ -5941,12 +5938,12 @@ let%test_module "account timing check" =
         in
         let%bind unchecked_min_balance_as_snarky_integer =
           Run.make_checked (fun () ->
-              snarky_integer_of_bools (Balance.to_bits unchecked_min_balance))
+              snarky_integer_of_bools (Balance.to_bits unchecked_min_balance) )
         in
         let%map equal_balances_checked =
           Run.make_checked (fun () ->
               Snarky_integer.Integer.equal ~m checked_min_balance
-                unchecked_min_balance_as_snarky_integer)
+                unchecked_min_balance_as_snarky_integer )
         in
         Snarky_backendless.As_prover.read Tick.Boolean.typ
           equal_balances_checked
@@ -6227,11 +6224,11 @@ let%test_module "transaction_undos" =
             let account_id = Account_id.create sender_pk Token_id.default in
             if
               List.find cmds ~f:(fun cmd ->
-                  Account_id.equal (User_command.fee_payer cmd) account_id)
+                  Account_id.equal (User_command.fee_payer cmd) account_id )
               |> Option.is_some
             then None
             else if Currency.Amount.(balance >= amount) then Some s
-            else None)
+            else None )
       in
       let new_cmds =
         let source_accounts =
@@ -6240,7 +6237,7 @@ let%test_module "transaction_undos" =
         assert (not (List.is_empty source_accounts)) ;
         let new_keys =
           List.init (List.length source_accounts) ~f:(fun _ ->
-              Signature_lib.Keypair.create ())
+              Signature_lib.Keypair.create () )
         in
         List.map (List.zip_exn source_accounts new_keys)
           ~f:(fun ((s, _, nonce, _), r) ->
@@ -6257,10 +6254,10 @@ let%test_module "transaction_undos" =
                      ; receiver_pk = reciever_pk
                      ; token_id = Token_id.default
                      ; amount
-                     })
+                     } )
             in
             let c = Signed_command.sign s payload in
-            User_command.Signed_command (Signed_command.forget_check c))
+            User_command.Signed_command (Signed_command.forget_check c) )
       in
       List.map ~f:(fun c -> Transaction.Command c) (cmds @ new_cmds)
 
@@ -6284,7 +6281,7 @@ let%test_module "transaction_undos" =
           Quickcheck.Generator.list_with_length count
             (Fee_transfer.Single.Gen.with_random_receivers ~keys:accounts
                ~max_fee ~min_fee
-               ~token:(Quickcheck.Generator.return Token_id.default))
+               ~token:(Quickcheck.Generator.return Token_id.default) )
         in
         One_or_two.group_list singles
         |> List.map ~f:(Fn.compose Or_error.ok_exn Fee_transfer.of_singles)
@@ -6299,7 +6296,7 @@ let%test_module "transaction_undos" =
                let keypair, _, _, _ =
                  Array.random_element_exn ledger_init_state
                in
-               keypair))
+               keypair ) )
           remaining
       in
       List.map
@@ -6312,7 +6309,7 @@ let%test_module "transaction_undos" =
       let%bind coinbase_new_accounts =
         Quickcheck.Generator.list_with_length count
           (Quickcheck.Generator.map ~f:fst
-             (Coinbase.Gen.gen ~constraint_constants))
+             (Coinbase.Gen.gen ~constraint_constants) )
       in
       let%map coinbase_existing_accounts =
         let remaining = max count (length - count) in
@@ -6321,7 +6318,7 @@ let%test_module "transaction_undos" =
               let keypair, _, _, _ =
                 Array.random_element_exn ledger_init_state
               in
-              keypair)
+              keypair )
         in
         let min_amount =
           Option.value_exn
@@ -6335,7 +6332,7 @@ let%test_module "transaction_undos" =
           (Coinbase.Gen.with_random_receivers ~keys ~min_amount ~max_amount
              ~fee_transfer:
                (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-                  ~min_fee:constraint_constants.account_creation_fee))
+                  ~min_fee:constraint_constants.account_creation_fee ) )
       in
       List.map
         ~f:(fun c -> Transaction.Coinbase c)
@@ -6361,13 +6358,13 @@ let%test_module "transaction_undos" =
     let test_undos ledger transactions =
       let res =
         List.fold ~init:[] transactions ~f:(fun acc t ->
-            test_undo ledger t :: acc)
+            test_undo ledger t :: acc )
       in
       List.iter res ~f:(fun (root_before, u) ->
           let () =
             Ledger.undo ~constraint_constants ledger u |> Or_error.ok_exn
           in
-          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before))
+          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before) )
 
     let%test_unit "undo_coinbase" =
       let gen =
@@ -6382,7 +6379,7 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger coinbase_list))
+              test_undos ledger coinbase_list ) )
 
     let%test_unit "undo_fee_transfers" =
       let gen =
@@ -6397,7 +6394,7 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger ft_list))
+              test_undos ledger ft_list ) )
 
     let%test_unit "undo_user_commands" =
       let gen =
@@ -6412,7 +6409,7 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger cmd_list))
+              test_undos ledger cmd_list ) )
 
     let%test_unit "undo_all_txns" =
       let gen =
@@ -6436,5 +6433,5 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger txn_list))
+              test_undos ledger txn_list ) )
   end )

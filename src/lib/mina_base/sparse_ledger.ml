@@ -44,7 +44,7 @@ module L = struct
     Option.try_with (fun () ->
         let account = M.get_exn !t loc in
         if Public_key.Compressed.(equal empty account.public_key) then None
-        else Some account)
+        else Some account )
     |> Option.bind ~f:Fn.id
 
   let location_of_account : t -> Account_id.t -> location option =
@@ -82,7 +82,7 @@ module L = struct
         if Public_key.Compressed.(equal empty a.public_key) then (
           set t loc to_set ;
           (`Added, loc) )
-        else (`Existed, loc))
+        else (`Existed, loc) )
 
   let remove_accounts_exn : t -> Account_id.t list -> unit =
    fun _t _xs -> failwith "remove_accounts_exn: not implemented"
@@ -130,17 +130,17 @@ let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
          ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
-         (Ledger.Any_ledger.M.merkle_root ledger))
+         (Ledger.Any_ledger.M.merkle_root ledger) )
     ~f:(fun _addr sparse_ledger account ->
       let loc =
         Option.value_exn
           (Ledger.Any_ledger.M.location_of_account ledger
-             (Account.identifier account))
+             (Account.identifier account) )
       in
       add_path sparse_ledger
         (Ledger.Any_ledger.M.merkle_path ledger loc)
         (Account.identifier account)
-        (Option.value_exn (Ledger.Any_ledger.M.get ledger loc)))
+        (Option.value_exn (Ledger.Any_ledger.M.get ledger loc)) )
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
@@ -157,13 +157,13 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
                 |> Option.value_exn ?here:None ?error:None ?message:None ) )
         | None ->
             let path, acct = Ledger.create_empty_exn ledger key in
-            (key :: new_keys, add_path sl path key acct))
+            (key :: new_keys, add_path sl path key acct) )
       ~init:([], of_ledger_root ledger)
   in
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash)) ;
+        ((merkle_root sparse :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) ) ;
   sparse
 
 let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
@@ -172,13 +172,13 @@ let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
       (of_root
          ~depth:(Ledger.Any_ledger.M.depth ledger)
          ~next_available_token:(Ledger.Any_ledger.M.next_available_token ledger)
-         (Ledger.Any_ledger.M.merkle_root ledger))
+         (Ledger.Any_ledger.M.merkle_root ledger) )
     ~f:(fun acc i ->
       let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
       add_path acc
         (Ledger.Any_ledger.M.merkle_path_at_index_exn ledger i)
         (Account.identifier account)
-        account)
+        account )
 
 let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
   let keygen () =
@@ -195,7 +195,7 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
       let sl = of_ledger_subset_exn ledger [ aid1; aid2 ] in
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash))
+        ((merkle_root sl :> Random_oracle.Digest.t) |> Ledger_hash.of_hash) )
 
 let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
@@ -269,13 +269,13 @@ let apply_user_command_exn
     let balance =
       Option.value_exn
         (Balance.sub_amount account.balance
-           (Amount.of_fee constraint_constants.account_creation_fee))
+           (Amount.of_fee constraint_constants.account_creation_fee) )
     in
     let account = { account with balance } in
     let timing =
       Or_error.ok_exn
         (Transaction_logic.validate_timing ~txn_amount:Amount.zero
-           ~txn_global_slot:current_global_slot ~account)
+           ~txn_global_slot:current_global_slot ~account )
     in
     { account with timing }
   in
@@ -400,7 +400,8 @@ let apply_user_command_exn
           raise
             (Reject
                (Failure
-                  "Token owner account for newly created token already exists")) ;
+                  "Token owner account for newly created token already exists"
+               ) ) ;
         let receiver_account =
           { receiver_account with
             token_permissions =
@@ -415,7 +416,8 @@ let apply_user_command_exn
         then
           raise
             (Reject
-               (Failure "Cannot open a disabled account in the default token")) ;
+               (Failure "Cannot open a disabled account in the default token")
+            ) ;
         let fee_payer_account =
           try charge_account_creation_fee_exn fee_payer_account
           with exn -> raise (Reject exn)
@@ -519,7 +521,7 @@ let apply_user_command_exn
     let indexed_accounts = compute_updates () in
     (* User command succeeded, update accounts in the ledger. *)
     List.fold ~init:t indexed_accounts ~f:(fun t (idx, account) ->
-        set_exn t idx account)
+        set_exn t idx account )
   with
   | Reject exn ->
       (* TODO: These transactions should never reach this stage, this error
@@ -654,7 +656,7 @@ let handler t =
           let index = find_index_exn !ledger pk in
           respond (Provide index)
       | _ ->
-          unhandled)
+          unhandled )
 
 let snapp_accounts (ledger : t) (t : Transaction.t) =
   match t with
@@ -666,7 +668,7 @@ let snapp_accounts (ledger : t) (t : Transaction.t) =
         Option.try_with (fun () ->
             ( find_index_exn ledger (Account_id.create pk token_id)
             |> get_exn ledger )
-              .snapp)
+              .snapp )
         |> Option.join
       in
       match Snapp_command.to_payload c with

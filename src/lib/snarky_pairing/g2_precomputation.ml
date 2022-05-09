@@ -194,7 +194,7 @@ struct
              let%map () = assert_r1cs c.gamma (s.rx - rx) (res + s.ry) in
              res
            in
-           { rx; ry })
+           { rx; ry } )
       in
       (s, c))
 
@@ -279,5 +279,5 @@ struct
       (let%map coeffs =
          go (Array.length naf - 1) false { rx = qx; ry = qy } []
        in
-       { q; coeffs })
+       { q; coeffs } )
 end

@@ -151,7 +151,7 @@ let to_field_constant (type f) ~endo
 let test (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type prover_state = unit
-       and type field = f) ~(endo : f) =
+       and type field = f ) ~(endo : f) =
   let open Impl in
   let module T = Internal_Basic in
   let n = 128 in
@@ -165,16 +165,17 @@ let test (type f)
           Field.typ
           (fun s ->
             make_checked (fun () ->
-                to_field_checked (module Impl) ~endo (SC.Scalar_challenge s)))
+                to_field_checked (module Impl) ~endo (SC.Scalar_challenge s) )
+            )
           (fun s ->
             to_field_constant
               (module Field.Constant)
               ~endo
-              (Scalar_challenge (Challenge.Constant.of_bits s)))
+              (Scalar_challenge (Challenge.Constant.of_bits s)) )
           xs
       with e ->
         eprintf !"Input %{sexp: bool list}\n%!" xs ;
-        raise e)
+        raise e )
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
@@ -298,17 +299,17 @@ struct
             (Typ.tuple2 G.typ (Typ.list ~length:n Boolean.typ))
             G.typ
             (fun (g, s) ->
-              make_checked (fun () -> endo g (SC.Scalar_challenge s)))
+              make_checked (fun () -> endo g (SC.Scalar_challenge s)) )
             (fun (g, s) ->
               let x =
                 Constant.to_field
                   (Scalar_challenge (Challenge.Constant.of_bits s))
               in
-              G.Constant.scale g x)
+              G.Constant.scale g x )
             (random_point, xs)
         with e ->
           eprintf !"Input %{sexp: bool list}\n%!" xs ;
-          raise e)
+          raise e )
 
   let endo_inv ((gx, gy) as g) chal =
     let res =

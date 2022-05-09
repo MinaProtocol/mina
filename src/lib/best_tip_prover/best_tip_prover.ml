@@ -39,7 +39,7 @@ module Make (Inputs : Inputs_intf) :
 
     let hash acc body_hash =
       (Protocol_state.hashes_abstract ~hash_body:Fn.id
-         { previous_state_hash = acc; body = body_hash })
+         { previous_state_hash = acc; body = body_hash } )
         .state_hash
   end)
 
@@ -136,7 +136,7 @@ module Make (Inputs : Inputs_intf) :
              @@ sprintf
                   !"Peer should have given a proof of length %d but got %d"
                   max_length merkle_list_length )
-           (Int.equal max_length merkle_list_length || root_is_genesis))
+           (Int.equal max_length merkle_list_length || root_is_genesis) )
     in
     let best_tip_with_hash =
       With_hash.of_data best_tip ~hash_data:state_hashes
@@ -150,13 +150,13 @@ module Make (Inputs : Inputs_intf) :
            (Merkle_list_verifier.verify
               ~init:
                 (State_hash.With_state_hashes.state_hash
-                   root_transition_with_hash)
+                   root_transition_with_hash )
               merkle_list
-              (State_hash.With_state_hashes.state_hash best_tip_with_hash))
+              (State_hash.With_state_hashes.state_hash best_tip_with_hash) )
            ~error:
              (Error.of_string
                 "Peer should have given a valid merkle list proof for their \
-                 best tip"))
+                 best tip" ) )
     in
     let%map root, best_tip =
       Deferred.Or_error.both

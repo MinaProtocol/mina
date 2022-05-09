@@ -28,7 +28,7 @@ let checked_interpolations_statically ~loc msg label_names =
                    field in the record"
                   interp
             | _ ->
-                ()) ;
+                () ) ;
           true )
   | _ ->
       false
@@ -81,7 +81,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
               Some (List.find_map_exn stris ~f:find_deriver)
           | _ ->
               failwith (sprintf "Expected structure payload for %s" deriver)
-        else None)
+        else None )
   in
   let (module Ast_builder) = Ast_builder.make deriver_loc in
   let open Ast_builder in
@@ -94,7 +94,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
           if has_record_arg then
             let fields =
               List.map label_names ~f:(fun label ->
-                  sprintf "%s=$%s" label label)
+                  sprintf "%s=$%s" label label )
             in
             sprintf "%s {%s}" ctor (String.concat ~sep:"; " fields)
           else sprintf "%s" ctor
@@ -124,7 +124,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
       if has_record_arg then
         let fields =
           List.map label_names ~f:(fun label ->
-              (Located.mk (Lident label), pvar label))
+              (Located.mk (Lident label), pvar label) )
         in
         Some (record fields Closed)
       else None
@@ -137,7 +137,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
       if has_record_arg then
         let fields =
           List.map label_names ~f:(fun label ->
-              (Located.mk (Lident label), evar label))
+              (Located.mk (Lident label), evar label) )
         in
         Some (record fields None)
       else None
@@ -147,11 +147,11 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   let stris =
     [ [%stri
         let ([%p pvar (event_name ^ "_structured_events_id")] :
-              Structured_log_events.id) =
+              Structured_log_events.id ) =
           Structured_log_events.id_of_string [%e estring (digest event_path)]]
     ; [%stri
         let ([%p pvar (event_name ^ "_structured_events_repr")] :
-              Structured_log_events.repr) =
+              Structured_log_events.repr ) =
           { id = [%e evar (event_name ^ "_structured_events_id")]
           ; event_name = [%e estring event_path]
           ; arguments =
@@ -170,9 +170,9 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                             @@ Conv_to_ppx_deriving.copy_expression
                             @@ [%expr
                                  [%e estring name]
-                                 , [%e to_yojson pld_type] [%e evar name]])] )
+                                 , [%e to_yojson pld_type] [%e evar name]] )] )
               | _ ->
-                  None)
+                  None )
           ; parse =
               (fun args ->
                 let result =
@@ -181,8 +181,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                   ignore args_list ;
                   [%e
                     List.fold_right label_decls
-                      ~f:
-                        (fun { pld_name = { txt = name; _ }; pld_type; _ } acc ->
+                      ~f:(fun { pld_name = { txt = name; _ }; pld_type; _ } acc ->
                         Conv_from_ppx_deriving.copy_expression
                         @@ Ppx_deriving_yojson.wrap_runtime
                         @@ Conv_to_ppx_deriving.copy_expression
@@ -196,17 +195,17 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                                       of_yojson
                                         ~path:(split_path @ [ ctor; name ])
                                         pld_type]
-                                      [%e evar name])
+                                      [%e evar name] )
                                    ~f:(fun [%p pvar name] -> [%e acc])
                              | None ->
                                  Core_kernel.Result.fail
                                    [%e
                                      estring
                                        (sprintf "%s, parse: missing argument %s"
-                                          event_path name)]])
+                                          event_path name )]] )
                       ~init:[%expr Core_kernel.Result.return [%e record_expr]]]
                 in
-                match result with Ok ev -> Some ev | Error _ -> None)
+                match result with Ok ev -> Some ev | Error _ -> None )
           }]
     ; [%stri
         let () =
@@ -222,7 +221,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
         (sprintf "File \"%s\", line %d, characters %d-%d:"
            msg_loc.loc_start.pos_fname msg_loc.loc_start.pos_lnum
            (msg_loc.loc_start.pos_cnum - msg_loc.loc_start.pos_bol)
-           (msg_loc.loc_end.pos_cnum - msg_loc.loc_start.pos_bol))
+           (msg_loc.loc_end.pos_cnum - msg_loc.loc_start.pos_bol) )
     in
     [%stri
       let () =
@@ -239,12 +238,12 @@ let generate_signature_items ~loc ~path:_ ty_ext =
       [ psig_value
           (value_description
              ~name:(Located.mk (event_name ^ "_structured_events_id"))
-             ~type_:[%type: Structured_log_events.id] ~prim:[])
+             ~type_:[%type: Structured_log_events.id] ~prim:[] )
       ; psig_value
           (value_description
              ~name:(Located.mk (event_name ^ "_structured_events_repr"))
-             ~type_:[%type: Structured_log_events.repr] ~prim:[])
-      ])
+             ~type_:[%type: Structured_log_events.repr] ~prim:[] )
+      ] )
 
 let str_type_ext =
   let args =

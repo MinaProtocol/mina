@@ -53,7 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "archive node test: collecting block logs" ;
     let%map () =
       Malleable_error.List.iter all_nodes ~f:(fun bp ->
-          Network.Node.dump_precomputed_blocks ~logger bp)
+          Network.Node.dump_precomputed_blocks ~logger bp )
     in
     [%log info] "archive node test: succesfully completed"
 end

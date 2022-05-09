@@ -57,7 +57,7 @@ module Wrap = struct
   type ('mb, 'ml) t =
     (module S
        with type max_branching = 'mb
-        and type max_local_max_branchings = 'ml)
+        and type max_local_max_branchings = 'ml )
 
   let create : type mb ml. unit -> (mb, ml) t =
    fun () ->
@@ -143,7 +143,7 @@ module Step = struct
              and type local_branches = local_branches
              and type statement = statement
              and type prev_values = prev_values
-             and type max_branching = max_branching) =
+             and type max_branching = max_branching ) =
    fun () ->
     let module R = struct
       type nonrec max_branching = max_branching

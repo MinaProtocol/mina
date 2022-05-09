@@ -40,17 +40,17 @@ let%test "access elements" =
         : ( Marlin_plonk_bindings_pasta_fq.t
           , Marlin_plonk_bindings_pasta_pallas.Affine.t
           , Marlin_plonk_bindings_pasta_fq_urs.Poly_comm.t )
-          Plonk_proof.t) =
+          Plonk_proof.t ) =
     dummy ()
   in
   let ({ l_comm; _ }
-        : Marlin_plonk_bindings_pasta_fq_urs.Poly_comm.t Plonk_proof.Messages.t)
-      =
+        : Marlin_plonk_bindings_pasta_fq_urs.Poly_comm.t Plonk_proof.Messages.t
+        ) =
     messages
   in
   let ({ unshifted; shifted }
         : Marlin_plonk_bindings_pasta_pallas.Affine.t
-          Marlin_plonk_bindings_types.Poly_comm.t) =
+          Marlin_plonk_bindings_types.Poly_comm.t ) =
     l_comm
   in
   let _x = unshifted.(0) in

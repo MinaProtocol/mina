@@ -26,7 +26,7 @@ let%test_module "network pool test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()))
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     module Mock_snark_pool =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
@@ -43,7 +43,7 @@ let%test_module "network pool test" =
       let work =
         `One
           (Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
-             Transaction_snark.Statement.gen)
+             Transaction_snark.Statement.gen )
       in
       let priced_proof =
         { Priced_proof.proof =
@@ -71,7 +71,7 @@ let%test_module "network pool test" =
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
                (Envelope.Incoming.local command)
-               (Mock_snark_pool.Broadcast_callback.Local (Fn.const ()))) ;
+               (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -79,10 +79,9 @@ let%test_module "network pool test" =
           match Mock_snark_pool.Resource_pool.request_proof pool work with
           | Some { proof; fee = _ } ->
               assert (
-                [%equal: Ledger_proof.t One_or_two.t] proof priced_proof.proof
-              )
+                [%equal: Ledger_proof.t One_or_two.t] proof priced_proof.proof )
           | None ->
-              failwith "There should have been a proof here")
+              failwith "There should have been a proof here" )
 
     let%test_unit "when creating a network, the incoming diffs and local diffs \
                    in the reader pipes will automatically get process" =
@@ -120,14 +119,14 @@ let%test_module "network pool test" =
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->
                ( Envelope.Incoming.local work
-               , Mina_net2.Validation_callback.create_without_expiration () ))
+               , Mina_net2.Validation_callback.create_without_expiration () ) )
         |> List.iter ~f:(fun diff ->
                Mock_snark_pool.Remote_sink.push remote_sink diff
-               |> Deferred.don't_wait_for) ;
+               |> Deferred.don't_wait_for ) ;
         List.map (List.drop works per_reader) ~f:create_work
         |> List.iter ~f:(fun diff ->
                Mock_snark_pool.Local_sink.push local_sink (diff, Fn.const ())
-               |> Deferred.don't_wait_for) ;
+               |> Deferred.don't_wait_for ) ;
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
@@ -143,7 +142,7 @@ let%test_module "network pool test" =
                assert (
                  List.mem works work
                    ~equal:Transaction_snark_work.Statement.equal ) ;
-               Deferred.unit) ;
+               Deferred.unit ) ;
         Deferred.unit
       in
       verify_unsolved_work |> Async.Thread_safe.block_on_async_exn

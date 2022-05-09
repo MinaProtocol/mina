@@ -151,7 +151,7 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
             * (e0.o + (bz * o) + gamma)
             * alpha * zkp
             + (alphas Range.perm 0 * vp_zeta / (zeta - one))
-            + (alphas Range.perm 1 * vp_zeta / (zeta - w3)))
+            + (alphas Range.perm 1 * vp_zeta / (zeta - w3)) )
       in
       let perm1 =
         let beta_sigma1 = with_label __LOC__ (fun () -> beta * e0.sigma1) in
@@ -160,7 +160,7 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
         with_label __LOC__ (fun () ->
             negate (e0.l + beta_sigma1 + gamma)
             * (e0.r + beta_sigma2 + gamma)
-            * (e1.z * beta_alpha * zkp))
+            * (e1.z * beta_alpha * zkp) )
       in
       (perm0, perm1)
     in
@@ -171,12 +171,12 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
       let lro =
         let s = [| sbox e0.l; sbox e0.r; sbox e0.o |] in
         Array.map mds ~f:(fun m ->
-            Array.reduce_exn ~f:F.( + ) (Array.map2_exn s m ~f:F.( * )))
+            Array.reduce_exn ~f:F.( + ) (Array.map2_exn s m ~f:F.( * )) )
       in
       with_label __LOC__ (fun () ->
           Array.mapi [| e1.l; e1.r; e1.o |] ~f:(fun i e ->
-              (lro.(i) - e) * alphas Range.psdn i)
-          |> Array.reduce_exn ~f:( + ))
+              (lro.(i) - e) * alphas Range.psdn i )
+          |> Array.reduce_exn ~f:( + ) )
     in
     let ecad0 =
       with_label __LOC__ (fun () ->
@@ -184,21 +184,21 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
           * alphas Range.add 0
           + ( ((e1.l + e1.r + e1.o) * (e1.l - e1.o) * (e1.l - e1.o))
             - ((e0.o + e0.l) * (e0.o + e0.l)) )
-            * alphas Range.add 1)
+            * alphas Range.add 1 )
     in
     let vbmul0, vbmul1 =
       let tmp = double e0.l - square e0.r + e1.r in
       ( with_label __LOC__ (fun () ->
             ((square e0.r - e0.r) * alphas Range.mul 0)
             + (((e1.l - e0.l) * e1.r) - e1.o + (e0.o * (double e0.r - one)))
-              * alphas Range.mul 1)
+              * alphas Range.mul 1 )
       , with_label __LOC__ (fun () ->
             ( square (double e0.o - (tmp * e0.r))
             - ((square e0.r - e1.r + e1.l) * square tmp) )
             * alphas Range.mul 2
             + ( ((e0.l - e1.l) * (double e0.o - (tmp * e0.r)))
               - ((e1.o + e0.o) * tmp) )
-              * alphas Range.mul 3) )
+              * alphas Range.mul 3 ) )
     in
     let endomul0, endomul1, endomul2 =
       let xr = square e0.r - e0.l - e1.r in
@@ -208,14 +208,14 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
             ((square e0.l - e0.l) * alphas Range.endml 0)
             + ((square e1.l - e1.l) * alphas Range.endml 1)
             + (e1.r - ((one + (e0.l * (endo - one))) * e0.r))
-              * alphas Range.endml 2)
+              * alphas Range.endml 2 )
       , with_label __LOC__ (fun () ->
             (((e1.l - e0.r) * e1.r) - e1.o + (e0.o * (double e0.l - one)))
-            * alphas Range.endml 3)
+            * alphas Range.endml 3 )
       , with_label __LOC__ (fun () ->
             ((square u - (square t * (xr + e0.l + e1.l))) * alphas Range.endml 4)
             + (((e0.l - e1.l) * u) - (t * (e0.o + e1.o)))
-              * alphas Range.endml 5) )
+              * alphas Range.endml 5 ) )
     in
     let linearization_check =
       let w = w3 in
@@ -283,4 +283,4 @@ let checked (type t)
            ; endomul1
            ; endomul2
            ]
-      |> Boolean.all)
+      |> Boolean.all )

@@ -73,7 +73,8 @@ let rec pack :
 
 type ('f, 'env) typ =
   { typ :
-      'var 'value.    ('value, 'var, 'env) Basic.t
+      'var 'value.
+         ('value, 'var, 'env) Basic.t
       -> ('var, 'value, 'f) Snarky_backendless.Typ.t
   }
 

@@ -7,7 +7,7 @@ open Fold_lib
 open Bitstring_lib
 
 (* Someday: Make more efficient by giving Field.unpack a length argument in
-camlsnark *)
+   camlsnark *)
 let unpack_field unpack ~bit_length x = List.take (unpack x) bit_length
 
 let bits_per_char = 8
@@ -72,7 +72,7 @@ module Vector = struct
             let rec go acc i =
               if i = V.length then acc else go (f acc (V.get t i)) (i + 1)
             in
-            go init 0)
+            go init 0 )
       }
 
     let iter t ~f =
@@ -120,7 +120,7 @@ module Make_field0
             if i = bit_length then acc
             else go (f acc (Bigint.test_bit n i)) (i + 1)
           in
-          go init 0)
+          go init 0 )
     }
 
   let iter t ~f =
@@ -230,7 +230,7 @@ module Snarkable = struct
 
     let v_of_list vs =
       List.foldi vs ~init:V.empty ~f:(fun i acc b ->
-          if i < V.length then V.set acc i b else acc)
+          if i < V.length then V.set acc i b else acc )
 
     let pack_var = Field.Var.project
 
@@ -292,7 +292,7 @@ module Snarkable = struct
         : (Unpacked.var, _) Checked.t =
       match
         List.map2 then_ else_ ~f:(fun then_ else_ ->
-            Boolean.if_ cond ~then_ ~else_)
+            Boolean.if_ cond ~then_ ~else_ )
       with
       | Ok result ->
           Checked.List.all result

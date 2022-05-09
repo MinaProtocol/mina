@@ -24,8 +24,8 @@ let b_poly = Tick.Field.(Dlog_main.b_poly ~add ~mul ~one)
 let combined_inner_product (type actual_branching)
     ~actual_branching:(module AB : Nat.Add.Intf with type n = actual_branching)
     (e1, e2) ~(old_bulletproof_challenges : (_, actual_branching) Vector.t) ~r
-    ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2)
-    ~(step_branch_domains : Domains.t) =
+    ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2) ~(step_branch_domains : Domains.t)
+    =
   let T = AB.eq in
   let b_polys =
     Vector.map
@@ -44,13 +44,13 @@ let combined_inner_product (type actual_branching)
     Pcs_batch.combine_split_evaluations
       (Common.dlog_pcs_batch (AB.add Nat.N8.n)
          ~max_quot_size:
-           (Common.max_quot_size_int (Domain.size step_branch_domains.h)))
+           (Common.max_quot_size_int (Domain.size step_branch_domains.h)) )
       ~xi ~init:Fn.id ~mul
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~last:Array.last ~evaluation_point:pt
       ~shifted_pow:(fun deg x ->
         Pcs_batch.pow ~one ~mul x
-          Int.(Max_degree.step - (deg mod Max_degree.step)))
+          Int.(Max_degree.step - (deg mod Max_degree.step)) )
       v b
   in
   let open Tick.Field in
@@ -63,7 +63,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     ~(max_branching : max_branching Nat.t)
     (module Max_local_max_branchings : Hlist.Maxes.S
       with type ns = max_local_max_branchings
-       and type length = max_branching)
+       and type length = max_branching )
     ((module Req) : (max_branching, max_local_max_branchings) Requests.Wrap.t)
     ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk ~step_domains
     ~wrap_domains ~pairing_plonk_indices pk
@@ -76,7 +76,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       , ( (Tock.Field.t array Dlog_plonk_types.Evals.t * Tock.Field.t) Double.t
         , max_branching )
         Vector.t )
-      P.Base.Pairing_based.t) =
+      P.Base.Pairing_based.t ) =
   (*
   let pairing_marlin_index =
     (Vector.to_array pairing_marlin_indices).(Index.to_int which_index)
@@ -100,13 +100,11 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
                might not be correct *)
             Common.hash_pairing_me_only ~app_state:to_field_elements
               (P.Base.Me_only.Pairing_based.prepare ~dlog_plonk_index
-                 prev_statement.proof_state.me_only)
+                 prev_statement.proof_state.me_only )
         }
     ; pass_through =
         (let module M =
-           H1.Map
-             (P.Base.Me_only.Dlog_based.Prepared)
-             (E01 (Digest.Constant))
+           H1.Map (P.Base.Me_only.Dlog_based.Prepared) (E01 (Digest.Constant))
              (struct
                let f (type n) (m : n P.Base.Me_only.Dlog_based.Prepared.t) =
                  let T =
@@ -117,7 +115,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in
-        V.f Max_local_max_branchings.length (M.f prev_me_only))
+        V.f Max_local_max_branchings.length (M.f prev_me_only) )
     }
   in
   let handler (Snarky_backendless.Request.With { request; respond }) =
@@ -128,9 +126,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         k prev_evals
     | Step_accs ->
         let module M =
-          H1.Map
-            (P.Base.Me_only.Dlog_based.Prepared)
-            (E01 (Pairing_acc))
+          H1.Map (P.Base.Me_only.Dlog_based.Prepared) (E01 (Pairing_acc))
             (struct
               let f :
                   type a.
@@ -175,9 +171,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
   let o =
     let sgs =
       let module M =
-        H1.Map
-          (P.Base.Me_only.Dlog_based.Prepared)
-          (E01 (Tick.Curve.Affine))
+        H1.Map (P.Base.Me_only.Dlog_based.Prepared) (E01 (Tick.Curve.Affine))
           (struct
             let f : type n. n P.Base.Me_only.Dlog_based.Prepared.t -> _ =
              fun t -> t.sg
@@ -191,7 +185,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         map2 (Vector.trim sgs lte) prev_challenges ~f:(fun commitment cs ->
             { Tick.Proof.Challenge_polynomial.commitment
             ; challenges = Vector.to_array cs
-            })
+            } )
         |> to_list)
       public_input proof
   in
@@ -245,7 +239,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       { sg = proof.openings.proof.sg
       ; old_bulletproof_challenges =
           Vector.map prev_statement.proof_state.unfinalized_proofs ~f:(fun t ->
-              t.deferred_values.bulletproof_challenges)
+              t.deferred_values.bulletproof_challenges )
       }
     in
     let chal = Challenge.Constant.of_tick_field in
@@ -255,7 +249,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             let x =
               Scalar_challenge.map ~f:Challenge.Constant.of_tick_field x
             in
-            x)
+            x )
       in
       let chals =
         Array.map prechals ~f:(fun x -> Ipa.Step.compute_challenge x)
@@ -268,7 +262,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       in
       let prechals =
         Array.map prechals ~f:(fun x ->
-            { Bulletproof_challenge.prechallenge = x })
+            { Bulletproof_challenge.prechallenge = x } )
       in
       (prechals, b)
     in
@@ -281,12 +275,12 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
           (Plonk_checks.domain
              (module Tick.Field)
              domain ~shifts:Common.tick_shifts
-             ~domain_generator:Backend.Tick.Field.domain_generator)
+             ~domain_generator:Backend.Tick.Field.domain_generator )
         { plonk0 with zeta = As_field.zeta; alpha = As_field.alpha }
         (Plonk_checks.evals_of_split_evals
            (module Tick.Field)
            proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
-           ~zeta:As_field.zeta ~zetaw)
+           ~zeta:As_field.zeta ~zetaw )
         (fst x_hat)
     in
     let shift_value =
@@ -330,16 +324,16 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
                 ( Vector.map2
                     (Vector.extend_exn prev_statement.proof_state.me_only.sg
                        max_branching
-                       (Lazy.force Dummy.Ipa.Wrap.sg))
+                       (Lazy.force Dummy.Ipa.Wrap.sg) )
                     me_only_prepared.old_bulletproof_challenges
                     ~f:(fun sg chals ->
                       { Tock.Proof.Challenge_polynomial.commitment = sg
                       ; challenges = Vector.to_array chals
-                      })
-                |> Vector.to_list ))
+                      } )
+                |> Vector.to_list ) )
           [ input ]
           (fun x () : unit ->
-            Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler)
+            Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler )
           ()
           { pass_through = prev_statement_with_hashes.proof_state.me_only
           ; proof_state =
@@ -347,7 +341,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
                 me_only =
                   Common.hash_dlog_me_only max_branching me_only_prepared
               }
-          })
+          } )
   in
   ( { proof = next_proof
     ; statement = Types.Dlog_based.Statement.to_minimal next_statement

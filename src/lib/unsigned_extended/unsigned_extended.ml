@@ -11,7 +11,6 @@ module Extend
     (Unsigned : Unsigned.S) (M : sig
       val length : int
     end) : S with type t = Unsigned.t = struct
-  ;;
   assert (M.length < Field.size_in_bits - 3)
 
   let length_in_bits = M.length

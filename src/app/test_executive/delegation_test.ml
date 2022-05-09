@@ -51,7 +51,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~txn_hash:hash ~node_included_in:`Any_node))
+              ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
     Malleable_error.return ()
 end

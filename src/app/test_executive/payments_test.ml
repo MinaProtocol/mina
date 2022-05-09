@@ -83,7 +83,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (List.to_string (Network.extra_genesis_keypairs network)
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
-           |> Bigstring.to_string)) ;
+           |> Bigstring.to_string ) ) ;
     let[@warning "-8"] [ fish1; fish2 ] =
       Network.extra_genesis_keypairs network
     in
@@ -130,14 +130,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ] ;
     let%bind txn_signed =
       User_command_input.to_user_command
-        ~get_current_nonce:(fun _ ->
-          failwith "get_current_nonce, don't call me")
+        ~get_current_nonce:(fun _ -> failwith "get_current_nonce, don't call me")
         ~nonce_map:
           (Account_id.Map.of_alist_exn
              [ ( Account_id.create sender_pub_key
                    (Signed_command_payload.Body.token txn_body)
                , (sender_current_nonce, sender_current_nonce) )
-             ])
+             ] )
         ~get_account:(fun _ -> `Bootstrapping)
         ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
@@ -155,8 +154,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~sender_pub_key:
                (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
              ~receiver_pub_key:
-               (Signed_command_payload.Body.receiver_pk
-                  signed_cmmd.payload.body)
+               (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
              ~amount:
                ( Signed_command_payload.amount signed_cmmd.payload
                |> Option.value_exn )
@@ -164,7 +162,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~nonce:signed_cmmd.payload.common.nonce
              ~memo:
                (Signed_command_memo.to_raw_bytes_exn
-                  signed_cmmd.payload.common.memo)
+                  signed_cmmd.payload.common.memo )
              ~token:(Signed_command_payload.token signed_cmmd.payload)
              ~valid_until:signed_cmmd.payload.common.valid_until
              ~raw_signature:
@@ -172,7 +170,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~txn_hash:hash ~node_included_in:(`Node untimed_node_b)))
+              ~txn_hash:hash ~node_included_in:(`Node untimed_node_b) ) )
     in
     let%bind () =
       section
@@ -245,7 +243,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Amount.to_int receiver_expected)
              (Currency.Balance.to_int sender_balance)
              (Currency.Amount.to_int sender_expected)
-             (Currency.Amount.to_int amount))
+             (Currency.Amount.to_int amount) )
     in
     let%bind () =
       section
@@ -265,7 +263,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~nonce:signed_cmmd.payload.common.nonce
             ~memo:
               (Signed_command_memo.to_raw_bytes_exn
-                 signed_cmmd.payload.common.memo)
+                 signed_cmmd.payload.common.memo )
             ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
@@ -314,7 +312,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               (Mina_numbers.Account_nonce.succ signed_cmmd.payload.common.nonce)
             ~memo:
               (Signed_command_memo.to_raw_bytes_exn
-                 signed_cmmd.payload.common.memo)
+                 signed_cmmd.payload.common.memo )
             ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
@@ -355,7 +353,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
+              ~txn_hash:hash ~node_included_in:(`Node timed_node_c) ) )
     in
     let%bind () =
       section "unable to send payment from timed account using illiquid tokens"
@@ -399,7 +397,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  "Payment failed in GraphQL, but for unexpected reason: %s"
                  err_str ;
                Malleable_error.soft_error_format ~value:()
-                 "Payment failed for unexpected reason: %s" err_str ))
+                 "Payment failed for unexpected reason: %s" err_str ) )
     in
     section
       "send out a bunch more txns to fill up the snark ledger, then wait for \
@@ -427,8 +425,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          repeat_seq ~n:10 ~f:(fun () ->
              Network.Node.must_send_payment ~logger sender ~sender_pub_key
                ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-             >>| ignore)
+             >>| ignore )
        in
        wait_for t
-         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
+         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
 end

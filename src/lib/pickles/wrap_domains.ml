@@ -10,9 +10,7 @@ module Make (A : T0) (A_value : T0) = struct
 
   let prev (type xs ys ws hs) ~self ~(choices : (xs, ys, ws, hs) H4.T(I).t) =
     let module M_inner =
-      H4.Map
-        (Tag)
-        (E04 (Domains))
+      H4.Map (Tag) (E04 (Domains))
         (struct
           let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
            fun t ->
@@ -21,21 +19,18 @@ module Make (A : T0) (A_value : T0) = struct
               | `Side_loaded _ ->
                   Common.wrap_domains
               | `Compiled d ->
-                  d.wrap_domains)
+                  d.wrap_domains )
         end)
     in
     let module M =
-      H4.Map
-        (I)
-        (H4.T
-           (E04 (Domains)))
-           (struct
-             let f :
-                 type vars values env widths heights.
-                    (vars, values, widths, heights) I.t
-                 -> (vars, values, widths, heights) H4.T(E04(Domains)).t =
-              fun rule -> M_inner.f rule.prevs
-           end)
+      H4.Map (I) (H4.T (E04 (Domains)))
+        (struct
+          let f :
+              type vars values env widths heights.
+                 (vars, values, widths, heights) I.t
+              -> (vars, values, widths, heights) H4.T(E04(Domains)).t =
+           fun rule -> M_inner.f rule.prevs
+        end)
     in
     M.f choices
 
@@ -46,7 +41,7 @@ module Make (A : T0) (A_value : T0) = struct
          Domain.Pow_2_roots_of_unity
            (Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]))
        in
-       { Common.wrap_domains with x })
+       { Common.wrap_domains with x } )
 
   let f_debug full_signature num_choices choices_length ~self ~choices
       ~max_branching =
@@ -66,9 +61,9 @@ module Make (A : T0) (A_value : T0) = struct
                  ~len:
                    (Common.index_commitment_length
                       ~max_degree:Common.Max_degree.step
-                      Fix_domains.rough_domains.h)
+                      Fix_domains.rough_domains.h )
              in
-             Verification_key.dummy_commitments g))
+             Verification_key.dummy_commitments g ) )
     in
     let prev_domains = prev ~self ~choices in
     Timer.clock __LOC__ ;

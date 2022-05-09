@@ -32,8 +32,9 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                              |> Envelope.Incoming.data
                            in
                            Mina_base.State_hash.(
-                             to_yojson (With_state_hashes.state_hash transition)))
-                         subtree)) )
+                             to_yojson (With_state_hashes.state_hash transition))
+                           )
+                         subtree ) ) )
             ]
           "Transition frontier already garbage-collected the parent of \
            $state_hash" ;
@@ -47,7 +48,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
       let%bind init_breadcrumb =
         breadcrumb_if_present
           (Logger.extend logger
-             [ ("Check", `String "Before creating breadcrumb") ])
+             [ ("Check", `String "Before creating breadcrumb") ] )
         |> Deferred.return
       in
       Rose_tree.Deferred.Or_error.fold_map_over_subtrees
@@ -89,12 +90,11 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 let%bind () =
                   Deferred.return
                     (Result.ok_if_true
-                       (State_hash.equal actual_parent_hash
-                          expected_parent_hash)
+                       (State_hash.equal actual_parent_hash expected_parent_hash)
                        ~error:
                          (Error.of_string
                             "Previous external transition hash does not equal \
-                             to current external transition's parent hash"))
+                             to current external transition's parent hash" ) )
                 in
                 let open Deferred.Let_syntax in
                 match%bind
@@ -102,7 +102,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                       Transition_frontier.Breadcrumb.build ~logger
                         ~precomputed_values ~verifier ~trust_system ~parent
                         ~transition:mostly_validated_transition
-                        ~sender:(Some sender) ~transition_receipt_time ())
+                        ~sender:(Some sender) ~transition_receipt_time () )
                 with
                 | Error _ ->
                     Deferred.return @@ Or_error.error_string missing_parent_msg
@@ -120,9 +120,9 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                                (Logger.extend logger
                                   [ ( "Check"
                                     , `String "After creating breadcrumb" )
-                                  ])
+                                  ] )
                            in
-                           new_breadcrumb)
+                           new_breadcrumb )
                     | Error err -> (
                         (* propagate bans through subtree *)
                         let subtree_nodes = Rose_tree.flatten subtree in
@@ -139,7 +139,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                                     "build_subtrees_of_breadcrumbs: sender of \
                                      external transition should not be Local"
                               | Remote peer ->
-                                  Set.add inet_addrs peer)
+                                  Set.add inet_addrs peer )
                         in
                         let ip_addresses = Set.to_list ip_address_set in
                         let trust_system_record_invalid msg error =
@@ -148,7 +148,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                                 Trust_system.record trust_system logger ip_addr
                                   ( Trust_system.Actions
                                     .Gossiped_invalid_transition
-                                  , Some (msg, []) ))
+                                  , Some (msg, []) ) )
                           in
                           Error error
                         in
@@ -160,7 +160,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                             trust_system_record_invalid
                               "invalid staged ledger diff" error
                         | `Fatal_error exn ->
-                            Deferred.return (Or_error.of_exn exn) ) ))
+                            Deferred.return (Or_error.of_exn exn) ) ) )
             |> Cached.sequence_deferred
           in
-          Cached.sequence_result cached_result))
+          Cached.sequence_result cached_result ) )

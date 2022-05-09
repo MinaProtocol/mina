@@ -91,10 +91,10 @@ struct
               S_checked.create (Sponge.Params.map ~f:Field.constant params)
             in
             Array.iter a ~f:(S_checked.absorb s) ;
-            S_checked.squeeze s))
+            S_checked.squeeze s ) )
       (fun a ->
         let s = S_constant.create params in
         Array.iter a ~f:(S_constant.absorb s) ;
-        S_constant.squeeze s)
+        S_constant.squeeze s )
       a
 end

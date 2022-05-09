@@ -63,7 +63,7 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
        (Shifted_value.typ Field.typ)
        Other_field.typ
        (Snarky_backendless.Typ.unit ())
-       Digest.typ index)
+       Digest.typ index )
     (let lengths =
        Commitment_lengths.of_domains_vector step_domains
          ~max_degree:Common.Max_degree.step
@@ -73,10 +73,10 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
      let t =
        Typ.tuple2
          (Dlog_plonk_types.Evals.typ ~default:Field.Constant.zero lengths
-            Field.typ)
+            Field.typ )
          Field.typ
      in
-     Typ.tuple2 t t)
+     Typ.tuple2 t t )
     (Vector.typ Inner_curve.typ local_max_branching)
     (Vector.typ (Vector.typ Field.typ Tick.Rounds.n) local_max_branching)
     Wrap_proof.typ

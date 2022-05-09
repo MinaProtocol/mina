@@ -24,7 +24,7 @@ let typ_optional typ ~default =
 (* TODO: One invariant that needs to be checked is
 
    If the fee payer is `Other { pk; _ }, this account should in fact
-   be distinct from the other accounts.  *)
+   be distinct from the other accounts. *)
 
 module Party = struct
   module Update = struct
@@ -90,7 +90,7 @@ module Party = struct
     let dummy : t =
       { app_state =
           Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
-              Set_or_keep.Keep)
+              Set_or_keep.Keep )
       ; delegate = Keep
       ; verification_key = Keep
       ; permissions = Keep
@@ -428,15 +428,16 @@ module Stable = struct
           Inner.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]
 
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable
+        (Binable_arg.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable _ = failwith "Snapps disabled"
+          let to_binable _ = failwith "Snapps disabled"
 
-                let of_binable _ = failwith "Snapps disabled"
-              end)
+          let of_binable _ = failwith "Snapps disabled"
+        end)
 
     let to_latest = Fn.id
 
@@ -500,7 +501,7 @@ let check_tokens (t : t) =
   let f (r : _ Inner.t) =
     let valid x = not (Token_id.(equal invalid) x) in
     Option.value_map r.fee_payment ~default:true ~f:(fun x ->
-        valid x.payload.token_id)
+        valid x.payload.token_id )
     && valid r.token_id
   in
   match t with
@@ -672,7 +673,7 @@ let accounts_accessed (t : t) : Account_id.t list =
     @ Option.(
         to_list
           (map fee_payment ~f:(fun x ->
-               Account_id.create x.payload.pk x.payload.token_id)))
+               Account_id.create x.payload.pk x.payload.token_id ) ))
   in
   let f2 r = f { r with two = Some r.Inner.two } in
   match t with
@@ -795,7 +796,7 @@ module Payload = struct
           |> Typ.transport
                ~there:
                  (Flagged_option.of_option
-                    ~default:Other_fee_payer.Payload.dummy)
+                    ~default:Other_fee_payer.Payload.dummy )
                ~back:Flagged_option.to_option
         ; Party.Predicated.Signed.typ
         ; Party.Predicated.Signed.typ
@@ -934,7 +935,7 @@ module Payload = struct
              ; one
              ; two
              } :
-              _ Inner.t) ~f1 ~f2 =
+              _ Inner.t ) ~f1 ~f2 =
           let p f { Party.Predicated.Poly.body; predicate } =
             List.reduce_exn ~f:append [ b body; f predicate ]
           in
@@ -973,7 +974,7 @@ module Payload = struct
            ; one
            ; two
            } :
-            _ Inner.t) ~f1 ~f2 =
+            _ Inner.t ) ~f1 ~f2 =
         let p f { Party.Predicated.Poly.body; predicate } =
           List.reduce_exn ~f:append [ b body; f predicate ]
         in
@@ -983,7 +984,7 @@ module Payload = struct
           ; Snapp_basic.Flagged_option.(
               to_input' ~f:Other_fee_payer.Payload.to_input
                 (of_option ~default:Other_fee_payer.Payload.dummy
-                   other_fee_payer_opt))
+                   other_fee_payer_opt ))
           ; p f1 one
           ; p f2 two
           ]
@@ -1114,7 +1115,7 @@ let check (t : t) : unit Or_error.t =
       ({ token_id; fee_payment; one; two } :
         ( ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t
         , ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t )
-        Inner.t) =
+        Inner.t ) =
     let%bind excess =
       opt "overflow" (Amount.Signed.add one.data.body.delta two.data.body.delta)
     in
@@ -1129,7 +1130,7 @@ let check (t : t) : unit Or_error.t =
       ({ token_id; fee_payment; one; two } :
         ( ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t
         , ((_ Body.Poly.t, _) Predicated.Poly.t, _) Authorized.Poly.t option )
-        Inner.t) =
+        Inner.t ) =
     let%bind excess =
       opt "overflow"
         ( match two with
@@ -1150,7 +1151,7 @@ let check (t : t) : unit Or_error.t =
       assert_
         (List.for_all (accounts_accessed t) ~f:(fun aid ->
              Account_id.public_key aid |> Public_key.decompress
-             |> Option.is_some))
+             |> Option.is_some ) )
         "public keys for all accounts involved in the transaction must be valid"
     in
     fee_checks ~excess ~token_id ~fee_payment
@@ -1172,7 +1173,7 @@ let to_payload (t : t) : Payload.t =
   let opt x =
     Option.value_map x ~default:Party.Predicated.Signed.dummy
       ~f:(fun { Party.Authorized.Poly.data; authorization = _ } ->
-        { data with predicate = Party.Predicated.Signed.dummy.predicate })
+        { data with predicate = Party.Predicated.Signed.dummy.predicate } )
   in
   match t with
   | Proved_empty
@@ -1185,7 +1186,7 @@ let to_payload (t : t) : Payload.t =
         ; token_id
         ; other_fee_payer_opt =
             Option.map fee_payment ~f:(fun { payload; signature = _ } ->
-                payload)
+                payload )
         }
   | Signed_empty
       { one = { data = one; authorization = _ }; two; token_id; fee_payment } ->
@@ -1197,7 +1198,7 @@ let to_payload (t : t) : Payload.t =
         ; token_id
         ; other_fee_payer_opt =
             Option.map fee_payment ~f:(fun { payload; signature = _ } ->
-                payload)
+                payload )
         }
   | Signed_signed
       { one = { data = one; authorization = _ }
@@ -1213,7 +1214,7 @@ let to_payload (t : t) : Payload.t =
         ; token_id
         ; other_fee_payer_opt =
             Option.map fee_payment ~f:(fun { payload; signature = _ } ->
-                payload)
+                payload )
         }
   | Proved_signed
       { one = { data = one; authorization = _ }
@@ -1229,7 +1230,7 @@ let to_payload (t : t) : Payload.t =
         ; token_id
         ; other_fee_payer_opt =
             Option.map fee_payment ~f:(fun { payload; signature = _ } ->
-                payload)
+                payload )
         }
   | Proved_proved
       { one = { data = one; authorization = _ }
@@ -1245,7 +1246,7 @@ let to_payload (t : t) : Payload.t =
         ; token_id
         ; other_fee_payer_opt =
             Option.map fee_payment ~f:(fun { payload; signature = _ } ->
-                payload)
+                payload )
         }
 
 let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t =
@@ -1257,7 +1258,7 @@ let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t =
     ; token_id
     ; fee_payment =
         Option.map fee_payment ~f:(fun (_priv_key, payload) ->
-            { Other_fee_payer.payload; signature = Signature.dummy })
+            { Other_fee_payer.payload; signature = Signature.dummy } )
     }
   in
   let sign =
@@ -1274,7 +1275,7 @@ let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t =
     ; two = { r.two with authorization = sign signer2 }
     ; fee_payment =
         Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
-            { x with signature = sign sk })
+            { x with signature = sign sk } )
     }
 
 let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
@@ -1283,11 +1284,11 @@ let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
         { Party.Authorized.Poly.data = data1; authorization = Signature.dummy }
     ; two =
         Option.map data2 ~f:(fun data ->
-            { Party.Authorized.Poly.data; authorization = () })
+            { Party.Authorized.Poly.data; authorization = () } )
     ; token_id
     ; fee_payment =
         Option.map fee_payment ~f:(fun (_priv_key, payload) ->
-            { Other_fee_payer.payload; signature = Signature.dummy })
+            { Other_fee_payer.payload; signature = Signature.dummy } )
     }
   in
   let sign =
@@ -1303,7 +1304,7 @@ let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
       one = { r.one with authorization = sign signer1 }
     ; fee_payment =
         Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
-            { x with signature = sign sk })
+            { x with signature = sign sk } )
     }
 
 module Base58_check = Codable.Make_base58_check (Stable.Latest)

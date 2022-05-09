@@ -11,7 +11,7 @@ let unsigned_scalar_scalar ~to_string typ_name =
     ~doc:
       (Core.sprintf
          !"String representing a %s number in base 10"
-         (String.lowercase typ_name))
+         (String.lowercase typ_name) )
     ~coerce:(fun num -> `String (to_string num))
 
 let public_key () =
@@ -30,4 +30,4 @@ let token_id () =
 
 let epoch_seed () =
   scalar "EpochSeed" ~doc:"Base58Check-encoded epoch seed" ~coerce:(fun seed ->
-      `String (Mina_base.Epoch_seed.to_base58_check seed))
+      `String (Mina_base.Epoch_seed.to_base58_check seed) )

@@ -30,7 +30,7 @@ module type S = sig
        and type transition_frontier := transition_frontier
        and type config := Resource_pool.Config.t
        and type transition_frontier_diff :=
-            Resource_pool.transition_frontier_diff
+        Resource_pool.transition_frontier_diff
        and type rejected_diff := Resource_pool.Diff.rejected
 
   val get_completed_work :

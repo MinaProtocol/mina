@@ -47,7 +47,7 @@ let register l = List.iter l ~f:register_one
 let run_simple_exercise name count =
   let (module Exercise) =
     List.find_exn !exercises ~f:(fun (module Exercise) ->
-        String.equal name Exercise.name)
+        String.equal name Exercise.name )
   in
   let outer_array = Array.init 100 ~f:(fun _ -> None) in
   let state = Splittable_random.State.of_int 13 in
@@ -72,7 +72,7 @@ let run_simple_exercise name count =
     let new_array =
       Array.init length ~f:(fun _ ->
           incr allocated_count ;
-          Some (exercise ()))
+          Some (exercise ()) )
     in
     let overwrite = Splittable_random.bool state in
     if overwrite then outer_array.(i) <- Some new_array ;

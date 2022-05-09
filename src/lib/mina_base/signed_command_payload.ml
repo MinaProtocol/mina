@@ -83,15 +83,16 @@ module Common = struct
       type t = Binable_arg.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
-      include Binable.Of_binable
-                (Binable_arg.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Binable_arg.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let of_binable = check
+            let of_binable = check
 
-                  let to_binable = check
-                end)
+            let to_binable = check
+          end)
 
       let to_latest = Fn.id
     end
@@ -159,8 +160,8 @@ module Common = struct
       ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
   module Checked = struct
-    let constant
-        ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : t) : var =
+    let constant ({ fee; fee_token; fee_payer_pk; nonce; valid_until; memo } : t)
+        : var =
       { fee = Currency.Fee.var_of_t fee
       ; fee_token = Token_id.var_of_t fee_token
       ; fee_payer_pk = Public_key.Compressed.var_of_t fee_payer_pk
@@ -248,15 +249,16 @@ module Body = struct
         | Mint_tokens of Minting_payload.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
-      include Binable.Of_binable
-                (Binable_arg.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Binable_arg.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let of_binable = check
+            let of_binable = check
 
-                  let to_binable = check
-                end)
+            let to_binable = check
+          end)
 
       let to_latest = Fn.id
     end
@@ -279,7 +281,7 @@ module Body = struct
       match source_pk with
       | Some token_owner_pk ->
           map New_token_payload.gen ~f:(fun payload ->
-              { payload with token_owner_pk })
+              { payload with token_owner_pk } )
       | None ->
           New_token_payload.gen
     in
@@ -287,7 +289,7 @@ module Body = struct
       match source_pk with
       | Some token_owner_pk ->
           map New_account_payload.gen ~f:(fun payload ->
-              { payload with token_owner_pk })
+              { payload with token_owner_pk } )
       | None ->
           New_account_payload.gen
     in
@@ -295,14 +297,14 @@ module Body = struct
       match source_pk with
       | Some token_owner_pk ->
           map Minting_payload.gen ~f:(fun payload ->
-              { payload with token_owner_pk })
+              { payload with token_owner_pk } )
       | None ->
           Minting_payload.gen
     in
     map
       (variant5
          (Payment_payload.gen ?source_pk ~max_amount)
-         stake_delegation_gen new_token_gen token_account_gen mint_tokens_gen)
+         stake_delegation_gen new_token_gen token_account_gen mint_tokens_gen )
       ~f:(function
         | `A p ->
             Payment p
@@ -313,7 +315,7 @@ module Body = struct
         | `D payload ->
             Create_token_account payload
         | `E payload ->
-            Mint_tokens payload)
+            Mint_tokens payload )
 
   let source_pk (t : t) =
     match t with

@@ -19,7 +19,7 @@ let%test_module "Archive node unit tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()))
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
@@ -27,7 +27,7 @@ let%test_module "Archive node unit tests" =
       Uri.of_string
         (Option.value
            (Sys.getenv "MINA_TEST_POSTGRES")
-           ~default:"postgres://admin:codarules@localhost:5432/archiver")
+           ~default:"postgres://admin:codarules@localhost:5432/archiver" )
 
     let conn_lazy =
       lazy
@@ -61,7 +61,7 @@ let%test_module "Archive node unit tests" =
       Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100
         ~fee_transfer:
           (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-             ~min_fee:Currency.Fee.zero)
+             ~min_fee:Currency.Fee.zero )
 
     let%test_unit "User_command: read and write" =
       let conn = Lazy.force conn_lazy in
@@ -84,7 +84,7 @@ let%test_module "Archive node unit tests" =
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     let%test_unit "Fee_transfer: read and write" =
       let kind_gen =
@@ -118,7 +118,7 @@ let%test_module "Archive node unit tests" =
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     let%test_unit "Coinbase: read and write" =
       let conn = Lazy.force conn_lazy in
@@ -141,7 +141,7 @@ let%test_module "Archive node unit tests" =
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     let%test_unit "Block: read and write" =
       let pool = Lazy.force conn_pool_lazy in
@@ -149,10 +149,10 @@ let%test_module "Archive node unit tests" =
         ( Quickcheck.Generator.with_size ~size:10
         @@ Quickcheck_lib.gen_imperative_list
              (Transition_frontier.For_tests.gen_genesis_breadcrumb
-                ~precomputed_values ~verifier ())
+                ~precomputed_values ~verifier () )
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
                 ?logger:None ~precomputed_values ~verifier ?trust_system:None
-                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts))
+                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts) )
         )
         ~f:(fun breadcrumbs ->
           Thread_safe.block_on_async_exn
@@ -170,7 +170,7 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added breadcrumb))
+                  (Diff.Builder.breadcrumb_added breadcrumb) )
               breadcrumbs
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
@@ -202,17 +202,17 @@ let%test_module "Archive node unit tests" =
                           Processor.For_test.assert_parent_exist ~parent_id
                             ~parent_hash:
                               (Transition_frontier.Breadcrumb.parent_hash
-                                 breadcrumb)
+                                 breadcrumb )
                             conn
                         else Deferred.Result.return ()
                     | None ->
-                        failwith "Failed to find saved block in database")
-                  pool)
+                        failwith "Failed to find saved block in database" )
+                  pool )
           with
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     (*
     let%test_unit "Block: read and write with pruning" =

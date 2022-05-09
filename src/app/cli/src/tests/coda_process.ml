@@ -61,7 +61,7 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
                 ~f:
                   (Fn.compose
                      (function [ a; b ] -> Some (a, b) | _ -> None)
-                     (String.split ~on:'=')) )
+                     (String.split ~on:'=') ) )
     ; block_production_key
     ; snark_worker_key
     ; work_selection_method
