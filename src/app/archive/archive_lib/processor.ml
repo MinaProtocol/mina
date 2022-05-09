@@ -972,7 +972,6 @@ end
 module Timing_info = struct
   type t =
     { account_identifier_id : int
-    ; initial_balance : int64
     ; initial_minimum_balance : int64
     ; cliff_time : int64
     ; cliff_amount : int64
@@ -983,7 +982,7 @@ module Timing_info = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int64; int64; int64; int64; int64; int64 ]
+      Caqti_type.[ int; int64; int64; int64; int64; int64 ]
 
   let table_name = "timing_info"
 
@@ -995,8 +994,8 @@ module Timing_info = struct
     in
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT account_identifier_id, initial_balance,
-                      initial_minimum_balance, cliff_time, cliff_amount,
+         {sql| SELECT account_identifier_id, initial_minimum_balance,
+                      cliff_time, cliff_amount,
                       vesting_period, vesting_increment
                FROM timing_info
                WHERE account_identifier_id = ?
@@ -1007,15 +1006,16 @@ module Timing_info = struct
       account_identifier_id =
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.int typ
-         {sql| SELECT account_identifier_id, initial_balance,
-                     initial_minimum_balance, cliff_time, cliff_amount,
-                     vesting_period, vesting_increment
+         {sql| SELECT account_identifier_id, initial_minimum_balance,
+                      cliff_time, cliff_amount,
+                      vesting_period, vesting_increment
                FROM timing_info
                WHERE account_identifier_id = ?
          |sql})
       account_identifier_id
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) account_identifier_id
+      (timing : Account_timing.t) =
     let open Deferred.Result.Let_syntax in
     let amount_to_int64 x =
       Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
@@ -1023,13 +1023,6 @@ module Timing_info = struct
     let balance_to_int64 x = amount_to_int64 (Currency.Balance.to_amount x) in
     let slot_to_int64 x =
       Mina_numbers.Global_slot.to_uint32 x |> Unsigned.UInt32.to_int64
-    in
-    let%bind account_identifier_id =
-      let account_id = Account_id.create acc.public_key acc.token_id in
-      (* TODO: TEMP!!!! add real token owner *)
-      Account_identifiers.add_if_doesn't_exist
-        (module Conn)
-        ~token_owner:None account_id
     in
     match%bind
       Conn.find_opt
@@ -1041,10 +1034,9 @@ module Timing_info = struct
         return id
     | None ->
         let values =
-          match acc.timing with
+          match timing with
           | Timed timing ->
               { account_identifier_id
-              ; initial_balance = balance_to_int64 acc.balance
               ; initial_minimum_balance =
                   balance_to_int64 timing.initial_minimum_balance
               ; cliff_time = slot_to_int64 timing.cliff_time
@@ -1055,7 +1047,6 @@ module Timing_info = struct
           | Untimed ->
               let zero = Int64.zero in
               { account_identifier_id
-              ; initial_balance = balance_to_int64 acc.balance
               ; initial_minimum_balance = zero
               ; cliff_time = zero
               ; cliff_amount = zero
@@ -1066,9 +1057,9 @@ module Timing_info = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO timing_info
-                    (account_identifier_id,initial_balance,initial_minimum_balance,
+                    (account_identifier_id,initial_minimum_balance,
                      cliff_time, cliff_amount, vesting_period, vesting_increment)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           values
@@ -2496,7 +2487,9 @@ module Accounts_accessed = struct
           Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
         in
         let%bind timing_id =
-          Timing_info.add_if_doesn't_exist (module Conn) account
+          Timing_info.add_if_doesn't_exist
+            (module Conn)
+            account_identifier_id account.timing
         in
         let%bind permissions_id =
           Zkapp_permissions.add_if_doesn't_exist
@@ -2714,14 +2707,13 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
-        let global_slot_since_genesis =
-          consensus_state
-          |> Consensus.Data.Consensus_state.global_slot_since_genesis
+        let global_slot_since_hard_fork =
+          Consensus.Data.Consensus_state.curr_global_slot consensus_state
           |> Unsigned.UInt32.to_int64
         in
         let chain_status =
-          if Int64.equal global_slot_since_genesis 0L then
-            (* genesis block *)
+          if Int64.equal global_slot_since_hard_fork 0L then
+            (* at-launch genesis block, or genesis block at hard fork *)
             Chain_status.(to_string Canonical)
           else Chain_status.(to_string Pending)
         in
@@ -2755,10 +2747,11 @@ module Block = struct
                 |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height
-            ; global_slot_since_hard_fork =
-                Consensus.Data.Consensus_state.curr_global_slot consensus_state
+            ; global_slot_since_hard_fork
+            ; global_slot_since_genesis =
+                consensus_state
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
                 |> Unsigned.UInt32.to_int64
-            ; global_slot_since_genesis
             ; timestamp =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.timestamp |> Block_time.to_int64
@@ -3414,6 +3407,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                             [ ("state_hash", State_hash.to_yojson state_hash)
                             ; ("error", `String (Caqti_error.show err))
                             ] ;
+
                         Conn.rollback () ) ) ))
       pool
   in
@@ -3497,64 +3491,157 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      let accounts =
-        match Option.map runtime_config.ledger ~f:(fun l -> l.base) with
-        | Some (Accounts accounts) ->
-            Genesis_ledger_helper.Accounts.to_full accounts
-        | Some (Named name) -> (
-            match Genesis_ledger.fetch_ledger name with
-            | Some (module M) ->
-                [%log info] "Found ledger with name $ledger_name"
-                  ~metadata:[ ("ledger_name", `String name) ] ;
-                Lazy.force M.accounts
+      match runtime_config.ledger with
+      | None ->
+          [%log fatal] "Runtime config does not contain a ledger" ;
+          failwith
+            "Runtime config does not contain a ledger, could not add genesis \
+             accounts"
+      | Some runtime_config_ledger -> (
+          (* blocks depend on having the protocol version set, which the daemon does on startup;
+             the actual value doesn't affect the block state hash, which is how we
+             identify a block in the archive db
+
+             here, we just set the protocol version to a dummy value
+          *)
+          Protocol_version.(set_current zero) ;
+          let proof_level = Genesis_constants.Proof_level.Full in
+          let%bind precomputed_values =
+            match%map
+              Genesis_ledger_helper.init_from_config_file ~logger
+                ~proof_level:(Some proof_level) runtime_config
+            with
+            | Ok (precomputed_values, _) ->
+                precomputed_values
+            | Error err ->
+                failwithf "Could not get precomputed values, error: %s"
+                  (Error.to_string_hum err) ()
+          in
+          (* code modeled on replayer ledger initialization *)
+          let%bind padded_accounts =
+            match
+              Genesis_ledger_helper.Ledger
+              .padded_accounts_from_runtime_config_opt ~logger ~proof_level
+                runtime_config_ledger ~ledger_name_prefix:"genesis_ledger"
+            with
             | None ->
-                [%log error]
-                  "Could not find a built-in ledger named $ledger_name"
-                  ~metadata:[ ("ledger_name", `String name) ] ;
-                failwith
-                  "Could not add genesis accounts: Named ledger not found" )
-        | _ ->
-            failwith "No accounts found in runtime config file"
-      in
-      let add_accounts () =
-        Caqti_async.Pool.use
-          (fun (module Conn : CONNECTION) ->
-            let open Deferred.Result.Let_syntax in
-            let%bind () = Conn.start () in
-            let rec go accounts =
-              let open Deferred.Let_syntax in
-              match accounts with
-              | [] ->
-                  Deferred.Result.return ()
-              | (_, account) :: accounts' -> (
-                  match%bind
-                    Timing_info.add_if_doesn't_exist (module Conn) account
-                  with
-                  | Error e as err ->
-                      [%log error]
-                        ~metadata:
-                          [ ("account", Account.to_yojson account)
-                          ; ("error", `String (Caqti_error.show e))
-                          ]
-                        "Failed to add genesis account: $account, see $error" ;
-                      let%map _ = Conn.rollback () in
-                      err
-                  | Ok _ ->
-                      go accounts' )
+                [%log fatal]
+                  "Could not load accounts from runtime config ledger" ;
+                exit 1
+            | Some accounts ->
+                return accounts
+          in
+          let constraint_constants =
+            Genesis_constants.Constraint_constants.compiled
+          in
+          let packed_ledger =
+            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+              ~depth:constraint_constants.ledger_depth padded_accounts
+          in
+          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+          let account_ids =
+            Mina_ledger.Ledger.accounts ledger |> Account_id.Set.to_list
+          in
+          let genesis_block =
+            let With_hash.{ data = block; hash = the_hash }, _ =
+              Mina_block.genesis ~precomputed_values
             in
-            let%bind () = go accounts in
-            Conn.commit ())
-          pool
-      in
-      match%map
-        retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
-      with
-      | Error e ->
-          [%log warn] "genesis accounts could not be added"
-            ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
-          failwith "Failed to add genesis accounts"
-      | Ok () ->
-          () )
+            With_hash.{ data = block; hash = the_hash }
+          in
+          let add_accounts () =
+            Caqti_async.Pool.use
+              (fun (module Conn : CONNECTION) ->
+                let%bind.Deferred.Result genesis_block_id =
+                  Block.add_if_doesn't_exist
+                    (module Conn)
+                    ~constraint_constants genesis_block
+                in
+                let%bind.Deferred.Result { ledger_hash; _ } =
+                  Block.load (module Conn) ~id:genesis_block_id
+                in
+                let db_ledger_hash =
+                  Ledger_hash.of_base58_check_exn ledger_hash
+                in
+                let actual_ledger_hash =
+                  Mina_ledger.Ledger.merkle_root ledger
+                in
+                if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
+                  [%log info]
+                    "Archived genesis block ledger hash equals actual genesis \
+                     ledger hash"
+                    ~metadata:
+                      [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash)
+                      ]
+                else (
+                  [%log error]
+                    "Archived genesis block ledger hash different than actual \
+                     genesis ledger hash"
+                    ~metadata:
+                      [ ( "archived_ledger_hash"
+                        , Ledger_hash.to_yojson db_ledger_hash )
+                      ; ( "actual_ledger_hash"
+                        , Ledger_hash.to_yojson actual_ledger_hash )
+                      ] ;
+                  exit 1 ) ;
+                let%bind.Deferred.Result () = Conn.start () in
+                let open Deferred.Let_syntax in
+                let%bind () =
+                  Deferred.List.iter account_ids ~f:(fun acct_id ->
+                      match
+                        Mina_ledger.Ledger.location_of_account ledger acct_id
+                      with
+                      | None ->
+                          [%log error] "Could not get location for account"
+                            ~metadata:
+                              [ ("account_id", Account_id.to_yojson acct_id) ] ;
+                          failwith "Could not get location for genesis account"
+                      | Some loc -> (
+                          let index =
+                            Mina_ledger.Ledger.index_of_account_exn ledger
+                              acct_id
+                          in
+                          let acct =
+                            match Mina_ledger.Ledger.get ledger loc with
+                            | None ->
+                                [%log error]
+                                  "Could not get account, given a location"
+                                  ~metadata:
+                                    [ ( "account_id"
+                                      , Account_id.to_yojson acct_id )
+                                    ] ;
+                                failwith
+                                  "Could not get genesis account, given a \
+                                   location"
+                            | Some acct ->
+                                acct
+                          in
+                          match%bind
+                            Accounts_accessed.add_if_doesn't_exist
+                              (module Conn)
+                              genesis_block_id (index, acct)
+                          with
+                          | Ok _ ->
+                              return ()
+                          | Error err ->
+                              [%log error] "Could not add genesis account"
+                                ~metadata:
+                                  [ ("account_id", Account_id.to_yojson acct_id)
+                                  ; ("error", `String (Caqti_error.show err))
+                                  ] ;
+                              failwith "Could not add add genesis account" ))
+                in
+                Conn.commit ())
+              pool
+          in
+          match%map
+            retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
+          with
+          | Error e ->
+              [%log warn] "genesis accounts could not be added"
+                ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
+              failwith "Failed to add genesis accounts"
+          | Ok () ->
+              () ) )
 
 let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
     pool =
@@ -3612,6 +3699,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
+      [%log info]
+        "Starting archive process; built with commit $commit on branch $branch"
+        ~metadata:
+          [ ("commit", `String Mina_version.commit_id)
+          ; ("branch", `String Mina_version.branch)
+          ; ("commit_date", `String Mina_version.commit_date)
+          ] ;
       let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
       run ~constraint_constants pool reader ~logger ~delete_older_than
       |> don't_wait_for ;

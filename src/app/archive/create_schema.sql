@@ -49,13 +49,11 @@ CREATE TABLE account_identifiers
 , UNIQUE (public_key_id,token_id)
 );
 
-/* the initial balance is the balance at genesis, whether the account is timed or not
-   for untimed accounts, the fields other than id, account_identifier_id, and token are 0
+/* for untimed accounts, the fields other than id, account_identifier_id, and token are 0
 */
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
 , account_identifier_id   int       NOT NULL UNIQUE REFERENCES account_identifiers(id)
-, initial_balance         bigint    NOT NULL
 , initial_minimum_balance bigint    NOT NULL
 , cliff_time              bigint    NOT NULL
 , cliff_amount            bigint    NOT NULL
@@ -152,7 +150,6 @@ CREATE TABLE blocks
 , chain_status                 chain_status_type NOT NULL
 );
 
-CREATE INDEX idx_blocks_id         ON blocks(id);
 CREATE INDEX idx_blocks_parent_id  ON blocks(parent_id);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
