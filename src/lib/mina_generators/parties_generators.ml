@@ -446,6 +446,147 @@ let gen_protocol_state_precondition
   ; next_epoch_data
   }
 
+let gen_invalid_protocol_state_precondition
+    (psv : Zkapp_precondition.Protocol_state.View.t) :
+    Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
+  let module Tamperable = struct
+    type t =
+      | Timestamp
+      | Blockchain_length
+      | Min_window_density
+      | Total_currency
+      | Global_slot_since_hard_fork
+      | Global_slot_since_genesis
+  end in
+  let open Quickcheck.Let_syntax in
+  let open Zkapp_precondition.Closed_interval in
+  let%bind protocol_state_precondition = gen_protocol_state_precondition psv in
+  let%bind lower = Bool.quickcheck_generator in
+  match%bind
+    Quickcheck.Generator.of_list
+      ( [ Timestamp
+        ; Blockchain_length
+        ; Min_window_density
+        ; Total_currency
+        ; Global_slot_since_hard_fork
+        ; Global_slot_since_genesis
+        ]
+        : Tamperable.t list )
+  with
+  | Timestamp ->
+      let%map timestamp =
+        let%map epsilon =
+          Int64.gen_incl 1_000_000L 60_000_000L >>| Block_time.Span.of_ms
+        in
+        if lower || Block_time.(psv.timestamp > add zero epsilon) then
+          { lower = Block_time.zero
+          ; upper = Block_time.sub psv.timestamp epsilon
+          }
+        else
+          { lower = Block_time.add psv.timestamp epsilon
+          ; upper = Block_time.max_value
+          }
+      in
+      { protocol_state_precondition with
+        timestamp = Zkapp_basic.Or_ignore.Check timestamp
+      }
+  | Blockchain_length ->
+      let open Mina_numbers in
+      let%map blockchain_length =
+        let%map epsilon = Length.(gen_incl (of_int 1) (of_int 10)) in
+        if lower || Length.(psv.blockchain_length > epsilon) then
+          { lower = Length.zero
+          ; upper =
+              Length.sub psv.blockchain_length epsilon
+              |> Option.value ~default:Length.zero
+          }
+        else
+          { lower = Length.add psv.blockchain_length epsilon
+          ; upper = Length.max_value
+          }
+      in
+      { protocol_state_precondition with
+        blockchain_length = Zkapp_basic.Or_ignore.Check blockchain_length
+      }
+  | Min_window_density ->
+      let open Mina_numbers in
+      let%map min_window_density =
+        let%map epsilon = Length.(gen_incl (of_int 1) (of_int 10)) in
+        if lower || Length.(psv.min_window_density > epsilon) then
+          { lower = Length.zero
+          ; upper =
+              Length.sub psv.min_window_density epsilon
+              |> Option.value ~default:Length.zero
+          }
+        else
+          { lower = Length.add psv.blockchain_length epsilon
+          ; upper = Length.max_value
+          }
+      in
+      { protocol_state_precondition with
+        min_window_density = Zkapp_basic.Or_ignore.Check min_window_density
+      }
+  | Total_currency ->
+      let open Currency in
+      let%map total_currency =
+        let%map epsilon =
+          Amount.(gen_incl (of_int 1_000) (of_int 1_000_000_000))
+        in
+        if lower || Amount.(psv.total_currency > epsilon) then
+          { lower = Amount.zero
+          ; upper =
+              Amount.sub psv.total_currency epsilon
+              |> Option.value ~default:Amount.zero
+          }
+        else
+          { lower =
+              Amount.add psv.total_currency epsilon
+              |> Option.value ~default:Amount.max_int
+          ; upper = Amount.max_int
+          }
+      in
+      { protocol_state_precondition with
+        total_currency = Zkapp_basic.Or_ignore.Check total_currency
+      }
+  | Global_slot_since_hard_fork ->
+      let open Mina_numbers in
+      let%map global_slot_since_hard_fork =
+        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
+        if lower || Global_slot.(psv.global_slot_since_hard_fork > epsilon) then
+          { lower = Global_slot.zero
+          ; upper =
+              Global_slot.sub psv.global_slot_since_hard_fork epsilon
+              |> Option.value ~default:Global_slot.zero
+          }
+        else
+          { lower = Global_slot.add psv.global_slot_since_hard_fork epsilon
+          ; upper = Global_slot.max_value
+          }
+      in
+      { protocol_state_precondition with
+        global_slot_since_hard_fork =
+          Zkapp_basic.Or_ignore.Check global_slot_since_hard_fork
+      }
+  | Global_slot_since_genesis ->
+      let open Mina_numbers in
+      let%map global_slot_since_genesis =
+        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
+        if lower || Global_slot.(psv.global_slot_since_genesis > epsilon) then
+          { lower = Global_slot.zero
+          ; upper =
+              Global_slot.sub psv.global_slot_since_genesis epsilon
+              |> Option.value ~default:Global_slot.zero
+          }
+        else
+          { lower = Global_slot.add psv.global_slot_since_genesis epsilon
+          ; upper = Global_slot.max_value
+          }
+      in
+      { protocol_state_precondition with
+        global_slot_since_genesis =
+          Zkapp_basic.Or_ignore.Check global_slot_since_genesis
+      }
+
 module Party_body_components = struct
   type ( 'pk
        , 'update
@@ -509,9 +650,9 @@ end
    fee payer, and `Token_id.t` for other parties.
 *)
 let gen_party_body_components (type a b c d) ?account_id ?balances_tbl ?vk
-    ?(new_account = false) ?(zkapp_account = false) ?(is_fee_payer = false)
-    ?available_public_keys ?permissions_auth
-    ?(required_balance_change : a option)
+    ?(invalid_protocol_state_precondition = false) ?(new_account = false)
+    ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
+    ?permissions_auth ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option) ?protocol_state_view
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment : b Quickcheck.Generator.t)
@@ -718,7 +859,11 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl ?vk
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
   let%bind protocol_state_precondition =
-    Option.value_map protocol_state_view ~f:gen_protocol_state_precondition
+    Option.value_map protocol_state_view
+      ~f:
+        ( if invalid_protocol_state_precondition then
+          gen_invalid_protocol_state_precondition
+        else gen_protocol_state_precondition )
       ~default:(return Zkapp_precondition.Protocol_state.accept)
   in
   let%map use_full_commitment = gen_use_full_commitment
@@ -740,9 +885,9 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl ?vk
   }
 
 let gen_party_from ?(succeed = true) ?(new_account = false)
-    ?(zkapp_account = false) ?account_id ?permissions_auth
-    ?required_balance_change ?required_balance ~authorization
-    ~available_public_keys ~ledger ~balances_tbl ?vk () =
+    ?(zkapp_account = false) ?(invalid_protocol_state_precondition = false)
+    ?account_id ?permissions_auth ?required_balance_change ?required_balance
+    ~authorization ~available_public_keys ~ledger ~balances_tbl ?vk () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -759,9 +904,10 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
         false
   in
   let%bind body_components =
-    gen_party_body_components ~new_account ~zkapp_account ~increment_nonce
-      ?permissions_auth ?account_id ?vk ~available_public_keys
-      ?required_balance_change ?required_balance ~ledger ~balances_tbl
+    gen_party_body_components ~invalid_protocol_state_precondition ~new_account
+      ~zkapp_account ~increment_nonce ?permissions_auth ?account_id ?vk
+      ~available_public_keys ?required_balance_change ?required_balance ~ledger
+      ~balances_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_predcondition:(fun account_id ledger ->
@@ -772,8 +918,9 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
   return { Party.Wire.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger ?vk
-    ?protocol_state_view () : Party.Body.Fee_payer.t Quickcheck.Generator.t =
+let gen_party_body_fee_payer ?(invalid_protocol_state_precondition = false)
+    ?permissions_auth ~account_id ~ledger ?vk ?protocol_state_view () :
+    Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let account_precondition_gen account_id ledger () =
     let account =
@@ -791,9 +938,9 @@ let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger ?vk
     Quickcheck.Generator.return account.nonce
   in
   let%map body_components =
-    gen_party_body_components ?permissions_auth ~account_id ?vk
-      ~is_fee_payer:true ~increment_nonce:() ~gen_balance_change:gen_fee
-      ~f_balance_change:fee_to_amt
+    gen_party_body_components ~invalid_protocol_state_precondition
+      ?permissions_auth ~account_id ?vk ~is_fee_payer:true ~increment_nonce:()
+      ~gen_balance_change:gen_fee ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
         (* make sure the fee payer's token id is the default,
            which is represented by the unit value in the body
@@ -805,12 +952,13 @@ let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger ?vk
   in
   Party_body_components.to_fee_payer body_components
 
-let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ?vk
-    () : Party.Fee_payer.t Quickcheck.Generator.t =
+let gen_fee_payer ?(invalid_protocol_state_precondition = false)
+    ?permissions_auth ~account_id ~ledger ?protocol_state_view ?vk () :
+    Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
-    gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger ?vk
-      ?protocol_state_view ()
+    gen_party_body_fee_payer ~invalid_protocol_state_precondition
+      ?permissions_auth ~account_id ~ledger ?vk ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
@@ -829,6 +977,7 @@ let gen_fee_payer ?permissions_auth ~account_id ~ledger ?protocol_state_view ?vk
 let max_other_parties = 2
 
 let gen_parties_from ?(succeed = true)
+    ?(invalid_protocol_state_precondition = false)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
@@ -914,9 +1063,10 @@ let gen_parties_from ?(succeed = true)
           (* Signature authorization to start *)
           let authorization = Control.Signature Signature.dummy in
           let required_balance_change = Currency.Amount.Signed.zero in
-          gen_party_from ~authorization ~new_account:new_parties
-            ~permissions_auth ~zkapp_account ~available_public_keys
-            ~required_balance_change ~ledger ~balances_tbl ?vk ()
+          gen_party_from ~invalid_protocol_state_precondition ~authorization
+            ~new_account:new_parties ~permissions_auth ~zkapp_account
+            ~available_public_keys ~required_balance_change ~ledger
+            ~balances_tbl ?vk ()
         in
         let%bind party =
           (* authorization according to chosen permissions auth *)
@@ -926,9 +1076,9 @@ let gen_parties_from ?(succeed = true)
           in
           (* if we use this account again, it will have a Signature authorization *)
           let permissions_auth = Control.Tag.Signature in
-          gen_party_from ~account_id ~authorization ~permissions_auth
-            ~zkapp_account ~available_public_keys ~succeed ~ledger ~balances_tbl
-            ?vk ()
+          gen_party_from ~invalid_protocol_state_precondition ~account_id
+            ~authorization ~permissions_auth ~zkapp_account
+            ~available_public_keys ~succeed ~ledger ~balances_tbl ?vk ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
         go (party :: party0 :: acc) (n - 1)
@@ -976,9 +1126,9 @@ let gen_parties_from ?(succeed = true)
           None
     in
     let authorization = Control.Signature Signature.dummy in
-    gen_party_from ~authorization ~new_account:true ~available_public_keys
-      ~succeed ~ledger ~required_balance_change ?required_balance ~balances_tbl
-      ?vk ()
+    gen_party_from ~invalid_protocol_state_precondition ~authorization
+      ~new_account:true ~available_public_keys ~succeed ~ledger
+      ~required_balance_change ?required_balance ~balances_tbl ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
@@ -1090,143 +1240,56 @@ let gen_parties_from ?(succeed = true)
     ; other_parties = other_parties_with_valid_signatures
     }
 
-let gen_invalid_protocol_state_precondition
-    (psv : Zkapp_precondition.Protocol_state.View.t) :
-    Zkapp_precondition.Protocol_state.t Base_quickcheck.Generator.t =
+let gen_invalid_auth =
   let module Tamperable = struct
     type t =
-      | Timestamp
-      | Blockchain_length
-      | Min_window_density
-      | Total_currency
-      | Global_slot_since_hard_fork
-      | Global_slot_since_genesis
+      | Delegate
+      | App_state
+      | Verification_key
+      | Zkapp_uri
+      | Token_symbol
+      | Voting_for
   end in
   let open Quickcheck.Let_syntax in
-  let open Zkapp_precondition.Closed_interval in
-  let%bind protocol_state_precondition = gen_protocol_state_precondition psv in
-  let%bind lower = Bool.quickcheck_generator in
+  let open Zkapp_basic in
   match%bind
     Quickcheck.Generator.of_list
-      ( [ Timestamp
-        ; Blockchain_length
-        ; Min_window_density
-        ; Total_currency
-        ; Global_slot_since_hard_fork
-        ; Global_slot_since_genesis
+      ( [ Delegate
+        ; App_state
+        ; Verification_key
+        ; Zkapp_uri
+        ; Token_symbol
+        ; Voting_for
         ]
         : Tamperable.t list )
   with
-  | Timestamp ->
-      let%map timestamp =
-        let%map epsilon =
-          Int64.gen_incl 1_000_000L 60_000_000L >>| Block_time.Span.of_ms
+  | App_state ->
+      let%map app_state =
+        let%map fields =
+          let field_gen =
+            Snark_params.Tick.Field.gen >>| fun x -> Set_or_keep.Set x
+          in
+          Quickcheck.Generator.list_with_length 8 field_gen
         in
-        if lower || Block_time.(psv.timestamp > add zero epsilon) then
-          { lower = Block_time.zero
-          ; upper = Block_time.sub psv.timestamp epsilon
-          }
-        else
-          { lower = Block_time.add psv.timestamp epsilon
-          ; upper = Block_time.max_value
-          }
+        Zkapp_state.V.of_list_exn fields
       in
-      { protocol_state_precondition with
-        timestamp = Zkapp_basic.Or_ignore.Check timestamp
-      }
-  | Blockchain_length ->
-      let open Mina_numbers in
-      let%map blockchain_length =
-        let%map epsilon = Length.(gen_incl (of_int 1) (of_int 10)) in
-        if lower || Length.(psv.blockchain_length > epsilon) then
-          { lower = Length.zero
-          ; upper =
-              Length.sub psv.blockchain_length epsilon
-              |> Option.value ~default:Length.zero
-          }
-        else
-          { lower = Length.add psv.blockchain_length epsilon
-          ; upper = Length.max_value
-          }
-      in
-      { protocol_state_precondition with
-        blockchain_length = Zkapp_basic.Or_ignore.Check blockchain_length
-      }
-  | Min_window_density ->
-      let open Mina_numbers in
-      let%map min_window_density =
-        let%map epsilon = Length.(gen_incl (of_int 1) (of_int 10)) in
-        if lower || Length.(psv.min_window_density > epsilon) then
-          { lower = Length.zero
-          ; upper =
-              Length.sub psv.min_window_density epsilon
-              |> Option.value ~default:Length.zero
-          }
-        else
-          { lower = Length.add psv.blockchain_length epsilon
-          ; upper = Length.max_value
-          }
-      in
-      { protocol_state_precondition with
-        min_window_density = Zkapp_basic.Or_ignore.Check min_window_density
-      }
-  | Total_currency ->
-      let open Currency in
-      let%map total_currency =
-        let%map epsilon =
-          Amount.(gen_incl (of_int 1_000) (of_int 1_000_000_000))
-        in
-        if lower || Amount.(psv.total_currency > epsilon) then
-          { lower = Amount.zero
-          ; upper =
-              Amount.sub psv.total_currency epsilon
-              |> Option.value ~default:Amount.zero
-          }
-        else
-          { lower =
-              Amount.add psv.total_currency epsilon
-              |> Option.value ~default:Amount.max_int
-          ; upper = Amount.max_int
-          }
-      in
-      { protocol_state_precondition with
-        total_currency = Zkapp_basic.Or_ignore.Check total_currency
-      }
-  | Global_slot_since_hard_fork ->
-      let open Mina_numbers in
-      let%map global_slot_since_hard_fork =
-        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
-        if lower || Global_slot.(psv.global_slot_since_hard_fork > epsilon) then
-          { lower = Global_slot.zero
-          ; upper =
-              Global_slot.sub psv.global_slot_since_hard_fork epsilon
-              |> Option.value ~default:Global_slot.zero
-          }
-        else
-          { lower = Global_slot.add psv.global_slot_since_hard_fork epsilon
-          ; upper = Global_slot.max_value
-          }
-      in
-      { protocol_state_precondition with
-        global_slot_since_hard_fork =
-          Zkapp_basic.Or_ignore.Check global_slot_since_hard_fork
-      }
-  | Global_slot_since_genesis ->
-      let open Mina_numbers in
-      let%map global_slot_since_genesis =
-        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
-        if lower || Global_slot.(psv.global_slot_since_genesis > epsilon) then
-          { lower = Global_slot.zero
-          ; upper =
-              Global_slot.sub psv.global_slot_since_genesis epsilon
-              |> Option.value ~default:Global_slot.zero
-          }
-        else
-          { lower = Global_slot.add psv.global_slot_since_genesis epsilon
-          ; upper = Global_slot.max_value
-          }
-      in
-      { protocol_state_precondition with
-        global_slot_since_genesis =
-          Zkapp_basic.Or_ignore.Check global_slot_since_genesis
-      }
+      { Party.Update.dummy with app_state }
+  | Delegate ->
+      let%map pk = Signature_lib.Public_key.Compressed.gen in
+      let delegate = Set_or_keep.Set pk in
+      { Party.Update.dummy with delegate }
+  | Verification_key ->
+      let data = Pickles.Side_loaded.Verification_key.dummy in
+      let hash = Zkapp_account.digest_vk data in
+      let verification_key = Set_or_keep.Set With_hash.{ data; hash } in
+      return { Party.Update.dummy with verification_key }
+  | Zkapp_uri ->
+      let zkapp_uri = Set_or_keep.Set "https://o1labs.org" in
+      return { Party.Update.dummy with zkapp_uri }
+  | Token_symbol ->
+      let token_symbol = Set_or_keep.Set "CODA" in
+      return { Party.Update.dummy with token_symbol }
+  | Voting_for ->
+      let%map field = Snark_params.Tick.Field.gen in
+      let voting_for = Set_or_keep.Set field in
+      { Party.Update.dummy with voting_for }

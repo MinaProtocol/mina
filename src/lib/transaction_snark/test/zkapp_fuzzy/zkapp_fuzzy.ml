@@ -3,7 +3,6 @@ open Signature_lib
 open Mina_base
 module U = Transaction_snark_tests.Util
 
-(* add a comment to make git happy *)
 let mk_ledgers_and_fee_payers ~num_of_fee_payers =
   let fee_payer_keypairs =
     Array.init num_of_fee_payers ~f:(fun _ -> Keypair.create ())
@@ -42,6 +41,7 @@ let mk_ledgers_and_fee_payers ~num_of_fee_payers =
 
 let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
+(*
 let generate_parties_and_apply_them_consecutively () =
   let num_of_fee_payers = 5 in
   let trials = 6 in
@@ -83,7 +83,35 @@ let generate_parties_and_apply_them_freshly () =
       for i = 0 to trials - 1 do
         test i
       done)
+*)
+
+let test_invalid_protocol_state_precondition () =
+  let num_of_fee_payers = 5 in
+  let trials = 1 in
+  Test_util.with_randomness 123456789 (fun () ->
+      let test i =
+        let ledger, fee_payer_keypairs, keymap =
+          mk_ledgers_and_fee_payers ~num_of_fee_payers
+        in
+        Quickcheck.test ~trials:1
+          (Mina_generators.Parties_generators.gen_parties_from
+             ~invalid_protocol_state_precondition:true
+             ~protocol_state_view:U.genesis_state_view
+             ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
+             ~keymap ~ledger ~vk ~prover ())
+          ~f:(fun parties ->
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                U.check_parties_with_merges_exn
+                  ~expected_failure:
+                    Transaction_status.Failure
+                    .Protocol_state_precondition_unsatisfied ledger [ parties ]
+                  ~state_body:U.genesis_state_body))
+      in
+      for i = 0 to trials - 1 do
+        test i
+      done)
 
 let () =
-  generate_parties_and_apply_them_consecutively () ;
-  generate_parties_and_apply_them_freshly ()
+  (*generate_parties_and_apply_them_consecutively () ;
+    generate_parties_and_apply_them_freshly ()*)
+  test_invalid_protocol_state_precondition ()
