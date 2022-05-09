@@ -17,10 +17,9 @@ module type Transition_handler_validator_intf = sig
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
     -> transition_reader:
-         External_transition.Initial_validated.t Envelope.Incoming.t
-         Strict_pipe.Reader.t
+         Mina_block.initial_valid_block Envelope.Incoming.t Strict_pipe.Reader.t
     -> valid_transition_writer:
-         ( ( External_transition.Initial_validated.t Envelope.Incoming.t
+         ( ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t
          , Strict_pipe.drop_head Strict_pipe.buffered
@@ -33,8 +32,8 @@ module type Transition_handler_validator_intf = sig
        logger:Logger.t
     -> frontier:transition_frontier
     -> unprocessed_transition_cache:unprocessed_transition_cache
-    -> External_transition.Initial_validated.t Envelope.Incoming.t
-    -> ( ( External_transition.Initial_validated.t Envelope.Incoming.t
+    -> Mina_block.initial_valid_block Envelope.Incoming.t
+    -> ( ( Mina_block.initial_valid_block Envelope.Incoming.t
          , State_hash.t )
          Cached.t
        , [> `In_frontier of State_hash.t
@@ -54,7 +53,7 @@ module type Breadcrumb_builder_intf = sig
     -> trust_system:Trust_system.t
     -> frontier:transition_frontier
     -> initial_hash:State_hash.t
-    -> ( External_transition.Initial_validated.t Envelope.Incoming.t
+    -> ( Mina_block.initial_valid_block Envelope.Incoming.t
        , State_hash.t )
        Cached.t
        Rose_tree.t
@@ -76,7 +75,7 @@ module type Transition_handler_processor_intf = sig
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
     -> primary_transition_reader:
-         ( External_transition.Initial_validated.t Envelope.Incoming.t
+         ( Mina_block.initial_valid_block Envelope.Incoming.t
          , State_hash.t )
          Cached.t
          Strict_pipe.Reader.t
@@ -85,7 +84,7 @@ module type Transition_handler_processor_intf = sig
     -> clean_up_catchup_scheduler:unit Ivar.t
     -> catchup_job_writer:
          ( State_hash.t
-           * ( External_transition.Initial_validated.t Envelope.Incoming.t
+           * ( Mina_block.initial_valid_block Envelope.Incoming.t
              , State_hash.t )
              Cached.t
              Rose_tree.t
@@ -106,7 +105,7 @@ module type Transition_handler_processor_intf = sig
          , unit )
          Strict_pipe.Writer.t
     -> processed_transition_writer:
-         ( [ `Transition of External_transition.Validated.t ]
+         ( [ `Transition of Mina_block.Validated.t ]
            * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )
@@ -121,8 +120,8 @@ module type Unprocessed_transition_cache_intf = sig
 
   val register_exn :
        t
-    -> External_transition.Initial_validated.t Envelope.Incoming.t
-    -> ( External_transition.Initial_validated.t Envelope.Incoming.t
+    -> Mina_block.initial_valid_block Envelope.Incoming.t
+    -> ( Mina_block.initial_valid_block Envelope.Incoming.t
        , State_hash.t )
        Cached.t
 end
@@ -170,8 +169,8 @@ module type Best_tip_prover_intf = sig
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
-    -> ( [ `Root of External_transition.Initial_validated.t ]
-       * [ `Best_tip of External_transition.Initial_validated.t ] )
+    -> ( [ `Root of Mina_block.initial_valid_block ]
+       * [ `Best_tip of Mina_block.initial_valid_block ] )
        Deferred.Or_error.t
 end
 
@@ -201,8 +200,8 @@ module type Consensus_best_tip_prover_intf = sig
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
-    -> ( [ `Root of External_transition.Initial_validated.t ]
-       * [ `Best_tip of External_transition.Initial_validated.t ] )
+    -> ( [ `Root of Mina_block.initial_valid_block ]
+       * [ `Best_tip of Mina_block.initial_valid_block ] )
        Deferred.Or_error.t
 end
 
@@ -266,16 +265,15 @@ module type Bootstrap_controller_intf = sig
     -> network:network
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> transition_reader:
-         External_transition.Initial_validated.t Envelope.Incoming.t
-         Strict_pipe.Reader.t
+         Mina_block.initial_valid_block Envelope.Incoming.t Strict_pipe.Reader.t
     -> persistent_root:persistent_root
     -> persistent_frontier:persistent_frontier
-    -> initial_root_transition:External_transition.Validated.t
+    -> initial_root_transition:Mina_block.Validated.t
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
     -> genesis_constants:Genesis_constants.t
     -> ( transition_frontier
-       * External_transition.Initial_validated.t Envelope.Incoming.t list )
+       * Mina_block.initial_valid_block Envelope.Incoming.t list )
        Deferred.t
 end
 
@@ -293,32 +291,30 @@ module type Transition_frontier_controller_intf = sig
     -> network:network
     -> time_controller:Block_time.Controller.t
     -> collected_transitions:
-         External_transition.Initial_validated.t Envelope.Incoming.t list
+         Mina_block.initial_valid_block Envelope.Incoming.t list
     -> frontier:transition_frontier
     -> network_transition_reader:
-         External_transition.Initial_validated.t Envelope.Incoming.t
-         Strict_pipe.Reader.t
+         Mina_block.initial_valid_block Envelope.Incoming.t Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[ `Clear ] Strict_pipe.Reader.t
-    -> External_transition.Validated.t Strict_pipe.Reader.t
+    -> Mina_block.Validated.t Strict_pipe.Reader.t
 end
 
 module type Initial_validator_intf = sig
-  type external_transition
+  type block
 
-  type external_transition_with_initial_validation
+  type block_with_initial_validation
 
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
     -> transition_reader:
-         ( [ `Transition of external_transition Envelope.Incoming.t ]
+         ( [ `Transition of block Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t -> unit ] )
          Strict_pipe.Reader.t
     -> valid_transition_writer:
-         ( [ `Transition of
-             external_transition_with_initial_validation Envelope.Incoming.t ]
+         ( [ `Transition of block_with_initial_validation Envelope.Incoming.t ]
            * [ `Time_received of Block_time.t ]
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )
@@ -360,12 +356,12 @@ module type Transition_router_intf = sig
          Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:
-         External_transition.Initial_validated.t Broadcast_pipe.Reader.t
-         * External_transition.Initial_validated.t Broadcast_pipe.Writer.t
+         Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+         * Mina_block.initial_valid_block Broadcast_pipe.Writer.t
     -> precomputed_values:Precomputed_values.t
     -> catchup_mode:[ `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
-    -> ( [ `Transition of External_transition.Validated.t ]
+    -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Strict_pipe.Reader.t

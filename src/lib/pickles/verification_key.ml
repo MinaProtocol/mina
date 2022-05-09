@@ -3,11 +3,73 @@ open Pickles_types
 open Import
 open Kimchi_pasta.Pasta
 
+module Verifier_index_json = struct
+  module Lookup = struct
+    type lookups_used = Kimchi_types.VerifierIndex.Lookup.lookups_used =
+      | Single
+      | Joint
+    [@@deriving yojson]
+
+    type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
+      { lookup_used : lookups_used
+      ; lookup_table : 'polyComm array
+      ; lookup_selectors : 'polyComm array
+      ; table_ids : 'polyComm option
+      ; max_joint_size : int
+      }
+    [@@deriving yojson]
+  end
+
+  type 'fr domain = 'fr Kimchi_types.VerifierIndex.domain =
+    { log_size_of_group : int; group_gen : 'fr }
+  [@@deriving yojson]
+
+  type 'polyComm verification_evals =
+        'polyComm Kimchi_types.VerifierIndex.verification_evals =
+    { sigma_comm : 'polyComm array
+    ; coefficients_comm : 'polyComm array
+    ; generic_comm : 'polyComm
+    ; psm_comm : 'polyComm
+    ; complete_add_comm : 'polyComm
+    ; mul_comm : 'polyComm
+    ; emul_comm : 'polyComm
+    ; endomul_scalar_comm : 'polyComm
+    ; chacha_comm : 'polyComm array option
+    }
+  [@@deriving yojson]
+
+  type ('fr, 'sRS, 'polyComm) verifier_index =
+        ('fr, 'sRS, 'polyComm) Kimchi_types.VerifierIndex.verifier_index =
+    { domain : 'fr domain
+    ; max_poly_size : int
+    ; max_quot_size : int
+    ; srs : 'sRS
+    ; evals : 'polyComm verification_evals
+    ; shifts : 'fr array
+    ; lookup_index : 'polyComm Lookup.t option
+    }
+  [@@deriving yojson]
+
+  type 'f or_infinity = 'f Kimchi_types.or_infinity =
+    | Infinity
+    | Finite of ('f * 'f)
+  [@@deriving yojson]
+
+  type 'g polycomm = 'g Kimchi_types.poly_comm =
+    { unshifted : 'g array; shifted : 'g option }
+  [@@deriving yojson]
+
+  let to_yojson fp fq =
+    verifier_index_to_yojson fp
+      (fun _ -> `Null)
+      (polycomm_to_yojson (or_infinity_to_yojson fq))
+end
+
 module Data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = { constraints : int }
+      type t = { constraints : int } [@@deriving yojson]
 
       let to_latest = Fn.id
     end
@@ -25,6 +87,7 @@ module Repr = struct
         ; step_domains : Domains.Stable.V1.t array
         ; data : Data.Stable.V1.t
         }
+      [@@deriving to_yojson]
 
       let to_latest = Fn.id
     end
@@ -37,10 +100,14 @@ module Stable = struct
     type t =
       { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
       ; step_domains : Domains.t array
-      ; index : Impls.Wrap.Verification_key.t
+      ; index :
+          (Impls.Wrap.Verification_key.t
+          [@to_yojson
+            Verifier_index_json.to_yojson Backend.Tock.Field.to_yojson
+              Backend.Tick.Field.to_yojson])
       ; data : Data.t
       }
-    [@@deriving fields]
+    [@@deriving fields, to_yojson]
 
     let to_latest = Fn.id
 
@@ -91,6 +158,8 @@ module Stable = struct
               end)
   end
 end]
+
+let to_yojson = Stable.Latest.to_yojson
 
 let dummy_commitments g =
   let open Plonk_types in

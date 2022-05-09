@@ -3,6 +3,8 @@
 open Core_kernel
 open Mina_base_import
 
+let invalid = (Public_key.Compressed.empty, Pickles.Backend.Tick.Field.zero)
+
 module Digest = struct
   [%%ifdef consensus_mechanism]
 
@@ -138,7 +140,7 @@ let create key tid = (key, tid)
 
 let empty : t = (Public_key.Compressed.empty, Digest.default)
 
-let public_key (key, _id) = key
+let public_key (key, _tid) = key
 
 let token_id (_key, id) = id
 
@@ -182,11 +184,15 @@ module Checked = struct
 
   let token_id (_key, tid) = tid
 
-  let to_input (key, tid) =
+  let to_input ((key, tid) : var) =
     let tid = Digest.Checked.to_input tid in
     Random_oracle.Input.Chunked.append
       (Public_key.Compressed.Checked.to_input key)
       tid
+
+  let derive_token_id ~(owner : var) : Digest.Checked.t =
+    Random_oracle.Checked.hash ~init:Hash_prefix.derive_token_id
+      (Random_oracle.Checked.pack_input (to_input owner))
 
   let equal (pk1, tid1) (pk2, tid2) =
     let%bind pk_equal = Public_key.Compressed.Checked.equal pk1 pk2 in

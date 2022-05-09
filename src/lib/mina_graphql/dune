@@ -81,6 +81,7 @@
    pickles_types
    graphql
    fields_derivers.graphql
-   o1trace)
+   o1trace
+   verifier)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))

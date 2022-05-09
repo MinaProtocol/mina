@@ -82,6 +82,7 @@ module Numeric = struct
       ; to_input : 'a -> F.t Random_oracle_input.Chunked.t
       ; to_input_checked : 'var -> Field.Var.t Random_oracle_input.Chunked.t
       ; lte_checked : 'var -> 'var -> Boolean.var
+      ; eq_checked : 'var -> 'var -> Boolean.var
       }
 
     let run f x y = Impl.run_checked (f x y)
@@ -94,6 +95,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -106,6 +108,7 @@ module Numeric = struct
         ; max_value = max_int
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -118,6 +121,7 @@ module Numeric = struct
         ; max_value = max_int
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -130,6 +134,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -142,6 +147,7 @@ module Numeric = struct
         ; max_value
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; equal
         ; typ
         ; to_input
@@ -153,6 +159,7 @@ module Numeric = struct
         { equal
         ; compare
         ; lte_checked = run Checked.( <= )
+        ; eq_checked = run Checked.( = )
         ; zero
         ; max_value
         ; typ = Checked.typ
@@ -256,6 +263,14 @@ module Numeric = struct
     let check { lte_checked = ( <= ); _ } (t : 'a t) (x : 'a) =
       Or_ignore.Checked.check t ~f:(fun { lower; upper } ->
           Boolean.all [ lower <= x; x <= upper ])
+
+    let is_constant { eq_checked = ( = ); _ } (t : 'a t) =
+      let is_constant ({ lower; upper } : _ Closed_interval.t) =
+        lower = upper
+      in
+      Or_ignore.Checked.map t ~f_implicit:is_constant
+        ~f_explicit:(fun { is_some; data } ->
+          Boolean.( &&& ) is_some (is_constant data))
   end
 
   let typ { equal = eq; zero; max_value; typ; _ } =
@@ -270,6 +285,9 @@ module Numeric = struct
     | Check { lower; upper } ->
         if compare lower x <= 0 && compare x upper <= 0 then Ok ()
         else Or_error.errorf "Bounds check failed: %s" label
+
+  let is_constant { equal = ( = ); _ } (t : 'a t) =
+    match t with Ignore -> false | Check { lower; upper } -> lower = upper
 end
 
 module Eq_data = struct
@@ -379,7 +397,7 @@ module Eq_data = struct
 
     let public_key () =
       Public_key.Compressed.
-        { default = Lazy.force invalid_public_key
+        { default = invalid_public_key
         ; to_input
         ; to_input_checked = Checked.to_input
         ; equal_checked = run Checked.equal
@@ -406,7 +424,7 @@ module Eq_data = struct
   let check_checked { Tc.equal_checked; _ } (t : 'a Checked.t) (x : 'a) =
     Checked.check t ~f:(equal_checked x)
 
-  let check ~label { Tc.equal; _ } (t : 'a t) (x : 'a) =
+  let check ?(label = "") { Tc.equal; _ } (t : 'a t) (x : 'a) =
     match t with
     | Ignore ->
         Ok ()
@@ -431,7 +449,7 @@ end
 module Leaf_typs = struct
   let public_key () =
     Public_key.Compressed.(
-      Or_ignore.typ_explicit ~ignore:(Lazy.force invalid_public_key) typ)
+      Or_ignore.typ_explicit ~ignore:invalid_public_key typ)
 
   open Eq_data.Tc
 
@@ -471,7 +489,6 @@ module Account = struct
           { balance : 'balance
           ; nonce : 'nonce
           ; receipt_chain_hash : 'receipt_chain_hash
-          ; public_key : 'pk
           ; delegate : 'pk
           ; state : 'field Zkapp_state.V.Stable.V1.t
           ; sequence_state : 'field
@@ -521,12 +538,17 @@ module Account = struct
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest
-          ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } :
+          ({ balance
+           ; nonce
+           ; receipt_chain_hash
+           ; public_key = _
+           ; delegate
+           ; state
+           } :
             t) : V2.t =
         { balance
         ; nonce
         ; receipt_chain_hash
-        ; public_key
         ; delegate
         ; state
         ; sequence_state = Ignore
@@ -540,7 +562,6 @@ module Account = struct
     let%bind balance = Numeric.gen Balance.gen Balance.compare in
     let%bind nonce = Numeric.gen Account_nonce.gen Account_nonce.compare in
     let%bind receipt_chain_hash = Or_ignore.gen Receipt.Chain_hash.gen in
-    let%bind public_key = Eq_data.gen Public_key.Compressed.gen in
     let%bind delegate = Eq_data.gen Public_key.Compressed.gen in
     let%bind state =
       let%bind fields =
@@ -559,7 +580,6 @@ module Account = struct
     { Poly.balance
     ; nonce
     ; receipt_chain_hash
-    ; public_key
     ; delegate
     ; state
     ; sequence_state
@@ -570,7 +590,6 @@ module Account = struct
     { balance = Ignore
     ; nonce = Ignore
     ; receipt_chain_hash = Ignore
-    ; public_key = Ignore
     ; delegate = Ignore
     ; state =
         Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
@@ -586,7 +605,6 @@ module Account = struct
     Poly.Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
-      ~public_key:!.(Or_ignore.deriver public_key)
       ~delegate:!.(Or_ignore.deriver public_key)
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
       ~sequence_state:!.(Or_ignore.deriver field)
@@ -598,7 +616,6 @@ module Account = struct
     let predicate : t =
       { accept with
         balance = Or_ignore.Check { Closed_interval.lower = b; upper = b }
-      ; public_key = Or_ignore.Check Public_key.Compressed.empty
       ; sequence_state = Or_ignore.Check (Field.of_int 99)
       ; proved_state = Or_ignore.Check true
       }
@@ -611,7 +628,6 @@ module Account = struct
       ({ balance
        ; nonce
        ; receipt_chain_hash
-       ; public_key
        ; delegate
        ; state
        ; sequence_state
@@ -623,7 +639,6 @@ module Account = struct
       [ Numeric.(to_input Tc.balance balance)
       ; Numeric.(to_input Tc.nonce nonce)
       ; Hash.(to_input Tc.receipt_chain_hash receipt_chain_hash)
-      ; Eq_data.(to_input_explicit (Tc.public_key ()) public_key)
       ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
           (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
@@ -651,7 +666,6 @@ module Account = struct
         ({ balance
          ; nonce
          ; receipt_chain_hash
-         ; public_key
          ; delegate
          ; state
          ; sequence_state
@@ -663,7 +677,6 @@ module Account = struct
         [ Numeric.(Checked.to_input Tc.balance balance)
         ; Numeric.(Checked.to_input Tc.nonce nonce)
         ; Hash.(to_input_checked Tc.receipt_chain_hash receipt_chain_hash)
-        ; Eq_data.(to_input_checked (Tc.public_key ()) public_key)
         ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
         ; Vector.reduce_exn ~f:append
             (Vector.map state ~f:Eq_data.(to_input_checked Tc.field))
@@ -678,7 +691,6 @@ module Account = struct
         ({ balance
          ; nonce
          ; receipt_chain_hash
-         ; public_key
          ; delegate
          ; state = _
          ; sequence_state = _
@@ -691,7 +703,6 @@ module Account = struct
           check_checked Tc.receipt_chain_hash receipt_chain_hash
             a.receipt_chain_hash)
       ; Eq_data.(check_checked (Tc.public_key ()) delegate a.delegate)
-      ; Eq_data.(check_checked (Tc.public_key ()) public_key a.public_key)
       ]
 
     let check_nonsnapp t a = Boolean.all (nonsnapp t a)
@@ -700,7 +711,6 @@ module Account = struct
         ({ balance = _
          ; nonce = _
          ; receipt_chain_hash = _
-         ; public_key = _
          ; delegate = _
          ; state
          ; sequence_state
@@ -737,7 +747,6 @@ module Account = struct
       ; nonce
       ; receipt_chain_hash
       ; public_key ()
-      ; public_key ()
       ; Zkapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
       ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
           ~ignore:(Lazy.force Zkapp_account.Sequence_events.empty_hash)
@@ -750,7 +759,6 @@ module Account = struct
       ({ balance
        ; nonce
        ; receipt_chain_hash
-       ; public_key
        ; delegate
        ; state
        ; sequence_state
@@ -772,10 +780,6 @@ module Account = struct
       Eq_data.(
         check ~label:"delegate" tc delegate
           (Option.value ~default:tc.default a.delegate))
-    in
-    let%bind () =
-      Eq_data.(
-        check ~label:"public_key" (Tc.public_key ()) public_key a.public_key)
     in
     let%bind () =
       match a.zkapp with
@@ -1278,17 +1282,30 @@ module Protocol_state = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
+  let epoch_data : Epoch_data.t =
+    { ledger = { hash = Ignore; total_currency = Ignore }
+    ; seed = Ignore
+    ; start_checkpoint = Ignore
+    ; lock_checkpoint = Ignore
+    ; epoch_length = Ignore
+    }
+
   let accept : t =
-    let epoch_data : Epoch_data.t =
-      { ledger = { hash = Ignore; total_currency = Ignore }
-      ; seed = Ignore
-      ; start_checkpoint = Ignore
-      ; lock_checkpoint = Ignore
-      ; epoch_length = Ignore
-      }
-    in
     { snarked_ledger_hash = Ignore
     ; timestamp = Ignore
+    ; blockchain_length = Ignore
+    ; min_window_density = Ignore
+    ; last_vrf_output = ()
+    ; total_currency = Ignore
+    ; global_slot_since_hard_fork = Ignore
+    ; global_slot_since_genesis = Ignore
+    ; staking_epoch_data = epoch_data
+    ; next_epoch_data = epoch_data
+    }
+
+  let valid_until time : t =
+    { snarked_ledger_hash = Ignore
+    ; timestamp = Check time
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
     ; last_vrf_output = ()
@@ -1660,7 +1677,7 @@ let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
   let%bind () = Protocol_state.check protocol_state_predicate state_view in
   let%bind () = Account.check self_predicate self in
   let%bind () =
-    Eq_data.(check (Tc.public_key ())) ~label:"fee_payer" fee_payer fee_payer_pk
+    Eq_data.(check (Tc.public_key ()) ~label:"fee_payer" fee_payer fee_payer_pk)
   in
   let%bind () =
     let check (s : Account_state.t) (a : _ option) =

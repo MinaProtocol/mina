@@ -716,7 +716,7 @@
               "deprecationReason": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "args": [],
               "type": {
@@ -792,34 +792,6 @@
               "deprecationReason": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
@@ -836,7 +808,7 @@
               "deprecationReason": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "args": [],
               "type": {
@@ -882,7 +854,7 @@
               "defaultValue": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -952,30 +924,6 @@
               "defaultValue": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "defaultValue": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "type": {
@@ -990,7 +938,7 @@
               "defaultValue": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2750,14 +2698,6 @@
               "deprecationReason": null
             },
             {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "delegate",
               "description": null,
               "args": [],
@@ -2825,12 +2765,6 @@
             },
             {
               "name": "receiptChainHash",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
-              "name": "publicKey",
               "description": null,
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "defaultValue": null
@@ -3100,6 +3034,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "caller",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -3294,6 +3244,20 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "caller",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
                   "ofType": null
                 }
               },
@@ -5281,16 +5245,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "JSON",
-          "description": "Arbitrary JSON",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "INPUT_OBJECT",
           "name": "VrfEvaluationInput",
           "description": "The witness to a vrf evaluation",
@@ -6849,14 +6803,6 @@
               "deprecationReason": null
             },
             {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "delegate",
               "description": null,
               "args": [],
@@ -7178,6 +7124,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "caller",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
                   "ofType": null
                 }
               },
@@ -8180,7 +8142,7 @@
               "deprecationReason": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "args": [],
               "type": {
@@ -8256,34 +8218,6 @@
               "deprecationReason": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
@@ -8300,7 +8234,7 @@
               "deprecationReason": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "args": [],
               "type": {
@@ -9598,6 +9532,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "JSON",
+          "description": "Arbitrary JSON",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "protocolStateProof",
           "description": null,
@@ -9607,6 +9551,14 @@
               "description": "Base-64 encoded proof",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "json",
+              "description": "JSON-encoded proof",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "JSON", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -10460,6 +10412,49 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "MerklePathElement",
+          "description": null,
+          "fields": [
+            {
+              "name": "isRightBranch",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "otherHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },
@@ -12920,6 +12915,52 @@
               "deprecationReason": null
             },
             {
+              "name": "accountMerklePath",
+              "description": "Get the merkle path for an account",
+              "args": [
+                {
+                  "name": "token",
+                  "description":
+                    "Token of account being retrieved (defaults to MINA)",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "TokenId",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "publicKey",
+                  "description": "Public key of account being retrieved",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "MerklePathElement",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "tokenOwner",
               "description": "Find the account ID that owns a given token",
               "args": [
@@ -13560,6 +13601,23 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockchainVerificationKey",
+              "description":
+                "The pickles verification key for the protocol state proof",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "JSON",
                   "ofType": null
                 }
               },

@@ -206,8 +206,9 @@ module Token_symbol = struct
          Num_bits.n)
 
   let typ : (var, t) Typ.t =
+    let (Typ typ) = Field.typ in
     Typ.transport
-      { Field.typ with check = range_check }
+      (Typ { typ with check = range_check })
       ~there:to_field ~back:of_field
 
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
@@ -541,20 +542,8 @@ let typ : (var, value) Typ.t =
         (Zkapp_account.t option As_prover.Ref.t, Zkapp_account.t option) Typ.t =
       Typ.Internal.ref ()
     in
-    let alloc =
-      let open Typ.Alloc in
-      let%map x = Typ.field.alloc and y = account.alloc in
-      (x, y)
-    in
-    let read (_, y) = account.read y in
-    let store y =
-      let open Typ.Store in
-      let x = hash_zkapp_account_opt y in
-      let%map x = Typ.field.store x and y = account.store y in
-      (x, y)
-    in
-    let check (x, _) = Typ.field.check x in
-    { alloc; read; store; check }
+    Typ.(Field.typ * account)
+    |> Typ.transport ~there:(fun x -> (hash_zkapp_account_opt x, x)) ~back:snd
   in
   typ' zkapp
 

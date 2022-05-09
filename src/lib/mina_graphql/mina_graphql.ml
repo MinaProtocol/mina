@@ -319,6 +319,19 @@ module Types = struct
               , global_slot_since_genesis ))
         ])
 
+  let merkle_path_element :
+      (_, [ `Left of Zkapp_basic.F.t | `Right of Zkapp_basic.F.t ] option) typ =
+    obj "MerklePathElement" ~fields:(fun _ ->
+        [ field "isRightBranch" ~typ:(non_null bool)
+            ~args:Arg.[]
+            ~resolve:(fun _ x ->
+              match x with `Left _ -> false | `Right _ -> true)
+        ; field "otherHash" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ x ->
+              match x with `Left h | `Right h -> Zkapp_basic.F.to_string h)
+        ])
+
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
 
@@ -800,7 +813,8 @@ module Types = struct
                   | None ->
                       Unsigned.UInt32.zero
                   | Some crumb ->
-                      Transition_frontier.Breadcrumb.blockchain_length crumb)
+                      Transition_frontier.Breadcrumb.consensus_state crumb
+                      |> Consensus.Data.Consensus_state.blockchain_length)
               (* TODO: Mutually recurse with "block" instead -- #5396 *)
             ; field "stateHash" ~typ:string
                 ~doc:
@@ -1678,9 +1692,9 @@ module Types = struct
                   | Signed_command c ->
                       let status =
                         match t.status with
-                        | Applied _ ->
+                        | Applied ->
                             Command_status.Applied
-                        | Failed (e, _) ->
+                        | Failed e ->
                             Command_status.Included_but_failed e
                       in
                       Some
@@ -1700,9 +1714,9 @@ module Types = struct
                   | Parties parties ->
                       let status =
                         match t.status with
-                        | Applied _ ->
+                        | Applied ->
                             Command_status.Applied
-                        | Failed (e, _) ->
+                        | Failed e ->
                             Command_status.Included_but_failed e
                       in
                       Some
@@ -1737,6 +1751,10 @@ module Types = struct
               Some
                 (Mina_transition.External_transition.Precomputed_block.Proof
                  .to_bin_string proof))
+        ; field "json" ~typ:json ~doc:"JSON-encoded proof"
+            ~args:Arg.[]
+            ~resolve:(fun _ proof ->
+              Some (Yojson.Safe.to_basic (Proof.to_yojson_full proof)))
         ])
 
   let block :
@@ -3086,9 +3104,9 @@ module Mutations = struct
                       in
                       let (status : Types.Command_status.t) =
                         match status with
-                        | Applied _ ->
+                        | Applied ->
                             Applied
-                        | Failed (failure, _balance_data) ->
+                        | Failed failure ->
                             Included_but_failed failure
                       in
                       ( { data = with_hash; status }
@@ -3837,6 +3855,25 @@ module Queries = struct
             Types.AccountObj.Partial_account.of_full_account ~breadcrumb account
             |> Types.AccountObj.lift coda pk))
 
+  let account_merkle_path =
+    field "accountMerklePath" ~doc:"Get the merkle path for an account"
+      ~typ:(list (non_null Types.merkle_path_element))
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of account being retrieved"
+              ~typ:(non_null Types.Input.public_key_arg)
+          ; arg' "token"
+              ~doc:"Token of account being retrieved (defaults to MINA)"
+              ~typ:Types.Input.token_id_arg ~default:Token_id.default
+          ]
+      ~resolve:(fun { ctx = mina; _ } () pk token ->
+        let open Option.Let_syntax in
+        let%bind ledger, _breadcrumb = get_ledger_and_breadcrumb mina in
+        let%map location =
+          Ledger.location_of_account ledger (Account_id.create pk token)
+        in
+        Ledger.merkle_path ledger location)
+
   let accounts_for_pk =
     field "accounts" ~doc:"Find all accounts for a public key"
       ~typ:(non_null (list (non_null Types.AccountObj.account)))
@@ -3991,17 +4028,14 @@ module Queries = struct
   (* used by best_chain, block below *)
   let block_of_breadcrumb coda breadcrumb =
     let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-    let transition =
-      Transition_frontier.Breadcrumb.validated_transition breadcrumb
-    in
+    let block = Transition_frontier.Breadcrumb.block breadcrumb in
     let transactions =
-      Mina_transition.External_transition.Validated.transactions
+      Mina_transition.Block.transactions
         ~constraint_constants:
-          (Mina_lib.config coda).precomputed_values.constraint_constants
-        transition
+          (Mina_lib.config coda).precomputed_values.constraint_constants block
     in
     { With_hash.Stable.Latest.data =
-        Filtered_external_transition.of_transition transition `All transactions
+        Filtered_external_transition.of_transition block `All transactions
     ; hash
     }
 
@@ -4090,8 +4124,9 @@ module Queries = struct
                   Transition_frontier.Breadcrumb.validated_transition bc
                 in
                 let block_height =
-                  Mina_transition.External_transition.Validated
-                  .blockchain_length validated_transition
+                  Mina_transition.(
+                    Mina_block.blockchain_length @@ With_hash.data
+                    @@ Mina_block.Validated.forget validated_transition)
                 in
                 Unsigned.UInt32.equal block_height height_uint32)
             |> Result.of_option
@@ -4304,6 +4339,17 @@ module Queries = struct
         Consensus_vrf.Layout.Evaluation.compute_vrf ~constraint_constants
           evaluation)
 
+  let blockchain_verification_key =
+    io_field "blockchainVerificationKey"
+      ~doc:"The pickles verification key for the protocol state proof"
+      ~typ:(non_null Types.json)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        let open Deferred.Result.Let_syntax in
+        Mina_lib.verifier mina |> Verifier.get_blockchain_verification_key
+        |> Deferred.Result.map_error ~f:Error.to_string_hum
+        >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic)
+
   let commands =
     [ sync_status
     ; daemon_status
@@ -4314,6 +4360,7 @@ module Queries = struct
     ; connection_gating_config
     ; account
     ; accounts_for_pk
+    ; account_merkle_path
     ; token_owner
     ; current_snark_worker
     ; best_chain
@@ -4335,6 +4382,7 @@ module Queries = struct
     ; check_vrf
     ; runtime_config
     ; thread_graph
+    ; blockchain_verification_key
     ]
 end
 

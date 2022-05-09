@@ -61,8 +61,9 @@ module Network_config = struct
 
   type t =
     { mina_automation_location : string
-    ; debug_arg : bool
-    ; keypairs : Network_keypair.t list
+    ; debug_arg : bool (* ; keypairs : Network_keypair.t list *)
+    ; block_producer_keypairs : Network_keypair.t list
+    ; extra_genesis_keypairs : Network_keypair.t list
     ; constants : Test_config.constants
     ; terraform : terraform_config
     }
@@ -81,7 +82,6 @@ module Network_config = struct
         ; delta
         ; slots_per_epoch
         ; slots_per_sub_window
-        ; proof_level
         ; txpool_max_size
         ; requires_graphql
         ; block_producers
@@ -91,9 +91,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key
-        ; work_delay
-        ; transaction_capacity
-        ; aux_account_balance
+        ; proof_config
         } =
       test_config
     in
@@ -108,7 +106,7 @@ module Network_config = struct
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
-    let bp_keypairs, aux_keypairs =
+    let bp_keypairs, extra_keypairs =
       List.split_n
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
         (List.drop
@@ -119,36 +117,45 @@ module Network_config = struct
     if List.length bp_keypairs < num_block_producers then
       failwith
         "not enough sample keypairs for specified number of block producers" ;
-    let aux_accounts, aux_keypairs =
-      match aux_account_balance with
-      | None ->
-          ([], [])
-      | Some balance when List.length aux_keypairs > 0 ->
-          let balance = Balance.of_formatted_string balance in
-          let default = Runtime_config.Accounts.Single.default in
-          ( List.map aux_keypairs ~f:(fun (pk, _) ->
-                { default with
-                  pk = Some (Public_key.Compressed.to_string pk)
-                ; balance
-                })
-          , aux_keypairs )
-      | _ ->
-          failwith "there should be at least one aux keypair"
+    assert (List.length bp_keypairs >= num_block_producers) ;
+    if List.length bp_keypairs < num_block_producers then
+      failwith
+        "not enough sample keypairs for specified number of extra keypairs" ;
+    assert (List.length extra_keypairs >= List.length extra_genesis_accounts) ;
+    let extra_keypairs_cut =
+      List.take extra_keypairs (List.length extra_genesis_accounts)
     in
     let extra_accounts =
-      List.map extra_genesis_accounts ~f:(fun { keypair; balance } ->
+      List.map (List.zip_exn extra_genesis_accounts extra_keypairs_cut)
+        ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, sk)) ->
+          let timing =
+            match timing with
+            | Account.Timing.Untimed ->
+                None
+            | Timed t ->
+                Some
+                  { Runtime_config.Accounts.Single.Timed.initial_minimum_balance =
+                      t.initial_minimum_balance
+                  ; cliff_time = t.cliff_time
+                  ; cliff_amount = t.cliff_amount
+                  ; vesting_period = t.vesting_period
+                  ; vesting_increment = t.vesting_increment
+                  }
+          in
           let default = Runtime_config.Accounts.Single.default in
           { default with
-            pk =
-              Some
-                Public_key.(Compressed.to_string (compress keypair.public_key))
-          ; sk = None
-          ; balance = Balance.of_formatted_string balance
+            pk = Some (Public_key.Compressed.to_string pk)
+          ; sk = Some (Private_key.to_base58_check sk)
+          ; balance =
+              Balance.of_formatted_string balance
+              (* delegation currently unsupported *)
+          ; delegate = None
+          ; timing
           })
     in
     let bp_accounts =
       List.map (List.zip_exn block_producers bp_keypairs)
-        ~f:(fun ({ Test_config.Block_producer.balance; timing }, (pk, _)) ->
+        ~f:(fun ({ Test_config.Wallet.balance; timing }, (pk, _)) ->
           let timing =
             match timing with
             | Account.Timing.Untimed ->
@@ -195,20 +202,6 @@ module Network_config = struct
           })
     in
     (* DAEMON CONFIG *)
-    let proof_config =
-      (* TODO: lift configuration of these up Test_config.t *)
-      { Runtime_config.Proof_keys.level = Some proof_level
-      ; sub_windows_per_window = None
-      ; ledger_depth = None
-      ; block_window_duration_ms = None
-      ; work_delay
-      ; transaction_capacity
-      ; coinbase_amount = None
-      ; supercharged_coinbase_factor = None
-      ; account_creation_fee = None
-      ; fork = None
-      }
-    in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
         ~default:Genesis_constants.Constraint_constants.compiled proof_config
@@ -229,10 +222,10 @@ module Network_config = struct
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
-      ; proof = Some proof_config
+      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
-            { base = Accounts (bp_accounts @ aux_accounts @ extra_accounts)
+            { base = Accounts (bp_accounts @ extra_accounts)
             ; add_genesis_winner = None
             ; num_accounts = None
             ; balances = []
@@ -278,12 +271,15 @@ module Network_config = struct
       in
       Network_keypair.create_network_keypair ~keypair ~secret_name
     in
-    let aux_net_keypairs = List.mapi aux_keypairs ~f:mk_net_keypair in
+    let extra_genesis_net_keypairs =
+      List.mapi extra_keypairs_cut ~f:mk_net_keypair
+    in
     let bp_net_keypairs = List.mapi bp_keypairs ~f:mk_net_keypair in
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
-    ; keypairs = bp_net_keypairs @ aux_net_keypairs
+    ; block_producer_keypairs = bp_net_keypairs
+    ; extra_genesis_keypairs = extra_genesis_net_keypairs
     ; constants
     ; terraform =
         { cluster_name
@@ -375,8 +371,9 @@ module Network_manager = struct
     ; snark_worker_workloads : Kubernetes_network.Workload.t list
     ; archive_workloads : Kubernetes_network.Workload.t list
     ; workloads_by_id : Kubernetes_network.Workload.t String.Map.t
-    ; mutable deployed : bool
-    ; keypairs : Keypair.t list
+    ; mutable deployed : bool (* ; keypairs : Keypair.t list *)
+    ; block_producer_keypairs : Keypair.t list
+    ; extra_genesis_keypairs : Keypair.t list
     }
 
   let run_cmd t prog args = Util.run_cmd t.testnet_dir prog args
@@ -510,8 +507,12 @@ module Network_manager = struct
       ; archive_workloads
       ; workloads_by_id
       ; deployed = false
-      ; keypairs =
-          List.map network_config.keypairs ~f:(fun { keypair; _ } -> keypair)
+      ; block_producer_keypairs =
+          List.map network_config.block_producer_keypairs
+            ~f:(fun { keypair; _ } -> keypair)
+      ; extra_genesis_keypairs =
+          List.map network_config.extra_genesis_keypairs
+            ~f:(fun { keypair; _ } -> keypair)
       }
     in
     [%log info] "Initializing terraform" ;
@@ -567,7 +568,8 @@ module Network_manager = struct
       ; archive_nodes
       ; nodes_by_pod_id
       ; testnet_log_filter = t.testnet_log_filter
-      ; keypairs = t.keypairs
+      ; block_producer_keypairs = t.block_producer_keypairs
+      ; extra_genesis_keypairs = t.extra_genesis_keypairs
       }
     in
     let nodes_to_string =

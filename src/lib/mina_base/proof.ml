@@ -13,10 +13,12 @@ module Stable = struct
     [@@deriving sexp, yojson, compare]
 
     let to_latest = Fn.id
+
+    let to_yojson_full = Pickles.Proof.Branching_2.to_yojson_full
   end
 end]
 
-[%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+[%%define_locally Stable.Latest.(to_yojson, of_yojson, to_yojson_full)]
 
 let%test_module "proof-tests" =
   ( module struct
