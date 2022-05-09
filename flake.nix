@@ -30,8 +30,11 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
+  inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, ... }:
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
+    }:
     {
       overlay = import ./nix/overlay.nix;
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
@@ -52,6 +55,12 @@
             };
           }
         ];
+      };
+      pipeline = with flake-buildkite-pipeline.lib; {
+        steps = flakeStepsCachix {
+          pushToBinaryCaches = [ "mina-demo" ];
+          commonExtraStepConfig.agents = [ "nix" ];
+        } self;
       };
     } // utils.lib.eachDefaultSystem (system:
       let
@@ -188,12 +197,10 @@
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-        packages.mina_static = ocamlPackages_static.mina;
+        # packages.mina_static = ocamlPackages_static.mina;
         packages.marlin_plonk_bindings_stubs = pkgs.marlin_plonk_bindings_stubs;
         packages.go-capnproto2 = pkgs.go-capnproto2;
         packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.marlin_plonk_bindings_stubs_static =
-          pkgs.pkgsMusl.marlin_plonk_bindings_stubs;
         packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
@@ -204,8 +211,8 @@
 
         devShell = ocamlPackages.mina-dev;
         devShells.default = ocamlPackages.mina-dev;
-
-        packages.impure-shell = import ./nix/impure-shell.nix pkgs;
+        packages.impure-shell =
+          (import ./nix/impure-shell.nix pkgs).inputDerivation;
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 
         inherit checks;
