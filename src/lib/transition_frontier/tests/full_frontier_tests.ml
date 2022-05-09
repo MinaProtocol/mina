@@ -82,7 +82,8 @@ let%test_module "Full_frontier tests" =
       let root_data =
         let open Root_data in
         { transition =
-            Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
+            External_transition.Validated.lift @@ Mina_block.Validated.lift
+            @@ Mina_block.genesis ~precomputed_values
         ; staged_ledger =
             Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
         ; protocol_states = []

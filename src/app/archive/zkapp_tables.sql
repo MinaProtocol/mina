@@ -47,13 +47,13 @@ CREATE TABLE zkapp_state_data_array
 */
 CREATE TABLE zkapp_states
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]
+, element_ids              int[]            NOT NULL
 );
 
 /* like zkapp_states, but for sequences */
 CREATE TABLE zkapp_sequence_states
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]
+, element_ids              int[]            NOT NULL
 );
 
 /* the element_ids are non-NULL, and refer to zkapp_state_data_array
@@ -61,7 +61,7 @@ CREATE TABLE zkapp_sequence_states
 */
 CREATE TABLE zkapp_events
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]
+, element_ids              int[]            NOT NULL
 );
 
 CREATE TABLE zkapp_verification_keys
