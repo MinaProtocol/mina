@@ -60,7 +60,7 @@ function compile(rules) {
 
 async function prove(prover, func, args) {
   // run rule to get the statement
-  let statement = Circuit.runAndCheckSync(() => {
+  let statement = Circuit.runAndCheck(() => {
     mainContext = {};
     func(...args);
     mainContext = undefined;
