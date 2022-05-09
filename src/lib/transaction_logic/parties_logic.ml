@@ -198,7 +198,9 @@ module Local_state = struct
           ( Mina_base.Stack_frame.Digest.Stable.V1.t
           , Mina_base.Call_stack_digest.Stable.V1.t
           , Token_id.Stable.V1.t
-          , Currency.Amount.Stable.V1.t
+          , ( Currency.Amount.Stable.V1.t
+            , Sgn.Stable.V1.t )
+            Currency.Signed_poly.Stable.V1.t
           , Ledger_hash.Stable.V1.t
           , bool
           , Parties.Transaction_commitment.Stable.V1.t
@@ -218,7 +220,7 @@ module Local_state = struct
       ( Stack_frame.Digest.Checked.t
       , Call_stack_digest.Checked.t
       , Token_id.Checked.t
-      , Currency.Amount.Checked.t
+      , Currency.Amount.Signed.Checked.t
       , Ledger_hash.var
       , Boolean.var
       , Parties.Transaction_commitment.Checked.t
@@ -723,7 +725,7 @@ module type Inputs_intf = sig
       ( Stack_frame.t
       , Call_stack.t
       , Token_id.t
-      , Amount.t
+      , Amount.Signed.t
       , Ledger.t
       , Bool.t
       , Transaction_commitment.t
@@ -1107,7 +1109,7 @@ module Make (Inputs : Inputs_intf) = struct
           Amount.of_constant_fee constraint_constants.account_creation_fee
         in
         let excess_minus_creation_fee, `Overflow excess_update_failed =
-          Amount.add_signed_flagged local_state.excess
+          Amount.Signed.add_flagged local_state.excess
             Amount.Signed.(negate (of_unsigned account_creation_fee))
         in
         let local_state =
@@ -1117,7 +1119,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         { local_state with
           excess =
-            Amount.if_ account_is_new ~then_:excess_minus_creation_fee
+            Amount.Signed.if_ account_is_new ~then_:excess_minus_creation_fee
               ~else_:local_state.excess
         }
       in
@@ -1405,11 +1407,6 @@ module Make (Inputs : Inputs_intf) = struct
     (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
        See comment above.
     *)
-    (* The first party must succeed. *)
-    Bool.(
-      assert_with_failure_status_tbl
-        ((not is_start') ||| local_state.success)
-        local_state.failure_status_tbl) ;
     let local_delta =
       (* NOTE: It is *not* correct to use the actual change in balance here.
          Indeed, if the account creation fee is paid, using that amount would
@@ -1431,15 +1428,13 @@ module Make (Inputs : Inputs_intf) = struct
           ( (not is_start')
           ||| (party_token_is_default &&& Amount.Signed.is_pos local_delta) )) ;
       let new_local_fee_excess, `Overflow overflow =
-        Amount.add_signed_flagged local_state.excess local_delta
+        Amount.Signed.add_flagged local_state.excess local_delta
       in
-      ( Amount.if_ party_token_is_default ~then_:new_local_fee_excess
+      ( Amount.Signed.if_ party_token_is_default ~then_:new_local_fee_excess
           ~else_:local_state.excess
       , (* No overflow if we aren't using the result of the addition (which we don't in the case that party token is not default). *)
         `Overflow (Bool.( &&& ) party_token_is_default overflow) )
     in
-    (* The first party must succeed. *)
-    Bool.(assert_ (not (is_start' &&& overflowed))) ;
     let local_state = { local_state with excess = new_local_fee_excess } in
     let local_state =
       Local_state.add_check local_state Local_excess_overflow
@@ -1473,7 +1468,9 @@ module Make (Inputs : Inputs_intf) = struct
       }
     in
     let valid_fee_excess =
-      let delta_settled = Amount.equal local_state.excess Amount.zero in
+      let delta_settled =
+        Amount.Signed.equal local_state.excess Amount.(Signed.of_unsigned zero)
+      in
       Bool.((not is_last_party) ||| delta_settled)
     in
     let local_state =
@@ -1486,8 +1483,7 @@ module Make (Inputs : Inputs_intf) = struct
     let global_state, global_excess_update_failed, update_global_state =
       let amt = Global_state.fee_excess global_state in
       let res, `Overflow overflow =
-        Amount.Signed.add_flagged amt
-          (Amount.Signed.of_unsigned local_state.excess)
+        Amount.Signed.add_flagged amt local_state.excess
       in
       let global_excess_update_failed =
         Bool.(update_global_state &&& overflow)
@@ -1503,15 +1499,20 @@ module Make (Inputs : Inputs_intf) = struct
     let local_state =
       { local_state with
         excess =
-          Amount.if_ update_local_excess ~then_:Amount.zero
+          Amount.Signed.if_ update_local_excess
+            ~then_:Amount.(Signed.of_unsigned zero)
             ~else_:local_state.excess
       }
     in
-    Bool.(assert_ (not (is_start' &&& global_excess_update_failed))) ;
     let local_state =
       Local_state.add_check local_state Global_excess_overflow
         Bool.(not global_excess_update_failed)
     in
+    (* The first party must succeed. *)
+    Bool.(
+      assert_with_failure_status_tbl
+        ((not is_start') ||| local_state.success)
+        local_state.failure_status_tbl) ;
     let global_state =
       Global_state.set_ledger ~should_update:update_global_state global_state
         local_state.ledger

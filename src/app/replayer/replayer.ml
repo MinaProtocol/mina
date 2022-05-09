@@ -512,112 +512,132 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
       |> Error.raise
 
 module Zkapp_helpers = struct
+  (* cache state view, since we'll replay several zkApps from a given block *)
+  let state_view_tbl : (int, Zkapp_precondition.Protocol_state.View.t) Hashtbl.t
+      =
+    Hashtbl.create (module Int)
+
   let get_parent_state_view ~pool block_id :
       Zkapp_precondition.Protocol_state.View.t Deferred.t =
     (* when a zkAppp is applied, use the protocol state associated with the parent block
        of the block containing the transaction
     *)
-    let query_db = Mina_caqti.query pool in
-    let%bind parent_id =
-      query_db ~f:(fun db -> Sql.Block.get_parent_id db block_id)
-    in
-    let%bind parent_block =
-      query_db ~f:(fun db -> Processor.Block.load db ~id:parent_id)
-    in
-    let%bind snarked_ledger_hash_str =
-      query_db ~f:(fun db ->
-          Sql.Snarked_ledger_hashes.run db parent_block.snarked_ledger_hash_id)
-    in
-    let snarked_ledger_hash =
-      Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
-    in
-    let timestamp = parent_block.timestamp |> Block_time.of_int64 in
-    let blockchain_length =
-      parent_block.height |> Unsigned.UInt32.of_int64
-      |> Mina_numbers.Length.of_uint32
-    in
-    let min_window_density =
-      parent_block.min_window_density |> Unsigned.UInt32.of_int64
-      |> Mina_numbers.Length.of_uint32
-    in
-    (* TODO : this will change *)
-    let last_vrf_output = () in
-    let total_currency =
-      parent_block.total_currency |> Unsigned.UInt64.of_int64
-      |> Currency.Amount.of_uint64
-    in
-    let global_slot_since_hard_fork =
-      parent_block.global_slot_since_hard_fork |> Unsigned.UInt32.of_int64
-      |> Mina_numbers.Global_slot.of_uint32
-    in
-    let global_slot_since_genesis =
-      parent_block.global_slot_since_genesis |> Unsigned.UInt32.of_int64
-      |> Mina_numbers.Global_slot.of_uint32
-    in
-    let epoch_data_of_raw_epoch_data (raw_epoch_data : Processor.Epoch_data.t) :
-        Mina_base.Epoch_data.Value.t Deferred.t =
-      let%bind hash_str =
-        query_db ~f:(fun db ->
-            Sql.Snarked_ledger_hashes.run db raw_epoch_data.ledger_hash_id)
-      in
-      let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
-      let total_currency =
-        raw_epoch_data.total_currency |> Unsigned.UInt64.of_int64
-        |> Currency.Amount.of_uint64
-      in
-      let ledger = { Mina_base.Epoch_ledger.Poly.hash; total_currency } in
-      let seed = raw_epoch_data.seed |> Epoch_seed.of_base58_check_exn in
-      let start_checkpoint =
-        raw_epoch_data.start_checkpoint |> State_hash.of_base58_check_exn
-      in
-      let lock_checkpoint =
-        raw_epoch_data.lock_checkpoint |> State_hash.of_base58_check_exn
-      in
-      let epoch_length =
-        raw_epoch_data.epoch_length |> Unsigned.UInt32.of_int64
-        |> Mina_numbers.Length.of_uint32
-      in
-      return
-        { Mina_base.Epoch_data.Poly.ledger
-        ; seed
-        ; start_checkpoint
-        ; lock_checkpoint
-        ; epoch_length
-        }
-    in
-    let%bind staking_epoch_raw =
-      query_db ~f:(fun db ->
-          Processor.Epoch_data.load db parent_block.staking_epoch_data_id)
-    in
-    let%bind (staking_epoch_data : Mina_base.Epoch_data.Value.t) =
-      epoch_data_of_raw_epoch_data staking_epoch_raw
-    in
-    let%bind next_epoch_raw =
-      query_db ~f:(fun db ->
-          Processor.Epoch_data.load db parent_block.staking_epoch_data_id)
-    in
-    let%bind next_epoch_data = epoch_data_of_raw_epoch_data next_epoch_raw in
-    return
-      { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
-      ; timestamp
-      ; blockchain_length
-      ; min_window_density
-      ; last_vrf_output
-      ; total_currency
-      ; global_slot_since_hard_fork
-      ; global_slot_since_genesis
-      ; staking_epoch_data
-      ; next_epoch_data
-      }
+    match Hashtbl.find state_view_tbl block_id with
+    | Some state_view ->
+        return state_view
+    | None ->
+        (* we're on a new block, cached state views won't be used again *)
+        Hashtbl.clear state_view_tbl ;
+        let%bind state_view =
+          let query_db = Mina_caqti.query pool in
+          let%bind parent_id =
+            query_db ~f:(fun db -> Sql.Block.get_parent_id db block_id)
+          in
+          let%bind parent_block =
+            query_db ~f:(fun db -> Processor.Block.load db ~id:parent_id)
+          in
+          let%bind snarked_ledger_hash_str =
+            query_db ~f:(fun db ->
+                Sql.Snarked_ledger_hashes.run db
+                  parent_block.snarked_ledger_hash_id)
+          in
+          let snarked_ledger_hash =
+            Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
+          in
+          let timestamp = parent_block.timestamp |> Block_time.of_int64 in
+          let blockchain_length =
+            parent_block.height |> Unsigned.UInt32.of_int64
+            |> Mina_numbers.Length.of_uint32
+          in
+          let min_window_density =
+            parent_block.min_window_density |> Unsigned.UInt32.of_int64
+            |> Mina_numbers.Length.of_uint32
+          in
+          (* TODO : this will change *)
+          let last_vrf_output = () in
+          let total_currency =
+            parent_block.total_currency |> Unsigned.UInt64.of_int64
+            |> Currency.Amount.of_uint64
+          in
+          let global_slot_since_hard_fork =
+            parent_block.global_slot_since_hard_fork |> Unsigned.UInt32.of_int64
+            |> Mina_numbers.Global_slot.of_uint32
+          in
+          let global_slot_since_genesis =
+            parent_block.global_slot_since_genesis |> Unsigned.UInt32.of_int64
+            |> Mina_numbers.Global_slot.of_uint32
+          in
+          let epoch_data_of_raw_epoch_data
+              (raw_epoch_data : Processor.Epoch_data.t) :
+              Mina_base.Epoch_data.Value.t Deferred.t =
+            let%bind hash_str =
+              query_db ~f:(fun db ->
+                  Sql.Snarked_ledger_hashes.run db raw_epoch_data.ledger_hash_id)
+            in
+            let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
+            let total_currency =
+              raw_epoch_data.total_currency |> Unsigned.UInt64.of_int64
+              |> Currency.Amount.of_uint64
+            in
+            let ledger = { Mina_base.Epoch_ledger.Poly.hash; total_currency } in
+            let seed = raw_epoch_data.seed |> Epoch_seed.of_base58_check_exn in
+            let start_checkpoint =
+              raw_epoch_data.start_checkpoint |> State_hash.of_base58_check_exn
+            in
+            let lock_checkpoint =
+              raw_epoch_data.lock_checkpoint |> State_hash.of_base58_check_exn
+            in
+            let epoch_length =
+              raw_epoch_data.epoch_length |> Unsigned.UInt32.of_int64
+              |> Mina_numbers.Length.of_uint32
+            in
+            return
+              { Mina_base.Epoch_data.Poly.ledger
+              ; seed
+              ; start_checkpoint
+              ; lock_checkpoint
+              ; epoch_length
+              }
+          in
+          let%bind staking_epoch_raw =
+            query_db ~f:(fun db ->
+                Processor.Epoch_data.load db parent_block.staking_epoch_data_id)
+          in
+          let%bind (staking_epoch_data : Mina_base.Epoch_data.Value.t) =
+            epoch_data_of_raw_epoch_data staking_epoch_raw
+          in
+          let%bind next_epoch_raw =
+            query_db ~f:(fun db ->
+                Processor.Epoch_data.load db parent_block.staking_epoch_data_id)
+          in
+          let%bind next_epoch_data =
+            epoch_data_of_raw_epoch_data next_epoch_raw
+          in
+          return
+            { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
+            ; timestamp
+            ; blockchain_length
+            ; min_window_density
+            ; last_vrf_output
+            ; total_currency
+            ; global_slot_since_hard_fork
+            ; global_slot_since_genesis
+            ; staking_epoch_data
+            ; next_epoch_data
+            }
+        in
+        ignore (Hashtbl.add state_view_tbl ~key:block_id ~data:state_view) ;
+        return state_view
 end
 
 let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     Parties.t Deferred.t =
   let query_db = Mina_caqti.query pool in
   let%bind fee_payer_body_id =
-    query_db ~f:(fun db -> Processor.Zkapp_fee_payers.load db cmd.fee_payer_id)
+    query_db ~f:(fun db ->
+        Processor.Zkapp_fee_payers.load db cmd.zkapp_fee_payer_id)
   in
-  (* use dummy authorizations, memo *)
+  (* use dummy authorizations *)
   let%bind (fee_payer : Party.Fee_payer.t) =
     let%map (body : Party.Body.Fee_payer.t) =
       Archive_lib.Load_data.get_fee_payer_body ~pool fee_payer_body_id
@@ -625,12 +645,25 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
   in
   let%bind (other_parties : Party.Wire.t list) =
-    Deferred.List.map (Array.to_list cmd.other_party_ids) ~f:(fun id ->
-        let%map body = Archive_lib.Load_data.get_other_party_body ~pool id in
-        let authorization = Control.None_given in
+    Deferred.List.map (Array.to_list cmd.zkapp_other_parties_ids) ~f:(fun id ->
+        let%bind { body_id; authorization_kind } =
+          query_db ~f:(fun db -> Processor.Zkapp_other_party.load db id)
+        in
+        let%map body =
+          Archive_lib.Load_data.get_other_party_body ~pool body_id
+        in
+        let (authorization : Control.t) =
+          match authorization_kind with
+          | Proof ->
+              Proof Proof.transaction_dummy
+          | Signature ->
+              Signature Signature.dummy
+          | None_given ->
+              None_given
+        in
         ({ body; authorization } : Party.Wire.t))
   in
-  let memo = Mina_base.Signed_command_memo.dummy in
+  let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let parties = Parties.of_wire { fee_payer; other_parties; memo } in
   return (parties : Parties.t)
 
@@ -935,6 +968,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               input.start_slot_since_genesis
             && Int.Set.mem block_ids cmd.block_id)
       in
+      [%log info] "Will replay %d zkApp commands"
+        (List.length filtered_zkapp_cmds) ;
       let sorted_zkapp_cmds =
         List.sort filtered_zkapp_cmds ~compare:(fun sc1 sc2 ->
             let tuple (sc : Sql.Zkapp_command.t) =
@@ -990,6 +1025,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             query_db ~f:(fun db ->
                 Processor.Accounts_created.all_from_block db last_block_id)
           in
+          [%log info]
+            "Verifying that accounts created are also deemed accessed in block \
+             with global slot since genesis %Ld"
+            last_global_slot_since_genesis ;
           (* every account created in preceding block is an accessed account in preceding block *)
           List.iter accounts_created_db
             ~f:(fun { account_identifier_id = acct_id_created; _ } ->
@@ -1006,6 +1045,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                     ] ;
                 if continue_on_error then incr error_count
                 else Core_kernel.exit 1 )) ;
+          [%log info]
+            "Verifying balances and nonces for accounts accessed in block with \
+             global slot since genesis %Ld"
+            last_global_slot_since_genesis ;
           let%map accounts_accessed =
             Deferred.List.map accounts_accessed_db
               ~f:(Archive_lib.Load_data.get_account_accessed ~pool)
@@ -1084,14 +1127,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
              $state_hash at global slot since genesis %Ld"
             curr_global_slot_since_genesis
         in
-        let run_checks_on_slot_change curr_global_slot_since_genesis =
+        let run_checks_on_slot_change cmd_global_slot_since_genesis =
           if
-            Int64.( > ) curr_global_slot_since_genesis
+            Int64.( > ) cmd_global_slot_since_genesis
               last_global_slot_since_genesis
           then (
             check_ledger_hash_after_last_slot () ;
             let%map () = check_account_accessed () in
-            log_state_hash_on_next_slot curr_global_slot_since_genesis )
+            log_state_hash_on_next_slot cmd_global_slot_since_genesis )
           else Deferred.unit
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
@@ -1179,29 +1222,29 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         | [], uc :: ucs, [] ->
             (* only user commands *)
             run_user_commands uc ucs
-        | [], [], sc :: scs ->
+        | [], [], zkc :: zkcs ->
             (* only zkApp commands *)
-            run_zkapp_commands sc scs
-        | [], uc :: ucs, sc :: scs -> (
+            run_zkapp_commands zkc zkcs
+        | [], uc :: ucs, zkc :: zkcs -> (
             (* no internal commands *)
             let seqs =
-              [ get_user_cmd_sequence uc; get_zkapp_cmd_sequence sc ]
+              [ get_user_cmd_sequence uc; get_zkapp_cmd_sequence zkc ]
             in
             match command_type_of_sequences seqs with
             | `User_command ->
                 run_user_commands uc ucs
             | `Zkapp_command ->
-                run_zkapp_commands sc scs )
-        | ic :: ics, [], sc :: scs -> (
+                run_zkapp_commands zkc zkcs )
+        | ic :: ics, [], zkc :: zkcs -> (
             (* no user commands *)
             let seqs =
-              [ get_internal_cmd_sequence ic; get_zkapp_cmd_sequence sc ]
+              [ get_internal_cmd_sequence ic; get_zkapp_cmd_sequence zkc ]
             in
             match command_type_of_sequences seqs with
             | `Internal_command ->
                 combine_or_run_internal_cmds ic ics
             | `Zkapp_command ->
-                run_zkapp_commands sc scs )
+                run_zkapp_commands zkc zkcs )
         | ic :: ics, uc :: ucs, [] -> (
             (* no zkApp commands *)
             let seqs =
@@ -1228,13 +1271,16 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   run_checks_on_slot_change uc.global_slot_since_genesis
                 in
                 let%bind () = run_user_command ~logger ~pool ~ledger uc in
-                apply_commands internal_cmds ucs zkcs
+                apply_commands internal_cmds ucs zkapp_cmds
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger
             | `Zkapp_command ->
+                let%bind () =
+                  run_checks_on_slot_change uc.global_slot_since_genesis
+                in
                 let%bind () = run_zkapp_command ~logger ~pool ~ledger zkc in
-                apply_commands internal_cmds ucs zkcs
+                apply_commands internal_cmds user_cmds zkcs
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id ~staking_epoch_ledger
                   ~next_epoch_ledger )
