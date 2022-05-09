@@ -129,7 +129,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
               (module Zkapp_statement)
               ~typ:Zkapp_statement.typ
               ~branches:(module Nat.N2)
-              ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
+              ~max_proofs_verified:
+                (module Nat.N2) (* You have to put 2 here... *)
               ~name:"ringsig"
               ~constraint_constants:
                 (Genesis_constants.Constraint_constants.to_snark_keys_header

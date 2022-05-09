@@ -1659,7 +1659,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
       (module Zkapp_statement.Constant)
       ~typ:zkapp_statement_typ
       ~branches:(module Pickles_types.Nat.N2)
-      ~max_branching:(module Pickles_types.Nat.N2)
+      ~max_proofs_verified:(module Pickles_types.Nat.N2)
       ~name:"smart-contract"
       ~constraint_constants:
         (* TODO these are dummy values *)
