@@ -677,16 +677,15 @@ module Account = struct
 
     open Impl
 
-    let nonsnapp
-        ({ balance
-         ; nonce
-         ; receipt_chain_hash
-         ; delegate
-         ; state = _
-         ; sequence_state = _
-         ; proved_state = _
-         } :
-          t) (a : Account.Checked.Unhashed.t) =
+    let checks
+        { balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate
+        ; state
+        ; sequence_state
+        ; proved_state
+        } (a : Account.Checked.Unhashed.t) =
       [ Numeric.(Checked.check Tc.balance balance a.balance)
       ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
       ; Eq_data.(
@@ -694,34 +693,25 @@ module Account = struct
             a.receipt_chain_hash)
       ; Eq_data.(check_checked (Tc.public_key ()) delegate a.delegate)
       ]
-
-    let check_nonsnapp t a = Boolean.all (nonsnapp t a)
-
-    let snapp
-        ({ balance = _
-         ; nonce = _
-         ; receipt_chain_hash = _
-         ; delegate = _
-         ; state
-         ; sequence_state
-         ; proved_state
-         } :
-          t) (snapp : Zkapp_account.Checked.t) =
-      Boolean.any
-        Vector.(
+      @ [ Boolean.any
+            Vector.(
+              to_list
+                (map a.zkapp.sequence_state
+                   ~f:
+                     Eq_data.(
+                       check_checked
+                         (Lazy.force Tc.sequence_state)
+                         sequence_state)))
+        ]
+      @ Vector.(
           to_list
-            (map snapp.sequence_state
-               ~f:
-                 Eq_data.(
-                   check_checked (Lazy.force Tc.sequence_state) sequence_state)))
-      :: Eq_data.(check_checked Tc.boolean proved_state snapp.proved_state)
-      :: Vector.(
-           to_list
-             (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+            (map2 state a.zkapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+      @ [ Eq_data.(check_checked Tc.boolean proved_state a.zkapp.proved_state) ]
 
-    let check_snapp t a = Boolean.all (snapp t a)
-
-    let check t a = Boolean.all (nonsnapp t a @ snapp t a.zkapp)
+    let check ~check t a =
+      List.iter
+        ~f:(check Transaction_status.Failure.Account_precondition_unsatisfied)
+        (checks t a)
 
     let digest (t : t) =
       Random_oracle.Checked.(
@@ -744,63 +734,58 @@ module Account = struct
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let check
-      ({ balance
-       ; nonce
-       ; receipt_chain_hash
-       ; delegate
-       ; state
-       ; sequence_state
-       ; proved_state
-       } :
-        t) (a : Account.t) =
-    let open Or_error.Let_syntax in
-    let%bind () =
-      Numeric.(check ~label:"balance" Tc.balance balance a.balance)
-    in
-    let%bind () = Numeric.(check ~label:"nonce" Tc.nonce nonce a.nonce) in
-    let%bind () =
-      Eq_data.(
+  let checks
+      { balance
+      ; nonce
+      ; receipt_chain_hash
+      ; delegate
+      ; state
+      ; sequence_state
+      ; proved_state
+      } (a : Account.t) =
+    [ Numeric.(check ~label:"balance" Tc.balance balance a.balance)
+    ; Numeric.(check ~label:"nonce" Tc.nonce nonce a.nonce)
+    ; Eq_data.(
         check ~label:"receipt_chain_hash" Tc.receipt_chain_hash
           receipt_chain_hash a.receipt_chain_hash)
-    in
-    let%bind () =
-      let tc = Eq_data.Tc.public_key () in
-      Eq_data.(
-        check ~label:"delegate" tc delegate
-          (Option.value ~default:tc.default a.delegate))
-    in
-    let%bind () =
-      match a.zkapp with
-      | None ->
-          return ()
-      | Some zkapp ->
-          let%bind (_ : int) =
-            List.fold_result ~init:0
-              Vector.(to_list (zip state zkapp.app_state))
-              ~f:(fun i (c, v) ->
-                let%map () =
-                  Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
-                in
-                i + 1)
-          in
-          let%bind () =
-            Eq_data.(
+    ; (let tc = Eq_data.Tc.public_key () in
+       Eq_data.(
+         check ~label:"delegate" tc delegate
+           (Option.value ~default:tc.default a.delegate)))
+    ]
+    @
+    match a.zkapp with
+    | None ->
+        []
+    | Some zkapp ->
+        [ ( match
+              List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
+                  Eq_data.(
+                    check
+                      (Lazy.force Tc.sequence_state)
+                      ~label:"" sequence_state state)
+                  |> Or_error.is_ok)
+            with
+          | None ->
+              Error (Error.createf "Sequence state mismatch")
+          | Some _ ->
+              Ok () )
+        ]
+        @ List.mapi
+            Vector.(to_list (zip state zkapp.app_state))
+            ~f:(fun i (c, v) ->
+              Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v))
+        @ [ Eq_data.(
               check ~label:"proved_state" Tc.boolean proved_state
                 zkapp.proved_state)
-          in
-          if
-            Option.is_some
-            @@ List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
-                   Eq_data.(
-                     check
-                       (Lazy.force Tc.sequence_state)
-                       ~label:"" sequence_state state)
-                   |> Or_error.is_ok)
-          then Ok ()
-          else Or_error.errorf "Equality check failed: sequence_state"
-    in
-    return ()
+          ]
+
+  let check ~check t a =
+    List.iter
+      ~f:(fun res ->
+        check Transaction_status.Failure.Account_precondition_unsatisfied
+          (Result.is_ok res))
+      (checks t a)
 end
 
 module Protocol_state = struct
@@ -1658,43 +1643,6 @@ let to_input
 let digest t =
   Random_oracle.(
     hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)))
-
-let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
-    ~state_view ~self ~(other_prev : A.t option) ~(other_next : unit option)
-    ~fee_payer_pk =
-  let open Or_error.Let_syntax in
-  let%bind () = Protocol_state.check protocol_state_predicate state_view in
-  let%bind () = Account.check self_predicate self in
-  let%bind () =
-    Eq_data.(check (Tc.public_key ()) ~label:"fee_payer" fee_payer fee_payer_pk)
-  in
-  let%bind () =
-    let check (s : Account_state.t) (a : _ option) =
-      match (s, a) with
-      | Any, _ | Empty, None | Non_empty, Some _ ->
-          return ()
-      | _ ->
-          Or_error.error_string "Bad account state"
-    in
-    let%bind () = check other.account_transition.prev other_prev
-    and () = check other.account_transition.next other_next in
-    match other_prev with
-    | None ->
-        return ()
-    | Some other_account -> (
-        let%bind () = Account.check other.predicate other_account in
-        match other_account.zkapp with
-        | None ->
-            assert_
-              ([%equal: _ Or_ignore.t] other.account_vk Ignore)
-              "other_account_vk must be ignore for user account"
-        | Some zkapp ->
-            Hash.(check ~label:"other_account_vk" Tc.field)
-              other.account_vk
-              (Option.value_map ~f:With_hash.hash zkapp.verification_key
-                 ~default:Field.zero) )
-  in
-  return ()
 
 let accept : t =
   { self_predicate = Account.accept
