@@ -25,7 +25,6 @@ max-indent=68
 match-indent-nested=never
 match-indent=0
 margin=80
-let-open=preserve
 let-module=compact
 let-binding-spacing=compact
 let-binding-indent=2
