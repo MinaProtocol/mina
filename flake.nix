@@ -34,6 +34,25 @@
     , opam-nix, opam-repository, nixpkgs-mozilla, ... }:
     {
       overlay = import ./nix/overlay.nix;
+      nixosModules.mina = import ./nix/modules/mina.nix inputs;
+      nixosConfigurations.container = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          self.nixosModules.mina
+          {
+            boot.isContainer = true;
+            networking.useDHCP = false;
+            networking.firewall.enable = false;
+
+            services.mina = {
+              enable = true;
+              waitForRpc = false;
+              external-ip = "0.0.0.0";
+              extraArgs = [ "--seed" ];
+            };
+          }
+        ];
+      };
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
