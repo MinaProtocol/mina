@@ -39,8 +39,10 @@ class SimpleZkapp extends SmartContract {
     this.x.set(initialState);
   }
 
-  update(x) {
-    this.x.set(x);
+  update(y) {
+    let x = this.x.get();
+    y.assertGt(0);
+    this.x.set(x.add(y));
   }
 }
 // note: this is our non-typescript way of doing what our decorators do
@@ -100,7 +102,7 @@ console.log("got initial state: " + zkappState);
 
 tic("create update transaction (no proof)");
 transaction = await Mina.transaction(() => {
-  zkapp.update(Field(3));
+  zkapp.update(Field(2));
   zkapp.sign(zkappKey);
 });
 transaction.sign();
@@ -121,7 +123,7 @@ console.log("got updated state: " + zkappState);
 
 tic("create update transaction (with proof)");
 transaction = await Mina.transaction(() => {
-  new SimpleZkapp(zkappAddress).update(Field(5));
+  new SimpleZkapp(zkappAddress).update(Field(2));
 });
 await transaction.prove();
 let partiesJsonUpdateWithProof = transaction.toJSON();

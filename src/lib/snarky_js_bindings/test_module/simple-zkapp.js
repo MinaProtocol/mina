@@ -6,12 +6,11 @@ import {
   State,
   PrivateKey,
   SmartContract,
-  compile,
   deploy,
-  call,
   isReady,
   shutdown,
   addCachedAccount,
+  Mina,
 } from "snarkyjs";
 
 await isReady;
@@ -31,8 +30,10 @@ class SimpleZkapp extends SmartContract {
     this.x.set(initialState);
   }
 
-  update(x) {
-    this.x.set(x);
+  update(y) {
+    let x = this.x.get();
+    y.assertGt(0);
+    this.x.set(x.add(y));
   }
 }
 // note: this is our non-typescript way of doing what our decorators do
@@ -60,7 +61,7 @@ if (command === "deploy") {
     nonce: feePayerNonce,
   });
 
-  let { verificationKey } = await compile(SimpleZkapp, zkappAddress);
+  let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
   let partiesJson = await deploy(SimpleZkapp, {
     zkappKey,
     verificationKey,
@@ -86,14 +87,15 @@ if (command === "deploy") {
 
 if (command === "update") {
   // snarkyjs part
-  let { provers } = SimpleZkapp.compile(zkappAddress);
-  let partiesJson = await call(
-    SimpleZkapp,
-    zkappAddress,
-    "update",
-    [Field(3)],
-    provers
-  );
+  addCachedAccount({
+    publicKey: zkappAddress,
+    zkapp: { appState: [initialState, 0, 0, 0, 0, 0, 0, 0] },
+  });
+  await SimpleZkapp.compile(zkappAddress);
+  let transaction = await Mina.transaction(() => {
+    new SimpleZkapp(zkappAddress).update(Field(2));
+  });
+  let partiesJson = (await transaction.prove()).toJSON();
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
