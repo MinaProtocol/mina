@@ -78,9 +78,12 @@ let%test_module "Full_frontier tests" =
              ~src:(Lazy.force Genesis_ledger.t)
              ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()))
       in
+      Protocol_version.(set_current zero) ;
       let root_data =
         let open Root_data in
-        { transition = External_transition.For_tests.genesis ~precomputed_values
+        { transition =
+            External_transition.Validated.lift @@ Mina_block.Validated.lift
+            @@ Mina_block.genesis ~precomputed_values
         ; staged_ledger =
             Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
         ; protocol_states = []

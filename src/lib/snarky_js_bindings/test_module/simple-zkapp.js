@@ -2,23 +2,21 @@ import Client from "mina-signer";
 import {
   Field,
   declareState,
-  declareMethodArguments,
+  declareMethods,
   State,
-  UInt64,
   PrivateKey,
   SmartContract,
-  compile,
   deploy,
-  call,
   isReady,
   shutdown,
-  PublicKey,
+  addCachedAccount,
+  Mina,
 } from "snarkyjs";
-import cached from "./cached.js";
 
 await isReady;
+const zkappTargetBalance = 10_000_000_000;
+const initialBalance = zkappTargetBalance;
 const transactionFee = 10_000_000;
-const initialBalance = 10_000_000_000 - transactionFee;
 const initialState = Field(1);
 
 class SimpleZkapp extends SmartContract {
@@ -27,83 +25,92 @@ class SimpleZkapp extends SmartContract {
     this.x = State();
   }
 
-  deploy() {
-    super.deploy();
-    let amount = new UInt64(Field(`${initialBalance}`));
-    this.balance.addInPlace(amount);
+  deploy(args) {
+    super.deploy(args);
     this.x.set(initialState);
   }
 
-  update(x) {
-    this.x.set(x);
+  update(y) {
+    let x = this.x.get();
+    y.assertGt(0);
+    this.x.set(x.add(y));
   }
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { update: [Field] });
+declareMethods(SimpleZkapp, { update: [Field] });
 
-// create new random zkapp key, or read from cache
-let keyPair = await cached(() => {
-  let privateKey = PrivateKey.random();
-  let publicKey = privateKey.toPublicKey().toJSON();
-  return { privateKey: privateKey.toJSON(), publicKey };
-});
-let zkappAddress = PublicKey.fromJSON(keyPair.publicKey);
-let zkappKey = PrivateKey.fromJSON(keyPair.privateKey);
+// parse command line; for local testing, use random keys as fallback
+let [command, zkappKeyBase58, feePayerKeyBase58, feePayerNonce] =
+  process.argv.slice(2);
+zkappKeyBase58 ||= PrivateKey.random().toBase58();
+feePayerKeyBase58 ||= PrivateKey.random().toBase58();
+feePayerNonce ||= command === "update" ? "2" : "0";
+console.log(
+  `simple-zkapp.js: Running "${command}" with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and fee payer nonce ${feePayerNonce}`
+);
 
-let [command, feePayerKey, feePayerNonce] = parseCommandLineArgs();
-feePayerKey ||= "EKEnXPN95QFZ6fWijAbhveqGtQZJT2nHptBMjFijJFb5ZUnRnHhg";
+let zkappKey = PrivateKey.fromBase58(zkappKeyBase58);
+let zkappAddress = zkappKey.toPublicKey();
 
 if (command === "deploy") {
   // snarkyjs part
-  let { verificationKey } = compile(SimpleZkapp, zkappAddress);
-  let partiesJson = deploy(SimpleZkapp, zkappKey, verificationKey);
-
-  // mina-signer part
-  let client = new Client({ network: "testnet" });
-  let feePayerAddress = client.derivePublicKey(feePayerKey);
-  let feePayer = {
-    feePayer: feePayerAddress,
-    fee: `${transactionFee + initialBalance}`,
+  let feePayerKey = PrivateKey.fromBase58(feePayerKeyBase58);
+  addCachedAccount({
+    publicKey: feePayerKey.toPublicKey(),
     nonce: feePayerNonce,
-  };
-  let parties = JSON.parse(partiesJson); // TODO shouldn't mina-signer just take the json string?
-  let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
-  console.log(data.parties);
-}
+  });
 
-if (command === "update") {
-  // snarkyjs part
-  let { provers } = SimpleZkapp.compile(zkappAddress);
-  let partiesJson = await call(
-    SimpleZkapp,
-    zkappAddress,
-    "update",
-    [Field(3)],
-    provers
-  );
+  let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
+  let partiesJson = await deploy(SimpleZkapp, {
+    zkappKey,
+    verificationKey,
+    initialBalance,
+    feePayerKey,
+  });
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
-  let feePayerAddress = client.derivePublicKey(feePayerKey);
+  let feePayerAddress = client.derivePublicKey(feePayerKeyBase58);
   let feePayer = {
     feePayer: feePayerAddress,
     fee: transactionFee,
     nonce: feePayerNonce,
   };
   let parties = JSON.parse(partiesJson);
-  let { data } = client.signTransaction({ parties, feePayer }, feePayerKey);
+  let { data } = client.signTransaction(
+    { parties, feePayer },
+    feePayerKeyBase58
+  );
+  console.log(data.parties);
+}
+
+if (command === "update") {
+  // snarkyjs part
+  addCachedAccount({
+    publicKey: zkappAddress,
+    zkapp: { appState: [initialState, 0, 0, 0, 0, 0, 0, 0] },
+  });
+  await SimpleZkapp.compile(zkappAddress);
+  let transaction = await Mina.transaction(() => {
+    new SimpleZkapp(zkappAddress).update(Field(2));
+  });
+  let partiesJson = (await transaction.prove()).toJSON();
+
+  // mina-signer part
+  let client = new Client({ network: "testnet" });
+  let feePayerAddress = client.derivePublicKey(feePayerKeyBase58);
+  let feePayer = {
+    feePayer: feePayerAddress,
+    fee: transactionFee,
+    nonce: feePayerNonce,
+  };
+  let parties = JSON.parse(partiesJson);
+  let { data } = client.signTransaction(
+    { parties, feePayer },
+    feePayerKeyBase58
+  );
   console.log(data.parties);
 }
 
 shutdown();
-
-function parseCommandLineArgs() {
-  return process.argv.slice(2).map((arg) => {
-    try {
-      return JSON.parse(arg);
-    } catch {
-      return arg;
-    }
-  });
-}

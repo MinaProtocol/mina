@@ -121,7 +121,7 @@ module Inputs = struct
                                         }
                                     , parties )
                                   ]
-                                |> List.rev)
+                                |> fst |> List.rev)
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for parties : \

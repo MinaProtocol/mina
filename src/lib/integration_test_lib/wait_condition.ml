@@ -156,6 +156,22 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
+  let ledger_proofs_emitted_since_genesis ~num_proofs =
+    let open Network_state in
+    let check () (state : Network_state.t) =
+      if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let description =
+      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
+        num_proofs
+    in
+    { description
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = Slots 15
+    ; hard_timeout = Slots 20
+    }
+
   let snapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
@@ -176,7 +192,7 @@ struct
           let actual_status = cmd_with_status.With_status.status in
           let successful =
             match actual_status with
-            | Transaction_status.Applied _ ->
+            | Transaction_status.Applied ->
                 not has_failures
             | Failed _ ->
                 has_failures

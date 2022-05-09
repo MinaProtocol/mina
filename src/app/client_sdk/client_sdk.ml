@@ -49,22 +49,17 @@ let _ =
                 ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
          in
          let other_parties_hash = Parties.Call_forest.hash other_parties in
-         let protocol_state_predicate_hash =
-           Zkapp_precondition.Protocol_state.digest
-             Zkapp_precondition.Protocol_state.accept
-         in
          let memo =
            fee_payer_party_js##.memo |> Js.to_string
            |> Memo.create_from_string_exn
          in
          let commitment : Parties.Transaction_commitment.t =
            Parties.Transaction_commitment.create ~other_parties_hash
-             ~protocol_state_predicate_hash
-             ~memo_hash:(Signed_command_memo.hash memo)
          in
          let fee_payer = payload_of_fee_payer_party_js fee_payer_party_js in
          let full_commitment =
-           Parties.Transaction_commitment.with_fee_payer commitment
+           Parties.Transaction_commitment.create_complete commitment
+             ~memo_hash:(Signed_command_memo.hash memo)
              ~fee_payer_hash:
                (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
          in
