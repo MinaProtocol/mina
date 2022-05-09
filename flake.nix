@@ -30,8 +30,10 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
+  inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, ...
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
     }:
     {
       overlay = import ./nix/overlay.nix;
@@ -53,6 +55,12 @@
             };
           }
         ];
+      };
+      pipeline = with flake-buildkite-pipeline.lib; {
+        steps = flakeStepsCachix {
+          pushToBinaryCaches = [ "mina-demo" ];
+          commonExtraStepConfig.agents = [ "nix" ];
+        } self;
       };
     } // utils.lib.eachDefaultSystem (system:
       let
