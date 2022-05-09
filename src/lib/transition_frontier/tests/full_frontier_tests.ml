@@ -4,7 +4,6 @@ open Async_kernel
 open Core_kernel
 open Signature_lib
 open Mina_base
-open Mina_block
 open Frontier_base
 open Deferred.Let_syntax
 
@@ -82,8 +81,7 @@ let%test_module "Full_frontier tests" =
       let root_data =
         let open Root_data in
         { transition =
-            External_transition.Validated.lift @@ Mina_block.Validated.lift
-            @@ Mina_block.genesis ~precomputed_values
+            Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
         ; staged_ledger =
             Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
         ; protocol_states = []

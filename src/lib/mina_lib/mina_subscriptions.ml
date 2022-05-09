@@ -114,10 +114,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             (sprintf "gcloud auth activate-service-account --key-file=%s" path)
           : int ) ) ;
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
-      Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_ext ->
-          let new_block =
-            Mina_block.External_transition.Validated.lower new_block_ext
-          in
+      Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let new_block_no_hash =
             Mina_block.Validated.forget new_block |> With_hash.data
           in
@@ -132,10 +129,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                  "Transition frontier not available when creating precomputed \
                   block"
            | Some tf -> (
-               let state_hash =
-                 let block_with_hash, _ = new_block in
-                 (With_hash.hash block_with_hash).state_hash
-               in
+               let state_hash = Mina_block.Validated.state_hash new_block in
                match Transition_frontier.find tf state_hash with
                | None ->
                    [%log warn]

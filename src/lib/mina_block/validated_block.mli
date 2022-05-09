@@ -1,7 +1,15 @@
 open Mina_base
 
-type t = Block.with_hash * State_hash.t Non_empty_list.t
-[@@deriving sexp, to_yojson, equal]
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving sexp, equal]
+
+    val to_yojson : t -> Yojson.Safe.t
+  end
+end]
+
+type t = Stable.Latest.t [@@deriving sexp, to_yojson, equal]
 
 val lift : Validation.fully_valid_with_block -> t
 

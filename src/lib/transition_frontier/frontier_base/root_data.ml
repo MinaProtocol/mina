@@ -34,7 +34,7 @@ module Historical = struct
   module Stable = struct
     module V3 = struct
       type t =
-        { transition : External_transition.Validated.Stable.V3.t
+        { transition : Mina_block.Validated.Stable.V1.t
         ; common : Common.Stable.V2.t
         ; staged_ledger_target_ledger_hash : Ledger_hash.Stable.V1.t
         }
@@ -52,10 +52,7 @@ module Historical = struct
   let pending_coinbase t = Common.pending_coinbase t.common
 
   let of_breadcrumb breadcrumb =
-    let transition =
-      External_transition.Validated.lift
-      @@ Breadcrumb.validated_transition breadcrumb
-    in
+    let transition = Breadcrumb.validated_transition breadcrumb in
     let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
     let scan_state = Staged_ledger.scan_state staged_ledger in
     let pending_coinbase =
@@ -73,7 +70,7 @@ module Limited = struct
   module Stable = struct
     module V3 = struct
       type t =
-        { transition : External_transition.Validated.Stable.V3.t
+        { transition : Mina_block.Validated.Stable.V1.t
         ; protocol_states :
             Mina_state.Protocol_state.Value.Stable.V2.t
             Mina_base.State_hash.With_state_hashes.Stable.V1.t
@@ -83,8 +80,7 @@ module Limited = struct
 
       let to_yojson { transition; protocol_states = _; common } =
         `Assoc
-          [ ( "transition"
-            , External_transition.Validated.Stable.V3.to_yojson transition )
+          [ ("transition", Mina_block.Validated.Stable.V1.to_yojson transition)
           ; ("protocol_states", `String "<opaque>")
           ; ("common", Common.Stable.V2.to_yojson common)
           ]
@@ -101,9 +97,7 @@ module Limited = struct
 
   let transition t = t.transition
 
-  let hashes t =
-    let x, _ = External_transition.Validated.lower t.transition in
-    With_hash.hash x
+  let hashes t = With_hash.hash @@ Mina_block.Validated.forget t.transition
 
   let protocol_states t = t.protocol_states
 
@@ -131,19 +125,12 @@ module Minimal = struct
   let hash t = t.hash
 
   let of_limited (l : Limited.t) =
-    let hash =
-      Mina_block.Validated.state_hash
-        (External_transition.Validated.lower l.transition)
-    in
+    let hash = Mina_block.Validated.state_hash l.transition in
     { hash; common = l.common }
 
   let upgrade t ~transition ~protocol_states =
     let hash = hash t in
-    assert (
-      State_hash.equal
-        ( Mina_block.Validated.state_hash
-        @@ External_transition.Validated.lower transition )
-        hash ) ;
+    assert (State_hash.equal (Mina_block.Validated.state_hash transition) hash) ;
     let protocol_states =
       List.map protocol_states ~f:(fun (state_hash, s) ->
           { With_hash.data = s
@@ -170,7 +157,7 @@ module Minimal = struct
 end
 
 type t =
-  { transition : External_transition.Validated.t
+  { transition : Mina_block.Validated.t
   ; staged_ledger : Staged_ledger.t
   ; protocol_states :
       Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
@@ -183,11 +170,7 @@ let minimize { transition; staged_ledger; protocol_states = _ } =
     Staged_ledger.pending_coinbase_collection staged_ledger
   in
   let common = Common.create ~scan_state ~pending_coinbase in
-  { Minimal.hash =
-      Mina_block.Validated.state_hash
-      @@ External_transition.Validated.lower transition
-  ; common
-  }
+  { Minimal.hash = Mina_block.Validated.state_hash transition; common }
 
 let limit { transition; staged_ledger; protocol_states } =
   let scan_state = Staged_ledger.scan_state staged_ledger in

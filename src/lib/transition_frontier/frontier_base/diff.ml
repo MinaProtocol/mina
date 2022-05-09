@@ -42,7 +42,7 @@ module Node = struct
     module V3 = struct
       type 'a t =
         | Full : Breadcrumb.t -> full t
-        | Lite : External_transition.Validated.Stable.V3.t -> lite t
+        | Lite : Mina_block.Validated.Stable.V1.t -> lite t
 
       include Dummy_binable1 (struct
         type nonrec 'a t = 'a t
@@ -207,8 +207,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
     | New_node (Full breadcrumb) ->
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
-        let x = External_transition.Validated.lower transition in
-        State_hash.to_yojson (Mina_block.Validated.state_hash x)
+        State_hash.to_yojson (Mina_block.Validated.state_hash transition)
     | Root_transitioned { new_root; garbage; just_emitted_a_proof } ->
         let garbage_hashes =
           match garbage with
@@ -232,10 +231,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   match diff with
   | New_node (Full breadcrumb) ->
-      let external_transition =
-        External_transition.Validated.lift
-        @@ Breadcrumb.validated_transition breadcrumb
-      in
+      let external_transition = Breadcrumb.validated_transition breadcrumb in
       New_node (Lite external_transition)
   | Root_transitioned
       { new_root; garbage = Full garbage_nodes; just_emitted_a_proof } ->
@@ -254,7 +250,7 @@ module Lite_binable = struct
 
     module V2 = struct
       type t =
-        | New_node of External_transition.Validated.Stable.V3.t
+        | New_node of Mina_block.Validated.Stable.V1.t
         | Root_transitioned of Root_transition.Lite.Stable.V4.t
         | Best_tip_changed of State_hash.Stable.V1.t
 

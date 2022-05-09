@@ -2,7 +2,6 @@ open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 open Mina_state
-open Mina_block
 open Frontier_base
 
 module Node = struct
@@ -121,9 +120,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ~precomputed_values ~persistent_root_instance ~time_controller =
   let open Root_data in
   let transition_receipt_time = None in
-  let validated_transition =
-    External_transition.Validated.lower root_data.transition
-  in
+  let validated_transition = root_data.transition in
   let root_hash = Mina_block.Validated.state_hash validated_transition in
   let protocol_states_for_root_scan_state =
     root_data.protocol_states
@@ -171,8 +168,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
 let root_data t =
   let open Root_data in
   let root = root t in
-  { transition =
-      External_transition.Validated.lift @@ Breadcrumb.validated_transition root
+  { transition = Breadcrumb.validated_transition root
   ; staged_ledger = Breadcrumb.staged_ledger root
   ; protocol_states = State_hash.Map.data t.protocol_states_for_root_scan_state
   }
@@ -296,9 +292,7 @@ let visualize_to_string t =
 let calculate_root_transition_diff t heir =
   let root = root t in
   let heir_hash = Breadcrumb.state_hash heir in
-  let heir_transition =
-    External_transition.Validated.lift @@ Breadcrumb.validated_transition heir
-  in
+  let heir_transition = Breadcrumb.validated_transition heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->

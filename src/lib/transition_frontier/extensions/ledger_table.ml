@@ -61,13 +61,11 @@ module T = struct
           | Full nodes ->
               let open Mina_state in
               List.iter nodes ~f:(fun node ->
-                  let With_hash.{ data = external_transition; _ }, _ =
-                    node.transition
-                  in
                   let blockchain_state =
                     Protocol_state.blockchain_state
                     @@ Mina_block.(
-                         Header.protocol_state @@ header external_transition)
+                         Header.protocol_state
+                         @@ Validated.header node.transition)
                   in
                   let staged_ledger =
                     Blockchain_state.staged_ledger_hash blockchain_state

@@ -6,11 +6,11 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V1 : sig
-    type t [@@deriving compare, sexp, to_yojson]
+    type t [@@deriving compare, sexp, to_yojson, equal]
   end
 end]
 
-type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
+type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson, equal]
 
 type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
 
@@ -36,7 +36,5 @@ val transactions :
   -> Transaction.t With_status.t list
 
 val payments : t -> Signed_command.t With_status.t list
-
-val equal : t -> t -> bool
 
 val account_ids_accessed : t -> Account_id.t list

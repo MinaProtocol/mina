@@ -46,9 +46,7 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition :
-        State_hash.Stable.V1.t
-        -> External_transition.Raw.Stable.V2.t t
+    | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V1.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
     | Root : Root_data.Minimal.Stable.V2.t t
     | Best_tip : State_hash.Stable.V1.t t
@@ -73,7 +71,7 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Raw.Stable.Latest.t]
+        [%bin_type_class: Mina_block.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -279,8 +277,7 @@ let check t ~genesis_state_hash =
             check_arcs succ_hash )
       in
       let%bind () = check_version () in
-      let%bind root_hash, root_transition = check_base () in
-      let root_block = External_transition.decompose root_transition in
+      let%bind root_hash, root_block = check_base () in
       let root_protocol_state =
         root_block |> Mina_block.header |> Mina_block.Header.protocol_state
       in
@@ -302,10 +299,7 @@ let check t ~genesis_state_hash =
 let initialize t ~root_data =
   let open Root_data.Limited in
   let root_state_hash, root_transition =
-    let t =
-      Mina_block.Validated.forget
-        (External_transition.Validated.lower @@ transition root_data)
-    in
+    let t = Mina_block.Validated.forget (transition root_data) in
     ( State_hash.With_state_hashes.state_hash t
     , State_hash.With_state_hashes.data t )
   in
@@ -314,19 +308,16 @@ let initialize t ~root_data =
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
-      Batch.set batch ~key:(Transition root_state_hash)
-        ~data:(External_transition.compose root_transition) ;
+      Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:(protocol_states root_data |> List.map ~f:With_hash.data) )
 
-let add t ~transition:(transition, _validation) =
+let add t ~transition =
+  let transition = Mina_block.Validated.forget transition in
   let hash = State_hash.With_state_hashes.state_hash transition in
-  let raw_transition =
-    External_transition.compose (With_hash.data transition)
-  in
   let parent_hash =
     With_hash.data transition |> Mina_block.header |> Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
@@ -340,7 +331,7 @@ let add t ~transition:(transition, _validation) =
     get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
   in
   Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:(Transition hash) ~data:raw_transition ;
+      Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
       Batch.set batch ~key:(Arcs hash) ~data:[] ;
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
@@ -375,8 +366,7 @@ let get_transition t hash =
     get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
   in
   let block =
-    let data = External_transition.decompose transition in
-    { With_hash.data
+    { With_hash.data = transition
     ; hash =
         { State_hash.State_hashes.state_hash = hash; state_body_hash = None }
     }

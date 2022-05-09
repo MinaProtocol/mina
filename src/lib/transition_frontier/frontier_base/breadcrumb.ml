@@ -164,8 +164,8 @@ let protocol_state b =
   b |> block |> Mina_block.header |> Mina_block.Header.protocol_state
 
 let protocol_state_with_hashes breadcrumb =
-  let x, _ = breadcrumb |> validated_transition in
-  With_hash.map x ~f:(Fn.compose Header.protocol_state Mina_block.header)
+  breadcrumb |> validated_transition |> Mina_block.Validated.forget
+  |> With_hash.map ~f:(Fn.compose Header.protocol_state Mina_block.header)
 
 let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
