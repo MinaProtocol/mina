@@ -2315,7 +2315,13 @@ module Block_and_zkapp_command = struct
           ; "failure_reasons_ids"
           ]
         , typ )
-      ~tannot:(function "status" -> Some "user_command_status" | _ -> None)
+      ~tannot:(function
+        | "status" ->
+            Some "user_command_status"
+        | "failure_reasons_ids" ->
+            Some "int[]"
+        | _ ->
+            None)
       (module Conn)
       { block_id; zkapp_command_id; sequence_no; status; failure_reasons_ids }
 

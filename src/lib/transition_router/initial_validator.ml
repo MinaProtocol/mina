@@ -11,7 +11,7 @@ type validation_error =
   [ `Invalid_time_received of [ `Too_early | `Too_late of int64 ]
   | `Invalid_genesis_protocol_state
   | `Invalid_proof
-  | `Invalid_delta_transition_chain_proof
+  | `Invalid_delta_block_chain_proof
   | `Verifier_error of Error.t
   | `Mismatched_protocol_version
   | `Invalid_protocol_version ]
@@ -59,7 +59,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
           , External_transition.protocol_state_proof transition
             |> Proof.to_yojson )
         ]
-    | `Invalid_delta_transition_chain_proof ->
+    | `Invalid_delta_block_chain_proof ->
         [ ("reason", `String "invalid delta transition chain proof") ]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
@@ -104,7 +104,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_proof) ;
       punish Sent_invalid_proof None
-  | `Invalid_delta_transition_chain_proof ->
+  | `Invalid_delta_block_chain_proof ->
       Queue.enqueue Transition_frontier.rejected_blocks
         ( state_hash
         , sender
@@ -282,8 +282,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                 in
                 match%bind
                   let open Interruptible.Result.Let_syntax in
-                  External_transition.(
-                    Validation.wrap transition_with_hash
+                  Validation.(
+                    wrap transition_with_hash
                     |> defer
                          (validate_time_received ~precomputed_values
                             ~time_received)
@@ -294,7 +294,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                             (validate_proofs ~verifier ~genesis_state_hash
                                [ x ])
                           >>| List.hd_exn)
-                    >>= defer validate_delta_transition_chain
+                    >>= defer validate_delta_block_chain
                     >>= defer validate_protocol_versions)
                 with
                 | Ok verified_transition ->
