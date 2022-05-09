@@ -246,8 +246,8 @@ end
 
 module Zkapp_command = struct
   type t =
-    { fee_payer_id : int
-    ; other_party_ids : int array
+    { zkapp_fee_payer_id : int
+    ; zkapp_other_parties_ids : int array
     ; memo : string
     ; block_id : int
     ; global_slot_since_genesis : int64
@@ -272,7 +272,7 @@ module Zkapp_command = struct
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT fee_payer_id,other_party_ids,memo,
+      {sql| SELECT zkapp_fee_payer_id,zkapp_other_parties_ids,memo,
                    blocks.id,blocks.global_slot_since_genesis,
                    parent.global_slot_since_genesis,
                    sequence_no,hash
@@ -281,7 +281,7 @@ module Zkapp_command = struct
 
             INNER JOIN blocks_zkapp_commands AS bzc
 
-            ON zkc.id = bzc.user_command_id
+            ON zkc.id = bzc.zkapp_command_id
 
             INNER JOIN blocks
 

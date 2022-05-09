@@ -404,7 +404,7 @@ let () =
           |> Array.to_list |> Field.Constant.project |> Field.constant |> mk
         with _ ->
           mk
-            (Field.pack
+            (Field.project
                (List.init bs##.length ~f:(fun i ->
                     Js.Optdef.case (Js.array_get bs i)
                       (fun () -> assert false)
