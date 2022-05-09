@@ -227,9 +227,11 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
-    let mina_archive_schema =
-      "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+    let mina_archive_base_url =
+      "https://raw.githubusercontent.com/MinaProtocol/mina/"
+      ^ Mina_version.commit_id ^ "/src/app/archive/"
     in
+    let mina_archive_schema = mina_archive_base_url ^ "create_schema.sql" in
     let mk_net_keypair index (pk, sk) =
       let secret_name = "test-keypair-" ^ Int.to_string index in
       let keypair =
