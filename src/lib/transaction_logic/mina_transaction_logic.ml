@@ -1553,7 +1553,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           | Nonce n ->
               let nonce_matches = Account.Nonce.equal account.nonce n in
               Inputs.Local_state.add_check local_state
-                Account_precondition_unsatisfied nonce_matches
+                Account_nonce_precondition_unsatisfied nonce_matches
           | Full p ->
               let local_state = ref local_state in
               let check failure b =

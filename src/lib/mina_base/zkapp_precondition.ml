@@ -686,32 +686,72 @@ module Account = struct
         ; sequence_state
         ; proved_state
         } (a : Account.Checked.Unhashed.t) =
-      [ Numeric.(Checked.check Tc.balance balance a.balance)
-      ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
-      ; Eq_data.(
-          check_checked Tc.receipt_chain_hash receipt_chain_hash
-            a.receipt_chain_hash)
-      ; Eq_data.(check_checked (Tc.public_key ()) delegate a.delegate)
+      [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
+        , Numeric.(Checked.check Tc.balance balance a.balance) )
+      ; ( Transaction_status.Failure.Account_nonce_precondition_unsatisfied
+        , Numeric.(Checked.check Tc.nonce nonce a.nonce) )
+      ; ( Transaction_status.Failure
+          .Account_receipt_chain_hash_precondition_unsatisfied
+        , Eq_data.(
+            check_checked Tc.receipt_chain_hash receipt_chain_hash
+              a.receipt_chain_hash) )
+      ; ( Transaction_status.Failure.Account_delegate_precondition_unsatisfied
+        , Eq_data.(check_checked (Tc.public_key ()) delegate a.delegate) )
       ]
-      @ [ Boolean.any
-            Vector.(
-              to_list
-                (map a.zkapp.sequence_state
-                   ~f:
-                     Eq_data.(
-                       check_checked
-                         (Lazy.force Tc.sequence_state)
-                         sequence_state)))
+      @ [ ( Transaction_status.Failure
+            .Account_sequence_state_precondition_unsatisfied
+          , Boolean.any
+              Vector.(
+                to_list
+                  (map a.zkapp.sequence_state
+                     ~f:
+                       Eq_data.(
+                         check_checked
+                           (Lazy.force Tc.sequence_state)
+                           sequence_state))) )
         ]
-      @ Vector.(
-          to_list
-            (map2 state a.zkapp.app_state ~f:Eq_data.(check_checked Tc.field)))
-      @ [ Eq_data.(check_checked Tc.boolean proved_state a.zkapp.proved_state) ]
+      @ ( Vector.(
+            to_list
+              (map2 state a.zkapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+        |> List.mapi ~f:(fun i check ->
+               let failure =
+                 match i with
+                 | 0 ->
+                     Transaction_status.Failure
+                     .Account_app_state_0_precondition_unsatisfied
+                 | 1 ->
+                     Transaction_status.Failure
+                     .Account_app_state_1_precondition_unsatisfied
+                 | 2 ->
+                     Transaction_status.Failure
+                     .Account_app_state_2_precondition_unsatisfied
+                 | 3 ->
+                     Transaction_status.Failure
+                     .Account_app_state_3_precondition_unsatisfied
+                 | 4 ->
+                     Transaction_status.Failure
+                     .Account_app_state_4_precondition_unsatisfied
+                 | 5 ->
+                     Transaction_status.Failure
+                     .Account_app_state_5_precondition_unsatisfied
+                 | 6 ->
+                     Transaction_status.Failure
+                     .Account_app_state_6_precondition_unsatisfied
+                 | 7 ->
+                     Transaction_status.Failure
+                     .Account_app_state_7_precondition_unsatisfied
+                 | _ ->
+                     failwithf "Unexpected index %i" i ()
+               in
+               (failure, check)) )
+      @ [ ( Transaction_status.Failure
+            .Account_proved_state_precondition_unsatisfied
+          , Eq_data.(check_checked Tc.boolean proved_state a.zkapp.proved_state)
+          )
+        ]
 
     let check ~check t a =
-      List.iter
-        ~f:(check Transaction_status.Failure.Account_precondition_unsatisfied)
-        (checks t a)
+      List.iter ~f:(fun (failure, passed) -> check failure passed) (checks t a)
 
     let digest (t : t) =
       Random_oracle.Checked.(
@@ -743,22 +783,29 @@ module Account = struct
       ; sequence_state
       ; proved_state
       } (a : Account.t) =
-    [ Numeric.(check ~label:"balance" Tc.balance balance a.balance)
-    ; Numeric.(check ~label:"nonce" Tc.nonce nonce a.nonce)
-    ; Eq_data.(
-        check ~label:"receipt_chain_hash" Tc.receipt_chain_hash
-          receipt_chain_hash a.receipt_chain_hash)
-    ; (let tc = Eq_data.Tc.public_key () in
-       Eq_data.(
-         check ~label:"delegate" tc delegate
-           (Option.value ~default:tc.default a.delegate)))
+    [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
+      , Numeric.(check ~label:"balance" Tc.balance balance a.balance) )
+    ; ( Transaction_status.Failure.Account_nonce_precondition_unsatisfied
+      , Numeric.(check ~label:"nonce" Tc.nonce nonce a.nonce) )
+    ; ( Transaction_status.Failure
+        .Account_receipt_chain_hash_precondition_unsatisfied
+      , Eq_data.(
+          check ~label:"receipt_chain_hash" Tc.receipt_chain_hash
+            receipt_chain_hash a.receipt_chain_hash) )
+    ; ( Transaction_status.Failure.Account_delegate_precondition_unsatisfied
+      , let tc = Eq_data.Tc.public_key () in
+        Eq_data.(
+          check ~label:"delegate" tc delegate
+            (Option.value ~default:tc.default a.delegate)) )
     ]
     @
     match a.zkapp with
     | None ->
         []
     | Some zkapp ->
-        [ ( match
+        [ ( Transaction_status.Failure
+            .Account_sequence_state_precondition_unsatisfied
+          , match
               List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
                   Eq_data.(
                     check
@@ -766,25 +813,55 @@ module Account = struct
                       ~label:"" sequence_state state)
                   |> Or_error.is_ok)
             with
-          | None ->
-              Error (Error.createf "Sequence state mismatch")
-          | Some _ ->
-              Ok () )
+            | None ->
+                Error (Error.createf "Sequence state mismatch")
+            | Some _ ->
+                Ok () )
         ]
         @ List.mapi
             Vector.(to_list (zip state zkapp.app_state))
             ~f:(fun i (c, v) ->
-              Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v))
-        @ [ Eq_data.(
-              check ~label:"proved_state" Tc.boolean proved_state
-                zkapp.proved_state)
+              let failure =
+                match i with
+                | 0 ->
+                    Transaction_status.Failure
+                    .Account_app_state_0_precondition_unsatisfied
+                | 1 ->
+                    Transaction_status.Failure
+                    .Account_app_state_1_precondition_unsatisfied
+                | 2 ->
+                    Transaction_status.Failure
+                    .Account_app_state_2_precondition_unsatisfied
+                | 3 ->
+                    Transaction_status.Failure
+                    .Account_app_state_3_precondition_unsatisfied
+                | 4 ->
+                    Transaction_status.Failure
+                    .Account_app_state_4_precondition_unsatisfied
+                | 5 ->
+                    Transaction_status.Failure
+                    .Account_app_state_5_precondition_unsatisfied
+                | 6 ->
+                    Transaction_status.Failure
+                    .Account_app_state_6_precondition_unsatisfied
+                | 7 ->
+                    Transaction_status.Failure
+                    .Account_app_state_7_precondition_unsatisfied
+                | _ ->
+                    failwithf "Unexpected index %i" i ()
+              in
+              ( failure
+              , Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v) ))
+        @ [ ( Transaction_status.Failure
+              .Account_proved_state_precondition_unsatisfied
+            , Eq_data.(
+                check ~label:"proved_state" Tc.boolean proved_state
+                  zkapp.proved_state) )
           ]
 
   let check ~check t a =
     List.iter
-      ~f:(fun res ->
-        check Transaction_status.Failure.Account_precondition_unsatisfied
-          (Result.is_ok res))
+      ~f:(fun (failure, res) -> check failure (Result.is_ok res))
       (checks t a)
 end
 

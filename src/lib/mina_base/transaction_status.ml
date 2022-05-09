@@ -39,7 +39,20 @@ module Failure = struct
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
         | Fee_payer_must_be_signed
-        | Account_precondition_unsatisfied
+        | Account_balance_precondition_unsatisfied
+        | Account_nonce_precondition_unsatisfied
+        | Account_receipt_chain_hash_precondition_unsatisfied
+        | Account_delegate_precondition_unsatisfied
+        | Account_sequence_state_precondition_unsatisfied
+        | Account_app_state_0_precondition_unsatisfied
+        | Account_app_state_1_precondition_unsatisfied
+        | Account_app_state_2_precondition_unsatisfied
+        | Account_app_state_3_precondition_unsatisfied
+        | Account_app_state_4_precondition_unsatisfied
+        | Account_app_state_5_precondition_unsatisfied
+        | Account_app_state_6_precondition_unsatisfied
+        | Account_app_state_7_precondition_unsatisfied
+        | Account_proved_state_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
@@ -152,8 +165,34 @@ module Failure = struct
         "Fee_payer_nonce_must_increase"
     | Fee_payer_must_be_signed ->
         "Fee_payer_must_be_signed"
-    | Account_precondition_unsatisfied ->
-        "Account_precondition_unsatisfied"
+    | Account_balance_precondition_unsatisfied ->
+        "Account_balance_precondition_unsatisfied"
+    | Account_nonce_precondition_unsatisfied ->
+        "Account_nonce_precondition_unsatisfied"
+    | Account_receipt_chain_hash_precondition_unsatisfied ->
+        "Account_receipt_chain_hash_precondition_unsatisfied"
+    | Account_delegate_precondition_unsatisfied ->
+        "Account_delegate_precondition_unsatisfied"
+    | Account_sequence_state_precondition_unsatisfied ->
+        "Account_sequence_state_precondition_unsatisfied"
+    | Account_app_state_0_precondition_unsatisfied ->
+        "Account_app_state_0_precondition_unsatisfied"
+    | Account_app_state_1_precondition_unsatisfied ->
+        "Account_app_state_1_precondition_unsatisfied"
+    | Account_app_state_2_precondition_unsatisfied ->
+        "Account_app_state_2_precondition_unsatisfied"
+    | Account_app_state_3_precondition_unsatisfied ->
+        "Account_app_state_3_precondition_unsatisfied"
+    | Account_app_state_4_precondition_unsatisfied ->
+        "Account_app_state_4_precondition_unsatisfied"
+    | Account_app_state_5_precondition_unsatisfied ->
+        "Account_app_state_5_precondition_unsatisfied"
+    | Account_app_state_6_precondition_unsatisfied ->
+        "Account_app_state_6_precondition_unsatisfied"
+    | Account_app_state_7_precondition_unsatisfied ->
+        "Account_app_state_7_precondition_unsatisfied"
+    | Account_proved_state_precondition_unsatisfied ->
+        "Account_proved_state_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "Protocol_state_precondition_unsatisfied"
     | Incorrect_nonce ->
@@ -218,8 +257,34 @@ module Failure = struct
         Ok Fee_payer_nonce_must_increase
     | "Fee_payer_must_be_signed" ->
         Ok Fee_payer_must_be_signed
-    | "Account_precondition_unsatisfied" ->
-        Ok Account_precondition_unsatisfied
+    | "Account_balance_precondition_unsatisfied" ->
+        Ok Account_balance_precondition_unsatisfied
+    | "Account_nonce_precondition_unsatisfied" ->
+        Ok Account_nonce_precondition_unsatisfied
+    | "Account_receipt_chain_hash_precondition_unsatisfied" ->
+        Ok Account_receipt_chain_hash_precondition_unsatisfied
+    | "Account_delegate_precondition_unsatisfied" ->
+        Ok Account_delegate_precondition_unsatisfied
+    | "Account_sequence_state_precondition_unsatisfied" ->
+        Ok Account_sequence_state_precondition_unsatisfied
+    | "Account_app_state_0_precondition_unsatisfied" ->
+        Ok Account_app_state_0_precondition_unsatisfied
+    | "Account_app_state_1_precondition_unsatisfied" ->
+        Ok Account_app_state_1_precondition_unsatisfied
+    | "Account_app_state_2_precondition_unsatisfied" ->
+        Ok Account_app_state_2_precondition_unsatisfied
+    | "Account_app_state_3_precondition_unsatisfied" ->
+        Ok Account_app_state_3_precondition_unsatisfied
+    | "Account_app_state_4_precondition_unsatisfied" ->
+        Ok Account_app_state_4_precondition_unsatisfied
+    | "Account_app_state_5_precondition_unsatisfied" ->
+        Ok Account_app_state_5_precondition_unsatisfied
+    | "Account_app_state_6_precondition_unsatisfied" ->
+        Ok Account_app_state_6_precondition_unsatisfied
+    | "Account_app_state_7_precondition_unsatisfied" ->
+        Ok Account_app_state_7_precondition_unsatisfied
+    | "Account_proved_state_precondition_unsatisfied" ->
+        Ok Account_proved_state_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
         Ok Protocol_state_precondition_unsatisfied
     | "Incorrect_nonce" ->
@@ -308,8 +373,34 @@ module Failure = struct
         "Fee payer party must increment its nonce"
     | Fee_payer_must_be_signed ->
         "Fee payer party must have a valid signature"
-    | Account_precondition_unsatisfied ->
-        "The party's account precondition unsatisfied"
+    | Account_balance_precondition_unsatisfied ->
+        "The party's account balance precondition was unsatisfied"
+    | Account_nonce_precondition_unsatisfied ->
+        "The party's account nonce precondition was unsatisfied"
+    | Account_receipt_chain_hash_precondition_unsatisfied ->
+        "The party's account receipt-chain hash precondition was unsatisfied"
+    | Account_delegate_precondition_unsatisfied ->
+        "The party's account delegate precondition was unsatisfied"
+    | Account_sequence_state_precondition_unsatisfied ->
+        "The party's account sequence state precondition was unsatisfied"
+    | Account_app_state_0_precondition_unsatisfied ->
+        "The party's account app state (0) precondition was unsatisfied"
+    | Account_app_state_1_precondition_unsatisfied ->
+        "The party's account app state (1) precondition was unsatisfied"
+    | Account_app_state_2_precondition_unsatisfied ->
+        "The party's account app state (2) precondition was unsatisfied"
+    | Account_app_state_3_precondition_unsatisfied ->
+        "The party's account app state (3) precondition was unsatisfied"
+    | Account_app_state_4_precondition_unsatisfied ->
+        "The party's account app state (4) precondition was unsatisfied"
+    | Account_app_state_5_precondition_unsatisfied ->
+        "The party's account app state (5) precondition was unsatisfied"
+    | Account_app_state_6_precondition_unsatisfied ->
+        "The party's account app state (6) precondition was unsatisfied"
+    | Account_app_state_7_precondition_unsatisfied ->
+        "The party's account app state (7) precondition was unsatisfied"
+    | Account_proved_state_precondition_unsatisfied ->
+        "The party's account proved state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "The party's protocol state precondition unsatisfied"
     | Incorrect_nonce ->

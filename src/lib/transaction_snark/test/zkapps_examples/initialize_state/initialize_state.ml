@@ -250,21 +250,24 @@ let%test_module "Initialize state test" =
 
     let%test_unit "Update without initialize fails" =
       let account =
-        test_parties ~expected_failure:Account_precondition_unsatisfied
+        test_parties
+          ~expected_failure:Account_proved_state_precondition_unsatisfied
           [ Deploy_party.party; Update_state_party.party ]
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Double initialize fails" =
       let account =
-        test_parties ~expected_failure:Account_precondition_unsatisfied
+        test_parties
+          ~expected_failure:Account_proved_state_precondition_unsatisfied
           [ Deploy_party.party; Initialize_party.party; Initialize_party.party ]
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Initialize after update fails" =
       let account =
-        test_parties ~expected_failure:Account_precondition_unsatisfied
+        test_parties
+          ~expected_failure:Account_proved_state_precondition_unsatisfied
           [ Deploy_party.party
           ; Initialize_party.party
           ; Update_state_party.party
