@@ -46,10 +46,8 @@ type t =
 
 module Builder = struct
   let breadcrumb_added ~(precomputed_values : Precomputed_values.t) breadcrumb =
-    let ((block, _) as validated_block) =
-      Breadcrumb.validated_transition breadcrumb
-    in
-    let commands = External_transition.Validated.commands validated_block in
+    let validated_block = Breadcrumb.validated_transition breadcrumb in
+    let commands = Mina_block.Validated.valid_commands validated_block in
     let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
     let ledger = Staged_ledger.ledger staged_ledger in
     let sender_receipt_chains_from_parent_ledger =
@@ -71,10 +69,10 @@ module Builder = struct
                in
                (sender, receipt_chain_hash)))
     in
+    let block_with_hash = Mina_block.Validated.forget validated_block in
+    let block = With_hash.data block_with_hash in
     let accounts_accessed =
-      let account_ids_accessed =
-        External_transition.Validated.account_ids_accessed validated_block
-      in
+      let account_ids_accessed = Mina_block.account_ids_accessed block in
       List.filter_map account_ids_accessed ~f:(fun acct_id ->
           (* an accessed account may not be the ledger *)
           let%bind.Option index =
@@ -89,7 +87,7 @@ module Builder = struct
         precomputed_values.constraint_constants.account_creation_fee
       in
       let previous_block_state_hash =
-        External_transition.Validated.protocol_state validated_block
+        Mina_block.header block |> Header.protocol_state
         |> Mina_state.Protocol_state.previous_state_hash
       in
       List.map
@@ -98,7 +96,7 @@ module Builder = struct
           (acct_id, account_creation_fee))
     in
     Transition_frontier.Breadcrumb_added
-      { block = With_hash.map ~f:External_transition.compose block
+      { block = With_hash.map ~f:External_transition.compose block_with_hash
       ; accounts_accessed
       ; accounts_created
       ; sender_receipt_chains_from_parent_ledger

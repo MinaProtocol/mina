@@ -45,4 +45,5 @@
    signature_lib
    genesis_constants
    transaction_snark_work
+   coda_genesis_proof
 ))

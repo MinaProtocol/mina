@@ -12,7 +12,7 @@ let validate_transition ~consensus_constants ~logger ~frontier
   let open Result.Let_syntax in
   let transition =
     Envelope.Incoming.data enveloped_transition
-    |> External_transition.Validation.forget_validation_with_hash
+    |> Mina_block.Validation.block_with_hash
   in
   let transition_hash = State_hash.With_state_hashes.state_hash transition in
   let root_breadcrumb = Transition_frontier.root frontier in
@@ -52,7 +52,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
     ~transition_reader
     ~(valid_transition_writer :
        ( [ `Block of
-           ( External_transition.Initial_validated.t Envelope.Incoming.t
+           ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
