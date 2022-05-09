@@ -82,7 +82,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
 - Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
 - Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
-- If you use vscode, you might like these extensions
+- If you use vscode, you might like this extension
 
   - [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
   - [OCaml Platform](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
