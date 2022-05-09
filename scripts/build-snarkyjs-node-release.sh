@@ -1,7 +1,6 @@
-# TODO merge this script with the non-release one
+SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
-SNARKY_JS_PATH=$1
-[ -z "$SNARKY_JS_PATH" ] && SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
+# 1. node build
 
 dune b src/lib/crypto/kimchi_bindings/js/node_js \
 && dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js || exit 1
@@ -23,3 +22,27 @@ pushd "$SNARKY_JS_PATH"/src/node_bindings
 popd
 
 npm run build --prefix="$SNARKY_JS_PATH"
+
+# 2. web build
+
+dune b src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
+cp _build/default/src/lib/crypto/kimchi_bindings/js/chrome/plonk_wasm* "$SNARKY_JS_PATH"/src/chrome_bindings/
+cp _build/default/src/lib/snarky_js_bindings/snarky_js_chrome*.js "$SNARKY_JS_PATH"/src/chrome_bindings/
+
+# better error messages
+# `s` is the jsoo representation of the error message string, and `s.c` is the actual JS string
+sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw joo_global_object.Error(s.c)/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
+sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
+sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
+
+pushd "$SNARKY_JS_PATH"/src/chrome_bindings
+  wasm-opt --detect-features --enable-mutable-globals -O4 plonk_wasm_bg.wasm -o plonk_wasm_bg.wasm.opt
+  mv plonk_wasm_bg.wasm.opt plonk_wasm_bg.wasm
+popd
+
+npm run build:web --prefix="$SNARKY_JS_PATH"
+
+# 3. update MINA_COMMIT file in snarkyjs
+
+echo "The mina commit used to generate the backends for node and chrome is
+$(git rev-parse HEAD)" > "$SNARKY_JS_PATH/MINA_COMMIT"
