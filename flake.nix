@@ -223,12 +223,9 @@
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-
         packages.marlin_plonk_bindings_stubs = pkgs.marlin_plonk_bindings_stubs;
         packages.go-capnproto2 = pkgs.go-capnproto2;
         packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.marlin_plonk_bindings_stubs_static =
-          pkgs.pkgsMusl.marlin_plonk_bindings_stubs;
         packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
