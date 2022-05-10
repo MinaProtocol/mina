@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Network_peer
 open Network_pool
 open Pipe_lib
@@ -261,7 +261,7 @@ module Rpcs = struct
       module T = struct
         type query = State_hash.t list [@@deriving sexp, to_yojson]
 
-        type response = External_transition.t list option
+        type response = Mina_block.t list option
       end
 
       module Caller = T
@@ -466,8 +466,8 @@ module Rpcs = struct
         [@@deriving sexp, to_yojson]
 
         type response =
-          ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
+          ( Mina_block.t
+          , State_body_hash.t list * Mina_block.t )
           Proof_carrying_data.t
           option
       end
@@ -608,8 +608,8 @@ module Rpcs = struct
         type query = unit [@@deriving sexp, to_yojson]
 
         type response =
-          ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
+          ( Mina_block.t
+          , State_body_hash.t list * Mina_block.t )
           Proof_carrying_data.t
           option
       end
@@ -1030,6 +1030,25 @@ type t =
 let wrap_rpc_data_in_envelope conn data =
   Envelope.Incoming.wrap_peer ~data ~sender:conn
 
+type protocol_version_status =
+  { valid_current : bool; valid_next : bool; matches_daemon : bool }
+
+let protocol_version_status t =
+  let header = Mina_block.header t in
+  let valid_current =
+    Protocol_version.is_valid (Header.current_protocol_version header)
+  in
+  let valid_next =
+    Option.for_all
+      (Header.proposed_protocol_version_opt header)
+      ~f:Protocol_version.is_valid
+  in
+  let matches_daemon =
+    Protocol_version.compatible_with_daemon
+      (Header.current_protocol_version header)
+  in
+  { valid_current; valid_next; matches_daemon }
+
 let create (config : Config.t) ~sinks
     ~(get_some_initial_peers :
           Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
@@ -1087,8 +1106,8 @@ let create (config : Config.t) ~sinks
   in
   let validate_protocol_versions ~rpc_name sender external_transition =
     let open Trust_system.Actions in
-    let External_transition.{ valid_current; valid_next; matches_daemon } =
-      External_transition.protocol_version_status external_transition
+    let { valid_current; valid_next; matches_daemon } =
+      protocol_version_status external_transition
     in
     let%bind () =
       if valid_current then return ()
@@ -1102,8 +1121,8 @@ let create (config : Config.t) ~sinks
                 ; ( "current_protocol_version"
                   , `String
                       (Protocol_version.to_string
-                         (External_transition.current_protocol_version
-                            external_transition)) )
+                         (Header.current_protocol_version
+                            (Mina_block.header external_transition))) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1122,8 +1141,8 @@ let create (config : Config.t) ~sinks
                   , `String
                       (Protocol_version.to_string
                          (Option.value_exn
-                            (External_transition.proposed_protocol_version_opt
-                               external_transition))) )
+                            (Header.proposed_protocol_version_opt
+                               (Mina_block.header external_transition)))) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1141,8 +1160,8 @@ let create (config : Config.t) ~sinks
                 ; ( "current_protocol_version"
                   , `String
                       (Protocol_version.to_string
-                         (External_transition.current_protocol_version
-                            external_transition)) )
+                         (Header.current_protocol_version
+                            (Mina_block.header external_transition))) )
                 ; ( "daemon_current_protocol_version"
                   , `String Protocol_version.(to_string @@ get_current ()) )
                 ] ) )

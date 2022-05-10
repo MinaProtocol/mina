@@ -6,7 +6,7 @@ open Unsigned
 open Signature_lib
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Snark_params
 open Blockchain_snark
 open Consensus
@@ -383,7 +383,7 @@ let propose_block_onto_chain ~logger ~keys
     Global_slot.start_time ~constants:consensus_constants proposal_slot
   in
   let previous_protocol_state =
-    External_transition.protocol_state previous_transition
+    Header.protocol_state @@ Mina_block.header previous_transition
   in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
@@ -393,7 +393,7 @@ let propose_block_onto_chain ~logger ~keys
     |> Blockchain_state.snarked_ledger_hash
   in
   let previous_protocol_state_proof =
-    External_transition.protocol_state_proof previous_transition
+    Header.protocol_state_proof @@ Mina_block.header previous_transition
   in
   (* TODO: insert random txns into the pool every block *)
   let transactions_by_fee = Sequence.empty in
@@ -520,8 +520,7 @@ let main () =
      let rec loop epoch (base_transition, base_staged_ledger) =
        let dist =
          Vrf_distribution.create ~stakers ~epoch
-           ~initial_consensus_state:
-             (External_transition.consensus_state base_transition)
+           ~initial_consensus_state:(Mina_block.consensus_state base_transition)
        in
        let proposal_chain = Vrf_distribution.pick_chain_unrealistically dist in
        Core_kernel.Printf.printf
@@ -539,8 +538,8 @@ let main () =
            ~f:(fun previous_chain ((_, block_data) as proposal) ->
              Core.Printf.printf !"[%d] %d --> %d\n%!" (UInt32.to_int epoch)
                ( UInt32.to_int @@ Global_slot.slot_number
-               @@ Consensus_state.global_slot
-               @@ External_transition.consensus_state @@ fst previous_chain )
+               @@ Consensus_state.global_slot @@ Mina_block.consensus_state
+               @@ fst previous_chain )
                ( UInt32.to_int
                @@ Global_slot.(
                     slot

@@ -27,7 +27,7 @@
    trust_system
    network_pool
    mina_net2
-   mina_transition
+   mina_block
    mina_base
    perf_histograms
    o1trace

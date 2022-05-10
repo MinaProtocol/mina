@@ -2,7 +2,7 @@ open Async
 open Core
 open Otp_lib
 open Mina_base
-open Mina_transition
+open Mina_block
 open Frontier_base
 
 type input = Diff.Lite.E.t list

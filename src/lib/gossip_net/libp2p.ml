@@ -419,7 +419,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
             let block_bin_prot =
-              Mina_transition.External_transition.Raw.Stable.Latest.bin_t
+              Mina_block.External_transition.Raw.Stable.Latest.bin_t
             in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
@@ -447,17 +447,17 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                   Sinks.Block_sink.push sink_block
                     ( `Transition
                         (Envelope.Incoming.map
-                           ~f:Mina_transition.External_transition.decompose env)
+                           ~f:Mina_block.External_transition.decompose env)
                     , `Time_received (Block_time.now config.time_controller)
                     , `Valid_cb vc ))
                 block_bin_prot v1_topic_block
-              >>| Fn.flip Fn.compose Mina_transition.External_transition.compose
+              >>| Fn.flip Fn.compose Mina_block.External_transition.compose
             in
             let map_v0_msg msg =
               match msg with
               | Message.New_state state ->
                   Message.Latest.T.New_state
-                    (Mina_transition.External_transition.compose state)
+                    (Mina_block.External_transition.compose state)
               | Message.Transaction_pool_diff diff ->
                   Message.Latest.T.Transaction_pool_diff diff
               | Message.Snark_pool_diff diff ->
@@ -472,8 +472,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                         ( `Transition
                             (Envelope.Incoming.map
                                ~f:(fun _ ->
-                                 Mina_transition.External_transition.decompose
-                                   state)
+                                 Mina_block.External_transition.decompose state)
                                env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )

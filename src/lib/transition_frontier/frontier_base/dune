@@ -27,7 +27,7 @@
    precomputed_values
    consensus
    network_peer
-   mina_transition
+   mina_block
    mina_base
    mina_state
    staged_ledger

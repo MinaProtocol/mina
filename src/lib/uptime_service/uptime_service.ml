@@ -3,7 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Pipe_lib
 open Signature_lib
 
@@ -255,7 +255,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
       let best_tip_block = Transition_frontier.Breadcrumb.block best_tip in
       if
         List.is_empty
-          (External_transition.transactions
+          (Mina_block.transactions
              ~constraint_constants:
                Genesis_constants.Constraint_constants.compiled best_tip_block)
       then (

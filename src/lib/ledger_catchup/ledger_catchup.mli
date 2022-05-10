@@ -2,7 +2,6 @@ open Async_kernel
 open Pipe_lib
 open Cache_lib
 open Mina_base
-open Mina_transition
 open Network_peer
 module Best_tip_lru = Best_tip_lru
 

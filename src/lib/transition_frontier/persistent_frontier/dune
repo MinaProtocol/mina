@@ -30,7 +30,7 @@
    transition_frontier_extensions
    mina_base
    rocksdb
-   mina_transition
+   mina_block
    mina_state
    genesis_constants
    verifier

@@ -28,7 +28,7 @@
    node_addrs_and_ports
    block_time
    mina_numbers
-   mina_transition
+   mina_block
    mina_state
    consensus
    )

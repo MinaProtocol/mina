@@ -31,7 +31,7 @@
    sync_handler
    transition_frontier
    pipe_lib
-   mina_transition
+   mina_block
    mina_base
    syncable_ledger
    consensus

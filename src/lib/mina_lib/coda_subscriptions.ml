@@ -115,7 +115,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
           : int )) ;
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_ext ->
-          let open Mina_transition in
+          let open Mina_block in
           let new_block = External_transition.Validated.lower new_block_ext in
           let hash =
             Mina_block.Validated.forget new_block
@@ -127,12 +127,10 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                (let scheduled_time = Block_time.now time_controller in
                 let precomputed_block =
                   Mina_block.Validated.forget new_block
-                  |> With_hash.data |> External_transition.compose
-                  |> External_transition.Precomputed_block
-                     .of_external_transition ~scheduled_time
+                  |> With_hash.data
+                  |> Precomputed.of_block ~scheduled_time
                 in
-                External_transition.Precomputed_block.to_yojson
-                  precomputed_block)
+                Precomputed.to_yojson precomputed_block)
            in
            if upload_blocks_to_gcloud then (
              [%log info] "log" ;

@@ -6,7 +6,7 @@ open Cache_lib
 open Pipe_lib
 open Mina_numbers
 open Mina_base
-open Mina_transition
+open Mina_block
 open Network_peer
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -227,12 +227,13 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
               ( "Invalid current or proposed protocol version in catchup block"
               , [ ( "current_protocol_version"
                   , `String
-                      ( External_transition.current_protocol_version transition
+                      ( Header.current_protocol_version
+                          (Mina_block.header transition)
                       |> Protocol_version.to_string ) )
                 ; ( "proposed_protocol_version"
                   , `String
-                      ( External_transition.proposed_protocol_version_opt
-                          transition
+                      ( Header.proposed_protocol_version_opt
+                          (Mina_block.header transition)
                       |> Option.value_map ~default:"<None>"
                            ~f:Protocol_version.to_string ) )
                 ] ) )
@@ -251,7 +252,8 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
                  daemon protocol version"
               , [ ( "block_current_protocol_version"
                   , `String
-                      ( External_transition.current_protocol_version transition
+                      ( Header.current_protocol_version
+                          (Mina_block.header transition)
                       |> Protocol_version.to_string ) )
                 ; ( "daemon_current_protocol_version"
                   , `String Protocol_version.(get_current () |> to_string) )
@@ -372,11 +374,13 @@ module Downloader = struct
                 match t.failure_reason with `Download -> true | _ -> false
             end)
             (struct
-              type t = External_transition.t
+              type t = Mina_block.t
 
               let key (t : t) =
-                External_transition.
-                  ((state_hashes t).state_hash, blockchain_length t)
+                ( ( Mina_block.header t |> Header.protocol_state
+                  |> Mina_state.Protocol_state.hashes )
+                    .state_hash
+                , Mina_block.blockchain_length t )
             end)
             (struct
               type t = (State_hash.t * Length.t) option
@@ -455,8 +459,7 @@ let get_state_hashes = ()
 module Initial_validate_batcher = struct
   open Network_pool.Batcher
 
-  type input =
-    (External_transition.t, State_hash.t) With_hash.t Envelope.Incoming.t
+  type input = (Mina_block.t, State_hash.t) With_hash.t Envelope.Incoming.t
 
   type nonrec 'a t = (input, input, 'a) t
 
@@ -469,9 +472,7 @@ module Initial_validate_batcher = struct
       ~how_to_add:`Insert ~max_weight_per_call:1000
       ~weight:(fun _ -> 1)
       ~compare_init:(fun e1 e2 ->
-        let len (x : input) =
-          External_transition.blockchain_length x.data.data
-        in
+        let len (x : input) = Mina_block.blockchain_length x.data.data in
         match Length.compare (len e1) (len e2) with
         | 0 ->
             compare_envelope e1 e2
@@ -512,7 +513,7 @@ module Verify_work_batcher = struct
   let create ~verifier : _ t =
     let works (x : input) =
       let wh, _ = x.data in
-      External_transition.staged_ledger_diff wh.data
+      Body.staged_ledger_diff (Mina_block.body wh.data)
       |> Staged_ledger_diff.completed_works
     in
     create
@@ -1008,7 +1009,10 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
           let x, _ = (Cached.peek x).data in
           best :=
             combine !best
-              (Some (With_hash.map ~f:External_transition.protocol_state x))) ;
+              (Some
+                 (With_hash.map
+                    ~f:(Fn.compose Header.protocol_state Mina_block.header)
+                    x))) ;
       !best
     in
     List.map trees ~f |> List.reduce ~f:combine |> Option.join
@@ -1141,7 +1145,9 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
                             ( Validation.block_with_hash data
                             |> State_hash.With_state_hashes.state_hash )
                           ~transition_chain_proof:
-                            ( (External_transition.state_hashes root).state_hash
+                            ( ( Mina_block.header root |> Header.protocol_state
+                              |> Mina_state.Protocol_state.hashes )
+                                .state_hash
                             , path )
                       in
                       Result.ok

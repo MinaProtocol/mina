@@ -42,7 +42,7 @@
    mina_base
    transition_chain_verifier
    fake_network
-   mina_transition
+   mina_block
    proof_carrying_data
    cache_lib
    network_peer
