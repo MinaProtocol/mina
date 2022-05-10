@@ -127,7 +127,11 @@ let create
       Impls.Step.input ~proofs_verified:max_proofs_verified
         ~wrap_rounds:Backend.Tock.Rounds.n
     in
-    Fix_domains.domains (module Impls.Step) etyp main
+    Fix_domains.domains
+      (module Impls.Step)
+      etyp
+      (Snarky_backendless.Typ.unit ())
+      main
   in
   Timer.clock __LOC__ ;
   T

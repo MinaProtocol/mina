@@ -351,7 +351,8 @@ let wrap
     let (T (input, conv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
-          ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } ->
+          ~f:
+            (fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             Backend.Tock.Proof.create_async ~primary:public_inputs
               ~auxiliary:auxiliary_inputs pk
               ~message:
@@ -367,6 +368,7 @@ let wrap
                       })
                 |> Vector.to_list ))
           [ input ]
+          ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler)
           { pass_through = prev_statement_with_hashes.proof_state.me_only

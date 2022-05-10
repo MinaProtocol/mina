@@ -617,11 +617,13 @@ struct
         (fun () ->
           Impls.Step.generate_witness_conv
             ~f:
-              (fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs } ->
+              (fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
+                   () ->
               Backend.Tick.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs
                 ~message:prev_challenge_polynomial_commitments pk)
             [ input ]
+            ~return_typ:(Snarky_backendless.Typ.unit ())
             (fun x () : unit ->
               Impls.Step.handle
                 (fun () : unit -> branch_data.main ~step_domains (conv x))

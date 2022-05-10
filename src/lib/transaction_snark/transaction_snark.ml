@@ -3334,7 +3334,9 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let open Tick in
   let main x = handle (Base.main ~constraint_constants x) handler in
-  generate_auxiliary_input [ Statement.With_sok.typ ] main statement
+  generate_auxiliary_input [ Statement.With_sok.typ ]
+    ~return_typ:(Snarky_backendless.Typ.unit ())
+    main statement
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
@@ -3375,7 +3377,8 @@ let constraint_system_digests ~constraint_constants () =
   [ ( "transaction-merge"
     , digest
         Merge.(
-          Tick.constraint_system ~exposing:[ Statement.With_sok.typ ] (fun x ->
+          Tick.constraint_system ~exposing:[ Statement.With_sok.typ ]
+            ~return_typ:(Snarky_backendless.Typ.unit ()) (fun x ->
               let open Tick in
               let%bind x1 = exists Statement.With_sok.typ in
               let%bind x2 = exists Statement.With_sok.typ in
@@ -3384,6 +3387,7 @@ let constraint_system_digests ~constraint_constants () =
     , digest
         Base.(
           Tick.constraint_system ~exposing:[ Statement.With_sok.typ ]
+            ~return_typ:(Snarky_backendless.Typ.unit ())
             (main ~constraint_constants)) )
   ]
 
