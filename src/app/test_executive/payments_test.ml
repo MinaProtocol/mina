@@ -72,12 +72,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     go n
 
   let run network t =
-    let open Network in
+    (*     let open Network in *)
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
+    let[@warning "-8"] [ untimed_node_a; untimed_node_b; _timed_node_c ] =
       Network.block_producers network
     in
     [%log info] "extra genesis keypairs: %s"
@@ -88,8 +88,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let[@warning "-8"] [ fish1; fish2 ] =
       Network.extra_genesis_keypairs network
     in
-    (* TEMP!!!! *)
-    let%bind.Deferred () = after (Time.Span.of_day 7.) in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
     let amount = Currency.Amount.of_formatted_string "10" in
     let fee = Currency.Fee.of_formatted_string "1" in
@@ -149,6 +147,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             * (Mina_numbers.Account_nonce.t * Mina_numbers.Account_nonce.t)
               Account_id.Map.t =
       txn_signed
+    in
+    let%bind () =
+      section "Running replayer"
+        (let%map replayer_result =
+           Network.Node.run_replayer ~logger
+             (List.hd_exn @@ Network.archive_nodes network)
+         in
+         Format.eprintf "REPLAYER RESULT: %s@." replayer_result)
     in
     (* setup complete *)
     let%bind () =
@@ -286,141 +292,141 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               Malleable_error.soft_error_format ~value:()
                 "Payment failed for unexpected reason: %s" err_str ))
     in
-    let%bind () =
-      section
-        "attempt to send again the same signed transaction command as before, \
-         but changing the nonce, to conduct a replay attack.  expecting a \
-         Invalid_signature"
-        (let open Deferred.Let_syntax in
-        match%bind
-          Network.Node.send_payment_with_raw_sig untimed_node_a ~logger
-            ~sender_pub_key:
-              (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
-            ~receiver_pub_key:
-              (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
-            ~amount:
-              ( Signed_command_payload.amount signed_cmmd.payload
-              |> Option.value_exn )
-            ~fee:(Signed_command_payload.fee signed_cmmd.payload)
-            ~nonce:
-              (Mina_numbers.Account_nonce.succ signed_cmmd.payload.common.nonce)
-            ~memo:
-              (Signed_command_memo.to_raw_bytes_exn
-                 signed_cmmd.payload.common.memo)
-            ~token:(Signed_command_payload.token signed_cmmd.payload)
-            ~valid_until:signed_cmmd.payload.common.valid_until
-            ~raw_signature:
-              (Mina_base.Signature.Raw.encode signed_cmmd.signature)
-        with
-        | Ok { nonce; _ } ->
-            Malleable_error.soft_error_format ~value:()
-              "Replay attack succeeded, but it should fail because the \
-               signature is wrong.  attempted nonce: %d"
-              (Mina_numbers.Account_nonce.to_int nonce)
-        | Error error ->
-            (* expect GraphQL error due to invalid signature *)
-            let err_str = Error.to_string_mach error in
-            let err_str_lowercase = String.lowercase err_str in
-            if
-              String.is_substring ~substring:"invalid_signature"
-                err_str_lowercase
-            then (
-              [%log info] "Got expected invalid signature error from GraphQL" ;
-              Malleable_error.return () )
-            else (
-              [%log error]
-                "Payment failed in GraphQL, but for unexpected reason: %s"
-                err_str ;
-              Malleable_error.soft_error_format ~value:()
-                "Payment failed for unexpected reason: %s" err_str ))
-    in
-    let%bind () =
-      section "send a single payment from timed account using available liquid"
-        (let amount = Currency.Amount.of_int 1_000_000_000_000 in
-         let receiver = untimed_node_a in
-         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-         let sender = timed_node_c in
-         let%bind sender_pub_key = Util.pub_key_of_node sender in
-         let receiver_account_id =
-           Account_id.create receiver_pub_key Token_id.default
-         in
-         let%bind { total_balance = timed_node_c_total
-                  ; liquid_balance_opt = timed_node_c_liquid_opt
-                  ; locked_balance_opt = timed_node_c_locked_opt
-                  ; _
-                  } =
-           Network.Node.must_get_account_data ~logger timed_node_c
-             ~account_id:receiver_account_id
-         in
-         [%log info] "timed_node_c total balance: %s"
-           (Currency.Balance.to_formatted_string timed_node_c_total) ;
-         [%log info] "timed_node_c liquid balance: %s"
-           (Currency.Balance.to_formatted_string
-              ( timed_node_c_liquid_opt
-              |> Option.value ~default:Currency.Balance.zero )) ;
-         [%log info] "timed_node_c liquid locked: %s"
-           (Currency.Balance.to_formatted_string
-              ( timed_node_c_locked_opt
-              |> Option.value ~default:Currency.Balance.zero )) ;
-         [%log info]
-           "Attempting to send txn from timed_node_c to untimed_node_a for \
-            amount of %s"
-           (Currency.Amount.to_formatted_string amount) ;
-         let%bind { hash; _ } =
-           Network.Node.must_send_payment ~logger timed_node_c ~sender_pub_key
-             ~receiver_pub_key ~amount ~fee
-         in
-         wait_for t
-           (Wait_condition.signed_command_to_be_included_in_frontier
-              ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
-    in
-    let%bind () =
-      section "unable to send payment from timed account using illiquid tokens"
-        (let amount = Currency.Amount.of_int 25_000_000_000_000 in
-         let receiver = untimed_node_b in
-         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-         let sender = timed_node_c in
-         let%bind sender_pub_key = Util.pub_key_of_node sender in
-         let sender_account_id =
-           Account_id.create sender_pub_key Token_id.default
-         in
-         let%bind { total_balance = timed_node_c_total; _ } =
-           Network.Node.must_get_account_data ~logger timed_node_c
-             ~account_id:sender_account_id
-         in
-         [%log info] "timed_node_c total balance: %s"
-           (Currency.Balance.to_formatted_string timed_node_c_total) ;
-         [%log info]
-           "Attempting to send txn from timed_node_c to untimed_node_a for \
-            amount of %s"
-           (Currency.Amount.to_formatted_string amount) ;
-         (* TODO: refactor this using new [expect] dsl when it's available *)
-         let open Deferred.Let_syntax in
-         match%bind
-           Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
-             ~amount ~fee
-         with
-         | Ok _ ->
-             Malleable_error.soft_error_string ~value:()
-               "Payment succeeded, but expected it to fail because of a \
-                minimum balance violation"
-         | Error error ->
-             (* expect GraphQL error due to insufficient funds *)
-             let err_str = Error.to_string_mach error in
-             let err_str_lowercase = String.lowercase err_str in
-             if
-               String.is_substring ~substring:"insufficient_funds"
-                 err_str_lowercase
-             then (
-               [%log info] "Got expected insufficient funds error from GraphQL" ;
-               Malleable_error.return () )
-             else (
-               [%log error]
-                 "Payment failed in GraphQL, but for unexpected reason: %s"
-                 err_str ;
+    (* let%bind () =
+         section
+           "attempt to send again the same signed transaction command as before, \
+            but changing the nonce, to conduct a replay attack.  expecting a \
+            Invalid_signature"
+           (let open Deferred.Let_syntax in
+           match%bind
+             Network.Node.send_payment_with_raw_sig untimed_node_a ~logger
+               ~sender_pub_key:
+                 (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
+               ~receiver_pub_key:
+                 (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
+               ~amount:
+                 ( Signed_command_payload.amount signed_cmmd.payload
+                 |> Option.value_exn )
+               ~fee:(Signed_command_payload.fee signed_cmmd.payload)
+               ~nonce:
+                 (Mina_numbers.Account_nonce.succ signed_cmmd.payload.common.nonce)
+               ~memo:
+                 (Signed_command_memo.to_raw_bytes_exn
+                    signed_cmmd.payload.common.memo)
+               ~token:(Signed_command_payload.token signed_cmmd.payload)
+               ~valid_until:signed_cmmd.payload.common.valid_until
+               ~raw_signature:
+                 (Mina_base.Signature.Raw.encode signed_cmmd.signature)
+           with
+           | Ok { nonce; _ } ->
                Malleable_error.soft_error_format ~value:()
-                 "Payment failed for unexpected reason: %s" err_str ))
-    in
+                 "Replay attack succeeded, but it should fail because the \
+                  signature is wrong.  attempted nonce: %d"
+                 (Mina_numbers.Account_nonce.to_int nonce)
+           | Error error ->
+               (* expect GraphQL error due to invalid signature *)
+               let err_str = Error.to_string_mach error in
+               let err_str_lowercase = String.lowercase err_str in
+               if
+                 String.is_substring ~substring:"invalid_signature"
+                   err_str_lowercase
+               then (
+                 [%log info] "Got expected invalid signature error from GraphQL" ;
+                 Malleable_error.return () )
+               else (
+                 [%log error]
+                   "Payment failed in GraphQL, but for unexpected reason: %s"
+                   err_str ;
+                 Malleable_error.soft_error_format ~value:()
+                   "Payment failed for unexpected reason: %s" err_str ))
+       in
+       let%bind () =
+         section "send a single payment from timed account using available liquid"
+           (let amount = Currency.Amount.of_int 1_000_000_000_000 in
+            let receiver = untimed_node_a in
+            let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+            let sender = timed_node_c in
+            let%bind sender_pub_key = Util.pub_key_of_node sender in
+            let receiver_account_id =
+              Account_id.create receiver_pub_key Token_id.default
+            in
+            let%bind { total_balance = timed_node_c_total
+                     ; liquid_balance_opt = timed_node_c_liquid_opt
+                     ; locked_balance_opt = timed_node_c_locked_opt
+                     ; _
+                     } =
+              Network.Node.must_get_account_data ~logger timed_node_c
+                ~account_id:receiver_account_id
+            in
+            [%log info] "timed_node_c total balance: %s"
+              (Currency.Balance.to_formatted_string timed_node_c_total) ;
+            [%log info] "timed_node_c liquid balance: %s"
+              (Currency.Balance.to_formatted_string
+                 ( timed_node_c_liquid_opt
+                 |> Option.value ~default:Currency.Balance.zero )) ;
+            [%log info] "timed_node_c liquid locked: %s"
+              (Currency.Balance.to_formatted_string
+                 ( timed_node_c_locked_opt
+                 |> Option.value ~default:Currency.Balance.zero )) ;
+            [%log info]
+              "Attempting to send txn from timed_node_c to untimed_node_a for \
+               amount of %s"
+              (Currency.Amount.to_formatted_string amount) ;
+            let%bind { hash; _ } =
+              Network.Node.must_send_payment ~logger timed_node_c ~sender_pub_key
+                ~receiver_pub_key ~amount ~fee
+            in
+            wait_for t
+              (Wait_condition.signed_command_to_be_included_in_frontier
+                 ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
+       in
+       let%bind () =
+         section "unable to send payment from timed account using illiquid tokens"
+           (let amount = Currency.Amount.of_int 25_000_000_000_000 in
+            let receiver = untimed_node_b in
+            let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+            let sender = timed_node_c in
+            let%bind sender_pub_key = Util.pub_key_of_node sender in
+            let sender_account_id =
+              Account_id.create sender_pub_key Token_id.default
+            in
+            let%bind { total_balance = timed_node_c_total; _ } =
+              Network.Node.must_get_account_data ~logger timed_node_c
+                ~account_id:sender_account_id
+            in
+            [%log info] "timed_node_c total balance: %s"
+              (Currency.Balance.to_formatted_string timed_node_c_total) ;
+            [%log info]
+              "Attempting to send txn from timed_node_c to untimed_node_a for \
+               amount of %s"
+              (Currency.Amount.to_formatted_string amount) ;
+            (* TODO: refactor this using new [expect] dsl when it's available *)
+            let open Deferred.Let_syntax in
+            match%bind
+              Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
+                ~amount ~fee
+            with
+            | Ok _ ->
+                Malleable_error.soft_error_string ~value:()
+                  "Payment succeeded, but expected it to fail because of a \
+                   minimum balance violation"
+            | Error error ->
+                (* expect GraphQL error due to insufficient funds *)
+                let err_str = Error.to_string_mach error in
+                let err_str_lowercase = String.lowercase err_str in
+                if
+                  String.is_substring ~substring:"insufficient_funds"
+                    err_str_lowercase
+                then (
+                  [%log info] "Got expected insufficient funds error from GraphQL" ;
+                  Malleable_error.return () )
+                else (
+                  [%log error]
+                    "Payment failed in GraphQL, but for unexpected reason: %s"
+                    err_str ;
+                  Malleable_error.soft_error_format ~value:()
+                    "Payment failed for unexpected reason: %s" err_str ))
+       in *)
     section
       "send out a bunch more txns to fill up the snark ledger, then wait for \
        proofs to be emitted"
