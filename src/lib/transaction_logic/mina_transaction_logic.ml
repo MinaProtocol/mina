@@ -1531,7 +1531,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , L.t
           , bool
           , Transaction_commitment.t
-          , Transaction_status.Failure.t list list )
+          , Transaction_status.Failure.Collection.t )
           Parties_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
       ; transaction_commitment : unit
