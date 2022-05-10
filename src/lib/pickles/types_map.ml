@@ -190,7 +190,9 @@ module For_step = struct
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key = index.wrap_index
-    ; wrap_domains = Common.wrap_domains ~proofs_verified:(Nat.to_int branches)
+    ; wrap_domains =
+        Common.wrap_domains
+          ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
     ; step_domains = `Side_loaded index.step_domains
     ; max_width = Some index.max_width
     }
