@@ -223,7 +223,7 @@ val apply_parties_unchecked :
      * ( ( Stack_frame.value
          , Stack_frame.value list
          , Token_id.t
-         , Currency.Amount.t
+         , Currency.Amount.Signed.t
          , t
          , bool
          , unit
