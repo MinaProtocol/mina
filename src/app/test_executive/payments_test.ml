@@ -49,6 +49,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ]
+    ; num_archive_nodes = 1
     ; num_snark_workers = 4
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -87,6 +88,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let[@warning "-8"] [ fish1; fish2 ] =
       Network.extra_genesis_keypairs network
     in
+    (* TEMP!!!! *)
+    let%bind.Deferred () = after (Time.Span.of_day 7.) in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
     let amount = Currency.Amount.of_formatted_string "10" in
     let fee = Currency.Fee.of_formatted_string "1" in
