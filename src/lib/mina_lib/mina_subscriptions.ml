@@ -114,11 +114,15 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             (sprintf "gcloud auth activate-service-account --key-file=%s" path)
           : int )) ;
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
-      Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
+      Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_ext ->
+          let open Mina_transition in
+          let new_block = External_transition.Validated.lower new_block_ext in
+          let new_block_no_hash =
+            Mina_block.Validated.forget new_block |> With_hash.data
+          in
           let hash =
-            ( new_block
-            |> Mina_transition.External_transition.Validated.state_hashes )
-              .state_hash
+            Mina_block.Validated.forget new_block
+            |> State_hash.With_state_hashes.state_hash
           in
           (let path, log = !precomputed_block_writer in
            match Broadcast_pipe.Reader.peek transition_frontier with
@@ -147,11 +151,10 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                               breadcrumb
                           in
                           let block =
-                            let block_with_hash, _ =
-                              External_transition.Validated.erase new_block
+                            let block_with_hash =
+                              Mina_block.Validated.forget new_block
                             in
                             With_hash.data block_with_hash
-                            |> External_transition.decompose
                           in
                           External_transition.Precomputed_block.of_block ~logger
                             ~constraint_constants ~staged_ledger ~scheduled_time
@@ -190,8 +193,8 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                      | Some _, Some network, Some bucket ->
                          let hash_string = State_hash.to_base58_check hash in
                          let height =
-                           Mina_transition.External_transition.Validated
-                           .blockchain_length new_block
+                           Mina_transition.Mina_block.blockchain_length
+                             new_block_no_hash
                            |> Mina_numbers.Length.to_string
                          in
                          let name =
@@ -272,18 +275,18 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                         else state_hash_data) )) ;
           match
             Filtered_external_transition.validate_transactions
-              ~constraint_constants new_block
+              ~constraint_constants new_block_no_hash
           with
           | Ok verified_transactions ->
               let unfiltered_external_transition =
                 lazy
-                  (Filtered_external_transition.of_transition new_block `All
-                     verified_transactions)
+                  (Filtered_external_transition.of_transition new_block_no_hash
+                     `All verified_transactions)
               in
               let filtered_external_transition =
                 if is_storing_all then Lazy.force unfiltered_external_transition
                 else
-                  Filtered_external_transition.of_transition new_block
+                  Filtered_external_transition.of_transition new_block_no_hash
                     (`Some
                       ( Public_key.Compressed.Set.of_list
                       @@ List.filter_opt (Hashtbl.keys subscribed_block_users)
@@ -297,7 +300,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               update_payment_subscriptions filtered_external_transition
                 participants ;
               update_block_subscriptions
-                { With_hash.data = new_block; hash }
+                { With_hash.data = new_block_no_hash; hash }
                 verified_transactions participants ;
               Deferred.unit
           | Error e ->

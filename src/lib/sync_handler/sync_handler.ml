@@ -157,10 +157,11 @@ module Make (Inputs : Inputs_intf) :
           Transition_frontier.(
             find frontier hash >>| Breadcrumb.validated_transition)
           ( find_in_root_history frontier hash
-          >>| fun x -> Root_data.Historical.transition x )
+          >>| Fn.compose External_transition.Validated.lower
+                Root_data.Historical.transition )
           ~f:Fn.const
       in
-      External_transition.Validation.forget_validation validated_transition
+      With_hash.data @@ Mina_block.Validated.forget validated_transition
     in
     match Transition_frontier.catchup_tree frontier with
     | Full _ ->

@@ -60,7 +60,7 @@ module Stable = struct
   end
 end]
 
-type with_hash = t State_hash.With_state_hashes.t
+type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
 
 [%%define_locally
 Stable.Latest.(create, compare, header, body, t_of_sexp, sexp_of_t, to_yojson)]

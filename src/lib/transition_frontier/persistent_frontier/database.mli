@@ -68,7 +68,7 @@ val initialize : t -> root_data:Root_data.Limited.t -> unit
 
 val add :
      t
-  -> transition:External_transition.Validated.t
+  -> transition:Mina_block.Validated.t
   -> ( unit
      , [> `Not_found of
           [> `Parent_transition of State_hash.t | `Arcs of State_hash.t ] ] )
@@ -85,7 +85,7 @@ val move_root :
 val get_transition :
      t
   -> State_hash.t
-  -> ( External_transition.Validated.t
+  -> ( Mina_block.Validated.t
      , [> `Not_found of [> `Transition of State_hash.t ] ] )
      Result.t
 
@@ -117,7 +117,7 @@ val crawl_successors :
      t
   -> State_hash.t
   -> init:'a
-  -> f:('a -> External_transition.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)
   -> ( unit
      , [> `Crawl_error of 'b
        | `Not_found of [> `Arcs of State_hash.t | `Transition of State_hash.t ]

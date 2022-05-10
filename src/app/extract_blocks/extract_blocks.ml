@@ -191,7 +191,9 @@ let fill_in_user_commands pool block_state_hash =
       let%bind fee_payer = account_identifier_of_id user_cmd.fee_payer_id in
       let%bind source = account_identifier_of_id user_cmd.source_id in
       let%bind receiver = account_identifier_of_id user_cmd.receiver_id in
-      let nonce = user_cmd.nonce |> Account.Nonce.of_int in
+      let nonce =
+        user_cmd.nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
+      in
       let amount =
         Option.map user_cmd.amount ~f:(fun amt ->
             Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)

@@ -52,8 +52,10 @@ type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
   [@@deriving register_event { msg = "Applying diffs: $diffs" }]
 
 let genesis_root_data ~precomputed_values =
-  let open Root_data.Limited in
-  let transition = External_transition.genesis ~precomputed_values in
+  let transition =
+    External_transition.Validated.lift @@ Mina_block.Validated.lift
+    @@ Mina_block.genesis ~precomputed_values
+  in
   let constraint_constants = precomputed_values.constraint_constants in
   let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
   (*if scan state is empty the protocol states required is also empty*)
@@ -63,7 +65,8 @@ let genesis_root_data ~precomputed_values =
       (Pending_coinbase.create
          ~depth:constraint_constants.pending_coinbase_depth ())
   in
-  create ~transition ~scan_state ~pending_coinbase ~protocol_states
+  Root_data.Limited.create ~transition ~scan_state ~pending_coinbase
+    ~protocol_states
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
@@ -370,7 +373,10 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier) )
       ]
     "POST: ($state_hash, $n)" ;
-  let user_cmds = Breadcrumb.commands breadcrumb in
+  let user_cmds =
+    Mina_block.Validated.valid_commands
+    @@ Breadcrumb.validated_transition breadcrumb
+  in
   (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
      command or snapp command
   *)
@@ -506,8 +512,9 @@ module For_tests = struct
     let constraint_constants = precomputed_values.constraint_constants in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let transition_receipt_time = Some (Time.now ()) in
+        Protocol_version.(set_current zero) ;
         let genesis_transition =
-          External_transition.For_tests.genesis ~precomputed_values
+          Mina_block.Validated.lift (Mina_block.genesis ~precomputed_values)
         in
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
@@ -644,7 +651,9 @@ module For_tests = struct
     in
     let root_data =
       Root_data.Limited.create
-        ~transition:(Breadcrumb.validated_transition root)
+        ~transition:
+          ( External_transition.Validated.lift
+          @@ Breadcrumb.validated_transition root )
         ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
         ~pending_coinbase:
           ( Breadcrumb.staged_ledger root
@@ -660,9 +669,10 @@ module For_tests = struct
             (State_hash.With_state_hashes.state_hash
                precomputed_values.protocol_state_with_hashes)) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
-        let transition, _ = Root_data.Limited.transition root_data in
+        let transition = Root_data.Limited.transition root_data in
         Persistent_root.Instance.set_root_state_hash instance
-          (State_hash.With_state_hashes.state_hash transition) ;
+          ( Mina_block.Validated.state_hash
+          @@ External_transition.Validated.lower transition ) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance)) ;
