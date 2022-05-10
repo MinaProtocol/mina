@@ -84,7 +84,7 @@ module Repr = struct
         { commitments :
             Backend.Tock.Curve.Affine.Stable.V1.t
             Plonk_verification_key_evals.Stable.V2.t
-        ; step_domains : Domains.Stable.V1.t array
+        ; step_domains : Domains.Stable.V2.t array
         ; data : Data.Stable.V1.t
         }
       [@@deriving to_yojson]
