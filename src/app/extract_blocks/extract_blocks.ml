@@ -7,21 +7,13 @@ open Mina_transaction
 open Signature_lib
 open Archive_lib
 
-let query_db pool ~f ~item =
-  match%bind Caqti_async.Pool.use f pool with
-  | Ok v ->
-      return v
-  | Error msg ->
-      failwithf "Error getting %s from db, error: %s" item
-        (Caqti_error.show msg) ()
-
 let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
     =
+  let query_db = Mina_caqti.query pool in
   let%bind hash_str =
-    query_db pool
-      ~f:(fun db ->
-        Sql.Snarked_ledger_hashes.run db raw_epoch_data.ledger_hash_id)
-      ~item:"epoch ledger hash"
+    query_db ~f:(fun db ->
+        Processor.Snarked_ledger_hash.find_by_id db
+          raw_epoch_data.ledger_hash_id)
   in
   let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
   let total_currency =
@@ -50,45 +42,38 @@ let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
 
 let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     Extensional.Block.t Deferred.t =
-  let query_db ~item ~f = query_db pool ~item ~f in
+  let query_db = Mina_caqti.query pool in
   let state_hash = State_hash.of_base58_check_exn block.state_hash in
   let parent_hash = State_hash.of_base58_check_exn block.parent_hash in
   let open Deferred.Let_syntax in
   let%bind creator_str =
-    query_db
-      ~f:(fun db -> Sql.Public_key.run db block.creator_id)
-      ~item:"creator public key"
+    query_db ~f:(fun db -> Processor.Public_key.find_by_id db block.creator_id)
   in
   let creator = Public_key.Compressed.of_base58_check_exn creator_str in
   let%bind block_winner_str =
-    query_db
-      ~f:(fun db -> Sql.Public_key.run db block.block_winner_id)
-      ~item:"block winner public key"
+    query_db ~f:(fun db ->
+        Processor.Public_key.find_by_id db block.block_winner_id)
   in
   let block_winner =
     Public_key.Compressed.of_base58_check_exn block_winner_str
   in
   let%bind snarked_ledger_hash_str =
-    query_db
-      ~f:(fun db ->
-        Sql.Snarked_ledger_hashes.run db block.snarked_ledger_hash_id)
-      ~item:"snarked ledger hash"
+    query_db ~f:(fun db ->
+        Processor.Snarked_ledger_hash.find_by_id db block.snarked_ledger_hash_id)
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
   in
   let%bind staking_epoch_data_raw =
-    query_db
-      ~f:(fun db -> Processor.Epoch_data.load db block.staking_epoch_data_id)
-      ~item:"staking epoch data"
+    query_db ~f:(fun db ->
+        Processor.Epoch_data.load db block.staking_epoch_data_id)
   in
   let%bind staking_epoch_data =
     epoch_data_of_raw_epoch_data ~pool staking_epoch_data_raw
   in
   let%bind next_epoch_data_raw =
-    query_db
-      ~f:(fun db -> Processor.Epoch_data.load db block.next_epoch_data_id)
-      ~item:"staking epoch data"
+    query_db ~f:(fun db ->
+        Processor.Epoch_data.load db block.next_epoch_data_id)
   in
   let%bind next_epoch_data =
     epoch_data_of_raw_epoch_data ~pool next_epoch_data_raw
@@ -110,7 +95,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let timestamp = Block_time.of_int64 block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
-  (* commands to be filled in later *)
+  (* commands, accounts_accessed, accounts_created to be filled in later *)
   return
     { Extensional.Block.state_hash
     ; parent_hash
@@ -128,49 +113,87 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; timestamp
     ; user_cmds = []
     ; internal_cmds = []
+    ; zkapp_cmds = []
     ; chain_status
+    ; accounts_accessed = []
+    ; accounts_created = []
     }
 
-let fill_in_user_commands pool block_state_hash =
-  let query_db ~item ~f = query_db pool ~item ~f in
-  let pk_of_id id ~item =
-    let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
-    Public_key.Compressed.of_base58_check_exn pk_str
-  in
-  let balance_of_id id ~item =
-    let%map { balance; _ } =
-      query_db ~f:(fun db -> Processor.Balance.load db ~id) ~item
-    in
-    balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
-  in
-  let balance_of_id_opt id_opt ~item =
-    Option.value_map id_opt ~default:(Deferred.return None) ~f:(fun id ->
-        let%map balance = balance_of_id id ~item in
-        Some balance)
-  in
+let fill_in_accounts_accessed pool block_state_hash =
+  let query_db = Mina_caqti.query pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
-    query_db ~item:"blocks" ~f:(fun db ->
-        Processor.Block.find db ~state_hash:block_state_hash)
+    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+  in
+  let%bind accounts_accessed =
+    query_db ~f:(fun db ->
+        Processor.Accounts_accessed.all_from_block db block_id)
+  in
+  Deferred.List.map accounts_accessed ~f:(Load_data.get_account_accessed ~pool)
+
+let fill_in_accounts_created pool block_state_hash =
+  let query_db = Mina_caqti.query pool in
+  let open Deferred.Let_syntax in
+  let%bind block_id =
+    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+  in
+  let%bind accounts_created =
+    query_db ~f:(fun db ->
+        Processor.Accounts_created.all_from_block db block_id)
+  in
+  Deferred.List.map accounts_created ~f:(fun acct_created ->
+      let ({ block_id = _; account_identifier_id; creation_fee }
+            : Processor.Accounts_created.t) =
+        acct_created
+      in
+      let%bind ({ public_key_id; token_id; _ }
+                 : Processor.Account_identifiers.t) =
+        query_db ~f:(fun db ->
+            Processor.Account_identifiers.load db account_identifier_id)
+      in
+      let%bind pk =
+        let%map pk_str =
+          query_db ~f:(fun db ->
+              Processor.Public_key.find_by_id db public_key_id)
+        in
+        Public_key.Compressed.of_base58_check_exn pk_str
+      in
+      let%bind token_id =
+        let%map { value; _ } =
+          query_db ~f:(fun db -> Processor.Token.find_by_id db token_id)
+        in
+        Token_id.of_string value
+      in
+      let account_id = Account_id.create pk token_id in
+      let fee =
+        creation_fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
+      in
+      return (account_id, fee))
+
+let fill_in_user_commands pool block_state_hash =
+  let query_db = Mina_caqti.query pool in
+  let account_identifier_of_id = Load_data.account_identifier_of_id pool in
+  let open Deferred.Let_syntax in
+  let%bind block_id =
+    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
   in
   let%bind user_command_ids_and_sequence_nos =
-    query_db ~item:"user command id, sequence no" ~f:(fun db ->
-        Sql.Blocks_and_user_commands.run db ~block_id)
+    query_db ~f:(fun db -> Sql.Blocks_and_user_commands.run db ~block_id)
   in
   (* create extensional user command for each id, seq no *)
   Deferred.List.map user_command_ids_and_sequence_nos
     ~f:(fun (user_command_id, sequence_no) ->
       let%bind user_cmd =
-        query_db ~item:"user commands" ~f:(fun db ->
+        query_db ~f:(fun db ->
             Processor.User_command.Signed_command.load db ~id:user_command_id)
       in
       let typ = user_cmd.typ in
-      let%bind fee_payer = pk_of_id ~item:"fee payer" user_cmd.fee_payer_id in
-      let%bind source = pk_of_id ~item:"source" user_cmd.source_id in
-      let%bind receiver = pk_of_id ~item:"receiver" user_cmd.receiver_id in
-      let fee_token = user_cmd.fee_token |> Token_id.of_string in
-      let token = user_cmd.token |> Token_id.of_string in
-      let nonce = user_cmd.nonce |> Account.Nonce.of_int in
+      let%bind fee_payer = account_identifier_of_id user_cmd.fee_payer_id in
+      let%bind source = account_identifier_of_id user_cmd.source_id in
+      let%bind receiver = account_identifier_of_id user_cmd.receiver_id in
+      let nonce =
+        user_cmd.nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
+      in
       let amount =
         Option.map user_cmd.amount ~f:(fun amt ->
             Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
@@ -185,9 +208,9 @@ let fill_in_user_commands pool block_state_hash =
       let memo = user_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_user_cmd =
-        query_db ~item:"block user commands" ~f:(fun db ->
+        query_db ~f:(fun db ->
             Processor.Block_and_signed_command.load db ~block_id
-              ~user_command_id)
+              ~user_command_id ~sequence_no)
       in
       let status = block_user_cmd.status in
       let failure_reason =
@@ -199,36 +222,12 @@ let fill_in_user_commands pool block_state_hash =
                 failwithf "Not a transaction status failure: %s, error: %s" s
                   err ())
       in
-      let%bind source_balance =
-        balance_of_id_opt block_user_cmd.source_balance_id
-          ~item:"source balance"
-      in
-      let fee_payer_account_creation_fee_paid =
-        Option.map block_user_cmd.fee_payer_account_creation_fee_paid
-          ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
-      in
-      let%bind fee_payer_balance =
-        balance_of_id block_user_cmd.fee_payer_balance_id
-          ~item:"fee payer balance"
-      in
-      let receiver_account_creation_fee_paid =
-        Option.map block_user_cmd.receiver_account_creation_fee_paid
-          ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
-      in
-      let%bind receiver_balance =
-        balance_of_id_opt block_user_cmd.receiver_balance_id
-          ~item:"receiver balance"
-      in
       return
         { Extensional.User_command.sequence_no
         ; typ
         ; fee_payer
         ; source
         ; receiver
-        ; fee_token
-        ; token
         ; nonce
         ; amount
         ; fee
@@ -237,78 +236,110 @@ let fill_in_user_commands pool block_state_hash =
         ; hash
         ; status
         ; failure_reason
-        ; source_balance
-        ; fee_payer_account_creation_fee_paid
-        ; fee_payer_balance
-        ; receiver_account_creation_fee_paid
-        ; receiver_balance
-        ; created_token = None (* TODO: remove dummy *)
         })
 
 let fill_in_internal_commands pool block_state_hash =
-  let query_db ~item ~f = query_db pool ~item ~f in
-  let pk_of_id id ~item =
-    let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
-    Public_key.Compressed.of_base58_check_exn pk_str
-  in
+  let query_db = Mina_caqti.query pool in
+  let account_identifier_of_id = Load_data.account_identifier_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
-    query_db ~item:"blocks" ~f:(fun db ->
-        Processor.Block.find db ~state_hash:block_state_hash)
+    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
   in
   let%bind internal_cmd_info =
-    query_db
-      ~item:
-        "internal command id, global_slot, sequence no, secondary sequence no, \
-         receiver_balance_id" ~f:(fun db ->
-        Sql.Blocks_and_internal_commands.run db ~block_id)
+    query_db ~f:(fun db -> Sql.Blocks_and_internal_commands.run db ~block_id)
   in
   Deferred.List.map internal_cmd_info
-    ~f:(fun
-         { internal_command_id
-         ; sequence_no
-         ; secondary_sequence_no
-         ; receiver_account_creation_fee_paid
-         ; receiver_balance_id
-         }
-       ->
-      let%bind { balance = receiver_balance_int64; _ } =
-        query_db ~item:"receiver balance" ~f:(fun db ->
-            Processor.Balance.load db ~id:receiver_balance_id)
-      in
-      let receiver_balance =
-        Unsigned.UInt64.of_int64 receiver_balance_int64
-        |> Currency.Balance.of_uint64
-      in
+    ~f:(fun { internal_command_id; sequence_no; secondary_sequence_no } ->
       (* pieces from the internal_commands table *)
       let%bind internal_cmd =
-        query_db ~item:"blocks internal commands" ~f:(fun db ->
+        query_db ~f:(fun db ->
             Processor.Internal_command.load db ~id:internal_command_id)
       in
       let typ = internal_cmd.typ in
-      let%bind receiver = pk_of_id ~item:"receiver" internal_cmd.receiver_id in
+      let%bind receiver = account_identifier_of_id internal_cmd.receiver_id in
       let fee =
         internal_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
       in
-      let token = internal_cmd.token |> Token_id.of_string in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
-      let receiver_account_creation_fee_paid =
-        Option.map receiver_account_creation_fee_paid ~f:(fun fee ->
-            fee |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64)
-      in
       let cmd =
         { Extensional.Internal_command.sequence_no
         ; secondary_sequence_no
         ; typ
         ; receiver
-        ; receiver_account_creation_fee_paid
-        ; receiver_balance
         ; fee
-        ; token
         ; hash
         }
       in
       return cmd)
+
+let fill_in_zkapp_commands pool block_state_hash =
+  let query_db = Mina_caqti.query pool in
+  let open Deferred.Let_syntax in
+  let%bind block_id =
+    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+  in
+  let%bind zkapp_command_ids_and_sequence_nos =
+    query_db ~f:(fun db -> Sql.Blocks_and_zkapp_commands.run db ~block_id)
+  in
+  (* create extensional zkapp command for each id, seq no *)
+  Deferred.List.map zkapp_command_ids_and_sequence_nos
+    ~f:(fun (zkapp_command_id, sequence_no) ->
+      let%bind zkapp_cmd =
+        query_db ~f:(fun db ->
+            Processor.User_command.Zkapp_command.load db zkapp_command_id)
+      in
+      let%bind fee_payer =
+        let%bind body_id =
+          query_db ~f:(fun db ->
+              Processor.Zkapp_fee_payers.load db zkapp_cmd.zkapp_fee_payer_id)
+        in
+        Load_data.get_fee_payer_body ~pool body_id
+      in
+      let%bind other_parties =
+        Deferred.List.map
+          (Array.to_list zkapp_cmd.zkapp_other_parties_ids)
+          ~f:(Load_data.get_other_party_body ~pool)
+      in
+      let memo = zkapp_cmd.memo |> Signed_command_memo.of_base58_check_exn in
+      let hash = zkapp_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let%bind block_zkapp_cmd =
+        query_db ~f:(fun db ->
+            Processor.Block_and_zkapp_command.load db ~block_id
+              ~zkapp_command_id ~sequence_no)
+      in
+
+      let status = block_zkapp_cmd.status in
+      let%bind failure_reasons =
+        Option.value_map block_zkapp_cmd.failure_reasons_ids
+          ~default:(return None) ~f:(fun ids ->
+            let%map display =
+              Deferred.List.map (Array.to_list ids) ~f:(fun id ->
+                  let%map { index; failures } =
+                    query_db ~f:(fun db ->
+                        Processor.Zkapp_party_failures.load db id)
+                  in
+                  ( index
+                  , List.map (Array.to_list failures) ~f:(fun s ->
+                        match Transaction_status.Failure.of_string s with
+                        | Ok failure ->
+                            failure
+                        | Error err ->
+                            failwithf
+                              "Invalid party transaction status, error: %s" err
+                              ()) ))
+            in
+            Some display)
+      in
+
+      return
+        { Extensional.Zkapp_command.sequence_no
+        ; fee_payer
+        ; other_parties
+        ; memo
+        ; hash
+        ; status
+        ; failure_reasons
+        })
 
 let check_state_hash ~logger state_hash_opt =
   match state_hash_opt with
@@ -347,23 +378,21 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
         "Failed to create a Caqti pool for Postgresql" ;
       exit 1
   | Ok pool ->
+      let query_db = Mina_caqti.query pool in
+
       [%log info] "Successfully created Caqti pool for Postgresql" ;
       let%bind blocks =
         if all_blocks then (
           [%log info] "Querying for all blocks" ;
-          query_db pool
-            ~f:(fun db -> Sql.Subchain.all_blocks db)
-            ~item:"all blocks" )
+          query_db ~f:(fun db -> Sql.Subchain.all_blocks db) )
         else
           match (start_state_hash_opt, end_state_hash_opt) with
           | None, Some end_state_hash ->
               [%log info]
                 "Querying for subchain to end block with given state hash" ;
               let%map blocks =
-                query_db pool
-                  ~f:(fun db ->
+                query_db ~f:(fun db ->
                     Sql.Subchain.start_from_unparented db ~end_state_hash)
-                  ~item:"blocks starting from unparented"
               in
               let end_block_found =
                 List.exists blocks ~f:(fun block ->
@@ -380,11 +409,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
                 "Querying for subchain from start block to end block with \
                  given state hashes" ;
               let%map blocks =
-                query_db pool
-                  ~f:(fun db ->
+                query_db ~f:(fun db ->
                     Sql.Subchain.start_from_specified db ~start_state_hash
                       ~end_state_hash)
-                  ~item:"blocks starting from specified"
               in
               let start_block_found =
                 List.exists blocks ~f:(fun block ->
@@ -427,7 +454,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             { block with user_cmds })
       in
       [%log info] "Querying for internal commands in blocks" ;
-      let%bind blocks_with_all_cmds =
+      let%bind blocks_with_internal_cmds =
         Deferred.List.map blocks_with_user_cmds ~f:(fun block ->
             let%map unsorted_internal_cmds =
               fill_in_internal_commands pool block.state_hash
@@ -442,9 +469,39 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             in
             { block with internal_cmds })
       in
+      [%log info] "Querying for zkapp commands in blocks" ;
+      let%bind blocks_with_zkapp_cmds =
+        Deferred.List.map blocks_with_internal_cmds ~f:(fun block ->
+            let%map unsorted_zkapp_cmds =
+              fill_in_zkapp_commands pool block.state_hash
+            in
+            (* sort, to give block a canonical representation *)
+            let zkapp_cmds =
+              List.sort unsorted_zkapp_cmds
+                ~compare:(fun (cmd1 : Extensional.Zkapp_command.t) cmd2 ->
+                  Int.compare cmd1.sequence_no cmd2.sequence_no)
+            in
+            { block with zkapp_cmds })
+      in
+      [%log info] "Querying for accounts accessed in blocks" ;
+      let%bind blocks_with_accounts_accessed =
+        Deferred.List.map blocks_with_zkapp_cmds ~f:(fun block ->
+            let%map accounts_accessed =
+              fill_in_accounts_accessed pool block.state_hash
+            in
+            { block with accounts_accessed })
+      in
+      [%log info] "Querying for accounts created in blocks" ;
+      let%bind blocks_with_accounts_created =
+        Deferred.List.map blocks_with_accounts_accessed ~f:(fun block ->
+            let%map accounts_created =
+              fill_in_accounts_created pool block.state_hash
+            in
+            { block with accounts_created })
+      in
       [%log info] "Writing blocks" ;
       let%map () =
-        Deferred.List.iter blocks_with_all_cmds ~f:(fun block ->
+        Deferred.List.iter blocks_with_accounts_created ~f:(fun block ->
             [%log info] "Writing block with $state_hash"
               ~metadata:
                 [ ("state_hash", State_hash.to_yojson block.state_hash) ] ;

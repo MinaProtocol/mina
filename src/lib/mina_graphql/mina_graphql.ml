@@ -813,7 +813,8 @@ module Types = struct
                   | None ->
                       Unsigned.UInt32.zero
                   | Some crumb ->
-                      Transition_frontier.Breadcrumb.blockchain_length crumb)
+                      Transition_frontier.Breadcrumb.consensus_state crumb
+                      |> Consensus.Data.Consensus_state.blockchain_length)
               (* TODO: Mutually recurse with "block" instead -- #5396 *)
             ; field "stateHash" ~typ:string
                 ~doc:
@@ -1691,9 +1692,9 @@ module Types = struct
                   | Signed_command c ->
                       let status =
                         match t.status with
-                        | Applied _ ->
+                        | Applied ->
                             Command_status.Applied
-                        | Failed (e, _) ->
+                        | Failed e ->
                             Command_status.Included_but_failed e
                       in
                       Some
@@ -1713,9 +1714,9 @@ module Types = struct
                   | Parties parties ->
                       let status =
                         match t.status with
-                        | Applied _ ->
+                        | Applied ->
                             Command_status.Applied
-                        | Failed (e, _) ->
+                        | Failed e ->
                             Command_status.Included_but_failed e
                       in
                       Some
@@ -3103,9 +3104,9 @@ module Mutations = struct
                       in
                       let (status : Types.Command_status.t) =
                         match status with
-                        | Applied _ ->
+                        | Applied ->
                             Applied
-                        | Failed (failure, _balance_data) ->
+                        | Failed failure ->
                             Included_but_failed failure
                       in
                       ( { data = with_hash; status }
@@ -4027,17 +4028,14 @@ module Queries = struct
   (* used by best_chain, block below *)
   let block_of_breadcrumb coda breadcrumb =
     let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-    let transition =
-      Transition_frontier.Breadcrumb.validated_transition breadcrumb
-    in
+    let block = Transition_frontier.Breadcrumb.block breadcrumb in
     let transactions =
-      Mina_transition.External_transition.Validated.transactions
+      Mina_transition.Block.transactions
         ~constraint_constants:
-          (Mina_lib.config coda).precomputed_values.constraint_constants
-        transition
+          (Mina_lib.config coda).precomputed_values.constraint_constants block
     in
     { With_hash.Stable.Latest.data =
-        Filtered_external_transition.of_transition transition `All transactions
+        Filtered_external_transition.of_transition block `All transactions
     ; hash
     }
 
@@ -4126,8 +4124,9 @@ module Queries = struct
                   Transition_frontier.Breadcrumb.validated_transition bc
                 in
                 let block_height =
-                  Mina_transition.External_transition.Validated
-                  .blockchain_length validated_transition
+                  Mina_transition.(
+                    Mina_block.blockchain_length @@ With_hash.data
+                    @@ Mina_block.Validated.forget validated_transition)
                 in
                 Unsigned.UInt32.equal block_height height_uint32)
             |> Result.of_option

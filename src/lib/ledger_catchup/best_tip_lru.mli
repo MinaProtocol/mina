@@ -2,7 +2,7 @@ open Mina_base
 open Mina_transition
 
 type elt =
-  ( External_transition.Initial_validated.t
+  ( Mina_block.initial_valid_block
   , State_body_hash.t list * External_transition.t )
   Proof_carrying_data.t
 

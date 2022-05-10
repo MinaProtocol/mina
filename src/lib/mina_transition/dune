@@ -19,6 +19,7 @@
    ;; local libraries
    mina_ledger
    mina_numbers
+   currency
    unsigned_extended
    ledger_proof
    logger
@@ -44,4 +45,5 @@
    signature_lib
    genesis_constants
    transaction_snark_work
+   coda_genesis_proof
 ))

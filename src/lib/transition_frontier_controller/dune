@@ -25,4 +25,5 @@
    transition_frontier_base
    precomputed_values
    logger
+   with_hash
 ))

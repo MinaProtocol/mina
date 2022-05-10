@@ -2,6 +2,7 @@
 
 open Build
 open Ipc
+open Core_kernel
 
 module type Rpc_intf = sig
   val name : string
@@ -542,4 +543,72 @@ module GetPeerNodeStatus = struct
     build'
       (module Request)
       Request.(builder_op Request.peer_set_builder peer_multiaddr)
+end
+
+module TestDecodeBitswapBlocks = struct
+  let name = "TestDecodeBitswapBlocks"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.TestDecodeBitswapBlocks.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.TestDecodeBitswapBlocks req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.TestDecodeBitswapBlocks.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.TestDecodeBitswapBlocks
+          resp ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request ~blocks ~root_block_hash =
+    let open Builder.Libp2pHelperInterface.TestDecodeBitswapBlocks in
+    build'
+      (module Request)
+      ( list_op Request.blocks_set_list
+          (List.map blocks ~f:(fun (hash, block) ->
+               build'
+                 (module Builder.BlockWithId)
+                 ( op Builder.BlockWithId.blake2b_hash_set
+                     (Blake2.to_raw_string hash)
+                 *> op Builder.BlockWithId.block_set block )))
+      *> builder_op Request.root_block_id_set_builder
+           (build'
+              (module Builder.RootBlockId)
+              (op Builder.RootBlockId.blake2b_hash_set
+                 (Blake2.to_raw_string root_block_hash))) )
+end
+
+module TestEncodeBitswapBlocks = struct
+  let name = "TestEncodeBitswapBlocks"
+
+  module Request = struct
+    type t = Builder.Libp2pHelperInterface.TestEncodeBitswapBlocks.Request.t
+
+    let to_rpc_request_body req =
+      Builder.Libp2pHelperInterface.RpcRequest.TestEncodeBitswapBlocks req
+  end
+
+  module Response = struct
+    type t = Reader.Libp2pHelperInterface.TestEncodeBitswapBlocks.Response.t
+
+    let of_rpc_response_body = function
+      | Reader.Libp2pHelperInterface.RpcResponseSuccess.TestEncodeBitswapBlocks
+          resp ->
+          Some resp
+      | _ ->
+          None
+  end
+
+  let create_request ~max_block_size ~data =
+    let open Builder.Libp2pHelperInterface.TestEncodeBitswapBlocks in
+    build'
+      (module Request)
+      ( op Request.data_set data
+      *> op Request.max_block_size_set_int max_block_size )
 end

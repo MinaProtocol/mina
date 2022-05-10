@@ -4,7 +4,7 @@ type nonrec 'f or_infinity = Infinity | Finite of ('f * 'f)
 type nonrec 'caml_f scalar_challenge = { inner : 'caml_f } [@@boxed]
 
 type nonrec 'caml_f random_oracles =
-  { joint_combiner : 'caml_f scalar_challenge * 'caml_f
+  { joint_combiner : ('caml_f scalar_challenge * 'caml_f) option
   ; beta : 'caml_f
   ; gamma : 'caml_f
   ; alpha_chal : 'caml_f scalar_challenge
@@ -102,6 +102,11 @@ type nonrec gate_type =
   | ChaCha1
   | ChaCha2
   | ChaChaFinal
+  | Lookup
+  | CairoClaim
+  | CairoInstruction
+  | CairoFlags
+  | CairoTransition
 
 type nonrec 'f circuit_gate =
   { typ : gate_type
@@ -126,6 +131,8 @@ module VerifierIndex = struct
       { lookup_used : lookups_used
       ; lookup_table : 'poly_comm array
       ; lookup_selectors : 'poly_comm array
+      ; table_ids : 'poly_comm option
+      ; max_joint_size : int
       }
   end
 
