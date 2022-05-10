@@ -1661,7 +1661,7 @@ module User_command = struct
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
-      ; nonce : int
+      ; nonce : int64
       ; amount : int64 option
       ; fee : int64
       ; valid_until : int64 option
@@ -1677,7 +1677,7 @@ module User_command = struct
           ; int
           ; int
           ; int
-          ; int
+          ; int64
           ; option int64
           ; int64
           ; option int64
@@ -1771,7 +1771,7 @@ module User_command = struct
             ; fee_payer_id
             ; source_id
             ; receiver_id
-            ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int
+            ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int64
             ; amount =
                 Signed_command.amount t
                 |> Core.Option.map ~f:(fun amt ->
@@ -1824,7 +1824,7 @@ module User_command = struct
             ; fee_payer_id
             ; source_id
             ; receiver_id
-            ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int
+            ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int64
             ; amount = user_cmd.amount |> amount_opt_to_int64_opt
             ; fee =
                 user_cmd.fee
@@ -3072,14 +3072,20 @@ module Block = struct
          Caqti_type.(tup2 int int)
          typ
          {sql| WITH RECURSIVE chain AS (
-              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                     next_epoch_data_id,ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,timestamp, chain_status
+              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
+                     staking_epoch_data_id,next_epoch_data_id,
+                     min_window_density,total_currency,
+                     ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,
+                     timestamp,chain_status
               FROM blocks b WHERE b.id = $1
 
               UNION ALL
 
-              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,b.staking_epoch_data_id,
-                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,b.timestamp,b.chain_status
+              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,
+                     b.staking_epoch_data_id,b.next_epoch_data_id,
+                     b.min_window_density,b.total_currency,
+                     b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,
+                     b.timestamp,b.chain_status
               FROM blocks b
 
               INNER JOIN chain
@@ -3088,8 +3094,12 @@ module Block = struct
 
            )
 
-           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                  next_epoch_data_id,ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,timestamp,chain_status
+           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
+                  staking_epoch_data_id, next_epoch_data_id,
+                  min_window_density, total_currency,
+                  ledger_hash,height,
+                  global_slot_since_hard_fork,global_slot_since_genesis,
+                  timestamp,chain_status
            FROM chain ORDER BY height ASC
       |sql})
       (end_block_id, start_block_id)
