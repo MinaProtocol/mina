@@ -79,7 +79,7 @@ module Proof : sig
     type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]
   end
 
-  module Branching_2 : sig
+  module Proofs_verified_2 : sig
     [%%versioned:
     module Stable : sig
       module V2 : sig
@@ -197,7 +197,7 @@ module Side_loaded : sig
 
   val create :
        name:string
-    -> max_branching:(module Nat.Add.Intf with type n = 'n1)
+    -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
     -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
     -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
@@ -227,7 +227,7 @@ end
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile_promise :
-     ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+     ?self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
@@ -236,11 +236,12 @@ val compile_promise :
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
-  -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
+  -> max_proofs_verified:
+       (module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
-       (   self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+       (   self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
         -> ( 'prev_varss
            , 'prev_valuess
            , 'widthss
@@ -248,23 +249,23 @@ val compile_promise :
            , 'a_var
            , 'a_value )
            H4_2.T(Inductive_rule).t)
-  -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+  -> ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
-          with type t = ('max_branching, 'max_branching) Proof.t
+          with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
            and type statement = 'a_value)
      * ( 'prev_valuess
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_branching, 'max_branching) Proof.t Promise.t )
+       , ('max_proofs_verified, 'max_proofs_verified) Proof.t Promise.t )
        H3_2.T(Prover).t
 
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile :
-     ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+     ?self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
@@ -273,11 +274,12 @@ val compile :
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
-  -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
+  -> max_proofs_verified:
+       (module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
-       (   self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+       (   self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
         -> ( 'prev_varss
            , 'prev_valuess
            , 'widthss
@@ -285,14 +287,14 @@ val compile :
            , 'a_var
            , 'a_value )
            H4_2.T(Inductive_rule).t)
-  -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+  -> ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
-          with type t = ('max_branching, 'max_branching) Proof.t
+          with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
            and type statement = 'a_value)
      * ( 'prev_valuess
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_branching, 'max_branching) Proof.t Deferred.t )
+       , ('max_proofs_verified, 'max_proofs_verified) Proof.t Deferred.t )
        H3_2.T(Prover).t

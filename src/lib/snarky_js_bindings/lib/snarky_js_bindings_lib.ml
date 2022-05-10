@@ -1702,7 +1702,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
       (module Zkapp_statement.Constant)
       ~typ:zkapp_statement_typ
       ~branches:(module Branches)
-      ~max_branching:
+      ~max_proofs_verified:
         (module Pickles_types.Nat.N2)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
       ~name:"smart-contract"
