@@ -34,7 +34,7 @@
    mina_state
    with_hash
    proof_carrying_data
-   mina_transition
+   mina_block
    coda_genesis_proof
    transition_chain_prover
    mina_ledger

@@ -1,4 +1,4 @@
-open Mina_transition
+open Mina_block
 open Core_kernel
 open Mina_base
 module Breadcrumb = Transition_frontier.Breadcrumb

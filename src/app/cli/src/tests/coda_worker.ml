@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Signature_lib
 open Pipe_lib
 open Init
@@ -580,7 +580,7 @@ module T = struct
                    in
                    let prev_state_hash =
                      With_hash.data block_with_hash
-                     |> Block.header |> Header.protocol_state
+                     |> Mina_block.header |> Header.protocol_state
                      |> Mina_state.Protocol_state.previous_state_hash
                    in
                    let state_hash =

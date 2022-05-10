@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 open Mina_state
-open Mina_transition
+open Mina_block
 open Frontier_base
 
 module Node = struct

@@ -1,7 +1,6 @@
 open Async
 open Core
 open Mina_base
-open Mina_transition
 open Network_pool
 open Pipe_lib
 open Network_peer
@@ -38,7 +37,7 @@ module Rpcs : sig
   module Get_transition_chain : sig
     type query = State_hash.t list
 
-    type response = External_transition.t list option
+    type response = Mina_block.t list option
   end
 
   module Get_transition_knowledge : sig
@@ -58,8 +57,8 @@ module Rpcs : sig
       (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
     type response =
-      ( External_transition.t
-      , State_body_hash.t list * External_transition.t )
+      ( Mina_block.t
+      , State_body_hash.t list * Mina_block.t )
       Proof_carrying_data.t
       option
   end
@@ -74,8 +73,8 @@ module Rpcs : sig
     type query = unit [@@deriving sexp, to_yojson]
 
     type response =
-      ( External_transition.t
-      , State_body_hash.t list * External_transition.t )
+      ( Mina_block.t
+      , State_body_hash.t list * Mina_block.t )
       Proof_carrying_data.t
       option
   end
@@ -199,9 +198,7 @@ val get_ancestry :
      t
   -> Peer.Id.t
   -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
-  -> ( External_transition.t
-     , State_body_hash.t list * External_transition.t )
-     Proof_carrying_data.t
+  -> (Mina_block.t, State_body_hash.t list * Mina_block.t) Proof_carrying_data.t
      Envelope.Incoming.t
      Deferred.Or_error.t
 
@@ -210,9 +207,7 @@ val get_best_tip :
   -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
-  -> ( External_transition.t
-     , State_body_hash.t list * External_transition.t )
-     Proof_carrying_data.t
+  -> (Mina_block.t, State_body_hash.t list * Mina_block.t) Proof_carrying_data.t
      Deferred.Or_error.t
 
 val get_transition_chain_proof :
@@ -229,7 +224,7 @@ val get_transition_chain :
   -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
-  -> External_transition.t list Deferred.Or_error.t
+  -> Mina_block.t list Deferred.Or_error.t
 
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
@@ -244,7 +239,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
 val broadcast_state :
-  t -> External_transition.t State_hash.With_state_hashes.t -> unit Deferred.t
+  t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
   t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t

@@ -24,7 +24,7 @@
    transition_frontier_base
    consensus
    mina_ledger
-   mina_transition
+   mina_block
    data_hash_lib
    precomputed_values
    with_hash

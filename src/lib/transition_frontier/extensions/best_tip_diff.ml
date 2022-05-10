@@ -31,7 +31,7 @@ module T = struct
   end
 
   let breadcrumb_commands =
-    Fn.compose Mina_transition.Mina_block.Validated.valid_commands
+    Fn.compose Mina_block.Validated.valid_commands
       Breadcrumb.validated_transition
 
   let create ~logger frontier =

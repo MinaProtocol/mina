@@ -17,7 +17,7 @@ open Pipe_lib.Strict_pipe
 open Cache_lib
 open Otp_lib
 open Mina_base
-open Mina_transition
+open Mina_block
 open Network_peer
 
 type t =
@@ -122,14 +122,16 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
 
 let mem t transition =
   Hashtbl.mem t.collected_transitions
-    (External_transition.parent_hash transition)
+    ( Mina_block.header transition
+    |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash )
 
 let mem_parent_hash t parent_hash =
   Hashtbl.mem t.collected_transitions parent_hash
 
 let has_timeout t transition =
   Hashtbl.mem t.parent_root_timeouts
-    (External_transition.parent_hash transition)
+    ( Mina_block.header transition
+    |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash )
 
 let has_timeout_parent_hash t parent_hash =
   Hashtbl.mem t.parent_root_timeouts parent_hash
@@ -183,7 +185,9 @@ let watch t ~timeout_duration ~cached_transition =
   in
   let hash = State_hash.With_state_hashes.state_hash transition_with_hash in
   let parent_hash =
-    With_hash.data transition_with_hash |> External_transition.parent_hash
+    With_hash.data transition_with_hash
+    |> Mina_block.header |> Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
   in
   let make_timeout duration =
     Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
@@ -199,8 +203,7 @@ let watch t ~timeout_duration ~cached_transition =
             ; ( "duration"
               , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
             ; ( "cached_transition"
-              , With_hash.data transition_with_hash
-                |> External_transition.to_yojson )
+              , With_hash.data transition_with_hash |> Mina_block.to_yojson )
             ]
           "Timed out waiting for the parent of $cached_transition after \
            $duration ms, signalling a catchup job" ;

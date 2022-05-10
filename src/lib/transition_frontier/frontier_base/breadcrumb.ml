@@ -2,7 +2,7 @@ open Async_kernel
 open Core
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Network_peer
 
 module T = struct

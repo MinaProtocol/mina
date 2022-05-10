@@ -28,8 +28,8 @@
    precomputed_values
    consensus
    network_peer
-   mina_transition
    mina_ledger
+   mina_block
    mina_base
    mina_transaction_logic
    mina_state

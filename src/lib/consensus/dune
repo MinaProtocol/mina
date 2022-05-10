@@ -96,7 +96,7 @@
 (executable
  (name proof_of_stake_fuzzer)
  (modules proof_of_stake_fuzzer)
- (libraries core_kernel signature_lib mina_state mina_transition consensus prover blockchain_snark logger.file_system)
+ (libraries core_kernel signature_lib mina_state mina_block consensus prover blockchain_snark logger.file_system)
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane)))
