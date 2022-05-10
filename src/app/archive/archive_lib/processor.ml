@@ -1566,31 +1566,6 @@ module Zkapp_fee_payer_body = struct
       id
 end
 
-module Zkapp_fee_payers = struct
-  type t = int
-
-  let typ = Caqti_type.int
-
-  let table_name = "zkapp_fee_payers"
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) (fp : Party.Fee_payer.t) =
-    let open Deferred.Result.Let_syntax in
-    let%bind body_id =
-      Zkapp_fee_payer_body.add_if_doesn't_exist (module Conn) fp.body
-    in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "body_id" ], typ)
-      (module Conn)
-      body_id
-
-  let load (module Conn : CONNECTION) id =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "body_id" ]))
-      id
-end
-
 module Epoch_data = struct
   type t =
     { seed : string
@@ -1832,7 +1807,7 @@ module User_command = struct
 
   module Zkapp_command = struct
     type t =
-      { zkapp_fee_payer_id : int
+      { zkapp_fee_payer_body_id : int
       ; zkapp_other_parties_ids : int array
       ; memo : string
       ; hash : string
@@ -1862,8 +1837,10 @@ module User_command = struct
     let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
       let open Deferred.Result.Let_syntax in
       let parties = Parties.to_wire ps in
-      let%bind zkapp_fee_payer_id =
-        Zkapp_fee_payers.add_if_doesn't_exist (module Conn) parties.fee_payer
+      let%bind zkapp_fee_payer_body_id =
+        Zkapp_fee_payer_body.add_if_doesn't_exist
+          (module Conn)
+          parties.fee_payer.body
       in
       let%bind zkapp_other_parties_ids =
         Mina_caqti.deferred_result_list_map parties.other_parties
@@ -1880,7 +1857,7 @@ module User_command = struct
         ~tannot:(function
           | "zkapp_other_parties_ids" -> Some "int[]" | _ -> None)
         (module Conn)
-        { zkapp_fee_payer_id; zkapp_other_parties_ids; memo; hash }
+        { zkapp_fee_payer_body_id; zkapp_other_parties_ids; memo; hash }
   end
 
   let as_signed_command (t : User_command.t) : Mina_base.Signed_command.t =

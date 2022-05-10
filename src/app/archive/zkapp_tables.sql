@@ -239,11 +239,6 @@ CREATE TABLE zkapp_fee_payer_body
 , nonce                                 bigint    NOT NULL
 );
 
-CREATE TABLE zkapp_fee_payers
-( id                       serial           PRIMARY KEY
-, body_id                  int              NOT NULL REFERENCES zkapp_fee_payer_body(id)
-);
-
 CREATE TYPE call_type_type AS ENUM ('call', 'delegate_call');
 
 /* events_ids and sequence_events_ids indicate a list of ids in
