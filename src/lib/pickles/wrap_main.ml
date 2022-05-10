@@ -51,7 +51,7 @@ let pad_domains (type prev_varss prev_valuess branches max_proofs_verified)
     let dummy_domains =
       (* TODO: The dummy should really be equal to one of the already present domains. *)
       let d = Domain.Pow_2_roots_of_unity 1 in
-      { Domains.h = d; x = d }
+      { Domains.h = d }
     in
     let module M =
       H4.Map

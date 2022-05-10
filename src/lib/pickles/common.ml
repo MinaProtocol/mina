@@ -28,12 +28,7 @@ let wrap_domains ~proofs_verified =
   let h =
     match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
   in
-  { Domains.h = Pow_2_roots_of_unity h
-  ; x =
-      Pow_2_roots_of_unity
-        (let (T (typ, _)) = Impls.Wrap.input () in
-         Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]))
-  }
+  { Domains.h = Pow_2_roots_of_unity h }
 
 let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
   let g (x, y) = [ x; y ] in

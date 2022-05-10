@@ -150,13 +150,7 @@ let max_domains_with_x =
   let conv (Domain.Pow_2_roots_of_unity n) =
     Plonk_checks.Domain.Pow_2_roots_of_unity n
   in
-  let x =
-    Plonk_checks.Domain.Pow_2_roots_of_unity
-      (Int.ceil_log2
-         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-            (Nat.to_int Width.Max.n)))
-  in
-  { Ds.h = conv max_domains.h; x }
+  { Ds.h = conv max_domains.h }
 
 module Vk = struct
   type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
