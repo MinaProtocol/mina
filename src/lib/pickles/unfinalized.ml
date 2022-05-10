@@ -68,7 +68,7 @@ module Constant = struct
         ~domain:
           (Plonk_checks.domain
              (module Tock.Field)
-             wrap_domains.h ~shifts:Common.tock_shifts
+             (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
              ~domain_generator:Tock.Field.domain_generator)
         chals evals
     in

@@ -643,8 +643,11 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                              ~default:wrap_domains ~f:(function
                              | `Compiled d ->
                                  d.wrap_domains
-                             | `Side_loaded _ ->
-                                 Common.wrap_domains)
+                             | `Side_loaded d ->
+                                 Common.wrap_domains
+                                   ~proofs_verified:
+                                     ( d.permanent.max_proofs_verified
+                                     |> Nat.Add.n |> Nat.to_int ))
                        end)
                    in
                    M.f rule.Inductive_rule.prevs
@@ -1035,9 +1038,153 @@ let%test_module "test no side-loaded" =
       end
     end
 
-    module Blockchain_snark = struct
+    (* Currently, a circuit must have at least 1 of every type of constraint. *)
+    let dummy_constraints () =
+      Impl.(
+        let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
+        let g =
+          exists Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
+              Tick.Inner_curve.(to_affine_exn one))
+        in
+        ignore
+          ( SC.to_field_checked'
+              (module Impl)
+              ~num_bits:16
+              (Kimchi_backend_common.Scalar_challenge.create x)
+            : Field.t * Field.t * Field.t ) ;
+        ignore
+          ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+            : Step_main_inputs.Inner_curve.t ) ;
+        ignore
+          ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+            : Step_main_inputs.Inner_curve.t ) ;
+        ignore
+          ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
+              (Kimchi_backend_common.Scalar_challenge.create x)
+            : Field.t * Field.t ))
+
+    module No_recursion = struct
       module Statement = Statement
 
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~typ:Field.typ
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = []
+                  ; main =
+                      (fun [] self ->
+                        dummy_constraints () ;
+                        Field.Assert.equal self Field.zero ;
+                        [])
+                  ; main_value = (fun _ _self -> [])
+                  }
+                ]))
+
+      module Proof = (val p)
+
+      let example =
+        let b0 =
+          Common.time "b0" (fun () ->
+              Promise.block_on_async_exn (fun () -> step [] Field.Constant.zero))
+        in
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (Field.Constant.zero, b0) ]) ) ;
+        (Field.Constant.zero, b0)
+    end
+
+    module Simple_chain = struct
+      module Statement = Statement
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~typ:Field.typ
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N1)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = [ self ]
+                  ; main =
+                      (fun [ prev ] self ->
+                        let is_base_case = Field.equal Field.zero self in
+                        let proof_must_verify = Boolean.not is_base_case in
+                        let self_correct = Field.(equal (one + prev) self) in
+                        Boolean.Assert.any [ self_correct; is_base_case ] ;
+                        [ proof_must_verify ])
+                  ; main_value =
+                      (fun _ self ->
+                        let is_base_case = Field.Constant.(equal zero self) in
+                        let proof_must_verify = not is_base_case in
+                        [ proof_must_verify ])
+                  }
+                ]))
+
+      module Proof = (val p)
+
+      let example =
+        let s_neg_one = Field.Constant.(negate one) in
+        let b_neg_one : (Nat.N1.n, Nat.N1.n) Proof0.t =
+          Proof0.dummy Nat.N1.n Nat.N1.n Nat.N1.n
+        in
+        let b0 =
+          Common.time "b0" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step [ (s_neg_one, b_neg_one) ] Field.Constant.zero))
+        in
+        (*
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (Field.Constant.zero, b0) ])
+        ) ; *)
+        let b1 =
+          Common.time "b1" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step [ (Field.Constant.zero, b0) ] Field.Constant.one))
+        in
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (Field.Constant.one, b1) ]) ) ;
+        (Field.Constant.one, b1)
+    end
+
+    module Tree_proof = struct
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
             compile_promise
@@ -1062,54 +1209,53 @@ let%test_module "test no side-loaded" =
                 }
               ~choices:(fun ~self ->
                 [ { identifier = "main"
-                  ; prevs = [ self; self ]
+                  ; prevs = [ No_recursion.tag; self ]
                   ; main =
-                      (fun [ prev; _ ] self ->
+                      (fun [ _; prev ] self ->
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ proof_must_verify; Boolean.false_ ])
+                        [ Boolean.true_; proof_must_verify ])
                   ; main_value =
                       (fun _ self ->
                         let is_base_case = Field.Constant.(equal zero self) in
                         let proof_must_verify = not is_base_case in
-                        [ proof_must_verify; false ])
+                        [ true; proof_must_verify ])
                   }
                 ]))
 
       module Proof = (val p)
-    end
 
-    let xs =
-      let s_neg_one = Field.Constant.(negate one) in
-      let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
-        Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
-      in
-      let b0 =
-        Common.time "b0" (fun () ->
-            Promise.block_on_async_exn (fun () ->
-                Blockchain_snark.step
-                  [ (s_neg_one, b_neg_one); (s_neg_one, b_neg_one) ]
-                  Field.Constant.zero))
-      in
-      assert (
-        Promise.block_on_async_exn (fun () ->
-            Blockchain_snark.Proof.verify_promise [ (Field.Constant.zero, b0) ])
-      ) ;
-      let b1 =
-        Common.time "b1" (fun () ->
-            Promise.block_on_async_exn (fun () ->
-                Blockchain_snark.step
-                  [ (Field.Constant.zero, b0); (Field.Constant.zero, b0) ]
-                  Field.Constant.one))
-      in
-      [ (Field.Constant.zero, b0); (Field.Constant.one, b1) ]
+      let example =
+        let s_neg_one = Field.Constant.(negate one) in
+        let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
+          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
+        in
+        let b0 =
+          Common.time "tree b0" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step
+                    [ No_recursion.example; (s_neg_one, b_neg_one) ]
+                    Field.Constant.zero))
+        in
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (Field.Constant.zero, b0) ]) ) ;
+        let b1 =
+          Common.time "tree b1" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step
+                    [ No_recursion.example; (Field.Constant.zero, b0) ]
+                    Field.Constant.one))
+        in
+        [ (Field.Constant.zero, b0); (Field.Constant.one, b1) ]
+    end
 
     let%test_unit "verify" =
       assert (
         Promise.block_on_async_exn (fun () ->
-            Blockchain_snark.Proof.verify_promise xs) )
+            Tree_proof.Proof.verify_promise Tree_proof.example) )
   end )
 
 (*
@@ -1155,21 +1301,6 @@ let%test_module "test" =
           let open Tick_field_sponge in
           let s = Field.create params in
           Field.absorb s x ; Field.squeeze s
-
-      let dummy_constraints () =
-        let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
-        let g = exists
-            Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
-                Tick.Inner_curve.(to_affine_exn one))
-        in
-        let _ =
-          Step_main_inputs.Ops.scale_fast g
-            (`Plus_two_to_len [|b; b|])
-        in
-        let _ =
-          Step_verifier.Scalar_challenge.endo g (Scalar_challenge [b])
-        in
-        ()
 
         let tag, _, p, Provers.[prove; _] =
           compile

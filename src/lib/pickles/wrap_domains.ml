@@ -17,11 +17,17 @@ module Make (A : T0) (A_value : T0) = struct
           let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
            fun t ->
             Types_map.lookup_map t ~self:self.Tag.id
-              ~default:Common.wrap_domains ~f:(function
-              | `Side_loaded _ ->
-                  Common.wrap_domains
-              | `Compiled d ->
-                  d.wrap_domains)
+              ~default:(fun () -> assert false)
+              ~f:(function
+                | `Side_loaded d ->
+                    fun () ->
+                      Common.wrap_domains
+                        ~proofs_verified:
+                          (Nat.to_int
+                             (Nat.Add.n d.permanent.max_proofs_verified))
+                | `Compiled d ->
+                    fun () -> d.wrap_domains)
+              ()
         end)
     in
     let module M =
@@ -38,15 +44,6 @@ module Make (A : T0) (A_value : T0) = struct
            end)
     in
     M.f choices
-
-  let result =
-    lazy
-      (let x =
-         let (T (typ, conv)) = Impls.Wrap.input () in
-         Domain.Pow_2_roots_of_unity
-           (Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]))
-       in
-       { Common.wrap_domains with x })
 
   let f_debug full_signature num_choices choices_length ~self ~choices
       ~max_proofs_verified =
@@ -78,7 +75,10 @@ module Make (A : T0) (A_value : T0) = struct
 
   let f full_signature num_choices choices_length ~self ~choices
       ~max_proofs_verified =
-    let res = Lazy.force result in
+    let res =
+      Common.wrap_domains
+        ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
+    in
     ( if debug then
       let res' =
         f_debug full_signature num_choices choices_length ~self ~choices

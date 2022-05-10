@@ -130,11 +130,9 @@ let wrap
              (E01 (Digest.Constant))
              (struct
                let f (type n) (m : n P.Base.Me_only.Wrap.Prepared.t) =
-                 let T =
-                   Nat.eq_exn max_proofs_verified
-                     (Vector.length m.old_bulletproof_challenges)
-                 in
-                 Common.hash_dlog_me_only max_proofs_verified m
+                 Common.hash_dlog_me_only
+                   (Vector.length m.old_bulletproof_challenges)
+                   m
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in

@@ -176,7 +176,7 @@ let dummy_commitments g =
 
 let dummy =
   lazy
-    (let rows = Domain.size Common.wrap_domains.h in
+    (let rows = Domain.size (Common.wrap_domains ~proofs_verified:2).h in
      let g = Backend.Tock.Curve.(to_affine_exn one) in
      { Repr.commitments = dummy_commitments g
      ; step_domains = [||]

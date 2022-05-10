@@ -30,36 +30,20 @@ module SC = Scalar_challenge
 
 include Wrap_verifier.Make (Wrap_main_inputs)
 
-let check_wrap_domains ds =
-  (* Assume all wraps have the same domain sizes *)
-  let module I =
-    H4.Iter
-      (H4.T
-         (E04
-            (Domains)))
-            (H4.Iter
-               (E04
-                  (Domains))
-                  (struct
-                    let f (d : Domains.t) =
-                      let d' = Common.wrap_domains in
-                      [%test_eq: Domain.t] d.h d'.h
-                  end))
-  in
-  I.f ds
-
 (* This function is kinda pointless since right now we're assuming all wrap domains
    are the same, but it will be useful when switch to the dlog-dlog system.
 
    The input is a list of Domains.t's [ ds_1; ...; ds_branches ].
    It pads each list with "dummy domains" to have length equal to Max_proofs_verified.n.
-   Then it transposes that matrix.
+   Then it transposes that matrix so that it is organized by "slot" with each entry being
+   a vector whose length is the number of branches.
 *)
-let pad_domains (type prev_varss prev_valuess branches n)
-    (module Max_proofs_verified : Nat.Intf with type n = n)
+let pad_domains (type prev_varss prev_valuess branches max_proofs_verified)
+    (module Max_proofs_verified : Nat.Intf with type n = max_proofs_verified)
     (pi_branches : (prev_varss, branches) Length.t)
     (prev_wrap_domains :
-      (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t) =
+      (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t) :
+    ((Domains.t, branches) Vector.t, max_proofs_verified) Vector.t =
   let module Ds = struct
     type t = (Domains.t, Max_proofs_verified.n) Vector.t
   end in
@@ -178,11 +162,6 @@ let wrap_main
           Types.Wrap.Statement.In_circuit.t
        -> unit) =
   Timer.clock __LOC__ ;
-  let wrap_domains =
-    check_wrap_domains prev_wrap_domains ;
-    Common.wrap_domains
-  in
-  Timer.clock __LOC__ ;
   let T = Max_proofs_verified.eq in
   let branches = Hlist.Length.to_nat pi_branches in
   Timer.clock __LOC__ ;
@@ -298,19 +277,26 @@ let wrap_main
                 exists ty ~request:(fun () -> Req.Evals)
               in
               let chals =
-                let ( (wrap_domains : (_, Max_proofs_verified.n) Vector.t)
-                    , max_quot_sizes ) =
+                (*
+                   domainses:
+                   For each step branch in this proof system,
+                    a list of the wrap domains in the proofs inside there.
+                *)
+                let wrap_domains :
+                    ( _ Plonk_checks.plonk_domain
+                    , Max_proofs_verified.n )
+                    Vector.t =
+                  Vector.map domainses ~f:(fun possible_wrap_domains ->
+                      Pseudo.Domain.to_domain ~shifts ~domain_generator
+                        ( which_branch
+                        , Vector.map ~f:(fun ds -> ds.h) possible_wrap_domains
+                        ))
+                in
+                let max_quot_sizes =
                   Vector.map domainses ~f:(fun ds ->
-                      let h =
-                        Plonk_checks.domain
-                          (module Field)
-                          ~shifts ~domain_generator wrap_domains.h
-                      in
-                      ( h
-                      , ( which_branch
-                        , Vector.map ds ~f:(fun d ->
-                              Common.max_quot_size_int (Domain.size d.h)) ) ))
-                  |> Vector.unzip
+                      ( which_branch
+                      , Vector.map ds ~f:(fun d ->
+                            Common.max_quot_size_int (Domain.size d.h)) ))
                 in
                 let actual_proofs_verifieds =
                   padded
@@ -336,7 +322,7 @@ let wrap_main
                        ; old_bulletproof_challenges
                        ; actual_proofs_verified
                        ; evals
-                       ; domain
+                       ; wrap_domain
                        ; max_quot_size
                        ]
                      ->
@@ -364,7 +350,7 @@ let wrap_main
                           finalize_other_proof
                             (Nat.Add.create max_local_max_proofs_verified)
                             ~max_quot_size ~actual_proofs_verified
-                            ~domain:(domain :> _ Plonk_checks.plonk_domain)
+                            ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
                             ~sponge ~old_bulletproof_challenges deferred_values
                             evals)
                     in
@@ -377,13 +363,7 @@ let wrap_main
           let prev_me_onlys =
             Vector.map2 prev_step_accs old_bp_chals
               ~f:(fun sacc (T (max_local_max_proofs_verified, chals)) ->
-                (* This is a hack. Assuming that the max number of recursive verifications for
-                     every rule is exactly 2 simplified the implementation. In the future we
-                     will have to fix this. *)
-                let T =
-                  Nat.eq_exn max_local_max_proofs_verified Max_proofs_verified.n
-                in
-                hash_me_only Max_proofs_verified.n
+                hash_me_only max_local_max_proofs_verified
                   { challenge_polynomial_commitment = sacc
                   ; old_bulletproof_challenges = chals
                   })
