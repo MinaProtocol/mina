@@ -201,6 +201,5 @@ let%test_module "Snapp deploy tests" =
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
                   U.check_parties_with_merges_exn ledger
-                    ~expected_failure:Invalid_fee_excess
-                    [ parties ])))
+                    ~expected_failure:Invalid_fee_excess [ parties ])))
   end )
