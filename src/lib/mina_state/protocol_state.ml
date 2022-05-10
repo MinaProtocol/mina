@@ -60,22 +60,6 @@ module Body = struct
 
         let to_latest = Fn.id
       end
-
-      module V1 = struct
-        type t =
-          ( State_hash.Stable.V1.t
-          , Blockchain_state.Value.Stable.V1.t
-          , Consensus.Data.Consensus_state.Value.Stable.V1.t
-          , Protocol_constants_checked.Value.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]
-
-        let to_latest (t : t) : V2.t =
-          { t with
-            blockchain_state =
-              Blockchain_state.Value.Stable.V1.to_latest t.blockchain_state
-          }
-      end
     end]
   end
 
@@ -142,12 +126,11 @@ module Body = struct
 
   let consensus_state { Poly.consensus_state; _ } = consensus_state
 
-  let view_checked (t : var) : Snapp_predicate.Protocol_state.View.Checked.t =
+  let view_checked (t : var) : Zkapp_precondition.Protocol_state.View.Checked.t
+      =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
     { snarked_ledger_hash = t.blockchain_state.registers.ledger
-    ; snarked_next_available_token =
-        t.blockchain_state.registers.next_available_token
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length_var cs
     ; min_window_density = C.min_window_density_var cs
@@ -166,12 +149,10 @@ module Body = struct
       (Random_oracle.pack_input (to_input s))
     |> State_body_hash.of_hash
 
-  let view (t : Value.t) : Snapp_predicate.Protocol_state.View.t =
+  let view (t : Value.t) : Zkapp_precondition.Protocol_state.View.t =
     let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
     let cs = t.consensus_state in
     { snarked_ledger_hash = t.blockchain_state.registers.ledger
-    ; snarked_next_available_token =
-        t.blockchain_state.registers.next_available_token
     ; timestamp = t.blockchain_state.timestamp
     ; blockchain_length = C.blockchain_length cs
     ; min_window_density = C.min_window_density cs
@@ -182,6 +163,11 @@ module Body = struct
     ; staking_epoch_data = C.staking_epoch_data cs
     ; next_epoch_data = C.next_epoch_data cs
     }
+
+  module For_tests = struct
+    let with_consensus_state (t : Value.t) consensus_state =
+      { t with consensus_state }
+  end
 end
 
 module Value = struct
@@ -192,14 +178,6 @@ module Value = struct
       [@@deriving sexp, hash, compare, equal, yojson]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, hash, compare, equal, yojson]
-
-      let to_latest (t : t) : V2.t =
-        { t with body = Body.Value.Stable.V1.to_latest t.body }
     end
   end]
 
@@ -322,9 +300,6 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
             ~consensus_constants
             ~genesis_ledger_hash:
               (Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger))
-            ~snarked_next_available_token:
-              (Mina_ledger.Ledger.next_available_token
-                 (Lazy.force genesis_ledger))
       ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
       ; consensus_state =
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger

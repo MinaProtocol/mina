@@ -10,6 +10,24 @@ let int16 =
   Command.Arg_type.map Command.Param.int
     ~f:(Fn.compose Or_error.ok_exn validate_int16)
 
+let pubsub_topic_mode =
+  let open Gossip_net.Libp2p in
+  Command.Arg_type.create (fun s ->
+      match s with
+      | "ro" ->
+          RO
+      | "rw" ->
+          RW
+      | "none" ->
+          N
+      | _ ->
+          eprintf "Invalid pubsub topic mode: %s" s ;
+          exit 1)
+
+let pubsub_topic_mode_to_string mode =
+  let open Gossip_net.Libp2p in
+  match mode with RO -> "ro" | RW -> "rw" | N -> "none"
+
 let public_key_compressed =
   Command.Arg_type.create (fun s ->
       let error_string e =

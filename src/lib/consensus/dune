@@ -47,6 +47,7 @@
    consensus.vrf
    snarky_taylor
    mina_base
+   mina_transaction_logic
    key_gen
    block_time
    perf_histograms

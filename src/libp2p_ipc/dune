@@ -19,8 +19,10 @@
    async_kernel
    ppx_inline_test.config
    ;; local libraries
+   blake2
    pipe_lib
    network_peer
+   o1trace
  )
  (preprocess (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx)))

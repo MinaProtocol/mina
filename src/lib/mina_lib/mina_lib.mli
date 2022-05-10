@@ -8,7 +8,7 @@ open Signature_lib
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
-module Subscriptions = Coda_subscriptions
+module Subscriptions = Mina_subscriptions
 
 type t
 
@@ -29,7 +29,7 @@ exception Offline_shutdown
 
 val time_controller : t -> Block_time.Controller.t
 
-val subscription : t -> Coda_subscriptions.t
+val subscription : t -> Mina_subscriptions.t
 
 val daemon_start_time : Time_ns.t
 
@@ -145,7 +145,7 @@ module Root_diff : sig
   module Stable : sig
     module V2 : sig
       type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V1.t list
+        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
         ; root_length : int
         }
     end
@@ -187,10 +187,10 @@ val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 
-val subscriptions : t -> Coda_subscriptions.t
+val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
-  t -> External_transition.Initial_validated.t Broadcast_pipe.Reader.t
+  t -> Mina_block.initial_valid_block Broadcast_pipe.Reader.t
 
 val block_produced_bvar :
   t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
@@ -202,3 +202,5 @@ val config : t -> Config.t
 val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
+
+val verifier : t -> Verifier.t

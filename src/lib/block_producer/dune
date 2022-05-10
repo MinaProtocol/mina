@@ -31,6 +31,8 @@
    mina_intf
    mina_ledger
    mina_base
+   mina_transaction
+   mina_transaction_logic
    mina_transition
    consensus
    interruptible

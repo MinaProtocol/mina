@@ -39,21 +39,23 @@ val deriver :
       ; graphql_arg :
           (unit -> Yojson.Safe.t Fields_derivers_graphql.Schema.Arg.arg_typ) ref
       ; graphql_fields :
-          Yojson.Safe.t Fields_derivers_snapps.Graphql.Fields.Input.T.t ref
+          Yojson.Safe.t Fields_derivers_zkapps.Graphql.Fields.Input.T.t ref
+      ; graphql_query : string option ref
+      ; graphql_query_accumulator : (string * string option) list ref
       ; map : (Yojson.Safe.t -> t) ref
       ; nullable_graphql_arg :
           (   unit
            -> Yojson.Safe.t option Fields_derivers_graphql.Schema.Arg.arg_typ)
           ref
       ; nullable_graphql_fields :
-          Yojson.Safe.t option Fields_derivers_snapps.Graphql.Fields.Input.T.t
+          Yojson.Safe.t option Fields_derivers_zkapps.Graphql.Fields.Input.T.t
           ref
       ; of_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
       ; to_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
       ; .. >
       as
       'a)
-     Fields_derivers_snapps.Unified_input.t
-     Fields_derivers_snapps.Unified_input.t
-     Fields_derivers_snapps.Unified_input.t
-  -> 'a Fields_derivers_snapps.Unified_input.t
+     Fields_derivers_zkapps.Unified_input.t
+     Fields_derivers_zkapps.Unified_input.t
+     Fields_derivers_zkapps.Unified_input.t
+  -> 'a Fields_derivers_zkapps.Unified_input.t

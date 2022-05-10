@@ -210,7 +210,7 @@ module Sponge (Impl : Snarky_backendless.Snark_intf.Run) = struct
 end
 
 module type Inputs_base = sig
-  module Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit
+  module Impl : Snarky_backendless.Snark_intf.Run
 
   module Inner_curve : sig
     open Impl
@@ -267,7 +267,7 @@ module Wrap_main_inputs = struct
   end
 end
 
-module Pairing_main_inputs = struct
+module Step_main_inputs = struct
   module type S = sig
     include Inputs_base
 

@@ -1,7 +1,7 @@
 use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
-use kimchi::index::{expr_linearization, Index as DlogIndex};
+use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -11,7 +11,7 @@ use std::{
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
-pub struct CamlPastaFqPlonkIndex(pub Box<DlogIndex<GAffine>>);
+pub struct CamlPastaFqPlonkIndex(pub Box<ProverIndex<GAffine>>);
 pub type CamlPastaFqPlonkIndexPtr<'a> = ocaml::Pointer<'a, CamlPastaFqPlonkIndex>;
 
 extern "C" fn caml_pasta_fq_plonk_index_finalize(v: ocaml::Raw) {
@@ -55,7 +55,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     let cs = match ConstraintSystem::<Fq>::create(
         gates,
         vec![],
-        oracle::pasta::fq_3::params(),
+        oracle::pasta::fq_kimchi::params(),
         public as usize,
     ) {
         None => {
@@ -80,7 +80,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     // create index
     Ok(CamlPastaFqPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, oracle::pasta::fp_3::params(), endo_q, srs.clone()),
+        ProverIndex::<GAffine>::create(cs, oracle::pasta::fp_kimchi::params(), endo_q, srs.clone()),
     )))
 }
 
@@ -140,12 +140,12 @@ pub fn caml_pasta_fq_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
-    t.cs.fr_sponge_params = oracle::pasta::fq_3::params();
+    let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
+    t.cs.fr_sponge_params = oracle::pasta::fq_kimchi::params();
     t.srs = srs.clone();
-    t.fq_sponge_params = oracle::pasta::fp_3::params();
+    t.fq_sponge_params = oracle::pasta::fp_kimchi::params();
 
-    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, &None);
+    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, None);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

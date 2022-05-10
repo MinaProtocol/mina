@@ -13,13 +13,14 @@
    core_kernel
    ppx_inline_test.config
    ;; local libraries
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    snarkette
    snarky.backendless
    key_cache
    hex
    kimchi_backend.common
-   run_in_thread
    kimchi_backend.pasta
    pickles_types
    sponge

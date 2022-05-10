@@ -23,8 +23,7 @@ module Signed_var = struct
   type 'mag repr = ('mag, Sgn.var) Signed_poly.t
 
   (* Invariant: At least one of these is Some *)
-  type nonrec 'mag t =
-    { mutable repr : 'mag repr option; mutable value : Field.Var.t option }
+  type nonrec 'mag t = { repr : 'mag repr; mutable value : Field.Var.t option }
 end
 
 [%%endif]
@@ -174,12 +173,21 @@ end = struct
 
   let var_of_t (t : t) : var = Field.Var.constant (Field.project (to_bits t))
 
-  let if_ cond ~then_ ~else_ : (var, _) Checked.t =
+  let if_ cond ~then_ ~else_ : var Checked.t =
     Field.Checked.if_ cond ~then_ ~else_
 
   let () = assert (Int.(length_in_bits mod 16 = 0))
 
-  let range_check' (t : var) =
+  (** UNSAFE. Take the field element formed by the final [length_in_bits] bits
+      of the argument.
+
+      WARNING: The returned value may be chosen arbitrarily by a malicious
+      prover, and this is really only useful for the more-efficient bit
+      projection. Users of this function must manually assert the relationship
+      between the argument and the return value, or the circuit will be
+      underconstrained.
+  *)
+  let image_from_bits_unsafe (t : var) =
     make_checked (fun () ->
         let _, _, actual_packed =
           Pickles.Scalar_challenge.to_field_checked' ~num_bits:length_in_bits m
@@ -193,22 +201,8 @@ end = struct
       this assertion.
   *)
   let range_check t =
-    let%bind actual = range_check' t in
-    Field.Checked.Assert.equal actual t
-
-  (** [range_check_flag t] returns a [Boolean.var] that is true when
-      [0 <= t < 2^length_in_bits], and false otherwise.
-
-      This function MUST NOT be used to constrain return values. Use
-      [range_adjust_flagged] instead.
-
-      This function should only be used for comparison operations, where the
-      result of an addition or subtraction is unused. For example,
-      [let ( <= ) x y = range_check_flag (Field.Var.sub y x)].
-  *)
-  let range_check_flag t =
-    let%bind actual = range_check' t in
-    Field.Checked.equal actual t
+    let%bind actual = image_from_bits_unsafe t in
+    with_label "range_check" (Field.Checked.Assert.equal actual t)
 
   let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
 
@@ -218,7 +212,7 @@ end = struct
   let double_modulus_as_field =
     lazy (Field.(mul (of_int 2)) (Lazy.force modulus_as_field))
 
-  (** [range_adjust_flagged kind t] returns [t'] that fits in [length_in_bits]
+  (** [range_check_flagged kind t] returns [t'] that fits in [length_in_bits]
       bits, and satisfies [t' = t + k * 2^length_in_bits] for some [k].
       The [`Overflow b] return value is false iff [t' = t].
 
@@ -237,7 +231,7 @@ end = struct
       * if [kind] is [`Add_or_sub],
         [- 2^length_in_bits < t < 2 * 2^length_in_bits - 1].
   *)
-  let range_adjust_flagged (kind : [ `Add | `Sub | `Add_or_sub ]) t =
+  let range_check_flagged (kind : [ `Add | `Sub | `Add_or_sub ]) t =
     let%bind adjustment_factor =
       exists Field.typ
         ~compute:
@@ -310,11 +304,7 @@ end = struct
       add t (scale adjustment_factor (Lazy.force modulus_as_field))
     in
     let%bind t_adjusted = seal t_adjusted in
-    let%bind actual = range_check' t_adjusted in
-    let%map () =
-      with_label "range_adjust_flagged"
-        (Field.Checked.Assert.equal actual t_adjusted)
-    in
+    let%map () = range_check t_adjusted in
     (t_adjusted, `Overflow out_of_range)
 
   let of_field (x : Field.t) : t =
@@ -323,8 +313,9 @@ end = struct
   let to_field (x : t) : Field.t = Field.project (to_bits x)
 
   let typ : (var, t) Typ.t =
+    let (Typ typ) = Field.typ in
     Typ.transport
-      { Field.typ with check = range_check }
+      (Typ { typ with check = range_check })
       ~there:to_field ~back:of_field
 
   [%%endif]
@@ -489,18 +480,6 @@ end = struct
     let to_field (t : t) : Field.t =
       Field.mul (Sgn.to_field t.sgn) (magnitude_to_field t.magnitude)
 
-    let magnitude_upper_bound =
-      Bigint.of_bignum_bigint Bignum_bigint.(one lsl M.length)
-
-    let of_field (x : Field.t) : t =
-      let n = Bigint.of_field x in
-      let sgn, magnitude =
-        if Int.( <= ) (Bigint.compare n magnitude_upper_bound) 0 then
-          (Sgn.Pos, x)
-        else (Sgn.Neg, Field.negate x)
-      in
-      { sgn; magnitude = of_field magnitude }
-
     type repr = var Signed_var.repr
 
     type nonrec var = var Signed_var.t
@@ -511,63 +490,26 @@ end = struct
         ~value_of_hlist:typ_of_hlist
 
     let typ : (var, t) Typ.t =
-      { alloc =
-          Snarky_backendless.Typ_monads.Alloc.map repr_typ.alloc ~f:(fun r ->
-              { Signed_var.value = None; repr = Some r })
-      ; check =
-          (fun x ->
-            match x.repr with None -> return () | Some r -> repr_typ.check r)
-      ; read =
-          (fun (x : var) ->
-            match (x.repr, x.value) with
-            | None, None ->
-                assert false
-            | Some r, None | Some r, Some _ ->
-                repr_typ.read r
-            | None, Some v ->
-                Snarky_backendless.Typ_monads.Read.map (Field.typ.read v)
-                  ~f:of_field)
-      ; store =
-          (fun (x : t) ->
-            Snarky_backendless.Typ_monads.Store.map (repr_typ.store x)
-              ~f:(fun r -> { Signed_var.value = None; repr = Some r }))
-      }
+      Typ.transport_var repr_typ
+        ~back:(fun repr -> { Signed_var.value = None; repr })
+        ~there:(fun { Signed_var.repr; _ } -> repr)
 
     let create_var ~magnitude ~sgn : var =
-      { repr = Some { magnitude; sgn }; value = None }
+      { repr = { magnitude; sgn }; value = None }
 
     module Checked = struct
       type t = var
 
       type signed_fee_var = t
 
-      let repr_value ({ magnitude; sgn } : repr) =
-        Field.Checked.mul magnitude (sgn :> Field.Var.t)
-
-      let repr (x : Field.Var.t) =
-        let%bind repr =
-          exists repr_typ
-            ~compute:As_prover.(map (read Field.typ x) ~f:of_field)
-        in
-        let%bind x' = repr_value repr in
-        let%map () = Field.Checked.Assert.equal x x' in
-        repr
-
-      let repr (t : var) =
-        match t.repr with
-        | Some r ->
-            Checked.return r
-        | None ->
-            let%map r = repr (Option.value_exn t.value) in
-            t.repr <- Some r ;
-            r
+      let repr (t : var) = Checked.return t.repr
 
       let value (t : var) =
         match t.value with
         | Some x ->
             Checked.return x
         | None ->
-            let r = Option.value_exn t.repr in
+            let r = t.repr in
             let%map x = Field.Checked.mul (r.sgn :> Field.Var.t) r.magnitude in
             t.value <- Some x ;
             x
@@ -589,21 +531,18 @@ end = struct
 
       let constant ({ magnitude; sgn } as t) =
         { Signed_var.repr =
-            Some
-              { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }
+            { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }
         ; value = Some (Field.Var.constant (to_field t))
         }
 
       let of_unsigned magnitude : var =
-        { repr = Some { magnitude; sgn = Sgn.Checked.pos }
-        ; value = Some magnitude
-        }
+        { repr = { magnitude; sgn = Sgn.Checked.pos }; value = Some magnitude }
 
       let negate (t : var) : var =
         { value = Option.map t.value ~f:Field.Var.negate
         ; repr =
-            Option.map t.repr ~f:(fun { magnitude; sgn } ->
-                { magnitude; sgn = Sgn.Checked.negate sgn })
+            (let { magnitude; sgn } = t.repr in
+             { magnitude; sgn = Sgn.Checked.negate sgn })
         }
 
       let if_repr cond ~then_ ~else_ =
@@ -613,14 +552,8 @@ end = struct
         in
         { sgn; magnitude }
 
-      let if_ cond ~(then_ : var) ~(else_ : var) : (var, _) Checked.t =
-        let%bind repr =
-          match (then_.repr, else_.repr) with
-          | Some r1, Some r2 ->
-              if_repr cond ~then_:r1 ~else_:r2 >>| Option.return
-          | _ ->
-              return None
-        in
+      let if_ cond ~(then_ : var) ~(else_ : var) : var Checked.t =
+        let%bind repr = if_repr cond ~then_:then_.repr ~else_:else_.repr in
         let%map value =
           match (then_.value, else_.value) with
           | Some v1, Some v2 ->
@@ -628,7 +561,6 @@ end = struct
           | _ ->
               return None
         in
-        assert (Option.is_some repr || Option.is_some value) ;
         { Signed_var.value; repr }
 
       let sgn (t : var) =
@@ -654,7 +586,7 @@ end = struct
                   | Sgn.Neg, Sgn.Neg ->
                       (* Ensure that we provide a value in the range
                          [-modulus_as_field < magnitude < 2*modulus_as_field]
-                         for [range_adjust_flagged].
+                         for [range_check_flagged].
                       *)
                       Sgn.Neg
                   | _ ->
@@ -665,13 +597,13 @@ end = struct
           Tick.Field.Checked.mul (sgn :> Field.Var.t) value
         in
         let%bind res_magnitude, `Overflow overflow =
-          range_adjust_flagged `Add_or_sub magnitude
+          range_check_flagged `Add_or_sub magnitude
         in
         (* Recompute the result from [res_magnitude], since it may have been
            adjusted.
         *)
         let%map res_value = Field.Checked.mul (sgn :> Field.Var.t) magnitude in
-        ( { Signed_var.repr = Some { magnitude = res_magnitude; sgn }
+        ( { Signed_var.repr = { magnitude = res_magnitude; sgn }
           ; value = Some res_value
           }
         , `Overflow overflow )
@@ -690,7 +622,7 @@ end = struct
           Tick.Field.Checked.mul (sgn :> Field.Var.t) res_value
         in
         let%map () = range_check magnitude in
-        { Signed_var.repr = Some { magnitude; sgn }; value = Some res_value }
+        { Signed_var.repr = { magnitude; sgn }; value = Some res_value }
 
       let ( + ) = add
 
@@ -727,29 +659,12 @@ end = struct
 
     let sub_flagged x y =
       let%bind z = seal (Field.Var.sub x y) in
-      let%map z, `Overflow underflow = range_adjust_flagged `Sub z in
+      let%map z, `Overflow underflow = range_check_flagged `Sub z in
       (z, `Underflow underflow)
 
     let sub_or_zero x y =
-      make_checked (fun () ->
-          let open Tick.Run in
-          let res = Pickles.Util.seal Tick.m Field.(x - y) in
-          let neg_res = Pickles.Util.seal Tick.m (Field.negate res) in
-          let x_gte_y = run_checked (range_check_flag res) in
-          let y_gte_x = run_checked (range_check_flag neg_res) in
-          Boolean.Assert.any [ x_gte_y; y_gte_x ] ;
-          (* If y_gte_x is false, then x_gte_y is true, so x >= y and
-             thus there was no underflow.
-
-             If y_gte_x is true, then y >= x, which means there was underflow
-             iff y != x.
-
-             Thus, underflow = (neg_res_good && y != x)
-          *)
-          let underflow =
-            Boolean.( &&& ) y_gte_x (Boolean.not (Field.equal x y))
-          in
-          Field.if_ underflow ~then_:Field.zero ~else_:res)
+      let%bind res, `Underflow underflow = sub_flagged x y in
+      Field.Checked.if_ underflow ~then_:Field.(Var.constant zero) ~else_:res
 
     let assert_equal x y = Field.Checked.Assert.equal x y
 
@@ -757,16 +672,19 @@ end = struct
 
     let ( = ) = equal
 
-    (* x <= y iff range_check_flag (y - x) *)
-    let ( <= ) x y = range_check_flag (Field.Var.sub y x)
+    let ( < ) x y =
+      let%bind diff = seal (Field.Var.sub x y) in
+      (* [lt] is true iff [x - y < 0], ie. [x < y] *)
+      let%map _res, `Overflow lt = range_check_flagged `Sub diff in
+      lt
+
+    (* x <= y iff not (y < x) *)
+    let ( <= ) x y =
+      let%map y_lt_x = y < x in
+      Boolean.not y_lt_x
 
     (* x >= y iff y <= x *)
     let ( >= ) x y = y <= x
-
-    let ( < ) x y =
-      let%bind x_lt_y = x <= y in
-      let%bind eq = x = y in
-      Boolean.( &&& ) x_lt_y (Boolean.not eq)
 
     let ( > ) x y = y < x
 
@@ -778,7 +696,7 @@ end = struct
 
     let add_flagged x y =
       let%bind z = seal (Field.Var.add x y) in
-      let%map z, `Overflow overflow = range_adjust_flagged `Add z in
+      let%map z, `Overflow overflow = range_check_flagged `Add z in
       (z, `Overflow overflow)
 
     let ( - ) = sub
@@ -794,7 +712,7 @@ end = struct
     let add_signed_flagged (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       let%bind res = seal (Field.Var.add t d) in
-      let%map res, `Overflow overflow = range_adjust_flagged `Add_or_sub res in
+      let%map res, `Overflow overflow = range_check_flagged `Add_or_sub res in
       (res, `Overflow overflow)
 
     let scale (f : Field.Var.t) (t : var) =
@@ -804,11 +722,10 @@ end = struct
 
     let%test_module "currency_test" =
       ( module struct
-        let expect_failure err c =
-          if Or_error.is_ok (check c ()) then failwith err
+        let expect_failure err c = if Or_error.is_ok (check c) then failwith err
 
         let expect_success err c =
-          match check c () with
+          match check c with
           | Ok () ->
               ()
           | Error e ->
@@ -1193,7 +1110,7 @@ let%test_module "sub_flagged module" =
 
       module Checked : sig
         val sub_flagged :
-          var -> var -> (var * [ `Underflow of Boolean.var ], 'a) Tick.Checked.t
+          var -> var -> (var * [ `Underflow of Boolean.var ]) Tick.Checked.t
       end
     end
 

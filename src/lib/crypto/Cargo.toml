@@ -5,6 +5,7 @@ members = [
 ]
 exclude = [
     "proof-systems",
+    "kimchi_bindings/wasm"
 ]
 
 [profile.release]

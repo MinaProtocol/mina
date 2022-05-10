@@ -35,6 +35,7 @@
    mina_metrics
    child_processes
    error_json
+   block_time
 )
  (preprocess
   (pps ppx_coda ppx_version ppx_inline_test ppx_compare ppx_deriving.make ppx_deriving_yojson ppx_optcomp

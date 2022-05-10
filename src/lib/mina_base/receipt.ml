@@ -47,18 +47,18 @@ module Chain_hash = struct
 
   let cons (e : Elt.t) (t : t) =
     let open Random_oracle.Legacy in
-    let init, x =
-      let open Hash_prefix in
+    let x =
       match e with
       | Signed_command payload ->
-          ( receipt_chain_user_command
-          , Transaction_union_payload.(
-              to_input_legacy (of_user_command_payload payload)) )
+          Transaction_union_payload.(
+            to_input_legacy (of_user_command_payload payload))
       | Parties s ->
-          (receipt_chain_snapp, Input.field s)
+          Input.field s
     in
     Input.(append x (field (t :> Field.t)))
-    |> pack_input |> hash ~init |> of_hash
+    |> pack_input
+    |> hash ~init:Hash_prefix.receipt_chain_user_command
+    |> of_hash
 
   [%%if defined consensus_mechanism]
 
@@ -79,19 +79,18 @@ module Chain_hash = struct
     let cons (e : Elt.t) t =
       let open Random_oracle.Legacy in
       let open Checked in
-      let open Hash_prefix in
-      let%bind init, x =
+      let%bind x =
         match e with
         | Signed_command payload ->
             let%map payload =
               Transaction_union_payload.Checked.to_input_legacy payload
             in
-            (receipt_chain_user_command, payload)
+            payload
         | Parties s ->
-            Let_syntax.return (receipt_chain_snapp, Input.field s)
+            Let_syntax.return (Input.field s)
       in
       make_checked (fun () ->
-          hash ~init
+          hash ~init:Hash_prefix.receipt_chain_user_command
             (pack_input Input.(append x (field (var_to_hash_packed t))))
           |> var_of_hash_packed)
   end
@@ -113,8 +112,7 @@ module Chain_hash = struct
             in
             As_prover.read typ res
           in
-          let (), x = Or_error.ok_exn (run_and_check comp ()) in
-          x
+          Or_error.ok_exn (run_and_check comp)
         in
         assert (equal unchecked checked))
 

@@ -50,7 +50,7 @@ module Poly : sig
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
-        ; set_snapp_uri : 'controller
+        ; set_zkapp_uri : 'controller
         ; edit_sequence_state : 'controller
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
@@ -105,22 +105,24 @@ val deriver :
            -> Auth_required.t Poly.t Fields_derivers_graphql.Schema.Arg.arg_typ)
           ref
       ; graphql_arg_accumulator :
-          Auth_required.t Poly.t Fields_derivers_snapps.Graphql.Args.Acc.T.t ref
+          Auth_required.t Poly.t Fields_derivers_zkapps.Graphql.Args.Acc.T.t ref
       ; graphql_creator : ('a -> Auth_required.t Poly.t) ref
       ; graphql_fields :
-          Auth_required.t Poly.t Fields_derivers_snapps.Graphql.Fields.Input.T.t
+          Auth_required.t Poly.t Fields_derivers_zkapps.Graphql.Fields.Input.T.t
           ref
       ; graphql_fields_accumulator :
           Auth_required.t Poly.t
-          Fields_derivers_snapps.Graphql.Fields.Accumulator.T.t
+          Fields_derivers_zkapps.Graphql.Fields.Accumulator.T.t
           list
           ref
+      ; graphql_query : string option ref
+      ; graphql_query_accumulator : (string * string option) option list ref
       ; map : (Auth_required.t Poly.t -> Auth_required.t Poly.t) ref
       ; nullable_graphql_arg :
           (unit -> 'b Fields_derivers_graphql.Schema.Arg.arg_typ) ref
       ; nullable_graphql_fields :
           Auth_required.t Poly.t option
-          Fields_derivers_snapps.Graphql.Fields.Input.T.t
+          Fields_derivers_zkapps.Graphql.Fields.Input.T.t
           ref
       ; of_json :
           (   [> `Assoc of (string * Yojson.Safe.t) list ]
@@ -132,7 +134,8 @@ val deriver :
            -> [> `Assoc of (string * Yojson.Safe.t) list ])
           ref
       ; to_json_accumulator :
-          (string * (Auth_required.t Poly.t -> Yojson.Safe.t)) list ref
+          (string * (Auth_required.t Poly.t -> Yojson.Safe.t)) option list ref
+      ; skip : bool ref
       ; .. >
       as
       'a)

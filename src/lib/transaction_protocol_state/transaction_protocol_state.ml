@@ -9,14 +9,6 @@ module Block_data = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t = Mina_state.Protocol_state.Body.Value.Stable.V1.t
-      [@@deriving sexp]
-
-      let to_latest (t : t) : V2.t =
-        Mina_state.Protocol_state.Body.Value.Stable.V1.to_latest t
-    end
   end]
 
   type var = Mina_state.Protocol_state.Body.var
@@ -31,11 +23,6 @@ module Poly = struct
       type 'a t = { transaction : 'a; block_data : Block_data.Stable.V2.t }
       [@@deriving sexp]
     end
-
-    module V1 = struct
-      type 'a t = { transaction : 'a; block_data : Block_data.Stable.V1.t }
-      [@@deriving sexp]
-    end
   end]
 end
 
@@ -43,10 +30,6 @@ end
 module Stable = struct
   module V2 = struct
     type 'a t = 'a Poly.Stable.V2.t [@@deriving sexp]
-  end
-
-  module V1 = struct
-    type 'a t = 'a Poly.Stable.V1.t [@@deriving sexp]
   end
 end]
 

@@ -1,7 +1,7 @@
 use ark_ec::AffineCurve;
 use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
-use kimchi::circuits::gate::LookupsUsed;
-use kimchi::index::LookupVerifierIndex;
+use kimchi::circuits::lookup::lookups::LookupsUsed;
+use kimchi::verifier_index::LookupVerifierIndex;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlPlonkDomain<Fr> {
@@ -31,7 +31,7 @@ pub enum CamlLookupsUsed {
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupVerifierIndex<PolyComm> {
     pub lookup_used: CamlLookupsUsed,
-    pub lookup_tables: Vec<Vec<PolyComm>>,
+    pub lookup_table: Vec<PolyComm>,
     pub lookup_selectors: Vec<PolyComm>,
 }
 
@@ -43,7 +43,7 @@ where
     fn from(li: LookupVerifierIndex<G>) -> Self {
         let LookupVerifierIndex {
             lookup_used,
-            lookup_tables,
+            lookup_table,
             lookup_selectors,
         } = li;
         CamlLookupVerifierIndex {
@@ -53,10 +53,8 @@ where
                     LookupsUsed::Joint => CamlLookupsUsed::Joint,
                 }
             },
-            lookup_tables: lookup_tables
-                .into_iter()
-                .map(|tbl| tbl.into_iter().map(From::from).collect())
-                .collect(),
+            lookup_table: lookup_table.into_iter().map(From::from).collect(),
+
             lookup_selectors: lookup_selectors.into_iter().map(From::from).collect(),
         }
     }
@@ -70,7 +68,7 @@ where
     fn from(li: CamlLookupVerifierIndex<CamlPolyComm>) -> Self {
         let CamlLookupVerifierIndex {
             lookup_used,
-            lookup_tables,
+            lookup_table,
             lookup_selectors,
         } = li;
         LookupVerifierIndex {
@@ -80,10 +78,7 @@ where
                     CamlLookupsUsed::Joint => LookupsUsed::Joint,
                 }
             },
-            lookup_tables: lookup_tables
-                .into_iter()
-                .map(|tbl| tbl.into_iter().map(From::from).collect())
-                .collect(),
+            lookup_table: lookup_table.into_iter().map(From::from).collect(),
             lookup_selectors: lookup_selectors.into_iter().map(From::from).collect(),
         }
     }

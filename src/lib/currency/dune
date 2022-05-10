@@ -35,6 +35,7 @@
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
+   ppx_annot
    ppx_coda
    ppx_version
    ppx_let

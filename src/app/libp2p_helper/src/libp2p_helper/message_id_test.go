@@ -42,9 +42,9 @@ func testPubsubMsgIdFun(t *testing.T, topic string) {
 	gossipSubp.D = 4
 	gossipSubp.Dlo = 2
 	gossipSubp.Dhi = 6
-	require.NoError(t, configurePubsub(alice, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
-	require.NoError(t, configurePubsub(bob, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
-	require.NoError(t, configurePubsub(carol, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(alice, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(bob, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(carol, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
 
 	// Subscribe to the topic
 	testSubscribeDo(t, alice, topic, 21, 58)

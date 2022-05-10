@@ -5,6 +5,7 @@
  (inline_tests)
  (libraries
    ;; opam libraries
+   base
    core_kernel
    ppx_inline_test.config
    ;; local libraries

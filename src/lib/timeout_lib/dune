@@ -5,7 +5,6 @@
    ;; opam libraries
    core_kernel
    async_kernel
-   core
    ;; local libraries
    logger
  )

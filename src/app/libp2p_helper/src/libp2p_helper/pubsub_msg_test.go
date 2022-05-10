@@ -32,11 +32,8 @@ func testPublishDo(t *testing.T, app *app, topic string, data []byte, rpcSeqno u
 }
 
 func TestPublish(t *testing.T) {
-	var err error
 	testApp, _ := newTestApp(t, nil, true)
-	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
-	require.NoError(t, err)
-
+	require.NoError(t, configurePubsub(testApp, 32, nil, nil))
 	testPublishDo(t, testApp, "testtopic", []byte("testdata"), 48)
 }
 
@@ -65,10 +62,8 @@ func testSubscribeDo(t *testing.T, app *app, topic string, subId uint64, rpcSeqn
 }
 
 func testSubscribeImpl(t *testing.T) (*app, string, uint64) {
-	var err error
 	testApp, _ := newTestApp(t, nil, true)
-	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
-	require.NoError(t, err)
+	require.NoError(t, configurePubsub(testApp, 32, nil, nil))
 
 	topic := "testtopic"
 	idx := uint64(21)

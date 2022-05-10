@@ -74,12 +74,12 @@ type linkIxPair struct {
 func testSplitJoinPrefix(maxBlockSize int, data []byte) error {
 	blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithHashF(maxBlockSize, badHash, data)
 	schema := MkBitswapBlockSchemaLengthPrefixed(maxBlockSize, len(data))
-	// len(blocks) < schema.totalBlocks is an ok case because some blocks and block subtrees
+	// len(blocks) < schema.numTotalBlocks is an ok case because some blocks and block subtrees
 	// may appear more than once in the tree (in case of data containing repeative subranges)
-	if len(blocks) > schema.totalBlocks {
-		return fmt.Errorf("mismatch of block count: %d > %d", len(blocks), schema.totalBlocks)
+	if len(blocks) > schema.numTotalBlocks {
+		return fmt.Errorf("mismatch of block count: %d > %d", len(blocks), schema.numTotalBlocks)
 	}
-	di := MkDepthIndices(schema.maxLinksPerBlock, schema.totalBlocks)
+	di := MkDepthIndices(schema.maxLinksPerBlock, schema.numTotalBlocks)
 	for q := []linkIxPair{{id: root}}; len(q) > 0; q = q[1:] {
 		id := q[0].id
 		ix := q[0].ix
@@ -124,10 +124,10 @@ func testSplitJoinPrefix(maxBlockSize int, data []byte) error {
 func testSplitJoin(maxBlockSize int, data []byte) error {
 	blocks, root := SplitDataToBitswapBlocksWithHashF(maxBlockSize, badHash, data)
 	schema := MkBitswapBlockSchema(maxBlockSize, len(data))
-	// len(blocks) < schema.totalBlocks is an ok case because some blocks and block subtrees
+	// len(blocks) < schema.numTotalBlocks is an ok case because some blocks and block subtrees
 	// may appear more than once in the tree (in case of data containing repeative subranges)
-	if len(blocks) > schema.totalBlocks {
-		return fmt.Errorf("mismatch of block count: %d > %d", len(blocks), schema.totalBlocks)
+	if len(blocks) > schema.numTotalBlocks {
+		return fmt.Errorf("mismatch of block count: %d > %d", len(blocks), schema.numTotalBlocks)
 	}
 	res, err := JoinBitswapBlocks(blocks, root)
 	if err != nil {

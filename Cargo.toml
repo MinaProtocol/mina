@@ -9,6 +9,8 @@ members = [
 ]
 exclude = [
     "_build/default/src/lib/crypto/proof-systems",
+    "_build/default/src/lib/crypto/kimchi_bindings/wasm",
+    "src/lib/crypto/kimchi_bindings/wasm"
 ]
 
 [profile.release]

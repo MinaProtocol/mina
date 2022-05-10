@@ -17,10 +17,8 @@
    sponge
    pickles
    random_oracle_input
-   o1trace
    snarky.backendless
-   kimchi.pasta_fp_poseidon
-   kimchi
    kimchi_backend.pasta
    fold_lib
+   random_oracle.permutation
 ))

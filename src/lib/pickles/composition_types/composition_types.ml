@@ -9,7 +9,7 @@ open Core_kernel
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
 
-module Dlog_based = struct
+module Wrap = struct
   module Proof_state = struct
     module Deferred_values = struct
       module Plonk = struct
@@ -221,6 +221,8 @@ module Dlog_based = struct
         { t with plonk = Plonk.to_minimal t.plonk }
     end
 
+    (** The component of the proof accumulation state that is only computed on by the
+        "wrapping" proof system, and that can be handled opaquely by any "step" circuits. *)
     module Me_only = struct
       [%%versioned
       module Stable = struct
@@ -335,6 +337,8 @@ module Dlog_based = struct
       { t with deferred_values = Deferred_values.to_minimal t.deferred_values }
   end
 
+  (** The component of the proof accumulation state that is only computed on by the
+      "stepping" proof system, and that can be handled opaquely by any "wrap" circuits. *)
   module Pass_through = struct
     type ('g, 's, 'sg, 'bulletproof_challenges) t =
       { app_state : 's
@@ -598,7 +602,7 @@ module Dlog_based = struct
   end
 end
 
-module Pairing_based = struct
+module Step = struct
   module Plonk_polys = Vector.Nat.N10
 
   module Openings = struct
@@ -612,7 +616,7 @@ module Pairing_based = struct
     end
 
     module Bulletproof = struct
-      include Dlog_plonk_types.Openings.Bulletproof
+      include Plonk_types.Openings.Bulletproof
 
       module Advice = struct
         (* This is data that can be computed in linear time from the above plus the statement.
@@ -634,7 +638,7 @@ module Pairing_based = struct
 
   module Proof_state = struct
     module Deferred_values = struct
-      module Plonk = Dlog_based.Proof_state.Deferred_values.Plonk
+      module Plonk = Wrap.Proof_state.Deferred_values.Plonk
 
       type ('plonk, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_ =
         { plonk : 'plonk
@@ -666,8 +670,8 @@ module Pairing_based = struct
       end
     end
 
-    module Pass_through = Dlog_based.Proof_state.Me_only
-    module Me_only = Dlog_based.Pass_through
+    module Pass_through = Wrap.Proof_state.Me_only
+    module Me_only = Wrap.Pass_through
 
     module Per_proof = struct
       type ( 'plonk

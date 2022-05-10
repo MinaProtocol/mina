@@ -27,6 +27,10 @@
    mina_version
    node_addrs_and_ports
    block_time
+   mina_numbers
+   mina_transition
+   mina_state
+   consensus
    )
   (preprocess (pps ppx_jane ppx_deriving.std ppx_coda ppx_version))
   (instrumentation (backend bisect_ppx))

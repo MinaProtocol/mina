@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 open Signature_lib
 module Ledger = Mina_ledger.Ledger
 
@@ -124,7 +125,7 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -142,7 +143,7 @@ val apply_diff_unchecked :
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
@@ -165,7 +166,7 @@ val create_diff :
   -> t
   -> coinbase_receiver:Public_key.Compressed.t
   -> logger:Logger.t
-  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
@@ -219,3 +220,9 @@ val check_commands :
   -> User_command.t list
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t
+
+(** account ids created in the latest block, taken from the previous_empty_accounts
+    in the latest and next-to-latest trees of the scan state
+*)
+val latest_block_accounts_created :
+  t -> previous_block_state_hash:State_hash.t -> Account_id.t list

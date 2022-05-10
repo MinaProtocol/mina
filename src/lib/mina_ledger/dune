@@ -20,17 +20,24 @@
    core_kernel.uuid
    ppx_inline_test.config
    ;; local libraries
+   sgn
    syncable_ledger
    snark_params
    pickles
+   pickles.backend
    mina_base.import
+   o1trace
    rocksdb
    random_oracle
    currency
    genesis_constants
+   kimchi_backend
+   kimchi_backend.pasta
    merkle_mask
    merkle_ledger
    mina_base
+   mina_transaction
+   mina_transaction_logic
    signature_lib
    mina_numbers
    debug_assert

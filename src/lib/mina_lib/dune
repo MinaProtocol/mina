@@ -69,6 +69,7 @@
    cli_lib
    signature_lib
    mina_base
+   mina_transaction
    mina_transition
    transition_frontier_extensions
    block_time
@@ -89,6 +90,7 @@
    coda_genesis_proof
    mina_base.import
    data_hash_lib
+   transition_handler
 )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))

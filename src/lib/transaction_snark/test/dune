@@ -3,8 +3,9 @@
  (libraries
    ;; opam libraries
    ppx_inline_test.config
-   async_unix
    async
+   async_kernel
+   async_unix
    core
    base
    core_kernel
@@ -23,6 +24,8 @@
    snark_params
    mina_ledger
    mina_base
+   mina_transaction
+   mina_transaction_logic
    currency
    mina_state
    signature_lib
@@ -37,9 +40,12 @@
    mina_numbers
    random_oracle
    sgn
+   sexplib0
+   test_util
+   transaction_witness
    )
   (library_flags -linkall)
   (inline_tests)
   (preprocess
-    (pps ppx_snarky ppx_version ppx_jane))
+    (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
   (instrumentation (backend bisect_ppx)))

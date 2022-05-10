@@ -26,7 +26,7 @@ module Accounts = struct
       in
       let token_id =
         Option.value_map t.token ~default:Token_id.default
-          ~f:Mina_base.Token_id.of_uint64
+          ~f:Mina_base.Token_id.of_string
       in
       let account_id = Mina_base.Account_id.create pk token_id in
       let account =
@@ -56,7 +56,7 @@ module Accounts = struct
             ; set_delegate
             ; set_permissions
             ; set_verification_key
-            ; set_snapp_uri
+            ; set_zkapp_uri
             ; edit_sequence_state
             ; set_token_symbol
             ; increment_nonce
@@ -81,7 +81,7 @@ module Accounts = struct
             ; set_delegate = auth_required set_delegate
             ; set_permissions = auth_required set_permissions
             ; set_verification_key = auth_required set_verification_key
-            ; set_snapp_uri = auth_required set_snapp_uri
+            ; set_zkapp_uri = auth_required set_zkapp_uri
             ; edit_sequence_state = auth_required edit_sequence_state
             ; set_token_symbol = auth_required set_token_symbol
             ; increment_nonce = auth_required increment_nonce
@@ -108,32 +108,32 @@ module Accounts = struct
             (String.length (Option.value_exn t.token_symbol))
             Mina_base.Account.Token_symbol.max_length
       in
-      let%map snapp =
-        match t.snapp with
+      let%map zkapp =
+        match t.zkapp with
         | None ->
             Ok None
         | Some
             { state
             ; verification_key
-            ; snapp_version
+            ; zkapp_version
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
             } ->
             let%bind app_state =
               if
-                Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
+                Pickles_types.Vector.Nat.to_int Zkapp_state.Max_state_size.n
                 <> List.length state
               then
                 Or_error.errorf
                   !"Snap account state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t (List.length state)
-              else Ok (Snapp_state.V.of_list_exn state)
+              else Ok (Zkapp_state.V.of_list_exn state)
             in
             let verification_key =
               Option.map verification_key
-                ~f:(With_hash.of_data ~hash_data:Snapp_account.digest_vk)
+                ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
             in
             let%map sequence_state =
               if
@@ -151,9 +151,9 @@ module Accounts = struct
               Mina_numbers.Global_slot.of_int last_sequence_slot
             in
             Some
-              { Snapp_account.verification_key
+              { Zkapp_account.verification_key
               ; app_state
-              ; snapp_version
+              ; zkapp_version
               ; sequence_state
               ; last_sequence_slot
               ; proved_state
@@ -175,9 +175,9 @@ module Accounts = struct
         ; voting_for =
             Option.value_map ~default:account.voting_for
               ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
-        ; snapp
+        ; zkapp
         ; permissions
-        ; snapp_uri = Option.value ~default:"" t.snapp_uri
+        ; zkapp_uri = Option.value ~default:"" t.zkapp_uri
         }
         : Mina_base.Account.t )
 
@@ -236,7 +236,7 @@ module Accounts = struct
             ; set_delegate
             ; set_permissions
             ; set_verification_key
-            ; set_snapp_uri
+            ; set_zkapp_uri
             ; edit_sequence_state
             ; set_token_symbol
             ; increment_nonce
@@ -252,25 +252,25 @@ module Accounts = struct
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
-          ; set_snapp_uri = auth_required set_snapp_uri
+          ; set_zkapp_uri = auth_required set_zkapp_uri
           ; edit_sequence_state = auth_required edit_sequence_state
           ; set_token_symbol = auth_required set_token_symbol
           ; increment_nonce = auth_required increment_nonce
           ; set_voting_for = auth_required set_voting_for
           }
       in
-      let snapp =
-        Option.map account.snapp
+      let zkapp =
+        Option.map account.zkapp
           ~f:(fun
                { app_state
                ; verification_key
-               ; snapp_version
+               ; zkapp_version
                ; sequence_state
                ; last_sequence_slot
                ; proved_state
                }
              ->
-            let state = Snapp_state.V.to_list app_state in
+            let state = Zkapp_state.V.to_list app_state in
             let verification_key =
               Option.map verification_key ~f:With_hash.data
             in
@@ -278,9 +278,9 @@ module Accounts = struct
             let last_sequence_slot =
               Mina_numbers.Global_slot.to_int last_sequence_slot
             in
-            { Runtime_config.Accounts.Single.Snapp_account.state
+            { Runtime_config.Accounts.Single.Zkapp_account.state
             ; verification_key
-            ; snapp_version
+            ; zkapp_version
             ; sequence_state
             ; last_sequence_slot
             ; proved_state
@@ -296,7 +296,7 @@ module Accounts = struct
           Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
             account.delegate
       ; timing
-      ; token = Some (Mina_base.Token_id.to_uint64 account.token_id)
+      ; token = Some (Mina_base.Token_id.to_string account.token_id)
       ; token_permissions
       ; nonce = account.nonce
       ; receipt_chain_hash =
@@ -305,10 +305,10 @@ module Accounts = struct
                account.receipt_chain_hash)
       ; voting_for =
           Some (Mina_base.State_hash.to_base58_check account.voting_for)
-      ; snapp
+      ; zkapp
       ; permissions
       ; token_symbol = Some account.token_symbol
-      ; snapp_uri = Some account.snapp_uri
+      ; zkapp_uri = Some account.zkapp_uri
       }
   end
 

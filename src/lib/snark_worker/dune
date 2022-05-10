@@ -33,6 +33,7 @@
    snark_work_lib
    currency
    mina_base
+   mina_transaction
    transaction_snark
    ledger_proof
    mina_ledger

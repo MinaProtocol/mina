@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
+open Mina_transaction
 open Pipe_lib
 open Network_peer
 
@@ -95,6 +96,12 @@ module type Resource_pool_diff_intf = sig
        Deferred.t
 
   val is_empty : t -> bool
+
+  val update_metrics :
+       t Envelope.Incoming.t
+    -> Mina_net2.Validation_callback.t
+    -> Logger.t option
+    -> unit
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -114,6 +121,18 @@ module type Resource_pool_intf = sig
   *)
   val get_rebroadcastable :
     t -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ]) -> Diff.t list
+end
+
+module type Broadcast_callback = sig
+  type resource_pool_diff
+
+  type rejected_diff
+
+  type t =
+    | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    | External of Mina_net2.Validation_callback.t
+
+  val drop : resource_pool_diff -> rejected_diff -> t -> unit Deferred.t
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -141,11 +160,22 @@ module type Network_pool_base_intf = sig
 
   type transition_frontier
 
-  module Broadcast_callback : sig
-    type t =
-      | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-      | External of Mina_net2.Validation_callback.t
-  end
+  module Local_sink :
+    Mina_net2.Sink.S_with_void
+      with type msg :=
+            resource_pool_diff
+            * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+
+  module Remote_sink :
+    Mina_net2.Sink.S_with_void
+      with type msg :=
+            resource_pool_diff Envelope.Incoming.t
+            * Mina_net2.Validation_callback.t
+
+  module Broadcast_callback :
+    Broadcast_callback
+      with type resource_pool_diff := resource_pool_diff
+       and type rejected_diff := rejected_diff
 
   val create :
        config:config
@@ -153,33 +183,21 @@ module type Network_pool_base_intf = sig
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> expiry_ns:Time_ns.Span.t
-    -> incoming_diffs:
-         ( resource_pool_diff Envelope.Incoming.t
-         * Mina_net2.Validation_callback.t )
-         Strict_pipe.Reader.t
-    -> local_diffs:
-         ( resource_pool_diff
-         * ((resource_pool_diff * rejected_diff) Or_error.t -> unit) )
-         Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:
          transition_frontier Option.t Broadcast_pipe.Reader.t
     -> logger:Logger.t
-    -> t
+    -> log_gossip_heard:bool
+    -> on_remote_push:(unit -> unit Deferred.t)
+    -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :
        resource_pool
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:
-         ( resource_pool_diff Envelope.Incoming.t
-         * Mina_net2.Validation_callback.t )
-         Strict_pipe.Reader.t
-    -> local_diffs:
-         ( resource_pool_diff
-         * ((resource_pool_diff * rejected_diff) Or_error.t -> unit) )
-         Strict_pipe.Reader.t
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
-    -> t
+    -> log_gossip_heard:bool
+    -> on_remote_push:(unit -> unit Deferred.t)
+    -> t * Remote_sink.t * Local_sink.t
 
   val resource_pool : t -> resource_pool
 
@@ -254,6 +272,10 @@ module type Snark_pool_diff_intf = sig
     }
   [@@deriving yojson, hash]
 
+  type Structured_log_events.t +=
+    | Snark_work_received of { work : compact; sender : Envelope.Sender.t }
+    [@@deriving register_event]
+
   include
     Resource_pool_diff_intf
       with type t := t
@@ -279,7 +301,7 @@ module type Transaction_pool_diff_intf = sig
   module Diff_error : sig
     type t =
       | Insufficient_replace_fee
-      | Invalid_signature
+      | Verification_failed
       | Duplicate
       | Sender_account_does_not_exist
       | Invalid_nonce
@@ -290,6 +312,7 @@ module type Transaction_pool_diff_intf = sig
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | Fee_payer_account_not_found
     [@@deriving sexp, yojson]
 
     val to_string_hum : t -> string
@@ -298,6 +321,10 @@ module type Transaction_pool_diff_intf = sig
   module Rejected : sig
     type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
   end
+
+  type Structured_log_events.t +=
+    | Transactions_received of { txns : t; sender : Envelope.Sender.t }
+    [@@deriving register_event]
 
   include
     Resource_pool_diff_intf

@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
 module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
@@ -106,6 +107,10 @@ val latest_ledger_proof :
 val free_space : t -> int
 
 val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
+
+(* a 0 index means next-to-latest tree *)
+val base_jobs_on_earlier_tree :
+  t -> index:int -> Transaction_with_witness.t list
 
 val hash : t -> Staged_ledger_hash.Aux_hash.t
 

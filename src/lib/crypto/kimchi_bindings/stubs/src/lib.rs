@@ -58,9 +58,10 @@ pub use {
     commitment_dlog::commitment::caml::{CamlOpeningProof, CamlPolyComm},
     kimchi::circuits::{
         gate::{caml::CamlCircuitGate, CurrOrNext, GateType},
-        scalars::caml::{CamlLookupEvaluations, CamlProofEvaluations, CamlRandomOracles},
+        scalars::caml::CamlRandomOracles,
         wires::caml::CamlWire,
     },
+    kimchi::proof::caml::{CamlLookupEvaluations, CamlProofEvaluations},
     kimchi::prover::caml::{CamlProverCommitments, CamlProverProof},
     oracle::sponge::caml::CamlScalarChallenge,
 };

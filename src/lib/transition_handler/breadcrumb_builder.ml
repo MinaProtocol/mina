@@ -72,8 +72,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   (* TODO: handle this edge case more gracefully *)
                   (* since we are building a disconnected subtree of breadcrumbs,
                    * we skip this step in validation *)
-                  External_transition.skip_frontier_dependencies_validation
-                    `This_transition_belongs_to_a_detached_subtree
+                  Validation.skip_frontier_dependencies_validation
+                    `This_block_belongs_to_a_detached_subtree
                     transition_with_initial_validation
                 in
                 let sender = Envelope.Incoming.sender enveloped_transition in
@@ -97,12 +97,11 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 in
                 let open Deferred.Let_syntax in
                 match%bind
-                  O1trace.trace_recurring "Breadcrumb.build" (fun () ->
-                      Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                          Transition_frontier.Breadcrumb.build ~logger
-                            ~precomputed_values ~verifier ~trust_system ~parent
-                            ~transition:mostly_validated_transition
-                            ~sender:(Some sender) ~transition_receipt_time ()))
+                  Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                      Transition_frontier.Breadcrumb.build ~logger
+                        ~precomputed_values ~verifier ~trust_system ~parent
+                        ~transition:mostly_validated_transition
+                        ~sender:(Some sender) ~transition_receipt_time ())
                 with
                 | Error _ ->
                     Deferred.return @@ Or_error.error_string missing_parent_msg

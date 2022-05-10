@@ -42,7 +42,9 @@
    currency
    hash_prefix_states
    kimchi_backend
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

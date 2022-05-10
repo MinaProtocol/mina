@@ -54,6 +54,8 @@ exception Libp2p_helper_died_unexpectedly
 (** Handle to all network functionality. *)
 type t
 
+module Bitswap_block = Bitswap_block
+
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
 
     They generally look like paths, and are read left-to-right. Each protocol
@@ -108,6 +110,7 @@ module Keypair : sig
 end
 
 module Validation_callback = Validation_callback
+module Sink = Sink
 
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *
@@ -161,6 +164,7 @@ val configure :
   -> max_connections:int
   -> validation_queue_size:int
   -> known_private_ip_nets:Core.Unix.Cidr.t list
+  -> topic_config:string list list
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.

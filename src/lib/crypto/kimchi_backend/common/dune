@@ -32,10 +32,13 @@
    key_cache
    pickles_types
    hex
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    sponge
    allocation_functor
    snarky.intf
+   promise
 ))
 
 (rule

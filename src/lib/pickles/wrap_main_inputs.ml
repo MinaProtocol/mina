@@ -10,7 +10,7 @@ open Import
 let high_entropy_bits = 128
 
 let sponge_params_constant =
-  Sponge.Params.(map pasta_q_3 ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map pasta_q_kimchi ~f:Impl.Field.Constant.of_string)
 
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
   Me.Field.of_bits (bits_random_oracle ~length s)
@@ -77,7 +77,7 @@ module Input_domain = struct
     let domain_size = Domain.size domain in
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
-            (Kimchi.Protocol.SRS.Fp.lagrange_commitment
+            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                (Tick.Keypair.load_urs ()) domain_size i)
               .unshifted.(0)
             |> Common.finite_exn))
@@ -201,6 +201,6 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Kimchi.Protocol.SRS.Fp.urs_h (Backend.Tick.Keypair.load_urs ())
+      ( Kimchi_bindings.Protocol.SRS.Fp.urs_h (Backend.Tick.Keypair.load_urs ())
       |> Common.finite_exn )
 end

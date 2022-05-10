@@ -2,7 +2,7 @@ open Pickles_types
 open Core_kernel
 open Import
 open Backend
-module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock) (Unit)
+module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)
 
 (** returns [true] if the [i]th bit of [x] is set to 1 *)
 let test_bit x i = B.(shift_right x i land one = one)
@@ -31,7 +31,7 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
   |> List.dedup_and_sort ~compare:B.compare
 
 module Step = struct
-  module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
+  module Impl = Snarky_backendless.Snark.Run.Make (Tick)
   include Impl
   module Verification_key = Tick.Verification_key
   module Proving_key = Tick.Proving_key
@@ -113,11 +113,14 @@ module Step = struct
         let b_eq = match b2 with true -> b1 | false -> Boolean.not b1 in
         Boolean.( && ) x_eq b_eq
       in
+      let (Typ typ_unchecked) = typ_unchecked in
       let%bind () = typ_unchecked.check t in
       Checked.List.map forbidden_shifted_values ~f:(equal t)
       >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
-    let typ = { typ_unchecked with check }
+    let typ : _ Snarky_backendless.Typ.t =
+      let (Typ typ_unchecked) = typ_unchecked in
+      Typ { typ_unchecked with check }
 
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
   end
@@ -126,7 +129,7 @@ module Step = struct
   module Challenge = Challenge.Make (Impl)
 
   let input ~branching ~wrap_rounds =
-    let open Types.Pairing_based.Statement in
+    let open Types.Step.Statement in
     let spec = spec branching wrap_rounds in
     let (T (typ, f)) =
       Spec.packed_typ
@@ -199,7 +202,7 @@ module Wrap = struct
 
     let typ_unchecked, check =
       (* Tick -> Tock *)
-      let t0 =
+      let (Typ t0 as typ_unchecked) =
         Typ.transport Field.typ
           ~there:(Fn.compose Tock.Field.of_bits Tick.Field.to_bits)
           ~back:(Fn.compose Tick.Field.of_bits Tock.Field.to_bits)
@@ -212,16 +215,18 @@ module Wrap = struct
         Checked.List.map forbidden_shifted_values ~f:(equal t)
         >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
       in
-      (t0, check)
+      (typ_unchecked, check)
 
-    let typ = { typ_unchecked with check }
+    let typ : _ Snarky_backendless.Typ.t =
+      let (Typ typ_unchecked) = typ_unchecked in
+      Typ { typ_unchecked with check }
 
     let to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
   let input () =
     let fp : ('a, Other_field.Constant.t) Typ.t = Other_field.typ_unchecked in
-    let open Types.Dlog_based.Statement in
+    let open Types.Wrap.Statement in
     let (T (typ, f)) =
       Spec.packed_typ
         (module Impl)

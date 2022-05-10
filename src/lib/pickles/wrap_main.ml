@@ -28,7 +28,7 @@ module SC = Scalar_challenge
    We use corresponding type variable names throughout this file.
 *)
 
-include Dlog_main.Make (struct
+include Wrap_verifier.Make (struct
   include Wrap_main_inputs
   module Branching_pred = Nat.N0
 end)
@@ -110,12 +110,11 @@ let pack_statement max_branching t =
   with_label __LOC__ (fun () ->
       Spec.pack
         (module Impl)
-        (Types.Pairing_based.Statement.spec max_branching Backend.Tock.Rounds.n)
-        (Types.Pairing_based.Statement.to_data t))
+        (Types.Step.Statement.spec max_branching Backend.Tock.Rounds.n)
+        (Types.Step.Statement.to_data t))
 
 let shifts ~log2_size =
-  Common.tock_shifts ~log2_size
-  |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
+  Common.tock_shifts ~log2_size |> Plonk_types.Shifts.map ~f:Impl.Field.constant
 
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
@@ -176,7 +175,7 @@ let wrap_main
           , _
           , _
           , _ )
-          Types.Dlog_based.Statement.In_circuit.t
+          Types.Wrap.Statement.In_circuit.t
        -> unit) =
   Timer.clock __LOC__ ;
   let wrap_domains =
@@ -219,14 +218,14 @@ let wrap_main
         , _
         , _
         , _ )
-        Types.Dlog_based.Statement.In_circuit.t) =
+        Types.Wrap.Statement.In_circuit.t) =
     with_label __LOC__ (fun () ->
         let which_branch =
           One_hot_vector.of_index which_branch ~length:branches
         in
         let prev_proof_state =
           with_label __LOC__ (fun () ->
-              let open Types.Pairing_based.Proof_state in
+              let open Types.Step.Proof_state in
               let typ =
                 typ
                   (module Impl)
@@ -235,7 +234,7 @@ let wrap_main
               in
               exists typ ~request:(fun () -> Req.Proof_state))
         in
-        let pairing_plonk_index =
+        let step_plonk_index =
           with_label __LOC__ (fun () ->
               choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
@@ -287,7 +286,7 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Dlog_plonk_types.All_evals.typ
+                    Plonk_types.All_evals.typ
                       (Evaluation_lengths.create ~of_int:Fn.id)
                       Field.typ ~default:Field.Constant.zero
                   in
@@ -382,14 +381,14 @@ let wrap_main
                 hash_me_only Max_branching.n
                   { sg = sacc; old_bulletproof_challenges = chals })
           in
-          { Types.Pairing_based.Statement.pass_through = prev_me_onlys
+          { Types.Step.Statement.pass_through = prev_me_onlys
           ; proof_state = prev_proof_state
           }
         in
         let openings_proof =
           let shift = Shifts.tick1 in
           exists
-            (Dlog_plonk_types.Openings.Bulletproof.typ
+            (Plonk_types.Openings.Bulletproof.typ
                ( Typ.transport Other_field.Packed.typ
                    ~there:(fun x ->
                      (* When storing, make it a shifted value *)
@@ -418,7 +417,7 @@ let wrap_main
           let messages =
             with_label __LOC__ (fun () ->
                 exists
-                  (Dlog_plonk_types.Messages.typ ~dummy:Inner_curve.Params.one
+                  (Plonk_types.Messages.typ ~dummy:Inner_curve.Params.one
                      Inner_curve.typ ~bool:Boolean.typ
                      ~commitment_lengths:
                        (Commitment_lengths.create ~of_int:Fn.id))
@@ -428,7 +427,7 @@ let wrap_main
           with_label __LOC__ (fun () ->
               incrementally_verify_proof
                 (module Max_branching)
-                ~step_widths ~step_domains ~verification_key:pairing_plonk_index
+                ~step_widths ~step_domains ~verification_key:step_plonk_index
                 ~xi ~sponge
                 ~public_input:
                   (Array.map (pack_statement Max_branching.n prev_statement)
@@ -445,7 +444,7 @@ let wrap_main
         with_label __LOC__ (fun () ->
             Field.Assert.equal me_only_digest
               (hash_me_only Max_branching.n
-                 { Types.Dlog_based.Proof_state.Me_only.sg = openings_proof.sg
+                 { Types.Wrap.Proof_state.Me_only.sg = openings_proof.sg
                  ; old_bulletproof_challenges = new_bulletproof_challenges
                  })) ;
         with_label __LOC__ (fun () ->

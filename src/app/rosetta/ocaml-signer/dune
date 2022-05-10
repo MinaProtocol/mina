@@ -3,15 +3,24 @@
  (public_name signer.cli)
  (modules signer_cli)
  (libraries
-   async
-   async_ssl
+   ;;opam libraries
+   async_kernel
+   core
    core_kernel
-   logger
-   rosetta_models
+   async
    lib
-   ppx_deriving_yojson.runtime
-   yojson
+   async_unix
+   async.async_command
+   ;;local libraries
+   kimchi_backend.pasta
+   pickles
+   rosetta_coding
+   rosetta_lib
    string_sign
+   signature_lib
+   mina_base
+   snark_params
+   pickles.backend
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
@@ -31,7 +40,7 @@
  (public_name signer)
  (modes native)
  (modules signer)
- (libraries signer_cli)
+ (libraries signer_cli async core_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
@@ -50,7 +59,7 @@
  (public_name signer-testnet)
  (modes native)
  (modules signer_testnet_signatures)
- (libraries signer_cli)
+ (libraries signer_cli async core_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
@@ -69,7 +78,7 @@
  (public_name signer-mainnet)
  (modes native)
  (modules signer_mainnet_signatures)
- (libraries signer_cli)
+ (libraries signer_cli async core_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx

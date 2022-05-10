@@ -6,7 +6,9 @@
    stdio
    base
    ;; local libraries
-   kimchi
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
 )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

@@ -21,7 +21,6 @@
    integers
    base_quickcheck
    core_kernel.uuid
-   rocks
    ;; local libraries
    run_in_thread
    kimchi_backend_common
@@ -36,7 +35,6 @@
    signature_lib
    rosetta_coding
    random_oracle
-   o1trace
    hash_prefix_states
    dummy_values
    currency
@@ -50,7 +48,7 @@
    crypto_params
    debug_assert
    fold_lib
-   fields_derivers.snapps
+   fields_derivers.zkapps
    fields_derivers.json
    fields_derivers.graphql
    one_or_two
@@ -66,13 +64,14 @@
    mina_signature_kind
    mina_base.util
    kimchi_backend
+   hex
+   snark_bits
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_snarky ppx_here ppx_coda ppx_version ppx_compare ppx_deriving.enum
-       ppx_deriving.ord ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv
-       ppx_bin_prot ppx_fields_conv ppx_variants_conv ppx_custom_printf
-       ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
+  (pps ppx_annot ppx_snarky ppx_here ppx_coda ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord ppx_deriving.make 
+       ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
+       ppx_variants_conv
  ))
  (instrumentation (backend bisect_ppx))
  (synopsis "Snarks and friends necessary for keypair generation"))

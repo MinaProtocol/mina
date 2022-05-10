@@ -301,8 +301,8 @@ let get_status ~flag t =
         None
   in
   let new_block_length_received =
-    Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
-    @@ Mina_transition.External_transition.Initial_validated.consensus_state
+    let open Mina_transition in
+    Length.to_int @@ Mina_block.blockchain_length @@ Validation.block
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Mina_lib.most_recent_valid_transition t)
   in
@@ -405,6 +405,22 @@ let get_status ~flag t =
     | _ ->
         None
   in
+  let metrics =
+    let open Mina_metrics.Block_producer in
+    Mina_metrics.
+      { Daemon_rpcs.Types.Status.Metrics.block_production_delay =
+          Block_production_delay_histogram.buckets block_production_delay
+      ; transaction_pool_diff_received =
+          Float.to_int @@ Gauge.value Network.transaction_pool_diff_received
+      ; transaction_pool_diff_broadcasted =
+          Float.to_int @@ Gauge.value Network.transaction_pool_diff_broadcasted
+      ; transaction_pool_size =
+          Float.to_int @@ Gauge.value Transaction_pool.pool_size
+      ; transactions_added_to_pool =
+          Float.to_int
+          @@ Counter.value Transaction_pool.transactions_added_to_pool
+      }
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; catchup_status
@@ -437,6 +453,7 @@ let get_status ~flag t =
   ; consensus_mechanism
   ; consensus_configuration
   ; addrs_and_ports
+  ; metrics
   }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t

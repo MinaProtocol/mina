@@ -14,7 +14,7 @@ Introduction
 ------------
 
 This document proposes a standard for Mina Schnorr signatures over
-the elliptic curve [Pallas Pasta](https://o1-labs.github.io/mina-book/specs/pasta_curves.html). It is adapted from a [BIP 340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki).
+the elliptic curve [Pallas Pasta](https://o1-labs.github.io/proof-systems/specs/pasta.html). It is adapted from a [BIP 340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki).
 
 ## Copyright
 
@@ -86,7 +86,7 @@ Y coordinate is even, and which satisfies *`sG = R + H(r || P || m)P`*.
 We first describe the verification algorithm, and then the signature
 algorithm.
 
-The following convention is used, with constants as defined for Mina's version of [Pasta Pallas](https://o1-labs.github.io/mina-book/specs/pasta_curves.html):
+The following convention is used, with constants as defined for Mina's version of [Pasta Pallas](https://o1-labs.github.io/proof-systems/specs/pasta.html):
 
 -   Lowercase variables represent integers or byte arrays.
     -   The constant *`p`* refers to the field size,
@@ -252,7 +252,7 @@ from ordinary signatures, giving improved privacy and efficiency versus
 Further, by combining Schnorr signatures with [Pedersen Secret
 Sharing](https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf),
 it is possible to obtain [an interactive threshold signature
-scheme](http://cacr.uwaterloo.ca/techreports/2001/corr2001-13.ps) that
+scheme](https://cacr.uwaterloo.ca/techreports/2001/corr2001-13.ps) that
 ensures that signatures can only be produced by arbitrary but
 predetermined sets of signers. For example, k-of-n threshold signatures
 can be realized this way. Furthermore, it is possible to replace the
@@ -261,8 +261,7 @@ security of that combination still needs analysis.
 
 ## Adaptor Signatures
 
-[Adaptor
-signatures](https://download.wpsoftware.net/bitcoin/wizardry/mw-slides/2018-05-18-l2/slides.pdf)
+[Adaptor signatures](https://web.archive.org/web/20211123033324/https://download.wpsoftware.net/bitcoin/wizardry/mw-slides/2018-05-18-l2/slides.pdf)
 can be produced by a signer by offsetting his public nonce with a known
 point *`T = tG`*, but not offsetting his secret nonce. A correct signature
 (or partial signature, as individual signers' contributions to a
@@ -289,7 +288,7 @@ applications without recourse to the blockchain, even multiple times.
 ## Blind Signatures
 
 Schnorr signatures admit a very [simple **blind signature**
-construction](https://www.math.uni-frankfurt.de/~dmst/research/papers/schnorr.blind_sigs_attack.2001.pdf)
+construction](https://publikationen.ub.uni-frankfurt.de/files/4292/schnorr.blind_sigs_attack.2001.pdf)
 which is a signature that a signer produces at the behest of another
 party without learning what he has signed. These can for example be used
 in [Partially Blind Atomic
@@ -302,7 +301,7 @@ While the traditional Schnorr blind signatures are vulnerable to
 [Wagner's
 attack](https://www.iacr.org/archive/crypto2002/24420288/24420288.pdf),
 there are [a number of
-mitigations](https://www.math.uni-frankfurt.de/~dmst/teaching/SS2012/Vorlesung/EBS5.pdf)
+mitigations](https://web.archive.org/web/20211102002134/https://www.math.uni-frankfurt.de/~dmst/teaching/SS2012/Vorlesung/EBS5.pdf)
 which allow them to be usable in practice without any known attacks.
 Nevertheless, more analysis is required to be confident about the
 security of the blind signature scheme.
@@ -377,7 +376,7 @@ Towns.
 
 [^5]: This matches the *compressed* encoding for elliptic curve points
     used in Bitcoin already, following section 2.3.3 of the [SEC
-    1](http://www.secg.org/sec1-v2.pdf) standard.
+    1](https://www.secg.org/sec1-v2.pdf) standard.
 
 [^6]: Given an X coordinate *x(P)*, there exist either exactly two or
     exactly zero valid Y coordinates. The valid Y coordinates are the

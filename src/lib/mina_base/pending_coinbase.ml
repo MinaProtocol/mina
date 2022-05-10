@@ -122,7 +122,7 @@ module type Data_hash_intf = sig
 
   val var_to_hash_packed : var -> Field.Var.t
 
-  val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+  val equal_var : var -> var -> Boolean.var Tick.Checked.t
 
   val to_bytes : t -> string
 
@@ -291,7 +291,7 @@ module State_stack = struct
     Boolean.(b1 && b2)
 
   let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
-      (var, 'a) Tick0.Checked.t =
+      var Tick0.Checked.t =
     let%bind init = Stack_hash.if_ cond ~then_:then_.init ~else_:else_.init in
     let%map curr = Stack_hash.if_ cond ~then_:then_.curr ~else_:else_.curr in
     { Poly.init; curr }
@@ -523,13 +523,12 @@ end
 module Merkle_tree_versioned = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Hash_versioned.Stable.V1.t
         , Stack_id.Stable.V1.t
-        , Stack_versioned.Stable.V1.t
-        , unit )
-        Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+        , Stack_versioned.Stable.V1.t )
+        Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -541,8 +540,7 @@ module Merkle_tree_versioned = struct
       t =
       ( Hash_versioned.t
       , Stack_id.t
-      , Stack_versioned.t
-      , unit )
+      , Stack_versioned.t )
       Sparse_ledger_lib.Sparse_ledger.T.t
 end
 
@@ -666,7 +664,7 @@ module T = struct
       { t with state = State_stack.push t.state state_body_hash }
 
     let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
-        (var, 'a) Tick0.Checked.t =
+        var Tick0.Checked.t =
       let%bind data =
         Coinbase_stack.Checked.if_ cond ~then_:then_.data ~else_:else_.data
       in
@@ -679,7 +677,7 @@ module T = struct
       type t = var
 
       let push_coinbase (coinbase : Coinbase_data.var) (t : t) :
-          (t, 'a) Tick0.Checked.t =
+          t Tick0.Checked.t =
         let%map data = Coinbase_stack.Checked.push t.data coinbase in
         { t with data }
 
@@ -688,7 +686,7 @@ module T = struct
         { t with state }
 
       let check_merge ~transition1:((s, t) : t * t)
-          ~transition2:((s', t') : t * t) : (Boolean.var, _) Tick0.Checked.t =
+          ~transition2:((s', t') : t * t) : Boolean.var Tick0.Checked.t =
         let%bind valid_coinbase_stacks =
           Coinbase_stack.Checked.check_merge (s.data, t.data) (s'.data, t'.data)
         in
@@ -704,9 +702,6 @@ module T = struct
 
       let if_ = if_
     end
-
-    (* Dummy value for Sparse_ledger *)
-    let token _ = ()
   end
 
   module Hash = struct
@@ -737,19 +732,9 @@ module T = struct
     type _unused = unit
       constraint
         t =
-        (Hash.t, Stack_id.t, Stack.t, unit) Sparse_ledger_lib.Sparse_ledger.T.t
+        (Hash.t, Stack_id.t, Stack.t) Sparse_ledger_lib.Sparse_ledger.T.t
 
-    module Dummy_token = struct
-      type t = unit [@@deriving sexp, yojson]
-
-      let max () () = ()
-
-      let next () = ()
-    end
-
-    module M =
-      Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Dummy_token) (Stack_id)
-        (Stack)
+    module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
 
     [%%define_locally
     M.
@@ -1032,10 +1017,7 @@ module T = struct
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
     let root_hash = hash_at_level depth in
-    { Poly.tree =
-        make_tree
-          (Merkle_tree.of_hash ~depth ~next_available_token:() root_hash)
-          Stack_id.zero
+    { Poly.tree = make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
     ; pos_list = []
     ; new_pos = Stack_id.zero
     }
@@ -1249,9 +1231,9 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Merkle_tree_versioned.Stable.V1.t
+      ( Merkle_tree_versioned.Stable.V2.t
       , Stack_id.Stable.V1.t )
       Poly_versioned.Stable.V1.t
     [@@deriving sexp, to_yojson]
@@ -1356,8 +1338,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
           in
           As_prover.read Stack.typ res
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
-        x
+        Or_error.ok_exn (run_and_check comp)
       in
       assert (Stack.equal unchecked checked))
 
@@ -1415,8 +1396,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
           in
           As_prover.read Hash.typ result
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
-        x
+        Or_error.ok_exn (run_and_check comp)
       in
       assert (Hash.equal (merkle_root unchecked) checked_merkle_root))
 
@@ -1475,8 +1455,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           in
           As_prover.read Hash.typ result
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
-        x
+        Or_error.ok_exn (run_and_check comp)
       in
       assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
       (*deleting the coinbase stack we just created. therefore if there was no update then don't try to delete*)
@@ -1497,8 +1476,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           in
           As_prover.read Hash.typ current
         in
-        let (), x = Or_error.ok_exn (run_and_check comp ()) in
-        x
+        Or_error.ok_exn (run_and_check comp)
       in
       assert (
         Hash.equal

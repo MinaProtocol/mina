@@ -21,6 +21,7 @@
    async_unix
    ;; local libraries
    logger
+   o1trace
  )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))

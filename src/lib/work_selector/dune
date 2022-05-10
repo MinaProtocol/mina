@@ -27,6 +27,7 @@
    snark_work_lib
    mina_state
    mina_base
+   mina_transaction
    network_pool
    staged_ledger
    logger

@@ -1,0 +1,26 @@
+(library
+ (name zkapps_examples)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ;; local libraries
+   crypto_params
+   currency
+   pasta_bindings
+   kimchi_backend
+   kimchi_backend_common
+   kimchi_pasta
+   mina_base
+   pickles
+   pickles.backend
+   pickles_types
+   random_oracle
+   snarky.backendless
+   snark_params
+   sgn
+   signature_lib
+   tuple_lib)
+ (instrumentation (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version)))

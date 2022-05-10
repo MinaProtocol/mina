@@ -33,27 +33,22 @@ module Gen_make (C : Signed_command_intf.Gen_intf) = struct
 
   open C.Gen
 
-  let payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-      ~fee_range () =
+  let payment ?sign_type ~key_gen ?nonce ~max_amount ~fee_range () =
     to_signed_command
-      (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-         ~fee_range ())
+      (payment ?sign_type ~key_gen ?nonce ~max_amount ~fee_range ())
 
   let payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-      ?fee_token ?payment_token ~fee_range () =
-    to_signed_command
-      (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-         ?fee_token ?payment_token ~fee_range ())
-
-  let stake_delegation ~key_gen ?nonce ?fee_token ~fee_range () =
-    to_signed_command
-      (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
-
-  let stake_delegation_with_random_participants ~keys ?nonce ?fee_token
       ~fee_range () =
     to_signed_command
-      (stake_delegation_with_random_participants ~keys ?nonce ?fee_token
+      (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
          ~fee_range ())
+
+  let stake_delegation ~key_gen ?nonce ~fee_range () =
+    to_signed_command (stake_delegation ~key_gen ?nonce ~fee_range ())
+
+  let stake_delegation_with_random_participants ~keys ?nonce ~fee_range () =
+    to_signed_command
+      (stake_delegation_with_random_participants ~keys ?nonce ~fee_range ())
 
   let sequence ?length ?sign_type a =
     Quickcheck.Generator.map
@@ -68,7 +63,7 @@ module Valid = struct
   module Stable = struct
     module V2 = struct
       type t =
-        ( Signed_command.With_valid_signature.Stable.V1.t
+        ( Signed_command.With_valid_signature.Stable.V2.t
         , Parties.Valid.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -83,7 +78,7 @@ end
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t = (Signed_command.Stable.V1.t, Parties.Stable.V1.t) Poly.Stable.V2.t
+    type t = (Signed_command.Stable.V2.t, Parties.Stable.V1.t) Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
@@ -126,7 +121,7 @@ module Verifiable = struct
   module Stable = struct
     module V2 = struct
       type t =
-        ( Signed_command.Stable.V1.t
+        ( Signed_command.Stable.V2.t
         , Parties.Verifiable.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -151,7 +146,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         let account : Account.t =
           !(get ledger !(location_of_account ledger id))
         in
-        !(!(account.snapp).verification_key).data)
+        !(!(account.zkapp).verification_key).data)
   in
   match t with
   | Signed_command c ->
@@ -161,8 +156,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         { fee_payer
         ; other_parties =
             other_parties
-            |> List.map ~f:(fun party -> (party, find_vk party))
-            |> Parties.Call_forest.With_hashes.of_parties_list
+            |> Parties.Call_forest.map ~f:(fun party -> (party, find_vk party))
         ; memo
         }
 
@@ -184,19 +178,12 @@ let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let accounts_accessed (t : t) ~next_available_token =
+let accounts_accessed (t : t) =
   match t with
   | Signed_command x ->
-      Signed_command.accounts_accessed x ~next_available_token
+      Signed_command.accounts_accessed x
   | Parties ps ->
       Parties.accounts_accessed ps
-
-let next_available_token (t : t) tok =
-  match t with
-  | Signed_command x ->
-      Signed_command.next_available_token x tok
-  | Parties _ps ->
-      tok
 
 let to_base58_check (t : t) =
   match t with
@@ -219,19 +206,12 @@ let nonce_exn (t : t) =
   | Parties p ->
       Parties.nonce p
 
-let check_tokens (t : t) =
-  match t with
-  | Signed_command x ->
-      Signed_command.check_tokens x
-  | Parties _ ->
-      true
-
 let check (t : t) : Valid.t option =
   match t with
   | Signed_command x ->
       Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
   | Parties p ->
-      if Parties.check p then Some (Parties (p :> Parties.Valid.t)) else None
+      Some (Parties (p :> Parties.Valid.t))
 
 let fee_token (t : t) =
   match t with
@@ -264,7 +244,7 @@ let to_valid_unsafe (t : t) =
 let filter_by_participant (commands : t list) public_key =
   List.filter commands ~f:(fun user_command ->
       Core_kernel.List.exists
-        (accounts_accessed ~next_available_token:Token_id.invalid user_command)
+        (accounts_accessed user_command)
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)

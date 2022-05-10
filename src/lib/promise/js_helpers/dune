@@ -1,0 +1,7 @@
+(library
+ (public_name promise.js_helpers)
+ (name promise_js_helpers)
+ (libraries promise.js)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version))
+)

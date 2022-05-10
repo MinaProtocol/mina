@@ -26,7 +26,7 @@ Download and build the app:
 2. Navigate into coda/frontend/wallet
 3. Update submodules: `git submodule update --init`
 4. `yarn` to install dependencies
-5. [Install coda](https://codaprotocol.com/docs/getting-started/)
+5. [Install coda](https://docs.minaprotocol.com/en/getting-started/)
 7. `yarn build` to build app
 
 Run locally with hot reloading:

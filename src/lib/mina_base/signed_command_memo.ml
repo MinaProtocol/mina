@@ -49,7 +49,7 @@ let max_digestible_string_length = 1000
 (* 0th byte is a tag to distinguish digests from other data
    1st byte is length, always 32 for digests
    bytes 2 to 33 are data, 0-right-padded if length is less than 32
- *)
+*)
 
 let digest_tag = '\x00'
 
@@ -71,6 +71,8 @@ let max_input_length = digest_length
 let tag (memo : t) = memo.[tag_index]
 
 let length memo = Char.to_int memo.[length_index]
+
+let is_bytes memo = Char.equal (tag memo) bytes_tag
 
 let is_digest memo = Char.equal (tag memo) digest_tag
 
@@ -140,6 +142,29 @@ let dummy = (create_by_digesting_string_exn "" :> t)
 
 let empty = create_from_string_exn ""
 
+type raw = Digest of string | Bytes of string
+
+let to_raw_exn memo =
+  let tag = tag memo in
+  if Char.equal tag digest_tag then Digest (to_base58_check memo)
+  else if Char.equal tag bytes_tag then
+    let len = length memo in
+    Bytes (String.init len ~f:(fun idx -> memo.[idx - 2]))
+  else failwithf "Unknown memo tag %c" tag ()
+
+let to_raw_bytes_exn memo =
+  match to_raw_exn memo with
+  | Digest _ ->
+      failwith "Cannot convert a digest to raw bytes"
+  | Bytes str ->
+      str
+
+let of_raw_exn = function
+  | Digest base58_check ->
+      of_base58_check_exn base58_check
+  | Bytes str ->
+      of_base58_check_exn str
+
 let fold_bits t =
   { Fold_lib.Fold.fold =
       (fun ~init ~f ->
@@ -160,9 +185,28 @@ let gen =
     ~f:create_by_digesting_string_exn
 
 let hash memo =
-  Random_oracle.hash ~init:Hash_prefix.snapp_memo
+  Random_oracle.hash ~init:Hash_prefix.zkapp_memo
     (Random_oracle.Legacy.pack_input
        (Random_oracle_input.Legacy.bitstring (to_bits memo)))
+
+let to_plaintext (memo : t) : string Or_error.t =
+  if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))
+  else Error (Error.of_string "Memo does not contain text bytes")
+
+let to_digest (memo : t) : string Or_error.t =
+  if is_digest memo then Ok (String.sub memo ~pos:2 ~len:digest_length)
+  else Error (Error.of_string "Memo does not contain a digest")
+
+let to_string_hum (memo : t) =
+  match to_plaintext memo with
+  | Ok text ->
+      text
+  | Error _ -> (
+      match to_digest memo with
+      | Ok digest ->
+          sprintf "0x%s" (Hex.encode digest)
+      | Error _ ->
+          "(Invalid memo, neither text nor a digest)" )
 
 [%%ifdef consensus_mechanism]
 
@@ -171,7 +215,7 @@ module Typ = Tick.Typ
 
 (* the code below is much the same as in Random_oracle.Digest; tag and length bytes
    make it a little different
- *)
+*)
 
 module Checked = struct
   type unchecked = t
@@ -196,7 +240,7 @@ let typ : (Checked.t, t) Typ.t =
 [%%endif]
 
 let deriver obj =
-  Fields_derivers_snapps.iso_string obj ~name:"Memo" ~to_string:to_base58_check
+  Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~to_string:to_base58_check
     ~of_string:of_base58_check_exn
 
 let%test_module "user_command_memo" =
@@ -240,12 +284,19 @@ let%test_module "user_command_memo" =
         | _ ->
             assert false
       in
+      let (Typ typ) = typ in
       let memo_var =
-        Snarky_backendless.Typ_monads.Store.run (typ.store memo) (fun x ->
-            Snarky_backendless.Cvar.Constant x)
+        memo |> typ.value_to_fields
+        |> (fun (arr, aux) ->
+             ( Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+             , aux ))
+        |> typ.var_of_fields
       in
       let memo_read =
-        Snarky_backendless.Typ_monads.Read.run (typ.read memo_var) read_constant
+        memo_var |> typ.var_to_fields
+        |> (fun (arr, aux) ->
+             (Array.map arr ~f:(fun x -> read_constant x), aux))
+        |> typ.value_of_fields
       in
       [%test_eq: string] memo memo_read
 

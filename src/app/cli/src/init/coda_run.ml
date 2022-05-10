@@ -1,6 +1,5 @@
 open Core
 open Async
-open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
@@ -283,7 +282,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   (* Setup RPC server for client interactions *)
   let implement rpc f =
     Rpc.Rpc.implement rpc (fun () input ->
-        trace_recurring (Rpc.Rpc.name rpc) (fun () -> f () input))
+        O1trace.thread ("serve_" ^ Rpc.Rpc.name rpc) (fun () -> f () input))
   in
   let implement_notrace = Rpc.Rpc.implement in
   let logger =
@@ -492,7 +491,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
              server_description port)
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
-      trace_task "full GraphQL server" (fun () ->
+      O1trace.background_thread "serve_graphql" (fun () ->
           create_graphql_server
             ~bind_to_address:
               Tcp.Bind_to_address.(
@@ -501,7 +500,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             rest_server_port)) ;
   (*Second graphql server with limited queries exposed*)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
-      trace_task "limited GraphQL server" (fun () ->
+      O1trace.background_thread "serve_limited_graphql" (fun () ->
           create_graphql_server
             ~bind_to_address:
               Tcp.Bind_to_address.(
@@ -513,7 +512,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port coda))
   in
-  trace_task "client RPC server" (fun () ->
+  O1trace.background_thread "serve_client_rpcs" (fun () ->
       Deferred.ignore_m
         (Tcp.Server.create
            ~on_handler_error:

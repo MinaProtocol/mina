@@ -3,7 +3,7 @@ open Mina_base
 open Mina_transition
 
 type elt =
-  ( External_transition.Initial_validated.t
+  ( Mina_block.initial_valid_block
   , State_body_hash.t list * External_transition.t )
   Proof_carrying_data.t
 
@@ -15,9 +15,8 @@ let t = Q.create ()
 
 let add (x : elt) =
   let h =
-    ( Proof_carrying_data.data x
-    |> External_transition.Initial_validated.state_hashes )
-      .state_hash
+    Proof_carrying_data.data x |> Validation.block_with_hash
+    |> State_hash.With_state_hashes.state_hash
   in
   if not (Q.mem t h) then (
     if Q.length t >= max_size then ignore (Q.dequeue_front t : elt option) ;

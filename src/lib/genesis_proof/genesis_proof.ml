@@ -160,8 +160,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
     let reg (t : Blockchain_state.Value.t) =
       { t.registers with
-        next_available_token = Token_id.(next default)
-      ; pending_coinbase_stack = Mina_base.Pending_coinbase.Stack.empty
+        pending_coinbase_stack = Mina_base.Pending_coinbase.Stack.empty
       }
     in
     { sok_digest = Mina_base.Sok_message.Digest.default

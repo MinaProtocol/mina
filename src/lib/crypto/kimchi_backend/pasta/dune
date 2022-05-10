@@ -18,7 +18,9 @@
    sponge
    pickles_types
    kimchi_backend.common
-   run_in_thread
-   kimchi
+   promise
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
    snarkette
 ))

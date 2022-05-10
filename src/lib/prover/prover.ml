@@ -19,7 +19,7 @@ module Extend_blockchain_input = struct
         ; block : Snark_transition.Value.Stable.V2.t
         ; ledger_proof : Ledger_proof.Stable.V2.t option
         ; prover_state : Consensus.Data.Prover_state.Stable.V2.t
-        ; pending_coinbase : Pending_coinbase_witness.Stable.V1.t
+        ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
         }
 
       let to_latest = Fn.id

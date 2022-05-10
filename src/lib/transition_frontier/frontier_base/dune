@@ -3,15 +3,51 @@
  (public_name transition_frontier_base)
  (flags -w -22)
  (libraries
-   ;; opam libraries
+   ;;opam libraries
+   async_unix
+   base.caml
+   async_kernel
    core_kernel
-   ;; local libraries
-   mina_base
-   mina_ledger
-   mina_state
+   bin_prot.shape
+   sexplib0
+   integers
+   core
+   async
+   base.base_internalhash_types
+   ;;local libraries
+   staged_ledger_diff
+   block_time
+   one_or_two
+   mina_base.import
+   currency
+   truth
+   allocation_functor
+   genesis_constants
+   transaction_snark_work
+   trust_system
+   precomputed_values
+   consensus
+   network_peer
    mina_transition
+   mina_ledger
+   mina_base
+   mina_transaction_logic
+   mina_state
    staged_ledger
-   base58_check
+   data_hash_lib
+   signature_lib
+   logger
+   verifier
+   with_hash
+   o1trace
+   visualization
+   mina_numbers
+   ledger_proof
+   protocol_version
+   mina_net2
+   transaction_snark
+   non_empty_list
+   coda_genesis_proof
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))
