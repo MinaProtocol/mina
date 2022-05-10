@@ -150,16 +150,23 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                             Transition_frontier.Breadcrumb.staged_ledger
                               breadcrumb
                           in
-                          let block =
-                            let block_with_hash =
-                              Mina_block.Validated.forget new_block
-                            in
-                            With_hash.data block_with_hash
+                          let block_with_hash =
+                            Mina_block.Validated.forget new_block
                           in
                           Mina_block.Precomputed.of_block ~logger
                             ~constraint_constants ~staged_ledger ~scheduled_time
-                            block
+                            block_with_hash
                         in
+                        [%log debug] "Precomputed block generated in $time ms"
+                          ~metadata:
+                            [ ( "time"
+                              , `Float
+                                  Time.(
+                                    Span.to_ms
+                                      (diff (now ())
+                                         (Block_time.to_time scheduled_time)))
+                              )
+                            ] ;
                         Mina_block.Precomputed.to_yojson precomputed_block)
                    in
                    if upload_blocks_to_gcloud then (

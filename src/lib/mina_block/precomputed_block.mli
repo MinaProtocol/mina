@@ -47,5 +47,5 @@ val of_block :
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> scheduled_time:Block_time.Time.t
   -> staged_ledger:Staged_ledger.t
-  -> Block.t
+  -> (Block.t, Mina_base.State_hash.State_hashes.t) With_hash.t
   -> t

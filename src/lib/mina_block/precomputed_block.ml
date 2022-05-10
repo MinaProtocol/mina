@@ -87,9 +87,14 @@ end]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~scheduled_time ~staged_ledger block =
+    ~scheduled_time ~staged_ledger block_with_hash =
   let ledger = Staged_ledger.ledger staged_ledger in
+  let block = With_hash.data block_with_hash in
+  let state_hash =
+    (With_hash.hash block_with_hash).State_hash.State_hashes.state_hash
+  in
   let account_ids_accessed = Block.account_ids_accessed block in
+  let start = Time.now () in
   let accounts_accessed =
     List.filter_map account_ids_accessed ~f:(fun acct_id ->
         try
@@ -107,6 +112,14 @@ let of_block ~logger
           None)
   in
   let header = Block.header block in
+  let accounts_accessed_time = Time.now () in
+  [%log debug]
+    "Precomputed block for $state_hash: accounts-accessed took $time ms"
+    ~metadata:
+      [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+      ; ( "time"
+        , `Float (Time.Span.to_ms (Time.diff accounts_accessed_time start)) )
+      ] ;
   let accounts_created =
     let account_creation_fee = constraint_constants.account_creation_fee in
     let previous_block_state_hash =
@@ -118,6 +131,17 @@ let of_block ~logger
          ~previous_block_state_hash) ~f:(fun acct_id ->
         (acct_id, account_creation_fee))
   in
+  let account_created_time = Time.now () in
+  [%log debug]
+    "Precomputed block for $state_hash: accounts-created took $time ms"
+    ~metadata:
+      [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+      ; ( "time"
+        , `Float
+            (Time.Span.to_ms
+               (Time.diff account_created_time accounts_accessed_time)) )
+      ] ;
+
   { scheduled_time
   ; protocol_state = Header.protocol_state header
   ; protocol_state_proof = Header.protocol_state_proof header
