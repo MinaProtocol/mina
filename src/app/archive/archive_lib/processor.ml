@@ -3505,7 +3505,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
              here, we just set the protocol version to a dummy value
           *)
           Protocol_version.(set_current zero) ;
-          let proof_level = Genesis_constants.Proof_level.Full in
+          let proof_level = Genesis_constants.Proof_level.compiled in
           let%bind precomputed_values =
             match%map
               Genesis_ledger_helper.init_from_config_file ~logger
