@@ -101,7 +101,7 @@ let gen_account_precondition_from_account ?(succeed = true) account =
             return (state, sequence_state, proved_state)
       in
       return
-        { Zkapp_precondition.Account.Poly.balance
+        { Zkapp_precondition.Account.balance
         ; nonce
         ; receipt_chain_hash
         ; delegate

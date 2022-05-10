@@ -14,6 +14,8 @@ module Verifier_index_json = struct
       { lookup_used : lookups_used
       ; lookup_table : 'polyComm array
       ; lookup_selectors : 'polyComm array
+      ; table_ids : 'polyComm option
+      ; max_joint_size : int
       }
     [@@deriving yojson]
   end

@@ -929,7 +929,8 @@ let init_from_inputs ?(genesis_dir = Cache_dir.autogen_path) ~logger
   values
 
 let init_from_config_file ?genesis_dir ~logger ~proof_level
-    (config : Runtime_config.t) =
+    (config : Runtime_config.t) :
+    (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
     inputs_from_config_file ?genesis_dir ~logger ~proof_level config

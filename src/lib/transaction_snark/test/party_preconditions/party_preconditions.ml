@@ -437,7 +437,7 @@ let%test_module "Account precondition tests" =
               let proved_state = Or_ignore.Check proved_state in
               (state, sequence_state, proved_state)
         in
-        { Zkapp_precondition.Account.Poly.balance
+        { Zkapp_precondition.Account.balance
         ; nonce
         ; receipt_chain_hash
         ; delegate

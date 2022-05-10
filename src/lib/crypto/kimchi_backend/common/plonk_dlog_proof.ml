@@ -221,13 +221,12 @@ module Make (Inputs : Inputs_intf) = struct
         G.Affine.t * G.Affine.t =
       (g g1, g g2)
     in
-    let lr : (G.Affine.Backend.t * G.Affine.Backend.t) array = t.lr in
     { Pickles_types.Plonk_types.Openings.Bulletproof.lr =
         Array.map ~f:gpair t.lr
     ; z_1 = t.z1
     ; z_2 = t.z2
     ; delta = g t.delta
-    ; sg = g t.sg
+    ; challenge_polynomial_commitment = g t.sg
     }
 
   let of_backend (t : Backend.t) : t =
@@ -284,7 +283,7 @@ module Make (Inputs : Inputs_intf) = struct
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
       ({ messages = { w_comm; z_comm; t_comm }
        ; openings =
-           { proof = { lr; z_1; z_2; delta; sg }
+           { proof = { lr; z_1; z_2; delta; challenge_polynomial_commitment }
            ; evals = evals0, evals1
            ; ft_eval1
            }
@@ -298,7 +297,13 @@ module Make (Inputs : Inputs_intf) = struct
         ; z_comm = pcwo z_comm
         ; t_comm = pcwo t_comm
         }
-    ; proof = { lr; delta = g delta; z1 = z_1; z2 = z_2; sg = g sg }
+    ; proof =
+        { lr
+        ; delta = g delta
+        ; z1 = z_1
+        ; z2 = z_2
+        ; sg = g challenge_polynomial_commitment
+        }
     ; evals = (eval_to_backend evals0, eval_to_backend evals1)
     ; ft_eval1
     ; public = primary_input

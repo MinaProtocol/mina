@@ -11,8 +11,8 @@ open Tuple_lib
 open Import
 
 (* given [chals], compute
-   \prod_i (1 / chals.(i) + chals.(i) * x^{2^i}) *)
-let b_poly ~one ~add ~mul chals =
+   \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
+let challenge_polynomial ~one ~add ~mul chals =
   let ( + ) = add and ( * ) = mul in
   stage (fun pt ->
       let k = Array.length chals in
@@ -343,21 +343,23 @@ struct
 
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
       ~(xi : Scalar_challenge.t)
-      ~(combined_inner_product : Other_field.Packed.t Shifted_value.Type1.t)
-      ~(* Corresponds to y in figure 7 of WTS *)
-       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
-      (advice : _ Types.Step.Openings.Bulletproof.Advice.t)
+      ~(advice :
+         Other_field.Packed.t Shifted_value.Type1.t
+         Types.Step.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
-        ({ lr; delta; z_1; z_2; sg } :
+        ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
           ( Inner_curve.t
           , Other_field.Packed.t Shifted_value.Type1.t )
           Openings.Bulletproof.t) =
     with_label __LOC__ (fun () ->
-        Other_field.Packed.absorb_shifted sponge combined_inner_product ;
-        (* a_hat should be equal to
+        Other_field.Packed.absorb_shifted sponge advice.combined_inner_product ;
+        (* combined_inner_product should be equal to
            sum_i < t, r^i pows(beta_i) >
-           = sum_i r^i < t, pows(beta_i) > *)
+           = sum_i r^i < t, pows(beta_i) >
+
+           That is checked later.
+        *)
         let u =
           let t = Sponge.squeeze_field sponge in
           group_map t
@@ -372,7 +374,7 @@ struct
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
         let p_prime =
-          let uc = scale_fast u combined_inner_product in
+          let uc = scale_fast u advice.combined_inner_product in
           combined_polynomial + uc
         in
         let q = p_prime + lr_prod in
@@ -385,7 +387,9 @@ struct
         in
         let rhs =
           let b_u = scale_fast u advice.b in
-          let z_1_g_plus_b_u = scale_fast (sg + b_u) z_1 in
+          let z_1_g_plus_b_u =
+            scale_fast (challenge_polynomial_commitment + b_u) z_1
+          in
           let z2_h =
             scale_fast (Inner_curve.constant (Lazy.force Generators.h)) z_2
           in
@@ -454,16 +458,15 @@ struct
              ({ inner = t2 } : Scalar_challenge.t) -> Field.Assert.equal t1 t2)
 
   let incrementally_verify_proof (type b)
-      (module Max_branching : Nat.Add.Intf with type n = b) ~step_widths
+      (module Max_proofs_verified : Nat.Add.Intf with type n = b) ~step_widths
       ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
       ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
-         array) ~(sg_old : (_, Max_branching.n) Vector.t)
-      ~(combined_inner_product : _ Shifted_value.Type1.t) ~advice
+         array) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
       ~(messages : _ Messages.t) ~which_branch ~openings_proof
       ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
-    let T = Max_branching.eq in
+    let T = Max_proofs_verified.eq in
     let public_input =
       Array.concat_map public_input ~f:(function
         | `Field (x, b) ->
@@ -477,7 +480,9 @@ struct
             Pseudo.choose (which_branch, step_widths) ~f:Field.of_int
           in
           Vector.map2
-            (ones_vector (module Impl) ~first_zero:actual_width Max_branching.n)
+            (ones_vector
+               (module Impl)
+               ~first_zero:actual_width Max_proofs_verified.n)
             sg_old
             ~f:(fun keep sg -> [| (keep, sg) |]))
     in
@@ -609,14 +614,14 @@ struct
                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
                      (snd (Columns.add Permuts_minus_1.n))
               |> Vector.map ~f:(Array.map ~f:(fun g -> (Boolean.true_, g))) )
-              (snd (Max_branching.add num_commitments_without_degree_bound))
+              (snd
+                 (Max_proofs_verified.add num_commitments_without_degree_bound))
           in
           check_bulletproof
             ~pcs_batch:
               (Common.dlog_pcs_batch
-                 (Max_branching.add num_commitments_without_degree_bound))
-            ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
-            ~advice ~openings_proof
+                 (Max_proofs_verified.add num_commitments_without_degree_bound))
+            ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound
                   ~f:(Array.map ~f:(fun (keep, x) -> (keep, `Finite x)))
@@ -667,7 +672,7 @@ struct
     Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
         scalar prechallenge)
 
-  let b_poly = Field.(b_poly ~add ~mul ~one)
+  let challenge_polynomial = Field.(challenge_polynomial ~add ~mul ~one)
 
   let pow2pow (pt : Field.t) (n : int) : Field.t =
     with_label __LOC__ (fun () ->
@@ -741,8 +746,8 @@ struct
      3. Check that the "b" value was computed correctly.
      4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
-      (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
-      ~domain ~max_quot_size ~sponge
+      (module Proofs_verified : Nat.Add.Intf with type n = b)
+      ?actual_proofs_verified ~domain ~max_quot_size ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _
@@ -755,7 +760,7 @@ struct
           ( { evals = evals1; public_input = x_hat1 }
           , { evals = evals2; public_input = x_hat2 } )
       } =
-    let T = Branching.eq in
+    let T = Proofs_verified.eq in
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
@@ -816,20 +821,20 @@ struct
           let actual_combined_inner_product =
             let sg_olds =
               Vector.map old_bulletproof_challenges ~f:(fun chals ->
-                  unstage (b_poly (Vector.to_array chals)))
+                  unstage (challenge_polynomial (Vector.to_array chals)))
             in
             let combine ~ft pt x_hat e =
-              let pi = Branching.add Nat.N26.n in
+              let pi = Proofs_verified.add Nat.N26.n in
               let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
               let sg_evals =
-                match actual_branching with
+                match actual_proofs_verified with
                 | None ->
                     Vector.map sg_olds ~f:(fun f -> [| f pt |])
-                | Some branching ->
+                | Some proofs_verified ->
                     let mask =
                       ones_vector
                         (module Impl)
-                        ~first_zero:branching (Vector.length sg_olds)
+                        ~first_zero:proofs_verified (Vector.length sg_olds)
                     in
                     with_label __LOC__ (fun () ->
                         Vector.map2 mask sg_olds ~f:(fun b f ->
@@ -857,10 +862,13 @@ struct
     in
     let b_correct =
       with_label __LOC__ (fun () ->
-          let b_poly =
-            unstage (b_poly (Vector.to_array bulletproof_challenges))
+          let challenge_poly =
+            unstage
+              (challenge_polynomial (Vector.to_array bulletproof_challenges))
           in
-          let b_actual = b_poly plonk.zeta + (r * b_poly zetaw) in
+          let b_actual =
+            challenge_poly plonk.zeta + (r * challenge_poly zetaw)
+          in
           equal
             (Shifted_value.Type2.to_field (module Field) ~shift:shift2 b)
             b_actual)
@@ -907,7 +915,7 @@ struct
      that we compute when verifying the previous proof. That is a commitment
      to them. *)
 
-  let hash_me_only (type n) (_max_branching : n Nat.t)
+  let hash_me_only (type n) (_max_proofs_verified : n Nat.t)
       (t : (_, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
     let sponge = Sponge.create sponge_params in
     Array.iter ~f:(Sponge.absorb sponge)
