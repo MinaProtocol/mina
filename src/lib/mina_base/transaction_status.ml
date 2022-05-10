@@ -44,19 +44,12 @@ module Failure = struct
         | Account_receipt_chain_hash_precondition_unsatisfied
         | Account_delegate_precondition_unsatisfied
         | Account_sequence_state_precondition_unsatisfied
-        | Account_app_state_0_precondition_unsatisfied
-        | Account_app_state_1_precondition_unsatisfied
-        | Account_app_state_2_precondition_unsatisfied
-        | Account_app_state_3_precondition_unsatisfied
-        | Account_app_state_4_precondition_unsatisfied
-        | Account_app_state_5_precondition_unsatisfied
-        | Account_app_state_6_precondition_unsatisfied
-        | Account_app_state_7_precondition_unsatisfied
+        | Account_app_state_precondition_unsatisfied of int
         | Account_proved_state_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
-      [@@deriving sexp, yojson, equal, compare, enum, hash]
+      [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
     end
@@ -98,15 +91,35 @@ module Failure = struct
 
   let failure_max = max
 
-  let failure_num_bits =
-    let num_values = failure_max - failure_min + 1 in
-    Int.ceil_log2 num_values
+  let all =
+    let add acc var = var.Variantslib.Variant.constructor :: acc in
+    Variants.fold ~init:[] ~predicate:add ~source_not_present:add
+      ~receiver_not_present:add ~amount_insufficient_to_create_account:add
+      ~cannot_pay_creation_fee_in_token:add ~source_insufficient_balance:add
+      ~source_minimum_balance_violation:add ~receiver_already_exists:add
+      ~token_owner_not_caller:add ~overflow:add ~global_excess_overflow:add
+      ~local_excess_overflow:add ~signed_command_on_zkapp_account:add
+      ~zkapp_account_not_present:add ~update_not_permitted_balance:add
+      ~update_not_permitted_timing_existing_account:add
+      ~update_not_permitted_delegate:add ~update_not_permitted_app_state:add
+      ~update_not_permitted_verification_key:add
+      ~update_not_permitted_sequence_state:add
+      ~update_not_permitted_zkapp_uri:add ~update_not_permitted_token_symbol:add
+      ~update_not_permitted_permissions:add ~update_not_permitted_nonce:add
+      ~update_not_permitted_voting_for:add ~parties_replay_check_failed:add
+      ~fee_payer_nonce_must_increase:add ~fee_payer_must_be_signed:add
+      ~account_balance_precondition_unsatisfied:add
+      ~account_nonce_precondition_unsatisfied:add
+      ~account_receipt_chain_hash_precondition_unsatisfied:add
+      ~account_delegate_precondition_unsatisfied:add
+      ~account_sequence_state_precondition_unsatisfied:add
+      ~account_app_state_precondition_unsatisfied:(fun acc var ->
+        List.init 8 ~f:var.constructor @ acc)
+      ~account_proved_state_precondition_unsatisfied:add
+      ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
+      ~invalid_fee_excess:add
 
-  let gen =
-    let open Quickcheck.Let_syntax in
-    let%map ndx = Int.gen_uniform_incl failure_min failure_max in
-    (* bounds are checked, of_enum always returns Some *)
-    Option.value_exn (of_enum ndx)
+  let gen = Quickcheck.Generator.of_list all
 
   let to_string = function
     | Predicate ->
@@ -175,22 +188,8 @@ module Failure = struct
         "Account_delegate_precondition_unsatisfied"
     | Account_sequence_state_precondition_unsatisfied ->
         "Account_sequence_state_precondition_unsatisfied"
-    | Account_app_state_0_precondition_unsatisfied ->
-        "Account_app_state_0_precondition_unsatisfied"
-    | Account_app_state_1_precondition_unsatisfied ->
-        "Account_app_state_1_precondition_unsatisfied"
-    | Account_app_state_2_precondition_unsatisfied ->
-        "Account_app_state_2_precondition_unsatisfied"
-    | Account_app_state_3_precondition_unsatisfied ->
-        "Account_app_state_3_precondition_unsatisfied"
-    | Account_app_state_4_precondition_unsatisfied ->
-        "Account_app_state_4_precondition_unsatisfied"
-    | Account_app_state_5_precondition_unsatisfied ->
-        "Account_app_state_5_precondition_unsatisfied"
-    | Account_app_state_6_precondition_unsatisfied ->
-        "Account_app_state_6_precondition_unsatisfied"
-    | Account_app_state_7_precondition_unsatisfied ->
-        "Account_app_state_7_precondition_unsatisfied"
+    | Account_app_state_precondition_unsatisfied i ->
+        sprintf "Account_app_state_%i_precondition_unsatisfied" i
     | Account_proved_state_precondition_unsatisfied ->
         "Account_proved_state_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
@@ -267,22 +266,6 @@ module Failure = struct
         Ok Account_delegate_precondition_unsatisfied
     | "Account_sequence_state_precondition_unsatisfied" ->
         Ok Account_sequence_state_precondition_unsatisfied
-    | "Account_app_state_0_precondition_unsatisfied" ->
-        Ok Account_app_state_0_precondition_unsatisfied
-    | "Account_app_state_1_precondition_unsatisfied" ->
-        Ok Account_app_state_1_precondition_unsatisfied
-    | "Account_app_state_2_precondition_unsatisfied" ->
-        Ok Account_app_state_2_precondition_unsatisfied
-    | "Account_app_state_3_precondition_unsatisfied" ->
-        Ok Account_app_state_3_precondition_unsatisfied
-    | "Account_app_state_4_precondition_unsatisfied" ->
-        Ok Account_app_state_4_precondition_unsatisfied
-    | "Account_app_state_5_precondition_unsatisfied" ->
-        Ok Account_app_state_5_precondition_unsatisfied
-    | "Account_app_state_6_precondition_unsatisfied" ->
-        Ok Account_app_state_6_precondition_unsatisfied
-    | "Account_app_state_7_precondition_unsatisfied" ->
-        Ok Account_app_state_7_precondition_unsatisfied
     | "Account_proved_state_precondition_unsatisfied" ->
         Ok Account_proved_state_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
@@ -291,16 +274,44 @@ module Failure = struct
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
-    | _ ->
-        Error "Transaction_status.Failure.of_string: Unknown value"
+    | str -> (
+        let res =
+          List.find_map
+            ~f:(fun (prefix, suffix, parse) ->
+              Option.try_with (fun () ->
+                  assert (
+                    String.length str
+                    >= String.length prefix + String.length suffix ) ;
+                  for i = 0 to String.length prefix - 1 do
+                    assert (Char.equal prefix.[i] str.[i])
+                  done ;
+                  for
+                    i = String.length str - String.length suffix
+                    to String.length str - 1
+                  do
+                    assert (Char.equal suffix.[i] str.[i])
+                  done ;
+                  parse
+                    (String.sub str ~pos:(String.length prefix)
+                       ~len:(String.length str - String.length suffix))))
+            [ ( "Account_app_state"
+              , "precondition_unsatisfied"
+              , fun str ->
+                  Account_app_state_precondition_unsatisfied (int_of_string str)
+              )
+            ]
+        in
+        match res with
+        | Some res ->
+            Ok res
+        | None ->
+            Error "Transaction_status.Failure.of_string: Unknown value" )
 
   let%test_unit "of_string(to_string) roundtrip" =
-    for i = failure_min to failure_max do
-      let failure = Option.value_exn (of_enum i) in
-      [%test_eq: (t, string) Result.t]
-        (of_string (to_string failure))
-        (Ok failure)
-    done
+    List.iter all ~f:(fun failure ->
+        [%test_eq: (t, string) Result.t]
+          (of_string (to_string failure))
+          (Ok failure))
 
   let describe = function
     | Predicate ->
@@ -383,22 +394,9 @@ module Failure = struct
         "The party's account delegate precondition was unsatisfied"
     | Account_sequence_state_precondition_unsatisfied ->
         "The party's account sequence state precondition was unsatisfied"
-    | Account_app_state_0_precondition_unsatisfied ->
-        "The party's account app state (0) precondition was unsatisfied"
-    | Account_app_state_1_precondition_unsatisfied ->
-        "The party's account app state (1) precondition was unsatisfied"
-    | Account_app_state_2_precondition_unsatisfied ->
-        "The party's account app state (2) precondition was unsatisfied"
-    | Account_app_state_3_precondition_unsatisfied ->
-        "The party's account app state (3) precondition was unsatisfied"
-    | Account_app_state_4_precondition_unsatisfied ->
-        "The party's account app state (4) precondition was unsatisfied"
-    | Account_app_state_5_precondition_unsatisfied ->
-        "The party's account app state (5) precondition was unsatisfied"
-    | Account_app_state_6_precondition_unsatisfied ->
-        "The party's account app state (6) precondition was unsatisfied"
-    | Account_app_state_7_precondition_unsatisfied ->
-        "The party's account app state (7) precondition was unsatisfied"
+    | Account_app_state_precondition_unsatisfied i ->
+        sprintf
+          "The party's account app state (%i) precondition was unsatisfied" i
     | Account_proved_state_precondition_unsatisfied ->
         "The party's account proved state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->

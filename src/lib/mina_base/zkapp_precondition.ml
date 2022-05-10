@@ -715,33 +715,9 @@ module Account = struct
               (map2 state a.zkapp.app_state ~f:Eq_data.(check_checked Tc.field)))
         |> List.mapi ~f:(fun i check ->
                let failure =
-                 match i with
-                 | 0 ->
-                     Transaction_status.Failure
-                     .Account_app_state_0_precondition_unsatisfied
-                 | 1 ->
-                     Transaction_status.Failure
-                     .Account_app_state_1_precondition_unsatisfied
-                 | 2 ->
-                     Transaction_status.Failure
-                     .Account_app_state_2_precondition_unsatisfied
-                 | 3 ->
-                     Transaction_status.Failure
-                     .Account_app_state_3_precondition_unsatisfied
-                 | 4 ->
-                     Transaction_status.Failure
-                     .Account_app_state_4_precondition_unsatisfied
-                 | 5 ->
-                     Transaction_status.Failure
-                     .Account_app_state_5_precondition_unsatisfied
-                 | 6 ->
-                     Transaction_status.Failure
-                     .Account_app_state_6_precondition_unsatisfied
-                 | 7 ->
-                     Transaction_status.Failure
-                     .Account_app_state_7_precondition_unsatisfied
-                 | _ ->
-                     failwithf "Unexpected index %i" i ()
+                 Transaction_status.Failure
+                 .Account_app_state_precondition_unsatisfied
+                   i
                in
                (failure, check)) )
       @ [ ( Transaction_status.Failure
@@ -822,33 +798,9 @@ module Account = struct
             Vector.(to_list (zip state zkapp.app_state))
             ~f:(fun i (c, v) ->
               let failure =
-                match i with
-                | 0 ->
-                    Transaction_status.Failure
-                    .Account_app_state_0_precondition_unsatisfied
-                | 1 ->
-                    Transaction_status.Failure
-                    .Account_app_state_1_precondition_unsatisfied
-                | 2 ->
-                    Transaction_status.Failure
-                    .Account_app_state_2_precondition_unsatisfied
-                | 3 ->
-                    Transaction_status.Failure
-                    .Account_app_state_3_precondition_unsatisfied
-                | 4 ->
-                    Transaction_status.Failure
-                    .Account_app_state_4_precondition_unsatisfied
-                | 5 ->
-                    Transaction_status.Failure
-                    .Account_app_state_5_precondition_unsatisfied
-                | 6 ->
-                    Transaction_status.Failure
-                    .Account_app_state_6_precondition_unsatisfied
-                | 7 ->
-                    Transaction_status.Failure
-                    .Account_app_state_7_precondition_unsatisfied
-                | _ ->
-                    failwithf "Unexpected index %i" i ()
+                Transaction_status.Failure
+                .Account_app_state_precondition_unsatisfied
+                  i
               in
               ( failure
               , Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v) ))
