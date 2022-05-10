@@ -14,7 +14,7 @@ end
 
 module Transmuter = struct
   module Source = struct
-    type t = External_transition.Initial_validated.t Envelope.Incoming.t
+    type t = Mina_block.initial_valid_block Envelope.Incoming.t
   end
 
   module Target = struct

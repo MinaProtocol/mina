@@ -2,11 +2,10 @@ import Client from "mina-signer";
 import {
   Field,
   declareState,
-  declareMethodArguments,
+  declareMethods,
   State,
   PrivateKey,
   SmartContract,
-  compile,
   deploy,
   isReady,
   shutdown,
@@ -39,7 +38,7 @@ class SimpleZkapp extends SmartContract {
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { update: [Field] });
+declareMethods(SimpleZkapp, { update: [Field] });
 
 // create new random zkapp keypair (with snarkyjs)
 let zkappKey = PrivateKey.random();
@@ -48,7 +47,7 @@ let zkappAddress = zkappKey.toPublicKey();
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
 let verificationKey = await cached(
-  async () => (await compile(SimpleZkapp, zkappAddress)).verificationKey
+  async () => (await SimpleZkapp.compile(zkappAddress)).verificationKey
 );
 toc();
 
@@ -85,7 +84,7 @@ toc();
 
 // check that signature matches with the one snarkyjs creates on the same transaction
 tic("sign deploy transaction (snarkyjs, for consistency check)");
-let signedDeploySnarkyJs = await signFeePayer(partiesJsonDeploy, feePayerKey, {
+let signedDeploySnarkyJs = signFeePayer(partiesJsonDeploy, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });

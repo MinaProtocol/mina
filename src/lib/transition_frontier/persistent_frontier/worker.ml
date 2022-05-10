@@ -71,6 +71,7 @@ module Worker = struct
     in
     match diff with
     | New_node (Lite transition) -> (
+        let transition = External_transition.Validated.lower transition in
         let r =
           ( Database.add t.db ~transition
             :> (mutant, apply_diff_error_internal) Result.t )
@@ -86,8 +87,7 @@ module Worker = struct
                 [ ( "hash"
                   , `String
                       (State_hash.to_base58_check
-                         (External_transition.Validated.state_hashes transition)
-                           .state_hash) )
+                         (Mina_block.Validated.state_hash transition)) )
                 ; ("parent", `String (State_hash.to_base58_check h))
                 ] ;
             Ok ()

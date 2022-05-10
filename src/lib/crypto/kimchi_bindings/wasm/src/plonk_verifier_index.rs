@@ -5,7 +5,8 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
-    constraints::{zk_polynomial, zk_w3, Shifts},
+    constraints::Shifts,
+    polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
 };
 use kimchi::linearization::expr_linearization;
