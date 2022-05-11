@@ -362,11 +362,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           let next = sys.next_row in
           next - prev
       in
-      Constraints.log ~weight
-        Impls.Step.(
-          make_checked (fun () : unit ->
-              let x = with_label __LOC__ (fun () -> exists typ) in
-              main x () ))
+      Constraints.log ~weight (Impls.Step.make_checked main)
     in
     if profile_constraints then
       Snarky_log.to_file
@@ -548,15 +544,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
-              let main x () : unit = b.main x ~step_domains in
+              let main () = b.main () ~step_domains in
               let () = if true then log_step main typ name b.index in
               let open Impls.Step in
               let k_p =
                 lazy
                   (let cs =
-                     constraint_system ~exposing:[ typ ]
-                       ~return_typ:(Snarky_backendless.Typ.unit ())
-                       main
+                     constraint_system ~exposing:[] ~return_typ:typ main
                    in
                    let cs_hash =
                      Md5.to_hex (R1CS_constraint_system.digest cs)
@@ -589,9 +583,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               in
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
-                    Cache.Step.read_or_generate cache k_p k_v typ
-                      (Snarky_backendless.Typ.unit ())
-                      main )
+                    Cache.Step.read_or_generate cache k_p k_v
+                      (Snarky_backendless.Typ.unit ()) typ (fun () -> main) )
               in
               accum_dirty (Lazy.map pk ~f:snd) ;
               accum_dirty (Lazy.map vk ~f:snd) ;

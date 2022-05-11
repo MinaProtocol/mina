@@ -25,7 +25,7 @@ let domains_etyp (type field rust_gates)
                                            .Plonk_constraint_system
                                            .t ) (Spec.ETyp.T (typ, conv))
     return_typ main =
-  let main x () : unit = main (conv x) in
+  let main x () = main (conv x) in
   domains (Impl.constraint_system ~exposing:[ typ ] ~return_typ main)
 
 let domains (type field rust_gates)
@@ -36,5 +36,5 @@ let domains (type field rust_gates)
                                            Kimchi_backend_common
                                            .Plonk_constraint_system
                                            .t ) typ return_typ main =
-  let main x () : unit = main x in
+  let main x () = main x in
   domains (Impl.constraint_system ~exposing:[ typ ] ~return_typ main)

@@ -30,11 +30,11 @@ type ( 'a_var
           Inductive_rule.t
       ; main :
              step_domains:(Domains.t, 'branches) Vector.t
+          -> unit
           -> ( (Unfinalized.t, 'max_proofs_verified) Vector.t
              , Impls.Step.Field.t
              , (Impls.Step.Field.t, 'max_proofs_verified) Vector.t )
              Types.Step.Statement.t
-          -> unit
       ; requests :
           (module Requests.Step.S
              with type statement = 'a_value
@@ -129,9 +129,8 @@ let create
     in
     Fix_domains.domains
       (module Impls.Step)
-      typ
       (Snarky_backendless.Typ.unit ())
-      main
+      typ main
   in
   Timer.clock __LOC__ ;
   T
