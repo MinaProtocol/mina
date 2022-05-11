@@ -179,7 +179,7 @@ module Wrap = struct
                 (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path))
 
-  let read_or_generate step_domains cache k_p k_v typ main =
+  let read_or_generate cache k_p k_v typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let s_p = storable in
@@ -249,7 +249,6 @@ module Wrap = struct
                { index = vk
                ; commitments =
                    Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
-               ; step_domains
                ; data =
                    (let open Kimchi_bindings.Protocol.Index.Fq in
                    { constraints = domain_d1_size pk.index })
