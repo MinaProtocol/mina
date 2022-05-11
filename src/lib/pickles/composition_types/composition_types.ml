@@ -274,13 +274,13 @@ module Wrap = struct
         end
       end]
 
-      let to_field_elements
+      let to_field_elements (type g f)
           { challenge_polynomial_commitment; old_bulletproof_challenges }
-          ~g1:g1_to_field_elements =
+          ~g1:(g1_to_field_elements : g -> f list) =
         Array.concat
-          [ Vector.to_array old_bulletproof_challenges
+          [ Array.of_list (g1_to_field_elements challenge_polynomial_commitment)
+          ; Vector.to_array old_bulletproof_challenges
             |> Array.concat_map ~f:Vector.to_array
-          ; Array.of_list (g1_to_field_elements challenge_polynomial_commitment)
           ]
 
       let typ g1 chal ~length =
@@ -397,35 +397,33 @@ module Wrap = struct
       }
     [@@deriving sexp]
 
-    let to_field_elements
+    let to_field_elements (type g f)
         { app_state
         ; dlog_plonk_index
         ; challenge_polynomial_commitments
         ; old_bulletproof_challenges
-        } ~app_state:app_state_to_field_elements ~comm ~g =
+        } ~app_state:app_state_to_field_elements ~comm ~(g : g -> f list) =
       Array.concat
         [ index_to_field_elements ~g:comm dlog_plonk_index
         ; app_state_to_field_elements app_state
-        ; Array.of_list
-            (List.concat_map ~f:g
-               (Vector.to_list challenge_polynomial_commitments))
-        ; Vector.to_array old_bulletproof_challenges
-          |> Array.concat_map ~f:Vector.to_array
+        ; Vector.map2 challenge_polynomial_commitments
+            old_bulletproof_challenges ~f:(fun comm chals ->
+              Array.append (Array.of_list (g comm)) (Vector.to_array chals))
+          |> Vector.to_list |> Array.concat
         ]
 
-    let to_field_elements_without_index
+    let to_field_elements_without_index (type g f)
         { app_state
         ; dlog_plonk_index = _
         ; challenge_polynomial_commitments
         ; old_bulletproof_challenges
-        } ~app_state:app_state_to_field_elements ~g =
+        } ~app_state:app_state_to_field_elements ~(g : g -> f list) =
       Array.concat
         [ app_state_to_field_elements app_state
-        ; Array.of_list
-            (List.concat_map ~f:g
-               (Vector.to_list challenge_polynomial_commitments))
-        ; Vector.to_array old_bulletproof_challenges
-          |> Array.concat_map ~f:Vector.to_array
+        ; Vector.map2 challenge_polynomial_commitments
+            old_bulletproof_challenges ~f:(fun comm chals ->
+              Array.append (Array.of_list (g comm)) (Vector.to_array chals))
+          |> Vector.to_list |> Array.concat
         ]
 
     open Snarky_backendless.H_list
