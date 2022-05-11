@@ -459,7 +459,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        let error_logs =
          String.split logs ~on:'\n'
          |> List.filter ~f:(fun log ->
-                String.is_substring log ~substring:{|"level":"Error"|})
+                String.is_substring log ~substring:{|"level":"Error"|}
+                || String.is_substring log ~substring:{|"level":"Fatal"|})
        in
        if List.is_empty error_logs then (
          [%log info] "The replayer encountered no errors" ;
