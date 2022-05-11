@@ -14,6 +14,8 @@ module Verifier_index_json = struct
       { lookup_used : lookups_used
       ; lookup_table : 'polyComm array
       ; lookup_selectors : 'polyComm array
+      ; table_ids : 'polyComm option
+      ; max_joint_size : int
       }
     [@@deriving yojson]
   end
@@ -174,7 +176,7 @@ let dummy_commitments g =
 
 let dummy =
   lazy
-    (let rows = Domain.size Common.wrap_domains.h in
+    (let rows = Domain.size (Common.wrap_domains ~proofs_verified:2).h in
      let g = Backend.Tock.Curve.(to_affine_exn one) in
      { Repr.commitments = dummy_commitments g
      ; step_domains = [||]

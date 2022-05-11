@@ -38,7 +38,7 @@
    logger
    mina_base
    snark_worker
-   mina_transition
+   mina_block
    daemon_rpcs
    snark_work_lib
    rfc3339_time

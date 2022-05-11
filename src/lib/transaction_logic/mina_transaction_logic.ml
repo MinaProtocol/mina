@@ -63,6 +63,7 @@ module Transaction_applied = struct
           { accounts :
               (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
           ; command : Parties.Stable.V1.t With_status.Stable.V2.t
+          ; previous_empty_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp]
 
@@ -93,7 +94,6 @@ module Transaction_applied = struct
           { fee_transfer : Fee_transfer.Stable.V2.t
           ; previous_empty_accounts : Account_id.Stable.V2.t list
           ; receiver_timing : Account.Timing.Stable.V1.t
-          ; balances : Transaction_status.Fee_transfer_balance_data.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -110,7 +110,6 @@ module Transaction_applied = struct
           { coinbase : Coinbase.Stable.V1.t
           ; previous_empty_accounts : Account_id.Stable.V2.t list
           ; receiver_timing : Account.Timing.Stable.V1.t
-          ; balances : Transaction_status.Coinbase_balance_data.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -157,21 +156,9 @@ module Transaction_applied = struct
         With_status.map s.command ~f:(fun c ->
             Transaction.Command (User_command.Parties c))
     | Fee_transfer f ->
-        { data = Fee_transfer f.fee_transfer
-        ; status =
-            Applied
-              ( Transaction_status.Auxiliary_data.empty
-              , Transaction_status.Fee_transfer_balance_data.to_balance_data
-                  f.balances )
-        }
+        { data = Fee_transfer f.fee_transfer; status = Applied }
     | Coinbase c ->
-        { data = Coinbase c.coinbase
-        ; status =
-            Applied
-              ( Transaction_status.Auxiliary_data.empty
-              , Transaction_status.Coinbase_balance_data.to_balance_data
-                  c.balances )
-        }
+        { data = Coinbase c.coinbase; status = Applied }
 
   let user_command_status : t -> Transaction_status.t =
    fun { varying; _ } ->
@@ -181,16 +168,10 @@ module Transaction_applied = struct
         status
     | Command (Parties c) ->
         c.command.status
-    | Fee_transfer f ->
+    | Fee_transfer _ ->
         Applied
-          ( Transaction_status.Auxiliary_data.empty
-          , Transaction_status.Fee_transfer_balance_data.to_balance_data
-              f.balances )
-    | Coinbase c ->
+    | Coinbase _ ->
         Applied
-          ( Transaction_status.Auxiliary_data.empty
-          , Transaction_status.Coinbase_balance_data.to_balance_data c.balances
-          )
 end
 
 module type S = sig
@@ -226,6 +207,7 @@ module type S = sig
       type t = Transaction_applied.Parties_applied.t =
         { accounts : (Account_id.t * Account.t option) list
         ; command : Parties.t With_status.t
+        ; previous_empty_accounts : Account_id.t list
         }
       [@@deriving sexp]
     end
@@ -242,7 +224,6 @@ module type S = sig
         { fee_transfer : Fee_transfer.t
         ; previous_empty_accounts : Account_id.t list
         ; receiver_timing : Account.Timing.t
-        ; balances : Transaction_status.Fee_transfer_balance_data.t
         }
       [@@deriving sexp]
     end
@@ -252,7 +233,6 @@ module type S = sig
         { coinbase : Coinbase.t
         ; previous_empty_accounts : Account_id.t list
         ; receiver_timing : Account.Timing.t
-        ; balances : Transaction_status.Coinbase_balance_data.t
         }
       [@@deriving sexp]
     end
@@ -305,7 +285,7 @@ module type S = sig
        * ( ( Stack_frame.value
            , Stack_frame.value list
            , Token_id.t
-           , Amount.t
+           , Amount.Signed.t
            , ledger
            , bool
            , unit
@@ -338,7 +318,7 @@ module type S = sig
              * ( Stack_frame.value
                , Stack_frame.value list
                , Token_id.t
-               , Amount.t
+               , Amount.Signed.t
                , ledger
                , bool
                , unit
@@ -610,21 +590,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           With_status.map s.command ~f:(fun c ->
               Transaction.Command (User_command.Parties c))
       | Fee_transfer f ->
-          { data = Fee_transfer f.fee_transfer
-          ; status =
-              Applied
-                ( Transaction_status.Auxiliary_data.empty
-                , Transaction_status.Fee_transfer_balance_data.to_balance_data
-                    f.balances )
-          }
+          { data = Fee_transfer f.fee_transfer; status = Applied }
       | Coinbase c ->
-          { data = Coinbase c.coinbase
-          ; status =
-              Applied
-                ( Transaction_status.Auxiliary_data.empty
-                , Transaction_status.Coinbase_balance_data.to_balance_data
-                    c.balances )
-          }
+          { data = Coinbase c.coinbase; status = Applied }
 
     let user_command_status : t -> Transaction_status.t =
      fun { varying; _ } ->
@@ -635,16 +603,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           status
       | Command (Parties c) ->
           c.command.status
-      | Fee_transfer f ->
+      | Fee_transfer _ ->
           Applied
-            ( Transaction_status.Auxiliary_data.empty
-            , Transaction_status.Fee_transfer_balance_data.to_balance_data
-                f.balances )
-      | Coinbase c ->
+      | Coinbase _ ->
           Applied
-            ( Transaction_status.Auxiliary_data.empty
-            , Transaction_status.Coinbase_balance_data.to_balance_data
-                c.balances )
   end
 
   let previous_empty_accounts action pk =
@@ -745,13 +707,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ~ledger ~current_global_slot
     in
     let applied_common : Transaction_applied.Signed_command_applied.Common.t =
-      { user_command =
-          { data = user_command
-          ; status =
-              Applied
-                ( Transaction_status.Auxiliary_data.empty
-                , Transaction_status.Balance_data.empty )
-          }
+      { user_command = { data = user_command; status = Applied }
       ; previous_receipt_chain_hash = account.receipt_chain_hash
       ; fee_payer_timing = account.timing
       ; source_timing = None
@@ -831,7 +787,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           ( [ (source_location, source_account) ]
           , `Source_timing source_timing
-          , Transaction_status.Auxiliary_data.empty
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
               { previous_delegate } )
       | Payment { amount; _ } ->
@@ -909,47 +864,22 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           let%map receiver_account =
             incr_balance receiver_account receiver_amount
           in
-          let previous_empty_accounts, auxiliary_data =
+          let previous_empty_accounts =
             match receiver_location with
             | `Existing _ ->
-                ([], Transaction_status.Auxiliary_data.empty)
+                []
             | `New ->
-                ( [ receiver ]
-                , { Transaction_status.Auxiliary_data.empty with
-                    receiver_account_creation_fee_paid =
-                      Some
-                        (Amount.of_fee
-                           constraint_constants.account_creation_fee)
-                  } )
+                [ receiver ]
           in
           ( [ (receiver_location, receiver_account)
             ; (source_location, source_account)
             ]
           , `Source_timing source_timing
-          , auxiliary_data
           , Transaction_applied.Signed_command_applied.Body.Payment
               { previous_empty_accounts } )
     in
-    let compute_balances () =
-      let compute_balance account_id =
-        match get_user_account_with_location ledger account_id with
-        | Ok (`Existing _, account) ->
-            Some account.balance
-        | _ ->
-            None
-      in
-      { Transaction_status.Balance_data.fee_payer_balance =
-          compute_balance fee_payer
-      ; source_balance = compute_balance source
-      ; receiver_balance = compute_balance receiver
-      }
-    in
     match compute_updates () with
-    | Ok
-        ( located_accounts
-        , `Source_timing source_timing
-        , auxiliary_data
-        , applied_body ) ->
+    | Ok (located_accounts, `Source_timing source_timing, applied_body) ->
         (* Update the ledger. *)
         let%bind () =
           List.fold located_accounts ~init:(Ok ())
@@ -960,10 +890,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let applied_common =
           { applied_common with
             source_timing = Some source_timing
-          ; user_command =
-              { data = user_command
-              ; status = Applied (auxiliary_data, compute_balances ())
-              }
+          ; user_command = { data = user_command; status = Applied }
           }
         in
         return
@@ -977,9 +904,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               { data = user_command
               ; status =
                   Failed
-                    ( Transaction_status.Failure.Collection.of_single_failure
-                        failure
-                    , compute_balances () )
+                    (Transaction_status.Failure.Collection.of_single_failure
+                       failure)
               }
           }
         in
@@ -1548,7 +1474,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ( Stack_frame.t
         , Call_stack.t
         , Token_id.t
-        , Amount.t
+        , Amount.Signed.t
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
@@ -1675,7 +1601,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ; transaction_commitment = ()
         ; full_transaction_commitment = ()
         ; token_id = Token_id.default
-        ; excess = Currency.Amount.zero
+        ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger
         ; success = true
         ; failure_status_tbl = []
@@ -1697,6 +1623,18 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     | Error e ->
         Error e
     | Ok (s, failure_status_tbl) ->
+        let account_ids_originally_not_in_ledger =
+          List.filter_map original_account_states
+            ~f:(fun (acct_id, loc_and_acct) ->
+              if Option.is_none loc_and_acct then Some acct_id else None)
+        in
+        (* accounts not originally in ledger, now present in ledger *)
+        let previous_empty_accounts =
+          List.filter_map account_ids_originally_not_in_ledger
+            ~f:(fun acct_id ->
+              Option.map (L.location_of_account ledger acct_id) ~f:(fun _ ->
+                  acct_id))
+        in
         Ok
           ( { Transaction_applied.Parties_applied.accounts = accounts ()
             ; command =
@@ -1706,23 +1644,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                     ( if
                       Transaction_status.Failure.Collection.is_empty
                         failure_status_tbl
-                    then
-                      Applied
-                        ( { fee_payer_account_creation_fee_paid = None
-                          ; receiver_account_creation_fee_paid = None
-                          }
-                        , { fee_payer_balance = None
-                          ; source_balance = None
-                          ; receiver_balance = None
-                          } )
-                    else
-                      Failed
-                        ( failure_status_tbl
-                        , { fee_payer_balance = None
-                          ; source_balance = None
-                          ; receiver_balance = None
-                          } ) )
+                    then Applied
+                    else Failed failure_status_tbl )
                 }
+            ; previous_empty_accounts
             }
           , s )
 
@@ -1808,38 +1733,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ~modify_timing:(fun acc ->
           update_timing_when_no_deduction ~txn_global_slot acc)
     in
-    let compute_balance account_id =
-      match get_user_account_with_location t account_id with
-      | Ok (`Existing _, account) ->
-          Some account.balance
-      | _ ->
-          None
-    in
-    let balances =
-      match Fee_transfer.to_singles transfer with
-      | `One ft ->
-          { Transaction_status.Fee_transfer_balance_data.receiver1_balance =
-              Option.value_exn
-                (compute_balance (Fee_transfer.Single.receiver ft))
-          ; receiver2_balance = None
-          }
-      | `Two (ft1, ft2) ->
-          { Transaction_status.Fee_transfer_balance_data.receiver1_balance =
-              Option.value_exn
-                (compute_balance (Fee_transfer.Single.receiver ft1))
-          ; receiver2_balance =
-              compute_balance (Fee_transfer.Single.receiver ft2)
-          }
-    in
     Transaction_applied.Fee_transfer_applied.
-      { fee_transfer = transfer
-      ; previous_empty_accounts
-      ; receiver_timing
-      ; balances
-      }
+      { fee_transfer = transfer; previous_empty_accounts; receiver_timing }
 
   let undo_fee_transfer ~constraint_constants t
-      ({ previous_empty_accounts; fee_transfer; receiver_timing; balances = _ } :
+      ({ previous_empty_accounts; fee_transfer; receiver_timing } :
         Transaction_applied.Fee_transfer_applied.t) =
     let open Or_error.Let_syntax in
     let%map _ =
@@ -1936,12 +1834,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       { coinbase = cb
       ; previous_empty_accounts = emptys1 @ emptys2
       ; receiver_timing = receiver_timing_for_applied
-      ; balances =
-          { Transaction_status.Coinbase_balance_data.coinbase_receiver_balance =
-              receiver_balance
-          ; fee_transfer_receiver_balance =
-              Option.map transferee_update ~f:(fun (_, a) -> a.balance)
-          }
       }
 
   (* Don't have to be atomic here because these should never fail. In fact, none of
@@ -1951,7 +1843,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         { coinbase = { receiver; fee_transfer; amount = coinbase_amount }
         ; previous_empty_accounts
         ; receiver_timing
-        ; balances = _
         } =
     let receiver_reward, receiver_timing =
       match fee_transfer with
@@ -2112,7 +2003,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         failwith "Transaction_applied/command mismatch"
 
   let undo_parties ~constraint_constants:_ ledger
-      { Transaction_applied.Parties_applied.accounts; command = _ } =
+      { Transaction_applied.Parties_applied.accounts; _ } =
     let to_update, to_delete =
       List.partition_map accounts ~f:(fun (id, a) ->
           match a with Some a -> `Fst (id, a) | None -> `Snd id)

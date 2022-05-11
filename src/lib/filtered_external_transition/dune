@@ -20,7 +20,7 @@
    mina_base
    mina_state
    mina_transaction
-   mina_transition
+   mina_block
    signature_lib
    mina_base.import
    mina_numbers

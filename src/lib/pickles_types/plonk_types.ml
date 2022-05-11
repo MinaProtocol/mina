@@ -150,7 +150,12 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
-          { lr : ('g * 'g) array; z_1 : 'fq; z_2 : 'fq; delta : 'g; sg : 'g }
+          { lr : ('g * 'g) array
+          ; z_1 : 'fq
+          ; z_2 : 'fq
+          ; delta : 'g
+          ; challenge_polynomial_commitment : 'g
+          }
         [@@deriving sexp, compare, yojson, hash, equal, hlist]
       end
     end]

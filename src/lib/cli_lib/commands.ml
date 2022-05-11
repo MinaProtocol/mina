@@ -5,12 +5,12 @@ open Async
 let generate_keypair =
   Command.async ~summary:"Generate a new public, private keypair"
     (let open Command.Let_syntax in
-    let env = Secrets.Keypair.env in
-    if Option.is_some (Sys.getenv env) then
-      eprintf "Using password from environment variable %s\n" env ;
     let%map_open privkey_path = Flag.privkey_write_path in
     Exceptions.handle_nicely
     @@ fun () ->
+    let env = Secrets.Keypair.env in
+    if Option.is_some (Sys.getenv env) then
+      eprintf "Using password from environment variable %s\n" env ;
     let open Deferred.Let_syntax in
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
@@ -148,9 +148,6 @@ module Vrf = struct
          threshold_met = true in the JSON output), or to generate a witness \
          that a 3rd party can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
-      let env = Secrets.Keypair.env in
-      if Option.is_some (Sys.getenv env) then
-        eprintf "Using password from environment variable %s\n" env ;
       let%map_open privkey_path = Flag.privkey_write_path
       and global_slot =
         flag "--global-slot" ~doc:"NUM Global slot to evaluate the VRF for"
@@ -180,6 +177,9 @@ module Vrf = struct
       in
       Exceptions.handle_nicely
       @@ fun () ->
+      let env = Secrets.Keypair.env in
+      if Option.is_some (Sys.getenv env) then
+        eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =
@@ -239,12 +239,12 @@ module Vrf = struct
          \"epochSeed\": _, \"delegatorIndex\": _} JSON message objects read on \
          stdin"
       (let open Command.Let_syntax in
-      let env = Secrets.Keypair.env in
-      if Option.is_some (Sys.getenv env) then
-        eprintf "Using password from environment variable %s\n" env ;
       let%map_open privkey_path = Flag.privkey_write_path in
       Exceptions.handle_nicely
       @@ fun () ->
+      let env = Secrets.Keypair.env in
+      if Option.is_some (Sys.getenv env) then
+        eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =

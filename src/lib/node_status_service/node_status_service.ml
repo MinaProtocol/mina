@@ -188,8 +188,9 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
             { version = 1
             ; block_height_at_best_tip =
                 Transition_frontier.best_tip tf
-                |> Transition_frontier.Breadcrumb.blockchain_length
-                |> Unsigned.UInt32.to_int
+                |> Transition_frontier.Breadcrumb.consensus_state
+                |> Consensus.Data.Consensus_state.blockchain_length
+                |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int
             ; max_observed_block_height =
                 !Mina_metrics.Transition_frontier.max_blocklength_observed
             ; max_observed_unvalidated_block_height =

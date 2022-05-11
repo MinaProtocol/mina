@@ -14,10 +14,8 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Cache_lib
-open Mina_transition
+open Mina_block
 open Network_peer
-module Transition_frontier_validation =
-  External_transition.Transition_frontier_validation (Transition_frontier)
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
@@ -64,7 +62,9 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       ()
   | _ ->
       let transition_time =
-        External_transition.Validated.consensus_time_produced_at transition
+        transition |> Mina_block.Validated.header
+        |> Mina_block.Header.protocol_state |> Protocol_state.consensus_state
+        |> Consensus.Data.Consensus_state.consensus_time
       in
       let time_elapsed =
         Block_time.diff
@@ -77,7 +77,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   Writer.write processed_transition_writer
     (`Transition transition, `Source source, `Valid_cb valid_cb) ;
   Catchup_scheduler.notify catchup_scheduler
-    ~hash:(External_transition.Validated.state_hashes transition).state_hash
+    ~hash:(Mina_block.Validated.state_hash transition)
 
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
@@ -106,10 +106,16 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind mostly_validated_transition =
       let open Deferred.Let_syntax in
       match
-        Transition_frontier_validation.validate_frontier_dependencies
+        Mina_block.Validation.validate_frontier_dependencies
           ~consensus_constants:
             precomputed_values.Precomputed_values.consensus_constants ~logger
-          ~frontier initially_validated_transition
+          ~root_block:
+            Transition_frontier.(Breadcrumb.block_with_hash @@ root frontier)
+          ~get_block_by_hash:
+            Transition_frontier.(
+              Fn.compose (Option.map ~f:Breadcrumb.block_with_hash)
+              @@ find frontier)
+          initially_validated_transition
       with
       | Ok t ->
           return (Ok t)
@@ -122,8 +128,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                      over the transition frontier root"
                   , metadata ) )
           in
-          let (_ : External_transition.Initial_validated.t Envelope.Incoming.t)
-              =
+          let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
             Cached.invalidate_with_failure cached_initially_validated_transition
           in
           Error ()
@@ -131,8 +136,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           [%log warn] ~metadata
             "Refusing to process the transition with hash $state_hash because \
              is is already in the transition frontier" ;
-          let (_ : External_transition.Initial_validated.t Envelope.Incoming.t)
-              =
+          let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
             Cached.invalidate_with_failure cached_initially_validated_transition
           in
           return (Error ())
@@ -145,7 +149,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           | ( _
             , _
             , _
-            , (`Delta_transition_chain, Truth.True delta_state_hashes)
+            , (`Delta_block_chain, Truth.True delta_state_hashes)
             , _
             , _
             , _ ) ->
@@ -163,7 +167,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
     let parent_hash =
       Protocol_state.previous_state_hash
-        (External_transition.protocol_state transition)
+        (Header.protocol_state @@ Mina_block.header transition)
     in
     let parent_breadcrumb = Transition_frontier.find_exn frontier parent_hash in
     let%bind breadcrumb =
@@ -200,7 +204,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
     ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
        ( [ `Block of
-           ( External_transition.Initial_validated.t Envelope.Incoming.t
+           ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t ]
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
@@ -209,7 +213,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
     ~(clean_up_catchup_scheduler : unit Ivar.t)
     ~(catchup_job_writer :
        ( State_hash.t
-         * ( External_transition.Initial_validated.t Envelope.Incoming.t
+         * ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t
            Rose_tree.t
@@ -306,7 +310,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                   let transition_time =
                     Transition_frontier.Breadcrumb.validated_transition
                       (Cached.peek breadcrumb)
-                    |> External_transition.Validated.protocol_state
+                    |> Mina_block.Validated.header
+                    |> Mina_block.Header.protocol_state
                     |> Protocol_state.blockchain_state
                     |> Blockchain_state.timestamp |> Block_time.to_time
                   in
@@ -371,8 +376,9 @@ let%test_module "Transition_handler.Processor tests" =
     let downcast_breadcrumb breadcrumb =
       let transition =
         Transition_frontier.Breadcrumb.validated_transition breadcrumb
-        |> External_transition.Validation.reset_frontier_dependencies_validation
-        |> External_transition.Validation.reset_staged_ledger_diff_validation
+        |> Mina_block.Validated.remember
+        |> Mina_block.Validation.reset_frontier_dependencies_validation
+        |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
       Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
@@ -438,16 +444,20 @@ let%test_module "Transition_handler.Processor tests" =
                                [%test_eq: State_hash.t]
                                  (Transition_frontier.Breadcrumb.state_hash
                                     next_expected_breadcrumb)
-                                 (External_transition.Validated.state_hashes
-                                    newly_added_transition)
-                                   .state_hash ;
+                                 (Mina_block.Validated.state_hash
+                                    newly_added_transition) ;
                                [%log info]
                                  ~metadata:
                                    [ ( "height"
                                      , `Int
-                                         ( External_transition.Validated
-                                           .blockchain_length
-                                             newly_added_transition
+                                         ( newly_added_transition
+                                         |> Mina_block.Validated.forget
+                                         |> With_hash.data |> Mina_block.header
+                                         |> Mina_block.Header.protocol_state
+                                         |> Protocol_state.consensus_state
+                                         |> Consensus.Data.Consensus_state
+                                            .blockchain_length
+                                         |> Mina_numbers.Length.to_uint32
                                          |> Unsigned.UInt32.to_int ) )
                                    ]
                                  "transition of $height passed processor" ;

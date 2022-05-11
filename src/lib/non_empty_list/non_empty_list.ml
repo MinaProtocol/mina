@@ -4,7 +4,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = 'a * 'a list [@@deriving sexp, compare, equal, hash]
+    type 'a t = 'a * 'a list [@@deriving sexp, compare, equal, hash, to_yojson]
   end
 end]
 

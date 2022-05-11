@@ -552,11 +552,13 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
+          (* internal commands always use the default token *)
+          let token_id = Mina_base.Token_id.(to_string default) in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
           ; receiver_account_creation_fee_paid= Option.map (Internal_commands.Extras.receiver_account_creation_fee_paid extras) ~f:Unsigned.UInt64.of_int64
           ; fee= Unsigned.UInt64.of_int64 ic.fee
-          ; token= `Token_id ic.token
+          ; token= `Token_id token_id
           ; sequence_no=Internal_commands.Extras.sequence_no extras
           ; secondary_sequence_no=Internal_commands.Extras.secondary_sequence_no extras
           ; hash= ic.hash } )
@@ -580,6 +582,9 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
+          (* TODO: do we want to mention tokens at all here? *)
+          let fee_token = Mina_base.Token_id.(to_string default) in
+          let token = Mina_base.Token_id.(to_string default) in
           let%map failure_status =
             match User_commands.Extras.failure_reason extras with
             | None -> (
@@ -619,9 +624,9 @@ WITH RECURSIVE chain AS (
           ; fee_payer= User_commands.Extras.fee_payer extras
           ; source= User_commands.Extras.source extras
           ; receiver= User_commands.Extras.receiver extras
-          ; fee_token= `Token_id uc.fee_token
-          ; token= `Token_id uc.token
-          ; nonce= Unsigned.UInt32.of_int uc.nonce
+          ; fee_token= `Token_id fee_token
+          ; token= `Token_id token
+          ; nonce= Unsigned.UInt32.of_int64 uc.nonce
           ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
           ; fee= Unsigned.UInt64.of_int64 uc.fee
           ; hash= uc.hash

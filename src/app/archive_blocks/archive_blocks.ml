@@ -49,16 +49,15 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
             return (add_to_failure_file file)
       in
       let add_precomputed_block =
-        make_add_block
-          Mina_transition.External_transition.Precomputed_block.of_yojson
+        make_add_block Mina_block.Precomputed.of_yojson
           (Processor.add_block_aux_precomputed
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled pool
+               Genesis_constants.Constraint_constants.compiled ~pool
              ~delete_older_than:None ~logger)
       in
       let add_extensional_block =
         make_add_block Archive_lib.Extensional.Block.of_yojson
-          (Processor.add_block_aux_extensional ~logger pool
+          (Processor.add_block_aux_extensional ~logger ~pool
              ~delete_older_than:None)
       in
       Deferred.List.iter files ~f:(fun file ->

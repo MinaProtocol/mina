@@ -4,7 +4,7 @@ open Pipe_lib
 open Mina_base
 open Mina_transaction
 open Mina_state
-open Mina_transition
+open Mina_block
 
 type Structured_log_events.t += Block_produced
   [@@deriving register_event { msg = "Successfully produced a new block" }]
@@ -49,9 +49,6 @@ end = struct
     t.task <- Some (ivar, interruptible) ;
     interruptible
 end
-
-module Transition_frontier_validation =
-  External_transition.Transition_frontier_validation (Transition_frontier)
 
 let time_to_ms = Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
 
@@ -309,19 +306,21 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           in
           Some (protocol_state, internal_transition, witness))
 
-module Precomputed_block = struct
-  type t = External_transition.Precomputed_block.t =
+module Precomputed = struct
+  type t = Precomputed.t =
     { scheduled_time : Block_time.t
     ; protocol_state : Protocol_state.value
     ; protocol_state_proof : Proof.t
     ; staged_ledger_diff : Staged_ledger_diff.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+    ; accounts_accessed : (int * Account.t) list
+    ; accounts_created : (Account_id.t * Currency.Fee.t) list
     }
 
-  let sexp_of_t = External_transition.Precomputed_block.sexp_of_t
+  let sexp_of_t = Precomputed.sexp_of_t
 
-  let t_of_sexp = External_transition.Precomputed_block.t_of_sexp
+  let t_of_sexp = Precomputed.t_of_sexp
 end
 
 let handle_block_production_errors ~logger ~rejected_blocks_logger
@@ -620,19 +619,15 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
             [%log info]
               ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
               "Producing new block with parent $breadcrumb%!" ;
-            let previous_transition =
-              Breadcrumb.validated_transition crumb
-              |> External_transition.Validation.forget_validation_with_hash
-            in
+            let previous_transition = Breadcrumb.block_with_hash crumb in
             let previous_protocol_state =
-              External_transition.protocol_state
-                (With_hash.data previous_transition)
+              Header.protocol_state
+              @@ Mina_block.header (With_hash.data previous_transition)
             in
             let%bind previous_protocol_state_proof =
               if
                 Consensus.Data.Consensus_state.is_genesis_state
-                  (External_transition.consensus_state
-                     (With_hash.data previous_transition))
+                  (Protocol_state.consensus_state previous_protocol_state)
                 && Option.is_none precomputed_values.proof_data
               then (
                 match%bind
@@ -650,8 +645,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 )
               else
                 return
-                  (External_transition.protocol_state_proof
-                     (With_hash.data previous_transition))
+                  ( Header.protocol_state_proof
+                  @@ Mina_block.header (With_hash.data previous_transition) )
             in
             let transactions =
               Network_pool.Transaction_pool.Resource_pool.transactions ~logger
@@ -687,7 +682,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     [%test_result: [ `Take | `Keep ]]
                       (Consensus.Hooks.select ~constants:consensus_constants
                          ~existing:
-                           (With_hash.map ~f:External_transition.consensus_state
+                           (With_hash.map ~f:Mina_block.consensus_state
                               previous_transition)
                          ~candidate:consensus_state_with_hashes ~logger)
                       ~expect:`Take
@@ -742,11 +737,11 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     in
                     let%bind transition =
                       let open Result.Let_syntax in
-                      External_transition.Validation.wrap
+                      Validation.wrap
                         { With_hash.hash = protocol_state_hashes
                         ; data =
                             (let body = Body.create staged_ledger_diff in
-                             Block.create ~body
+                             Mina_block.create ~body
                                ~header:
                                  (Header.create
                                     ~body_reference:
@@ -754,23 +749,28 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                                     ~protocol_state ~protocol_state_proof
                                     ~delta_block_chain_proof ()))
                         }
-                      |> External_transition.skip_time_received_validation
-                           `This_transition_was_not_received_via_gossip
-                      |> External_transition.skip_protocol_versions_validation
-                           `This_transition_has_valid_protocol_versions
-                      |> External_transition.validate_genesis_protocol_state
+                      |> Validation.skip_time_received_validation
+                           `This_block_was_not_received_via_gossip
+                      |> Validation.skip_protocol_versions_validation
+                           `This_block_has_valid_protocol_versions
+                      |> Validation.validate_genesis_protocol_state
                            ~genesis_state_hash:
                              (Protocol_state.genesis_state_hash
                                 ~state_hash:(Some previous_state_hash)
                                 previous_protocol_state)
-                      >>| External_transition.skip_proof_validation
-                            `This_transition_was_generated_internally
-                      >>| External_transition
-                          .skip_delta_transition_chain_validation
-                            `This_transition_was_not_received_via_gossip
-                      >>= Transition_frontier_validation
-                          .validate_frontier_dependencies ~logger ~frontier
+                      >>| Validation.skip_proof_validation
+                            `This_block_was_generated_internally
+                      >>| Validation.skip_delta_block_chain_validation
+                            `This_block_was_not_received_via_gossip
+                      >>= Validation.validate_frontier_dependencies ~logger
                             ~consensus_constants
+                            ~root_block:
+                              ( Transition_frontier.root frontier
+                              |> Breadcrumb.block_with_hash )
+                            ~get_block_by_hash:
+                              (Fn.compose
+                                 (Option.map ~f:Breadcrumb.block_with_hash)
+                                 (Transition_frontier.find frontier))
                       |> Deferred.return
                     in
                     let transition_receipt_time = Some (Time.now ()) in
@@ -1158,12 +1158,18 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
   in
   let start = Block_time.now time_controller in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
+  (* accounts_accessed, accounts_created are unused here
+     those fields are in precomputed blocks to add to the
+     archive db, they're not needed for replaying blocks
+  *)
   let produce
-      { Precomputed_block.scheduled_time
+      { Precomputed.scheduled_time
       ; protocol_state
       ; protocol_state_proof
       ; staged_ledger_diff
       ; delta_transition_chain_proof = delta_block_chain_proof
+      ; accounts_accessed = _
+      ; accounts_created = _
       } =
     let protocol_state_hashes = Protocol_state.hashes protocol_state in
     let consensus_state_with_hashes =
@@ -1185,19 +1191,16 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         [%log trace]
           ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
           "Emitting precomputed block with parent $breadcrumb%!" ;
-        let previous_transition =
-          Breadcrumb.validated_transition crumb
-          |> External_transition.Validation.forget_validation_with_hash
-        in
+        let previous_transition = Breadcrumb.block_with_hash crumb in
         let previous_protocol_state =
-          External_transition.protocol_state
-            (With_hash.data previous_transition)
+          Header.protocol_state
+          @@ Mina_block.header (With_hash.data previous_transition)
         in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [ `Take | `Keep ]]
               (Consensus.Hooks.select ~constants:consensus_constants
                  ~existing:
-                   (With_hash.map ~f:External_transition.consensus_state
+                   (With_hash.map ~f:Mina_block.consensus_state
                       previous_transition)
                  ~candidate:consensus_state_with_hashes ~logger)
               ~expect:`Take
@@ -1223,32 +1226,39 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           in
           let%bind transition =
             let open Result.Let_syntax in
-            External_transition.Validation.wrap
+            Validation.wrap
               { With_hash.hash = protocol_state_hashes
               ; data =
                   (let body = Body.create staged_ledger_diff in
-                   Block.create ~body
+                   Mina_block.create ~body
                      ~header:
                        (Header.create
                           ~body_reference:(Body_reference.of_body body)
                           ~protocol_state ~protocol_state_proof
                           ~delta_block_chain_proof ()))
               }
-            |> External_transition.skip_time_received_validation
-                 `This_transition_was_not_received_via_gossip
-            |> External_transition.skip_protocol_versions_validation
-                 `This_transition_has_valid_protocol_versions
-            |> External_transition.validate_genesis_protocol_state
+            |> Validation.skip_time_received_validation
+                 `This_block_was_not_received_via_gossip
+            |> Validation.skip_protocol_versions_validation
+                 `This_block_has_valid_protocol_versions
+            |> Validation.skip_proof_validation
+                 `This_block_was_generated_internally
+            |> Validation.skip_delta_block_chain_validation
+                 `This_block_was_not_received_via_gossip
+            |> Validation.validate_genesis_protocol_state
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash
                       ~state_hash:(Some previous_protocol_state_hash)
                       previous_protocol_state)
-            >>| External_transition.skip_proof_validation
-                  `This_transition_was_generated_internally
-            >>| External_transition.skip_delta_transition_chain_validation
-                  `This_transition_was_not_received_via_gossip
-            >>= Transition_frontier_validation.validate_frontier_dependencies
-                  ~logger ~frontier ~consensus_constants
+            >>= Validation.validate_frontier_dependencies ~logger
+                  ~consensus_constants
+                  ~root_block:
+                    ( Transition_frontier.root frontier
+                    |> Breadcrumb.block_with_hash )
+                  ~get_block_by_hash:
+                    (Fn.compose
+                       (Option.map ~f:Breadcrumb.block_with_hash)
+                       (Transition_frontier.find frontier))
             |> Deferred.return
           in
           let transition_receipt_time = None in
@@ -1337,7 +1347,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             let new_time_offset =
               Time.diff (Time.now ())
                 (Block_time.to_time
-                   precomputed_block.Precomputed_block.scheduled_time)
+                   precomputed_block.Precomputed.scheduled_time)
             in
             [%log info]
               "Changing time offset from $old_time_offset to $new_time_offset"

@@ -117,8 +117,10 @@ let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
       in
       let block_height_at_best_tip =
         Mina_lib.best_tip mina
-        |> Participating_state.map
-             ~f:Transition_frontier.Breadcrumb.blockchain_length
+        |> Participating_state.map ~f:(fun b ->
+               Transition_frontier.Breadcrumb.consensus_state b
+               |> Consensus.Data.Consensus_state.blockchain_length
+               |> Mina_numbers.Length.to_uint32)
         |> Participating_state.map ~f:Unsigned.UInt32.to_int
         |> Participating_state.active
       in

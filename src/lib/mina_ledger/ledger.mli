@@ -134,6 +134,7 @@ module Transaction_applied : sig
     type t = Transaction_applied.Parties_applied.t =
       { accounts : (Account_id.t * Account.t option) list
       ; command : Parties.t With_status.t
+      ; previous_empty_accounts : Account_id.t list
       }
     [@@deriving sexp]
   end
@@ -150,7 +151,6 @@ module Transaction_applied : sig
       { fee_transfer : Fee_transfer.t
       ; previous_empty_accounts : Account_id.t list
       ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Fee_transfer_balance_data.t
       }
     [@@deriving sexp]
   end
@@ -160,7 +160,6 @@ module Transaction_applied : sig
       { coinbase : Coinbase.t
       ; previous_empty_accounts : Account_id.t list
       ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Coinbase_balance_data.t
       }
     [@@deriving sexp]
   end
@@ -224,7 +223,7 @@ val apply_parties_unchecked :
      * ( ( Stack_frame.value
          , Stack_frame.value list
          , Token_id.t
-         , Currency.Amount.t
+         , Currency.Amount.Signed.t
          , t
          , bool
          , unit

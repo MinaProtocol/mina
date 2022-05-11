@@ -2,7 +2,7 @@ open Mina_base
 open Core
 open Async
 open Cache_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
@@ -72,8 +72,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   (* TODO: handle this edge case more gracefully *)
                   (* since we are building a disconnected subtree of breadcrumbs,
                    * we skip this step in validation *)
-                  External_transition.skip_frontier_dependencies_validation
-                    `This_transition_belongs_to_a_detached_subtree
+                  Validation.skip_frontier_dependencies_validation
+                    `This_block_belongs_to_a_detached_subtree
                     transition_with_initial_validation
                 in
                 let sender = Envelope.Incoming.sender enveloped_transition in
@@ -82,8 +82,9 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   Transition_frontier.Breadcrumb.state_hash parent
                 in
                 let actual_parent_hash =
-                  transition_with_hash |> With_hash.data
-                  |> External_transition.parent_hash
+                  transition_with_hash |> With_hash.data |> Mina_block.header
+                  |> Header.protocol_state
+                  |> Mina_state.Protocol_state.previous_state_hash
                 in
                 let%bind () =
                   Deferred.return

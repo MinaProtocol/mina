@@ -33,6 +33,8 @@ pub struct CamlLookupVerifierIndex<PolyComm> {
     pub lookup_used: CamlLookupsUsed,
     pub lookup_table: Vec<PolyComm>,
     pub lookup_selectors: Vec<PolyComm>,
+    pub table_ids: Option<PolyComm>,
+    pub max_joint_size: ocaml::Int
 }
 
 impl<G, CamlPolyComm> From<LookupVerifierIndex<G>> for CamlLookupVerifierIndex<CamlPolyComm>
@@ -45,6 +47,8 @@ where
             lookup_used,
             lookup_table,
             lookup_selectors,
+            table_ids,
+            max_joint_size,
         } = li;
         CamlLookupVerifierIndex {
             lookup_used: {
@@ -56,6 +60,8 @@ where
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
 
             lookup_selectors: lookup_selectors.into_iter().map(From::from).collect(),
+            table_ids: table_ids.map(From::from),
+            max_joint_size: max_joint_size.try_into().unwrap(),
         }
     }
 }
@@ -70,6 +76,8 @@ where
             lookup_used,
             lookup_table,
             lookup_selectors,
+            table_ids,
+            max_joint_size,
         } = li;
         LookupVerifierIndex {
             lookup_used: {
@@ -80,6 +88,8 @@ where
             },
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
             lookup_selectors: lookup_selectors.into_iter().map(From::from).collect(),
+            table_ids: table_ids.map(From::from),
+            max_joint_size: max_joint_size.try_into().unwrap(),
         }
     }
 }

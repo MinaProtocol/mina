@@ -24,8 +24,11 @@ let tick_shifts, tock_shifts =
   ( mk Kimchi_bindings.Protocol.VerifierIndex.Fp.shifts
   , mk Kimchi_bindings.Protocol.VerifierIndex.Fq.shifts )
 
-let wrap_domains =
-  { Domains.h = Pow_2_roots_of_unity 15
+let wrap_domains ~proofs_verified =
+  let h =
+    match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
+  in
+  { Domains.h = Pow_2_roots_of_unity h
   ; x =
       Pow_2_roots_of_unity
         (let (T (typ, _)) = Impls.Wrap.input () in
@@ -40,16 +43,16 @@ let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state)
 
-let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
+let hash_dlog_me_only (type n) (_max_proofs_verified : n Nat.t)
     (t :
       (Tick.Curve.Affine.t, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
   Tock_field_sponge.digest Tock_field_sponge.params
     (Types.Wrap.Proof_state.Me_only.to_field_elements t
        ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]))
 
-let dlog_pcs_batch (type n_branching total)
+let dlog_pcs_batch (type proofs_verified total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (n_branching, Nat.N26.n, total) Nat.Adds.t) =
+      total Nat.t * (proofs_verified, Nat.N26.n, total) Nat.Adds.t) =
   Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 let when_profiling profiling default =
@@ -196,11 +199,12 @@ let tock_unpadded_public_input_of_statement prev_statement =
 
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_branching
+let tick_public_input_of_statement ~max_proofs_verified
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv)) =
-      Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n
+      Impls.Step.input ~proofs_verified:max_proofs_verified
+        ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input [ input ] prev_statement
   in

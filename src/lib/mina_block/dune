@@ -1,6 +1,6 @@
 (library
- (name mina_transition)
- (public_name mina_transition)
+ (name mina_block)
+ (public_name mina_block)
  (instrumentation (backend bisect_ppx))
  (inline_tests)
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
@@ -19,6 +19,7 @@
    ;; local libraries
    mina_ledger
    mina_numbers
+   currency
    unsigned_extended
    ledger_proof
    logger
@@ -44,4 +45,5 @@
    signature_lib
    genesis_constants
    transaction_snark_work
+   coda_genesis_proof
 ))

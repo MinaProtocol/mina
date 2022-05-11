@@ -1,5 +1,5 @@
 open Core
-open Mina_transition
+open Mina_block
 open Signature_lib
 open Async
 
@@ -42,8 +42,9 @@ let main () =
     let found_snark_prover_ivar = Ivar.create () in
     Pipe.iter new_block_pipe ~f:(fun transition ->
         let completed_works =
-          Staged_ledger_diff.completed_works
-          @@ External_transition.Validated.staged_ledger_diff transition
+          Staged_ledger_diff.completed_works @@ Body.staged_ledger_diff
+          @@ Mina_block.Validated.body
+          @@ External_transition.Validated.lower transition
         in
         if
           List.exists completed_works

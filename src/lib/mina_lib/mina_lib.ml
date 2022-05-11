@@ -3,7 +3,7 @@ open Async
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
-open Mina_transition
+open Mina_block
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
@@ -11,7 +11,7 @@ open Network_peer
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
-module Subscriptions = Coda_subscriptions
+module Subscriptions = Mina_subscriptions
 module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
 
@@ -63,7 +63,7 @@ type components =
   ; snark_pool : Network_pool.Snark_pool.t
   ; transition_frontier : Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block :
-      External_transition.Initial_validated.t Broadcast_pipe.Reader.t
+      Mina_block.initial_valid_block Broadcast_pipe.Reader.t
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
@@ -109,7 +109,7 @@ type t =
   ; snark_job_state : Work_selector.State.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
-  ; subscriptions : Coda_subscriptions.t
+  ; subscriptions : Mina_subscriptions.t
   ; sync_status : Sync_status.t Mina_incremental.Status.Observer.t
   ; precomputed_block_writer :
       ([ `Path of string ] option * [ `Log ] option) ref
@@ -625,7 +625,9 @@ let get_snarked_ledger t state_hash_opt =
           ~finish:Fn.id
       in
       let snarked_ledger_hash =
-        Transition_frontier.Breadcrumb.blockchain_state b
+        Transition_frontier.Breadcrumb.block b
+        |> Mina_block.header |> Header.protocol_state
+        |> Mina_state.Protocol_state.blockchain_state
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
       let merkle_root = Ledger.merkle_root ledger in
@@ -681,10 +683,10 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
 let snark_job_state t = t.snark_job_state
 
 let add_block_subscriber t public_key =
-  Coda_subscriptions.add_block_subscriber t.subscriptions public_key
+  Mina_subscriptions.add_block_subscriber t.subscriptions public_key
 
 let add_payment_subscriber t public_key =
-  Coda_subscriptions.add_payment_subscriber t.subscriptions public_key
+  Mina_subscriptions.add_payment_subscriber t.subscriptions public_key
 
 let transaction_pool t = t.components.transaction_pool
 
@@ -746,9 +748,10 @@ let root_diff t =
   in
   O1trace.background_thread "read_root_diffs" (fun () ->
       let open Root_diff.Stable.Latest in
-      let length_of_breadcrumb =
-        Fn.compose Unsigned.UInt32.to_int
-          Transition_frontier.Breadcrumb.blockchain_length
+      let length_of_breadcrumb b =
+        Transition_frontier.Breadcrumb.consensus_state b
+        |> Consensus.Data.Consensus_state.blockchain_length
+        |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int
       in
       Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
         | None ->
@@ -758,7 +761,8 @@ let root_diff t =
             Strict_pipe.Writer.write root_diff_writer
               { commands =
                   List.map
-                    (Transition_frontier.Breadcrumb.commands root)
+                    ( Transition_frontier.Breadcrumb.validated_transition root
+                    |> Mina_block.Validated.valid_commands )
                     ~f:(With_status.map ~f:User_command.forget_check)
               ; root_length = length_of_breadcrumb root
               } ;
@@ -784,8 +788,9 @@ let root_diff t =
                       in
                       Strict_pipe.Writer.write root_diff_writer
                         { commands =
-                            Transition_frontier.Breadcrumb.commands
+                            Transition_frontier.Breadcrumb.validated_transition
                               new_root_breadcrumb
+                            |> Mina_block.Validated.valid_commands
                             |> List.map
                                  ~f:
                                    (With_status.map
@@ -1782,9 +1787,9 @@ let create ?wallets (config : Config.t) =
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
             Broadcast_pipe.create
-              ( External_transition.genesis
-                  ~precomputed_values:config.precomputed_values
-              |> External_transition.Validated.to_initial_validated )
+              ( Mina_block.genesis ~precomputed_values:config.precomputed_values
+              |> Validation.reset_frontier_dependencies_validation
+              |> Validation.reset_staged_ledger_diff_validation )
           in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run ~logger:config.logger
@@ -1809,7 +1814,8 @@ let create ?wallets (config : Config.t) =
             let api_pipe, new_blocks_pipe =
               Strict_pipe.Reader.(
                 Fork.two
-                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
+                  (map downstream_pipe ~f:(fun (`Transition t, _, _) ->
+                       External_transition.Validated.lift t)))
             in
             (network_pipe, api_pipe, new_blocks_pipe)
           in
@@ -1836,11 +1842,13 @@ let create ?wallets (config : Config.t) =
                      (`Transition transition, `Source source, `Valid_cb valid_cb)
                    ->
                   let hash =
-                    (External_transition.Validated.state_hashes transition)
-                      .state_hash
+                    Mina_block.Validated.forget transition
+                    |> State_hash.With_state_hashes.state_hash
                   in
                   let consensus_state =
-                    transition |> External_transition.Validated.consensus_state
+                    transition |> Mina_block.Validated.header
+                    |> Header.protocol_state
+                    |> Mina_state.Protocol_state.consensus_state
                   in
                   let now =
                     let open Block_time in
@@ -1858,8 +1866,7 @@ let create ?wallets (config : Config.t) =
                           [%str_log' info config.logger]
                             ~metadata:
                               [ ( "external_transition"
-                                , External_transition.Validated.to_yojson
-                                    transition )
+                                , Mina_block.Validated.to_yojson transition )
                               ]
                             (Rebroadcast_transition { state_hash = hash }) ;
                           (*send callback to libp2p to forward the gossiped transition*)
@@ -1873,8 +1880,7 @@ let create ?wallets (config : Config.t) =
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
                           don't_wait_for
                             (Mina_networking.broadcast_state net
-                               (External_transition.Validation
-                                .forget_validation_with_hash transition)) ;
+                               (Mina_block.Validated.forget transition)) ;
                           Option.iter
                             ~f:
                               (Fn.flip
@@ -1900,8 +1906,7 @@ let create ?wallets (config : Config.t) =
                       let metadata =
                         [ ("state_hash", State_hash.to_yojson hash)
                         ; ( "external_transition"
-                          , External_transition.Validated.to_yojson transition
-                          )
+                          , Mina_block.Validated.to_yojson transition )
                         ; ("timing", timing_error_json)
                         ]
                       in
@@ -1978,6 +1983,7 @@ let create ?wallets (config : Config.t) =
                     , `Int (Host_and_port.port archive_process_port.value) )
                   ] ;
               Archive_client.run ~logger:config.logger
+                ~precomputed_values:config.precomputed_values
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port) ;
           let precomputed_block_writer =
@@ -1987,7 +1993,7 @@ let create ?wallets (config : Config.t) =
               , if config.log_precomputed_blocks then Some `Log else None )
           in
           let subscriptions =
-            Coda_subscriptions.create ~logger:config.logger
+            Mina_subscriptions.create ~logger:config.logger
               ~constraint_constants ~new_blocks ~wallets
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
