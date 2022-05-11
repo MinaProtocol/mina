@@ -131,18 +131,9 @@ module Step = struct
   let input ~proofs_verified ~wrap_rounds =
     let open Types.Step.Statement in
     let spec = spec proofs_verified wrap_rounds in
-    let (T (typ, f)) =
-      Spec.packed_typ
-        (module Impl)
-        (T
-           ( Shifted_value.Type2.typ Other_field.typ_unchecked
-           , fun (Shifted_value.Type2.Shifted_value x as t) ->
-               Impl.run_checked (Other_field.check x) ;
-               t ))
-        spec
-    in
-    let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.ETyp.T (typ, fun x -> of_data (f x))
+    Spec.typ (module Impl) (Shifted_value.Type2.typ Other_field.typ) spec
+    |> Typ.transport ~there:to_data ~back:of_data
+    |> Typ.transport_var ~there:to_data ~back:of_data
 end
 
 module Wrap = struct

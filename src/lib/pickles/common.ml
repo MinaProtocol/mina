@@ -202,7 +202,7 @@ let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 let tick_public_input_of_statement ~max_proofs_verified
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
-    let (T (input, _conv)) =
+    let input =
       Impls.Step.input ~proofs_verified:max_proofs_verified
         ~wrap_rounds:Tock.Rounds.n
     in

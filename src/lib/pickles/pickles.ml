@@ -555,17 +555,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           (Branch_data)
           (E04 (Lazy_keys))
           (struct
-            let etyp =
+            let typ =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
-              let (T (typ, conv)) = etyp in
-              let main x () : unit =
-                b.main
-                  (Impls.Step.with_label "conv" (fun () -> conv x))
-                  ~step_domains
-              in
+              let main x () : unit = b.main x ~step_domains in
               let () = if true then log_step main typ name b.index in
               let open Impls.Step in
               let k_p =
