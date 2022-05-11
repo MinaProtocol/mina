@@ -52,6 +52,7 @@ val deriver :
           ref
       ; of_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
       ; to_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
+      ; js_layout : Yojson.Safe.t ref
       ; .. >
       as
       'a)

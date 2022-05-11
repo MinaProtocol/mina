@@ -26,6 +26,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let to_json_accumulator = ref [] in
     let of_json_creator = ref String.Map.empty in
 
+    let js_layout = ref (`String "UNALTERED") in
+    let js_layout_accumulator = ref [] in
+
     let contramap = ref (fun _ -> failwith "unimplemented") in
     let map = ref (fun _ -> failwith "unimplemented") in
 
@@ -60,6 +63,10 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
       method of_json_creator = of_json_creator
 
+      method js_layout = js_layout
+
+      method js_layout_accumulator = js_layout_accumulator
+
       method contramap = contramap
 
       method map = map
@@ -74,6 +81,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
       constraint 'a = _ Graphql.Fields.Input.t
       constraint 'a = _ Graphql.Args.Input.t
       constraint 'a = _ Fields_derivers_graphql.Graphql_query.Input.t
+      constraint 'a = _ Fields_derivers_js.Js_layout.Input.t
   end
 
   let yojson obj ?doc ~name ~map ~contramap : _ Unified_input.t =
@@ -105,6 +113,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
     obj#contramap := contramap ;
 
     obj#map := map ;
+
+    obj#js_layout := Fields_derivers_js.Js_layout.leaftype name ;
 
     Fields_derivers_graphql.Graphql_query.scalar obj
 
@@ -162,6 +172,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _b = Graphql.Args.skip obj in
     let _c = Fields_derivers_json.To_yojson.skip obj in
     let _d = Fields_derivers_graphql.Graphql_query.skip obj in
+    let _e = Fields_derivers_js.Js_layout.skip obj in
     Fields_derivers_json.Of_yojson.skip obj
 
   let int obj : _ Unified_input.t =
@@ -169,6 +180,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _b = Graphql.Args.int obj in
     let _c = Fields_derivers_json.To_yojson.int obj in
     let _d = Fields_derivers_graphql.Graphql_query.int obj in
+    let _e = Fields_derivers_js.Js_layout.int obj in
     Fields_derivers_json.Of_yojson.int obj
 
   let string obj : _ Unified_input.t =
@@ -176,6 +188,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _b = Graphql.Args.string obj in
     let _c = Fields_derivers_json.To_yojson.string obj in
     let _d = Fields_derivers_graphql.Graphql_query.string obj in
+    let _e = Fields_derivers_js.Js_layout.string obj in
     Fields_derivers_json.Of_yojson.string obj
 
   let bool obj : _ Unified_input.t =
@@ -183,6 +196,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _b = Graphql.Args.bool obj in
     let _c = Fields_derivers_json.To_yojson.bool obj in
     let _d = Fields_derivers_graphql.Graphql_query.bool obj in
+    let _e = Fields_derivers_js.Js_layout.bool obj in
     Fields_derivers_json.Of_yojson.bool obj
 
   let global_slot obj =
@@ -202,6 +216,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _b = Graphql.Args.option x obj in
     let _c = Fields_derivers_json.To_yojson.option x obj in
     let _d = Fields_derivers_graphql.Graphql_query.option x obj in
+    let _e = Fields_derivers_js.Js_layout.option x obj in
     Fields_derivers_json.Of_yojson.option x obj
 
   let list (x : _ Unified_input.t) obj : _ Unified_input.t =
@@ -209,6 +224,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _b = Graphql.Args.list x obj in
     let _c = Fields_derivers_json.To_yojson.list x obj in
     let _d = Fields_derivers_graphql.Graphql_query.list x obj in
+    let _e = Fields_derivers_js.Js_layout.list x obj in
     Fields_derivers_json.Of_yojson.list x obj
 
   let iso ~map ~contramap (x : _ Unified_input.t) obj : _ Unified_input.t =
@@ -216,6 +232,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _b = Graphql.Args.map ~f:map x obj in
     let _c = Fields_derivers_json.To_yojson.contramap ~f:contramap x obj in
     let _d = Fields_derivers_graphql.Graphql_query.wrapped x obj in
+    let _e = Fields_derivers_js.Js_layout.wrapped x obj in
     Fields_derivers_json.Of_yojson.map ~f:map x obj
 
   let iso_record ~of_record ~to_record record_deriver obj =
@@ -242,7 +259,10 @@ module Make (Schema : Graphql_intf.Schema) = struct
       Fields_derivers_graphql.Graphql_query.add_field ~t_fields_annots x fd
         acc''''
     in
-    ((function `Left x -> c1 x | `Right x -> c2 x), acc''''')
+    let _, acc'''''' =
+      Fields_derivers_js.Js_layout.add_field ~t_fields_annots x fd acc'''''
+    in
+    ((function `Left x -> c1 x | `Right x -> c2 x), acc'''''')
 
   let ( !. ) ?skip_data x fd acc = add_field ?skip_data (x @@ o ()) fd acc
 
@@ -258,6 +278,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
     in
     let _d =
       Fields_derivers_graphql.Graphql_query.finish ((fun x -> f (`Left x)), acc)
+    in
+    let _e =
+      Fields_derivers_js.Js_layout.finish ((fun x -> f (`Left x)), acc)
     in
     Fields_derivers_json.Of_yojson.finish ((fun x -> f (`Right x)), acc)
 
@@ -436,6 +459,7 @@ end
 
 module Derivers = Make (Fields_derivers_graphql.Schema)
 include Derivers
+module Js_layout = Fields_derivers_js.Js_layout
 
 [%%ifdef consensus_mechanism]
 
