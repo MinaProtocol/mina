@@ -960,7 +960,14 @@ module Node = struct
         (run_in_container t
            ~cmd:[ "jq"; "-c"; ".ledger"; "/config/daemon.json" ])
     in
-    let replayer_input = sprintf {| { "genesis_ledger": %s } |} ledger in
+    let replayer_input =
+      sprintf
+        {| { "genesis_ledger": %s,
+                                      "add_genesis_winner": true
+                                    }
+                                 |}
+        ledger
+    in
     let dest = "replayer-input.json" in
     let%bind _res =
       Deferred.bind ~f:Malleable_error.return
