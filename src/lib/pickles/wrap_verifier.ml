@@ -120,12 +120,17 @@ struct
   let scalar_to_field s =
     SC.to_field_checked (module Impl) s ~endo:Endo.Step_inner_curve.scalar
 
+  let assert_n_bits ~n a =
+    (* Scalar_challenge.to_field_checked has the side effect of
+        checking that the input fits in n bits. *)
+    ignore
+      ( SC.to_field_checked
+          (module Impl)
+          (SC.SC.create a) ~endo:Endo.Step_inner_curve.scalar ~num_bits:n
+        : Field.t )
+
   let lowest_128_bits ~constrain_low_bits x =
-    let assert_128_bits a =
-      (* Scalar_challenge.to_field_checked has the side effect of
-         checking that the input fits in 128 bits. *)
-      ignore (scalar_to_field (SC.SC.create a) : Field.t)
-    in
+    let assert_128_bits = assert_n_bits ~n:128 in
     Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
 
   let squeeze_challenge sponge : Field.t =
