@@ -11,8 +11,7 @@ type 'field vanishing_polynomial_domain =
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Plonk_types.Shifts.t
-  ; generator : 'field
-  ; size : 'field >
+  ; generator : 'field >
 
 type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
 
@@ -55,13 +54,10 @@ let vanishing_polynomial (type t) ((module F) : t field) domain x =
 
 let domain (type t) ((module F) : t field) ~shifts ~domain_generator
     (domain : Domain.t) : t plonk_domain =
-  let size = F.of_int (Domain.size domain) in
   let log2_size = Domain.log2_size domain in
   let shifts = shifts ~log2_size in
   let generator = domain_generator ~log2_size in
   object
-    method size = size
-
     method shifts = shifts
 
     method vanishing_polynomial x = vanishing_polynomial (module F) domain x
