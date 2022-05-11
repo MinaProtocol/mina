@@ -496,7 +496,9 @@ module Initial_validate_batcher = struct
         >>| function
         | Ok tvs ->
             Ok (List.map tvs ~f:(fun x -> `Valid x))
-        | Error `Invalid_proof ->
+        | Error `Invalid_proof
+        | Error `Invalid_block_creator
+        | Error `Invalid_reference_signature ->
             Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x)))
         | Error (`Verifier_error e) ->
             Error e )

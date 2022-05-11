@@ -1,9 +1,7 @@
 (library
  (name mina_block)
  (public_name mina_block)
- (instrumentation (backend bisect_ppx))
  (inline_tests)
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (libraries
    ;; opam libraries
    integers
@@ -15,6 +13,7 @@
    base64
    result
    ppx_inline_test.config
+   base
    core
    ;; local libraries
    mina_ledger
@@ -46,4 +45,14 @@
    genesis_constants
    transaction_snark_work
    coda_genesis_proof
-))
+   blake2
+   snark_params
+   crypto_params
+   pickles
+   pickles.backend
+   pasta_bindings
+   kimchi_pasta
+   random_oracle
+   random_oracle_input)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson)))

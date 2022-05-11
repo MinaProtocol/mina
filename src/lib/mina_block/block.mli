@@ -6,11 +6,11 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V1 : sig
-    type t [@@deriving compare, sexp, to_yojson, equal]
+    type t [@@deriving sexp, to_yojson, equal]
   end
 end]
 
-type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson, equal]
+type t = Stable.Latest.t [@@deriving sexp, to_yojson, equal]
 
 type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
 

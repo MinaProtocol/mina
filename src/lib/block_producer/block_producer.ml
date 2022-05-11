@@ -321,6 +321,7 @@ module Precomputed = struct
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
+    ; body_reference : Body_reference.t
     }
 
   let sexp_of_t = Precomputed.sexp_of_t
@@ -585,7 +586,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (scheduled_time, block_data, winner_pk) =
+      let produce ivar
+          (scheduled_time, block_data, winner_pubkey, producer_privkey) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -667,7 +669,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
-                ~winner_pk ~block_reward_threshold
+                ~winner_pk:winner_pubkey ~block_reward_threshold
             in
             match next_state_opt with
             | None ->
@@ -750,7 +752,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                                ~header:
                                  (Header.create
                                     ~body_reference:
-                                      (Body_reference.of_body body)
+                                      (Body_reference.of_body
+                                         ~private_key:producer_privkey body )
                                     ~protocol_state ~protocol_state_proof
                                     ~delta_block_chain_proof () ) )
                         }
@@ -1043,7 +1046,11 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                          ignore
                            ( Interruptible.finally
                                (Singleton_supervisor.dispatch
-                                  production_supervisor (now, data, winner_pk) )
+                                  production_supervisor
+                                  ( now
+                                  , data
+                                  , winner_pk
+                                  , slot_won.producer.private_key ) )
                                ~f:(check_next_block_timing new_global_slot i')
                              : (_, _) Interruptible.t ) )
                        else
@@ -1118,7 +1125,10 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                                    ( Interruptible.finally
                                        (Singleton_supervisor.dispatch
                                           production_supervisor
-                                          (scheduled_time, data, winner_pk) )
+                                          ( scheduled_time
+                                          , data
+                                          , winner_pk
+                                          , slot_won.producer.private_key ) )
                                        ~f:
                                          (check_next_block_timing
                                             new_global_slot i' )
@@ -1176,6 +1186,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       ; accounts_accessed = _
       ; accounts_created = _
       ; tokens_used = _
+      ; body_reference
       } =
     let protocol_state_hashes = Protocol_state.hashes protocol_state in
     let consensus_state_with_hashes =
@@ -1238,10 +1249,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   (let body = Body.create staged_ledger_diff in
                    Mina_block.create ~body
                      ~header:
-                       (Header.create
-                          ~body_reference:(Body_reference.of_body body)
-                          ~protocol_state ~protocol_state_proof
-                          ~delta_block_chain_proof () ) )
+                       (Header.create ~body_reference ~protocol_state
+                          ~protocol_state_proof ~delta_block_chain_proof () ) )
               }
             |> Validation.skip_time_received_validation
                  `This_block_was_not_received_via_gossip

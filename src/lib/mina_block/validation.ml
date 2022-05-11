@@ -306,7 +306,6 @@ let reset_genesis_protocol_state_validation (block_with_hash, validation) =
       failwith "why can't this be refuted?"
 
 let validate_proofs ~verifier ~genesis_state_hash tvs =
-  let open Deferred.Let_syntax in
   let to_verify =
     List.filter_map tvs ~f:(fun (t, _validation) ->
         if
@@ -325,7 +324,24 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
                ~state:(Header.protocol_state header)
                ~proof:(Header.protocol_state_proof header) ) )
   in
-  match%map
+  let%bind.Deferred.Result () =
+    Deferred.Result.all_unit
+      (List.map tvs ~f:(fun (t, _) ->
+           let header = Block.header @@ With_hash.data t in
+           let ref = Header.body_reference header in
+           let public_key_opt =
+             Header.protocol_state header
+             |> Protocol_state.consensus_state |> Consensus_state.block_creator
+             |> Signature_lib.Public_key.decompress
+           in
+           Option.value_map public_key_opt
+             ~default:(Deferred.Result.fail `Invalid_block_creator)
+             ~f:(fun public_key ->
+               if Body_reference.verify ~public_key ref then
+                 Deferred.Result.return ()
+               else Deferred.Result.fail `Invalid_reference_signature ) ) )
+  in
+  match%map.Deferred
     match to_verify with
     | [] ->
         (* Skip calling the verifier, nothing here to verify. *)
@@ -448,25 +464,35 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~precomputed_values ~verifier ~parent_staged_ledger ~parent_protocol_state
     (t, validation) =
-  let open Deferred.Result.Let_syntax in
   let target_hash_of_ledger_proof =
     Fn.compose Registers.ledger
     @@ Fn.compose Ledger_proof.statement_target Ledger_proof.statement
   in
   let block = With_hash.data t in
-  let protocol_state = block |> Block.header |> Header.protocol_state in
+  let header = Block.header block in
+  let protocol_state = Header.protocol_state header in
   let blockchain_state = Protocol_state.blockchain_state protocol_state in
   let consensus_state = Protocol_state.consensus_state protocol_state in
-  let staged_ledger_diff = block |> Block.body |> Body.staged_ledger_diff in
+  let body = Block.body block in
   let apply_start_time = Core.Time.now () in
-  let%bind ( `Hash_after_applying staged_ledger_hash
-           , `Ledger_proof proof_opt
-           , `Staged_ledger transitioned_staged_ledger
-           , `Pending_coinbase_update _ ) =
+  let body_ref_from_header =
+    Body_reference.reference (Header.body_reference header)
+  in
+  let body_ref_computed = Body_reference.compute_reference body in
+  let%bind.Deferred.Result () =
+    if Blake2.equal body_ref_computed body_ref_from_header then
+      Deferred.Result.return ()
+    else Deferred.Result.fail `Invalid_body_reference
+  in
+  let%bind.Deferred.Result ( `Hash_after_applying staged_ledger_hash
+                           , `Ledger_proof proof_opt
+                           , `Staged_ledger transitioned_staged_ledger
+                           , `Pending_coinbase_update _ ) =
     Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
       ~constraint_constants:
         precomputed_values.Precomputed_values.constraint_constants ~logger
-      ~verifier parent_staged_ledger staged_ledger_diff
+      ~verifier parent_staged_ledger
+      (Body.staged_ledger_diff body)
       ~current_state_view:
         Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
       ~state_and_body_hash:

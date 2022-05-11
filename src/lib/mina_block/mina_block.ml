@@ -24,7 +24,8 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
   let protocol_state = With_hash.data genesis_state in
   let block_with_hash =
     let body = Body.create Staged_ledger_diff.empty_diff in
-    let body_reference = Body_reference.of_body body in
+    let private_key = snd Consensus_state_hooks.genesis_winner in
+    let body_reference = Body_reference.of_body ~private_key body in
     let header =
       Header.create ~body_reference ~protocol_state
         ~protocol_state_proof:Proof.blockchain_dummy

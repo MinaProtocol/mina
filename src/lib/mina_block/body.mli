@@ -3,7 +3,7 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V1 : sig
-    type t [@@deriving compare, sexp, to_yojson]
+    type t [@@deriving compare, sexp, to_yojson, bin_io]
   end
 end]
 

@@ -90,6 +90,18 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                  (Mina_block.Validated.lift fully_valid_block)
                ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
                ~transition_receipt_time )
+      | Error `Invalid_body_reference ->
+          let message = "invalid body reference" in
+          let%map () =
+            match sender with
+            | None | Some Envelope.Sender.Local ->
+                return ()
+            | Some (Envelope.Sender.Remote peer) ->
+                Trust_system.(
+                  record trust_system logger peer
+                    Actions.(Gossiped_invalid_transition, Some (message, [])))
+          in
+          Error (`Invalid_staged_ledger_diff (Error.of_string message))
       | Error (`Invalid_staged_ledger_diff errors) ->
           let reasons =
             String.concat ~sep:" && "
@@ -399,7 +411,10 @@ module For_tests = struct
         let body =
           Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
         in
-        let body_reference = Mina_block.Body_reference.of_body body in
+        let body_reference =
+          Mina_block.Body_reference.of_body body
+            ~private_key:(snd Mina_state.Consensus_state_hooks.genesis_winner)
+        in
         let header =
           Mina_block.Header.create ~protocol_state
             ~protocol_state_proof:Proof.blockchain_dummy

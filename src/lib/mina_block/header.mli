@@ -5,12 +5,12 @@ open Mina_state
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V1 : sig
-    type t [@@deriving compare, sexp, to_yojson]
+  module V2 : sig
+    type t [@@deriving sexp, to_yojson]
   end
 end]
 
-type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
+type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
 val create :
      protocol_state:Protocol_state.Value.t

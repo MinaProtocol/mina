@@ -59,6 +59,7 @@ module T = struct
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
+    ; body_reference : Body_reference.t
     }
   [@@deriving sexp, yojson]
 end
@@ -69,7 +70,7 @@ include T
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t = T.t =
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
@@ -83,6 +84,7 @@ module Stable = struct
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
           (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
+      ; body_reference : Body_reference.Stable.V2.t
       }
 
     let to_latest = Fn.id
@@ -163,6 +165,7 @@ let of_block ~logger
   ; accounts_accessed
   ; accounts_created
   ; tokens_used
+  ; body_reference = Header.body_reference header
   }
 
 (* NOTE: This serialization is used externally and MUST NOT change.
