@@ -5,29 +5,54 @@ open Hlist
 module Sc = Kimchi_backend_common.Scalar_challenge
 
 module Basic = struct
-  type (_, _, _) t = ..
+  type (_, _, _) t =
+    | Field : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) t
+    | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) t
+    | Digest
+        : ( 'digest1
+          , 'digest2
+          , < digest1 : 'digest1 ; digest2 : 'digest2 ; .. > )
+          t
+    | Challenge
+        : ( 'challenge1
+          , 'challenge2
+          , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
+          t
+    | Bulletproof_challenge
+        : ( 'bp_chal1
+          , 'bp_chal2
+          , < bulletproof_challenge1 : 'bp_chal1
+            ; bulletproof_challenge2 : 'bp_chal2
+            ; .. > )
+          t
+    | Index : ('index1, 'index2, < index1 : 'index1 ; index2 : 'index2 ; .. >) t
 end
 
 open Basic
 
-type (_, _, _) Basic.t +=
-  | Field : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) t
-  | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) t
-  | Digest :
-      ('digest1, 'digest2, < digest1 : 'digest1 ; digest2 : 'digest2 ; .. >) t
-  | Challenge :
-      ( 'challenge1
-      , 'challenge2
-      , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
-      t
-  | Bulletproof_challenge :
-      ( 'bp_chal1
-      , 'bp_chal2
-      , < bulletproof_challenge1 : 'bp_chal1
-        ; bulletproof_challenge2 : 'bp_chal2
-        ; .. > )
-      t
-  | Index : ('index1, 'index2, < index1 : 'index1 ; index2 : 'index2 ; .. >) t
+type ('a, 'b, 'c) basic = ('a, 'b, 'c) Basic.t =
+  | Field
+      : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
+  | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) basic
+  | Digest
+      : ( 'digest1
+        , 'digest2
+        , < digest1 : 'digest1 ; digest2 : 'digest2 ; .. > )
+        basic
+  | Challenge
+      : ( 'challenge1
+        , 'challenge2
+        , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
+        basic
+  | Bulletproof_challenge
+      : ( 'bp_chal1
+        , 'bp_chal2
+        , < bulletproof_challenge1 : 'bp_chal1
+          ; bulletproof_challenge2 : 'bp_chal2
+          ; .. > )
+        basic
+  | Index
+      : ('index1, 'index2, < index1 : 'index1 ; index2 : 'index2 ; .. >) basic
 
 module rec T : sig
   type (_, _, _) t =
@@ -207,8 +232,6 @@ let pack_basic (type field other_field other_field_var)
     | Bulletproof_challenge ->
         let { Bulletproof_challenge.prechallenge = { Sc.inner = pre } } = x in
         [| `Packed_bits (pre, Challenge.length) |]
-    | _ ->
-        failwith "unknown basic spec"
   in
   { pack }
 
@@ -239,8 +262,6 @@ let typ_basic (type field other_field other_field_var)
         Challenge.typ
     | Bulletproof_challenge ->
         Bulletproof_challenge.typ Challenge.typ
-    | _ ->
-        failwith "unknown basic spec"
   in
   { typ }
 
@@ -299,8 +320,6 @@ let packed_typ_basic (type field other_field other_field_var)
           |> Typ.transport_var ~there ~back
         in
         T (typ, Fn.id)
-    | _ ->
-        failwith "etyp: unhandled variant"
   in
   { etyp }
 
