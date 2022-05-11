@@ -1635,8 +1635,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let previous_empty_accounts =
           List.filter_map account_ids_originally_not_in_ledger
             ~f:(fun acct_id ->
-              Option.map (L.location_of_account ledger acct_id) ~f:(fun _ ->
-                  acct_id))
+              Option.bind (L.location_of_account ledger acct_id) ~f:(fun loc ->
+                  (*Check account ids because sparse ledger stores empty
+                    accounts at new account locations*)
+                  let open Option.Let_syntax in
+                  let%bind acc = L.get ledger loc in
+                  Option.some_if
+                    (Account_id.equal (Account.identifier acc) acct_id)
+                    acct_id))
         in
         if successfully_applied || List.is_empty previous_empty_accounts then
           Ok
@@ -1644,7 +1650,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               ; command =
                   { With_status.data = c
                   ; status =
-                      (* TODO *)
                       ( if successfully_applied then Applied
                       else Failed failure_status_tbl )
                   }
