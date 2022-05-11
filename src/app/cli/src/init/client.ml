@@ -1724,7 +1724,7 @@ let add_peers_graphql =
     (Cli_lib.Background_daemon.graphql_init (Param.both peers seed)
        ~f:(fun graphql_endpoint (input_peers, seed) ->
          let open Deferred.Let_syntax in
-         let peers =
+         let _peers =
            Array.of_list_map input_peers ~f:(fun peer ->
                match
                  Mina_net2.Multiaddr.of_string peer
@@ -1746,19 +1746,32 @@ let add_peers_graphql =
                      peer ;
                    Core.exit 1)
          in
-         let seed = Option.value ~default:true seed in
-         let%map response =
-           Graphql_client.query_exn
-             (Graphql_queries.Add_peers.make ~peers ~seed ())
-             graphql_endpoint
+         let seed = Some (Option.value ~default:true seed) in
+         (* let seed_simple = Some seed in *)
+         let input_peers_simple =
+           List.filter_map input_peers ~f:(fun peer ->
+               Mina_net2.Multiaddr.of_string peer |> Mina_net2.Multiaddr.to_peer)
          in
+         let query =
+           Graphql_queries.add_peers_query ~peers:input_peers_simple ~seed
+         in
+         let req =
+           object
+             method variables = `Assoc []
+
+             method query = Mina_graphql.Mutations.string_of_mutation query
+
+             method parse = Mina_graphql.Mutations.response_of_json query
+           end
+         in
+         let%map response = Graphql_client.query_exn req graphql_endpoint in
          printf "Requested to add peers:\n" ;
-         Array.iter response#addPeers ~f:(fun peer ->
+         List.iter response.add_peers ~f:(fun peer ->
              printf "%s\n"
                (Network_peer.Peer.to_multiaddr_string
-                  { host = Unix.Inet_addr.of_string peer#host
-                  ; libp2p_port = peer#libp2pPort
-                  ; peer_id = peer#peerId
+                  { host = Unix.Inet_addr.of_string peer.host
+                  ; libp2p_port = peer.libp2p_port
+                  ; peer_id = peer.peer_id
                   }))))
 
 let compile_time_constants =

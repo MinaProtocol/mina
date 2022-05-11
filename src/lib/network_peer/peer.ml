@@ -95,6 +95,8 @@ let to_string { host; libp2p_port; peer_id } =
     (Int.to_string libp2p_port)
     peer_id
 
+let pp fmt x = Format.fprintf fmt "%s" (to_string x)
+
 let to_multiaddr_string { host; libp2p_port; peer_id } =
   sprintf "/ip4/%s/tcp/%d/p2p/%s"
     (Unix.Inet_addr.to_string host)

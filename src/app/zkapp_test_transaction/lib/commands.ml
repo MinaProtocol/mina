@@ -683,8 +683,9 @@ let%test_module "ZkApps test transaction" =
 
     let hit_server (parties : Parties.t) query =
       let typ = Mina_graphql.Types.Input.send_zkapp in
+      let module Wrapper = Mina_graphql.Wrapper in
       let query_top_level =
-        Graphql_async.Schema.(
+        Wrapper.(
           io_field "sendZkapp" ~typ:(non_null string)
             ~args:Arg.[ arg "input" ~typ:(non_null typ) ]
             ~doc:"sample query"
@@ -709,7 +710,10 @@ let%test_module "ZkApps test transaction" =
       in
       let schema =
         Graphql_async.Schema.(
-          schema [] ~mutations:[ query_top_level ] ~subscriptions:[])
+          schema []
+            ~mutations:
+              (Wrapper.Fields.to_ocaml_grapql_server_fields [ query_top_level ])
+            ~subscriptions:[])
       in
       let%map res = execute () schema query in
       match res with

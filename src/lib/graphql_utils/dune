@@ -1,0 +1,6 @@
+(library
+ (name graphql_utils)
+ (public_name graphql_utils)
+ (libraries graphql graphql-async)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving_yojson)))

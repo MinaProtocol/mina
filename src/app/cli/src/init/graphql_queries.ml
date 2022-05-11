@@ -253,6 +253,13 @@ mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
 }
 |}]
 
+let add_peers_query ~peers ~seed : _ Mina_graphql.Mutations.mutation =
+  let open Mina_graphql in
+  Mutations.Add_peers
+    { arguments = { peers; seed }
+    ; subquery = Host { s = Libp2p_port { s = Peer_id { s = Empty } } }
+    }
+
 module Archive_precomputed_block =
 [%graphql
 {|
