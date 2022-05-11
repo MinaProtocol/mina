@@ -1628,6 +1628,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ~f:(fun (acct_id, loc_and_acct) ->
               if Option.is_none loc_and_acct then Some acct_id else None)
         in
+        let successfully_applied =
+          Transaction_status.Failure.Collection.is_empty failure_status_tbl
+        in
         (* accounts not originally in ledger, now present in ledger *)
         let previous_empty_accounts =
           List.filter_map account_ids_originally_not_in_ledger
@@ -1635,21 +1638,22 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               Option.map (L.location_of_account ledger acct_id) ~f:(fun _ ->
                   acct_id))
         in
-        Ok
-          ( { Transaction_applied.Parties_applied.accounts = accounts ()
-            ; command =
-                { With_status.data = c
-                ; status =
-                    (* TODO *)
-                    ( if
-                      Transaction_status.Failure.Collection.is_empty
-                        failure_status_tbl
-                    then Applied
-                    else Failed failure_status_tbl )
-                }
-            ; previous_empty_accounts
-            }
-          , s )
+        if successfully_applied || List.is_empty previous_empty_accounts then
+          Ok
+            ( { Transaction_applied.Parties_applied.accounts = accounts ()
+              ; command =
+                  { With_status.data = c
+                  ; status =
+                      (* TODO *)
+                      ( if successfully_applied then Applied
+                      else Failed failure_status_tbl )
+                  }
+              ; previous_empty_accounts
+              }
+            , s )
+        else
+          Or_error.error_string
+            "Parties application failed but new accounts created"
 
   let apply_parties_unchecked ~constraint_constants ~state_view ledger c =
     apply_parties_unchecked_aux ~constraint_constants ~state_view ledger c
