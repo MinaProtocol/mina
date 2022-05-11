@@ -11,6 +11,8 @@ module Auth_required : sig
     end
   end]
 
+  val from : auth_tag:Control.Tag.t -> t
+
   val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
   val check : t -> Control.Tag.t -> bool
