@@ -463,9 +463,9 @@ struct
              ({ inner = t2 } : Scalar_challenge.t) -> Field.Assert.equal t1 t2)
 
   let incrementally_verify_proof (type b)
-      (module Max_proofs_verified : Nat.Add.Intf with type n = b) ~step_widths
-      ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge
+      (module Max_proofs_verified : Nat.Add.Intf with type n = b)
+      ~actual_proofs_verified_mask ~step_domains
+      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
          array) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
@@ -481,15 +481,8 @@ struct
     in
     let sg_old =
       with_label __LOC__ (fun () ->
-          let actual_width =
-            Pseudo.choose (which_branch, step_widths) ~f:Field.of_int
-          in
-          Vector.map2
-            (ones_vector
-               (module Impl)
-               ~first_zero:actual_width Max_proofs_verified.n)
-            sg_old
-            ~f:(fun keep sg -> [| (keep, sg) |]))
+          Vector.map2 actual_proofs_verified_mask sg_old ~f:(fun keep sg ->
+              [| (keep, sg) |]))
     in
     with_label __LOC__ (fun () ->
         let sample () = Opt.challenge sponge in
