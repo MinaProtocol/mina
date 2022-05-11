@@ -2107,8 +2107,7 @@ module Types = struct
         ~coerce:Signature_lib.Private_key.of_yojson
 
     let token_id_arg =
-      scalar "TokenId"
-        ~doc:"String representation of a token's UInt64 identifier"
+      scalar "TokenId" ~doc:"Base58Check representation of a token identifier"
         ~coerce:(fun token ->
           try
             match token with
