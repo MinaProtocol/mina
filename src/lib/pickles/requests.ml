@@ -23,6 +23,7 @@ module Wrap = struct
           , max_proofs_verified )
           Vector.t
           t
+      | Which_branch : Index.t t
       | Step_accs : (Tock.Inner_curve.Affine.t, max_proofs_verified) Vector.t t
       | Old_bulletproof_challenges :
           max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
@@ -68,6 +69,7 @@ module Wrap = struct
       type _ t +=
         | Evals :
             (Tock.Field.t, Tock.Field.t array) Plonk_types.All_evals.t vec t
+        | Which_branch : Index.t t
         | Step_accs : Tock.Inner_curve.Affine.t vec t
         | Old_bulletproof_challenges :
             max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
