@@ -181,7 +181,7 @@ let wrap_main
                ; xi
                ; combined_inner_product
                ; b
-               ; which_branch
+               ; branch_data
                ; bulletproof_challenges
                }
            ; sponge_digest_before_evaluations
@@ -197,17 +197,46 @@ let wrap_main
         , _
         , _
         , _
-        , _ )
+        , Field.t )
         Types.Wrap.Statement.In_circuit.t) =
     with_label __LOC__ (fun () ->
         let which_branch =
+          exists
+            (Index.packed_typ (module Impl))
+            ~request:(fun () -> Req.Which_branch)
+        in
+        let which_branch =
           One_hot_vector.of_index which_branch ~length:branches
+        in
+        let actual_proofs_verified_mask =
+          Util.ones_vector
+            (module Impl)
+            ~first_zero:
+              (Pseudo.choose (which_branch, step_widths) ~f:Field.of_int)
+            Max_proofs_verified.n
+        in
+        let domain_log2 =
+          Pseudo.choose
+            ( which_branch
+            , Vector.map ~f:(fun ds -> Domain.log2_size ds.h) step_domains )
+            ~f:Field.of_int
+        in
+        let () =
+          (* Check that the branch_data public-input is correct *)
+          Branch_data.Checked.pack
+            (module Impl)
+            { proofs_verified_mask =
+                Vector.extend_exn actual_proofs_verified_mask Nat.N2.n
+                  Boolean.false_
+            ; domain_log2
+            }
+          |> Field.Assert.equal branch_data
         in
         let prev_proof_state =
           with_label __LOC__ (fun () ->
               let open Types.Step.Proof_state in
               let typ =
-                typ
+                typ ~assert_16_bits:(assert_n_bits ~n:16)
                   (module Impl)
                   Max_proofs_verified.n
                   (Shifted_value.Type2.typ Field.typ)
@@ -414,8 +443,8 @@ let wrap_main
           with_label __LOC__ (fun () ->
               incrementally_verify_proof
                 (module Max_proofs_verified)
-                ~step_widths ~step_domains ~verification_key:step_plonk_index
-                ~xi ~sponge
+                ~actual_proofs_verified_mask ~step_domains
+                ~verification_key:step_plonk_index ~xi ~sponge
                 ~public_input:
                   (Array.map
                      (pack_statement Max_proofs_verified.n prev_statement)
