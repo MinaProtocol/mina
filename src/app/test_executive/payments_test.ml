@@ -420,7 +420,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  "Payment failed for unexpected reason: %s" err_str ))
     in
     let%bind () =
-      section
+      section_hard
         "send out a bunch more txns to fill up the snark ledger, then wait for \
          proofs to be emitted"
         (let receiver = untimed_node_a in
@@ -451,7 +451,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
     in
-    section "Running replayer"
+    section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
            (List.hd_exn @@ Network.archive_nodes network)
