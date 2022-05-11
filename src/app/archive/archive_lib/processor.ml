@@ -2836,10 +2836,14 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Via_coinbase
                       in
-                      let%bind fee_transfer_receiver_id =
-                        Public_key.add_if_doesn't_exist
+                      let%bind _receiver_account_identifier_id =
+                        (* fee transfer via coinbase uses default token *)
+                        let account_id =
+                          Account_id.create receiver_pk Token_id.default
+                        in
+                        Account_identifiers.add_if_doesn't_exist
                           (module Conn)
-                          receiver_pk
+                          ~token_owner:None account_id
                       in
                       Block_and_internal_command.add
                         (module Conn)
