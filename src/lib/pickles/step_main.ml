@@ -50,21 +50,10 @@ let verify_one
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~max_width:d.max_width
-          ~step_widths:d.proofs_verifieds ~step_domains:d.step_domains ~sponge
-          ~prev_challenges proof_state.deferred_values prev_proof_evals)
+          ~step_domains:d.step_domains ~sponge ~prev_challenges
+          proof_state.deferred_values prev_proof_evals)
   in
-  let which_branch = proof_state.deferred_values.which_branch in
-  let proof_state =
-    with_label __LOC__ (fun () ->
-        { proof_state with
-          deferred_values =
-            { proof_state.deferred_values with
-              which_branch =
-                one_hot_vector_to_num proof_state.deferred_values.which_branch
-                |> Types.Index.of_field (module Impl)
-            }
-        })
-  in
+  let branch_data = proof_state.deferred_values.branch_data in
   let statement =
     let prev_me_only =
       with_label __LOC__ (fun () ->
@@ -74,7 +63,11 @@ let verify_one
           in
           hash ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
-            ~which_branch
+            ~proofs_verified_mask:
+              (Vector.trim branch_data.proofs_verified_mask
+                 (Nat.lte_exn
+                    (Vector.length prev_challenge_polynomial_commitments)
+                    Nat.N2.n))
             (* Use opt sponge for cutting off the bulletproof challenges early *)
             { app_state
             ; dlog_plonk_index = d.wrap_key
@@ -295,7 +288,8 @@ let step_main :
                       Types_map.For_step.t =
                     { branches = self_branches
                     ; proofs_verifieds =
-                        Vector.map basic.proofs_verifieds ~f:Field.of_int
+                        `Known
+                          (Vector.map basic.proofs_verifieds ~f:Field.of_int)
                     ; max_proofs_verified = (module Max_proofs_verified)
                     ; max_width = None
                     ; typ = basic.typ
