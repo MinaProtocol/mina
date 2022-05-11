@@ -693,9 +693,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate
-              (Vector.to_array step_domains)
-              cache disk_key_prover disk_key_verifier typ main)
+            Cache.Wrap.read_or_generate cache disk_key_prover disk_key_verifier
+              typ main)
       in
       (r, disk_key_verifier)
     in
@@ -836,11 +835,6 @@ module Side_loaded = struct
       ; wrap_index = Lazy.force d.wrap_key
       ; max_width =
           Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_proofs_verified))
-      ; step_data =
-          At_most.of_vector
-            (Vector.map2 d.proofs_verifieds d.step_domains ~f:(fun width ds ->
-                 ({ Domains.h = ds.h }, Width.of_int_exn width)))
-            (Nat.lte_exn (Vector.length d.step_domains) Max_branches.n)
       }
 
     module Max_width = Width.Max
@@ -881,9 +875,6 @@ module Side_loaded = struct
         List.map ts ~f:(fun (vk, x, p) ->
             let vk : V.t =
               { commitments = vk.wrap_index
-              ; step_domains =
-                  Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
-                      { Domains.h = d.h })
               ; index =
                   ( match vk.wrap_vk with
                   | None ->
