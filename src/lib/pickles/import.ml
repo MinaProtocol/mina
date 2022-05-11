@@ -5,6 +5,7 @@ module Types = Composition_types
 module Digest = Types.Digest
 module Spec = Types.Spec
 module Index = Types.Index
+module Branch_data = Composition_types.Branch_data
 module Step_bp_vec = Types.Step_bp_vec
 module Nvector = Types.Nvector
 module Bulletproof_challenge = Types.Bulletproof_challenge
