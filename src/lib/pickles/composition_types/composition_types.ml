@@ -2,6 +2,7 @@ open Pickles_types
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 module Bulletproof_challenge = Bulletproof_challenge
 module Index = Index
+module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
 open Core_kernel
@@ -141,7 +142,7 @@ module Wrap = struct
                , 'fp
                , 'fq
                , 'bulletproof_challenges
-               , 'index )
+               , 'branch_data )
                t =
             { plonk : 'plonk
             ; combined_inner_product : 'fp
@@ -154,8 +155,8 @@ module Wrap = struct
                   (** The challenge used for combining polynomials *)
             ; bulletproof_challenges : 'bulletproof_challenges
                   (** The challenges from the inner-product argument that was partially verified. *)
-            ; which_branch : 'index
-                  (** Which step branch of the proof-system was verified? *)
+            ; branch_data : 'branch_data
+                  (** Data specific to which step branch of the proof-system was verified *)
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
@@ -168,21 +169,21 @@ module Wrap = struct
            , 'fp
            , 'fq
            , 'bulletproof_challenges
-           , 'index )
+           , 'branch_data )
            t =
             ( 'plonk
             , 'scalar_challenge
             , 'fp
             , 'fq
             , 'bulletproof_challenges
-            , 'index )
+            , 'branch_data )
             Stable.Latest.t =
         { plonk : 'plonk
         ; combined_inner_product : 'fp
         ; b : 'fp
         ; xi : 'scalar_challenge
         ; bulletproof_challenges : 'bulletproof_challenges
-        ; which_branch : 'index
+        ; branch_data : 'branch_data
         }
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
@@ -210,14 +211,14 @@ module Wrap = struct
           ; b : 'fp
           ; xi
           ; bulletproof_challenges
-          ; which_branch
+          ; branch_data
           } ~f ~scalar =
         { xi = scalar xi
         ; combined_inner_product
         ; b
         ; plonk
         ; bulletproof_challenges
-        ; which_branch
+        ; branch_data
         }
 
       module In_circuit = struct
@@ -226,14 +227,14 @@ module Wrap = struct
              , 'fp
              , 'fq
              , 'bulletproof_challenges
-             , 'index )
+             , 'branch_data )
              t =
           ( ('challenge, 'scalar_challenge, 'fp) Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fp
           , 'fq
           , 'bulletproof_challenges
-          , 'index )
+          , 'branch_data )
           Stable.Latest.t
         [@@deriving sexp, compare, yojson, hash, equal]
 
@@ -568,7 +569,7 @@ module Wrap = struct
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
-          ; Vector (B Index, Nat.N1.n)
+          ; Vector (B Branch_data, Nat.N1.n)
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
@@ -578,7 +579,7 @@ module Wrap = struct
                    { xi
                    ; combined_inner_product
                    ; b
-                   ; which_branch
+                   ; branch_data
                    ; bulletproof_challenges
                    ; plonk =
                        { alpha
@@ -615,7 +616,7 @@ module Wrap = struct
         let digest =
           [ sponge_digest_before_evaluations; me_only; pass_through ]
         in
-        let index = [ which_branch ] in
+        let index = [ branch_data ] in
         Hlist.HlistId.
           [ fp
           ; challenge
@@ -651,13 +652,13 @@ module Wrap = struct
         let [ sponge_digest_before_evaluations; me_only; pass_through ] =
           digest
         in
-        let [ which_branch ] = index in
+        let [ branch_data ] = index in
         { proof_state =
             { deferred_values =
                 { xi
                 ; combined_inner_product
                 ; b
-                ; which_branch
+                ; branch_data
                 ; bulletproof_challenges
                 ; plonk =
                     { alpha
@@ -962,7 +963,7 @@ module Step = struct
         }
     end
 
-    let typ impl proofs_verified fq :
+    let typ impl ~assert_16_bits proofs_verified fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
         , _ )
@@ -972,8 +973,7 @@ module Step = struct
         Vector (Per_proof.In_circuit.spec Backend.Tock.Rounds.n, proofs_verified)
       in
       spec unfinalized_proofs (B Spec.Digest)
-      |> Spec.typ impl fq ~challenge:`Constrained
-           ~scalar_challenge:`Unconstrained
+      |> Spec.typ impl fq ~assert_16_bits
       |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
       |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
   end
