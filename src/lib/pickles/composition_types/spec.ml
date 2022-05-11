@@ -239,7 +239,6 @@ let pack impl t = pack (pack_basic impl) t
 
 let typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    ~challenge ~scalar_challenge
     (field : (other_field_var, other_field) Impl.Typ.t) =
   let open Impl in
   let module C = Common (Impl) in
@@ -265,8 +264,7 @@ let typ_basic (type field other_field other_field_var)
   in
   { typ }
 
-let typ ~challenge ~scalar_challenge impl field t =
-  typ (typ_basic ~challenge ~scalar_challenge impl field) t
+let typ impl field t = typ (typ_basic impl field) t
 
 let packed_typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
