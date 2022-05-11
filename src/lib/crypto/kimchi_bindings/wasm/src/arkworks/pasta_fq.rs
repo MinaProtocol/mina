@@ -3,13 +3,13 @@ use ark_ff::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     FftField, One, UniformRand, Zero,
 };
-use ark_ff::{BigInteger256, FromBytes, ToBytes};
+use ark_ff::{FromBytes, ToBytes};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
-use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionIntoWasmAbi};
+use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi};
 use wasm_bindgen::prelude::*;
 
 #[repr(C)]
@@ -71,8 +71,13 @@ impl IntoWasmAbi for WasmPastaFq {
 
 impl OptionIntoWasmAbi for WasmPastaFq {
     fn none() -> Self::Abi {
-        let max_bigint = WasmBigInteger256(BigInteger256([u64::MAX, u64::MAX, u64::MAX, u64::MAX]));
-        max_bigint.into_abi()
+        <Vec<u8> as OptionIntoWasmAbi>::none()
+    }
+}
+
+impl OptionFromWasmAbi for WasmPastaFq {
+    fn is_none(abi: &Self::Abi) -> bool {
+        <Vec<u8> as OptionFromWasmAbi>::is_none(abi)
     }
 }
 

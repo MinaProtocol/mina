@@ -98,17 +98,22 @@ var caml_pasta_fp_copy = function(x, y) {
     }
 };
 
-// Provides: caml_pasta_fp_option
-var caml_pasta_fp_option = function(x) {
-    // We encode 'none' in WASM as a biginteger formed from a series of
-    // max-size u64s, which gets split into u8s. This value is never returned
-    // as a valid field element, since it is larger than the field's modulus.
-    for (var i = 0, l = x.length; i < l; i++) {
-        if (x[i] != 255) {
-            return [0, x]; // Some(x)
-        }
+// Provides: caml_option_of_maybe_undefined
+var caml_option_of_maybe_undefined = function(x) {
+    if (x === undefined) {
+        return 0; // None
+    } else {
+        return [0, x]; // Some(x)
     }
-    return 0;
+};
+
+// Provides: caml_option_to_maybe_undefined
+var caml_option_to_maybe_undefined = function(x) {
+    if (x === 0) { // None
+        return undefined;
+    } else {
+        return x[1];
+    }
 };
 
 // Provides: caml_pasta_fp_size_in_bits
@@ -140,9 +145,9 @@ var caml_pasta_fp_mul = plonk_wasm.caml_pasta_fp_mul
 var caml_pasta_fp_div = plonk_wasm.caml_pasta_fp_div
 
 // Provides: caml_pasta_fp_inv
-// Requires: plonk_wasm, caml_pasta_fp_option
+// Requires: plonk_wasm, caml_option_of_maybe_undefined
 var caml_pasta_fp_inv = function(x) {
-    return caml_pasta_fp_option(plonk_wasm.caml_pasta_fp_inv(x));
+    return caml_option_of_maybe_undefined(plonk_wasm.caml_pasta_fp_inv(x));
 };
 
 // Provides: caml_pasta_fp_square
@@ -156,9 +161,9 @@ var caml_pasta_fp_is_square = function(x) {
 };
 
 // Provides: caml_pasta_fp_sqrt
-// Requires: plonk_wasm, caml_pasta_fp_option
+// Requires: plonk_wasm, caml_option_of_maybe_undefined
 var caml_pasta_fp_sqrt = function(x) {
-    return caml_pasta_fp_option(plonk_wasm.caml_pasta_fp_sqrt(x));
+    return caml_option_of_maybe_undefined(plonk_wasm.caml_pasta_fp_sqrt(x));
 };
 
 // Provides: caml_pasta_fp_of_int
@@ -265,19 +270,6 @@ var caml_pasta_fq_copy = function(x, y) {
     }
 };
 
-// Provides: caml_pasta_fq_option
-var caml_pasta_fq_option = function(x) {
-    // We encode 'none' in WASM as a biginteger formed from a series of
-    // max-size u64s, which gets split into u8s. This value is never returned
-    // as a valid field element, since it is larger than the field's modulus.
-    for (var i = 0, l = x.length; i < l; i++) {
-        if (x[i] != 255) {
-            return [0, x]; // Some(x)
-        }
-    }
-    return 0;
-};
-
 // Provides: caml_pasta_fq_size_in_bits
 // Requires: plonk_wasm
 var caml_pasta_fq_size_in_bits = plonk_wasm.caml_pasta_fq_size_in_bits
@@ -307,9 +299,9 @@ var caml_pasta_fq_mul = plonk_wasm.caml_pasta_fq_mul
 var caml_pasta_fq_div = plonk_wasm.caml_pasta_fq_div
 
 // Provides: caml_pasta_fq_inv
-// Requires: plonk_wasm, caml_pasta_fq_option
+// Requires: plonk_wasm, caml_option_of_maybe_undefined
 var caml_pasta_fq_inv = function(x) {
-    return caml_pasta_fq_option(plonk_wasm.caml_pasta_fq_inv(x));
+    return caml_option_of_maybe_undefined(plonk_wasm.caml_pasta_fq_inv(x));
 };
 
 // Provides: caml_pasta_fq_square
@@ -323,9 +315,9 @@ var caml_pasta_fq_is_square = function(x) {
 };
 
 // Provides: caml_pasta_fq_sqrt
-// Requires: plonk_wasm, caml_pasta_fq_option
+// Requires: plonk_wasm, caml_option_of_maybe_undefined
 var caml_pasta_fq_sqrt = function(x) {
-    return caml_pasta_fq_option(plonk_wasm.caml_pasta_fq_sqrt(x));
+    return caml_option_of_maybe_undefined(plonk_wasm.caml_pasta_fq_sqrt(x));
 };
 
 // Provides: caml_pasta_fq_of_int
@@ -2135,10 +2127,16 @@ var caml_pasta_fq_plonk_proof_deep_copy = function(proof) {
 
 
 // Provides: caml_random_oracles_of_rust
-// Requires: caml_u8array_vector_of_rust_flat_vector
+// Requires: caml_u8array_vector_of_rust_flat_vector, caml_option_of_maybe_undefined
 var caml_random_oracles_of_rust = function(x) {
+    var joint_combiner_chal = x.joint_combiner_chal;
+    var joint_combiner = x.joint_combiner;
+    var joint_combiner_ocaml = undefined;
+    if (joint_combiner_chal !== undefined && joint_combiner !== undefined) {
+        joint_combiner_ocaml = [0, [0, joint_combiner_chal], joint_combiner];
+    }
     return [0,
-      [0, [0, x.joint_combiner_chal], x.joint_combiner],
+      caml_option_of_maybe_undefined(joint_combiner_ocaml),
       x.beta,
       x.gamma,
       [0, x.alpha_chal],
@@ -2152,12 +2150,19 @@ var caml_random_oracles_of_rust = function(x) {
 };
 
 // Provides: caml_random_oracles_to_rust
-// Requires: caml_u8array_vector_to_rust_flat_vector
+// Requires: caml_u8array_vector_to_rust_flat_vector, caml_option_to_maybe_undefined
 var caml_random_oracles_to_rust = function(x, roKlass) {
     // var caml_vector = [0, x[1], x[2], x[3][1], x[4], x[5], x[6], x[7], x[8][1], x[9][1], x[10][1]];
+    var joint_combiner_ocaml = caml_option_to_maybe_undefined(x[1]);
+    var joint_combiner_chal = undefined;
+    var joint_combiner = undefined;
+    if (joint_combiner_ocaml !== undefined) {
+        joint_combiner_chal = joint_combiner_ocaml[1][1];
+        joint_combiner = joint_combiner_ocaml[2];
+    }
     return new roKlass(
-      x[1][1][1],
-      x[1][2],
+      joint_combiner_chal,
+      joint_combiner,
       x[2],
       x[3],
       x[4][1],

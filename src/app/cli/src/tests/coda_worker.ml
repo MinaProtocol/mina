@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Signature_lib
 open Pipe_lib
 open Init
@@ -574,11 +574,17 @@ module T = struct
                  ~f:(fun t ->
                    Pipe.write_without_pushback_if_open
                      validated_transitions_keyswaptest_writer t ;
+                   let block_with_hash =
+                     External_transition.Validated.lower t
+                     |> Mina_block.Validated.forget
+                   in
                    let prev_state_hash =
-                     External_transition.Validated.parent_hash t
+                     With_hash.data block_with_hash
+                     |> Mina_block.header |> Header.protocol_state
+                     |> Mina_state.Protocol_state.previous_state_hash
                    in
                    let state_hash =
-                     (External_transition.Validated.state_hashes t).state_hash
+                     State_hash.With_state_hashes.state_hash block_with_hash
                    in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in

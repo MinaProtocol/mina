@@ -633,14 +633,10 @@ end
 let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     Parties.t Deferred.t =
   let query_db = Mina_caqti.query pool in
-  let%bind fee_payer_body_id =
-    query_db ~f:(fun db ->
-        Processor.Zkapp_fee_payers.load db cmd.zkapp_fee_payer_id)
-  in
   (* use dummy authorizations *)
   let%bind (fee_payer : Party.Fee_payer.t) =
     let%map (body : Party.Body.Fee_payer.t) =
-      Archive_lib.Load_data.get_fee_payer_body ~pool fee_payer_body_id
+      Archive_lib.Load_data.get_fee_payer_body ~pool cmd.zkapp_fee_payer_body_id
     in
     ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
   in

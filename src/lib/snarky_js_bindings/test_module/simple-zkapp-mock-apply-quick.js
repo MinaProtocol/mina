@@ -1,13 +1,11 @@
 import {
   Field,
   declareState,
-  declareMethodArguments,
+  declareMethods,
   State,
   PrivateKey,
   SmartContract,
-  compile,
   deploy,
-  callUnproved,
   isReady,
   shutdown,
   Mina,
@@ -45,7 +43,7 @@ class SimpleZkapp extends SmartContract {
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(SimpleZkapp, { x: Field });
-declareMethodArguments(SimpleZkapp, { update: [Field] });
+declareMethods(SimpleZkapp, { update: [Field] });
 
 // setup mock mina
 let Local = Mina.LocalBlockchain();
@@ -59,12 +57,12 @@ let zkappAddress = zkappKey.toPublicKey();
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
 let verificationKey = await cached(
-  async () => (await compile(SimpleZkapp, zkappAddress)).verificationKey
+  async () => (await SimpleZkapp.compile(zkappAddress)).verificationKey
 );
 toc();
 
 tic("create deploy transaction");
-let partiesJsonDeploy = await deploy(SimpleZkapp, {
+let jsonDeploy = await deploy(SimpleZkapp, {
   zkappKey,
   verificationKey,
   initialBalance,
@@ -75,33 +73,32 @@ let partiesJsonDeploy = await deploy(SimpleZkapp, {
 toc();
 
 tic("apply deploy transaction");
-Local.applyJsonTransaction(partiesJsonDeploy);
+Local.applyJsonTransaction(jsonDeploy);
 toc();
 
 // check that deploy txn was applied
-let zkappState = Mina.getAccount(zkappAddress).zkapp.appState[0];
+let zkapp = new SimpleZkapp(zkappAddress);
+let zkappState = zkapp.x.get();
 zkappState.assertEquals(1);
 console.log("got initial state: " + zkappState);
 
 tic("create update transaction (no proof)");
-let partiesJsonUpdate = await callUnproved(
-  SimpleZkapp,
-  zkappAddress,
-  "update",
-  [Field(3)],
-  zkappKey
-);
-partiesJsonUpdate = await signFeePayer(partiesJsonUpdate, sender.privateKey, {
-  transactionFee,
+let transaction = await Mina.transaction(() => {
+  // if we sign the transaction, no proof will be created
+  zkapp.sign(zkappKey);
+  zkapp.update(Field(3));
 });
+await transaction.sign().prove();
+let jsonUpdate = transaction.toJSON();
+jsonUpdate = signFeePayer(jsonUpdate, sender.privateKey, { transactionFee });
 toc();
 
 tic("apply update transaction (no proof)");
-Local.applyJsonTransaction(partiesJsonUpdate);
+Local.applyJsonTransaction(jsonUpdate);
 toc();
 
 // check that first update txn was applied
-zkappState = Mina.getAccount(zkappAddress).zkapp.appState[0];
+zkappState = zkapp.x.get();
 zkappState.assertEquals(3);
 console.log("got updated state: " + zkappState);
 

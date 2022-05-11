@@ -9,9 +9,9 @@ open Backend
 
 module Wrap = struct
   module type S = sig
-    type max_branching
+    type max_proofs_verified
 
-    type max_local_max_branchings
+    type max_local_max_proofs_verifieds
 
     open Impls.Wrap
     open Wrap_main_inputs
@@ -20,12 +20,12 @@ module Wrap = struct
     type _ t +=
       | Evals :
           ( (Field.Constant.t, Field.Constant.t array) Plonk_types.All_evals.t
-          , max_branching )
+          , max_proofs_verified )
           Vector.t
           t
-      | Step_accs : (Tock.Inner_curve.Affine.t, max_branching) Vector.t t
+      | Step_accs : (Tock.Inner_curve.Affine.t, max_proofs_verified) Vector.t t
       | Old_bulletproof_challenges :
-          max_local_max_branchings H1.T(Challenges_vector.Constant).t t
+          max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
       | Proof_state :
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
@@ -36,7 +36,7 @@ module Wrap = struct
               , Digest.Constant.t
               , bool )
               Types.Step.Proof_state.Per_proof.In_circuit.t
-            , max_branching )
+            , max_proofs_verified )
             Vector.t
           , Digest.Constant.t )
           Types.Step.Proof_state.t
@@ -51,26 +51,26 @@ module Wrap = struct
 
   type ('mb, 'ml) t =
     (module S
-       with type max_branching = 'mb
-        and type max_local_max_branchings = 'ml)
+       with type max_proofs_verified = 'mb
+        and type max_local_max_proofs_verifieds = 'ml)
 
   let create : type mb ml. unit -> (mb, ml) t =
    fun () ->
     let module R = struct
-      type nonrec max_branching = mb
+      type nonrec max_proofs_verified = mb
 
-      type nonrec max_local_max_branchings = ml
+      type nonrec max_local_max_proofs_verifieds = ml
 
       open Snarky_backendless.Request
 
-      type 'a vec = ('a, max_branching) Vector.t
+      type 'a vec = ('a, max_proofs_verified) Vector.t
 
       type _ t +=
         | Evals :
             (Tock.Field.t, Tock.Field.t array) Plonk_types.All_evals.t vec t
         | Step_accs : Tock.Inner_curve.Affine.t vec t
         | Old_bulletproof_challenges :
-            max_local_max_branchings H1.T(Challenges_vector.Constant).t t
+            max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
         | Proof_state :
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
@@ -82,7 +82,7 @@ module Wrap = struct
                 , Digest.Constant.t
                 , bool )
                 Types.Step.Proof_state.Per_proof.In_circuit.t
-              , max_branching )
+              , max_proofs_verified )
               Vector.t
             , Digest.Constant.t )
             Types.Step.Proof_state.t
@@ -103,8 +103,8 @@ module Step = struct
 
     type prev_values
 
-    (* TODO: As an optimization this can be the local branching size *)
-    type max_branching
+    (* TODO: As an optimization this can be the local proofs-verified size *)
+    type max_proofs_verified
 
     type local_signature
 
@@ -122,17 +122,17 @@ module Step = struct
   end
 
   let create :
-      type local_signature local_branches statement prev_values max_branching.
+      type local_signature local_branches statement prev_values max_proofs_verified.
          unit
       -> (module S
             with type local_signature = local_signature
              and type local_branches = local_branches
              and type statement = statement
              and type prev_values = prev_values
-             and type max_branching = max_branching) =
+             and type max_proofs_verified = max_proofs_verified) =
    fun () ->
     let module R = struct
-      type nonrec max_branching = max_branching
+      type nonrec max_proofs_verified = max_proofs_verified
 
       type nonrec statement = statement
 

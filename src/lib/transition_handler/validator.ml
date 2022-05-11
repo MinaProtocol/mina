@@ -4,7 +4,7 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Cache_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 
 let validate_transition ~consensus_constants ~logger ~frontier
@@ -12,7 +12,7 @@ let validate_transition ~consensus_constants ~logger ~frontier
   let open Result.Let_syntax in
   let transition =
     Envelope.Incoming.data enveloped_transition
-    |> External_transition.Validation.forget_validation_with_hash
+    |> Mina_block.Validation.block_with_hash
   in
   let transition_hash = State_hash.With_state_hashes.state_hash transition in
   let root_breadcrumb = Transition_frontier.root frontier in
@@ -40,8 +40,7 @@ let validate_transition ~consensus_constants ~logger ~frontier
             ~existing:
               (Transition_frontier.Breadcrumb.consensus_state_with_hashes
                  root_breadcrumb)
-            ~candidate:
-              (With_hash.map ~f:External_transition.consensus_state transition)))
+            ~candidate:(With_hash.map ~f:Mina_block.consensus_state transition)))
       ~error:`Disconnected
   in
   (* we expect this to be Ok since we just checked the cache *)
@@ -52,7 +51,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
     ~transition_reader
     ~(valid_transition_writer :
        ( [ `Block of
-           ( External_transition.Initial_validated.t Envelope.Incoming.t
+           ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
            Cached.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
@@ -80,14 +79,13 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                   , Some
                       ( "external transition $state_hash"
                       , [ ("state_hash", State_hash.to_yojson transition_hash)
-                        ; ( "transition"
-                          , External_transition.to_yojson transition )
+                        ; ("transition", Mina_block.to_yojson transition)
                         ] ) )
               in
               let transition_time =
-                External_transition.protocol_state transition
-                |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-                |> Block_time.to_time
+                Mina_block.header transition
+                |> Header.protocol_state |> Protocol_state.blockchain_state
+                |> Blockchain_state.timestamp |> Block_time.to_time
               in
               Perf_histograms.add_span
                 ~name:"accepted_transition_remote_latency"
@@ -102,7 +100,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                 , Some
                     ( "external transition with state hash $state_hash"
                     , [ ("state_hash", State_hash.to_yojson transition_hash)
-                      ; ("transition", External_transition.to_yojson transition)
+                      ; ("transition", Mina_block.to_yojson transition)
                       ] ) )
           | Error `Disconnected ->
               Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
@@ -111,7 +109,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                   [ ("state_hash", State_hash.to_yojson transition_hash)
                   ; ("reason", `String "not selected over current root")
                   ; ( "protocol_state"
-                    , External_transition.protocol_state transition
+                    , Header.protocol_state (Mina_block.header transition)
                       |> Protocol_state.value_to_yojson )
                   ]
                 "Validation error: external transition with state hash \
@@ -124,5 +122,5 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                     , [ ( "sender"
                         , Envelope.Sender.to_yojson
                             (Envelope.Incoming.sender transition_env) )
-                      ; ("transition", External_transition.to_yojson transition)
+                      ; ("transition", Mina_block.to_yojson transition)
                       ] ) )))

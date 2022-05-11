@@ -41,7 +41,7 @@ let sample_block_sexp =
               0x0000000000000000000000000000000000000000000000000000000000000000)
              (token_id
               0x0000000000000000000000000000000000000000000000000000000000000001)
-             (excess 0) (ledger 0) (success true) (failure_status_tbl ())))))
+             (excess ((magnitude 0) (sgn Pos))) (ledger 0) (success true) (failure_status_tbl ())))))
        (timestamp 1600251660000)))
      (consensus_state
       ((blockchain_length 2) (epoch_count 0) (min_window_density 77)
@@ -3016,7 +3016,7 @@ let sample_block_json =
         },
         "genesis_ledger_hash":
           "jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco",
-        "registers":{"ledger":"jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco","pending_coinbase_stack":null,"local_state":{"call_stack":"0x0000000000000000000000000000000000000000000000000000000000000000","transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","full_transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","stack_frame":"0x0000000000000000000000000000000000000000000000000000000000000000","token_id":"wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf","excess":"0","ledger":"jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd","success":true,
+        "registers":{"ledger":"jxRZMzMSPVEMJ9wE4yqKEwQqVS3KZfDewHLYCC9aeqdig68Trco","pending_coinbase_stack":null,"local_state":{"call_stack":"0x0000000000000000000000000000000000000000000000000000000000000000","transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","full_transaction_commitment":"0x0000000000000000000000000000000000000000000000000000000000000000","stack_frame":"0x0000000000000000000000000000000000000000000000000000000000000000","token_id":"wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf","excess":{"magnitude":"0","sgn":["Pos"]},"ledger":"jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd","success":true,
         "failure_status_tbl": []}},
         "timestamp": "1600251660000"
       },

@@ -2,7 +2,6 @@ open Async_kernel
 open Pipe_lib
 open Cache_lib
 open Mina_base
-open Mina_transition
 open Network_peer
 module Best_tip_lru = Best_tip_lru
 
@@ -19,7 +18,7 @@ val run :
   -> frontier:Transition_frontier.t
   -> catchup_job_reader:
        ( State_hash.t
-       * ( External_transition.Initial_validated.t Envelope.Incoming.t
+       * ( Mina_block.initial_valid_block Envelope.Incoming.t
          , State_hash.t )
          Cached.t
          Rose_tree.t

@@ -191,7 +191,9 @@ let fill_in_user_commands pool block_state_hash =
       let%bind fee_payer = account_identifier_of_id user_cmd.fee_payer_id in
       let%bind source = account_identifier_of_id user_cmd.source_id in
       let%bind receiver = account_identifier_of_id user_cmd.receiver_id in
-      let nonce = user_cmd.nonce |> Account.Nonce.of_int in
+      let nonce =
+        user_cmd.nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
+      in
       let amount =
         Option.map user_cmd.amount ~f:(fun amt ->
             Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
@@ -287,11 +289,7 @@ let fill_in_zkapp_commands pool block_state_hash =
             Processor.User_command.Zkapp_command.load db zkapp_command_id)
       in
       let%bind fee_payer =
-        let%bind body_id =
-          query_db ~f:(fun db ->
-              Processor.Zkapp_fee_payers.load db zkapp_cmd.zkapp_fee_payer_id)
-        in
-        Load_data.get_fee_payer_body ~pool body_id
+        Load_data.get_fee_payer_body ~pool zkapp_cmd.zkapp_fee_payer_body_id
       in
       let%bind other_parties =
         Deferred.List.map

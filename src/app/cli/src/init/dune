@@ -58,8 +58,8 @@
    generated_graphql_queries
    mina_transaction
    mina_user_error
-   mina_transition
    mina_ledger
+   mina_block
    mina_lib
    mina_base
    cli_lib

@@ -483,10 +483,11 @@ AS combo GROUP BY combo.pk_id
           (* Could not get a nonce, return 0 *)
           Deferred.Result.return (last_relevant_command_balance, UInt64.zero)
         | None, Some timing_info ->
-          (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block *)
-          let balance_at_genesis : int64 =
-            Int64.(
-              timing_info.initial_balance - timing_info.initial_minimum_balance)
+          (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block
+             TODO: this is probably wrong now, because we have timing info for all accounts, in every block
+          *)
+          let balance_at_genesis : int64 = failwith "TODO: LOOK UP BALANCE"
+              (* WAS : timing_info.initial_balance - timing_info.initial_minimum_balance) *)
           in
           let incremental_balance_since_genesis : UInt64.t =
             compute_incremental_balance timing_info
@@ -546,7 +547,8 @@ AS combo GROUP BY combo.pk_id
           Deferred.Result.return last_relevant_command_balance
         | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
-          Deferred.Result.return timing_info.initial_balance
+          failwith "LOOKUP BALANCE, NONCE IN ACCOUNTS_ACCESSED; timing_info isn't just genesis ledger any longer"
+          (* WAS:    Deferred.Result.return timing_info.initial_balance *)
       in
       let balance_info : Balance_info.t = {liquid_balance; total_balance} in
       Deferred.Result.return (requested_block_identifier, balance_info, nonce)

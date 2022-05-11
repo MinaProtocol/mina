@@ -1,6 +1,6 @@
 open Core_kernel
 open Mina_base
-open Mina_transition
+open Mina_block
 
 type full = Full
 
@@ -53,7 +53,7 @@ end
 
 module Node_list = struct
   type full_node =
-    { transition : External_transition.Validated.t
+    { transition : Mina_block.Validated.t
     ; scan_state : Staged_ledger.Scan_state.t
     }
 
@@ -66,10 +66,8 @@ module Node_list = struct
   type 'repr node_list = 'repr t
 
   let to_lite =
-    let f { transition; _ } =
-      (External_transition.Validated.state_hashes transition).state_hash
-    in
-    List.map ~f
+    List.map ~f:(fun { transition; _ } ->
+        Mina_block.Validated.state_hash transition)
 
   module Lite = struct
     module Binable_arg = struct
@@ -209,8 +207,8 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
     | New_node (Full breadcrumb) ->
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
-        let x, _ = transition in
-        State_hash.to_yojson (State_hash.With_state_hashes.state_hash x)
+        let x = External_transition.Validated.lower transition in
+        State_hash.to_yojson (Mina_block.Validated.state_hash x)
     | Root_transitioned { new_root; garbage; just_emitted_a_proof } ->
         let garbage_hashes =
           match garbage with
@@ -234,7 +232,11 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   match diff with
   | New_node (Full breadcrumb) ->
-      New_node (Lite (Breadcrumb.validated_transition breadcrumb))
+      let external_transition =
+        External_transition.Validated.lift
+        @@ Breadcrumb.validated_transition breadcrumb
+      in
+      New_node (Lite external_transition)
   | Root_transitioned
       { new_root; garbage = Full garbage_nodes; just_emitted_a_proof } ->
       Root_transitioned

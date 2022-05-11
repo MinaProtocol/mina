@@ -43,9 +43,10 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             Transition_frontier.best_tip_path transition_frontier
           in
           let in_breadcrumb breadcrumb =
-            List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
-              ~f:(fun { data = cmd'; _ } ->
-                User_command.equal cmd (User_command.forget_check cmd'))
+            breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+            |> Mina_block.Validated.valid_commands
+            |> List.exists ~f:(fun { data = cmd'; _ } ->
+                   User_command.equal cmd (User_command.forget_check cmd'))
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
             return State.Included ;

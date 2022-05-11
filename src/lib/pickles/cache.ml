@@ -82,7 +82,7 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path))
 
-  let read_or_generate cache k_p k_v typ main =
+  let read_or_generate cache k_p k_v typ return_typ main =
     let s_p = storable in
     let s_v = vk_storable in
     let open Impls.Step in
@@ -98,7 +98,8 @@ module Step = struct
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
-                  constraint_system ~exposing:[ typ ] main |> Keypair.generate)
+                  constraint_system ~exposing:[ typ ] ~return_typ main
+                  |> Keypair.generate)
             in
             Timer.clock __LOC__ ;
             ignore
@@ -179,7 +180,7 @@ module Wrap = struct
                 (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
               header path))
 
-  let read_or_generate step_domains cache k_p k_v typ main =
+  let read_or_generate step_domains cache k_p k_v typ return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let s_p = storable in
@@ -195,7 +196,8 @@ module Wrap = struct
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   constraint_system ~exposing:[ typ ] main |> Keypair.generate)
+                   constraint_system ~exposing:[ typ ] ~return_typ main
+                   |> Keypair.generate)
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)

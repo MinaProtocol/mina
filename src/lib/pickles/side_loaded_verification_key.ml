@@ -42,7 +42,7 @@ let input_size ~of_int ~add ~mul w =
   (* This should be an affine function in [a]. *)
   let size a =
     let (T (typ, conv)) =
-      Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
+      Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Impls.Step.Data_spec.size [ typ ]
   in
@@ -205,7 +205,9 @@ module Stable = struct
       let of_repr
           ({ Repr.Stable.V2.step_data; max_width; wrap_index = c } :
             R.Stable.V2.t) : t =
-        let d = Common.wrap_domains.h in
+        let d =
+          (Common.wrap_domains ~proofs_verified:(Width.to_int max_width)).h
+        in
         let log2_size = Import.Domain.log2_size d in
         let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
         (* we only compute the wrap_vk if the srs can be loaded *)
@@ -355,7 +357,8 @@ let%test_unit "input_size" =
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Nat.of_int n in
          let (T (typ, conv)) =
-           Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
+           Impls.Step.input ~proofs_verified:a
+             ~wrap_rounds:Backend.Tock.Rounds.n
          in
          Impls.Step.Data_spec.size [ typ ]))
 
