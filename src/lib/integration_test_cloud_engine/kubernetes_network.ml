@@ -977,6 +977,7 @@ module Node = struct
            ; dest
            ; "--output-file"
            ; "/dev/null"
+           ; "--continue-on-error"
            ])
 
   let dump_mina_logs ~logger (t : t) ~log_file =
