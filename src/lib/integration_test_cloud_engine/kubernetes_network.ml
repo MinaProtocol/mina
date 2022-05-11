@@ -955,18 +955,15 @@ module Node = struct
     [%log info] "Running replayer on archived data (node: %s, container: %s)"
       t.pod_id mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
-    let%bind ledger =
+    let%bind accounts =
       Deferred.bind ~f:Malleable_error.return
         (run_in_container t
-           ~cmd:[ "jq"; "-c"; ".ledger"; "/config/daemon.json" ])
+           ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/config/daemon.json" ])
     in
     let replayer_input =
       sprintf
-        {| { "genesis_ledger": %s,
-                                      "add_genesis_winner": true
-                                    }
-                                 |}
-        ledger
+        {| { "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
+        accounts
     in
     let dest = "replayer-input.json" in
     let%bind _res =
