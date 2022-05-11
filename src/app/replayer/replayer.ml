@@ -1088,7 +1088,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                       "Balance in ledger does not match balance in account \
                        accessed"
                       ~metadata:
-                        [ ( "balance_in_ledger"
+                        [ ("account_id", Account_id.to_yojson account_id)
+                        ; ( "balance_in_ledger"
                           , Currency.Balance.to_yojson balance_in_ledger )
                         ; ( "balance_in_account_accessed"
                           , Currency.Balance.to_yojson balance )
@@ -1102,10 +1103,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                     [%log error]
                       "Nonce in ledger does not match nonce in account accessed"
                       ~metadata:
-                        [ ( "balance_in_ledger"
+                        [ ("account_id", Account_id.to_yojson account_id)
+                        ; ( "nonce_in_ledger"
                           , Mina_numbers.Account_nonce.to_yojson nonce_in_ledger
                           )
-                        ; ( "balance_in_account_accessed"
+                        ; ( "nonce_in_account_accessed"
                           , Mina_numbers.Account_nonce.to_yojson nonce )
                         ] ;
                     if continue_on_error then incr error_count
