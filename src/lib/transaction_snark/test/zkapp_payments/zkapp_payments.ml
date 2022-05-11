@@ -118,6 +118,10 @@ let%test_module "Zkapp payments tests" =
                 let txn_state_view =
                   Mina_state.Protocol_state.Body.view U.genesis_state_body
                 in
+                let (`If_this_is_used_it_should_have_a_comment_justifying_it t1)
+                    =
+                  Parties.to_valid_unsafe t1
+                in
                 merkle_root_after_parties_exn ledger ~txn_state_view t1
               in
               let hash_post = Ledger.merkle_root ledger in
