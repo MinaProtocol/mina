@@ -36,7 +36,7 @@ features:
     enabled: true
   persistence:
     # for every deploy the name must be unique
-    enabled: true
+    enabled: false
     name: "generic-node-volume"
     storageClass: standard
     mountPath: /data/
@@ -53,7 +53,7 @@ daemon:
   seedPeers: []
 
 persistence:
-  enabled: false
+  enabled: true
 
 coordinator:
   enablesd: false
@@ -74,13 +74,13 @@ rosetta:
   image:
     repository: minaprotocol/mina-rosetta
     pullPolicy: IfNotPresent
-    tag: latest
+    tag: 1.3.1beta1-529bf17-berkeley-mainnet
   pg_conn: 'postgres://postgresql:5432'
   graphql_host: 'http://127.0.0.1'
 
 watchdog:
   enabled: true
-  image: gcr.io/o1labs-192920/watchdog:0.3.7
+  image: gcr.io/o1labs-192920/watchdog:latest
   memory: 512m
   cpu: 1.0
 restartEveryMins: ""

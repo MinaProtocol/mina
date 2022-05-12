@@ -15,7 +15,6 @@ spec:
   selector:
     matchLabels:
       app: {{.Values.name}}-rosetta
-  serviceName: "nginx"
   template:
     metadata:
       labels:
@@ -43,7 +42,7 @@ spec:
         image:  "{{.Values.rosetta.image.repository }}:{{.Values.rosetta.image.tag}}"
         imagePullPolicy: {{.Values.rosetta.image.pullPolicy}}
         {{- if .Values.features.customEntrypoint.enabled}}
-        command: [ {{ .Values.features.customEntrypoint.command}} ]
+        command: "mina-rosetta"
         {{- end }}
         {{- if .Values.features.uploadBlocksToGCloud.enabled}}
         - name: gcloud-keyfile
@@ -55,63 +54,35 @@ spec:
             memory: {{.Values.resources.requests.memory}}
             cpu: {{.Values.resources.requests.cpu}}
         args:
-        - "mina-rosetta"
-        - "run"
-        - "daemon"
-        - "--log-level"
-        - "Debug"
-        - "--log-json"
-        - "--client-port"
-        - "$(DAEMON_CLIENT_PORT)"
-        - "--rest-port"
-        - "$(DAEMON_REST_PORT)"
-        - "--external-port"
-        - "$(DAEMON_EXTERNAL_PORT)"
-        - "--server-port"
-        - "$(DAEMON_SERVER_PORT)"
-        - "--postgres-uri"
+        {{- if .Values.archive.enabled}}
+        - "--archive-uri"
         - "$(DAEMON_PG_CONN_PORT)"
+        {{- end}}
+        - "--graphql-uri"
+        - "$(DAEMON_GRAPHQL_URI)"
+        - "--port"
+        - "$(DAEMON_ROSETTA_PORT)"
+        - "--log-json"
         - "--metrics-port"
         - "$(DAEMON_METRICS_PORT)"
-        - --archive-uri
-        - "$(DAEMON_ROSETTA_PG_CONN_PORT)"
-        - --graphql-uri
-        - "$(DAEMON_GRAPHQL_URI)"
-        - --port
-        - "$(DAEMON_ROSETTA_PORT)"
-        {{- if .Values.libp2p.seed.enabled}}
-        - "--seed"
-        {{- end }}
-        {{- range .Values.features.seedPeers}}
-        - "-peer"
-        - {{ . | quote }}
-        {{- end }}
-        {{- if .Values.features.privateKeySecret.enabled}}
-        - "--block-producer-key"
-        - "/root/wallet-keys/key"
-        {{- end }}
-        {{-  if .Values.features.uploadBlocksToGCloud.enabled}}
-        - "-upload-blocks-to-gcloud"
-        - "true"
-        {{- end }}
         {{- range .Values.rosetta.args}}
         - {{ .| quote }}
         {{- end }}
         env:
-        - name: DAEMON_REST_PORT
-          value: {{.Values.ports.graphql | quote}}
-        - name: DAEMON_ROSETTA_PG_CONN_PORT
-          value: {{.Values.rosetta.pg_conn | quote}}
-        - name: DAEMON_CLIENT_PORT
-          value: {{.Values.ports.client  | quote}}
+        - name: DAEMON_GRAPHQL_URI
+          value: {{ $.Values.name }}:{{ .Values.ports.graphql }}/graphql
         - name: DAEMON_ROSETTA_PORT
           value: {{.Values.ports.rosetta | quote}}
         - name: DAEMON_METRICS_PORT
           value: {{.Values.ports.metrics | quote}}
-        - name: DAEMON_SERVER_PORT
-          value: {{.Values.ports.archive | quote}}
-        - name: DAEMON_PG_CONN_PORT
-          value: {{.Values.archive.pg_conn | quote}}
+        - name: MINA_ROSETTA_PG_DATA_INTERVAL
+          value: "30"
+        - name: MINA_ROSETTA_MAX_DB_POOL_SIZE
+          value: "80"
+        - name: MINA_ROSETTA_NETWORK
+          value: "mainnet"
+        - name: MINA_NETWORK
+          value: "mainnet"
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CODA_CLIENT_TRUSTLIST
@@ -127,9 +98,9 @@ spec:
         - name: DAEMON_EXTERNAL_PORT
           value: {{.Values.ports.p2p | quote}}
         ports:
-        - name: archive-port
+        - name: rosetta-port
           protocol: TCP
-          containerPort: {{.Values.ports.archive}}
+          containerPort: {{.Values.ports.rosetta}}
         - name: metrics-port
           protocol: TCP
           containerPort: {{.Values.ports.metrics}}
@@ -137,17 +108,6 @@ spec:
           protocol: TCP
           containerPort: {{.Values.ports.p2p}}
           hostPort: {{.Values.ports.external}}
-      {{- if .Values.features.privateKeySecret.enabled}}
-      - name: private-keys
-        secret:
-          secretName: {{ .Values.features.privateKeySecret.secretName }}
-          defaultMode: 256
-          items:
-          - key: key
-            path: key
-          - key: pub
-            path: key.pub
-      {{- end }}
       volumes:
       - name: destination-libp2p
         emptyDir: {}

@@ -35,20 +35,10 @@ spec:
         - "-u"
         - "/code/watchdog.py"
         env:
-          - name: "RESTART_EVERY_MINS"
-            value: {{.Values.restartEveryMins | quote}}
-          - name: "RESTART_NODES"
-            value: {{.Values.restartNodes | quote}}
           - name: "METRICS_PORT"
             value: {{.Values.ports.metrics | quote}}
           - name: "SEED_PEERS_URL"
             value: {{$.Values.seedPeersURL | quote}}
-          - name: "GOOGLE_APPLICATION_CREDENTIALS"
-            value: "/gcloud/keyfile.json"
-          {{- if .Values.features.uploadBlocksToGCloud.enabled}}
-          - name: "CHECK_GCLOUD_STORAGE_BUCKET"
-            value: "true"
-          {{- end }}
         ports:
         - name: metrics-port
           protocol: TCP

@@ -15,7 +15,6 @@ spec:
   selector:
     matchLabels:
       app: {{.Values.name}}
-  serviceName: "nginx"
   template:
     metadata:
       labels:
@@ -71,7 +70,7 @@ spec:
         - name: destination-libp2p
           mountPath: /root/libp2p-keys
           readOnly: true
-        {{-  if .Values.persistence.enabled}}
+        {{- if .Values.persistence.enabled}}
         - name: config-dir
           mountPath: "/root/.mina-config"
         {{- end }}
