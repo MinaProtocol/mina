@@ -172,4 +172,4 @@ let signature_kind_of_string_js network_js fname : Mina_signature_kind.t =
   | s ->
       raise_js_error
         (Core_kernel.sprintf
-           "%s: expected network to be mainnet or testnet, got: %s" fname s)
+           "%s: expected network to be mainnet or testnet, got: %s" fname s )

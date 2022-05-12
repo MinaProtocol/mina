@@ -57,7 +57,7 @@ let%test_module "multisig_account" =
         let verify_sig (sigma, pk) : Boolean.var Checked.t =
           Checked.List.exists pubkeys ~f:(fun pk' ->
               [ eq_pk pk pk'; check_sig pk' commitment sigma ]
-              |> Checked.List.all >>= Boolean.all)
+              |> Checked.List.all >>= Boolean.all )
         in
         Checked.List.map witness ~f:verify_sig
         >>= fun bs -> [%with_label __LOC__] (Boolean.Assert.all bs)
@@ -94,9 +94,9 @@ let%test_module "multisig_account" =
                  ~compute:(As_prover.return msg)
              in
              let witness = [ (sigma_var, pk_var) ] in
-             check_witness 1 [ pk ] msg_var witness)
+             check_witness 1 [ pk ] msg_var witness )
             |> Checked.map ~f:As_prover.return
-            |> run_and_check |> Or_error.ok_exn)
+            |> run_and_check |> Or_error.ok_exn )
 
       let%test_unit "2-of-2" =
         let gen =
@@ -131,9 +131,9 @@ let%test_module "multisig_account" =
                  ~compute:(As_prover.return msg)
              in
              let witness = [ (sigma0_var, pk0_var); (sigma1_var, pk1_var) ] in
-             check_witness 2 [ pk0; pk1 ] msg_var witness)
+             check_witness 2 [ pk0; pk1 ] msg_var witness )
             |> Checked.map ~f:As_prover.return
-            |> run_and_check |> Or_error.ok_exn)
+            |> run_and_check |> Or_error.ok_exn )
     end
 
     type _ Snarky_backendless.Request.t +=
@@ -212,7 +212,7 @@ let%test_module "multisig_account" =
                                  (Pickles_types.Hlist.E01
                                     (Pickles.Inductive_rule.B))
                                .t ->
-                        [])
+                        [] )
                   ; main_value = (fun [] _ -> [])
                   }
                 in
@@ -221,12 +221,12 @@ let%test_module "multisig_account" =
                   (module Zkapp_statement)
                   ~typ:Zkapp_statement.typ
                   ~branches:(module Nat.N2)
-                  ~max_proofs_verified:
-                    (module Nat.N2) (* You have to put 2 here... *)
+                  ~max_proofs_verified:(module Nat.N2)
+                    (* You have to put 2 here... *)
                   ~name:"multisig"
                   ~constraint_constants:
                     (Genesis_constants.Constraint_constants.to_snark_keys_header
-                       constraint_constants)
+                       constraint_constants )
                   ~choices:(fun ~self ->
                     [ multisig_rule
                     ; { identifier = "dummy"
@@ -239,7 +239,7 @@ let%test_module "multisig_account" =
                             |> fun () ->
                             (* Unsatisfiable. *)
                             Run.exists Field.typ ~compute:(fun () ->
-                                Run.Field.Constant.zero)
+                                Run.Field.Constant.zero )
                             |> fun s ->
                             Run.Field.(Assert.equal s (s + one))
                             |> fun () :
@@ -249,9 +249,9 @@ let%test_module "multisig_account" =
                                      (Pickles_types.Hlist.E01
                                         (Pickles.Inductive_rule.B))
                                    .t ->
-                            [ Boolean.true_; Boolean.true_ ])
+                            [ Boolean.true_; Boolean.true_ ] )
                       }
-                    ])
+                    ] )
               in
               let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
               let { Mina_transaction_logic.For_tests.Transaction_spec.fee
@@ -274,7 +274,7 @@ let%test_module "multisig_account" =
                  Ledger.get_or_create_account ledger id
                    (Account.create id
                       Currency.Balance.(
-                        Option.value_exn (add_amount zero total)))
+                        Option.value_exn (add_amount zero total)) )
                  |> Or_error.ok_exn
                in
                let _is_new, loc =
@@ -295,7 +295,7 @@ let%test_module "multisig_account" =
                        { (Option.value ~default:Zkapp_account.default a.zkapp) with
                          verification_key = Some vk
                        }
-                 }) ;
+                 } ) ;
               let update_empty_permissions =
                 let permissions =
                   Zkapp_basic.Set_or_keep.Set Permissions.empty
@@ -414,7 +414,7 @@ let%test_module "multisig_account" =
                     ~memo_hash:(Signed_command_memo.hash memo)
                     ~fee_payer_hash:
                       (Parties.Digest.Party.create
-                         (Party.of_fee_payer fee_payer))
+                         (Party.of_fee_payer fee_payer) )
                 in
                 { fee_payer with
                   authorization =
@@ -427,7 +427,7 @@ let%test_module "multisig_account" =
                 ; authorization =
                     Signature
                       (Signature_lib.Schnorr.Chunked.sign sender.private_key
-                         (Random_oracle.Input.Chunked.field transaction))
+                         (Random_oracle.Input.Chunked.field transaction) )
                 }
               in
               let parties : Parties.t =
@@ -443,5 +443,5 @@ let%test_module "multisig_account" =
                   }
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t)))
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t) ) )
   end )

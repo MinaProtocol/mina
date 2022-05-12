@@ -2,7 +2,7 @@ open Async_kernel
 open Core
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Frontier_base
 module Database = Database
 
@@ -23,7 +23,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
         Map.add_exn acc ~key:(Protocol_state.hashes protocol_state).state_hash
-          ~data:protocol_state)
+          ~data:protocol_state )
   in
   let get_state hash =
     match Map.find protocol_states_map hash with
@@ -72,7 +72,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
          !"Constructed staged ledger %{sexp: Staged_ledger_hash.t} did not \
            match the staged ledger hash in the protocol state %{sexp: \
            Staged_ledger_hash.t}"
-         constructed_staged_ledger_hash staged_ledger_hash)
+         constructed_staged_ledger_hash staged_ledger_hash )
 
 module rec Instance_type : sig
   type t =
@@ -120,18 +120,18 @@ module Instance = struct
       Some
         (Sync.create ~constraint_constants ~logger:t.factory.logger
            ~time_controller:t.factory.time_controller ~db:t.db
-           ~persistent_root_instance)
+           ~persistent_root_instance )
 
   let stop_sync t =
     let open Deferred.Let_syntax in
     assert_sync t ~f:(fun sync ->
         let%map () = Sync.close sync in
         t.sync <- None ;
-        Ok ())
+        Ok () )
 
   let notify_sync t ~diffs =
     assert_sync t ~f:(fun sync ->
-        Sync.notify sync ~diffs ; Deferred.Result.return ())
+        Sync.notify sync ~diffs ; Deferred.Result.return () )
 
   let destroy t =
     let open Deferred.Let_syntax in
@@ -207,7 +207,7 @@ module Instance = struct
       in
       (root, root_transition, best_tip, protocol_states, root_hash))
       |> Result.map_error ~f:(fun err ->
-             `Failure (Database.Error.not_found_message err))
+             `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
     in
     let root_genesis_state_hash =
@@ -241,7 +241,7 @@ module Instance = struct
         ~root_ledger:
           (Mina_ledger.Ledger.Any_ledger.cast
              (module Mina_ledger.Ledger.Db)
-             root_ledger)
+             root_ledger )
         ~consensus_local_state ~max_length ~precomputed_values
         ~persistent_root_instance
     in
@@ -287,7 +287,7 @@ module Instance = struct
                  ~sender:None ~transition_receipt_time ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
-             breadcrumb))
+             breadcrumb ) )
         ~f:
           (Result.map_error ~f:(function
             | `Crawl_error err ->
@@ -304,7 +304,7 @@ module Instance = struct
                   ( "error rebuilding transition frontier from persistence: "
                   ^ msg )
             | `Not_found _ as err ->
-                `Failure (Database.Error.not_found_message err)))
+                `Failure (Database.Error.not_found_message err) ) )
     in
     let%map () = apply_diff Diff.(E (Best_tip_changed best_tip)) in
     (frontier, extensions)
@@ -358,6 +358,6 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
                    | `Genesis_state_mismatch _ ->
                        "genesis state mismatch"
                    | `Corrupt err ->
-                       Database.Error.message err)
+                       Database.Error.message err )
               |> Result.ok_or_failwith
-              : Frozen_ledger_hash.t )))
+              : Frozen_ledger_hash.t ) ) )

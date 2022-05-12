@@ -32,7 +32,7 @@ module Aux_hash = struct
             | Error e ->
                 Error
                   (sprintf "Aux_hash.of_yojson, bad Base58Check:%s"
-                     (Error.to_string_hum e))
+                     (Error.to_string_hum e) )
             | Ok x ->
                 Ok x )
         | _ ->
@@ -78,7 +78,7 @@ module Pending_coinbase_aux = struct
             | Error e ->
                 Error
                   (sprintf "Pending_coinbase_aux.of_yojson, bad Base58Check:%s"
-                     (Error.to_string_hum e)) )
+                     (Error.to_string_hum e) ) )
         | _ ->
             Error "Pending_coinbase_aux.of_yojson expected `String"
     end
@@ -137,7 +137,7 @@ module Non_snark = struct
     Array.reduce_exn ~f:append
       (Array.of_list_map
          (Fold.to_list (fold t))
-         ~f:(fun b -> packed (field_of_bool b, 1)))
+         ~f:(fun b -> packed (field_of_bool b, 1)) )
 
   let ledger_hash ({ ledger_hash; _ } : t) = ledger_hash
 
@@ -173,7 +173,7 @@ module Non_snark = struct
            * anything that uses staged-ledger-hashes from within Checked
            * computations. It's useful when debugging to dump the protocol state
            * and so we can just lie here instead. *)
-        warn_improper_transport () ; Lazy.force dummy)
+        warn_improper_transport () ; Lazy.force dummy )
 end
 
 module Poly = struct

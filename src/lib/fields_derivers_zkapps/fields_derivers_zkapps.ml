@@ -82,21 +82,21 @@ module Make (Schema : Graphql_intf.Schema) = struct
        Graphql.Fields.Input.T.
          { run =
              (fun () ->
-               scalar name ?doc ~coerce:Yojson.Safe.to_basic |> non_null)
-         }) ;
+               scalar name ?doc ~coerce:Yojson.Safe.to_basic |> non_null )
+         } ) ;
 
     (obj#nullable_graphql_fields :=
        let open Schema in
        Graphql.Fields.Input.T.
-         { run = (fun () -> scalar name ?doc ~coerce:Yojson.Safe.to_basic) }) ;
+         { run = (fun () -> scalar name ?doc ~coerce:Yojson.Safe.to_basic) } ) ;
 
     (obj#graphql_arg :=
        fun () ->
          Schema.Arg.scalar name ?doc ~coerce:Graphql.arg_to_yojson
-         |> Schema.Arg.non_null) ;
+         |> Schema.Arg.non_null ) ;
 
     (obj#nullable_graphql_arg :=
-       fun () -> Schema.Arg.scalar name ?doc ~coerce:Graphql.arg_to_yojson) ;
+       fun () -> Schema.Arg.scalar name ?doc ~coerce:Graphql.arg_to_yojson ) ;
 
     obj#to_json := Fn.id ;
 
@@ -129,7 +129,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
         | `String x ->
             of_string x
         | _ ->
-            raise (Fields_derivers_json.Of_yojson.Invalid_json_scalar `String))
+            raise (Fields_derivers_json.Of_yojson.Invalid_json_scalar `String)
+        )
       ~contramap:(fun x -> `String (to_string x))
 
   let uint64 obj : _ Unified_input.t =
@@ -155,7 +156,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
       ~to_string:Signature_lib.Public_key.Compressed.to_string
       ~of_string:
         (except ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
-           `Public_key)
+           `Public_key )
 
   let skip obj : _ Unified_input.t =
     let _a = Graphql.Fields.skip obj in
@@ -319,7 +320,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
         | Ok (`Response data) ->
             data |> Yojson.Basic.to_string |> printf "%s" |> return
         | _ ->
-            failwith "Unexpected response")
+            failwith "Unexpected response" )
 
     module Loop = struct
       let rec json_to_string_gql : Yojson.Safe.t -> string = function
@@ -328,7 +329,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
               ( List.map kv ~f:(fun (k, v) ->
                     sprintf "%s: %s"
                       (Fields_derivers.under_to_camel k)
-                      (json_to_string_gql v))
+                      (json_to_string_gql v) )
               |> String.concat ~sep:",\n" )
         | `List xs ->
             sprintf "[\n%s\n]"
@@ -363,7 +364,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
                 ~doc:"sample args query"
                 ~resolve:(fun { ctx; _ } () (input : 'a) ->
                   ctx := Some input ;
-                  0))
+                  0 ))
           in
           let out_schema : ('a option ref, unit) Schema.field =
             Schema.(

@@ -25,7 +25,7 @@
    consensus
    genesis_constants
    mina_numbers
-   mina_transition
+   mina_block
    logger
    transition_frontier_full_frontier
    transition_frontier_persistent_root

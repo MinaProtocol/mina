@@ -27,7 +27,7 @@
    child_processes
    memory_stats
    blockchain_snark
-   mina_transition
+   mina_block
    mina_state
    mina_base
    logger

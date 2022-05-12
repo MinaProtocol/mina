@@ -42,7 +42,7 @@
    mina_generators
    mina_base
    mina_ledger
-   mina_transition
+   mina_block
    transition_frontier
    logger
    mina_metrics

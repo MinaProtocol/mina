@@ -277,7 +277,7 @@ module Step_main_inputs = struct
           with module Field := Impl.Field
            and module State := Sponge_lib.State
            and type input :=
-                [ `Field of Impl.Field.t | `Bits of Impl.Boolean.var list ]
+            [ `Field of Impl.Field.t | `Bits of Impl.Boolean.var list ]
            and type digest := Impl.Field.t
            and type t = Impl.Field.t Sponge_lib.t
 

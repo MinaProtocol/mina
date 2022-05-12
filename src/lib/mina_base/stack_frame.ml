@@ -70,7 +70,7 @@ end = struct
           , Parties.Digest.Party.t
           , Parties.Digest.Forest.t )
           Parties.Call_forest.t )
-        frame) =
+        frame ) =
     List.reduce_exn ~f:Random_oracle.Input.Chunked.append
       [ Token_id.to_input caller
       ; Token_id.to_input caller_caller

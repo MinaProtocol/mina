@@ -27,7 +27,7 @@ let main ~archive_uri ~state_hash ~sequence_no () =
         query_db
           ~f:(fun db ->
             Sql.Receiver_balances.run_ids_from_fee_transfer db state_hash
-              sequence_no)
+              sequence_no )
           ~item:"receiver balance ids"
       in
       if List.length receiver_balance_ids <> 2 then (
@@ -71,14 +71,14 @@ let main ~archive_uri ~state_hash ~sequence_no () =
       let%bind new_balance_id_1 =
         query_db
           ~f:(fun db ->
-            Sql.Receiver_balances.add_if_doesn't_exist db balance_1_swapped)
+            Sql.Receiver_balances.add_if_doesn't_exist db balance_1_swapped )
           ~item:"receiver balance 1 swapped"
       in
       [%log info] "New balance id for balance 1: %d" new_balance_id_1 ;
       let%bind new_balance_id_2 =
         query_db
           ~f:(fun db ->
-            Sql.Receiver_balances.add_if_doesn't_exist db balance_2_swapped)
+            Sql.Receiver_balances.add_if_doesn't_exist db balance_2_swapped )
           ~item:"receiver balance 2 swapped"
       in
       [%log info] "New balance id for balance 2: %d" new_balance_id_2 ;
@@ -87,7 +87,7 @@ let main ~archive_uri ~state_hash ~sequence_no () =
         query_db
           ~f:(fun db ->
             Sql.Receiver_balances.swap_in_new_balance db state_hash sequence_no
-              balance_1_id new_balance_id_1)
+              balance_1_id new_balance_id_1 )
           ~item:"balance 1 swap"
       in
       [%log info] "Swapping in new balance 2" ;
@@ -95,7 +95,7 @@ let main ~archive_uri ~state_hash ~sequence_no () =
         query_db
           ~f:(fun db ->
             Sql.Receiver_balances.swap_in_new_balance db state_hash sequence_no
-              balance_2_id new_balance_id_2)
+              balance_2_id new_balance_id_2 )
           ~item:"balance 2 swap"
       in
       Deferred.unit
@@ -122,4 +122,4 @@ let () =
              ~doc:"NN Sequence number of the two fee transfers"
              Param.(required int)
          in
-         main ~archive_uri ~state_hash ~sequence_no)))
+         main ~archive_uri ~state_hash ~sequence_no )))

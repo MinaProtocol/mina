@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 open Mina_numbers
 
@@ -23,7 +23,7 @@ let is_transition_for_bootstrap ~logger
   in
   let new_consensus_state =
     Validation.block_with_hash new_transition
-    |> With_hash.map ~f:External_transition.consensus_state
+    |> With_hash.map ~f:Mina_block.consensus_state
   in
   let constants = precomputed_values.consensus_constants in
   match
@@ -42,7 +42,7 @@ let is_transition_for_bootstrap ~logger
         + 290 + slack
         < Length.to_int
             (Consensus.Data.Consensus_state.blockchain_length
-               new_consensus_state.data)
+               new_consensus_state.data )
       then (* Then our entire frontier is useless. *)
         true
       else
@@ -52,7 +52,7 @@ let is_transition_for_bootstrap ~logger
             (Logger.extend logger
                [ ( "selection_context"
                  , `String "Transition_router.is_transition_for_bootstrap" )
-               ])
+               ] )
 
 let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~network ~time_controller ~producer_transition_reader_ref
@@ -71,7 +71,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
         Mina_block.handle_dropped_transition
           ( With_hash.hash @@ Validation.block_with_hash
           @@ Network_peer.Envelope.Incoming.data block )
-          ?valid_cb ~pipe_name:name ~logger)
+          ?valid_cb ~pipe_name:name ~logger )
       ()
   in
   transition_reader_ref := transition_frontier_controller_reader ;
@@ -92,7 +92,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
       (Fn.compose Deferred.return
-         (Strict_pipe.Writer.write verified_transition_writer))
+         (Strict_pipe.Writer.write verified_transition_writer) )
   |> don't_wait_for
 
 let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
@@ -109,10 +109,10 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
       ~f:(fun (`Block head, `Valid_cb valid_cb) ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
-        Mina_transition.Mina_block.handle_dropped_transition
+        Mina_block.handle_dropped_transition
           ( With_hash.hash @@ Validation.block_with_hash
           @@ Network_peer.Envelope.Incoming.data head )
-          ~pipe_name:name ~logger ?valid_cb)
+          ~pipe_name:name ~logger ?valid_cb )
       ()
   in
   transition_reader_ref := bootstrap_controller_reader ;
@@ -125,20 +125,20 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   producer_transition_writer_ref := producer_transition_writer ;
   Option.iter best_seen_transition ~f:(fun block ->
       Strict_pipe.Writer.write bootstrap_controller_writer
-        (`Block block, `Valid_cb None)) ;
+        (`Block block, `Valid_cb None) ) ;
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   upon
     (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
        ~consensus_local_state ~transition_reader:!transition_reader_ref
        ~persistent_frontier ~persistent_root ~initial_root_transition
-       ~best_seen_transition ~precomputed_values ~catchup_mode)
+       ~best_seen_transition ~precomputed_values ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
       Strict_pipe.Writer.kill !transition_writer_ref ;
       start_transition_frontier_controller ~logger ~trust_system ~verifier
         ~network ~time_controller ~producer_transition_reader_ref
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~transition_reader_ref
-        ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier)
+        ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier )
 
 let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
@@ -167,8 +167,7 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ( "length"
                   , Length.to_yojson
-                      (External_transition.blockchain_length peer_best_tip.data)
-                  )
+                      (Mina_block.blockchain_length peer_best_tip.data) )
                 ]
               "Successfully downloaded best tip with $length from $peer" ;
             (* TODO: Use batch verification instead *)
@@ -200,7 +199,7 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
                   (Some
                      (Envelope.Incoming.wrap_peer
                         ~data:{ peer_best_tip with data = candidate_best_tip }
-                        ~sender:peer)) ))
+                        ~sender:peer ) ) ) )
   in
   [%log debug]
     ~metadata:
@@ -213,7 +212,7 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
           ~f:(fun enveloped_existing_best_tip enveloped_candidate_best_tip ->
             let f x =
               Validation.block_with_hash x
-              |> With_hash.map ~f:External_transition.consensus_state
+              |> With_hash.map ~f:Mina_block.consensus_state
             in
             match
               Consensus.Hooks.select
@@ -225,7 +224,7 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
             | `Keep ->
                 enveloped_existing_best_tip
             | `Take ->
-                enveloped_candidate_best_tip))
+                enveloped_candidate_best_tip ) )
   in
   Option.iter res ~f:(fun best ->
       let best_tip_length =
@@ -236,12 +235,12 @@ let download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
         best_tip_length ;
       don't_wait_for
       @@ Broadcast_pipe.Writer.write most_recent_valid_block_writer
-           best.data.data) ;
+           best.data.data ) ;
   Option.map res
     ~f:
       (Envelope.Incoming.map ~f:(fun (x : _ Proof_carrying_data.t) ->
            Ledger_catchup.Best_tip_lru.add x ;
-           x.data))
+           x.data ) )
 
 let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
     ~consensus_local_state ~precomputed_values ~catchup_mode =
@@ -319,9 +318,9 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
   match%bind
     Deferred.both
       (download_best_tip ~notify_online ~logger ~network ~verifier ~trust_system
-         ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values)
+         ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values )
       (load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
-         ~consensus_local_state ~precomputed_values ~catchup_mode)
+         ~consensus_local_state ~precomputed_values ~catchup_mode )
   with
   | best_tip, None ->
       [%log info] "Unable to load frontier; starting bootstrap" ;
@@ -349,7 +348,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                 , `Int
                     (Unsigned.UInt32.to_int
                        ( Mina_block.blockchain_length
-                       @@ Validation.block best_tip.data )) )
+                       @@ Validation.block best_tip.data ) ) )
               ]
             "Network best tip is too new to catchup to (best_tip with \
              $length); starting bootstrap" ;
@@ -373,7 +372,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                   , `Int
                       (Unsigned.UInt32.to_int
                          ( Mina_block.blockchain_length
-                         @@ Validation.block (Option.value_exn best_tip).data ))
+                         @@ Validation.block (Option.value_exn best_tip).data ) )
                   )
                 ]
               "Network best tip is recent enough to catchup to (best_tip with \
@@ -405,7 +404,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                           (fun peer rpc query ->
                             Mina_networking.(
                               query_peer network peer.peer_id
-                                (Rpcs.Consensus_rpc rpc) query))
+                                (Rpcs.Consensus_rpc rpc) query) )
                       }
                     ~ledger_depth:
                       precomputed_values.constraint_constants.ledger_depth
@@ -477,14 +476,14 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
   let verified_transition_reader, verified_transition_writer =
     let name = "verified transitions" in
     create_bufferred_pipe ~name
-      ~f:
-        (fun (`Transition (head : Mina_block.Validated.t), _, `Valid_cb valid_cb)
-             ->
+      ~f:(fun ( `Transition (head : Mina_block.Validated.t)
+              , _
+              , `Valid_cb valid_cb ) ->
         Mina_metrics.(
           Counter.inc_one Pipe.Drop_on_overflow.router_verified_transitions) ;
-        Mina_transition.Mina_block.handle_dropped_transition
+        Mina_block.handle_dropped_transition
           (Mina_block.Validated.forget head |> With_hash.hash)
-          ~pipe_name:name ~logger ?valid_cb)
+          ~pipe_name:name ~logger ?valid_cb )
       ()
   in
   let transition_reader, transition_writer =
@@ -492,10 +491,10 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     create_bufferred_pipe ~name
       ~f:(fun (`Block block, `Valid_cb valid_cb) ->
         Mina_metrics.(Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
-        Mina_transition.Mina_block.handle_dropped_transition
+        Mina_block.handle_dropped_transition
           ( Network_peer.Envelope.Incoming.data block
           |> Validation.block_with_hash |> With_hash.hash )
-          ?valid_cb ~pipe_name:name ~logger)
+          ?valid_cb ~pipe_name:name ~logger )
       ()
   in
   let transition_reader_ref = ref transition_reader in
@@ -509,7 +508,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
   O1trace.background_thread "transition_router" (fun () ->
       don't_wait_for
       @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
-             Strict_pipe.Writer.write !producer_transition_writer_ref x) ;
+             Strict_pipe.Writer.write !producer_transition_writer_ref x ) ;
       let%bind () =
         wait_till_genesis ~logger ~time_controller ~precomputed_values
       in
@@ -520,10 +519,10 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
             let `Block block, `Valid_cb valid_cb = head in
             Mina_metrics.(
               Counter.inc_one Pipe.Drop_on_overflow.router_valid_transitions) ;
-            Mina_transition.Mina_block.handle_dropped_transition
+            Mina_block.handle_dropped_transition
               ( Network_peer.Envelope.Incoming.data block
               |> Validation.block_with_hash |> With_hash.hash )
-              ~valid_cb ~pipe_name:name ~logger)
+              ~valid_cb ~pipe_name:name ~logger )
           ()
       in
       Initial_validator.run ~logger ~trust_system ~verifier
@@ -566,16 +565,16 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                     ~constants:precomputed_values.consensus_constants
                     ~existing:
                       ( Validation.block_with_hash current_transition
-                      |> With_hash.map ~f:External_transition.consensus_state )
+                      |> With_hash.map ~f:Mina_block.consensus_state )
                     ~candidate:
                       ( Validation.block_with_hash incoming_transition
-                      |> With_hash.map ~f:External_transition.consensus_state )
-                    ~logger)
+                      |> With_hash.map ~f:Mina_block.consensus_state )
+                    ~logger )
              then
                (* TODO: do we need to push valid_cb? *)
                Broadcast_pipe.Writer.write most_recent_valid_block_writer
                  incoming_transition
-             else Deferred.unit) ;
+             else Deferred.unit ) ;
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
            ~f:(fun (`Block enveloped_transition, `Valid_cb vc) ->
@@ -617,5 +616,5 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                       Deferred.unit
                 in
                 Strict_pipe.Writer.write !transition_writer_ref
-                  (`Block enveloped_transition, `Valid_cb (Some vc)))) ;
+                  (`Block enveloped_transition, `Valid_cb (Some vc)) ) ) ;
   (verified_transition_reader, initialization_finish_signal)

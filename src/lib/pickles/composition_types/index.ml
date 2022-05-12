@@ -18,7 +18,7 @@ let of_int_exn = Char.of_int_exn
 
 let of_bits bits =
   List.foldi bits ~init:0 ~f:(fun i acc b ->
-      if b then acc lor (1 lsl i) else acc)
+      if b then acc lor (1 lsl i) else acc )
   |> Char.of_int_exn
 
 module Checked (Impl : Snarky_backendless.Snark_intf.Run) = struct
@@ -36,7 +36,7 @@ let typ bool : (('bvar, Nat.N8.n) Vector.t, t, 'f) Snarky_backendless.Typ.t =
   transport (Vector.typ bool Nat.N8.n)
     ~there:(fun (x : char) ->
       let x = Char.to_int x in
-      Vector.init Nat.N8.n ~f:(fun i -> (x lsr i) land 1 = 1))
+      Vector.init Nat.N8.n ~f:(fun i -> (x lsr i) land 1 = 1) )
     ~back:(fun bits -> of_bits (Vector.to_list bits))
 
 let packed_typ (type f)

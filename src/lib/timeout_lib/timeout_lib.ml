@@ -87,8 +87,8 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
             ( create time_controller timeout_duration ~f:(fun x ->
                   if Ivar.is_full ivar then
                     [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-                  Ivar.fill_if_empty ivar x)
-              : unit t ))
+                  Ivar.fill_if_empty ivar x )
+              : unit t ) )
     in
     Deferred.(
       choose

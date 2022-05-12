@@ -28,7 +28,7 @@ let display
      ; success
      ; failure_status_tbl
      } :
-      t) : display =
+      t ) : display =
   let open Kimchi_backend.Pasta.Basic in
   let f x =
     Visualization.display_prefix_of_string
@@ -64,7 +64,7 @@ let dummy : unit -> t =
       ; ledger = Frozen_ledger_hash.empty_hash
       ; success = true
       ; failure_status_tbl = []
-      })
+      } )
 
 let empty = dummy
 
@@ -106,7 +106,7 @@ let to_input
      ; success
      ; failure_status_tbl = _
      } :
-      t) =
+      t ) =
   let open Random_oracle.Input.Chunked in
   let open Pickles.Impls.Step in
   Array.reduce_exn ~f:append
@@ -129,7 +129,7 @@ module Checked = struct
     let ( ! ) f x y = Impl.run_checked (f x y) in
     let f eq f =
       Impl.with_label (Core_kernel.Field.name f) (fun () ->
-          Core_kernel.Field.(eq (get f t1) (get f t2)))
+          Core_kernel.Field.(eq (get f t1) (get f t2)) )
     in
     Mina_transaction_logic.Parties_logic.Local_state.Fields.iter
       ~stack_frame:(f Stack_frame.Digest.Checked.Assert.equal)
@@ -166,7 +166,7 @@ module Checked = struct
        ; success
        ; failure_status_tbl = _
        } :
-        t) =
+        t ) =
     (* failure_status is the unit value, no need to represent it *)
     let open Random_oracle.Input.Chunked in
     let open Snark_params.Tick.Field.Var in
