@@ -1,11 +1,12 @@
+(include ../../dune.linker.inc)
+
 (library
     (name rocks)
     (public_name rocks)
     (no_dynlink)
     (libraries ctypes ctypes.foreign)
     (modules (:standard \ rocks_linker_flags_gen rocks_test))
-    (c_library_flags (:standard (:include flags.sexp)))
-    (self_build_stubs_archive (rocksdb))
+    (c_library_flags (:standard (:include flags.sexp) -fuse-ld=%{read:dune-linker}))
     )
 
 (executable
@@ -16,6 +17,7 @@
 
 (rule
  (targets flags.sexp)
+ (deps librocksdb_stubs.a)
  (action (run ./rocks_linker_flags_gen.exe)))
 
 (rule
