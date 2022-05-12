@@ -220,6 +220,13 @@
         packages.impure-shell =
           (import ./nix/impure-shell.nix pkgs).inputDerivation;
         devShells.impure = import ./nix/impure-shell.nix pkgs;
+        devShells.rust-wasm-impure = pkgs.mkShell {
+          name = "mina-rust-wasm-shell";
+          buildInputs = [
+            pkgs.kimchi-rust-wasm
+            pkgs.wasm-pack
+          ];
+        };
 
         inherit checks;
       });

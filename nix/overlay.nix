@@ -1,5 +1,11 @@
 final: prev:
-let pkgs = final;
+let
+  pkgs = final;
+  rustPlatformFor = rust: prev.makeRustPlatform {
+    cargo = rust;
+    rustc = rust;
+    # override stdenv.targetPlatform here, if neccesary
+  };
 in {
   # nixpkgs + musl problems
   postgresql =
@@ -57,7 +63,7 @@ in {
   });
 
   # Rust stuff (for marlin_plonk_bindings_stubs)
-  crypto-rust-musl = ((final.crypto-rust-toolchain.rust.override { targets = [ "x86_64-unknown-linux-musl" ]; }).overrideAttrs
+  crypto-rust-musl = ((final.crypto-rust.override { targets = [ "x86_64-unknown-linux-musl" ]; }).overrideAttrs
     (oa: {
       nativeBuildInputs = [ final.makeWrapper ];
       buildCommand = oa.buildCommand + ''
@@ -69,27 +75,17 @@ in {
       inherit (prev.rust) toRustTarget toRustTargetSpec;
     };
 
-  rustPlatform-musl = prev.makeRustPlatform {
-    cargo = final.crypto-rust-musl;
-    rustc = final.crypto-rust-musl;
-  };
-
-  crypto-rust-toolchain = final.rustChannelOf rec {
+  crypto-rust = (final.rustChannelOf rec {
     channel = (builtins.fromTOML (builtins.readFile ../src/lib/crypto/rust-toolchain.toml)).toolchain.channel;
     # update the hash if the assertion fails
     sha256 = assert channel == "1.58.0"; "sha256-eQBpSmy9+oHfVyPs0Ea+GVZ0fvIatj6QVhNhYKOJ6Jk=";
-  };
-
-  rustPlatform-latest = prev.makeRustPlatform {
-    cargo = final.crypto-rust-toolchain.rust;
-    rustc = final.crypto-rust-toolchain.rust;
-  };
+  }).rust;
 
   # Dependencies which aren't in nixpkgs and local packages which need networking to build
-  kimchi_bindings_stubs = (if pkgs.stdenv.hostPlatform.isMusl then
-    pkgs.rustPlatform-musl
+  kimchi_bindings_stubs = (rustPlatformFor (if pkgs.stdenv.hostPlatform.isMusl then
+    final.crypto-rust-musl
   else
-    pkgs.rustPlatform-latest).buildRustPackage {
+    final.crypto-rust)).buildRustPackage {
       pname = "kimchi_bindings_stubs";
       version = "0.1.0";
       src = ../src/lib/crypto;
@@ -156,5 +152,47 @@ in {
       cp -r --reflink=auto ${pkgs.libp2p_ipc_go}/ vendor/libp2p_ipc
       sed -i 's/.*libp2p_ipc.*//' go.mod
     '';
+  };
+
+  kimchi-rust-wasm = ((final.rustChannelOf {
+    # todo: read src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml
+    channel = "nightly";
+    date = "2021-11-16";
+    sha256 = "sha256-ErdLrUf9f3L/JtM5ghbefBMgsjDMYN3YHDTfGc008b4=";
+  }).rust.override {
+    targets = [ "wasm32-unknown-unknown" ];
+    # rust-src is needed for -Zbuild-std
+    extensions = [ "rust-src" ];
+  });
+
+  # TODO: these should be built for both web and nodejs, see the dune files
+  # at ../src/lib/crypto/kimchi_bindings/js/{chrome,node_js}/dune
+  plonk_wasm = (rustPlatformFor final.kimchi-rust-wasm).buildRustPackage {
+    pname = "plonk_wasm";
+    version = "0.1.0";
+    src = final.lib.sourceByRegex ../src [
+      "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
+      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+      "^external(/wasm-bindgen-rayon(/.*)?)?"
+    ];
+    sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
+    nativeBuildInputs = [ pkgs.wasm-pack pkgs.wasm-bindgen-cli ];
+    cargoLock.lockFile = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
+    RUSTFLAGS = "-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296";
+    # adapted from cargoBuildHook
+    # FIXME: wasm-pack can't find wasm-bindgen
+    buildPhase = ''
+      runHook preBuild
+      # TODO: remove: this file also adds -Zbuild-std
+      sed -i '/build-std/d' .cargo/config
+      (
+      set -x
+      wasm-pack build --mode no-install --target nodejs --out-dir $out ./. -- --features nodejs
+      )
+      runHook postBuild
+    '';
+    # FIXME: cargo flag -Zbuild-std=panic_abort,std doesn't work
+    dontCargoBuild = true;
+    cargoBuildFeatures = ["nodejs"];
   };
 }
