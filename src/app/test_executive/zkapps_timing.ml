@@ -24,6 +24,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "1000000000"; timing = Untimed }
         ; { balance = "1000000000"; timing = Untimed }
         ]
+    ; num_archive_nodes = 1
     ; num_snark_workers = 0
     }
 
@@ -441,5 +442,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Malleable_error.hard_error
              (Error.of_string "Ledger update contains a timing update") ))
     in
-    return ()
+    section_hard "running replayer"
+      (let%bind logs =
+         Network.Node.run_replayer ~logger
+           (List.hd_exn @@ Network.archive_nodes network)
+       in
+       check_replayer_logs ~logger logs)
 end

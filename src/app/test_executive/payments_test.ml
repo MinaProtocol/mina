@@ -8,6 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -456,16 +458,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          Network.Node.run_replayer ~logger
            (List.hd_exn @@ Network.archive_nodes network)
        in
-       let error_logs =
-         String.split logs ~on:'\n'
-         |> List.filter ~f:(fun log ->
-                String.is_substring log ~substring:{|"level":"Error"|}
-                || String.is_substring log ~substring:{|"level":"Fatal"|})
-       in
-       if List.is_empty error_logs then (
-         [%log info] "The replayer encountered no errors" ;
-         return () )
-       else
-         let error = String.concat error_logs ~sep:"\n  " in
-         Malleable_error.hard_error_string ("Replayer errors:\n  " ^ error))
+       check_replayer_logs ~logger logs)
 end

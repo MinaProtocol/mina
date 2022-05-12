@@ -148,4 +148,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; voting_fors_compat
       ]
       ~f:Fn.id
+
+  (* [logs] is a string containing the entire replayer output *)
+  let check_replayer_logs ~logger logs =
+    let error_logs =
+      String.split logs ~on:'\n'
+      |> List.filter ~f:(fun log ->
+             String.is_substring log ~substring:{|"level":"Error"|}
+             || String.is_substring log ~substring:{|"level":"Fatal"|})
+    in
+    if List.is_empty error_logs then (
+      [%log info] "The replayer encountered no errors" ;
+      Malleable_error.return () )
+    else
+      let error = String.concat error_logs ~sep:"\n  " in
+      Malleable_error.hard_error_string ("Replayer errors:\n  " ^ error)
 end

@@ -28,6 +28,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ]
+    ; num_archive_nodes = 1
     ; num_snark_workers = 2
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -533,5 +534,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
     in
-    return ()
+    section_hard "running replayer"
+      (let%bind logs =
+         Network.Node.run_replayer ~logger
+           (List.hd_exn @@ Network.archive_nodes network)
+       in
+       check_replayer_logs ~logger logs)
 end
