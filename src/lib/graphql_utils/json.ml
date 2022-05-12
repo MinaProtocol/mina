@@ -27,3 +27,18 @@ let get_int = function
 
 let string_of_option (f : 'a -> string) (x : 'a option) : string =
   match x with None -> "null" | Some x -> f x
+
+let non_null_list_of_json elem_of_json query json =
+  match json with
+  | `List l ->
+      Stdlib.List.map (elem_of_json query) l
+  | _ ->
+      failwith
+      @@ Format.asprintf "expecting a json list (%s): but got\n%a\n " __LOC__
+           Yojson.Basic.pp json
+
+let nullable of_json query json =
+  match json with `Null -> None | json -> Some (of_json query json)
+
+let list_of_json elem_of_json query json =
+  nullable (non_null_list_of_json elem_of_json) query json

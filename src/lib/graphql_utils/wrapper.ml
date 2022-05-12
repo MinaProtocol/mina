@@ -274,6 +274,44 @@ module Make (Schema : Graphql_intf.Schema) = struct
   let enum_value = Schema.enum_value
 
   type ('a, 'b) typ = ('a, 'b) Schema.typ
+
+  (* module Make_scalar_typ (Input: sig *)
+  (*                             type out *)
+  (*                             val typ: typ *)
+  (*                             val response_of_json_non_null *)
+  (*                           end) = struct *)
+  (*   let typ = int *)
+
+  (*   type query = unit *)
+
+  (*   let response_of_json_non_null () = Json.get_int *)
+
+  (*   let response_of_json = Json.nullable response_of_json_non_null *)
+  (* end *)
+
+  module Int_typ = struct
+    let nullable_typ () = int
+
+    let typ () = non_null int
+
+    type 'a final_option_modifier = 'a
+
+    type 'a modifier = 'a
+
+    type 'a query = Q : int query
+
+    let response_of_json = Json.get_int
+  end
+
+  module String_typ = struct
+    let typ = string
+
+    type query = unit
+
+    let response_of_json_non_null () = Json.get_string
+
+    let response_of_json = Json.nullable response_of_json_non_null
+  end
 end
 
 module Make2 (Schema : Graphql_intf.Schema) = struct

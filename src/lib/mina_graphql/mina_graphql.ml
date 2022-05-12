@@ -70,7 +70,7 @@ module Mutations = struct
         "Add a wallet - this will create a new keypair and store it in the \
          daemon"
       ~deprecated:(Deprecated (Some "use createAccount instead"))
-      ~typ:(non_null Types.Payload.create_account)
+      ~typ:(non_null Payload.create_account)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.create_account) ]
       ~resolve:create_account_resolver
 
@@ -79,14 +79,14 @@ module Mutations = struct
       ~doc:
         "Create a new account - this will create a new keypair and store it in \
          the daemon"
-      ~typ:(non_null Types.Payload.create_account)
+      ~typ:(non_null Payload.create_account)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.create_account) ]
       ~resolve:create_account_resolver
 
   let create_hd_account : (Mina_lib.t, unit, _, _, _) Fields.field =
     io_field "createHDAccount"
       ~doc:Secrets.Hardware_wallets.create_hd_account_summary
-      ~typ:(non_null Types.Payload.create_account)
+      ~typ:(non_null Payload.create_account)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.create_hd_account) ]
       ~resolve:(fun { ctx = coda; _ } () hd_index ->
         Mina_lib.wallets coda |> Secrets.Wallets.create_hd_account ~hd_index)
@@ -111,16 +111,22 @@ module Mutations = struct
     io_field "unlockWallet"
       ~doc:"Allow transactions to be sent from the unlocked account"
       ~deprecated:(Deprecated (Some "use unlockAccount instead"))
-      ~typ:(non_null Types.Payload.unlock_account)
+      ~typ:(non_null Payload.Unlock_account.typ)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.unlock_account) ]
       ~resolve:unlock_account_resolver
 
-  let unlock_account =
-    io_field "unlockAccount"
-      ~doc:"Allow transactions to be sent from the unlocked account"
-      ~typ:(non_null Types.Payload.unlock_account)
-      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.unlock_account) ]
-      ~resolve:unlock_account_resolver
+  module Unlock_account = struct
+    let unlock_account =
+      io_field "unlockAccount"
+        ~doc:"Allow transactions to be sent from the unlocked account"
+        ~typ:(non_null Payload.Unlock_account.typ)
+        ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.unlock_account) ]
+        ~resolve:unlock_account_resolver
+
+    type gql_arg = string * Account.key
+
+    type 'a subquery = 'a Payload.Unlock_account.query
+  end
 
   let lock_account_resolver { ctx = t; _ } () pk =
     Mina_lib.wallets t |> Secrets.Wallets.lock ~needle:pk ;
@@ -130,14 +136,14 @@ module Mutations = struct
     field "lockWallet"
       ~doc:"Lock an unlocked account to prevent transaction being sent from it"
       ~deprecated:(Deprecated (Some "use lockAccount instead"))
-      ~typ:(non_null Types.Payload.lock_account)
+      ~typ:(non_null Payload.lock_account)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.lock_account) ]
       ~resolve:lock_account_resolver
 
   let lock_account =
     field "lockAccount"
       ~doc:"Lock an unlocked account to prevent transaction being sent from it"
-      ~typ:(non_null Types.Payload.lock_account)
+      ~typ:(non_null Payload.lock_account)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.lock_account) ]
       ~resolve:lock_account_resolver
 
@@ -156,14 +162,14 @@ module Mutations = struct
     io_field "deleteWallet"
       ~doc:"Delete the private key for an account that you track"
       ~deprecated:(Deprecated (Some "use deleteAccount instead"))
-      ~typ:(non_null Types.Payload.delete_account)
+      ~typ:(non_null Payload.delete_account)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.delete_account) ]
       ~resolve:delete_account_resolver
 
   let delete_account =
     io_field "deleteAccount"
       ~doc:"Delete the private key for an account that you track"
-      ~typ:(non_null Types.Payload.delete_account)
+      ~typ:(non_null Payload.delete_account)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.delete_account) ]
       ~resolve:delete_account_resolver
 
@@ -176,20 +182,20 @@ module Mutations = struct
   let reload_wallets =
     io_field "reloadWallets" ~doc:"Reload tracked account information from disk"
       ~deprecated:(Deprecated (Some "use reloadAccounts instead"))
-      ~typ:(non_null Types.Payload.reload_accounts)
+      ~typ:(non_null Payload.reload_accounts)
       ~args:Arg.[]
       ~resolve:reload_account_resolver
 
   let reload_accounts =
     io_field "reloadAccounts"
       ~doc:"Reload tracked account information from disk"
-      ~typ:(non_null Types.Payload.reload_accounts)
+      ~typ:(non_null Payload.reload_accounts)
       ~args:Arg.[]
       ~resolve:reload_account_resolver
 
   let import_account =
     io_field "importAccount" ~doc:"Reload tracked account information from disk"
-      ~typ:(non_null Types.Payload.import_account)
+      ~typ:(non_null Payload.import_account)
       ~args:
         Arg.
           [ arg "path"
@@ -228,7 +234,7 @@ module Mutations = struct
   let reset_trust_status =
     io_field "resetTrustStatus"
       ~doc:"Reset trust status for all peers at a given IP address"
-      ~typ:(list (non_null Types.Payload.trust_status))
+      ~typ:(list (non_null Payload.trust_status))
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.reset_trust_status) ]
       ~resolve:(fun { ctx = coda; _ } () ip_address_input ->
         let open Deferred.Result.Let_syntax in
@@ -473,7 +479,7 @@ module Mutations = struct
   let send_delegation =
     io_field "sendDelegation"
       ~doc:"Change your delegate by sending a transaction"
-      ~typ:(non_null Types.Payload.send_delegation)
+      ~typ:(non_null Payload.send_delegation)
       ~args:
         Arg.
           [ arg "input" ~typ:(non_null Types.Input.send_delegation)
@@ -499,7 +505,7 @@ module Mutations = struct
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
-      ~typ:(non_null Types.Payload.send_payment)
+      ~typ:(non_null Payload.send_payment)
       ~args:
         Arg.
           [ arg "input" ~typ:(non_null Types.Input.send_payment)
@@ -527,7 +533,7 @@ module Mutations = struct
 
   let make_zkapp_endpoint ~name ~doc ~f =
     io_field name ~doc
-      ~typ:(non_null Types.Payload.send_zkapp)
+      ~typ:(non_null Payload.send_zkapp)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_zkapp) ]
       ~resolve:(fun { ctx = coda; _ } () parties ->
         f coda parties (* TODO: error handling? *))
@@ -546,7 +552,7 @@ module Mutations = struct
       ~doc:"Send a zkApp (for internal testing purposes)"
       ~args:
         Arg.[ arg "parties" ~typ:(non_null Types.Input.internal_send_zkapp) ]
-      ~typ:(non_null Types.Payload.send_zkapp)
+      ~typ:(non_null Payload.send_zkapp)
       ~resolve:(fun { ctx = mina; _ } () parties ->
         send_zkapp_command mina parties)
 
@@ -619,7 +625,7 @@ module Mutations = struct
   let send_rosetta_transaction =
     io_field "sendRosettaTransaction"
       ~doc:"Send a transaction in Rosetta format"
-      ~typ:(non_null Types.Payload.send_rosetta_transaction)
+      ~typ:(non_null Payload.send_rosetta_transaction)
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.rosetta_transaction) ]
       ~resolve:(fun { ctx = mina; _ } () signed_command ->
         match%map
@@ -652,7 +658,7 @@ module Mutations = struct
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
       ~args:Arg.[ arg "basename" ~typ:string ]
-      ~typ:(non_null Types.Payload.export_logs)
+      ~typ:(non_null Payload.export_logs)
       ~resolve:(fun { ctx = coda; _ } () basename_opt ->
         let%map result = export_logs ~coda basename_opt in
         Result.map_error result
@@ -662,7 +668,7 @@ module Mutations = struct
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
       ~args:
         Arg.[ arg "input" ~typ:(non_null Types.Input.set_coinbase_receiver) ]
-      ~typ:(non_null Types.Payload.set_coinbase_receiver)
+      ~typ:(non_null Payload.set_coinbase_receiver)
       ~resolve:(fun { ctx = mina; _ } () coinbase_receiver ->
         let old_coinbase_receiver =
           match Mina_lib.coinbase_receiver mina with
@@ -685,7 +691,7 @@ module Mutations = struct
     io_field "setSnarkWorker"
       ~doc:"Set key you wish to snark work with or disable snark working"
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_snark_worker) ]
-      ~typ:(non_null Types.Payload.set_snark_worker)
+      ~typ:(non_null Payload.set_snark_worker)
       ~resolve:(fun { ctx = coda; _ } () pk ->
         let old_snark_worker_key = Mina_lib.snark_worker_key coda in
         let%map () = Mina_lib.replace_snark_worker_key coda pk in
@@ -695,7 +701,7 @@ module Mutations = struct
     result_field "setSnarkWorkFee"
       ~doc:"Set fee that you will like to receive for doing snark work"
       ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.set_snark_work_fee) ]
-      ~typ:(non_null Types.Payload.set_snark_work_fee)
+      ~typ:(non_null Payload.set_snark_work_fee)
       ~resolve:(fun { ctx = coda; _ } () raw_fee ->
         let open Result.Let_syntax in
         let%map fee =
@@ -715,7 +721,7 @@ module Mutations = struct
       ~doc:
         "Set the connection gating config, returning the current config after \
          the application (which may have failed)"
-      ~typ:(non_null Types.Payload.set_connection_gating_config)
+      ~typ:(non_null Payload.set_connection_gating_config)
       ~resolve:(fun { ctx = coda; _ } () config ->
         let open Deferred.Result.Let_syntax in
         let%bind config = Deferred.return config in
@@ -762,17 +768,19 @@ module Mutations = struct
                 Deferred.return err
           in
           List.map ~f:Network_peer.Peer.to_display peers)
+
+    type gql_arguments =
+      { peers : Network_peer.Peer.t list; seed : bool option }
+
+    type 'a gql_subquery = 'a DaemonStatus.Peer.query
   end
 
   type 'add_peers r_mut = { add_peers : 'add_peers }
 
-  type add_peers_arguments =
-    { peers : Network_peer.Peer.t list; seed : bool option }
-
   type _ mutation =
     | Add_peers :
-        { subquery : 'sub DaemonStatus.Peer.query
-        ; arguments : add_peers_arguments
+        { subquery : 'sub Add_peer.gql_subquery
+        ; arguments : Add_peer.gql_arguments
         }
         -> 'sub r_mut mutation
 
@@ -786,7 +794,7 @@ module Mutations = struct
     match query with
     | Add_peers { subquery; _ } ->
         { add_peers =
-            (Graphql_utils.Gql_types.non_null_list_of_json
+            (Graphql_utils.Json.non_null_list_of_json
                DaemonStatus.Peer.response_of_json_non_null)
               subquery
               (Graphql_utils.Json.get Add_peer.add_peer.name json)
@@ -859,7 +867,7 @@ module Mutations = struct
       [ add_wallet
       ; create_account
       ; create_hd_account
-      ; unlock_account
+      ; Unlock_account.unlock_account
       ; unlock_wallet
       ; lock_account
       ; lock_wallet
@@ -1044,7 +1052,7 @@ module Queries = struct
 
   let trust_status =
     field "trustStatus"
-      ~typ:(list (non_null Types.Payload.trust_status))
+      ~typ:(list (non_null Payload.trust_status))
       ~args:Arg.[ arg "ipAddress" ~typ:(non_null string) ]
       ~doc:"Trust status for an IPv4 or IPv6 address"
       ~resolve:(fun { ctx = coda; _ } () (ip_addr_string : string) ->
@@ -1056,7 +1064,7 @@ module Queries = struct
 
   let trust_status_all =
     field "trustStatusAll"
-      ~typ:(non_null @@ list @@ non_null Types.Payload.trust_status)
+      ~typ:(non_null @@ list @@ non_null Payload.trust_status)
       ~args:Arg.[]
       ~doc:"IP address and trust status for all peers"
       ~resolve:(fun { ctx = coda; _ } () ->
@@ -1508,7 +1516,7 @@ module Queries = struct
         "The rules that the libp2p helper will use to determine which \
          connections to permit"
       ~args:Arg.[]
-      ~typ:(non_null Types.Payload.set_connection_gating_config)
+      ~typ:(non_null Payload.set_connection_gating_config)
       ~resolve:(fun { ctx = coda; _ } _ ->
         let net = Mina_lib.net coda in
         let%map config = Mina_networking.connection_gating_config net in

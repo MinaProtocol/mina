@@ -301,7 +301,7 @@ end
 
 module Identifier = Account_id
 
-type key = Key.t [@@deriving sexp, equal, hash, compare, yojson]
+type key = Key.t [@@deriving sexp, equal, hash, compare, yojson { exn = true }]
 
 module Timing = Account_timing
 
