@@ -151,13 +151,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* [logs] is a string containing the entire replayer output *)
   let check_replayer_logs ~logger logs =
+    let log_level_substring level = sprintf {|"level":"%s"|} level in
+    let error_log_substring = log_level_substring "Error" in
+    let fatal_log_substring = log_level_substring "Fatal" in
+    let info_log_substring = log_level_substring "Info" in
+    let split_logs = String.split logs ~on:'\n' in
     let error_logs =
-      String.split logs ~on:'\n'
+      split_logs
       |> List.filter ~f:(fun log ->
-             String.is_substring log ~substring:{|"level":"Error"|}
-             || String.is_substring log ~substring:{|"level":"Fatal"|})
+             String.is_substring log ~substring:error_log_substring
+             || String.is_substring log ~substring:fatal_log_substring)
     in
-    if List.is_empty error_logs then (
+    let info_logs =
+      split_logs
+      |> List.filter ~f:(fun log ->
+             String.is_substring log ~substring:info_log_substring)
+    in
+    if List.length info_logs < 25 then
+      Malleable_error.hard_error_string
+        "Replayer output contains suspiciously few Info logs"
+    else if List.is_empty error_logs then (
       [%log info] "The replayer encountered no errors" ;
       Malleable_error.return () )
     else

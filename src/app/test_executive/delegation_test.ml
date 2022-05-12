@@ -37,7 +37,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ node_a; node_b ] = Network.block_producers network in
     let%bind () =
-      section "delegate all mina currency from node_b to node_a"
+      section "Delegate all mina currency from node_b to node_a"
         (let amount = Currency.Amount.of_int 2_000_000_000 in
          (* let fee = Currency.Fee.of_int 10_000_000 in *)
          let delegation_receiver = node_a in
@@ -57,7 +57,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier
               ~txn_hash:hash ~node_included_in:`Any_node))
     in
-    section_hard "running replayer"
+    section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
            (List.hd_exn @@ Network.archive_nodes network)

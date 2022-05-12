@@ -534,7 +534,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
     in
-    section_hard "running replayer"
+    section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
            (List.hd_exn @@ Network.archive_nodes network)
