@@ -167,9 +167,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       |> List.filter ~f:(fun log ->
              String.is_substring log ~substring:info_log_substring)
     in
-    if List.length info_logs < 25 then
+    let num_info_logs = List.length info_logs in
+    if num_info_logs < 25 then
       Malleable_error.hard_error_string
-        "Replayer output contains suspiciously few Info logs"
+        (sprintf "Replayer output contains suspiciously few (%d) Info logs"
+           num_info_logs)
     else if List.is_empty error_logs then (
       [%log info] "The replayer encountered no errors" ;
       Malleable_error.return () )
