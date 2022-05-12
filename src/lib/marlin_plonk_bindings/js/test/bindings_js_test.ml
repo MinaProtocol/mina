@@ -2,7 +2,7 @@ open Marlin_plonk_bindings
 open Js_of_ocaml
 
 (* NOTE: For nodejs, we need to manually add the following line to the javascript bindings, after imports['env'] has been declared.
-imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
+   imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
 *)
 
 type a = { a : int; b : bool; c : int option option }
@@ -58,7 +58,7 @@ let _ =
        method bytesOfJsString x = Js.to_string x |> Bytes.of_string
 
        method bytesToJsString x = Bytes.to_string x |> Js.string
-    end)
+    end )
 
 let _ =
   let open Bigint_256 in
@@ -87,7 +87,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Pasta_fp in
@@ -152,7 +152,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Pasta_fq in
@@ -217,7 +217,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Bigint_256 in
@@ -245,7 +245,7 @@ let _ =
          let ten_bytes = to_bytes ten in
          assert (compare (of_bytes ten_bytes) ten = 0) ;
          assert (compare (deep_copy six) six = 0)
-    end)
+    end )
 
 let _ =
   let open Pasta_fp in
@@ -258,8 +258,7 @@ let _ =
          assert (
            String.equal
              (Bigint_256.to_string size)
-             "28948022309329048855892746252171976963363056481941560715954676764349967630337"
-         ) ;
+             "28948022309329048855892746252171976963363056481941560715954676764349967630337" ) ;
          let one = of_int 1 in
          let two = of_string "2" in
          let rand1 = random () in
@@ -304,7 +303,7 @@ let _ =
          let gen = domain_generator 2 in
          assert (equal (of_bytes (to_bytes gen)) gen) ;
          assert (equal (deep_copy rand2) rand2)
-    end)
+    end )
 
 let _ =
   let open Pasta_fq in
@@ -317,8 +316,7 @@ let _ =
          assert (
            String.equal
              (Bigint_256.to_string size)
-             "28948022309329048855892746252171976963363056481941647379679742748393362948097"
-         ) ;
+             "28948022309329048855892746252171976963363056481941647379679742748393362948097" ) ;
          let one = of_int 1 in
          let two = of_string "2" in
          let rand1 = random () in
@@ -363,7 +361,7 @@ let _ =
          let gen = domain_generator 2 in
          assert (equal (of_bytes (to_bytes gen)) gen) ;
          assert (equal (deep_copy rand2) rand2)
-    end)
+    end )
 
 let _ =
   let open Pasta_fp_vector in
@@ -391,7 +389,7 @@ let _ =
          assert (Pasta_fp.equal (Pasta_fp.of_int 10) (get first 1)) ;
          assert (Pasta_fp.equal (Pasta_fp.of_int 30) (get first 2)) ;
          assert (Pasta_fp.equal (Pasta_fp.of_int 1) (get second 0))
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_vector in
@@ -419,4 +417,4 @@ let _ =
          assert (Pasta_fq.equal (Pasta_fq.of_int 10) (get first 1)) ;
          assert (Pasta_fq.equal (Pasta_fq.of_int 30) (get first 2)) ;
          assert (Pasta_fq.equal (Pasta_fq.of_int 1) (get second 0))
-    end)
+    end )

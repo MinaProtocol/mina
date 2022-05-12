@@ -36,9 +36,9 @@ let vesta =
           ksprintf time "vesta %d" i (fun () ->
               Marlin_plonk_bindings.Pasta_fp_urs.lagrange_commitment
                 (Vesta_based_plonk.Keypair.load_urs ())
-                ~domain_size i)
+                ~domain_size i )
           |> Zexe_backend.Pasta.Fp_poly_comm.of_backend_without_degree_bound
-          |> unwrap))
+          |> unwrap ) )
 
 let pallas =
   let max_domain_log2 = Nat.to_int Pallas_based_plonk.Rounds.n in
@@ -51,9 +51,9 @@ let pallas =
           ksprintf time "pallas %d" i (fun () ->
               Marlin_plonk_bindings.Pasta_fq_urs.lagrange_commitment
                 (Pallas_based_plonk.Keypair.load_urs ())
-                ~domain_size i)
+                ~domain_size i )
           |> Zexe_backend.Pasta.Fq_poly_comm.of_backend_without_degree_bound
-          |> unwrap))
+          |> unwrap ) )
 
 let mk xss ~f =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -62,7 +62,7 @@ let mk xss ~f =
   let open E in
   pexp_array
     (List.map xss ~f:(fun xs ->
-         pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f)))))
+         pexp_array (List.map xs ~f:(fun g -> pexp_array (List.map g ~f))) ) )
 
 let structure =
   let loc = Ppxlib.Location.none in

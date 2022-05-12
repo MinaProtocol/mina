@@ -97,7 +97,7 @@ module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
        ?handler:
          (   Snarky_backendless.Request.request
-          -> Snarky_backendless.Request.response)
+          -> Snarky_backendless.Request.response )
     -> ( 'prev_values
        , 'local_widths
        , 'local_heights )
@@ -207,12 +207,12 @@ val compile :
            , 'heightss
            , 'a_var
            , 'a_value )
-           H4_2.T(Inductive_rule).t)
+           H4_2.T(Inductive_rule).t )
   -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_branching, 'max_branching) Proof.t
-           and type statement = 'a_value)
+           and type statement = 'a_value )
      * ( 'prev_valuess
        , 'widthss
        , 'heightss

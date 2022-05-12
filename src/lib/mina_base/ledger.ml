@@ -252,7 +252,7 @@ module Ledger_inner = struct
         (sprintf
            !"Could not create a new account with pk \
              %{sexp:Public_key.Compressed.t}: Account already exists"
-           (Account_id.public_key account_id))
+           (Account_id.public_key account_id) )
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
@@ -267,7 +267,7 @@ module Ledger_inner = struct
       Result.of_option (get ledger loc)
         ~error:
           (Error.of_string
-             "get_or_create: Account was not found in the ledger after creation")
+             "get_or_create: Account was not found in the ledger after creation" )
     in
     (action, account, loc)
 
@@ -280,7 +280,7 @@ module Ledger_inner = struct
         failwith "create_empty for a key already present"
     | `Added, new_loc ->
         Debug_assert.debug_assert (fun () ->
-            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger)) ;
+            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
         (merkle_path ledger new_loc, Account.empty)
 
   let _handler t =
@@ -290,7 +290,7 @@ module Ledger_inner = struct
         | `Left h ->
             h
         | `Right h ->
-            h)
+            h )
     in
     stage (fun (With { request; respond }) ->
         match request with
@@ -308,7 +308,7 @@ module Ledger_inner = struct
             let index = index_of_account_exn t pk in
             respond (Provide index)
         | _ ->
-            unhandled)
+            unhandled )
 end
 
 include Ledger_inner
@@ -363,4 +363,4 @@ let apply_initial_ledger_state : t -> init_state -> unit =
         ; timing
         }
       in
-      create_new_account_exn t account_id account')
+      create_new_account_exn t account_id account' )

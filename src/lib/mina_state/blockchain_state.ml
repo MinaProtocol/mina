@@ -81,7 +81,7 @@ let var_to_input
      ; snarked_next_available_token
      ; timestamp
      } :
-      var) =
+      var ) =
   let open Random_oracle.Input in
   let%map.Checked snarked_next_available_token =
     Token_id.Checked.to_input snarked_next_available_token
@@ -93,7 +93,7 @@ let var_to_input
     ; snarked_next_available_token
     ; bitstring
         (Bitstring_lib.Bitstring.Lsb_first.to_list
-           (Block_time.Unpacked.var_to_bits timestamp))
+           (Block_time.Unpacked.var_to_bits timestamp) )
     ]
 
 let to_input
@@ -103,7 +103,7 @@ let to_input
      ; snarked_next_available_token
      ; timestamp
      } :
-      Value.t) =
+      Value.t ) =
   let open Random_oracle.Input in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash

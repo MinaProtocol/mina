@@ -47,23 +47,20 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    include Binable.Of_binable
-              (R.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable
+        (R.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable
-                    { Poly.step_data; max_width; wrap_index; wrap_vk = _ } =
-                  { Repr.Stable.V1.step_data; max_width; wrap_index }
+          let to_binable { Poly.step_data; max_width; wrap_index; wrap_vk = _ }
+              =
+            { Repr.Stable.V1.step_data; max_width; wrap_index }
 
-                let of_binable
-                    { Repr.Stable.V1.step_data; max_width; wrap_index = c } =
-                  { Poly.step_data
-                  ; max_width
-                  ; wrap_index = c
-                  ; wrap_vk = Some ()
-                  }
-              end)
+          let of_binable { Repr.Stable.V1.step_data; max_width; wrap_index = c }
+              =
+            { Poly.step_data; max_width; wrap_index = c; wrap_vk = Some () }
+        end)
   end
 end]
 
@@ -93,7 +90,7 @@ let dummy : t =
        ; emul1_comm = g
        ; emul2_comm = g
        ; emul3_comm = g
-       })
+       } )
   ; wrap_vk = None
   }
 

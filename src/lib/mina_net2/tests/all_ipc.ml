@@ -1,22 +1,22 @@
 (* Test all IPCs.
-This test executes a simulation with 3 nodes: Alice, Bob and Carol.
+   This test executes a simulation with 3 nodes: Alice, Bob and Carol.
 
-Topology of the network:
-    * Yota <--> Alice
-    * Yota <--> Bob
-    * Yota <--> Carol
-    * Alice <--> Bob
-    * Alice <--> Carol
+   Topology of the network:
+       * Yota <--> Alice
+       * Yota <--> Bob
+       * Yota <--> Carol
+       * Alice <--> Bob
+       * Alice <--> Carol
 
-Additional libp2p helper Yota is launched to correctly setup routing on
-Alice and Bob. Yota performs no active actions. Note, that there is no connection
-between Bob and Carol (this is implemented by banning Carol's peer id in configuration
-of Bob).
+   Additional libp2p helper Yota is launched to correctly setup routing on
+   Alice and Bob. Yota performs no active actions. Note, that there is no connection
+   between Bob and Carol (this is implemented by banning Carol's peer id in configuration
+   of Bob).
 
-Each node runs its own sequence of actions. Some actions have an effect of
-synchronizing nodes (see comments in the code).
+   Each node runs its own sequence of actions. Some actions have an effect of
+   synchronizing nodes (see comments in the code).
 
-All upcalls and RPC request/response pairs are tested this way. *)
+   All upcalls and RPC request/response pairs are tested this way. *)
 
 open Core
 open Async
@@ -178,7 +178,7 @@ let%test_module "all-ipc test" =
             | Connected ->
                 true
             | _ ->
-                raise UnexpectedState)
+                raise UnexpectedState )
         |> or_timeout ~msg:"Alice: connect to Bob"
       in
       (* Get addresses of Alice *)
@@ -194,7 +194,7 @@ let%test_module "all-ipc test" =
             | Connected ->
                 true
             | _ ->
-                raise UnexpectedState)
+                raise UnexpectedState )
         |> or_timeout ~msg:"Alice: wait for Carol to connect"
       in
       (* Subscribe to topic "c" *)
@@ -213,7 +213,7 @@ let%test_module "all-ipc test" =
                   check_msg env cb topic_c_received_2 ad.b_peerid `Accept
                 else raise UnexpectedState ;
                 if !topic_c_received_1 && !topic_c_received_2 then
-                  Ivar.fill_if_empty topic_c_received_ivar () ))
+                  Ivar.fill_if_empty topic_c_received_ivar () ) )
       in
       (* Subscribe to topic "a" *)
       let topic_a_received_1 = ref false in
@@ -234,7 +234,7 @@ let%test_module "all-ipc test" =
                 if
                   !topic_a_received_1 && !topic_a_received_2
                   && !topic_a_received_3
-                then Ivar.fill_if_empty topic_a_received_ivar () ))
+                then Ivar.fill_if_empty topic_a_received_ivar () ) )
         >>| Or_error.ok_exn
       in
       (* Open stream 1 to Bob *)
@@ -287,7 +287,7 @@ let%test_module "all-ipc test" =
                   let s_in, _ = Libp2p_stream.pipes s in
                   Pipe.read s_in >>| expectEof
               | _ ->
-                  Deferred.unit)
+                  Deferred.unit )
         |> or_timeout ~msg:"Stream 3 opening to fail"
       in
 
@@ -326,7 +326,7 @@ let%test_module "all-ipc test" =
           ~f:(fun b_acc pid ->
             b_acc
             && List.fold peers ~init:false ~f:(fun acc p ->
-                   acc || String.equal p.peer_id pid)) ) ;
+                   acc || String.equal p.peer_id pid ) ) ) ;
 
       (* Ban Carol in Alice's gating config *)
       let%bind _ =
@@ -343,7 +343,7 @@ let%test_module "all-ipc test" =
             | Disconnected ->
                 true
             | _ ->
-                raise UnexpectedState)
+                raise UnexpectedState )
         |> or_timeout ~msg:"Alice: wait for Carol to disconnect"
       in
 
@@ -356,7 +356,7 @@ let%test_module "all-ipc test" =
           | Connected ->
               false
           | _ ->
-              raise UnexpectedState)
+              raise UnexpectedState )
       |> or_timeout ~msg:"Alice: wait for Bob to disconnect"
 
     let bob b ad (pc, _) msgs =
@@ -368,7 +368,7 @@ let%test_module "all-ipc test" =
       let streams_r, streams_w = Pipe.create () in
       let%bind () =
         open_protocol ~protocol ~on_handler_error:`Raise b (fun stream ->
-            Pipe.write streams_w stream)
+            Pipe.write streams_w stream )
         >>| Or_error.ok_exn
       in
       (* Await connection to succeed *)
@@ -381,7 +381,7 @@ let%test_module "all-ipc test" =
             | Connected ->
                 true
             | _ ->
-                raise UnexpectedState)
+                raise UnexpectedState )
         |> or_timeout ~msg:"Bob: Alice connected"
       in
       (* Set Bob's node status *)
@@ -396,7 +396,7 @@ let%test_module "all-ipc test" =
               ( if String.equal env.data msgs.topic_a_msg_1 then
                   check_msg env cb topic_a_received_1 ad.a_peerid `Accept
                 else raise UnexpectedState ;
-                Ivar.fill topic_a_received_ivar () ))
+                Ivar.fill topic_a_received_ivar () ) )
         >>| Or_error.ok_exn
       in
       (* Subscribe to topic "c" *)
@@ -405,7 +405,7 @@ let%test_module "all-ipc test" =
           ~on_decode_failure:(`Call (fun _ _ -> raise UnexpectedState))
           ~bin_prot:bin_typed_msg
           ~handle_and_validate_incoming_message:(fun _ _ ->
-            raise UnexpectedState)
+            raise UnexpectedState )
         >>| Or_error.ok_exn
       in
       (* Await for stream1 to open *)
@@ -460,7 +460,7 @@ let%test_module "all-ipc test" =
       let streams_r, streams_w = Pipe.create () in
       let%bind () =
         open_protocol ~protocol ~on_handler_error:`Raise c (fun stream ->
-            Pipe.write streams_w stream)
+            Pipe.write streams_w stream )
         >>| Or_error.ok_exn
       in
       (* Await connection to succeed *)
@@ -473,7 +473,7 @@ let%test_module "all-ipc test" =
             | Connected ->
                 true
             | _ ->
-                raise UnexpectedState)
+                raise UnexpectedState )
         |> or_timeout ~msg:"Carol: Alice connected"
       in
 
@@ -522,7 +522,7 @@ let%test_module "all-ipc test" =
           | Connected ->
               false
           | _ ->
-              raise UnexpectedState)
+              raise UnexpectedState )
       |> or_timeout ~msg:"Carol: wait for Alice to disconnect"
 
     let def_gating_config =
@@ -554,7 +554,8 @@ let%test_module "all-ipc test" =
           ~direct_peers:[] ~seed_peers ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~min_connections:25 ~max_connections:50
           ~validation_queue_size:150 ~initial_gating_config:gating_config
-          ~known_private_ip_nets:[] ~topic_config:[ [ topic_a; topic_c ] ]
+          ~known_private_ip_nets:[]
+          ~topic_config:[ [ topic_a; topic_c ] ]
         >>| Or_error.ok_exn
       in
       let%bind raw_seed_peers = listening_addrs node >>| Or_error.ok_exn in

@@ -301,8 +301,12 @@ module Accumulator = struct
       { shifted_accumulator = f t1.shifted_accumulator t2.shifted_accumulator
       ; unshifted_accumulators =
           Int.Map.merge
-            ~f:(fun ~key:_ -> function `Both (x, y) -> Some (f x y) | _ ->
-                  failwith "map2: Key not present in both maps")
+            ~f:
+              (fun ~key:_ -> function
+                | `Both (x, y) ->
+                    Some (f x y)
+                | _ ->
+                    failwith "map2: Key not present in both maps" )
             t1.unshifted_accumulators t2.unshifted_accumulators
       }
 
@@ -316,7 +320,7 @@ module Accumulator = struct
             | `Left x ->
                 Some x
             | `Right _y ->
-                failwith "shift not present in accumulating map")
+                failwith "shift not present in accumulating map" )
       }
   end
 

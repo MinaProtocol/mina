@@ -32,7 +32,7 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
       | `Invalid ->
           `Invalid
       | `Valid_assuming (c, _) ->
-          `Valid c)
+          `Valid c )
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =
@@ -46,5 +46,5 @@ let verify_transaction_snarks _ ts =
       let msg_digest = Sok_message.digest message in
       let sok_digest = Transaction_snark.sok_digest proof in
       Sok_message.Digest.(equal sok_digest default)
-      || Mina_base.Sok_message.Digest.equal sok_digest msg_digest)
+      || Mina_base.Sok_message.Digest.equal sok_digest msg_digest )
   |> Deferred.Or_error.return

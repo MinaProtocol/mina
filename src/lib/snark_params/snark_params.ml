@@ -58,7 +58,7 @@ let%test_unit "group-map test" =
                 (module M)
                 ~params (M.Field.constant t)
             in
-            fun () -> M.As_prover.(read_var x, read_var y))
+            fun () -> M.As_prover.(read_var x, read_var y) )
           ()
         |> Or_error.ok_exn
       in
@@ -71,7 +71,7 @@ let%test_unit "group-map test" =
           + (Tick0.Inner_curve.Params.a * x)
           + Tick0.Inner_curve.Params.b)
         Tick0.Field.(y * y) ;
-      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output actual)
+      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output actual )
 
 module Make_inner_curve_scalar (Impl : Snark_intf.S) (Other_impl : Snark_intf.S) =
 struct
@@ -93,13 +93,13 @@ struct
     Typ.transport_var
       (Typ.transport
          (Typ.list ~length:size_in_bits Boolean.typ)
-         ~there:unpack ~back:project)
+         ~there:unpack ~back:project )
       ~there:Bitstring.Lsb_first.to_list ~back:Bitstring.Lsb_first.of_list
 
   let gen : t Quickcheck.Generator.t =
     Quickcheck.Generator.map
       (Bignum_bigint.gen_incl Bignum_bigint.one
-         Bignum_bigint.(Other_impl.Field.size - one))
+         Bignum_bigint.(Other_impl.Field.size - one) )
       ~f:(fun x -> Other_impl.Bigint.(to_field (of_bignum_bigint x)))
 
   let test_bit x i = Other_impl.Bigint.(test_bit (of_field x) i)
@@ -140,29 +140,31 @@ module Tock = struct
   module Inner_curve = struct
     include Tock0.Inner_curve
 
-    include Sexpable.Of_sexpable
-              (struct
-                type t = Field.t * Field.t [@@deriving sexp]
-              end)
-              (struct
-                type nonrec t = t
+    include
+      Sexpable.Of_sexpable
+        (struct
+          type t = Field.t * Field.t [@@deriving sexp]
+        end)
+        (struct
+          type nonrec t = t
 
-                let to_sexpable = to_affine_exn
+          let to_sexpable = to_affine_exn
 
-                let of_sexpable = of_affine
-              end)
+          let of_sexpable = of_affine
+        end)
 
     include Make_inner_curve_aux (Tock0) (Tick0)
 
     module Checked = struct
-      include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
-                (struct
-                  include Tock0.Inner_curve
-                end)
-                (Params)
-                (struct
-                  let add = None
-                end)
+      include
+        Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
+          (struct
+            include Tock0.Inner_curve
+          end)
+          (Params)
+          (struct
+            let add = None
+          end)
 
       let add_known_unsafe t x = add_unsafe t (constant x)
     end
@@ -191,34 +193,36 @@ module Tick = struct
   module Inner_curve = struct
     include Crypto_params.Tick.Inner_curve
 
-    include Sexpable.Of_sexpable
-              (struct
-                type t = Field.t * Field.t [@@deriving sexp]
-              end)
-              (struct
-                type nonrec t = t
+    include
+      Sexpable.Of_sexpable
+        (struct
+          type t = Field.t * Field.t [@@deriving sexp]
+        end)
+        (struct
+          type nonrec t = t
 
-                let to_sexpable = to_affine_exn
+          let to_sexpable = to_affine_exn
 
-                let of_sexpable = of_affine
-              end)
+          let of_sexpable = of_affine
+        end)
 
     include Make_inner_curve_aux (Tick0) (Tock0)
 
     module Checked = struct
-      include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
-                (Crypto_params.Tick.Inner_curve)
-                (Params)
-                (struct
-                  let add =
-                    Some
-                      (fun p1 p2 ->
-                        let c =
-                          Run.make_checked (fun () ->
-                              Pickles.Step_main_inputs.Ops.add_fast p1 p2)
-                        in
-                        Tick0.with_state (As_prover.return ()) c)
-                end)
+      include
+        Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
+          (Crypto_params.Tick.Inner_curve)
+          (Params)
+          (struct
+            let add =
+              Some
+                (fun p1 p2 ->
+                  let c =
+                    Run.make_checked (fun () ->
+                        Pickles.Step_main_inputs.Ops.add_fast p1 p2 )
+                  in
+                  Tick0.with_state (As_prover.return ()) c )
+          end)
 
       let add_known_unsafe t x = add_unsafe t (constant x)
     end

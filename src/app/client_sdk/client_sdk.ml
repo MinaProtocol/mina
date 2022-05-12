@@ -334,4 +334,4 @@ let _ =
          Js.string (Yojson.Safe.to_string result_json)
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
-    end)
+    end )

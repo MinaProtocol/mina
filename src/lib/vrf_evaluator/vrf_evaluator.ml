@@ -89,7 +89,7 @@ module Worker_state = struct
     let last_checked_slot_and_epoch = Table.create () in
     List.iter new_keys ~f:(fun (_, pk) ->
         let data = Option.value (Table.find old_table pk) ~default in
-        Table.add_exn last_checked_slot_and_epoch ~key:pk ~data) ;
+        Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
     last_checked_slot_and_epoch
 
   let seen_slot last_checked_slot_and_epoch epoch slot =
@@ -107,7 +107,7 @@ module Worker_state = struct
                Some pk
              else (
                Table.set last_checked_slot_and_epoch ~key:pk ~data:(epoch, slot) ;
-               Some pk ))
+               Some pk ) )
     in
     match unseens with
     | [] ->
@@ -289,7 +289,7 @@ module Functions = struct
               [%log info]
                 "Received epoch data for current epoch $epoch. Skipping "
                 ~metadata:[ ("epoch", Epoch.to_yojson e.epoch) ] ;
-              Deferred.unit ))
+              Deferred.unit ) )
 
   let slots_won_so_far =
     create Unit.bin_t Vrf_evaluation_result.Stable.Latest.bin_t (fun w () ->
@@ -305,7 +305,7 @@ module Functions = struct
           | None ->
               Completed
         in
-        return Vrf_evaluation_result.{ slots_won; evaluator_status })
+        return Vrf_evaluation_result.{ slots_won; evaluator_status } )
 
   let update_block_producer_keys =
     create Block_producer_keys.Stable.Latest.bin_t Unit.bin_t (fun w e ->
@@ -313,7 +313,7 @@ module Functions = struct
         [%log info] "Updating block producer keys" ;
         w.block_producer_keys <- e ;
         (*TODO: Interrupt the evaluation here when we handle key updated*)
-        Deferred.unit)
+        Deferred.unit )
 end
 
 module Worker = struct
@@ -364,7 +364,7 @@ module Worker = struct
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate
                ~directory:init_arg.conf_dir
-               ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate) ;
+               ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate ) ;
         [%log info] "Vrf_evaluator started" ;
         return (Worker_state.create init_arg)
 
@@ -411,14 +411,14 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
        ~f:(fun stdout ->
          return
          @@ [%log debug] "Vrf_evaluator stdout: $stdout"
-              ~metadata:[ ("stdout", `String stdout) ]) ;
+              ~metadata:[ ("stdout", `String stdout) ] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
          @@ [%log error] "Vrf_evaluator stderr: $stderr"
-              ~metadata:[ ("stderr", `String stderr) ]) ;
+              ~metadata:[ ("stderr", `String stderr) ] ) ;
   let t = { connection; process } in
   let%map _ = update_block_producer_keys ~keypairs t in
   t

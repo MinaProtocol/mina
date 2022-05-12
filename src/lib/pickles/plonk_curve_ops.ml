@@ -30,7 +30,7 @@ struct
   let scale_fast t (`Plus_two_to_len scalar) =
     let ((xt, yt) as t) =
       with_label __LOC__ (fun () ->
-          Tuple_lib.Double.map ~f:(Util.seal (module Impl)) t)
+          Tuple_lib.Double.map ~f:(Util.seal (module Impl)) t )
     in
     let module S = Zexe_backend_common.Scale_round in
     let rec go rows p i =
@@ -109,16 +109,16 @@ struct
             G.typ
             (fun (g, s) ->
               make_checked (fun () ->
-                  scale_fast g (`Plus_two_to_len (Array.of_list s))))
+                  scale_fast g (`Plus_two_to_len (Array.of_list s)) ) )
             (fun (g, s) ->
               let open G.Constant.Scalar in
               let shift =
                 project (List.init n ~f:(fun _ -> false) @ [ true ])
               in
               let x = project s + shift in
-              G.Constant.scale g x)
+              G.Constant.scale g x )
             (random_point, xs)
         with e ->
           eprintf !"Input %{sexp: bool list}\n%!" xs ;
-          raise e)
+          raise e )
 end

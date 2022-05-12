@@ -41,7 +41,7 @@ let validate_keypair =
                   exit 1 )
             | None ->
                 eprintf "No public key found in file %s\n" pubkey_path ;
-                exit 1)
+                exit 1 )
       with exn ->
         eprintf "Could not read public key file %s, error: %s\n" pubkey_path
           (Exn.to_string exn) ;
@@ -122,8 +122,8 @@ let validate_transaction =
                        error:%s@."
                       (Yojson.Safe.pretty_to_string transaction_json)
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err)))
-              jsons)
+                         (Error_json.error_to_yojson err) ) )
+              jsons )
       with
     | Ok () ->
         ()
@@ -277,15 +277,15 @@ module Vrf = struct
                         (Yojson.Safe.pretty_print ?std:None)
                         (Evaluation.to_yojson evaluation) ;
                       Deferred.return (`Repeat ())
-                    with Yojson.End_of_input -> return (`Finished ()))
+                    with Yojson.End_of_input -> return (`Finished ()) )
                 >>| function
                 | Ok x ->
                     x
                 | Error err ->
                     Format.eprintf "Error:@.%s@.@."
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err)) ;
-                    `Repeat ())
+                         (Error_json.error_to_yojson err) ) ;
+                    `Repeat () )
         | Error err ->
             eprintf "Could not read the specified keypair: %s\n"
               (Secrets.Privkey_error.to_string err) ;
@@ -331,15 +331,15 @@ module Vrf = struct
                     (Yojson.Safe.pretty_print ?std:None)
                     (Evaluation.to_yojson evaluation) ;
                   Deferred.return (`Repeat ())
-                with Yojson.End_of_input -> return (`Finished ()))
+                with Yojson.End_of_input -> return (`Finished ()) )
             >>| function
             | Ok x ->
                 x
             | Error err ->
                 Format.eprintf "Error:@.%s@.@."
                   (Yojson.Safe.pretty_to_string
-                     (Error_json.error_to_yojson err)) ;
-                `Repeat ())
+                     (Error_json.error_to_yojson err) ) ;
+                `Repeat () )
       in
       exit 0 )
 

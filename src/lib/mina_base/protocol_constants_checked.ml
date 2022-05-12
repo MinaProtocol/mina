@@ -6,12 +6,12 @@ module T = Mina_numbers.Length
 
 (*constants actually required for blockchain snark*)
 (* k
-  ,c
-  ,slots_per_epoch
-  ,slots_per_sub_window
-  ,sub_windows_per_window
-  ,checkpoint_window_size_in_slots
-  ,block_window_duration_ms*)
+   ,c
+   ,slots_per_epoch
+   ,slots_per_sub_window
+   ,sub_windows_per_window
+   ,checkpoint_window_size_in_slots
+   ,block_window_duration_ms*)
 
 module Poly = Genesis_constants.Protocol.Poly
 
@@ -109,7 +109,7 @@ let var_to_input (var : var) =
         ; slots_per_epoch
         ; slots_per_sub_window
         ; genesis_state_timestamp
-       |])
+       |] )
 
 let%test_unit "value = var" =
   let compiled = Genesis_constants.for_unit_tests.protocol in
@@ -124,7 +124,8 @@ let%test_unit "value = var" =
     [%test_eq: Value.t] protocol_constants
       (t_of_value protocol_constants |> value_of_t)
   in
-  Quickcheck.test ~trials:100 Value.gen ~examples:[ value_of_t compiled ]
+  Quickcheck.test ~trials:100 Value.gen
+    ~examples:[ value_of_t compiled ]
     ~f:test
 
 [%%endif]

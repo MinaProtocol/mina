@@ -78,16 +78,16 @@ let participants ~next_available_token
         , union set
             ( of_list
             @@ User_command.accounts_accessed ~next_available_token
-                 user_command.data.data ) ))
+                 user_command.data.data ) ) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
-        add set (Fee_transfer.Single.receiver ft))
+        add set (Fee_transfer.Single.receiver ft) )
   in
   add
     (add
        (union user_command_set fee_transfer_participants)
-       (Account_id.create creator Token_id.default))
+       (Account_id.create creator Token_id.default) )
     (Account_id.create winner Token_id.default)
 
 let participant_pks
@@ -98,11 +98,11 @@ let participant_pks
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
         @@ User_command.accounts_accessed ~next_available_token:Token_id.invalid
-             user_command.data.data)
+             user_command.data.data )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
-        add set ft.receiver_pk)
+        add set ft.receiver_pk )
   in
   add (add (union user_command_set fee_transfer_participants) creator) winner
 
@@ -160,78 +160,83 @@ let of_transition block tracked_participants
           ; coinbase_receiver = None
           }
         , next_available_token )
-      ~f:(fun (acc_transactions, next_available_token) -> function
-        | { data = Command (Snapp_command _); _ } -> failwith "Not implemented"
-        | { data = Command command; status } -> (
-            let command = (command :> User_command.t) in
-            let should_include_transaction command participants =
-              List.exists
-                (User_command.accounts_accessed ~next_available_token command)
-                ~f:(fun account_id ->
-                  Public_key.Compressed.Set.mem participants
-                    (Account_id.public_key account_id))
-            in
-            match tracked_participants with
-            | `Some interested_participants
-              when not
-                     (should_include_transaction command
-                        interested_participants) ->
-                ( acc_transactions
-                , User_command.next_available_token command next_available_token
-                )
-            | `All | `Some _ ->
-                (* Should include this command. *)
-                ( { acc_transactions with
-                    commands =
-                      { With_status.data =
-                          { With_hash.data = command
-                          ; hash = Transaction_hash.hash_command command
-                          }
-                      ; status
-                      }
-                      :: acc_transactions.commands
-                  }
-                , User_command.next_available_token command next_available_token
-                ) ) | { data = Fee_transfer fee_transfer; _ } ->
-            let fee_transfer_list =
-              List.map (Mina_base.Fee_transfer.to_list fee_transfer)
-                ~f:(fun f -> (f, Fee_transfer_type.Fee_transfer))
-            in
-            let fee_transfers =
+      ~f:
+        (fun (acc_transactions, next_available_token) -> function
+          | { data = Command (Snapp_command _); _ } ->
+              failwith "Not implemented"
+          | { data = Command command; status } -> (
+              let command = (command :> User_command.t) in
+              let should_include_transaction command participants =
+                List.exists
+                  (User_command.accounts_accessed ~next_available_token command)
+                  ~f:(fun account_id ->
+                    Public_key.Compressed.Set.mem participants
+                      (Account_id.public_key account_id) )
+              in
               match tracked_participants with
-              | `All ->
-                  fee_transfer_list
-              | `Some interested_participants ->
-                  List.filter
-                    ~f:(fun ({ receiver_pk = pk; _ }, _) ->
-                      Public_key.Compressed.Set.mem interested_participants pk)
+              | `Some interested_participants
+                when not
+                       (should_include_transaction command
+                          interested_participants ) ->
+                  ( acc_transactions
+                  , User_command.next_available_token command
+                      next_available_token )
+              | `All | `Some _ ->
+                  (* Should include this command. *)
+                  ( { acc_transactions with
+                      commands =
+                        { With_status.data =
+                            { With_hash.data = command
+                            ; hash = Transaction_hash.hash_command command
+                            }
+                        ; status
+                        }
+                        :: acc_transactions.commands
+                    }
+                  , User_command.next_available_token command
+                      next_available_token ) )
+          | { data = Fee_transfer fee_transfer; _ } ->
+              let fee_transfer_list =
+                List.map (Mina_base.Fee_transfer.to_list fee_transfer)
+                  ~f:(fun f -> (f, Fee_transfer_type.Fee_transfer))
+              in
+              let fee_transfers =
+                match tracked_participants with
+                | `All ->
                     fee_transfer_list
-            in
-            ( { acc_transactions with
-                fee_transfers = fee_transfers @ acc_transactions.fee_transfers
-              }
-            , next_available_token )
-        | { data = Coinbase { Coinbase.amount; fee_transfer; receiver }; _ } ->
-            let fee_transfer =
-              Option.map
-                ~f:(fun ft ->
-                  ( Coinbase_fee_transfer.to_fee_transfer ft
-                  , Fee_transfer_type.Fee_transfer_via_coinbase ))
-                fee_transfer
-            in
-            let fee_transfers =
-              List.append
-                (Option.to_list fee_transfer)
-                acc_transactions.fee_transfers
-            in
-            ( { acc_transactions with
-                fee_transfers
-              ; coinbase_receiver = Some receiver
-              ; coinbase =
-                  Currency.Amount.(
-                    Option.value_exn (add amount acc_transactions.coinbase))
-              }
-            , next_available_token ))
+                | `Some interested_participants ->
+                    List.filter
+                      ~f:(fun ({ receiver_pk = pk; _ }, _) ->
+                        Public_key.Compressed.Set.mem interested_participants pk
+                        )
+                      fee_transfer_list
+              in
+              ( { acc_transactions with
+                  fee_transfers = fee_transfers @ acc_transactions.fee_transfers
+                }
+              , next_available_token )
+          | { data = Coinbase { Coinbase.amount; fee_transfer; receiver }; _ }
+            ->
+              let fee_transfer =
+                Option.map
+                  ~f:(fun ft ->
+                    ( Coinbase_fee_transfer.to_fee_transfer ft
+                    , Fee_transfer_type.Fee_transfer_via_coinbase ) )
+                  fee_transfer
+              in
+              let fee_transfers =
+                List.append
+                  (Option.to_list fee_transfer)
+                  acc_transactions.fee_transfers
+              in
+              ( { acc_transactions with
+                  fee_transfers
+                ; coinbase_receiver = Some receiver
+                ; coinbase =
+                    Currency.Amount.(
+                      Option.value_exn (add amount acc_transactions.coinbase))
+                }
+              , next_available_token ) )
   in
   let snark_jobs =
     staged_ledger_diff |> Staged_ledger_diff.completed_works

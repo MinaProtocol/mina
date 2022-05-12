@@ -65,7 +65,7 @@ module Builder = struct
       let senders =
         commands
         |> List.map ~f:(fun { data; _ } ->
-               User_command.(fee_payer (forget_check data)))
+               User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       let ledger =
@@ -81,7 +81,7 @@ module Builder = struct
                let%map { receipt_chain_hash; _ } =
                  Ledger.get ledger ledger_location
                in
-               (sender, receipt_chain_hash)))
+               (sender, receipt_chain_hash)) )
     in
     Transition_frontier.Breadcrumb_added
       { block; sender_receipt_chains_from_parent_ledger }

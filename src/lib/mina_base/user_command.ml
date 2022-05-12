@@ -26,13 +26,13 @@ module Gen_make (C : Signed_command_intf.Gen_intf) = struct
       ~fee_range () =
     f
       (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-         ~fee_range ())
+         ~fee_range () )
 
   let payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
       ?fee_token ?payment_token ~fee_range () =
     f
       (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-         ?fee_token ?payment_token ~fee_range ())
+         ?fee_token ?payment_token ~fee_range () )
 
   let stake_delegation ~key_gen ?nonce ?fee_token ~fee_range () =
     f (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
@@ -41,7 +41,7 @@ module Gen_make (C : Signed_command_intf.Gen_intf) = struct
       ~fee_range () =
     f
       (stake_delegation_with_random_participants ~keys ?nonce ?fee_token
-         ~fee_range ())
+         ~fee_range () )
 
   let sequence ?length ?sign_type a =
     Quickcheck.Generator.map
@@ -164,7 +164,7 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
 
 let to_verifiable t ~ledger ~get ~location_of_account =
   Option.try_with (fun () ->
-      to_verifiable_exn t ~ledger ~get ~location_of_account)
+      to_verifiable_exn t ~ledger ~get ~location_of_account )
 
 let fee_exn : t -> Currency.Fee.t = function
   | Signed_command x ->
@@ -254,4 +254,4 @@ let filter_by_participant (commands : t list) public_key =
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)
-             Account_id.public_key))
+             Account_id.public_key ) )

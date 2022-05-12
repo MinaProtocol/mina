@@ -26,8 +26,8 @@ module Token_id = struct
                     "When metadata is provided for account identifiers, \
                      acceptable format is exactly { \"token_id\": \
                      <string-encoded-uint64> }. You provided %s"
-                    (Yojson.Safe.pretty_to_string bad))
-               (`Json_parse None))
+                    (Yojson.Safe.pretty_to_string bad) )
+               (`Json_parse None) )
       | None ->
           M.return None
   end

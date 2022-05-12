@@ -62,22 +62,23 @@ module Stable = struct
                 { Marlin_plonk_bindings.Types.Poly_comm.shifted = None
                 ; unshifted =
                     Array.map unshifted ~f:(fun x -> Or_infinity.Finite x)
-                })
+                } )
         ; shifts = Common.tock_shifts ~log2_size
         }
       in
       { commitments = c; step_domains; data = d; index = t }
 
-    include Binable.Of_binable
-              (Repr.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable
+        (Repr.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable { commitments; step_domains; data; index = _ } =
-                  { Repr.commitments; data; step_domains }
+          let to_binable { commitments; step_domains; data; index = _ } =
+            { Repr.commitments; data; step_domains }
 
-                let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
-              end)
+          let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
+        end)
   end
 end]
 
@@ -116,4 +117,4 @@ let dummy =
      ; step_domains = [||]
      ; data = { constraints = rows }
      }
-     |> Stable.Latest.of_repr (Marlin_plonk_bindings.Pasta_fq_urs.create 1))
+     |> Stable.Latest.of_repr (Marlin_plonk_bindings.Pasta_fq_urs.create 1) )

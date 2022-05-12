@@ -51,7 +51,7 @@ module Evals = struct
        ; g_2
        ; g_3
        } :
-        a t) ~(f : a -> b) : b t =
+        a t ) ~(f : a -> b) : b t =
     { w_hat = f w_hat
     ; z_hat_a = f z_hat_a
     ; z_hat_b = f z_hat_b
@@ -141,7 +141,7 @@ module Evals = struct
          ; rc_c
          ]
        , [ g_1; g_2; g_3 ] ) :
-        ('a, _) Vector.t * ('a, _) Vector.t) : 'a t =
+        ('a, _) Vector.t * ('a, _) Vector.t ) : 'a t =
     { w_hat
     ; z_hat_a
     ; z_hat_b
@@ -167,8 +167,9 @@ module Evals = struct
               (fun arr ->
                 t.store
                   (Array.append arr
-                     (Array.create ~len:(length - Array.length arr) default)))
-          })
+                     (Array.create ~len:(length - Array.length arr) default) )
+                )
+          } )
     in
     let t =
       let l1, l2 = to_vectors lengths in
@@ -233,7 +234,8 @@ module Poly_comm = struct
     include Dlog_plonk_types.Poly_comm.With_degree_bound
 
     let typ ?(array = Snarky_backendless.Typ.array) g ~length =
-      Snarky_backendless.Typ.of_hlistable [ array ~length g; g ]
+      Snarky_backendless.Typ.of_hlistable
+        [ array ~length g; g ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -290,7 +292,7 @@ module Messages = struct
           (fun a ->
             let n = Array.length a in
             if n > length then failwithf "Expected %d <= %d" n length () ;
-            typ.store (Array.append a (Array.create ~len:(length - n) dummy)))
+            typ.store (Array.append a (Array.create ~len:(length - n) dummy)) )
       }
     in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in

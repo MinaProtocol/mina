@@ -3,7 +3,7 @@ open Mina_base
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-      List.equal equal [ h ] (List.find_all_dups ~compare ls))
+      List.equal equal [ h ] (List.find_all_dups ~compare ls) )
 
 module Make
     (Engine : Intf.Engine.S)
@@ -49,7 +49,7 @@ struct
       if
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false)
+            |> Option.value ~default:false )
       then Predicate_passed
       else Predicate_continuation ()
     in
@@ -96,7 +96,7 @@ struct
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find state.best_tips_by_node (Node.id node))
+            String.Map.find state.best_tips_by_node (Node.id node) )
       in
       if
         List.for_all best_tips ~f:Option.is_some

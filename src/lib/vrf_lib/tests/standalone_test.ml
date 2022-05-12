@@ -69,13 +69,14 @@ let%test_module "vrf-test" =
             (to_affine_or_infinity y))
 
       module Checked = struct
-        include Snarky_curves.Make_weierstrass_checked
-                  (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
-                  (Snark_params.Tick.Inner_curve)
-                  (Snark_params.Tick.Inner_curve.Params)
-                  (struct
-                    let add = None
-                  end)
+        include
+          Snarky_curves.Make_weierstrass_checked
+            (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
+            (Snark_params.Tick.Inner_curve)
+            (Snark_params.Tick.Inner_curve.Params)
+            (struct
+              let add = None
+            end)
 
         let add_known_unsafe t x = add_unsafe t (constant x)
       end
@@ -89,17 +90,18 @@ let%test_module "vrf-test" =
       module T = struct
         type t = Curve.t
 
-        include Sexpable.Of_sexpable
-                  (struct
-                    type t = Field.t * Field.t [@@deriving sexp]
-                  end)
-                  (struct
-                    type t = Curve.t
+        include
+          Sexpable.Of_sexpable
+            (struct
+              type t = Field.t * Field.t [@@deriving sexp]
+            end)
+            (struct
+              type t = Curve.t
 
-                    let to_sexpable = Curve.to_affine_exn
+              let to_sexpable = Curve.to_affine_exn
 
-                    let of_sexpable = Curve.of_affine
-                  end)
+              let of_sexpable = Curve.of_affine
+            end)
       end
 
       include T
@@ -137,7 +139,7 @@ let%test_module "vrf-test" =
               failwithf
                 !"inv failured, x = %{sexp:t}, x + inv x = %{sexp:t}, expected \
                   %{sexp:t}"
-                x res zero ())
+                x res zero () )
 
       let%test_unit "scaling associates" =
         let open Quickcheck in
@@ -146,7 +148,7 @@ let%test_module "vrf-test" =
             assert (
               equal
                 (scale generator (Scalar.mul a b))
-                (scale (scale generator a) b) ))
+                (scale (scale generator a) b) ) )
 
       module Checked = struct
         include Curve.Checked
@@ -165,7 +167,7 @@ let%test_module "vrf-test" =
       Array.init (5 * Impl.Field.size_in_bits) ~f:(fun _ ->
           let t = Curve.random () in
           let tt = Curve.double t in
-          (t, tt, Curve.add t tt, Curve.double tt))
+          (t, tt, Curve.add t tt, Curve.double tt) )
 
     module Pedersen =
       Snarky.Pedersen.Make (Impl) (Curve)
@@ -179,17 +181,18 @@ let%test_module "vrf-test" =
 
       type t = Curve.t
 
-      include Sexpable.Of_sexpable
-                (struct
-                  type t = Field.t * Field.t [@@deriving sexp]
-                end)
-                (struct
-                  type t = Curve.t
+      include
+        Sexpable.Of_sexpable
+          (struct
+            type t = Field.t * Field.t [@@deriving sexp]
+          end)
+          (struct
+            type t = Curve.t
 
-                  let to_sexpable = Curve.to_affine_exn
+            let to_sexpable = Curve.to_affine_exn
 
-                  let of_sexpable = Curve.of_affine
-                end)
+            let of_sexpable = Curve.of_affine
+          end)
 
       type value = t [@@deriving sexp]
 
@@ -219,7 +222,7 @@ let%test_module "vrf-test" =
         ~f:(fun i acc triple ->
           Curve.add acc
             (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
-               triple))
+               triple ) )
       |> Curve.to_affine_exn |> fst
 
     let hash_bits_checked bits =
@@ -282,5 +285,5 @@ let%test_module "vrf-test" =
           if not (Option.is_some (Vrf.Evaluation.verified_output eval ctx)) then
             failwithf
               !"%{sexp:Vrf.Context.t}, %{sexp:Vrf.Evaluation.t}"
-              ctx eval ())
+              ctx eval () )
   end )

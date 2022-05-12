@@ -65,7 +65,7 @@ module Raw = struct
 
   let%test_unit "partial isomorphism" =
     Quickcheck.test ~trials:300 Stable.Latest.gen ~f:(fun signature ->
-        [%test_eq: t option] (Some signature) (encode signature |> decode))
+        [%test_eq: t option] (Some signature) (encode signature |> decode) )
 end
 
 [%%ifdef consensus_mechanism]

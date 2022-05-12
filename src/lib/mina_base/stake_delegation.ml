@@ -31,7 +31,7 @@ let source = function
 
 let gen_with_delegator delegator =
   Quickcheck.Generator.map Public_key.Compressed.gen ~f:(fun k ->
-      Set_delegate { delegator; new_delegate = k })
+      Set_delegate { delegator; new_delegate = k } )
 
 let gen =
   Quickcheck.Generator.bind ~f:gen_with_delegator Public_key.Compressed.gen

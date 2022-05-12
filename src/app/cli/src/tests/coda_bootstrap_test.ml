@@ -35,7 +35,7 @@ let main () =
          ~metadata:[ ("status", Sync_status.to_yojson sync_status) ]
          "Bootstrap node received status: $status" ;
        Hash_set.add previous_status sync_status ;
-       Deferred.unit))
+       Deferred.unit ) )
   |> don't_wait_for ;
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger

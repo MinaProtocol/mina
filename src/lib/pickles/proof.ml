@@ -116,8 +116,8 @@ end
 
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
-let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
-    (most_recent_width : r Nat.t) : (w, h) t =
+let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t)
+    : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -155,11 +155,11 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             ; old_bulletproof_challenges =
                 (* Not sure if this should be w or h honestly ...*)
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Dummy.Ipa.Step.challenges)
+                    Dummy.Ipa.Step.challenges )
                 (* TODO: Should this be wrap? *)
             ; sg =
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Lazy.force Dummy.Ipa.Wrap.sg)
+                    Lazy.force Dummy.Ipa.Wrap.sg )
             }
         }
     ; proof =
@@ -185,12 +185,12 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 }
             ; evals =
                 (let e () = Dlog_plonk_types.Evals.map lengths ~f:tock in
-                 (e (), e ()))
+                 (e (), e ()) )
             }
         }
     ; prev_evals =
         (let e () = Dlog_plonk_types.Evals.map lengths ~f:tick_arr in
-         (e (), e ()))
+         (e (), e ()) )
     ; prev_x_hat = (tick (), tick ())
     }
 
@@ -255,15 +255,16 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
 
   let hash t = Repr.hash (to_repr t)
 
-  include Sexpable.Of_sexpable
-            (Repr)
-            (struct
-              type nonrec t = t
+  include
+    Sexpable.Of_sexpable
+      (Repr)
+      (struct
+        type nonrec t = t
 
-              let to_sexpable = to_repr
+        let to_sexpable = to_repr
 
-              let of_sexpable = of_repr
-            end)
+        let of_sexpable = of_repr
+      end)
 
   let to_yojson x = Repr.to_yojson (to_repr x)
 
@@ -320,15 +321,16 @@ module Branching_2 = struct
 
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
-      include Binable.Of_binable
-                (Repr.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Repr.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_repr
+            let to_binable = to_repr
 
-                  let of_binable = of_repr
-                end)
+            let of_binable = of_repr
+          end)
     end
   end]
 
@@ -389,15 +391,16 @@ module Branching_max = struct
 
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
-      include Binable.Of_binable
-                (Repr.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Repr.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_repr
+            let to_binable = to_repr
 
-                  let of_binable = of_repr
-                end)
+            let of_binable = of_repr
+          end)
     end
   end]
 

@@ -40,7 +40,7 @@ struct
     in
     let res =
       Array.init (rounds_full + 1) ~f:(fun _ ->
-          Array.create ~len:3 Impl.Field.Constant.zero)
+          Array.create ~len:3 Impl.Field.Constant.zero )
     in
     res.(0) <- start ;
     for i = 1 to rounds_full do
@@ -63,7 +63,7 @@ struct
           exists
             (Typ.array
                ~length:Int.(rounds_full + 1)
-               (Typ.array ~length:3 Field.typ))
+               (Typ.array ~length:3 Field.typ) )
             ~compute:
               As_prover.(fun () -> round_table (Array.map init ~f:read_var))
         in
@@ -74,8 +74,8 @@ struct
               [ { basic = T (Poseidon { state = t })
                 ; annotation = Some "plonk-poseidon"
                 }
-              ])) ;
-        t.(Int.(Array.length t - 1)))
+              ] )) ;
+        t.(Int.(Array.length t - 1)) )
 
   (* TODO: experiment with sealing version of this *)
   let add_assign ~state i x =

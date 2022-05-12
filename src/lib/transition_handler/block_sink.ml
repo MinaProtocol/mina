@@ -72,7 +72,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
            Mina_block.(
              header state |> Header.protocol_state
              |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-             |> Block_time.to_time)) ;
+             |> Block_time.to_time) ) ;
       Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
       if log_gossip_heard then
         [%str_log info]
@@ -84,7 +84,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
                    |> Protocol_state.hashes)
                    .state_hash
              ; sender = Envelope.Incoming.sender e
-             }) ;
+             } ) ;
       Mina_net2.Validation_callback.set_message_type cb `Block ;
       Mina_metrics.(Counter.inc_one Network.Block.received) ;
       let sender = Envelope.Incoming.sender e in
@@ -121,7 +121,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       let tm_slot =
         lift_consensus_time
           (Consensus.Data.Consensus_time.of_time_exn
-             ~constants:consensus_constants tm)
+             ~constants:consensus_constants tm )
       in
       Mina_metrics.Block_latency.Gossip_slots.update
         (Float.of_int (tm_slot - tn_production_slot)) ;
@@ -134,7 +134,7 @@ let log_rate_limiter_occasionally rl ~logger ~label =
   every t (fun () ->
       [%log' debug logger]
         ~metadata:[ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]
-        !"%s $rate_limiter" label)
+        !"%s $rate_limiter" label )
 
 let create
     { logger

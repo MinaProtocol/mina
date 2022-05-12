@@ -51,14 +51,14 @@ let main () =
             ~f:(fun { Transaction_snark_work.prover; _ } ->
               [%log trace] "Prover of completed work"
                 ~metadata:[ ("Prover", Public_key.Compressed.to_yojson prover) ] ;
-              Public_key.Compressed.equal prover public_key)
+              Public_key.Compressed.equal prover public_key )
         then (
           [%log trace] "Found snark prover ivar filled"
             ~metadata:
               [ ("public key", Public_key.Compressed.to_yojson public_key) ] ;
           Ivar.fill_if_empty found_snark_prover_ivar () )
         else () ;
-        Deferred.unit)
+        Deferred.unit )
     |> don't_wait_for ;
     Ivar.read found_snark_prover_ivar
   in

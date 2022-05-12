@@ -300,7 +300,7 @@ module Make
 
     let%snarkydef verifier (type s) ~equal ~final_check
         ((module Shifted) as shifted :
-          (module Curve.Checked.Shifted.S with type t = s))
+          (module Curve.Checked.Shifted.S with type t = s) )
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
         =
       let%bind e = Message.hash_checked m ~public_key ~r in
@@ -335,7 +335,7 @@ end
 
 (* nonconsensus version of the functor; yes, there's some repeated code,
    but seems difficult to abstract over the functors and signatures
- *)
+*)
 
 module type S = sig
   open Snark_params.Tick
@@ -561,7 +561,7 @@ module Message = struct
         let open Random_oracle.Checked in
         hash ~init:Hash_prefix_states.signature (pack_input input)
         |> Digest.to_bits ~length:Field.size_in_bits
-        |> Bitstring_lib.Bitstring.Lsb_first.of_list)
+        |> Bitstring_lib.Bitstring.Lsb_first.of_list )
 
   [%%endif]
 end
@@ -589,7 +589,7 @@ let message_typ () : (Message.var, Message.t) Tick.Typ.t =
           let%map bitstrings =
             Store.all @@ Array.to_list
             @@ Array.map bitstrings ~f:(fun l ->
-                   Store.all @@ List.map ~f:(store Tick.Boolean.typ) l)
+                   Store.all @@ List.map ~f:(store Tick.Boolean.typ) l )
           in
           { Random_oracle.Input.field_elements = Array.of_list field_elements
           ; bitstrings = Array.of_list bitstrings
@@ -604,7 +604,7 @@ let message_typ () : (Message.var, Message.t) Tick.Typ.t =
           let%map bitstrings =
             Read.all @@ Array.to_list
             @@ Array.map bitstrings ~f:(fun l ->
-                   Read.all @@ List.map ~f:(read Tick.Boolean.typ) l)
+                   Read.all @@ List.map ~f:(read Tick.Boolean.typ) l )
           in
           { Random_oracle.Input.field_elements = Array.of_list field_elements
           ; bitstrings = Array.of_list bitstrings
@@ -625,9 +625,9 @@ let%test_unit "schnorr checked + unchecked" =
            let%bind (module Shifted) =
              Tick.Inner_curve.Checked.Shifted.create ()
            in
-           S.Checked.verifies (module Shifted) s public_key msg)
-         (fun _ -> true))
-        (pubkey, msg, s))
+           S.Checked.verifies (module Shifted) s public_key msg )
+         (fun _ -> true) )
+        (pubkey, msg, s) )
 
 [%%endif]
 

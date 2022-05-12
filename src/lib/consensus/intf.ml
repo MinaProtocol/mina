@@ -257,7 +257,7 @@ module type State_hooks = sig
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> coinbase_receiver:Public_key.Compressed.t
           -> supercharge_coinbase:bool
-          -> consensus_state)
+          -> consensus_state )
          Quickcheck.Generator.t
   end
 end
@@ -376,7 +376,7 @@ module type S = sig
         -> logger:Logger.t
         -> get_delegators:
              (   Public_key.Compressed.t
-              -> Mina_base.Account.t Mina_base.Account.Index.Table.t option)
+              -> Mina_base.Account.t Mina_base.Account.Index.Table.t option )
         -> ( ( [ `Vrf_eval of string ]
              * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
              * [> `Delegator of
@@ -655,7 +655,10 @@ module type S = sig
 
       type query =
         { query :
-            'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
+            'q 'r.
+               Network_peer.Peer.t
+            -> ('q, 'r) rpc
+            -> 'q
             -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
         }
     end
@@ -764,16 +767,16 @@ module type S = sig
         (Blockchain_state : Blockchain_state)
         (Protocol_state : Protocol_state
                             with type blockchain_state :=
-                                  Blockchain_state.Value.t
+                              Blockchain_state.Value.t
                              and type blockchain_state_var :=
-                                  Blockchain_state.var
+                              Blockchain_state.var
                              and type consensus_state := Consensus_state.Value.t
                              and type consensus_state_var := Consensus_state.var)
         (Snark_transition : Snark_transition
                               with type blockchain_state_var :=
-                                    Blockchain_state.var
+                                Blockchain_state.var
                                and type consensus_transition_var :=
-                                    Consensus_transition.var) :
+                                Consensus_transition.var) :
       State_hooks
         with type blockchain_state := Blockchain_state.Value.t
          and type protocol_state := Protocol_state.Value.t

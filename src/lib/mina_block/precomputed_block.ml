@@ -37,7 +37,7 @@ module Proof = struct
         Or_error.try_with (fun () -> of_bin_string str)
         |> Result.map_error ~f:(fun err ->
                sprintf "Precomputed_block.Proof.of_yojson: %s"
-                 (Error.to_string_hum err))
+                 (Error.to_string_hum err) )
     | json ->
         Proof.of_yojson json
 end
