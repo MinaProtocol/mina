@@ -288,6 +288,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   let of_json obj x = !(obj#map) @@ !(obj#of_json) x
 
+  let js_layout deriver = !((deriver @@ o ())#js_layout)
+
   let typ obj = !(obj#graphql_fields).Graphql.Fields.Input.T.run ()
 
   let arg_typ obj = !(obj#graphql_arg) ()

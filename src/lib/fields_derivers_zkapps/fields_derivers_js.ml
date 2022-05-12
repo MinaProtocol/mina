@@ -19,11 +19,7 @@ module Js_layout = struct
   let leaftype (s : string) : Yojson.Safe.t = `Assoc [ ("type", `String s) ]
 
   let docs (s : Fields_derivers.Annotations.Fields.T.t) : Yojson.Safe.t =
-    `Assoc
-      [ ("doc", match s.doc with Some s -> `String s | None -> `Null)
-      ; ( "deprecated"
-        , match s.deprecated with Some s -> `String s | None -> `Null )
-      ]
+    match s.doc with Some t -> `String t | None -> `Null
 
   let add_field ~t_fields_annots t_field field (acc : _ Accumulator.t) :
       _ * _ Accumulator.t =
@@ -83,10 +79,7 @@ module Js_layout = struct
     let inner = !(x#js_layout) in
     (* print_endline ("option: " ^ (inner |> Yojson.Safe.to_string)) ; *)
     obj#js_layout :=
-      `Assoc
-        [ ("type", `String "union")
-        ; ("parts", `List [ inner; leaftype "undefined" ])
-        ] ;
+      `Assoc [ ("type", `String "orundefined"); ("inner", inner) ] ;
     obj
 
   let wrapped x obj =
