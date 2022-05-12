@@ -3082,6 +3082,11 @@ module Ledger = struct
     apply_parties_transaction l txn (Js.to_string account_creation_fee)
 
   let () =
+    let js_layout =
+      !((Parties.deriver @@ Fields_derivers_zkapps.Derivers.o ())#js_layout)
+    in
+    console_log_string (js_layout |> Yojson.Safe.to_string) ;
+
     let static_method name f =
       Js.Unsafe.set ledger_class (Js.string name) (Js.wrap_callback f)
     in
