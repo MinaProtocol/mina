@@ -1,6 +1,7 @@
-[%%import "../../config.mlh"]
+[%%import "/src/config.mlh"]
 
-open Core
+open Core_kernel
+open Mina_base_util
 open Fold_lib
 open Snark_params.Tick
 
@@ -131,7 +132,12 @@ module Non_snark = struct
 
   let fold t = Fold.string_bits (digest t)
 
-  let to_input t = Random_oracle.Input.bitstring (Fold.to_list (fold t))
+  let to_input t =
+    let open Random_oracle.Input.Chunked in
+    Array.reduce_exn ~f:append
+      (Array.of_list_map
+         (Fold.to_list (fold t))
+         ~f:(fun b -> packed (field_of_bool b, 1)) )
 
   let ledger_hash ({ ledger_hash; _ } : t) = ledger_hash
 
@@ -141,7 +147,10 @@ module Non_snark = struct
       =
     { aux_hash; ledger_hash; pending_coinbase_aux }
 
-  let var_to_input = Random_oracle.Input.bitstring
+  let var_to_input (t : var) =
+    let open Random_oracle.Input.Chunked in
+    Array.reduce_exn ~f:append
+      (Array.of_list_map t ~f:(fun b -> packed ((b :> Field.Var.t), 1)))
 
   let var_of_t t : var =
     List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
@@ -242,13 +251,13 @@ let var_of_t ({ pending_coinbase_hash; non_snark } : t) : var =
   { non_snark; pending_coinbase_hash }
 
 let to_input ({ non_snark; pending_coinbase_hash } : t) =
-  Random_oracle.Input.(
+  Random_oracle.Input.Chunked.(
     append
       (Non_snark.to_input non_snark)
       (field (pending_coinbase_hash :> Field.t)))
 
 let var_to_input ({ non_snark; pending_coinbase_hash } : var) =
-  Random_oracle.Input.(
+  Random_oracle.Input.Chunked.(
     append
       (Non_snark.var_to_input non_snark)
       (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)))

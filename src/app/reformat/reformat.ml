@@ -15,7 +15,7 @@ let dirs_trustlist =
   ; "node_modules"
   ; "tablecloth"
   ; "zexe"
-  ; "marlin"
+  ; "proof-systems"
   ; "snarky"
   ; "_opam" ]
 

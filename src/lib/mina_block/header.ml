@@ -12,8 +12,8 @@ open Mina_state
 module Stable = struct
   module V1 = struct
     type t =
-      { protocol_state : Protocol_state.Value.Stable.V1.t
-      ; protocol_state_proof : Proof.Stable.V1.t [@sexp.opaque]
+      { protocol_state : Protocol_state.Value.Stable.V2.t
+      ; protocol_state_proof : Proof.Stable.V2.t [@sexp.opaque]
       ; delta_block_chain_proof :
           (* TODO: abstract *)
           State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
