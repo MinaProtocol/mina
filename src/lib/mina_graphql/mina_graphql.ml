@@ -2107,8 +2107,7 @@ module Types = struct
         ~coerce:Signature_lib.Private_key.of_yojson
 
     let token_id_arg =
-      scalar "TokenId"
-        ~doc:"String representation of a token's UInt64 identifier"
+      scalar "TokenId" ~doc:"Base58Check representation of a token identifier"
         ~coerce:(fun token ->
           try
             match token with
@@ -3896,6 +3895,27 @@ module Queries = struct
         | None ->
             [])
 
+  let token_accounts =
+    field "tokenAccounts" ~doc:"Find all accounts for a token ID"
+      ~typ:(non_null (list (non_null Types.AccountObj.account)))
+      ~args:
+        Arg.
+          [ arg "tokenId" ~doc:"Token ID to find accounts for"
+              ~typ:(non_null Types.Input.token_id_arg)
+          ]
+      ~resolve:(fun { ctx = coda; _ } () token_id ->
+        match get_ledger_and_breadcrumb coda with
+        | Some (ledger, breadcrumb) ->
+            List.filter_map (Ledger.to_list ledger) ~f:(fun acc ->
+                let open Option.Let_syntax in
+                let%map () =
+                  Option.some_if (Token_id.equal token_id acc.token_id) ()
+                in
+                Types.AccountObj.Partial_account.of_full_account ~breadcrumb acc
+                |> Types.AccountObj.lift coda acc.public_key)
+        | None ->
+            [])
+
   let token_owner =
     field "tokenOwner" ~doc:"Find the account ID that owns a given token"
       ~typ:Types.account_id
@@ -4360,6 +4380,7 @@ module Queries = struct
     ; accounts_for_pk
     ; account_merkle_path
     ; token_owner
+    ; token_accounts
     ; current_snark_worker
     ; best_chain
     ; block
