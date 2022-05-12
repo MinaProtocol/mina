@@ -49,6 +49,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ]
+    ; num_archive_nodes = 1
     ; num_snark_workers = 4
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -418,15 +419,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Malleable_error.soft_error_format ~value:()
                  "Payment failed for unexpected reason: %s" err_str ))
     in
-    section
-      "send out a bunch more txns to fill up the snark ledger, then wait for \
-       proofs to be emitted"
-      (let receiver = untimed_node_a in
-       let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-       let sender = untimed_node_b in
-       let%bind sender_pub_key = Util.pub_key_of_node sender in
-       let%bind () =
-         (*
+    let%bind () =
+      section_hard
+        "send out a bunch more txns to fill up the snark ledger, then wait for \
+         proofs to be emitted"
+        (let receiver = untimed_node_a in
+         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let sender = untimed_node_b in
+         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let%bind () =
+           (*
             To fill up a `small` transaction capacity with work delay of 1, 
             there needs to be 12 total txns sent.
 
@@ -441,11 +443,29 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
             2 successful txn are sent in the prior course of this test,
             so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
-         repeat_seq ~n:10 ~f:(fun () ->
-             Network.Node.must_send_payment ~logger sender ~sender_pub_key
-               ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-             >>| ignore)
+           repeat_seq ~n:10 ~f:(fun () ->
+               Network.Node.must_send_payment ~logger sender ~sender_pub_key
+                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+               >>| ignore)
+         in
+         wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
+    in
+    section_hard "running replayer"
+      (let%bind logs =
+         Network.Node.run_replayer ~logger
+           (List.hd_exn @@ Network.archive_nodes network)
        in
-       wait_for t
-         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
+       let error_logs =
+         String.split logs ~on:'\n'
+         |> List.filter ~f:(fun log ->
+                String.is_substring log ~substring:{|"level":"Error"|}
+                || String.is_substring log ~substring:{|"level":"Fatal"|})
+       in
+       if List.is_empty error_logs then (
+         [%log info] "The replayer encountered no errors" ;
+         return () )
+       else
+         let error = String.concat error_logs ~sep:"\n  " in
+         Malleable_error.hard_error_string ("Replayer errors:\n  " ^ error))
 end

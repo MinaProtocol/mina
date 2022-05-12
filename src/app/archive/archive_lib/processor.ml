@@ -2822,6 +2822,25 @@ module Block = struct
                 in
                 sequence_no + 1
             | { data = Coinbase coinbase; _ } ->
+                let%bind () =
+                  match Mina_base.Coinbase.fee_transfer coinbase with
+                  | None ->
+                      return ()
+                  | Some { receiver_pk; fee } ->
+                      let fee_transfer =
+                        Mina_base.Fee_transfer.Single.create ~receiver_pk ~fee
+                          ~fee_token:Token_id.default
+                      in
+                      let%bind id =
+                        Fee_transfer.add_if_doesn't_exist
+                          (module Conn)
+                          fee_transfer `Via_coinbase
+                      in
+                      Block_and_internal_command.add
+                        (module Conn)
+                        ~block_id ~internal_command_id:id ~sequence_no
+                        ~secondary_sequence_no:0
+                in
                 let%bind id =
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
                 in
