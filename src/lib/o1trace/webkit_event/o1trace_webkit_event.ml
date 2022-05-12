@@ -12,7 +12,7 @@ let emit_event =
         try Webkit_trace_event_binary_output.emit_event ~buf wr event
         with exn ->
           Writer.writef wr "failed to write o1trace event: %s\n"
-            (Exn.to_string exn))
+            (Exn.to_string exn) )
 
 let timestamp () =
   Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn
@@ -86,15 +86,16 @@ let measure (name : string) (f : unit -> 'a) : 'a =
 *)
 
 module T = struct
-  include O1trace.Plugins.Register_plugin
-            (struct
-              type state = unit [@@deriving sexp_of]
+  include
+    O1trace.Plugins.Register_plugin
+      (struct
+        type state = unit [@@deriving sexp_of]
 
-              let name = "Webkit_event"
+        let name = "Webkit_event"
 
-              let init_state _ = ()
-            end)
-            ()
+        let init_state _ = ()
+      end)
+      ()
 
   let on_job_enter (fiber : O1trace.Thread.Fiber.t) =
     emit_event
@@ -119,7 +120,7 @@ let start_tracing wr =
         emit_event
           (new_thread_event ~include_name:true
              (O1trace.Thread.name thread)
-             New_thread)) ;
+             New_thread ) ) ;
     O1trace.Plugins.enable_plugin (module T) )
 
 let stop_tracing () =

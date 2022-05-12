@@ -54,7 +54,7 @@ module Builder = struct
       let senders =
         commands
         |> List.map ~f:(fun { data; _ } ->
-               User_command.(fee_payer (forget_check data)))
+               User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       Set.to_list senders
@@ -67,7 +67,7 @@ module Builder = struct
                let%map { receipt_chain_hash; _ } =
                  Mina_ledger.Ledger.get ledger ledger_location
                in
-               (sender, receipt_chain_hash)))
+               (sender, receipt_chain_hash)) )
     in
     let block_with_hash = Mina_block.Validated.forget validated_block in
     let block = With_hash.data block_with_hash in
@@ -77,10 +77,10 @@ module Builder = struct
           (* an accessed account may not be the ledger *)
           let%bind.Option index =
             Option.try_with (fun () ->
-                Mina_ledger.Ledger.index_of_account_exn ledger acct_id)
+                Mina_ledger.Ledger.index_of_account_exn ledger acct_id )
           in
           let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
-          Some (index, account))
+          Some (index, account) )
     in
     let accounts_created =
       let account_creation_fee =
@@ -92,8 +92,8 @@ module Builder = struct
       in
       List.map
         (Staged_ledger.latest_block_accounts_created staged_ledger
-           ~previous_block_state_hash) ~f:(fun acct_id ->
-          (acct_id, account_creation_fee))
+           ~previous_block_state_hash ) ~f:(fun acct_id ->
+          (acct_id, account_creation_fee) )
     in
     Transition_frontier.Breadcrumb_added
       { block = With_hash.map ~f:External_transition.compose block_with_hash

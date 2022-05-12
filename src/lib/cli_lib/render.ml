@@ -26,7 +26,7 @@ module String_list_formatter = struct
     List.mapi pks ~f:(fun i pk ->
         let i = i + 1 in
         let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
-        sprintf "%s%i, %s" padding i pk)
+        sprintf "%s%i, %s" padding i pk )
     |> String.concat ~sep:"\n"
 end
 
@@ -58,6 +58,6 @@ module Public_key_with_details = struct
 
   let to_text account =
     List.map account ~f:(fun (public_key, balance, nonce) ->
-        sprintf !"%s, %d, %d" public_key balance nonce)
+        sprintf !"%s, %d, %d" public_key balance nonce )
     |> String.concat ~sep:"\n"
 end

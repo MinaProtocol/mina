@@ -47,13 +47,13 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
            let reader, writer = Pipe.create () in
-           (Some wallet, (reader, writer)))
+           (Some wallet, (reader, writer)) )
   in
   let subscribed_payment_users =
     Public_key.Compressed.Table.of_alist_exn
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
            let reader, writer = Pipe.create () in
-           (wallet, (reader, writer)))
+           (wallet, (reader, writer)) )
   in
   let update_payment_subscriptions filtered_external_transition participants =
     Set.iter participants ~f:(fun participant ->
@@ -67,11 +67,11 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                    | User_command.Signed_command c ->
                        Some c
                    | Parties _ ->
-                       None)
+                       None )
               |> Fn.flip Signed_command.filter_by_participant participant
             in
             List.iter user_commands ~f:(fun user_command ->
-                Pipe.write_without_pushback_if_open writer user_command)))
+                Pipe.write_without_pushback_if_open writer user_command ) ) )
   in
   let update_block_subscriptions { With_hash.data = external_transition; hash }
       transactions participants =
@@ -85,8 +85,8 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                     transactions
                 in
                 Pipe.write_without_pushback_if_open writer
-                  { With_hash.data; hash }))
-          ~if_not_found:ignore) ;
+                  { With_hash.data; hash } ) )
+          ~if_not_found:ignore ) ;
     Hashtbl.find_and_call subscribed_block_users None
       ~if_found:(fun pipes ->
         List.iter pipes ~f:(fun (_, writer) ->
@@ -95,7 +95,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                 `All transactions
             in
             if not (Pipe.is_closed writer) then
-              Pipe.write_without_pushback writer { With_hash.data; hash }))
+              Pipe.write_without_pushback writer { With_hash.data; hash } ) )
       ~if_not_found:ignore
   in
   let gcloud_keyfile =
@@ -112,7 +112,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
       ignore
         ( Core.Sys.command
             (sprintf "gcloud auth activate-service-account --key-file=%s" path)
-          : int )) ;
+          : int ) ) ;
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_ext ->
           let new_block =
@@ -160,7 +160,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                             ~constraint_constants ~staged_ledger ~scheduled_time
                             block
                         in
-                        Mina_block.Precomputed.to_yojson precomputed_block)
+                        Mina_block.Precomputed.to_yojson precomputed_block )
                    in
                    if upload_blocks_to_gcloud then (
                      [%log info] "log" ;
@@ -229,10 +229,10 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                                        Async.Process.run () ~prog:"bash"
                                          ~args:[ "-c"; command ]
                                        |> Deferred.Result.map_error
-                                            ~f:(Error.tag ~tag:__LOC__))
+                                            ~f:(Error.tag ~tag:__LOC__) )
                                    |> Result.map_error
                                         ~f:(Error.tag ~tag:__LOC__)
-                                   |> Deferred.return |> Deferred.Or_error.join)
+                                   |> Deferred.return |> Deferred.Or_error.join )
                              in
                              ( match output with
                              | Ok _result ->
@@ -258,7 +258,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                            Out_channel.output_lines out_channel
                              [ Yojson.Safe.to_string
                                  (Lazy.force precomputed_block)
-                             ])) ;
+                             ] ) ) ;
                    [%log info] "Saw block with state hash $state_hash"
                      ~metadata:
                        (let state_hash_data =
@@ -270,7 +270,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                           state_hash_data
                           @ [ ("precomputed_block", Lazy.force precomputed_block)
                             ]
-                        else state_hash_data) )) ;
+                        else state_hash_data ) ) ) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block_no_hash
@@ -279,7 +279,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               let unfiltered_external_transition =
                 lazy
                   (Filtered_external_transition.of_transition new_block_no_hash
-                     `All verified_transactions)
+                     `All verified_transactions )
               in
               let filtered_external_transition =
                 if is_storing_all then Lazy.force unfiltered_external_transition
@@ -288,7 +288,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                     (`Some
                       ( Public_key.Compressed.Set.of_list
                       @@ List.filter_opt (Hashtbl.keys subscribed_block_users)
-                      ))
+                      ) )
                     verified_transactions
               in
               let participants =
@@ -310,7 +310,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                   ]
                 "Staged ledger had error with transactions in block for state \
                  $state_hash: $error" ;
-              Deferred.unit)) ;
+              Deferred.unit ) ) ;
   let reorganization_subscription = [] in
   let reader, writer =
     Strict_pipe.create ~name:"Reorganization subscription"
@@ -334,12 +334,12 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               Broadcast_pipe.Reader.iter best_tip_diff_pipe
                 ~f:(fun { reorg_best_tip; _ } ->
                   if reorg_best_tip then Strict_pipe.Writer.write writer () ;
-                  Deferred.unit))) ;
+                  Deferred.unit ) ) ) ;
   Strict_pipe.Reader.iter reader ~f:(fun () ->
       List.iter t.reorganization_subscription ~f:(fun (_, writer) ->
           if not (Pipe.is_closed writer) then
-            Pipe.write_without_pushback writer `Changed) ;
-      Deferred.unit)
+            Pipe.write_without_pushback writer `Changed ) ;
+      Deferred.unit )
   |> don't_wait_for ;
   t
 
@@ -360,12 +360,12 @@ let add_block_subscriber t public_key =
                  (* Intentionally using pointer equality *)
                  not
                  @@ Tuple2.equal ~eq1:Pipe.equal ~eq2:Pipe.equal rw_pair
-                      rw_pair')
+                      rw_pair' )
            with
            | [] ->
                None
            | l ->
-               Some l )) ) ;
+               Some l ) ) ) ;
   block_reader
 
 let add_payment_subscriber t public_key =

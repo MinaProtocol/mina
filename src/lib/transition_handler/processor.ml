@@ -70,7 +70,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
         Block_time.diff
           (Block_time.now time_controller)
           (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
-             transition_time)
+             transition_time )
       in
       Mina_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
@@ -156,7 +156,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
               let timeout_duration =
                 Option.fold
                   (Transition_frontier.find frontier
-                     (Non_empty_list.head delta_state_hashes))
+                     (Non_empty_list.head delta_state_hashes) )
                   ~init:(Block_time.Span.of_ms 0L)
                   ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
               in
@@ -177,7 +177,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
             ~verifier ~trust_system ~transition_receipt_time
             ~sender:(Some sender) ~parent:parent_breadcrumb
             ~transition:mostly_validated_transition
-            (* TODO: Can we skip here? *) ())
+            (* TODO: Can we skip here? *) () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
@@ -190,7 +190,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           | Error (`Fatal_error exn) ->
               raise exn
           | Ok breadcrumb ->
-              Deferred.return (Ok breadcrumb))
+              Deferred.return (Ok breadcrumb) )
     in
     Mina_metrics.(
       Counter.inc_one
@@ -198,7 +198,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
          ~processed_transition_writer ~only_if_present:false ~time_controller
-         ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb))
+         ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb ))
 
 let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
     ~trust_system ~time_controller ~frontier
@@ -208,7 +208,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
            , State_hash.t )
            Cached.t ]
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
-       Reader.t)
+       Reader.t )
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
     ~(clean_up_catchup_scheduler : unit Ivar.t)
     ~(catchup_job_writer :
@@ -220,19 +220,19 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
            list
        , crash buffered
        , unit )
-       Writer.t)
+       Writer.t )
     ~(catchup_breadcrumbs_reader :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
          list
        * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ] )
-       Reader.t)
+       Reader.t )
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t) ~processed_transition_writer =
+       Writer.t ) ~processed_transition_writer =
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
       ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -259,12 +259,12 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
               Mina_metrics.(
                 Gauge.inc_one
                   Transition_frontier_controller.transitions_being_processed) ;
-              `Local_breadcrumb (Cached.pure breadcrumb))
+              `Local_breadcrumb (Cached.pure breadcrumb) )
         ; Reader.map catchup_breadcrumbs_reader
             ~f:(fun (cb, catchup_breadcrumbs_callback) ->
-              `Catchup_breadcrumbs (cb, catchup_breadcrumbs_callback))
+              `Catchup_breadcrumbs (cb, catchup_breadcrumbs_callback) )
         ; Reader.map primary_transition_reader ~f:(fun vt ->
-              `Partially_valid_transition vt)
+              `Partially_valid_transition vt )
         ]
         ~f:(fun msg ->
           let open Deferred.Let_syntax in
@@ -282,7 +282,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                                * we're catching up *)
                             ~f:
                               (add_and_finalize ~logger ~only_if_present:true
-                                 ~source:`Catchup ~valid_cb:None))
+                                 ~source:`Catchup ~valid_cb:None ) )
                     with
                   | Ok () ->
                       ()
@@ -292,7 +292,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                               let (_ : Transition_frontier.Breadcrumb.t) =
                                 Cached.invalidate_with_failure cached_breadcrumb
                               in
-                              ())) ;
+                              () ) ) ;
                       [%log error]
                         "Error, failed to attach all catchup breadcrumbs to \
                          transition frontier: $error"
@@ -319,7 +319,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                     ~name:"accepted_transition_local_latency"
                     (Core_kernel.Time.diff
                        Block_time.(now time_controller |> to_time)
-                       transition_time) ;
+                       transition_time ) ;
                   let%map () =
                     match%map
                       add_and_finalize ~logger ~only_if_present:false
@@ -343,7 +343,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                       Transition_frontier_controller.transitions_being_processed)
               | `Partially_valid_transition
                   (`Block transition, `Valid_cb valid_cb) ->
-                  process_transition ~transition ~valid_cb)))
+                  process_transition ~transition ~valid_cb ) ) )
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
@@ -371,7 +371,7 @@ let%test_module "Transition_handler.Processor tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()))
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     let downcast_breadcrumb breadcrumb =
       let transition =
@@ -388,19 +388,19 @@ let%test_module "Transition_handler.Processor tests" =
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
         (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
-           ~verifier ~max_length ~frontier_size ~branch_size ())
+           ~verifier ~max_length ~frontier_size ~branch_size () )
         ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
                 let valid_transition_reader, valid_transition_writer =
                   Strict_pipe.create
                     (Buffered
-                       (`Capacity branch_size, `Overflow (Drop_head ignore)))
+                       (`Capacity branch_size, `Overflow (Drop_head ignore)) )
                 in
                 let producer_transition_reader, _ =
                   Strict_pipe.create
                     (Buffered
-                       (`Capacity branch_size, `Overflow (Drop_head ignore)))
+                       (`Capacity branch_size, `Overflow (Drop_head ignore)) )
                 in
                 let _, catchup_job_writer =
                   Strict_pipe.create (Buffered (`Capacity 1, `Overflow Crash))
@@ -411,7 +411,7 @@ let%test_module "Transition_handler.Processor tests" =
                 let processed_transition_reader, processed_transition_writer =
                   Strict_pipe.create
                     (Buffered
-                       (`Capacity branch_size, `Overflow (Drop_head ignore)))
+                       (`Capacity branch_size, `Overflow (Drop_head ignore)) )
                 in
                 let clean_up_catchup_scheduler = Ivar.create () in
                 let cache = Unprocessed_transition_cache.create ~logger in
@@ -427,7 +427,7 @@ let%test_module "Transition_handler.Processor tests" =
                       |> Unprocessed_transition_cache.register_exn cache
                     in
                     Strict_pipe.Writer.write valid_transition_writer
-                      (`Block b, `Valid_cb None)) ;
+                      (`Block b, `Valid_cb None) ) ;
                 match%map
                   Block_time.Timeout.await
                     ~timeout_duration:(Block_time.Span.of_ms 30000L)
@@ -443,9 +443,9 @@ let%test_module "Transition_handler.Processor tests" =
                            | next_expected_breadcrumb :: tail ->
                                [%test_eq: State_hash.t]
                                  (Transition_frontier.Breadcrumb.state_hash
-                                    next_expected_breadcrumb)
+                                    next_expected_breadcrumb )
                                  (Mina_block.Validated.state_hash
-                                    newly_added_transition) ;
+                                    newly_added_transition ) ;
                                [%log info]
                                  ~metadata:
                                    [ ( "height"
@@ -464,12 +464,12 @@ let%test_module "Transition_handler.Processor tests" =
                                if List.is_empty tail then `Stop true
                                else `Continue tail
                            | [] ->
-                               `Stop false )))
+                               `Stop false ) ) )
                 with
                 | `Timeout ->
                     failwith "test timed out"
                 | `Ok (`Eof _) ->
                     failwith "pipe closed unexpectedly"
                 | `Ok (`Terminated x) ->
-                    x) ))
+                    x ) ) )
   end )

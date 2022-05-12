@@ -120,7 +120,7 @@ module type S0 = sig
       Rpc_master
         with type Master.T.query = unit
          and type Master.T.response =
-              (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
+          (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
 
     module Submit_work :
       Rpc_master
