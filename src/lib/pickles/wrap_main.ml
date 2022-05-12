@@ -202,7 +202,8 @@ let wrap_main
     with_label __LOC__ (fun () ->
         let which_branch =
           exists
-            (Index.packed_typ (module Impl))
+            (Typ.transport Field.typ ~there:Field.Constant.of_int
+               ~back:(fun _ -> failwith "unimplemented"))
             ~request:(fun () -> Req.Which_branch)
         in
         let which_branch =

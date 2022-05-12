@@ -605,12 +605,10 @@ struct
           ~wrap_rounds:Tock.Rounds.n
       in
       let { Domains.h } =
-        List.nth_exn
-          (Vector.to_list step_domains)
-          (Index.to_int branch_data.index)
+        List.nth_exn (Vector.to_list step_domains) branch_data.index
       in
-      ksprintf Common.time "step-prover %d (%d)"
-        (Index.to_int branch_data.index) (Domain.size h) (fun () ->
+      ksprintf Common.time "step-prover %d (%d)" branch_data.index
+        (Domain.size h) (fun () ->
           Impls.Step.generate_witness_conv
             ~f:
               (fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs } ->

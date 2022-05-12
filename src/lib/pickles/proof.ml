@@ -22,7 +22,7 @@ module Base = struct
           , ('s, 'sgs, 'bp_chals) Me_only.Step.t
           , 'dlog_me_onlys )
           Types.Step.Statement.t
-      ; index : Types.Index.t
+      ; index : int
       ; prev_evals : 'prev_evals
       ; proof : Tick.Proof.t
       }

@@ -375,9 +375,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               main x ()))
     in
     if profile_constraints then
-      Snarky_log.to_file
-        (sprintf "step-snark-%s-%d.json" name (Index.to_int index))
-        log
+      Snarky_log.to_file (sprintf "step-snark-%s-%d.json" name index) log
 
   let log_wrap main typ name id =
     let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
@@ -519,7 +517,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:(Index.of_int_exn !i)
+                    Step_branch_data.create ~index:!i
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~typ A.to_field_elements
                       A_value.to_field_elements rule ~wrap_domains
@@ -580,13 +578,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                        ; identifier = name ^ "-" ^ b.rule.identifier
                        }
                        cs_hash
-                   , Index.to_int b.index
+                   , b.index
                    , cs ))
               in
               let k_v =
                 match disk_keys with
                 | Some ks ->
-                    Lazy.return ks.(Index.to_int b.index)
+                    Lazy.return ks.(b.index)
                 | None ->
                     lazy
                       (let id, _header, index, cs = Lazy.force k_p in

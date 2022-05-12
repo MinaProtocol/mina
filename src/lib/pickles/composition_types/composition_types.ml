@@ -1,7 +1,6 @@
 open Pickles_types
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 module Bulletproof_challenge = Bulletproof_challenge
-module Index = Index
 module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec

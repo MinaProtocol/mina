@@ -23,10 +23,6 @@ let one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
-(* Converts a one hot vector to an Index.t value *)
-let one_hot_vector_to_index v =
-  one_hot_vector_to_num v |> Types.Index.of_field (module Impl)
-
 let verify_one
     ({ app_state
      ; wrap_proof
