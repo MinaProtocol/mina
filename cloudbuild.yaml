@@ -1,0 +1,13 @@
+images:
+  - "gcr.io/${PROJECT_ID}/mina-archive:1.2.3"
+steps:
+  - args:
+      - build
+      - "-t"
+      - "gcr.io/${PROJECT_ID}/mina-archive:1.2.3"
+      - "--build-arg"
+      - MINA_REPO=https://github.com/minaprotocol/mina
+      - "-f"
+      - dockerfiles/Dockerfile-mina-archive
+      - dockerfiles/
+    name: gcr.io/cloud-builders/docker

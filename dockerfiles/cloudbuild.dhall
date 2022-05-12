@@ -1,0 +1,224 @@
+let Schema = ./cloudbuild-schema.dhall
+
+let Map =
+      https://raw.githubusercontent.com/dhall-lang/dhall-lang/master/Prelude/Map/package.dhall
+
+let List/concatMap =
+      https://raw.githubusercontent.com/dhall-lang/dhall-lang/master/Prelude/List/concatMap
+
+let Optional/map =
+      https://raw.githubusercontent.com/dhall-lang/dhall-lang/master/Prelude/Optional/map
+
+let DebCodename =
+      < bionic
+      | focal
+      | impish
+      | jammy
+      | stretch
+      | buster
+      | bullseye
+      | sid
+      | bookworm
+      >
+
+let debInfo
+    : DebCodename → { debCodename : Text, image : Text }
+    = λ(codename : DebCodename) →
+        let text =
+              merge
+                { bionic = "bionic"
+                , focal = "focal"
+                , impish = "impish"
+                , jammy = "jammy"
+                , stretch = "stretch"
+                , buster = "buster"
+                , bullseye = "bullseye"
+                , sid = "sid"
+                , bookworm = "bookworm"
+                }
+                codename
+
+        in    { debCodename = text }
+            ⫽ { image =
+                      merge
+                        { bionic = "ubuntu"
+                        , focal = "ubuntu"
+                        , impish = "ubuntu"
+                        , jammy = "ubuntu"
+                        , stretch = "debian"
+                        , buster = "debian"
+                        , bullseye = "debian"
+                        , sid = "debian"
+                        , bookworm = "debian"
+                        }
+                        codename
+                  ++  text
+              }
+
+let debInfo_ =
+      λ(codename : Optional DebCodename) →
+        merge
+          { Some =
+              λ(a : DebCodename) →
+                { debCodename = Some (debInfo a).debCodename
+                , image = Some (debInfo a).image
+                }
+          , None = { debCodename = None Text, image = None Text }
+          }
+          codename
+
+let ServiceDescription =
+      { Type =
+          { repo : Optional Text
+          , version : Text
+          , network : Optional Text
+          , branch : Optional Text
+          , cache : Optional Text
+          , debCodename : Optional DebCodename
+          , debRelease : Optional Text
+          , debVersion : Optional Text
+          , extraArgs : List Text
+          }
+      , default =
+        { repo = Some "https://github.com/minaprotocol/mina"
+        , network = None Text
+        , branch = None Text
+        , cache = None Text
+        , debCodename = None DebCodename
+        , debRelease = None Text
+        , debVersion = None Text
+        , extraArgs = [] : List Text
+        }
+      }
+
+let DockerfileDescription =
+      { Type =
+          { service : Text
+          , dockerfilePaths : List Text
+          , dockerContext : Optional Text
+          }
+      , default.dockerContext = None Text
+      }
+
+let optionalBuildArg
+    : Text → Optional Text → List Text
+    = λ(n : Text) →
+      λ(o : Optional Text) →
+        merge
+          { Some = λ(a : Text) → [ "--build-arg", n ++ "=" ++ a ]
+          , None = [] : List Text
+          }
+          o
+
+let dockerfilePathsArgs =
+      λ(dockerfilePaths : List Text) →
+        List/concatMap Text Text (λ(f : Text) → [ "-f", f ]) dockerfilePaths
+
+let mkArgs
+    : Text → DockerfileDescription.Type → ServiceDescription.Type → List Text
+    = λ(tag : Text) →
+      λ(desc : DockerfileDescription.Type) →
+      λ(serviceDesc : ServiceDescription.Type) →
+          [ "build", "-t", tag ]
+        # optionalBuildArg "image" (debInfo_ serviceDesc.debCodename).image
+        # optionalBuildArg "MINA_REPO" serviceDesc.repo
+        # optionalBuildArg "network" serviceDesc.network
+        # optionalBuildArg "MINA_BRANCH" serviceDesc.branch
+        # optionalBuildArg
+            "deb_codename"
+            (debInfo_ serviceDesc.debCodename).debCodename
+        # optionalBuildArg "deb_release" serviceDesc.debRelease
+        # optionalBuildArg "deb_version" serviceDesc.debVersion
+        # serviceDesc.extraArgs
+        # merge
+            { Some =
+                λ(ctx : Text) →
+                  dockerfilePathsArgs desc.dockerfilePaths # [ ctx ]
+            , None = desc.dockerfilePaths
+            }
+            desc.dockerContext
+
+let cloudBuild
+    : DockerfileDescription.Type →
+      ServiceDescription.Type →
+        Schema.Cloudbuild.Type
+    = λ(desc : DockerfileDescription.Type) →
+      λ(serviceDesc : ServiceDescription.Type) →
+        let tag = "gcr.io/\${PROJECT_ID}/${desc.service}:${serviceDesc.version}"
+
+        let args = mkArgs tag desc serviceDesc
+
+        in  Schema.Cloudbuild::{
+            , steps =
+              [ Schema.Step::{
+                , name = "gcr.io/cloud-builders/docker"
+                , args = Some args
+                }
+              ]
+            , images = Some [ tag ]
+            }
+
+let dockerBuild
+    : DockerfileDescription.Type → ServiceDescription.Type → List Text
+    = λ(desc : DockerfileDescription.Type) →
+      λ(serviceDesc : ServiceDescription.Type) →
+        let tag = "${desc.service}:${serviceDesc.version}"
+
+        let args = mkArgs tag desc serviceDesc
+
+        in  args
+
+let services =
+      { mina-archive =
+        { service = "mina-archive"
+        , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
+        , dockerContext = Some "dockerfiles/"
+        }
+      , bot =
+        { service = "bot"
+        , dockerfilePaths = [ "frontend/bot/Dockerfile" ]
+        , dockerContext = Some "frontend/bot"
+        }
+      , mina-daemon =
+        { service = "mina-daemon"
+        , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
+        , dockerContext = Some "dockerfiles/"
+        }
+      , mina-toolchain =
+        { service = "mina-toolchain"
+        , dockerfilePaths =
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-toolchain"
+          ]
+        , dockerContext = None Text
+        }
+      , mina-rosetta =
+        { service = "mina-rosetta"
+        , dockerfilePaths =
+          [ "dockerfiles/stages/1-build-deps"
+          , "dockerfiles/stages/2-opam-deps"
+          , "dockerfiles/stages/3-builder"
+          , "dockerfiles/stages/4-production"
+          ]
+        , dockerContext = None Text
+        }
+      , leaderboard =
+        { service = "leaderboard"
+        , dockerfilePaths = [ "frontend/leaderboard/Dockerfile" ]
+        , dockerContext = Some "frontend/leaderboard"
+        }
+      , delegation-backend =
+        { service = "delegation-backend"
+        , dockerfilePaths = [ "dockerfiles/Dockerfile-delegation-backend" ]
+        , dockerContext = Some "src/app/delegation_backend"
+        }
+      , delegation-backend-toolchain =
+        { service = "delegation-backend"
+        , dockerfilePaths =
+          [ "dockerfiles/Dockerfile-delegation-backend-toolchain" ]
+        , dockerContext = Some "src/app/delegation_backend"
+        }
+      }
+
+in  { cloudBuild, dockerBuild, ServiceDescription, DebCodename } ⫽ services
