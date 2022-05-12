@@ -108,7 +108,7 @@ struct
         , Digest.Constant.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
-        , Index.t )
+        , Branch_data.t )
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
@@ -139,11 +139,8 @@ struct
         let plonk0 = t.statement.proof_state.deferred_values.plonk in
         let plonk =
           let domain =
-            (Vector.to_array (Types_map.lookup_step_domains tag)).(Index.to_int
-                                                                     t.statement
-                                                                       .proof_state
-                                                                       .deferred_values
-                                                                       .which_branch)
+            Branch_data.domain
+              t.statement.proof_state.deferred_values.branch_data
           in
           let to_field =
             SC.to_field_constant

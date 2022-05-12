@@ -766,7 +766,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
               full_signature.maxes wrap_requests
               ~dlog_plonk_index:wrap_vk.commitments wrap_main
-              A_value.to_field_elements ~step_vk ~step_domains:b.domains
+              A_value.to_field_elements ~step_vk
               ~step_plonk_indices:(Lazy.force step_vks) ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
