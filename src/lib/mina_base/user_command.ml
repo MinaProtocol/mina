@@ -199,12 +199,21 @@ let fee_payer (t : t) =
   | Parties p ->
       Parties.fee_payer p
 
-let nonce_exn (t : t) =
+(** The application nonce is the nonce of the fee payer at which a user command can be applied. *)
+let application_nonce (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.nonce x
   | Parties p ->
-      Parties.nonce p
+      Parties.application_nonce p
+
+(** The target nonce is what the nonce of the fee payer will be after a user command is applied. *)
+let target_nonce (t : t) =
+  match t with
+  | Signed_command x ->
+      Account.Nonce.succ (Signed_command.nonce x)
+  | Parties p ->
+      Parties.target_nonce p
 
 let check (t : t) : Valid.t option =
   match t with

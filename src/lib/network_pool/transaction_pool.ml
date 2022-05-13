@@ -361,7 +361,7 @@ struct
                   ~fee_payer_nonce:
                     ( Transaction_hash.User_command_with_valid_signature.command
                         cmd
-                    |> User_command.nonce_exn )
+                    |> User_command.application_nonce )
               with
               | Ok (t, _) ->
                   Some (cmd, t)
@@ -1586,7 +1586,7 @@ struct
                in
                let get_nonce txn =
                  Transaction_hash.User_command_with_valid_signature.command txn
-                 |> User_command.nonce_exn
+                 |> User_command.application_nonce
                in
                if cmp <> 0 then cmp
                else
@@ -1767,8 +1767,8 @@ let%test_module _ =
             (User_command.fee_payer cmd2)
         then
           Account.Nonce.compare
-            (User_command.nonce_exn cmd1)
-            (User_command.nonce_exn cmd2)
+            (User_command.application_nonce cmd1)
+            (User_command.application_nonce cmd2)
         else
           let get_fee_wu cmd = User_command.fee_per_wu cmd in
           (* descending order of fee/weight *)

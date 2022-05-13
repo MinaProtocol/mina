@@ -2371,7 +2371,7 @@ module For_tests = struct
       }
     |> Signed_command.forget_check
 
-  let party_send ?(use_full_commitment = true)
+  let party_send ?(use_full_commitment = true) ?(double_sender_nonce = true)
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Parties.t =
     let sender_pk = Public_key.compress sender.public_key in
@@ -2385,9 +2385,11 @@ module For_tests = struct
          This would also allow us to prevent replays of snapp proofs, by
          allowing them to bump their nonce.
       *)
-      sender_nonce |> Account.Nonce.to_uint32
-      |> Unsigned.UInt32.(mul (of_int 2))
-      |> Account.Nonce.to_uint32
+      if double_sender_nonce then
+        sender_nonce |> Account.Nonce.to_uint32
+        |> Unsigned.UInt32.(mul (of_int 2))
+        |> Account.Nonce.to_uint32
+      else sender_nonce
     in
     let parties : Parties.Wire.t =
       { fee_payer =
