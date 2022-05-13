@@ -30,16 +30,16 @@ let%test_module "Initialize state test" =
         (module Zkapp_statement)
         ~typ:Zkapp_statement.typ
         ~branches:(module Nat.N3)
-        ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
+        ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"empty_update"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants)
+             constraint_constants )
         ~choices:(fun ~self ->
           [ Zkapps_initialize_state.initialize_rule pk_compressed
           ; Zkapps_initialize_state.update_state_rule pk_compressed
           ; dummy_rule self
-          ])
+          ] )
 
     module P = (val p_module)
 
@@ -93,7 +93,7 @@ let%test_module "Initialize state test" =
             initialize_prover []
               { transaction = Party.Body.digest party_body
               ; at_party = Parties.Call_forest.empty
-              })
+              } )
 
       let party : Party.t =
         { body = party_body; authorization = Proof party_proof }
@@ -113,7 +113,7 @@ let%test_module "Initialize state test" =
               []
               { transaction = Party.Body.digest party_body
               ; at_party = Parties.Call_forest.empty
-              })
+              } )
 
       let party : Party.t =
         { body = party_body; authorization = Proof party_proof }
@@ -139,7 +139,7 @@ let%test_module "Initialize state test" =
         { body =
             { Party.Body.Fee_payer.dummy with
               public_key = pk_compressed
-            ; balance_change = Currency.Fee.(of_int 100)
+            ; fee = Currency.Fee.(of_int 100)
             ; protocol_state_precondition
             }
         ; authorization = Signature.dummy
@@ -151,7 +151,7 @@ let%test_module "Initialize state test" =
           ~memo_hash
           ~fee_payer_hash:
             (Parties.Call_forest.Digest.Party.create
-               (Party.of_fee_payer fee_payer))
+               (Party.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t
           =
@@ -172,7 +172,7 @@ let%test_module "Initialize state test" =
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
                } as party :
-                Party.t)
+                Party.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
                 let commitment =
                   if use_full_commitment then full_commitment
@@ -182,10 +182,10 @@ let%test_module "Initialize state test" =
                   authorization =
                     Signature
                       (Schnorr.Chunked.sign sk
-                         (Random_oracle.Input.Chunked.field commitment))
+                         (Random_oracle.Input.Chunked.field commitment) )
                 }
             | party ->
-                party)
+                party )
         in
         { fee_payer; other_parties; memo }
       in
@@ -203,8 +203,8 @@ let%test_module "Initialize state test" =
             |> Or_error.ok_exn
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
-              check_parties_with_merges_exn ?expected_failure ledger [ parties ]) ;
-          Ledger.get ledger loc)
+              check_parties_with_merges_exn ?expected_failure ledger [ parties ] ) ;
+          Ledger.get ledger loc )
 
     let%test_unit "Initialize" =
       let account =
@@ -279,7 +279,7 @@ let%test_module "Initialize state test" =
             (* Raises an exception due to verifying a proof without a valid vk
                in the account.
             *)
-            test_parties [ Initialize_party.party; Update_state_party.party ])
+            test_parties [ Initialize_party.party; Update_state_party.party ] )
       in
       assert (Or_error.is_error account)
   end )

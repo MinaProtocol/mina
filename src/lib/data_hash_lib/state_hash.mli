@@ -45,7 +45,7 @@ val deriver :
       ; map : (Yojson.Safe.t -> t) ref
       ; nullable_graphql_arg :
           (   unit
-           -> Yojson.Safe.t option Fields_derivers_graphql.Schema.Arg.arg_typ)
+           -> Yojson.Safe.t option Fields_derivers_graphql.Schema.Arg.arg_typ )
           ref
       ; nullable_graphql_fields :
           Yojson.Safe.t option Fields_derivers_zkapps.Graphql.Fields.Input.T.t
@@ -54,7 +54,7 @@ val deriver :
       ; to_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
       ; .. >
       as
-      'a)
+      'a )
      Fields_derivers_zkapps.Unified_input.t
      Fields_derivers_zkapps.Unified_input.t
      Fields_derivers_zkapps.Unified_input.t

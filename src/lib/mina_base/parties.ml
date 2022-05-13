@@ -43,7 +43,7 @@ module Call_forest = struct
 
     let rec fold_forest (ts : (_ t, _) With_stack_hash.t list) ~f ~init =
       List.fold ts ~init ~f:(fun acc { elt; stack_hash = _ } ->
-          fold elt ~init:acc ~f)
+          fold elt ~init:acc ~f )
 
     and fold { party; calls; party_digest = _ } ~f ~init =
       fold_forest calls ~f ~init:(f init party)
@@ -55,7 +55,7 @@ module Call_forest = struct
              acc
              { elt = elt1; stack_hash = _ }
              { elt = elt2; stack_hash = _ }
-           -> fold2_exn elt1 elt2 ~init:acc ~f)
+           -> fold2_exn elt1 elt2 ~init:acc ~f )
 
     and fold2_exn { party = party1; calls = calls1; party_digest = _ }
         { party = party2; calls = calls2; party_digest = _ } ~f ~init =
@@ -451,12 +451,12 @@ module Call_forest = struct
       ~add_caller ~null_id:Token_id.default
       ~party_id:(fun p ->
         Account_id.(
-          derive_token_id ~owner:(create p.body.public_key p.body.token_id)))
+          derive_token_id ~owner:(create p.body.public_key p.body.token_id)) )
 
   let remove_callers (type party_with_caller party_without_sender h1 h2 id)
       (ps : (party_with_caller, h1, h2) t) ~(equal_id : id -> id -> bool)
       ~(add_call_type :
-         party_with_caller -> Party.Call_type.t -> party_without_sender)
+         party_with_caller -> Party.Call_type.t -> party_without_sender )
       ~(null_id : id) ~(party_caller : party_with_caller -> id) :
       (party_without_sender, h1, h2) t =
     let rec go ~top_level_party parent_caller ps =
@@ -508,7 +508,7 @@ module Call_forest = struct
       ; party_digest = ()
       ; calls =
           List.map calls ~f:(fun elt ->
-              { With_stack_hash.elt; stack_hash = () })
+              { With_stack_hash.elt; stack_hash = () } )
       }
     in
     let t : With_call_type.t =
@@ -546,13 +546,13 @@ module Call_forest = struct
          ~call_type:(fun p -> p.caller)
          ~add_caller:(fun p caller : int P.t -> { p with caller })
          ~null_id
-         ~party_id:(fun p -> p.id))
+         ~party_id:(fun p -> p.id) )
       expected_output ;
     [%test_eq: With_call_type.t]
       (remove_callers expected_output ~equal_id:Int.equal
          ~add_call_type:(fun p call_type -> { p with caller = call_type })
          ~null_id
-         ~party_caller:(fun p -> p.caller))
+         ~party_caller:(fun p -> p.caller) )
       t
 
   module With_hashes = struct
@@ -583,11 +583,12 @@ module Call_forest = struct
       |> add_callers
            ~call_type:(fun ((p : Party.Wire.t), _) -> p.body.caller)
            ~add_caller:(fun (p, vk) (caller : Token_id.t) ->
-             ((add_caller p caller : Party.t), vk))
+             ((add_caller p caller : Party.t), vk) )
            ~null_id:Token_id.default
            ~party_id:(fun (p, _) ->
              Account_id.(
-               derive_token_id ~owner:(create p.body.public_key p.body.token_id)))
+               derive_token_id ~owner:(create p.body.public_key p.body.token_id))
+             )
       |> accumulate_hashes
 
     let to_parties_list (x : _ t) = to_parties_list x
@@ -608,7 +609,7 @@ module Call_forest = struct
   let exists (type p) (t : (p, _, _) t) ~(f : p -> bool) : bool =
     with_return (fun { return } ->
         fold t ~init:() ~f:(fun () p -> if f p then return true else ()) ;
-        false)
+        false )
 end
 
 module Wire = struct
@@ -634,12 +635,11 @@ module Wire = struct
 
   let check_depths (t : t) =
     try
-      assert (t.fee_payer.body.call_depth = 0) ;
       let (_ : int) =
         List.fold ~init:0 t.other_parties ~f:(fun depth party ->
             let new_depth = party.body.call_depth in
             if new_depth >= 0 && new_depth <= depth + 1 then new_depth
-            else assert false)
+            else assert false )
       in
       true
     with _ -> false
@@ -675,16 +675,16 @@ module Stable = struct
       ; other_parties =
           w.other_parties
           |> Call_forest.of_parties_list ~party_depth:(fun (p : Party.Wire.t) ->
-                 p.body.call_depth)
+                 p.body.call_depth )
           |> Call_forest.add_callers
                ~call_type:(fun (p : Party.Wire.t) -> p.body.caller)
                ~add_caller ~null_id:Token_id.default
                ~party_id:(fun (p : Party.Wire.t) ->
                  Account_id.(
                    derive_token_id
-                     ~owner:(create p.body.public_key p.body.token_id)))
+                     ~owner:(create p.body.public_key p.body.token_id)) )
           |> Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
-                 Digest.Party.create p)
+                 Digest.Party.create p )
       }
 
     let to_wire (t : t) : Wire.t =
@@ -695,18 +695,19 @@ module Stable = struct
             (Call_forest.remove_callers ~equal_id:Token_id.equal
                ~add_call_type:Party.to_wire ~null_id:Token_id.default
                ~party_caller:(fun p -> p.body.caller)
-               t.other_parties)
+               t.other_parties )
       }
 
-    include Binable.Of_binable
-              (Wire.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable
+        (Wire.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let of_binable = of_wire
+          let of_binable = of_wire
 
-                let to_binable = to_wire
-              end)
+          let to_binable = to_wire
+        end)
   end
 end]
 
@@ -721,12 +722,11 @@ let parties (t : t) : _ Call_forest.t =
   in
   Call_forest.cons fee_payer t.other_parties
 
-let fee (t : t) : Currency.Fee.t = t.fee_payer.body.balance_change
+let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
-let nonce (t : t) : Account.Nonce.t =
-  (fee_payer_party t).body.account_precondition
+let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).body.nonce
 
 let fee_token (_t : t) = Token_id.default
 
@@ -746,8 +746,9 @@ let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
 
 let accounts_accessed (t : t) =
-  Call_forest.fold t.other_parties ~init:[ fee_payer t ] ~f:(fun acc p ->
-      Party.account_id p :: acc)
+  Call_forest.fold t.other_parties
+    ~init:[ fee_payer t ]
+    ~f:(fun acc p -> Party.account_id p :: acc)
   |> List.rev |> List.stable_dedup
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
@@ -922,7 +923,7 @@ type other_parties = (Party.t, Digest.Party.t, Digest.Forest.t) Call_forest.t
 let other_parties_deriver obj =
   let of_parties_with_depth (ps : Party.t list) : other_parties =
     Call_forest.of_parties_list ps ~party_depth:(fun (p : Party.t) ->
-        p.body.call_depth)
+        p.body.call_depth )
     |> Call_forest.accumulate_hashes'
   and to_parties_with_depth (ps : other_parties) : Party.t list =
     Call_forest.to_list ps
@@ -973,7 +974,7 @@ let dummy =
 let inner_query =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
-       Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())))
+       Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())) )
 
 let%test_module "Test" =
   ( module struct

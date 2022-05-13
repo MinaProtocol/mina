@@ -38,7 +38,7 @@ let () =
   (* Mock data *)
   let received_ballots =
     Array.init number_of_voters ~f:(fun _ ->
-        Ballot.Opened.create (if Random.bool () then Pepperoni else Mushroom))
+        Ballot.Opened.create (if Random.bool () then Pepperoni else Mushroom) )
   in
   let commitments, winner, proof = tally_and_prove received_ballots in
   let log_events =

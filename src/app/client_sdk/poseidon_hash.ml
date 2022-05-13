@@ -28,7 +28,7 @@ module Field = struct
     let bits_to_bytes bits =
       let byte_of_bits bs =
         List.foldi bs ~init:0 ~f:(fun i acc b ->
-            if b then acc lor (1 lsl i) else acc)
+            if b then acc lor (1 lsl i) else acc )
         |> Char.of_int_exn
       in
       List.map

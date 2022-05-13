@@ -37,12 +37,22 @@ module Call_type = struct
     end
   end]
 
+  let to_string = function Call -> "call" | Delegate_call -> "delegate_call"
+
+  let of_string = function
+    | "call" ->
+        Call
+    | "delegate_call" ->
+        Delegate_call
+    | s ->
+        failwithf "Invalid call type: %s" s ()
+
   let quickcheck_generator =
     Quickcheck.Generator.map Bool.quickcheck_generator ~f:(function
       | false ->
           Call
       | true ->
-          Delegate_call)
+          Delegate_call )
 end
 
 module Update = struct
@@ -152,7 +162,7 @@ module Update = struct
            ; vesting_period
            ; vesting_increment
            } :
-            t) =
+            t ) =
         List.reduce_exn ~f:Random_oracle_input.Chunked.append
           [ Balance.var_to_input initial_minimum_balance
           ; Global_slot.Checked.to_input cliff_time
@@ -245,7 +255,7 @@ module Update = struct
           (Quickcheck.Generator.return
              (let data = Pickles.Side_loaded.Verification_key.dummy in
               let hash = Zkapp_account.digest_vk data in
-              { With_hash.data; hash }))
+              { With_hash.data; hash } ) )
       else return Set_or_keep.Keep
     in
     let%bind permissions =
@@ -323,7 +333,7 @@ module Update = struct
          ; timing
          ; voting_for
          } :
-          t) =
+          t ) =
       let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Zkapp_state.to_input app_state
@@ -331,7 +341,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input delegate
             ~f:Public_key.Compressed.Checked.to_input
         ; Set_or_keep.Checked.to_input verification_key ~f:(fun x ->
-              field (Data_as_hash.hash x.data))
+              field (Data_as_hash.hash x.data) )
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
         ; Set_or_keep.Checked.to_input zkapp_uri ~f:Data_as_hash.to_input
@@ -366,7 +376,7 @@ module Update = struct
        ; timing
        ; voting_for
        } :
-        t) =
+        t ) =
     let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Zkapp_state.to_input app_state
@@ -403,26 +413,26 @@ module Update = struct
             | { With_hash.data = Some data; hash } ->
                 Some { With_hash.data; hash }
             | { With_hash.data = None; _ } ->
-                None)
+                None )
           ~of_option:(function
             | Some { With_hash.data; hash } ->
                 { With_hash.data = Some data; hash }
             | None ->
-                { With_hash.data = None; hash = Field.Constant.zero })
+                { With_hash.data = None; hash = Field.Constant.zero } )
         |> Typ.transport_var
              ~there:
                (Set_or_keep.Checked.map
-                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data))
+                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data) )
              ~back:(fun x ->
                Set_or_keep.Checked.map x ~f:(fun data ->
                    { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
-                   }))
+                   } ) )
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
       ; Set_or_keep.optional_typ
           (Data_as_hash.optional_typ ~hash:Account.hash_zkapp_uri
              ~non_preimage:(Account.hash_zkapp_uri_opt None)
-             ~dummy_value:"")
+             ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
           Account.Token_symbol.typ
@@ -460,7 +470,7 @@ module Update = struct
              dummy |> to_base58_check |> of_base58_check_exn)
          in
          let hash = Zkapp_account.digest_vk data in
-         { With_hash.data; hash })
+         { With_hash.data; hash } )
     in
     let update : t =
       { app_state
@@ -556,7 +566,7 @@ module Account_precondition = struct
       Full
         { Zkapp_precondition.Account.accept with
           nonce = Check { lower = n; upper = n }
-        ; public_key = Check Public_key.Compressed.empty
+        ; delegate = Check Public_key.Compressed.empty
         }
     in
     let module Fd = Fields_derivers_zkapps.Derivers in
@@ -573,7 +583,7 @@ module Account_precondition = struct
       ( {json|{
           balance: null,
           nonce: {lower: "34928", upper: "34928"},
-          receiptChainHash: null, publicKey: null, delegate: null,
+          receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
           sequenceState: null, provedState: null
         }|json}
@@ -614,69 +624,8 @@ module Account_precondition = struct
 end
 
 module Body = struct
-  module Poly
-      (Public_key : Type)
-      (Token_id : Type)
-      (Update : Type)
-      (Amount : Type)
-      (Events : Type)
-      (Call_data : Type)
-      (Int : Type)
-      (Bool : Type)
-      (Protocol_state : Type)
-      (Account_precondition : Type)
-      (Caller : Type) =
-  struct
-    (** Body component of a party *)
-    type t =
-      { public_key : Public_key.t
-      ; token_id : Token_id.t
-      ; update : Update.t
-      ; balance_change : Amount.t
-      ; increment_nonce : Bool.t
-      ; events : Events.t
-      ; sequence_events : Events.t
-      ; call_data : Call_data.t
-      ; call_depth : Int.t
-      ; protocol_state_precondition : Protocol_state.t
-      ; account_precondition : Account_precondition.t
-      ; use_full_commitment : Bool.t
-      ; caller : Caller.t
-      }
-  end
-
   (* Why isn't this derived automatically? *)
   let hash_fold_array f init x = Array.fold ~init ~f x
-
-  module Int = struct
-    include Int
-
-    type t = int [@@deriving sexp, equal, yojson, hash, compare]
-  end
-
-  module Bool = struct
-    include Bool
-
-    type t = bool [@@deriving sexp, equal, yojson, hash, compare]
-  end
-
-  module Unit = struct
-    include Unit
-
-    type t = unit [@@deriving sexp, equal, yojson, hash, compare]
-  end
-
-  module Amount_sgn_signed_poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-        [@@deriving sexp, equal, hash, compare, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
 
   module Events' = struct
     [%%versioned
@@ -695,21 +644,11 @@ module Body = struct
     module Stable = struct
       module V1 = struct
         type t =
-              Poly(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
-                (Update.Stable.V1)
-                (Amount_sgn_signed_poly.Stable.V1)
-                (Events'.Stable.V1)
-                (Pickles.Backend.Tick.Field.Stable.V1)
-                (Int)
-                (Bool)
-                (Zkapp_precondition.Protocol_state.Stable.V1)
-                (Account_precondition.Stable.V1)
-                (Call_type.Stable.V1)
-              .t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; token_id : Token_id.Stable.V1.t
           ; update : Update.Stable.V1.t
-          ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
           ; sequence_events : Events'.Stable.V1.t
@@ -732,22 +671,11 @@ module Body = struct
   module Stable = struct
     module V1 = struct
       type t =
-            Poly(Public_key.Compressed.Stable.V1)(Token_id.Stable.V1)
-              (Update.Stable.V1)
-              (Amount_sgn_signed_poly.Stable.V1)
-              (Events'.Stable.V1)
-              (Pickles.Backend.Tick.Field.Stable.V1)
-              (Int)
-              (Bool)
-              (Zkapp_precondition.Protocol_state.Stable.V1)
-              (Account_precondition.Stable.V1)
-              (Token_id.Stable.V1)
-            .t
-            (* Opaque to txn logic *) =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V1.t
         ; update : Update.Stable.V1.t
-        ; balance_change : Amount_sgn_signed_poly.Stable.V1.t
+        ; balance_change :
+            (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         ; increment_nonce : bool
         ; events : Events'.Stable.V1.t
         ; sequence_events : Events'.Stable.V1.t
@@ -794,31 +722,14 @@ module Body = struct
     module Stable = struct
       module V1 = struct
         type t =
-              Poly(Public_key.Compressed.Stable.V1)(Unit)(Update.Stable.V1)
-                (Fee.Stable.V1)
-                (Events'.Stable.V1)
-                (Pickles.Backend.Tick.Field.Stable.V1)
-                (Int)
-                (Unit)
-                (Zkapp_precondition.Protocol_state.Stable.V1)
-                (Account_nonce.Stable.V1)
-                (Unit)
-              .t
-              (* Opaque to txn logic *) =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : unit [@skip]
           ; update : Update.Stable.V1.t
-          ; balance_change : Fee.Stable.V1.t
-          ; increment_nonce : unit [@skip]
+          ; fee : Fee.Stable.V1.t
           ; events : Events'.Stable.V1.t
           ; sequence_events : Events'.Stable.V1.t
-          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-          ; call_depth : int
           ; protocol_state_precondition :
               Zkapp_precondition.Protocol_state.Stable.V1.t
-          ; account_precondition : Account_nonce.Stable.V1.t
-          ; use_full_commitment : unit [@skip]
-          ; caller : unit [@skip]
+          ; nonce : Account_nonce.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
 
@@ -828,18 +739,12 @@ module Body = struct
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
-      ; token_id = ()
       ; update = Update.dummy
-      ; balance_change = Fee.zero
-      ; increment_nonce = ()
+      ; fee = Fee.zero
       ; events = []
       ; sequence_events = []
-      ; call_data = Field.zero
-      ; call_depth = 0
       ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-      ; account_precondition = Account_nonce.zero
-      ; use_full_commitment = ()
-      ; caller = ()
+      ; nonce = Account_nonce.zero
       }
 
     let deriver obj =
@@ -849,14 +754,12 @@ module Body = struct
           ~of_string:Fee.of_string
       in
       let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
-      let unit = ( !. ) ~skip_data:() skip in
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-        ~token_id:unit ~balance_change:!.fee ~increment_nonce:unit
+        ~fee:!.fee
         ~events:!.(list @@ array field @@ o ())
         ~sequence_events:!.(list @@ array field @@ o ())
-        ~call_data:!.field ~call_depth:!.int
         ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
-        ~account_precondition:!.uint32 ~use_full_commitment:unit ~caller:unit
+        ~nonce:!.uint32
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
@@ -871,18 +774,53 @@ module Body = struct
     ; token_id = Token_id.default
     ; update = t.update
     ; balance_change =
-        { Signed_poly.sgn = Sgn.Neg
-        ; magnitude = Amount.of_fee t.balance_change
-        }
+        { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
     ; increment_nonce = true
     ; events = t.events
     ; sequence_events = t.sequence_events
-    ; call_data = t.call_data
-    ; call_depth = t.call_depth
+    ; call_data = Field.zero
+    ; call_depth = 0
     ; protocol_state_precondition = t.protocol_state_precondition
-    ; account_precondition = Account_precondition.Nonce t.account_precondition
+    ; account_precondition = Account_precondition.Nonce t.nonce
     ; use_full_commitment = true
     ; caller = Token_id.default
+    }
+
+  let to_fee_payer_exn (t : t) : Fee_payer.t =
+    let { public_key
+        ; token_id = _
+        ; update
+        ; balance_change
+        ; increment_nonce = _
+        ; events
+        ; sequence_events
+        ; call_data = _
+        ; call_depth = _
+        ; protocol_state_precondition
+        ; account_precondition
+        ; use_full_commitment = _
+        ; caller = _
+        } =
+      t
+    in
+    let fee =
+      Currency.Fee.of_uint64
+        (balance_change.magnitude |> Currency.Amount.to_uint64)
+    in
+    let nonce =
+      match account_precondition with
+      | Nonce nonce ->
+          Mina_numbers.Account_nonce.of_uint32 nonce
+      | Full _ | Accept ->
+          failwith "Expected a nonce for fee payer account precondition"
+    in
+    { public_key
+    ; update
+    ; fee
+    ; events
+    ; sequence_events
+    ; protocol_state_precondition
+    ; nonce
     }
 
   module Checked = struct
@@ -898,17 +836,6 @@ module Body = struct
     end
 
     type t =
-          Poly(Type_of_var(Public_key.Compressed))(Token_id.Checked)
-            (Update.Checked)
-            (Type_of_var(Amount.Signed))
-            (Type_of_var(Events))
-            (Field.Var)
-            (Int_as_prover_ref)
-            (Type_of_var(Boolean))
-            (Zkapp_precondition.Protocol_state.Checked)
-            (Account_precondition.Checked)
-            (Token_id.Checked)
-          .t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
       ; update : Update.Checked.t
@@ -941,7 +868,7 @@ module Body = struct
          ; use_full_commitment
          ; caller
          } :
-          t) =
+          t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input public_key
         ; Update.Checked.to_input update
@@ -1068,7 +995,7 @@ module Body = struct
        ; use_full_commitment
        ; caller
        } :
-        t) =
+        t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input public_key
       ; Update.to_input update
@@ -1097,16 +1024,12 @@ module Body = struct
   end
 end
 
-module Poly (Body : Type) (Auth : Type) = struct
-  type t = { body : Body.t; authorization : Auth.t }
-end
-
 module T = struct
   module Wire = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Poly(Body.Wire.Stable.V1)(Control.Stable.V2).t =
+        type t =
           { body : Body.Wire.Stable.V1.t; authorization : Control.Stable.V2.t }
         [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -1119,8 +1042,7 @@ module T = struct
   module Stable = struct
     module V1 = struct
       (** A party to a zkApp transaction *)
-      type t = Poly(Body.Stable.V1)(Control.Stable.V2).t =
-        { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
+      type t = { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id

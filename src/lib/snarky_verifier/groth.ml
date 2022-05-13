@@ -35,7 +35,7 @@ module Make (Inputs : Inputs.S) = struct
 
     let if_list if_ b ~then_ ~else_ =
       Checked.List.map (List.zip_exn then_ else_) ~f:(fun (t, e) ->
-          if_ b ~then_:t ~else_:e)
+          if_ b ~then_:t ~else_:e )
 
     let if_ b ~then_ ~else_ =
       let c if_ p = if_ b ~then_:(p then_) ~else_:(p else_) in

@@ -9,7 +9,7 @@ open Pipe_lib
   4. 'merge_t: 'merge Merge.t
   5. 'base_job: Base.Job.t
   6. 'merge_job: Merge.Job.t
-  *)
+*)
 
 (*Note:  Prefixing some of the general purpose functions that could be used in the future with an "_" to not cause "unused function" error*)
 
@@ -322,13 +322,13 @@ module Tree = struct
                   | Continue r ->
                       f_merge i r y
                   | x ->
-                      M.return x)
+                      M.return x )
                 ~f_base:(fun acc (x, y) ->
                   match%bind f_base acc x with
                   | Continue r ->
                       f_base r y
                   | x ->
-                      M.return x)
+                      M.return x )
                 ~init:acc' sub_tree
           | x ->
               M.return x )
@@ -424,15 +424,14 @@ module Tree = struct
               ~f_merge:(fun (b, b') i (x, y) ->
                 let%bind left = f_merge b i x in
                 let%map right = f_merge b' i y in
-                ((fst left, fst right), Option.both (snd left) (snd right)))
+                ((fst left, fst right), Option.both (snd left) (snd right)) )
               ~f_base:(fun (b, b') (x, x') ->
                 let%bind left = f_base b x in
                 let%map right = f_base b' x' in
-                (left, right))
+                (left, right) )
               ~weight_merge:(fun (a, b) -> (weight_merge a, weight_merge b))
               ~update_level
-              ~jobs_split:(fun (x, y) (a, b) ->
-                (jobs_split x a, jobs_split y b))
+              ~jobs_split:(fun (x, y) (a, b) -> (jobs_split x a, jobs_split y b))
               ~jobs:new_jobs_list sub_tree
         in
         (Node { depth; value = value'; sub_tree = sub }, scan_result)
@@ -454,7 +453,7 @@ module Tree = struct
         let sub, counts =
           update_accumulate
             ~f_merge:(fun (b1, b2) (x, y) ->
-              transpose (f_merge b1 x, f_merge b2 y))
+              transpose (f_merge b1 x, f_merge b2 y) )
             ~f_base:(fun (x, y) -> transpose (f_base x, f_base y))
             sub_tree
         in
@@ -569,7 +568,7 @@ module Tree = struct
       ~jobs ~update_level ~jobs_split:(fun (w1, w2) a ->
         let l = weight_lens.get w1 in
         let r = weight_lens.get w2 in
-        (List.take a l, List.take (List.drop a l) r))
+        (List.take a l, List.take (List.drop a l) r) )
 
   let reset_weights :
          [ `Base | `Merge | `Both ]
@@ -651,13 +650,13 @@ module Tree = struct
         | true, (_weight, Merge.Job.Full { left; right; status = Todo; _ }) ->
             Available_job.Merge (left, right) :: acc
         | _ ->
-            acc)
+            acc )
       ~f_base:(fun acc d ->
         match (level = depth, d) with
         | true, (_weight, Base.Job.Full { job; status = Todo; _ }) ->
             Available_job.Base job :: acc
         | _ ->
-            acc)
+            acc )
       tree
     |> List.rev
 
@@ -670,13 +669,13 @@ module Tree = struct
         | _, Merge.Job.Full { status = Job_status.Done; _ } ->
             acc
         | _ ->
-            Job.Merge a :: acc)
+            Job.Merge a :: acc )
       ~f_base:(fun acc d ->
         match d with
         | _, Base.Job.Full { status = Job_status.Done; _ } ->
             acc
         | _ ->
-            Job.Base d :: acc)
+            Job.Base d :: acc )
       tree
     |> List.rev
 
@@ -689,9 +688,9 @@ module Tree = struct
         | _weight, Merge.Job.Full x ->
             Job.Merge x :: acc
         | _ ->
-            acc)
+            acc )
       ~f_base:(fun acc d ->
-        match d with _weight, Base.Job.Full j -> Job.Base j :: acc | _ -> acc)
+        match d with _weight, Base.Job.Full j -> Job.Base j :: acc | _ -> acc )
       tree
     |> List.rev
 
@@ -700,7 +699,7 @@ module Tree = struct
     fold_depth ~init:[]
       ~f_merge:(fun _ _ _ -> [])
       ~f_base:(fun acc d ->
-        match d with _, Base.Job.Full { job; _ } -> job :: acc | _ -> acc)
+        match d with _, Base.Job.Full { job; _ } -> job :: acc | _ -> acc )
       tree
     |> List.rev
 
@@ -714,13 +713,13 @@ module Tree = struct
         | Merge.Job.Full { status = Job_status.Todo; _ } ->
             (b, m + 1)
         | _ ->
-            (b, m))
+            (b, m) )
       ~f_base:(fun (b, m) (_, d) ->
         match d with
         | Base.Job.Full { status = Job_status.Todo; _ } ->
             (b + 1, m)
         | _ ->
-            (b, m))
+            (b, m) )
       tree
 
   let leaves : ('merge_t, 'base_t) t -> 'base_t list =
@@ -728,7 +727,7 @@ module Tree = struct
     fold_depth ~init:[]
       ~f_merge:(fun _ _ _ -> [])
       ~f_base:(fun acc d ->
-        match d with _, Base.Job.Full _ -> d :: acc | _ -> acc)
+        match d with _, Base.Job.Full _ -> d :: acc | _ -> acc )
       tree
     |> List.rev
 
@@ -747,9 +746,9 @@ module Tree = struct
         let subtree =
           _view_tree sub_tree
             ~show_merge:(fun (x, y) ->
-              sprintf !"%s  %s" (show_merge x) (show_merge y))
+              sprintf !"%s  %s" (show_merge x) (show_merge y) )
             ~show_base:(fun (x, y) ->
-              sprintf !"%s  %s" (show_base x) (show_base y))
+              sprintf !"%s  %s" (show_base x) (show_base y) )
         in
         curr ^ subtree
 
@@ -847,20 +846,21 @@ module T = struct
                   | Merge.Job.Full { status = Job_status.Done; _ } ->
                       (fst merge_node, Merge.Job.Empty)
                   | _ ->
-                      merge_node)
-                ~f_base:Fn.id)
+                      merge_node )
+                ~f_base:Fn.id )
         in
         { t with trees }
 
-      include Binable.Of_binable2
-                (Binable_arg.Stable.V1)
-                (struct
-                  type nonrec ('merge, 'base) t = ('merge, 'base) t
+      include
+        Binable.Of_binable2
+          (Binable_arg.Stable.V1)
+          (struct
+            type nonrec ('merge, 'base) t = ('merge, 'base) t
 
-                  let to_binable = with_leaner_trees
+            let to_binable = with_leaner_trees
 
-                  let of_binable = Fn.id
-                end)
+            let of_binable = Fn.id
+          end)
     end
   end]
 
@@ -888,7 +888,7 @@ module T = struct
             let x = Int.pow 2 level / Int.pow 2 (d + 1) in
             (weight x 0, weight x 0)
         in
-        (weight, merge_job))
+        (weight, merge_job) )
       (base_weight, base_job)
 
   let create_tree ~depth =
@@ -925,7 +925,7 @@ module State = struct
           ~f:
             (Tree.map_depth
                ~f_merge:(fun _ -> Merge.map ~f:f1)
-               ~f_base:(Base.map ~f:f2))
+               ~f_base:(Base.map ~f:f2) )
     ; acc = Option.map t.acc ~f:(fun (m, bs) -> (f1 m, List.map bs ~f:f2))
     }
 
@@ -938,7 +938,7 @@ module State = struct
     let () =
       let tree_hash tree f_merge f_base =
         List.iter (Tree.to_hashable_jobs tree) ~f:(fun job ->
-            match job with Job.Merge a -> f_merge a | Base d -> f_base d)
+            match job with Job.Merge a -> f_merge a | Base d -> f_base d )
       in
       Non_empty_list.iter trees ~f:(fun tree ->
           let w_to_string { Weight.base = b; merge = m } =
@@ -967,11 +967,11 @@ module State = struct
                   ^ Job_status.to_string status ) ;
                 add_string (f_base job)
           in
-          tree_hash tree f_merge f_base)
+          tree_hash tree f_merge f_base )
     in
     let acc_string =
       Option.value_map acc ~default:"None" ~f:(fun (a, d_lst) ->
-          f_merge a ^ List.fold ~init:"" d_lst ~f:(fun acc d -> acc ^ f_base d))
+          f_merge a ^ List.fold ~init:"" d_lst ~f:(fun acc d -> acc ^ f_base d) )
     in
     add_string acc_string ;
     add_string (Int.to_string curr_job_seq_no) ;
@@ -987,8 +987,7 @@ module State = struct
         -> init:'acc
         -> f_merge:
              ('acc -> 'merge Merge.t -> ('acc, 'final) Continue_or_stop.t M.t)
-        -> f_base:
-             ('acc -> 'base Base.t -> ('acc, 'final) Continue_or_stop.t M.t)
+        -> f_base:('acc -> 'base Base.t -> ('acc, 'final) Continue_or_stop.t M.t)
         -> finish:('acc -> 'final M.t)
         -> 'final M.t =
      fun t ~init ~f_merge ~f_base ~finish ->
@@ -1045,7 +1044,7 @@ let work_to_do :
  fun trees ~max_base_jobs ->
   let depth = Int.ceil_log2 max_base_jobs in
   List.concat_mapi trees ~f:(fun i tree ->
-      Tree.jobs_on_level ~depth ~level:(depth - i) tree)
+      Tree.jobs_on_level ~depth ~level:(depth - i) tree )
 
 let work :
     type merge base.
@@ -1090,7 +1089,7 @@ let all_work :
         | [] ->
             (t', work_list)
         | work ->
-            (t', work :: work_list))
+            (t', work :: work_list) )
   in
   if List.is_empty set1 then List.rev other_sets
   else set1 :: List.rev other_sets
@@ -1111,7 +1110,7 @@ let work_for_next_update :
       List.take
         (work
            (Non_empty_list.to_list t.trees)
-           ~max_base_jobs:t.max_base_jobs ~delay)
+           ~max_base_jobs:t.max_base_jobs ~delay )
         ((count - current_tree_space) * 2)
     in
     List.filter ~f:(Fn.compose not List.is_empty) [ set1; set2 ]
@@ -1126,11 +1125,11 @@ let free_space_on_current_tree t =
 let cons b bs =
   Option.value_map (Non_empty_list.of_list_opt bs)
     ~default:(Non_empty_list.singleton b) ~f:(fun bs ->
-      Non_empty_list.cons b bs)
+      Non_empty_list.cons b bs )
 
 let append bs bs' =
   Option.value_map (Non_empty_list.of_list_opt bs') ~default:bs ~f:(fun bs' ->
-      Non_empty_list.append bs bs')
+      Non_empty_list.append bs bs' )
 
 let add_merge_jobs :
     completed_jobs:'merge list -> ('base, 'merge, _) State_or_error.t =
@@ -1150,7 +1149,7 @@ let add_merge_jobs :
           (sprintf
              !"More work than required: Required- %d got- %d"
              (List.length jobs_required)
-             (List.length merge_jobs))
+             (List.length merge_jobs) )
     in
     let curr_tree, to_be_updated_trees =
       (Non_empty_list.head state.trees, Non_empty_list.tail state.trees)
@@ -1179,8 +1178,8 @@ let add_merge_jobs :
               | Error e ->
                   Error
                     (Error.tag_arg e "Error while adding merge jobs to tree"
-                       ("tree_number", i) [%sexp_of: string * int])
-            else Ok (tree :: trees, scan_result, jobs))
+                       ("tree_number", i) [%sexp_of: string * int] )
+            else Ok (tree :: trees, scan_result, jobs) )
       in
       match res with
       | Ok res ->
@@ -1198,7 +1197,7 @@ let add_merge_jobs :
                 ([], None)
             | t :: ts ->
                 let tree_data = Tree.base_jobs t in
-                (List.rev ts, Some (res, tree_data)))
+                (List.rev ts, Some (res, tree_data)) )
       in
       if
         Option.is_some result_opt
@@ -1228,7 +1227,7 @@ let add_data : data:'base list -> (_, _, 'base) State_or_error.t =
         ~message:
           (sprintf
              !"Data count (%d) exceeded available space (%d)"
-             (List.length data) available_space)
+             (List.length data) available_space )
     in
     let%bind tree, _ =
       match
@@ -1290,7 +1289,7 @@ let reset_seq_no : type a b. (a, b) t -> (a, b) t =
           | _ ->
               max_seq
         in
-        (seq_no, tree' :: updated_trees))
+        (seq_no, tree' :: updated_trees) )
   in
   { state with
     curr_job_seq_no = next_seq_no
@@ -1320,7 +1319,7 @@ let update_metrics t =
                (Int.to_float @@ base_job_count) ;
              Mina_metrics.(
                Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name))
-               (Int.to_float @@ merge_job_count)))
+               (Int.to_float @@ merge_job_count) ) )
 
 let update_helper :
        data:'base list
@@ -1337,7 +1336,7 @@ let update_helper :
       ~message:
         (sprintf
            !"Data count (%d) exceeded maximum (%d)"
-           data_count t.max_base_jobs)
+           data_count t.max_base_jobs )
   in
   let required_jobs = List.concat @@ work_for_next_update t ~data_count in
   let%bind () =
@@ -1348,7 +1347,7 @@ let update_helper :
       ~message:
         (sprintf
            !"Insufficient jobs (Data count %d): Required- %d got- %d"
-           data_count required got)
+           data_count required got )
   in
   let delay = t.delay + 1 in
   (*Increment the sequence number*)
@@ -1384,7 +1383,7 @@ let update_helper :
         (sprintf
            !"Tree list length (%d) exceeded maximum (%d)"
            (Non_empty_list.length state.trees)
-           (max_trees state))
+           (max_trees state) )
   in
   result_opt
 
@@ -1414,6 +1413,18 @@ let base_jobs_on_latest_tree t =
     (Tree.jobs_on_level ~depth ~level:depth (Non_empty_list.head t.trees))
     ~f:(fun job -> match job with Base d -> Some d | Merge _ -> None)
 
+(* 0-based indexing, so 0 indicates next-to-latest tree *)
+let base_jobs_on_earlier_tree t ~index =
+  let depth = Int.ceil_log2 t.max_base_jobs in
+  let earlier_trees = Non_empty_list.tail t.trees in
+  match List.nth earlier_trees index with
+  | None ->
+      []
+  | Some tree ->
+      let jobs = Tree.jobs_on_level ~depth ~level:depth tree in
+      List.filter_map jobs ~f:(fun job ->
+          match job with Base d -> Some d | Merge _ -> None )
+
 let partition_if_overflowing : ('merge, 'base) t -> Space_partition.t =
  fun t ->
   let cur_tree_space = free_space_on_current_tree t in
@@ -1437,7 +1448,7 @@ let pending_data t =
 
 let view_jobs_with_position (state : ('merge, 'base) State.t) fa fd =
   List.fold ~init:[] (Non_empty_list.to_list state.trees) ~f:(fun acc tree ->
-      Tree.view_jobs_with_position tree fa fd :: acc)
+      Tree.view_jobs_with_position tree fa fd :: acc )
 
 let job_count t =
   State.fold_chronological t ~init:(0., 0.)
@@ -1453,7 +1464,7 @@ let job_count t =
         | Empty ->
             (0., 0.)
       in
-      (c +. count_todo, c' +. count_done))
+      (c +. count_todo, c' +. count_done) )
     ~f_base:(fun (c, c') base_node ->
       let count_todo, count_done =
         match snd base_node with
@@ -1464,7 +1475,7 @@ let job_count t =
         | Full { status = Job_status.Done; _ } ->
             (0., 1.)
       in
-      (c +. count_todo, c' +. count_done))
+      (c +. count_todo, c' +. count_done) )
 
 let assert_job_count t t' ~completed_job_count ~base_job_count ~value_emitted =
   let todo_before, done_before = job_count t in
@@ -1474,14 +1485,14 @@ let assert_job_count t t' ~completed_job_count ~base_job_count ~value_emitted =
   (*list of jobs*)
   let all_jobs_expected =
     List.fold ~init:[] (Non_empty_list.to_list t'.trees) ~f:(fun acc tree ->
-        Tree.jobs_records tree @ acc)
+        Tree.jobs_records tree @ acc )
     |> List.filter ~f:(fun job ->
            match job with
            | Job.Base { status = Job_status.Todo; _ }
            | Job.Merge { status = Todo; _ } ->
                true
            | _ ->
-               false)
+               false )
   in
   assert (List.length all_jobs = List.length all_jobs_expected) ;
   let expected_todo_after =
@@ -1525,7 +1536,7 @@ let%test_module "test" =
             in
             let new_merges =
               List.map work ~f:(fun job ->
-                  match job with Base i -> i | Merge (i, j) -> i + j)
+                  match job with Base i -> i | Merge (i, j) -> i + j )
             in
             let result_opt, t' =
               test_update ~data ~completed_jobs:new_merges t
@@ -1538,13 +1549,13 @@ let%test_module "test" =
                   | [] ->
                       ((0, []), [])
                   | x :: xs ->
-                      ((List.sum (module Int) x ~f:Fn.id, x), List.rev xs))
+                      ((List.sum (module Int) x ~f:Fn.id, x), List.rev xs) )
             in
             assert (
               [%equal: int * int list]
                 (Option.value ~default:expected_result result_opt)
                 expected_result ) ;
-            (remaining_expected_results, t'))
+            (remaining_expected_results, t') )
       in
       ()
 
@@ -1565,7 +1576,7 @@ let%test_module "test" =
           in
           let new_merges =
             List.map work ~f:(fun job ->
-                match job with Base i -> i | Merge (i, j) -> i + j)
+                match job with Base i -> i | Merge (i, j) -> i + j )
           in
           let result_opt, t' = test_update ~data ~completed_jobs:new_merges t in
           let expected_result =
@@ -1575,7 +1586,7 @@ let%test_module "test" =
             [%equal: int * int list]
               (Option.value ~default:expected_result result_opt)
               expected_result ) ;
-          state := t')
+          state := t' )
   end )
 
 let gen :
@@ -1605,7 +1616,7 @@ let gen :
       in
       Option.value_map ~default:s res_opt ~f:(fun x ->
           let tuple = if Option.is_some old_tuple then old_tuple else s.acc in
-          { s with acc = f_acc tuple x }))
+          { s with acc = f_acc tuple x } ) )
 
 let%test_module "scans" =
   ( module struct
@@ -1624,7 +1635,7 @@ let%test_module "scans" =
             let tuple =
               if Option.is_some old_tuple then f_acc old_tuple x else state.acc
             in
-            { state with acc = tuple })
+            { state with acc = tuple } )
       in
       let%bind () = Linear_pipe.write w state.acc in
       let rem_ds = List.drop ds state.max_base_jobs in
@@ -1647,11 +1658,11 @@ let%test_module "scans" =
     let scan ~data ~depth ~f ~f_acc =
       Linear_pipe.create_reader ~close_on_exception:true (fun w ->
           let s = ref (empty ~max_base_jobs:(Int.pow 2 depth) ~delay:1) in
-          do_steps ~state:s ~data ~f w ~f_acc)
+          do_steps ~state:s ~data ~f w ~f_acc )
 
     let step_repeatedly ~state ~data ~f ~f_acc =
       Linear_pipe.create_reader ~close_on_exception:true (fun w ->
-          do_steps ~state ~data ~f w ~f_acc)
+          do_steps ~state ~data ~f w ~f_acc )
 
     let%test_module "scan (+) over ints" =
       ( module struct
@@ -1694,7 +1705,7 @@ let%test_module "scans" =
                     if i > fst partition.first then tree_count_before + 1
                     else tree_count_before
                   in
-                  assert (tree_count_after = expected_tree_count))
+                  assert (tree_count_after = expected_tree_count) )
 
         let%test_unit "sequence number reset" =
           (*create jobs with unique sequence numbers starting from 1. At any
@@ -1725,23 +1736,23 @@ let%test_module "scans" =
                   List.fold (List.init cur_levels ~f:Fn.id) ~init:0
                     ~f:(fun acc j ->
                       let j = j + i in
-                      acc + (Int.pow 2 j * (depth - j)))
+                      acc + (Int.pow 2 j * (depth - j)) )
                 in
                 let offset = i in
                 let sum_of_all_seq_numbers =
                   List.sum
                     (module Int)
-                    ~f:
-                      (fun (job :
-                             (int64 Merge.Record.t, int64 Base.Record.t) Job.t) ->
+                    ~f:(fun (job :
+                              (int64 Merge.Record.t, int64 Base.Record.t) Job.t
+                              ) ->
                       match job with
                       | Job.Merge { seq_no; _ } ->
                           seq_no - offset
                       | Base { seq_no; _ } ->
-                          seq_no - offset)
+                          seq_no - offset )
                     jobs
                 in
-                assert (sum_of_all_seq_numbers = seq_sum))
+                assert (sum_of_all_seq_numbers = seq_sum) )
           in
           let state = ref (State.empty ~max_base_jobs ~delay:0) in
           let counter = ref 0 in
@@ -1757,7 +1768,7 @@ let%test_module "scans" =
                 (*start the rest after enough jobs are created*)
                 if !counter >= p + 1 then verify_sequence_number !state
                 else counter := !counter + 1
-              else ())
+              else () )
 
         let%test_unit "serialize, deserialize scan state" =
           Backtrace.elide := false ;
@@ -1787,7 +1798,7 @@ let%test_module "scans" =
               let new_hash =
                 State.hash deserialized Int64.to_string Int64.to_string
               in
-              assert (Hash.equal hash_s new_hash))
+              assert (Hash.equal hash_s new_hash) )
 
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;
@@ -1817,7 +1828,7 @@ let%test_module "scans" =
                           let%bind () = Pipe.write w next in
                           go ()
                         in
-                        go ())
+                        go () )
                   in
                   let pipe s =
                     step_repeatedly ~state:s ~data:one_then_zeros ~f:job_done
@@ -1835,7 +1846,7 @@ let%test_module "scans" =
                            | `Ok (Some (v', _)) ->
                                v'
                            | `Ok None ->
-                               v)
+                               v )
                   in
                   (* after we flush intermediate work *)
                   let old_acc =
@@ -1848,7 +1859,7 @@ let%test_module "scans" =
                   (* eventually we'll emit the acc+1 element *)
                   let%map _ = fill_some_zeros v s in
                   let acc_plus_one = !s.acc |> Option.value_exn in
-                  assert (Int64.(equal (fst acc_plus_one) (fst acc + one)))))
+                  assert (Int64.(equal (fst acc_plus_one) (fst acc + one))) ) )
       end )
 
     let%test_module "scan (+) over ints, map from string" =
@@ -1872,7 +1883,7 @@ let%test_module "scans" =
                     let next =
                       if count <= 0 then "0" else Int.to_string (x - count)
                     in
-                    return (Some (next, count - 1)))
+                    return (Some (next, count - 1)) )
             ; has_reader = false
             }
           in
@@ -1893,14 +1904,14 @@ let%test_module "scans" =
                        | `Ok (Some (v, _)) ->
                            v
                        | `Ok None ->
-                           acc)
+                           acc )
               in
               let expected =
                 List.fold
                   (List.init n ~f:(fun i -> Int64.of_int i))
                   ~init:Int64.zero ~f:Int64.( + )
               in
-              assert ([%equal: int64] after_3n expected))
+              assert ([%equal: int64] after_3n expected) )
       end )
 
     let%test_module "scan (concat) over strings" =
@@ -1922,7 +1933,7 @@ let%test_module "scans" =
                     let next =
                       if count <= 0 then "" else Int.to_string (x - count) ^ ","
                     in
-                    return (Some (next, count - 1)))
+                    return (Some (next, count - 1)) )
             ; has_reader = false
             }
           in
@@ -1942,13 +1953,13 @@ let%test_module "scans" =
                        | `Ok (Some (v, _)) ->
                            v
                        | `Ok None ->
-                           acc)
+                           acc )
               in
               let expected =
                 List.fold
                   (List.init n ~f:(fun i -> Int.to_string i ^ ","))
                   ~init:"" ~f:String.( ^ )
               in
-              assert (String.equal after_42n expected))
+              assert (String.equal after_42n expected) )
       end )
   end )

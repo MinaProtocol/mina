@@ -66,7 +66,7 @@ module Chunked = struct
           ~f:(fun (xs, acc, acc_n) (x, n) ->
             let n' = Int.(n + acc_n) in
             if Int.(n' < size_in_bits) then (xs, shift_left acc n + x, n')
-            else (acc :: xs, zero, 0))
+            else (acc :: xs, zero, 0) )
       in
       let xs = if acc_n > 0 then acc :: xs else xs in
       Array.of_list_rev xs
@@ -105,7 +105,7 @@ module Legacy = struct
           let n = n + List.length bitstring in
           let bits = bits @ bitstring in
           let acc, bits, n = pack_full_fields acc bits n in
-          (acc, bits, n))
+          (acc, bits, n) )
     in
     if remaining_length = 0 then packed_field_elements
     else pack remaining_bits :: packed_field_elements
@@ -162,7 +162,7 @@ module Legacy = struct
             in
             let combined = bs @ pad in
             assert (List.length combined = 8) ;
-            go 0 0 combined)
+            go 0 0 combined )
         |> List.map ~f:Char.of_int_exn
         |> List.rev |> String.of_char_list
       in
@@ -193,7 +193,7 @@ module Legacy = struct
       let run p cs =
         p cs
         |> M.bind ~f:(fun (a, cs') ->
-               match cs' with [] -> M.return a | _ -> M.fail `Expected_eof)
+               match cs' with [] -> M.return a | _ -> M.fail `Expected_eof )
 
       let fail why _ = M.fail why
 
@@ -236,7 +236,7 @@ module Legacy = struct
             | Error _ ->
                 (acc, xs)
           in
-          M.return @@ go cs [])
+          M.return @@ go cs [] )
         |> map ~f:List.rev
 
       let%test_unit "many" =
@@ -255,7 +255,7 @@ module Legacy = struct
                 let%bind a, xs = p xs in
                 go xs (a :: acc) (i - 1)
           in
-          go cs [] n)
+          go cs [] n )
         |> map ~f:List.rev
 
       let%test_unit "exactly" =
@@ -323,7 +323,7 @@ module Legacy = struct
              let pad = List.init (8 - List.length xs) ~f:(Fn.const false) in
              let combined = xs @ pad in
              assert (List.length combined = 8) ;
-             go 0 0 combined)
+             go 0 0 combined )
       |> List.map ~f:Char.of_int_exn
       |> String.of_char_list
 
@@ -411,7 +411,7 @@ module Legacy = struct
               Coding2.serialize' input ~pack:Fn.id
             in
             let actual = Array.(concat [ prefix; middle; suffix ]) in
-            [%test_eq: bool list array] expected actual)
+            [%test_eq: bool list array] expected actual )
 
       let%test_unit "field/string partial isomorphism bitstrings" =
         Quickcheck.test ~trials:300
@@ -422,7 +422,7 @@ module Legacy = struct
               Coding.field_of_string serialized ~size_in_bits:255
             in
             [%test_eq: (bool list, unit) Result.t] (input |> Result.return)
-              deserialized)
+              deserialized )
 
       let%test_unit "serialize/deserialize partial isomorphism 32byte fields" =
         let size_in_bits = 255 in
@@ -448,17 +448,17 @@ module Legacy = struct
             in
             assert (
               Array.for_all input.field_elements ~f:(fun el ->
-                  List.length el = size_in_bits) ) ;
+                  List.length el = size_in_bits ) ) ;
             Result.iter deserialized ~f:(fun x ->
                 assert (
                   Array.for_all x.field_elements ~f:(fun el ->
-                      List.length el = size_in_bits) )) ;
+                      List.length el = size_in_bits ) ) ) ;
             [%test_eq:
               ( (bool list, bool) t
               , [ `Expected_eof | `Unexpected_eof ] )
               Result.t]
               (normalized input |> Result.return)
-              (deserialized |> Result.map ~f:normalized))
+              (deserialized |> Result.map ~f:normalized) )
 
       let%test_unit "data is preserved by to_bits" =
         Quickcheck.test ~trials:300 (gen_input ())
@@ -473,7 +473,7 @@ module Legacy = struct
                   *)
                   let field_bits, rest = List.split_n bits size_in_bits in
                   assert (bools_equal field_bits field) ;
-                  rest)
+                  rest )
             in
             (* Bits come after. *)
             let remaining_bits =
@@ -484,10 +484,10 @@ module Legacy = struct
                     List.split_n bits (List.length bitstring)
                   in
                   assert (bools_equal bitstring_bits bitstring) ;
-                  rest)
+                  rest )
             in
             (* All bits should have been consumed. *)
-            assert (List.is_empty remaining_bits))
+            assert (List.is_empty remaining_bits) )
 
       let%test_unit "data is preserved by pack_to_fields" =
         Quickcheck.test ~trials:300 (gen_input ())
@@ -506,7 +506,7 @@ module Legacy = struct
                       failwith "Too few field elements"
                   | field :: rest ->
                       assert ([%equal: bool list] field input_field) ;
-                      rest)
+                      rest )
             in
             (* Check that the remaining fields have the correct size. *)
             let final_field_idx = List.length bitstring_fields - 1 in
@@ -523,7 +523,7 @@ module Legacy = struct
                          maximum of [size_in_bits - 1]. It should not be empty.
                   *)
                   assert (not (List.is_empty field_bits)) ;
-                  assert (List.length field_bits < size_in_bits) )) ;
+                  assert (List.length field_bits < size_in_bits) ) ) ;
             let rec go input_bitstrings packed_fields =
               match (input_bitstrings, packed_fields) with
               | [], [] ->
@@ -556,6 +556,6 @@ module Legacy = struct
             (* Check that the bits match between the input bitstring and the
                    remaining fields.
             *)
-            go (Array.to_list input.bitstrings) bitstring_fields)
+            go (Array.to_list input.bitstrings) bitstring_fields )
     end )
 end

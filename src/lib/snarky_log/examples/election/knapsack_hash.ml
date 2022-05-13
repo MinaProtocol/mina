@@ -16,7 +16,7 @@ let var_to_bits xs =
   Checked.map ~f:List.concat
     (Checked.all
        (List.map xs
-          ~f:(Field.Checked.choose_preimage_var ~length:Field.size_in_bits)))
+          ~f:(Field.Checked.choose_preimage_var ~length:Field.size_in_bits) ) )
 
 let knapsack = M.create ~dimension ~max_input_length:1000
 

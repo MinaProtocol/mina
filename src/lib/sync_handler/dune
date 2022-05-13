@@ -23,7 +23,7 @@
    mina_intf
    transition_frontier
    best_tip_prover
-   mina_transition
+   mina_block
    network_peer
    logger
    merkle_ledger

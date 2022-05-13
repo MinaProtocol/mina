@@ -19,6 +19,7 @@
    mina_transaction_logic
    kimchi_backend
    kimchi_backend.pasta
+   sgn
    with_hash
    )
  (instrumentation (backend bisect_ppx))

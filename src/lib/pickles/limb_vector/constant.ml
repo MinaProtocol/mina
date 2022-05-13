@@ -7,7 +7,7 @@ let to_bits t =
   Vector.to_list t
   |> List.concat_map ~f:(fun n ->
          let test_bit i = Int64.(shift_right n i land one = one) in
-         List.init 64 ~f:test_bit)
+         List.init 64 ~f:test_bit )
 
 module Hex64 = struct
   module T = struct
@@ -43,7 +43,7 @@ module Hex64 = struct
 
     let%test_unit "int64 hex" =
       Quickcheck.test (Int64.gen_incl zero max_value) ~f:(fun x ->
-          assert (equal x (of_hex (to_hex x))))
+          assert (equal x (of_hex (to_hex x))) )
 
     let sexp_of_t = Fn.compose String.sexp_of_t to_hex
 
@@ -82,7 +82,7 @@ module Make (N : Vector.Nat_intf) = struct
   let of_bits bits =
     let pack =
       List.foldi ~init:Int64.zero ~f:(fun i acc b ->
-          if b then Int64.(acc lor shift_left one i) else acc)
+          if b then Int64.(acc lor shift_left one i) else acc )
     in
     let bits =
       List.groupi ~break:(fun i _ _ -> i mod 64 = 0) bits |> List.map ~f:pack

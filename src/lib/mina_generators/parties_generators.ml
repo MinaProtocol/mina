@@ -11,14 +11,7 @@ module Ledger = Mina_ledger.Ledger
 let gen_account_precondition_from_account ?(succeed = true) account =
   let open Quickcheck.Let_syntax in
   let%bind b = Quickcheck.Generator.bool in
-  let { Account.Poly.public_key
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; zkapp
-      ; _
-      } =
+  let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
     account
   in
   (* choose constructor *)
@@ -72,7 +65,6 @@ let gen_account_precondition_from_account ?(succeed = true) account =
           (return { Zkapp_precondition.Closed_interval.lower; upper })
       in
       let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
-      let public_key = Or_ignore.Check public_key in
       let%bind delegate =
         match delegate with
         | None ->
@@ -95,7 +87,7 @@ let gen_account_precondition_from_account ?(succeed = true) account =
         | Some { Zkapp_account.app_state; sequence_state; proved_state; _ } ->
             let state =
               Zkapp_state.V.map app_state ~f:(fun field ->
-                  Quickcheck.random_value (Or_ignore.gen (return field)))
+                  Quickcheck.random_value (Or_ignore.gen (return field)) )
             in
             let%bind sequence_state =
               (* choose a value from account sequence state *)
@@ -109,10 +101,9 @@ let gen_account_precondition_from_account ?(succeed = true) account =
             return (state, sequence_state, proved_state)
       in
       return
-        { Zkapp_precondition.Account.Poly.balance
+        { Zkapp_precondition.Account.balance
         ; nonce
         ; receipt_chain_hash
-        ; public_key
         ; delegate
         ; state
         ; sequence_state
@@ -222,7 +213,7 @@ let gen_account_precondition_from ?(succeed = true) ~account_id ~ledger () =
           "gen_account_precondition_from: account id with public key %s and \
            token id %s not in ledger"
           (Signature_lib.Public_key.Compressed.to_base58_check
-             (Account_id.public_key account_id))
+             (Account_id.public_key account_id) )
           (Account_id.token_id account_id |> Token_id.to_string)
           ()
       else
@@ -311,7 +302,7 @@ let gen_epoch_data_predicate
       , State_hash.Stable.V1.t
       , State_hash.Stable.V1.t
       , Mina_numbers.Length.Stable.V1.t )
-      Zkapp_precondition.Protocol_state.Epoch_data.Poly.t) :
+      Zkapp_precondition.Protocol_state.Epoch_data.Poly.t ) :
     Zkapp_precondition.Protocol_state.Epoch_data.t Base_quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind ledger =
@@ -421,17 +412,11 @@ module Party_body_components = struct
   let to_fee_payer t : Party.Body.Fee_payer.t =
     { public_key = t.public_key
     ; update = t.update
-    ; token_id = t.token_id
-    ; balance_change = t.balance_change
-    ; increment_nonce = t.increment_nonce
+    ; fee = t.balance_change
     ; events = t.events
     ; sequence_events = t.sequence_events
-    ; call_data = t.call_data
-    ; call_depth = t.call_depth
     ; protocol_state_precondition = t.protocol_state_precondition
-    ; account_precondition = Account.Nonce.zero
-    ; use_full_commitment = t.use_full_commitment
-    ; caller = ()
+    ; nonce = Account.Nonce.zero
     }
 
   let to_typical_party t : Party.Body.Wire.t =
@@ -577,7 +562,7 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
                 "gen_party_body: could not find account location for passed \
                  account id with public key %s and token_id %s"
                 (Signature_lib.Public_key.Compressed.to_base58_check
-                   (Account_id.public_key account_id))
+                   (Account_id.public_key account_id) )
                 (Account_id.token_id account_id |> Token_id.to_string)
                 ()
           | Some location -> (
@@ -588,7 +573,7 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
                     "gen_party_body: could not find account for passed account \
                      id with public key %s and token id %s"
                     (Signature_lib.Public_key.Compressed.to_base58_check
-                       (Account_id.public_key account_id))
+                       (Account_id.public_key account_id) )
                     (Account_id.token_id account_id |> Token_id.to_string)
                     ()
               | Some acct ->
@@ -640,7 +625,7 @@ let gen_party_body_components (type a b c d) ?account_id ?balances_tbl
             Some (add_balance_and_balance_change account.balance balance_change)
         | Some balance ->
             (* update entry in table *)
-            Some (add_balance_and_balance_change balance balance_change)) ) ;
+            Some (add_balance_and_balance_change balance balance_change) ) ) ;
   let field_array_list_gen ~max_array_len ~max_list_len =
     let array_gen =
       let%bind array_len = Int.gen_uniform_incl 0 max_array_len in
@@ -712,7 +697,7 @@ let gen_party_from ?(succeed = true) ?(new_account = false)
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_predcondition:(fun account_id ledger ->
-        gen_account_precondition_from ~succeed ~account_id ~ledger)
+        gen_account_precondition_from ~succeed ~account_id ~ledger )
       ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
   in
   let body = Party_body_components.to_typical_party body_components in
@@ -746,7 +731,7 @@ let gen_party_body_fee_payer ?permissions_auth ~account_id ~ledger
            which is represented by the unit value in the body
         *)
         assert (Token_id.equal token_id Token_id.default) ;
-        ())
+        () )
       ~f_account_predcondition:account_precondition_gen
       ~gen_use_full_commitment:(return ()) ~ledger ?protocol_state_view ()
   in
@@ -778,7 +763,7 @@ let max_other_parties = 2
 let gen_parties_from ?(succeed = true)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
-       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t)
+       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ~ledger ?protocol_state_view () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
@@ -793,7 +778,7 @@ let gen_parties_from ?(succeed = true)
       then
         failwithf "gen_parties_from: public key %s is in ledger, but not keymap"
           (Signature_lib.Public_key.Compressed.to_base58_check pk)
-          ()) ;
+          () ) ;
   (* table of public keys not in the ledger, to be used for new parties
      we have the corresponding private keys, so we can create signatures for those new parties
   *)
@@ -802,7 +787,7 @@ let gen_parties_from ?(succeed = true)
     Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
         let account_id = Account_id.create pk Token_id.default in
         if not (Account_id.Set.mem ledger_accounts account_id) then
-          Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:()) ;
+          Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:() ) ;
     tbl
   in
   let%bind fee_payer =
@@ -822,7 +807,7 @@ let gen_parties_from ?(succeed = true)
     let fee_payer_balance =
       (* if we've done things right, all the options here are Some *)
       let fee =
-        fee_payer.body.balance_change |> Currency.Fee.to_uint64
+        fee_payer.body.fee |> Currency.Fee.to_uint64
         |> Currency.Amount.of_uint64
       in
       let ledger_balance =
@@ -900,7 +885,7 @@ let gen_parties_from ?(succeed = true)
         | Some sum ->
             sum
         | None ->
-            failwith "Overflow adding other parties balances")
+            failwith "Overflow adding other parties balances" )
   in
 
   (* create a party with balance change to yield a zero sum
@@ -943,7 +928,7 @@ let gen_parties_from ?(succeed = true)
       (Random_oracle.Input.Chunked.field
          ( Parties.commitment parties_dummy_signatures
          |> Parties.Transaction_commitment.create_complete ~memo_hash
-              ~fee_payer_hash ))
+              ~fee_payer_hash ) )
   in
   let fee_payer_with_valid_signature =
     { parties_dummy_signatures.fee_payer with
@@ -994,7 +979,7 @@ let gen_parties_from ?(succeed = true)
           | Proof _ | None_given ->
               authorization
         in
-        { Party.body; authorization = authorization_with_valid_signature })
+        { Party.body; authorization = authorization_with_valid_signature } )
   in
   return
     { parties_dummy_signatures with
