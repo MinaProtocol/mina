@@ -280,9 +280,35 @@ module Make (Schema : Graphql_intf.Schema) = struct
       Fields_derivers_graphql.Graphql_query.finish ((fun x -> f (`Left x)), acc)
     in
     let _e =
-      Fields_derivers_js.Js_layout.finish ((fun x -> f (`Left x)), acc)
+      Fields_derivers_js.Js_layout.finish name ~t_toplevel_annots
+        ((fun x -> f (`Left x)), acc)
     in
     Fields_derivers_json.Of_yojson.finish ((fun x -> f (`Right x)), acc)
+
+  let balance_change obj =
+    let sign_to_string = function
+      | Sgn.Pos ->
+          "Positive"
+      | Sgn.Neg ->
+          "Negative"
+    in
+    let sign_of_string = function
+      | "Positive" ->
+          Sgn.Pos
+      | "Negative" ->
+          Sgn.Neg
+      | _ ->
+          failwith "impossible"
+    in
+    let sign_deriver =
+      iso_string ~name:"Sign" ~to_string:sign_to_string
+        ~of_string:sign_of_string
+    in
+    let ( !. ) = ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots in
+    Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
+      ~sgn:!.sign_deriver
+    |> finish "BalanceChange"
+         ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
 
   let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
 

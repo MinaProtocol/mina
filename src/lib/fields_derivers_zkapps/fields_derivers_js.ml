@@ -40,11 +40,17 @@ module Js_layout = struct
     acc#js_layout_accumulator := new_field :: rest ;
     ((fun _ -> failwith "Unused"), acc)
 
-  let finish (_creator, obj) =
+  let finish name ~t_toplevel_annots (_creator, obj) =
+    let annotations =
+      Fields_derivers.Annotations.Top.of_annots ~name t_toplevel_annots
+    in
     let js_layout_accumulator = !(obj#js_layout_accumulator) in
     obj#js_layout :=
       `Assoc
         [ ("type", `String "object")
+        ; ("name", `String annotations.name)
+        ; ( "docs"
+          , match annotations.doc with Some s -> `String s | None -> `Null )
         ; ( "layout"
           , `List
               ( List.filter_map js_layout_accumulator
