@@ -236,11 +236,21 @@ module For_tests = struct
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they have at least one coin*)
-  let gen_payments staged_ledger accounts_with_secret_keys :
+  let gen_payments ?send_to_random_pk staged_ledger accounts_with_secret_keys :
       Signed_command.With_valid_signature.t Sequence.t =
     let account_ids =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
           Account.identifier account )
+    in
+    (* One transaction is sent to a random address to make sure generated block
+       contains a transaction to new account, not only to existing *)
+    let random_pk =
+      ref
+        (let%bind.Option () = send_to_random_pk in
+         try
+           Private_key.create () |> Public_key.of_private_key_exn
+           |> Public_key.compress |> Some
+         with _ -> None )
     in
     Sequence.filter_map (accounts_with_secret_keys |> Sequence.of_list)
       ~f:(fun (sender_sk, sender_account) ->
@@ -248,13 +258,18 @@ module For_tests = struct
         let%bind sender_sk = sender_sk in
         let sender_keypair = Keypair.of_private_key_exn sender_sk in
         let token = sender_account.token_id in
-        let%bind receiver =
-          account_ids
-          |> List.filter
-               ~f:(Fn.compose (Token_id.equal token) Account_id.token_id)
-          |> List.random_element
+        (* Send some transactions to the new accounts *)
+        let%bind receiver_pk =
+          Option.value_map !random_pk
+            ~f:(fun a ->
+              random_pk := None ;
+              Some a )
+            ~default:
+              ( account_ids
+              |> List.filter
+                   ~f:(Fn.compose (Token_id.equal token) Account_id.token_id)
+              |> List.random_element >>| Account_id.public_key )
         in
-        let receiver_pk = Account_id.public_key receiver in
         let nonce =
           let ledger = Staged_ledger.ledger staged_ledger in
           let status, account_location =
@@ -267,7 +282,7 @@ module For_tests = struct
           (Option.value_exn (Mina_ledger.Ledger.get ledger account_location))
             .nonce
         in
-        let send_amount = Currency.Amount.of_int 1 in
+        let send_amount = Currency.Amount.of_int 1000000001 in
         let sender_account_amount =
           sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
@@ -282,7 +297,7 @@ module For_tests = struct
         in
         Signed_command.sign sender_keypair payload )
 
-  let gen ?(logger = Logger.null ())
+  let gen ?(logger = Logger.null ()) ?send_to_random_pk
       ~(precomputed_values : Precomputed_values.t) ~verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
@@ -299,7 +314,8 @@ module For_tests = struct
       let open Deferred.Let_syntax in
       let parent_staged_ledger = staged_ledger parent_breadcrumb in
       let transactions =
-        gen_payments parent_staged_ledger accounts_with_secret_keys
+        gen_payments ?send_to_random_pk parent_staged_ledger
+          accounts_with_secret_keys
         |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
       in
       let _, largest_account =
@@ -460,8 +476,8 @@ module For_tests = struct
       ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?logger ~verifier ~precomputed_values ?trust_system
-        ~accounts_with_secret_keys
+      gen ?send_to_random_pk:None ?logger ~verifier ~precomputed_values
+        ?trust_system ~accounts_with_secret_keys
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
@@ -470,8 +486,8 @@ module For_tests = struct
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ~precomputed_values ~verifier ?trust_system
-           ~accounts_with_secret_keys )
+        (gen ?send_to_random_pk:None ?logger ~precomputed_values ~verifier
+           ?trust_system ~accounts_with_secret_keys )
     in
     let%map breadcrumbs_constructors = gen_list in
     fun root ->

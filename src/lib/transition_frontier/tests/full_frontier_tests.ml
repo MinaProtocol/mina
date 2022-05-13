@@ -112,7 +112,8 @@ let%test_module "Full_frontier tests" =
       Persistent_root.Instance.destroy persistent_root_instance
 
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
-      Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->
+      Quickcheck.test (gen_breadcrumb ?send_to_random_pk:None) ~trials:4
+        ~f:(fun make_breadcrumb ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let frontier = create_frontier () in
               let root = Full_frontier.root frontier in
@@ -123,6 +124,42 @@ let%test_module "Full_frontier tests" =
                   (Breadcrumb.state_hash breadcrumb)
               in
               [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ;
+              clean_up_persistent_root ~frontier ) )
+
+    (* This test outputs random block to stderr in sexp and json
+       The output is useful for src/lib/mina_block tests when the sexp/json representation changes. *)
+    (* TODO make generation more feauture-rich:
+       * include snark works
+       * include all types of transactions
+       * etc.
+    *)
+    let%test_unit "Generate and print random block" =
+      Quickcheck.test (gen_breadcrumb ~send_to_random_pk:()) ~trials:1
+        ~f:(fun make_breadcrumb ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let frontier = create_frontier () in
+              let root = Full_frontier.root frontier in
+              let%map breadcrumb = make_breadcrumb root in
+              let block = Breadcrumb.block breadcrumb in
+              let staged_ledger =
+                Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+              in
+              let scheduled_time =
+                Mina_block.(Header.protocol_state @@ header block)
+                |> Mina_state.Protocol_state.blockchain_state
+                |> Mina_state.Blockchain_state.timestamp
+              in
+              let precomputed =
+                Mina_block.Precomputed.of_block ~logger ~constraint_constants
+                  ~staged_ledger ~scheduled_time (Breadcrumb.block_with_hash breadcrumb)
+              in
+              eprintf
+                !"Randomly generated block, sexp:\n\
+                  %{sexp:Mina_block.Precomputed.t}\n"
+                precomputed ;
+              eprintf
+                !"Randomly generated block, json:\n%{Yojson.Safe}\n"
+                (Mina_block.Precomputed.to_yojson precomputed) ;
               clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Constructing a better branch should change the best tip" =

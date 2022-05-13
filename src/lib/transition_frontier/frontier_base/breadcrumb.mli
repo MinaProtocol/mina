@@ -83,6 +83,7 @@ val name : t -> string
 module For_tests : sig
   val gen :
        ?logger:Logger.t
+    -> ?send_to_random_pk:unit
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
     -> ?trust_system:Trust_system.t

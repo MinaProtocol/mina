@@ -35,6 +35,8 @@
    frontier_base
    transition_frontier
    protocol_version
+   sexplib0
+   yojson
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
