@@ -13,6 +13,8 @@ module Digest : sig
 
   val of_field : Snark_params.Tick.Field.t -> t
 
+  val to_field : t -> Snark_params.Tick.Field.t
+
   include Stringable.S with type t := t
 
   include Comparable_binable with type t := t

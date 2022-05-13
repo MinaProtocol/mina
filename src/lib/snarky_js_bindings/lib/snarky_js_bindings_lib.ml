@@ -2981,6 +2981,14 @@ module Ledger = struct
     sk_base58 |> Js.to_string |> Signature_lib.Private_key.of_base58_check_exn
     |> To_js.private_key
 
+  let field_to_base58 (field : field_class Js.t) : Js.js_string Js.t =
+    field |> of_js_field |> to_unchecked |> Mina_base.Account_id.Digest.of_field
+    |> Mina_base.Account_id.Digest.to_string |> Js.string
+
+  let field_of_base58 (field : Js.js_string Js.t) : field_class Js.t =
+    to_js_field @@ Field.constant @@ Mina_base.Account_id.Digest.to_field
+    @@ Mina_base.Account_id.Digest.of_string @@ Js.to_string @@ field
+
   let add_account_exn (l : L.t) pk (balance : string) =
     let account_id = account_id pk in
     let bal_u64 = Unsigned.UInt64.of_string balance in
@@ -3107,6 +3115,8 @@ module Ledger = struct
     static_method "publicKeyOfString" public_key_of_string ;
     static_method "privateKeyToString" private_key_to_string ;
     static_method "privateKeyOfString" private_key_of_string ;
+    static_method "fieldToBase58" field_to_base58 ;
+    static_method "fieldOfBase58" field_of_base58 ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;
