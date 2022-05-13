@@ -976,6 +976,75 @@ let inner_query =
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
        Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())) )
 
+module For_tests = struct
+  (* replace dummy signatures with valid signatures for fee payer, other parties
+     [keymap] maps compressed public keys to private keys
+  *)
+  let replace_signatures ~keymap (parties : t) : t =
+    let memo_hash = Signed_command_memo.hash parties.memo in
+    let fee_payer_hash =
+      Party.of_fee_payer parties.fee_payer |> Digest.Party.create
+    in
+    let fee_payer_sk =
+      Signature_lib.Public_key.Compressed.Map.find_exn keymap
+        parties.fee_payer.body.public_key
+    in
+    let fee_payer_signature =
+      Signature_lib.Schnorr.Chunked.sign fee_payer_sk
+        (Random_oracle.Input.Chunked.field
+           ( commitment parties
+           |> Transaction_commitment.create_complete ~memo_hash ~fee_payer_hash
+           ) )
+    in
+    let fee_payer_with_valid_signature =
+      { parties.fee_payer with authorization = fee_payer_signature }
+    in
+    let other_parties_hash = other_parties_hash parties in
+    let tx_commitment = Transaction_commitment.create ~other_parties_hash in
+    let full_tx_commitment =
+      Transaction_commitment.create_complete tx_commitment ~memo_hash
+        ~fee_payer_hash
+    in
+    let sign_for_other_party ~use_full_commitment sk =
+      let commitment =
+        if use_full_commitment then full_tx_commitment else tx_commitment
+      in
+      Signature_lib.Schnorr.Chunked.sign sk
+        (Random_oracle.Input.Chunked.field commitment)
+    in
+    let other_parties_with_valid_signatures =
+      Call_forest.map parties.other_parties
+        ~f:(fun ({ body; authorization } : Party.t) ->
+          let authorization_with_valid_signature =
+            match authorization with
+            | Control.Signature _dummy ->
+                let pk = body.public_key in
+                let sk =
+                  match
+                    Signature_lib.Public_key.Compressed.Map.find keymap pk
+                  with
+                  | Some sk ->
+                      sk
+                  | None ->
+                      failwithf
+                        "Could not find private key for public key %s in keymap"
+                        (Signature_lib.Public_key.Compressed.to_base58_check pk)
+                        ()
+                in
+                let use_full_commitment = body.use_full_commitment in
+                let signature = sign_for_other_party ~use_full_commitment sk in
+                Control.Signature signature
+            | Proof _ | None_given ->
+                authorization
+          in
+          { Party.body; authorization = authorization_with_valid_signature } )
+    in
+    { parties with
+      fee_payer = fee_payer_with_valid_signature
+    ; other_parties = other_parties_with_valid_signatures
+    }
+end
+
 let%test_module "Test" =
   ( module struct
     module Fd = Fields_derivers_zkapps.Derivers

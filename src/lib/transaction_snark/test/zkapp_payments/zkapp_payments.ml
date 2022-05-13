@@ -131,8 +131,7 @@ let%test_module "Zkapp payments tests" =
                 party_send ~constraint_constants (List.hd_exn specs)
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ] )
-          |> fun _ -> () )
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t) ) )
 
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
@@ -148,7 +147,7 @@ let%test_module "Zkapp payments tests" =
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger partiess |> fun _ -> () ) )
+              ignore (U.apply_parties ledger partiess : Sparse_ledger.t) ) )
 
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in

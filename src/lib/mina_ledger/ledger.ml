@@ -424,20 +424,20 @@ let%test_unit "tokens test" =
   let constraint_constants =
     Genesis_constants.Constraint_constants.for_unit_tests
   in
-  let keypairs = Quickcheck.random_value (Init_ledger.gen ()) in
-  let get ledger pk token =
+  let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
+  let ledger_get_exn ledger pk token =
     match
       Ledger_inner.get_or_create ledger (Account_id.create pk token)
       |> Or_error.ok_exn
     with
     | `Added, _, _ ->
         failwith "Account did not exist"
-    | `Existed, a, _ ->
-        a
+    | `Existed, acct, _ ->
+        acct
   in
   let mk_parties_transaction ledger other_parties : Parties.t =
     let fee_payer : Party.Fee_payer.t =
-      let kp, _ = keypairs.(0) in
+      let kp, _ = keypair_and_amounts.(0) in
       let pk = Public_key.compress kp.public_key in
       let _, ({ nonce; _ } : Account.t), _ =
         Ledger_inner.get_or_create ledger
@@ -479,7 +479,7 @@ let%test_unit "tokens test" =
       in
       ()
     in
-    let party caller kp token_id balance_change : Party.Body.Wire.t =
+    let mk_party_body caller kp token_id balance_change : Party.Body.Wire.t =
       { update = Party.Update.noop
       ; public_key = Public_key.compress kp.Keypair.public_key
       ; token_id
@@ -498,7 +498,7 @@ let%test_unit "tokens test" =
       ; caller
       }
     in
-    let token_funder, _ = keypairs.(1) in
+    let token_funder, _ = keypair_and_amounts.(1) in
     let token_owner = Keypair.create () in
     let token_account1 = Keypair.create () in
     let token_account2 = Keypair.create () in
@@ -517,11 +517,12 @@ let%test_unit "tokens test" =
     let create_token : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
       forest
         [ node
-            (party Call token_funder Token_id.default
+            (mk_party_body Call token_funder Token_id.default
                (-(4 * account_creation_fee)) )
             []
         ; node
-            (party Call token_owner Token_id.default (3 * account_creation_fee))
+            (mk_party_body Call token_owner Token_id.default
+               (3 * account_creation_fee) )
             []
         ]
     in
@@ -535,28 +536,34 @@ let%test_unit "tokens test" =
     let token_minting =
       forest
         [ node
-            (party Call token_owner Token_id.default (-account_creation_fee))
-            [ node (party Call token_account1 custom_token_id 100) [] ]
+            (mk_party_body Call token_owner Token_id.default
+               (-account_creation_fee) )
+            [ node (mk_party_body Call token_account1 custom_token_id 100) [] ]
         ]
     in
     let token_transfer =
       forest
         [ node
-            (party Call token_owner Token_id.default (-account_creation_fee))
-            [ node (party Call token_account1 custom_token_id (-30)) []
-            ; node (party Call token_account2 custom_token_id 30) []
+            (mk_party_body Call token_owner Token_id.default
+               (-account_creation_fee) )
+            [ node (mk_party_body Call token_account1 custom_token_id (-30)) []
+            ; node (mk_party_body Call token_account2 custom_token_id 30) []
             ]
         ]
     in
     let check_token_balance k balance =
       [%test_eq: Currency.Balance.t]
-        (get ledger (Public_key.compress k.Keypair.public_key) custom_token_id)
+        (ledger_get_exn ledger
+           (Public_key.compress k.Keypair.public_key)
+           custom_token_id )
           .balance
         (Currency.Balance.of_int balance)
     in
     execute_parties_transaction create_token ;
     (* Check that token_owner exists *)
-    get ledger (Public_key.compress token_owner.public_key) Token_id.default
+    ledger_get_exn ledger
+      (Public_key.compress token_owner.public_key)
+      Token_id.default
     |> ignore ;
     execute_parties_transaction token_minting ;
     check_token_balance token_account1 100 ;
@@ -567,7 +574,7 @@ let%test_unit "tokens test" =
   Ledger_inner.with_ledger ~depth ~f:(fun ledger ->
       Init_ledger.init
         (module Ledger_inner)
-        [| keypairs.(0); keypairs.(1) |]
+        [| keypair_and_amounts.(0); keypair_and_amounts.(1) |]
         ledger ;
       main ledger )
 
