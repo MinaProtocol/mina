@@ -182,7 +182,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
     Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
   in
   let txn_dummy =
-    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n ~domain_log2:16
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n ~domain_log2:14
   in
   B.step
     ~handler:

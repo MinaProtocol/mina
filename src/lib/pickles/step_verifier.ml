@@ -537,40 +537,6 @@ struct
               (run (fun () ->
                    (checked_domain ())#vanishing_polynomial (Field.constant pt) )
               ) )
-
-      let%test_unit "side loaded domains" =
-        let module O = One_hot_vector.Make (Impl) in
-        let open Side_loaded_verification_key in
-        let branches = Nat.N2.n in
-        let domains = Vector.[ { Domains.h = 10 }; { h = 15 } ] in
-        let pt = Field.Constant.random () in
-        List.iteri (Vector.to_list domains) ~f:(fun i ds ->
-            let check field1 field2 =
-              let d_unchecked =
-                Plonk_checks.domain
-                  (module Field.Constant)
-                  (Pow_2_roots_of_unity (field1 ds))
-                  ~shifts:Common.tick_shifts
-                  ~domain_generator:Backend.Tick.Field.domain_generator
-              in
-              let checked_domain () =
-                side_loaded_domains
-                  (Vector.map domains
-                     ~f:
-                       (Domains.map ~f:(fun x ->
-                            Domain.Pow_2_roots_of_unity (Field.of_int x) ) ) )
-                  (O.of_index (Field.of_int i) ~length:branches)
-                |> field2
-              in
-              [%test_eq: Field.Constant.t] d_unchecked#size
-                (run (fun () -> (checked_domain ())#size)) ;
-              [%test_eq: Field.Constant.t]
-                (d_unchecked#vanishing_polynomial pt)
-                (run (fun () ->
-                     (checked_domain ())#vanishing_polynomial
-                       (Field.constant pt) ) )
-            in
-            check Domains.h Domains.h )
     end )
 
   module Split_evaluations = struct
