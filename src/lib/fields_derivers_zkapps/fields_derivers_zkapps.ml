@@ -160,7 +160,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
       ~of_string:(except ~f:Field.of_string `Field)
 
   let public_key obj : _ Unified_input.t =
-    iso_string obj ~name:"Field"
+    iso_string obj ~name:"PublicKey"
       ~doc:"String representing a public key in base58"
       ~to_string:Signature_lib.Public_key.Compressed.to_string
       ~of_string:
