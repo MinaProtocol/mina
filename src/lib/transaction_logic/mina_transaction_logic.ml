@@ -151,10 +151,10 @@ module Transaction_applied = struct
     match varying with
     | Command (Signed_command uc) ->
         With_status.map uc.common.user_command ~f:(fun cmd ->
-            Transaction.Command (User_command.Signed_command cmd))
+            Transaction.Command (User_command.Signed_command cmd) )
     | Command (Parties s) ->
         With_status.map s.command ~f:(fun c ->
-            Transaction.Command (User_command.Parties c))
+            Transaction.Command (User_command.Parties c) )
     | Fee_transfer f ->
         { data = Fee_transfer f.fee_transfer; status = Applied }
     | Coinbase c ->
@@ -324,7 +324,7 @@ module type S = sig
                , unit
                , Transaction_status.Failure.Collection.t )
                Parties_logic.Local_state.t
-          -> 'acc)
+          -> 'acc )
     -> ?fee_excess:Amount.Signed.t
     -> ledger
     -> Parties.t
@@ -557,7 +557,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         (sprintf
            !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
              transaction amount %{sexp: Currency.Amount.t} insufficient"
-           fee amount)
+           fee amount )
         Amount.(sub amount (of_fee fee))
     else Ok amount
 
@@ -585,10 +585,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       match varying with
       | Command (Signed_command uc) ->
           With_status.map uc.common.user_command ~f:(fun cmd ->
-              Transaction.Command (User_command.Signed_command cmd))
+              Transaction.Command (User_command.Signed_command cmd) )
       | Command (Parties s) ->
           With_status.map s.command ~f:(fun c ->
-              Transaction.Command (User_command.Parties c))
+              Transaction.Command (User_command.Parties c) )
       | Fee_transfer f ->
           { data = Fee_transfer f.fee_transfer; status = Applied }
       | Coinbase c ->
@@ -831,7 +831,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                 let%map balance =
                   Result.map_error (sub_amount account.balance amount)
                     ~f:(fun _ ->
-                      Transaction_status.Failure.Source_insufficient_balance)
+                      Transaction_status.Failure.Source_insufficient_balance )
                 in
                 (location, source_timing, { account with timing; balance })
             in
@@ -846,7 +846,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                   raise
                     (Reject
                        (Error.createf "%s"
-                          (Transaction_status.Failure.describe failure)))
+                          (Transaction_status.Failure.describe failure) ) )
             else ret
           in
           (* Charge the account creation fee. *)
@@ -859,7 +859,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                 sub_account_creation_fee ~constraint_constants `Added amount
                 |> Result.map_error ~f:(fun _ ->
                        Transaction_status.Failure
-                       .Amount_insufficient_to_create_account)
+                       .Amount_insufficient_to_create_account )
           in
           let%map receiver_account =
             incr_balance receiver_account receiver_amount
@@ -885,7 +885,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           List.fold located_accounts ~init:(Ok ())
             ~f:(fun acc (location, account) ->
               let%bind () = acc in
-              set_with_location ledger location account)
+              set_with_location ledger location account )
         in
         let applied_common =
           { applied_common with
@@ -905,7 +905,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               ; status =
                   Failed
                     (Transaction_status.Failure.Collection.of_single_failure
-                       failure)
+                       failure )
               }
           }
         in
@@ -1574,7 +1574,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
               let%map a = L.get ledger loc in
-              (loc, a)) ))
+              (loc, a)) ) )
     in
     let perform eff = Env.perform ~constraint_constants eff in
     let rec step_all user_acc
@@ -1586,7 +1586,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       else
         let%bind states =
           Or_error.try_with (fun () ->
-              M.step ~constraint_constants { perform } (g_state, l_state))
+              M.step ~constraint_constants { perform } (g_state, l_state) )
         in
         step_all (f user_acc states) states
     in
@@ -1613,7 +1613,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
             { parties; memo_hash = Signed_command_memo.hash c.memo }
-            { perform } initial_state)
+            { perform } initial_state )
     in
     let accounts () =
       List.map original_account_states
@@ -1626,14 +1626,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let account_ids_originally_not_in_ledger =
           List.filter_map original_account_states
             ~f:(fun (acct_id, loc_and_acct) ->
-              if Option.is_none loc_and_acct then Some acct_id else None)
+              if Option.is_none loc_and_acct then Some acct_id else None )
         in
         (* accounts not originally in ledger, now present in ledger *)
         let previous_empty_accounts =
           List.filter_map account_ids_originally_not_in_ledger
             ~f:(fun acct_id ->
               Option.map (L.location_of_account ledger acct_id) ~f:(fun _ ->
-                  acct_id))
+                  acct_id ) )
         in
         Ok
           ( { Transaction_applied.Parties_applied.accounts = accounts ()
@@ -1654,9 +1654,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   let apply_parties_unchecked ~constraint_constants ~state_view ledger c =
     apply_parties_unchecked_aux ~constraint_constants ~state_view ledger c
       ~init:None ~f:(fun _acc (global_state, local_state) ->
-        Some (local_state, global_state.fee_excess))
+        Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (party_applied, state_res) ->
-           (party_applied, Option.value_exn state_res))
+           (party_applied, Option.value_exn state_res) )
 
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
@@ -1729,16 +1729,16 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             let amount = Amount.of_fee f in
             sub_account_creation_fee ~constraint_constants action amount
           in
-          add_amount b amount)
+          add_amount b amount )
         ~modify_timing:(fun acc ->
-          update_timing_when_no_deduction ~txn_global_slot acc)
+          update_timing_when_no_deduction ~txn_global_slot acc )
     in
     Transaction_applied.Fee_transfer_applied.
       { fee_transfer = transfer; previous_empty_accounts; receiver_timing }
 
   let undo_fee_transfer ~constraint_constants t
       ({ previous_empty_accounts; fee_transfer; receiver_timing } :
-        Transaction_applied.Fee_transfer_applied.t) =
+        Transaction_applied.Fee_transfer_applied.t ) =
     let open Or_error.Let_syntax in
     let%map _ =
       process_fee_transfer t fee_transfer
@@ -1752,15 +1752,15 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             sub_account_creation_fee ~constraint_constants action
               (Amount.of_fee f)
           in
-          sub_amount b amount)
+          sub_amount b amount )
         ~modify_timing:(fun _ -> Ok receiver_timing)
     in
     remove_accounts_exn t previous_empty_accounts
 
   let apply_coinbase ~constraint_constants ~txn_global_slot t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-        ({ receiver; fee_transfer; amount = coinbase_amount } as cb :
-          Coinbase.t) =
+        ({ receiver; fee_transfer; amount = coinbase_amount } as cb : Coinbase.t)
+      =
     let open Or_error.Let_syntax in
     let%bind receiver_reward, emptys1, transferee_update, transferee_timing_prev
         =
@@ -2006,7 +2006,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       { Transaction_applied.Parties_applied.accounts; _ } =
     let to_update, to_delete =
       List.partition_map accounts ~f:(fun (id, a) ->
-          match a with Some a -> `Fst (id, a) | None -> `Snd id)
+          match a with Some a -> `Fst (id, a) | None -> `Snd id )
     in
     let to_update =
       List.dedup_and_sort
@@ -2019,12 +2019,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           let%map loc =
             location_of_account' ledger (sprintf !"%{sexp:Account_id.t}" id) id
           in
-          (`Existing loc, a))
+          (`Existing loc, a) )
       |> Or_error.all
     in
     remove_accounts_exn ledger to_delete ;
     List.iter to_update ~f:(fun (location, account) ->
-        ignore @@ set_with_location ledger location account)
+        ignore @@ set_with_location ledger location account )
 
   let undo :
          constraint_constants:Genesis_constants.Constraint_constants.t
@@ -2046,7 +2046,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Ok ()
     in
     Debug_assert.debug_assert (fun () ->
-        [%test_eq: Ledger_hash.t] applied.previous_hash (merkle_root ledger)) ;
+        [%test_eq: Ledger_hash.t] applied.previous_hash (merkle_root ledger) ) ;
     res
 
   let apply_transaction ~constraint_constants
@@ -2059,13 +2059,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Command (Signed_command txn) ->
           Or_error.map
             (apply_user_command_unchecked ~constraint_constants ~txn_global_slot
-               ledger txn) ~f:(fun applied ->
-              Transaction_applied.Varying.Command (Signed_command applied))
+               ledger txn ) ~f:(fun applied ->
+              Transaction_applied.Varying.Command (Signed_command applied) )
       | Command (Parties txn) ->
           Or_error.map
             (apply_parties_unchecked ~state_view:txn_state_view
-               ~constraint_constants ledger txn) ~f:(fun (applied, _) ->
-              Transaction_applied.Varying.Command (Parties applied))
+               ~constraint_constants ledger txn ) ~f:(fun (applied, _) ->
+              Transaction_applied.Varying.Command (Parties applied) )
       | Fee_transfer t ->
           Or_error.map
             (apply_fee_transfer ~constraint_constants ~txn_global_slot ledger t)
@@ -2081,7 +2081,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let applied, _ =
       Or_error.ok_exn
         (apply_parties_unchecked ~constraint_constants
-           ~state_view:txn_state_view ledger payment)
+           ~state_view:txn_state_view ledger payment )
     in
     let root = merkle_root ledger in
     Or_error.ok_exn (undo_parties ~constraint_constants ledger applied) ;
@@ -2092,7 +2092,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let applied =
       Or_error.ok_exn
         (apply_user_command ~constraint_constants ~txn_global_slot ledger
-           payment)
+           payment )
     in
     let root = merkle_root ledger in
     Or_error.ok_exn (undo_user_command ledger applied) ;
@@ -2148,14 +2148,14 @@ module For_tests = struct
             L.get_or_create l
               (Account_id.create
                  (Public_key.compress kp.public_key)
-                 Token_id.default)
+                 Token_id.default )
             |> Or_error.ok_exn
           in
           L.set l loc
             { account with
               balance =
                 Currency.Balance.of_uint64 (Unsigned.UInt64.of_int64 amount)
-            })
+            } )
 
     let gen () : t Quickcheck.Generator.t =
       let tbl = Public_key.Compressed.Hash_set.create () in
@@ -2166,7 +2166,7 @@ module For_tests = struct
         else
           let%bind kp =
             filter Keypair.gen ~f:(fun kp ->
-                not (Hash_set.mem tbl (Public_key.compress kp.public_key)))
+                not (Hash_set.mem tbl (Public_key.compress kp.public_key)) )
           and amount = Int64.gen_incl min_init_balance max_init_balance in
           Hash_set.add tbl (Public_key.compress kp.public_key) ;
           go ((kp, amount) :: acc) (n - 1)
@@ -2244,7 +2244,7 @@ module For_tests = struct
         go [] num_transactions
           (Keypair.Map.of_alist_exn
              (List.map (Array.to_list init_ledger) ~f:(fun (pk, _) ->
-                  (pk, Account_nonce.zero))))
+                  (pk, Account_nonce.zero) ) ) )
       in
       return { init_ledger; specs }
 
@@ -2338,7 +2338,7 @@ module For_tests = struct
                         Option.value_exn
                           (Amount.sub amount
                              (Amount.of_fee
-                                constraint_constants.account_creation_fee))
+                                constraint_constants.account_creation_fee ) )
                       else amount )
                 ; increment_nonce = false
                 ; events = []
@@ -2378,7 +2378,7 @@ module For_tests = struct
                 authorization = Control.Signature other_parties_signature
               }
           | _ ->
-              party)
+              party )
     in
     let signature =
       Schnorr.Chunked.sign sender.private_key
@@ -2415,7 +2415,7 @@ module For_tests = struct
                     mismatch ()
                 | Some a1, Some a2 ->
                     [%test_eq: Account_without_receipt_chain_hash.t]
-                      (hide_rc a1) (hide_rc a2) )))
+                      (hide_rc a1) (hide_rc a2) ) ) )
 
   let txn_global_slot = Global_slot.zero
 
@@ -2424,7 +2424,7 @@ module For_tests = struct
       ~finish:(fun () -> Ok ())
       ~init:()
       ~f:(fun () t ->
-        match f t with Error e -> Stop (Error e) | Ok _ -> Continue ())
+        match f t with Error e -> Stop (Error e) | Ok _ -> Continue () )
 
   let view : Zkapp_precondition.Protocol_state.View.t =
     let h = Frozen_ledger_hash.empty_hash in

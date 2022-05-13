@@ -112,11 +112,11 @@ end = struct
       (Vector.typ Boolean.typ Length.n)
       ~there:(fun x ->
         let x = to_int x in
-        Vector.init Length.n ~f:(fun i -> (x lsr i) land 1 = 1))
+        Vector.init Length.n ~f:(fun i -> (x lsr i) land 1 = 1) )
       ~back:(fun v ->
         Vector.foldi v ~init:0 ~f:(fun i acc b ->
-            if b then acc lor (1 lsl i) else acc)
-        |> of_int_exn)
+            if b then acc lor (1 lsl i) else acc )
+        |> of_int_exn )
 end
 
 module Domain = struct
@@ -133,7 +133,7 @@ module Domains = struct
     let dom =
       Typ.transport Typ.field
         ~there:(fun (Plonk_checks.Domain.Pow_2_roots_of_unity n) ->
-          Field.Constant.of_int n)
+          Field.Constant.of_int n )
         ~back:(fun _ -> assert false)
       |> Typ.transport_var
            ~there:(fun (Domain.Pow_2_roots_of_unity n) -> n)
@@ -226,10 +226,10 @@ module Stable = struct
                    ; complete_add_comm = g c.complete_add_comm
                    ; endomul_scalar_comm = g c.endomul_scalar_comm
                    ; chacha_comm = None
-                   })
+                   } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
-              })
+              } )
         in
         { Poly.max_width; wrap_index = c; wrap_vk }
 
@@ -247,15 +247,16 @@ module Stable = struct
 
       let compare x y = R.compare (to_repr x) (to_repr y)
 
-      include Binable.Of_binable
-                (R.Stable.V2)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (R.Stable.V2)
+          (struct
+            type nonrec t = t
 
-                  let to_binable r = to_repr r
+            let to_binable r = to_repr r
 
-                  let of_binable r = of_repr r
-                end)
+            let of_binable r = of_repr r
+          end)
     end
 
     include T
@@ -287,7 +288,7 @@ let dummy : t =
        ; mul_comm = g
        ; emul_comm = g
        ; endomul_scalar_comm = g
-       })
+       } )
   ; wrap_vk = None
   }
 
@@ -332,7 +333,7 @@ let%test_unit "input_size" =
            Impls.Step.input ~proofs_verified:a
              ~wrap_rounds:Backend.Tock.Rounds.n
          in
-         Impls.Step.Data_spec.size [ typ ]))
+         Impls.Step.Data_spec.size [ typ ] ) )
 
 let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
@@ -341,6 +342,6 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
     [ Width.typ; Plonk_verification_key_evals.typ Inner_curve.typ ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
-      failwith "Side_loaded_verification_key: value_of_hlist")
+      failwith "Side_loaded_verification_key: value_of_hlist" )
     ~value_to_hlist:(fun { Poly.wrap_index; max_width; _ } ->
-      [ max_width; wrap_index ])
+      [ max_width; wrap_index ] )

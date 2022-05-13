@@ -28,7 +28,7 @@ let gen_with_dummies : t Quickcheck.Generator.t Lazy.t =
           Proof proof
         in
         let dummy_signature = Signature Signature.dummy in
-        [ dummy_proof; dummy_signature; None_given ]))
+        [ dummy_proof; dummy_signature; None_given ] ) )
 
 [%%else]
 

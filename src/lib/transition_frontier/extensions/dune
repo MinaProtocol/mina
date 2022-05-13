@@ -11,7 +11,7 @@
    base.base_internalhash_types
    ;;local libraries
    with_hash
-   mina_transition
+   mina_block
    transaction_snark_work
    data_hash_lib
    pipe_lib

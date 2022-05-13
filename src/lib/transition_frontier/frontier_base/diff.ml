@@ -1,6 +1,6 @@
 open Core_kernel
 open Mina_base
-open Mina_transition
+open Mina_block
 
 type full = Full
 
@@ -67,7 +67,7 @@ module Node_list = struct
 
   let to_lite =
     List.map ~f:(fun { transition; _ } ->
-        Mina_block.Validated.state_hash transition)
+        Mina_block.Validated.state_hash transition )
 
   module Lite = struct
     module Binable_arg = struct
@@ -158,7 +158,7 @@ module Root_transition = struct
 
           let of_binable
               ({ new_root; garbage; just_emitted_a_proof } :
-                Binable_arg.Stable.V4.t) : t =
+                Binable_arg.Stable.V4.t ) : t =
             { new_root; garbage; just_emitted_a_proof }
         end
 

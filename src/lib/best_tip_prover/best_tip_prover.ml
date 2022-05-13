@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_base
 open Mina_state
 open Async_kernel
-open Mina_transition
+open Mina_block
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -39,7 +39,7 @@ module Make (Inputs : Inputs_intf) :
 
     let hash acc body_hash =
       (Protocol_state.hashes_abstract ~hash_body:Fn.id
-         { previous_state_hash = acc; body = body_hash })
+         { previous_state_hash = acc; body = body_hash } )
         .state_hash
   end)
 
@@ -123,7 +123,10 @@ module Make (Inputs : Inputs_intf) :
     let genesis_state_hash =
       State_hash.With_state_hashes.state_hash genesis_protocol_state
     in
-    let root_state_hash = (External_transition.state_hashes root).state_hash in
+    let state_hashes block =
+      Mina_block.header block |> Header.protocol_state |> Protocol_state.hashes
+    in
+    let root_state_hash = (state_hashes root).state_hash in
     let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in
     let%bind () =
       Deferred.return
@@ -133,13 +136,13 @@ module Make (Inputs : Inputs_intf) :
              @@ sprintf
                   !"Peer should have given a proof of length %d but got %d"
                   max_length merkle_list_length )
-           (Int.equal max_length merkle_list_length || root_is_genesis))
+           (Int.equal max_length merkle_list_length || root_is_genesis) )
     in
     let best_tip_with_hash =
-      With_hash.of_data best_tip ~hash_data:External_transition.state_hashes
+      With_hash.of_data best_tip ~hash_data:state_hashes
     in
     let root_transition_with_hash =
-      With_hash.of_data root ~hash_data:External_transition.state_hashes
+      With_hash.of_data root ~hash_data:state_hashes
     in
     let%bind (_ : State_hash.t Non_empty_list.t) =
       Deferred.return
@@ -147,13 +150,13 @@ module Make (Inputs : Inputs_intf) :
            (Merkle_list_verifier.verify
               ~init:
                 (State_hash.With_state_hashes.state_hash
-                   root_transition_with_hash)
+                   root_transition_with_hash )
               merkle_list
-              (State_hash.With_state_hashes.state_hash best_tip_with_hash))
+              (State_hash.With_state_hashes.state_hash best_tip_with_hash) )
            ~error:
              (Error.of_string
                 "Peer should have given a valid merkle list proof for their \
-                 best tip"))
+                 best tip" ) )
     in
     let%map root, best_tip =
       Deferred.Or_error.both

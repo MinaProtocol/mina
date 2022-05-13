@@ -9,7 +9,7 @@
    core_kernel
    ;; local libraries
    transition_frontier_extensions
-   mina_transition
+   mina_block
    mina_state
    mina_intf
    mina_base

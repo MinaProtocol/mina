@@ -102,7 +102,7 @@ module Stable = struct
           (Impls.Wrap.Verification_key.t
           [@to_yojson
             Verifier_index_json.to_yojson Backend.Tock.Field.to_yojson
-              Backend.Tick.Field.to_yojson])
+              Backend.Tick.Field.to_yojson] )
       ; data : Data.t
       }
     [@@deriving fields, to_yojson]
@@ -137,23 +137,24 @@ module Stable = struct
              ; complete_add_comm = g c.complete_add_comm
              ; endomul_scalar_comm = g c.endomul_scalar_comm
              ; chacha_comm = None
-             })
+             } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
         }
       in
       { commitments = c; data = d; index = t }
 
-    include Binable.Of_binable
-              (Repr.Stable.V2)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable
+        (Repr.Stable.V2)
+        (struct
+          type nonrec t = t
 
-                let to_binable { commitments; data; index = _ } =
-                  { Repr.commitments; data }
+          let to_binable { commitments; data; index = _ } =
+            { Repr.commitments; data }
 
-                let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
-              end)
+          let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
+        end)
   end
 end]
 
@@ -177,4 +178,4 @@ let dummy =
     (let rows = Domain.size (Common.wrap_domains ~proofs_verified:2).h in
      let g = Backend.Tock.Curve.(to_affine_exn one) in
      { Repr.commitments = dummy_commitments g; data = { constraints = rows } }
-     |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1))
+     |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1) )

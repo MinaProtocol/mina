@@ -167,7 +167,7 @@ module For_step = struct
            ; var_to_field_elements
            }
        } :
-        (a, b, c, d) Side_loaded.t) : (a, b, c, d) t =
+        (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
     let index =
       match ephemeral with
       | Some { index = `In_circuit i } ->
@@ -201,7 +201,7 @@ module For_step = struct
        ; wrap_domains
        ; step_domains
        } :
-        _ Compiled.t) =
+        _ Compiled.t ) =
     { branches
     ; max_width = None
     ; max_proofs_verified
@@ -284,7 +284,7 @@ let lookup_map (type a b c d) (t : (a, b, c, d) Tag.t) ~self ~default
     ~(f :
           [ `Compiled of (a, b, c, d) Compiled.t
           | `Side_loaded of (a, b, c, d) Side_loaded.t ]
-       -> _) =
+       -> _ ) =
   match Type_equal.Id.same_witness t.id self with
   | Some _ ->
       default
@@ -313,7 +313,7 @@ let set_ephemeral { Tag.kind; id } eph =
     | None ->
         assert false
     | Some (T (id, d)) ->
-        T (id, { d with ephemeral = Some eph }))
+        T (id, { d with ephemeral = Some eph }) )
 
 let add_exn (type a b c d) (tag : (a, b, c, d) Tag.t)
     (data : (a, b, c, d) Compiled.t) =

@@ -407,7 +407,7 @@ module Wrap = struct
         ; app_state_to_field_elements app_state
         ; Vector.map2 challenge_polynomial_commitments
             old_bulletproof_challenges ~f:(fun comm chals ->
-              Array.append (Array.of_list (g comm)) (Vector.to_array chals))
+              Array.append (Array.of_list (g comm)) (Vector.to_array chals) )
           |> Vector.to_list |> Array.concat
         ]
 
@@ -421,7 +421,7 @@ module Wrap = struct
         [ app_state_to_field_elements app_state
         ; Vector.map2 challenge_polynomial_commitments
             old_bulletproof_challenges ~f:(fun comm chals ->
-              Array.append (Array.of_list (g comm)) (Vector.to_array chals))
+              Array.append (Array.of_list (g comm)) (Vector.to_array chals) )
           |> Vector.to_list |> Array.concat
         ]
 
@@ -445,7 +445,7 @@ module Wrap = struct
          ; challenge_polynomial_commitments
          ; old_bulletproof_challenges
          ] :
-          (unit, _) t) =
+          (unit, _) t ) =
       { app_state
       ; dlog_plonk_index
       ; challenge_polynomial_commitments
@@ -601,7 +601,7 @@ module Wrap = struct
            ; pass_through
              (* pass_through is represented as a digest inside the circuit *)
            } :
-            _ t) =
+            _ t ) =
         let open Vector in
         let fp =
           combined_inner_product :: b :: zeta_to_srs_length
@@ -641,7 +641,8 @@ module Wrap = struct
                      :: poseidon_selector
                         :: vbmul
                            :: complete_add
-                              :: endomul :: endomul_scalar :: perm :: generic) =
+                              :: endomul :: endomul_scalar :: perm :: generic )
+            =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -866,7 +867,7 @@ module Step = struct
              ; should_finalize
              ; sponge_digest_before_evaluations
              } :
-              _ t) =
+              _ t ) =
           let open Vector in
           let fq =
             combined_inner_product :: b :: zeta_to_srs_length

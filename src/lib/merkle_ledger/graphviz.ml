@@ -147,7 +147,7 @@ struct
         (Queue.of_list
            [ Addr.child_exn ~ledger_depth initial_address Direction.Left
            ; Addr.child_exn ~ledger_depth initial_address Direction.Right
-           ])
+           ] )
     in
     let edges =
       List.folding_map edges ~init:(0, 0)
@@ -176,7 +176,7 @@ struct
               ( (new_empty_account_counter, empty_hash_counter)
               , { source
                 ; target = Pretty_empty_account new_empty_account_counter
-                } ))
+                } ) )
     in
     edges
 
@@ -203,7 +203,7 @@ struct
             | Pretty_empty_hash count ->
                 write_empty_entry ~id:"HASH" source count
             | Pretty_empty_account count ->
-                write_empty_entry ~id:"ACCOUNT" source count)
+                write_empty_entry ~id:"ACCOUNT" source count )
         |> List.concat |> String.concat ~sep:"\n"
       in
       let code = wrapper ~name body in

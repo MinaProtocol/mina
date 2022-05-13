@@ -191,7 +191,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       (* TODO: This shares some computation with the permutation scalar in
          derive_plonk. Could share between them. *)
       Vector.foldi e0.s ~init ~f:(fun i acc s ->
-          ((beta * s) + w0.(i) + gamma) * acc)
+          ((beta * s) + w0.(i) + gamma) * acc )
     in
     let shifts = domain#shifts in
     let ft_eval0 = ft_eval0 - p_eval0 in
@@ -229,7 +229,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             Vector.foldi e0.s
               ~init:(e1.z * beta * alpha_pow perm_alpha0 * zkp)
               ~f:(fun i acc s -> acc * (gamma + (beta * s) + w0.(i)))
-            |> negate)
+            |> negate )
       in
       let generic =
         let open Vector in
@@ -285,11 +285,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         Vector.to_list
           (with_label __LOC__ (fun () ->
                Vector.map2 plonk.generic actual.generic
-                 ~f:(Shifted_value.equal Field.equal)))
+                 ~f:(Shifted_value.equal Field.equal) ) )
         @ with_label __LOC__ (fun () ->
               List.map
                 ~f:(fun f ->
-                  Shifted_value.equal Field.equal (f plonk) (f actual))
-                [ poseidon_selector; vbmul; complete_add; endomul; perm ])
-        |> Boolean.all)
+                  Shifted_value.equal Field.equal (f plonk) (f actual) )
+                [ poseidon_selector; vbmul; complete_add; endomul; perm ] )
+        |> Boolean.all )
 end

@@ -20,7 +20,7 @@ let unrelated_g =
     unstage
       (group_map
          (module Me.Field)
-         ~a:Me.Inner_curve.Params.a ~b:Me.Inner_curve.Params.b)
+         ~a:Me.Inner_curve.Params.a ~b:Me.Inner_curve.Params.b )
   and str = Fn.compose bits_to_bytes Me.Field.to_bits in
   fun (x, y) -> group_map (field_random_oracle (str x ^ str y))
 
@@ -78,9 +78,9 @@ module Input_domain = struct
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
             (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
-               (Tick.Keypair.load_urs ()) domain_size i)
+               (Tick.Keypair.load_urs ()) domain_size i )
               .unshifted.(0)
-            |> Common.finite_exn))
+            |> Common.finite_exn ) )
 
   let domain = Domain.Pow_2_roots_of_unity 7
 end
@@ -169,7 +169,7 @@ module Inner_curve = struct
 
   let scale t bs =
     with_label __LOC__ (fun () ->
-        T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs))
+        T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
 
   let to_field_elements (x, y) = [ x; y ]
 
@@ -185,7 +185,7 @@ module Inner_curve = struct
               C.scale
                 (C.of_affine (read typ t))
                 (Other.Field.inv
-                   (Other.Field.of_bits (List.map ~f:(read Boolean.typ) bs)))
+                   (Other.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
               |> C.to_affine_exn)
     in
     assert_equal t (scale res bs) ;

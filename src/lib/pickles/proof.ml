@@ -162,11 +162,11 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             ; old_bulletproof_challenges =
                 (* Not sure if this should be w or h honestly ...*)
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Dummy.Ipa.Step.challenges)
+                    Dummy.Ipa.Step.challenges )
                 (* TODO: Should this be wrap? *)
             ; challenge_polynomial_commitments =
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Lazy.force Dummy.Ipa.Wrap.sg)
+                    Lazy.force Dummy.Ipa.Wrap.sg )
             }
         }
     ; proof =
@@ -200,7 +200,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
            ; evals = e ()
            }
          in
-         { ft_eval1 = tick (); evals = (ex (), ex ()) })
+         { ft_eval1 = tick (); evals = (ex (), ex ()) } )
     }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
@@ -227,8 +227,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   let to_repr (T t) : Repr.t =
     let lte =
       Nat.lte_exn
-        (Vector.length
-           t.statement.pass_through.challenge_polynomial_commitments)
+        (Vector.length t.statement.pass_through.challenge_polynomial_commitments)
         W.n
     in
     { t with
@@ -279,15 +278,16 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
 
   let hash t = Repr.hash (to_repr t)
 
-  include Sexpable.Of_sexpable
-            (Repr)
-            (struct
-              type nonrec t = t
+  include
+    Sexpable.Of_sexpable
+      (Repr)
+      (struct
+        type nonrec t = t
 
-              let to_sexpable = to_repr
+        let to_sexpable = to_repr
 
-              let of_sexpable = of_repr
-            end)
+        let of_sexpable = of_repr
+      end)
 
   let to_base64 t =
     (* assume call to Nat.lte_exn does not raise with a valid instance of t *)
@@ -364,15 +364,16 @@ module Proofs_verified_2 = struct
 
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
-      include Binable.Of_binable
-                (Repr.Stable.V2)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Repr.Stable.V2)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_repr
+            let to_binable = to_repr
 
-                  let of_binable = of_repr
-                end)
+            let of_binable = of_repr
+          end)
     end
   end]
 
@@ -433,15 +434,16 @@ module Proofs_verified_max = struct
 
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
-      include Binable.Of_binable
-                (Repr.Stable.V2)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Repr.Stable.V2)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_repr
+            let to_binable = to_repr
 
-                  let of_binable = of_repr
-                end)
+            let of_binable = of_repr
+          end)
     end
   end]
 

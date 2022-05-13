@@ -113,9 +113,9 @@ let stats (type a)
         List.filter_map gossip_states ~f:(fun gos_state ->
             if
               List.exists exclusion_list ~f:(fun id ->
-                  String.equal id gos_state.node_id)
+                  String.equal id gos_state.node_id )
             then None
-            else Some gos_state)
+            else Some gos_state )
       in
       let event_type_gossip_states =
         List.map gossip_states_filtered ~f:(fun gos_state ->
@@ -123,7 +123,7 @@ let stats (type a)
             Set.union
               [ event_type_gossip_state_by_direction.sent
               ; event_type_gossip_state_by_direction.received
-              ])
+              ] )
       in
       ( `Seen_by_all (Set.size (Set.inter event_type_gossip_states))
       , `Seen_by_some (Set.size (Set.union event_type_gossip_states)) )

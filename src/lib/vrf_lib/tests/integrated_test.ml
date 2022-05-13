@@ -44,7 +44,7 @@ module Message = struct
   let hash_to_group ~constraint_constants:_ msg =
     Group_map.to_group
       (Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_message
-         [| msg.state_hash |])
+         [| msg.state_hash |] )
     |> Tick.Inner_curve.of_affine
 
   module Checked = struct
@@ -53,7 +53,7 @@ module Message = struct
           Group_map.Checked.to_group
             (Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_message
                (Random_oracle.Checked.pack_input
-                  (Mina_base.State_hash.var_to_input msg.state_hash))))
+                  (Mina_base.State_hash.var_to_input msg.state_hash) ) ) )
   end
 end
 
@@ -75,7 +75,7 @@ module Output_hash = struct
       Snark_params.Tick.make_checked (fun () ->
           let x, y = g in
           Random_oracle.Checked.hash
-            [| Mina_base.State_hash.var_to_hash_packed state_hash; x; y |])
+            [| Mina_base.State_hash.var_to_hash_packed state_hash; x; y |] )
   end
 end
 
@@ -100,9 +100,9 @@ let%test_unit "eval unchecked vs. checked equality" =
          (fun (private_key, msg) ->
            let open Tick.Checked in
            let%bind (module Shifted) = Group.Checked.Shifted.create () in
-           Vrf.Checked.eval (module Shifted) ~private_key msg)
+           Vrf.Checked.eval (module Shifted) ~private_key msg )
          (fun (private_key, msg) ->
-           Vrf.eval ~constraint_constants ~private_key msg))
+           Vrf.eval ~constraint_constants ~private_key msg ) )
 
 let%bench_module "vrf bench module" =
   ( module struct
@@ -127,6 +127,6 @@ let%bench_module "vrf bench module" =
           (fun (private_key, msg) ->
             let open Tick.Checked in
             let%bind (module Shifted) = Group.Checked.Shifted.create () in
-            Vrf.Checked.eval (module Shifted) ~private_key msg)
+            Vrf.Checked.eval (module Shifted) ~private_key msg )
           (private_key, msg)
   end )

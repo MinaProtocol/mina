@@ -69,6 +69,6 @@ module Checked = struct
     Fields.fold ~init:[] ~ledger:(f !Frozen_ledger_hash.equal_var)
       ~pending_coinbase_stack:(f !Pending_coinbase.Stack.equal_var)
       ~local_state:(fun acc f ->
-        Local_state.Checked.equal' (Field.get f t1) (Field.get f t2) @ acc)
+        Local_state.Checked.equal' (Field.get f t1) (Field.get f t2) @ acc )
     |> Impl.Boolean.all
 end

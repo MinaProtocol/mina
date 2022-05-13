@@ -207,9 +207,7 @@ module Pubsub : sig
        t
     -> string
     -> handle_and_validate_incoming_message:
-         (   string Envelope.Incoming.t
-          -> Validation_callback.t
-          -> unit Deferred.t)
+         (string Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t)
     -> string subscription Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify

@@ -49,17 +49,16 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
             return (add_to_failure_file file)
       in
       let add_precomputed_block =
-        make_add_block
-          Mina_transition.External_transition.Precomputed_block.of_yojson
+        make_add_block Mina_block.Precomputed.of_yojson
           (Processor.add_block_aux_precomputed
              ~constraint_constants:
                Genesis_constants.Constraint_constants.compiled ~pool
-             ~delete_older_than:None ~logger)
+             ~delete_older_than:None ~logger )
       in
       let add_extensional_block =
         make_add_block Archive_lib.Extensional.Block.of_yojson
           (Processor.add_block_aux_extensional ~logger ~pool
-             ~delete_older_than:None)
+             ~delete_older_than:None )
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->
@@ -80,7 +79,7 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
                       [ ("file", `String file)
                       ; ("error", `String (Exn.to_string exn))
                       ] ;
-                  return (add_to_failure_file file)))
+                  return (add_to_failure_file file) ) )
 
 let () =
   Command.(
@@ -116,4 +115,4 @@ let () =
              (Flag.optional_with_default true Param.bool)
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
-           ~log_successes ~files)))
+           ~log_successes ~files )))

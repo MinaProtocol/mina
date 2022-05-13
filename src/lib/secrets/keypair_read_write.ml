@@ -57,7 +57,7 @@ struct
          with exn ->
            Privkey_error.corrupted_privkey
              (Error.createf "Error parsing decrypted private key file: %s"
-                (Exn.to_string exn))
+                (Exn.to_string exn) )
        in
        try return (Keypair.of_private_key_exn sk)
        with exn ->
@@ -65,7 +65,7 @@ struct
            (Error.createf
               "Error computing public key from private, is your keyfile \
                corrupt? %s"
-              (Exn.to_string exn))
+              (Exn.to_string exn) )
 
   (** Reads a private key from [privkey_path] using [Secret_file], throws on failure *)
   let read_exn ~(privkey_path : string) ~(password : Secret_file.password) :
@@ -88,7 +88,7 @@ struct
           in
           lazy
             (Password.read_hidden_line ~error_help_message
-               "Secret key password: ")
+               "Secret key password: " )
     in
     read_exn ~privkey_path:path ~password
 end

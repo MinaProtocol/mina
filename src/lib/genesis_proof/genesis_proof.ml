@@ -187,7 +187,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   B.step
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
-         ~genesis_epoch_ledger)
+         ~genesis_epoch_ledger )
     { transition =
         Snark_transition.genesis ~constraint_constants ~consensus_constants
           ~genesis_ledger
@@ -235,7 +235,7 @@ let create_values txn b (t : Inputs.t) =
       Some
         { blockchain_proof_system_id =
             (let (module B) = b in
-             Lazy.force B.Proof.id)
+             Lazy.force B.Proof.id )
         ; genesis_proof
         }
   }
@@ -252,7 +252,7 @@ let create_values_no_proof (t : Inputs.t) =
   ; constraint_system_digests =
       lazy
         (let txn, b = blockchain_snark_state t in
-         Lazy.force (digests txn b))
+         Lazy.force (digests txn b) )
   ; proof_data = None
   }
 

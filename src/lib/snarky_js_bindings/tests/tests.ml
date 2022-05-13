@@ -5,16 +5,20 @@ module Field = Impl.Field
 (* function to check a circuit defined by a 'main' function *)
 let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
   let kp =
-    Impl.constraint_system ~exposing:spec (main ?w:None)
+    Impl.constraint_system ~exposing:spec
+      ~return_typ:(Snarky_backendless.Typ.unit ())
+      (main ?w:None)
     |> Impl.Keypair.generate
   in
   let pk = Impl.Keypair.pk kp in
   let proof =
     Impl.generate_witness_conv
-      ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } ->
+      ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } _ ->
         Backend.Proof.create pk ~auxiliary:auxiliary_inputs
-          ~primary:public_inputs)
-      spec (main ?w:priv) pub
+          ~primary:public_inputs )
+      spec
+      ~return_typ:(Snarky_backendless.Typ.unit ())
+      (main ?w:priv) pub
   in
   let vk = Impl.Keypair.vk kp in
   (* TODO: make work for larger arbitrary pub spec *)

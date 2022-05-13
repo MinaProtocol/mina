@@ -31,7 +31,7 @@
    transition_frontier
    perf_histograms
    mina_metrics
-   mina_transition
+   mina_block
    network_peer
    with_hash
    logger

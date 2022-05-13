@@ -3,7 +3,7 @@ open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Sync_ledger = Mina_ledger.Sync_ledger
-open Mina_transition
+open Mina_block
 open Frontier_base
 open Network_peer
 
@@ -54,7 +54,7 @@ module Make (Inputs : Inputs_intf) :
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
-           staking_epoch_ledger)
+           staking_epoch_ledger )
     then
       match staking_epoch_ledger with
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
@@ -65,7 +65,7 @@ module Make (Inputs : Inputs_intf) :
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
-           next_epoch_ledger)
+           next_epoch_ledger )
     then
       match next_epoch_ledger with
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
@@ -108,7 +108,7 @@ module Make (Inputs : Inputs_intf) :
              | None ->
                  Stop None
              | Some acc' ->
-                 Continue (Some acc'))
+                 Continue (Some acc') )
            ~finish:Fn.id
     in
     match
@@ -191,11 +191,11 @@ module Make (Inputs : Inputs_intf) :
           (Consensus.Hooks.select ~constants:consensus_constants
              ~logger:
                (Logger.extend logger
-                  [ ("selection_context", `String "Root.prove") ])
+                  [ ("selection_context", `String "Root.prove") ] )
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
-                  best_tip_with_witness.data)
-             ~candidate:seen_consensus_state)
+               (With_hash.map ~f:Mina_block.consensus_state
+                  best_tip_with_witness.data )
+             ~candidate:seen_consensus_state )
           `Keep
       in
       let%map () = Option.some_if is_tip_better () in
@@ -216,11 +216,10 @@ module Make (Inputs : Inputs_intf) :
           (Consensus.Hooks.select ~constants:consensus_constants
              ~logger:
                (Logger.extend logger
-                  [ ("selection_context", `String "Root.verify") ])
+                  [ ("selection_context", `String "Root.verify") ] )
              ~existing:
-               (With_hash.map ~f:External_transition.consensus_state
-                  best_tip_transition)
-             ~candidate)
+               (With_hash.map ~f:Mina_block.consensus_state best_tip_transition)
+             ~candidate )
           `Keep
       in
       let%map () =
@@ -230,7 +229,7 @@ module Make (Inputs : Inputs_intf) :
              ~error:
                (Error.createf
                   !"Peer lied about it's best tip %{sexp:State_hash.t}"
-                  (State_hash.With_state_hashes.state_hash best_tip_transition)))
+                  (State_hash.With_state_hashes.state_hash best_tip_transition) ) )
       in
       verified_witness
   end

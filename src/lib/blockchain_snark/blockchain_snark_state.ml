@@ -37,7 +37,7 @@ let wrap_handler h w =
   | None ->
       blockchain_handler
         (fun (Snarky_backendless.Request.With { respond; _ }) ->
-          respond Unhandled)
+          respond Unhandled )
         w
   | Some h ->
       (* TODO: Clean up the handler composition interface. *)
@@ -58,10 +58,10 @@ let non_pc_registers_equal_var t1 t2 =
         ~ledger:(f !Frozen_ledger_hash.equal_var)
         ~pending_coinbase_stack:(fun acc f ->
           let () = F.get f t1 and () = F.get f t2 in
-          acc)
+          acc )
         ~local_state:(fun acc f ->
-          Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc)
-      |> Impl.Boolean.all)
+          Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
+      |> Impl.Boolean.all )
 
 let non_pc_registers_equal t1 t2 =
   let module F = Core_kernel.Field in
@@ -106,7 +106,7 @@ let%snarkydef step ~(logger : Logger.t)
       with_label __LOC__
         (exists
            (Protocol_state.typ ~constraint_constants)
-           ~request:(As_prover.return Prev_state))
+           ~request:(As_prover.return Prev_state) )
     in
     let%bind h, body = Protocol_state.hash_checked t in
     let%map () =
@@ -118,7 +118,7 @@ let%snarkydef step ~(logger : Logger.t)
     with_label __LOC__
       (Consensus_state_hooks.next_state_checked ~constraint_constants
          ~prev_state:previous_state ~prev_state_hash:previous_state_hash
-         transition txn_snark.supply_increase)
+         transition txn_snark.supply_increase )
   in
   let supercharge_coinbase =
     Consensus.Data.Consensus_state.supercharge_coinbase_var consensus_state
@@ -188,7 +188,7 @@ let%snarkydef step ~(logger : Logger.t)
           (Pending_coinbase.Checked.add_coinbase ~constraint_constants
              root_after_delete
              (Snark_transition.pending_coinbase_update transition)
-             ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash)
+             ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash )
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in
@@ -257,8 +257,8 @@ let%snarkydef step ~(logger : Logger.t)
               "blockchain snark update success: $result = \
                (transaction_snark_input_correct=$transaction_snark_input_correct \
                ∨ nothing_changed \
-               (no_coinbases_popped=$no_coinbases_popped)=$nothing_changed) \
-               ∧ updated_consensus_state=$updated_consensus_state ∧ \
+               (no_coinbases_popped=$no_coinbases_popped)=$nothing_changed) ∧ \
+               updated_consensus_state=$updated_consensus_state ∧ \
                correct_coinbase_status=$correct_coinbase_status"
               ~metadata:
                 [ ( "transaction_snark_input_correct"
@@ -305,7 +305,7 @@ let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash
             ~compute:(As_prover.return txn_snark)
         in
         step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-          [ prev; txn_snark ] curr))
+          [ prev; txn_snark ] curr ) )
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
@@ -316,9 +316,9 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         let b1, b2 =
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               [ x1; x2 ] x)
+               [ x1; x2 ] x )
         in
-        [ b1; b2 ])
+        [ b1; b2 ] )
   ; main_value =
       (fun [ prev; (txn : Transaction_snark.Statement.With_sok.t) ] curr ->
         let registers (t : Protocol_state.Value.t) =
@@ -326,7 +326,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         in
         [ not
             (Consensus.Data.Consensus_state.is_genesis_state
-               (Protocol_state.consensus_state curr))
+               (Protocol_state.consensus_state curr) )
         ; List.for_all ~f:Fn.id
             [ non_pc_registers_equal (registers prev) (registers curr)
             ; Currency.Amount.(equal zero)
@@ -335,7 +335,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
                 txn.target.pending_coinbase_stack
             ]
           |> not
-        ])
+        ] )
   }
 
 module Statement = struct
@@ -399,7 +399,10 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            in
            ()
          in
-         Tick.constraint_system ~exposing:[ Mina_base.State_hash.typ ] main) )
+         Tick.constraint_system
+           ~exposing:[ Mina_base.State_hash.typ ]
+           ~return_typ:(Snarky_backendless.Typ.unit ())
+           main ) )
   ]
 
 module Make (T : sig
@@ -421,9 +424,9 @@ end) : S = struct
       ~name:"blockchain-snark"
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
-           constraint_constants)
+           constraint_constants )
       ~choices:(fun ~self ->
-        [ rule ~proof_level ~constraint_constants T.tag self ])
+        [ rule ~proof_level ~constraint_constants T.tag self ] )
 
   let step = with_handler step
 

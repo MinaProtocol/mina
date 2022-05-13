@@ -60,7 +60,7 @@ module Domain_log2 = struct
   let of_bits_msb (bs : bool list) : t =
     List.fold bs ~init:0 ~f:(fun acc b ->
         let acc = acc lsl 1 in
-        if b then acc + 1 else acc)
+        if b then acc + 1 else acc )
     |> of_int_exn
 
   let of_field_exn (type f)
@@ -101,8 +101,8 @@ let pack (type f)
       (Pickles_types.Vector.to_list (Proofs_verified.to_mask proofs_verified))
 
 let unpack (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    (x : f) : t =
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) (x : f)
+    : t =
   match Impl.Field.Constant.unpack x with
   | x0 :: x1 :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: _ ->
       { proofs_verified = Proofs_verified.of_mask_exn [ x0; x1 ]

@@ -35,7 +35,7 @@ module Step = struct
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
                   Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
-                    (Backend.Tick.Keypair.load_urs ()))
+                    (Backend.Tick.Keypair.load_urs ()) )
                 path
             in
             [%test_eq: int] header.header_version header_read.header_version ;
@@ -44,15 +44,15 @@ module Step = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            { Backend.Tick.Keypair.index; cs }))
+            { Backend.Tick.Keypair.index; cs } ) )
       (fun (_, header, _, _) t path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
                 (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
-                   t.Backend.Tick.Keypair.index)
-              header path))
+                   t.Backend.Tick.Keypair.index )
+              header path ) )
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
@@ -64,7 +64,7 @@ module Step = struct
                 ~read_data:(fun ~offset path ->
                   Kimchi_bindings.Protocol.VerifierIndex.Fp.read (Some offset)
                     (Backend.Tick.Keypair.load_urs ())
-                    path)
+                    path )
                 path
             in
             [%test_eq: int] header.header_version header_read.header_version ;
@@ -73,16 +73,16 @@ module Step = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            index))
+            index ) )
       (fun (_, header, _, _) x path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
-              header path))
+              header path ) )
 
-  let read_or_generate cache k_p k_v typ main =
+  let read_or_generate cache k_p k_v typ return_typ main =
     let s_p = storable in
     let s_v = vk_storable in
     let open Impls.Step in
@@ -90,15 +90,16 @@ module Step = struct
       lazy
         ( match
             Common.time "step keypair read" (fun () ->
-                Key_cache.Sync.read cache s_p (Lazy.force k_p))
+                Key_cache.Sync.read cache s_p (Lazy.force k_p) )
           with
         | Ok (pk, dirty) ->
             Common.time "step keypair create" (fun () ->
-                (Keypair.create ~pk ~vk:(Backend.Tick.Keypair.vk pk), dirty))
+                (Keypair.create ~pk ~vk:(Backend.Tick.Keypair.vk pk), dirty) )
         | Error _e ->
             let r =
               Common.time "stepkeygen" (fun () ->
-                  constraint_system ~exposing:[ typ ] main |> Keypair.generate)
+                  constraint_system ~exposing:[ typ ] ~return_typ main
+                  |> Keypair.generate )
             in
             Timer.clock __LOC__ ;
             ignore
@@ -111,7 +112,7 @@ module Step = struct
         (let k_v = Lazy.force k_v in
          match
            Common.time "step vk read" (fun () ->
-               Key_cache.Sync.read cache s_v k_v)
+               Key_cache.Sync.read cache s_v k_v )
          with
          | Ok (vk, _) ->
              (vk, `Cache_hit)
@@ -119,7 +120,7 @@ module Step = struct
              let pk, c = Lazy.force pk in
              let vk = Keypair.vk pk in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
-             (vk, c))
+             (vk, c) )
     in
     (pk, vk)
 end
@@ -161,7 +162,7 @@ module Wrap = struct
               Snark_keys_header.read_with_header
                 ~read_data:(fun ~offset ->
                   Kimchi_bindings.Protocol.Index.Fq.read (Some offset)
-                    (Backend.Tock.Keypair.load_urs ()))
+                    (Backend.Tock.Keypair.load_urs ()) )
                 path
             in
             [%test_eq: int] header.header_version header_read.header_version ;
@@ -170,16 +171,16 @@ module Wrap = struct
               header.constraint_constants header_read.constraint_constants ;
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
-            { Backend.Tock.Keypair.index; cs }))
+            { Backend.Tock.Keypair.index; cs } ) )
       (fun (_, header, _) t path ->
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
               ~append_data:
                 (Kimchi_bindings.Protocol.Index.Fq.write (Some true) t.index)
-              header path))
+              header path ) )
 
-  let read_or_generate cache k_p k_v typ main =
+  let read_or_generate cache k_p k_v typ return_typ main =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let s_p = storable in
@@ -188,19 +189,20 @@ module Wrap = struct
         (let k = Lazy.force k_p in
          match
            Common.time "wrap key read" (fun () ->
-               Key_cache.Sync.read cache s_p k)
+               Key_cache.Sync.read cache s_p k )
          with
          | Ok (pk, d) ->
              (Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk), d)
          | Error _e ->
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   constraint_system ~exposing:[ typ ] main |> Keypair.generate)
+                   constraint_system ~exposing:[ typ ] ~return_typ main
+                   |> Keypair.generate )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
                  : unit Or_error.t ) ;
-             (r, `Generated_something))
+             (r, `Generated_something) )
     in
     let vk =
       lazy
@@ -215,7 +217,7 @@ module Wrap = struct
                        ~read_data:(fun ~offset path ->
                          Binable.of_string
                            (module Vk.Stable.Latest)
-                           (In_channel.read_all path))
+                           (In_channel.read_all path) )
                        path
                    in
                    [%test_eq: int] header.header_version
@@ -227,7 +229,7 @@ module Wrap = struct
                      header_read.constraint_constants ;
                    [%test_eq: string] header.constraint_system_hash
                      header_read.constraint_system_hash ;
-                   index))
+                   index ) )
              (fun (_, header, _) t path ->
                Or_error.try_with (fun () ->
                    Snark_keys_header.write_with_header
@@ -235,8 +237,9 @@ module Wrap = struct
                      ~append_data:(fun path ->
                        Out_channel.with_file ~append:true path ~f:(fun file ->
                            Out_channel.output_string file
-                             (Binable.to_string (module Vk.Stable.Latest) t)))
-                     header path))
+                             (Binable.to_string (module Vk.Stable.Latest) t) )
+                       )
+                     header path ) )
          in
          match Key_cache.Sync.read cache s_v k_v with
          | Ok (vk, d) ->
@@ -256,7 +259,7 @@ module Wrap = struct
              in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
              let _vk = Key_cache.Sync.read cache s_v k_v in
-             (vk, `Generated_something))
+             (vk, `Generated_something) )
     in
     (pk, vk)
 end

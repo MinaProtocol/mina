@@ -10,9 +10,7 @@ module Make (A : T0) (A_value : T0) = struct
 
   let prev (type xs ys ws hs) ~self ~(choices : (xs, ys, ws, hs) H4.T(I).t) =
     let module M_inner =
-      H4.Map
-        (Tag)
-        (E04 (Domains))
+      H4.Map (Tag) (E04 (Domains))
         (struct
           let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
            fun t ->
@@ -24,24 +22,21 @@ module Make (A : T0) (A_value : T0) = struct
                       Common.wrap_domains
                         ~proofs_verified:
                           (Nat.to_int
-                             (Nat.Add.n d.permanent.max_proofs_verified))
+                             (Nat.Add.n d.permanent.max_proofs_verified) )
                 | `Compiled d ->
-                    fun () -> d.wrap_domains)
+                    fun () -> d.wrap_domains )
               ()
         end)
     in
     let module M =
-      H4.Map
-        (I)
-        (H4.T
-           (E04 (Domains)))
-           (struct
-             let f :
-                 type vars values env widths heights.
-                    (vars, values, widths, heights) I.t
-                 -> (vars, values, widths, heights) H4.T(E04(Domains)).t =
-              fun rule -> M_inner.f rule.prevs
-           end)
+      H4.Map (I) (H4.T (E04 (Domains)))
+        (struct
+          let f :
+              type vars values env widths heights.
+                 (vars, values, widths, heights) I.t
+              -> (vars, values, widths, heights) H4.T(E04(Domains)).t =
+           fun rule -> M_inner.f rule.prevs
+        end)
     in
     M.f choices
 
@@ -53,13 +48,13 @@ module Make (A : T0) (A_value : T0) = struct
     in
     let dummy_step_widths =
       Vector.init num_choices ~f:(fun _ ->
-          Nat.to_int (Nat.Add.n max_proofs_verified))
+          Nat.to_int (Nat.Add.n max_proofs_verified) )
     in
     let dummy_step_keys =
       lazy
         (Vector.init num_choices ~f:(fun _ ->
              let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
-             Verification_key.dummy_commitments g))
+             Verification_key.dummy_commitments g ) )
     in
     let prev_domains = prev ~self ~choices in
     Timer.clock __LOC__ ;
@@ -69,7 +64,11 @@ module Make (A : T0) (A_value : T0) = struct
     in
     Timer.clock __LOC__ ;
     let t =
-      Fix_domains.domains (module Impls.Wrap) (Impls.Wrap.input ()) main
+      Fix_domains.domains
+        (module Impls.Wrap)
+        (Impls.Wrap.input ())
+        (Snarky_backendless.Typ.unit ())
+        main
     in
     Timer.clock __LOC__ ; t
 

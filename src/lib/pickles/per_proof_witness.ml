@@ -133,9 +133,10 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
         Digest.typ
         (Branch_data.typ
            (module Impl)
-           ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16))
+           ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
     ; (let lengths = Evaluation_lengths.create ~of_int:Fn.id in
-       Plonk_types.All_evals.typ lengths Field.typ ~default:Field.Constant.zero)
+       Plonk_types.All_evals.typ lengths Field.typ ~default:Field.Constant.zero
+      )
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
     ; Vector.typ Inner_curve.typ max_proofs_verified
     ]

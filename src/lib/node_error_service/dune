@@ -33,7 +33,7 @@
     mina_version
     participating_state
     mina_metrics
-    mina_transition
+    mina_block
     mina_state
     consensus
     mina_numbers

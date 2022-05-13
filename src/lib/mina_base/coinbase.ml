@@ -58,8 +58,8 @@ let create ~amount ~receiver ~fee_transfer =
           Option.some_if
             (not
                (Public_key.Compressed.equal receiver
-                  (Fee_transfer.receiver_pk fee_transfer)))
-            fee_transfer)
+                  (Fee_transfer.receiver_pk fee_transfer) ) )
+            fee_transfer )
     in
     Ok { t with fee_transfer = adjusted_fee_transfer }
   else Or_error.error_string "Coinbase.create: invalid coinbase"
@@ -94,7 +94,7 @@ module Gen = struct
       if supercharged_coinbase then
         Option.value_exn
           (Currency.Amount.scale amount
-             constraint_constants.supercharged_coinbase_factor)
+             constraint_constants.supercharged_coinbase_factor )
       else amount
     in
     (* keep account-creation fee for the coinbase-receiver *)
@@ -102,7 +102,7 @@ module Gen = struct
       Option.value_exn
         (Currency.Fee.sub
            (Currency.Amount.to_fee amount)
-           constraint_constants.account_creation_fee)
+           constraint_constants.account_creation_fee )
     in
     let min_fee = constraint_constants.account_creation_fee in
     let%map fee_transfer =

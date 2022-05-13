@@ -116,7 +116,7 @@ module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
        ?handler:
          (   Snarky_backendless.Request.request
-          -> Snarky_backendless.Request.response)
+          -> Snarky_backendless.Request.response )
     -> ( 'prev_values
        , 'local_widths
        , 'local_heights )
@@ -236,8 +236,7 @@ val compile_promise :
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
-  -> max_proofs_verified:
-       (module Nat.Add.Intf with type n = 'max_proofs_verified)
+  -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
@@ -248,12 +247,12 @@ val compile_promise :
            , 'heightss
            , 'a_var
            , 'a_value )
-           H4_2.T(Inductive_rule).t)
+           H4_2.T(Inductive_rule).t )
   -> ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
-           and type statement = 'a_value)
+           and type statement = 'a_value )
      * ( 'prev_valuess
        , 'widthss
        , 'heightss
@@ -274,8 +273,7 @@ val compile :
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
-  -> max_proofs_verified:
-       (module Nat.Add.Intf with type n = 'max_proofs_verified)
+  -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
@@ -286,12 +284,12 @@ val compile :
            , 'heightss
            , 'a_var
            , 'a_value )
-           H4_2.T(Inductive_rule).t)
+           H4_2.T(Inductive_rule).t )
   -> ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
-           and type statement = 'a_value)
+           and type statement = 'a_value )
      * ( 'prev_valuess
        , 'widthss
        , 'heightss

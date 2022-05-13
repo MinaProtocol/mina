@@ -34,11 +34,9 @@ DROP TYPE user_command_status;
 
 DROP TABLE zkapp_commands;
 
-DROP TABLE zkapp_other_party;
-
-DROP TABLE zkapp_fee_payers;
-
 DROP TABLE zkapp_fee_payer_body;
+
+DROP TABLE zkapp_other_party;
 
 DROP TABLE zkapp_other_party_body;
 

@@ -53,7 +53,7 @@ module Wrap = struct
   type ('mb, 'ml) t =
     (module S
        with type max_proofs_verified = 'mb
-        and type max_local_max_proofs_verifieds = 'ml)
+        and type max_local_max_proofs_verifieds = 'ml )
 
   let create : type mb ml. unit -> (mb, ml) t =
    fun () ->
@@ -131,7 +131,7 @@ module Step = struct
              and type local_branches = local_branches
              and type statement = statement
              and type prev_values = prev_values
-             and type max_proofs_verified = max_proofs_verified) =
+             and type max_proofs_verified = max_proofs_verified ) =
    fun () ->
     let module R = struct
       type nonrec max_proofs_verified = max_proofs_verified

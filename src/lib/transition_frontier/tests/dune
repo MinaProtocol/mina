@@ -18,7 +18,7 @@
    child_processes
    genesis_constants
    logger
-   mina_transition
+   mina_block
    signature_lib
    transition_frontier_persistent_root
    inline_test_quiet_logs

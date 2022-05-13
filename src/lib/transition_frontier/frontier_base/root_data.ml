@@ -1,6 +1,6 @@
 open Core_kernel
 open Mina_base
-open Mina_transition
+open Mina_block
 
 module Common = struct
   [%%versioned
@@ -151,7 +151,7 @@ module Minimal = struct
               { Mina_base.State_hash.State_hashes.state_hash
               ; state_body_hash = None
               }
-          })
+          } )
     in
     ignore
       ( Staged_ledger.Scan_state.check_required_protocol_states
