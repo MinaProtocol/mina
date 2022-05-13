@@ -6,7 +6,7 @@
     (no_dynlink)
     (libraries ctypes ctypes.foreign)
     (modules (:standard \ rocks_linker_flags_gen rocks_test))
-    (c_library_flags (:standard (:include flags.sexp) -fuse-ld=%{read:dune-linker}))
+    (c_library_flags (:standard (:include flags.sexp) %{read:dune-linker}))
     )
 
 (executable
