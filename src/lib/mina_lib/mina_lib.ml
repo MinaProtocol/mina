@@ -661,18 +661,15 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       account_id
   in
   let txn_pool_nonce =
-    let nonces =
-      List.map pooled_transactions
-        ~f:
-          (Fn.compose User_command.nonce_exn
-             Transaction_hash.User_command_with_valid_signature.command)
-    in
-    (* The last nonce gives us the maximum nonce in the transaction pool *)
-    List.last nonces
+    List.last pooled_transactions
+    |> Option.map
+         ~f:
+           (Fn.compose User_command.target_nonce
+              Transaction_hash.User_command_with_valid_signature.command)
   in
   match txn_pool_nonce with
   | Some nonce ->
-      Participating_state.Option.return (Account.Nonce.succ nonce)
+      Participating_state.Option.return nonce
   | None ->
       let open Participating_state.Option.Let_syntax in
       let%map account = get_account t account_id in

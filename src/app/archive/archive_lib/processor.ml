@@ -2522,9 +2522,7 @@ module Block = struct
                     ( Mina_base.User_command.fee_payer command
                     |> Account_id.public_key )
                     ~f:(fun _ ->
-                      Some
-                        ( Mina_base.User_command.nonce_exn command
-                        |> Unsigned.UInt32.succ ))
+                      Some (Mina_base.User_command.target_nonce command))
                 in
                 let%bind id =
                   User_command.add_if_doesn't_exist
