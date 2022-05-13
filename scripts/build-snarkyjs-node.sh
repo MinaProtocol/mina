@@ -2,10 +2,12 @@ SNARKY_JS_PATH=$1
 [ -z "$SNARKY_JS_PATH" ] && SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
 dune b src/lib/crypto/kimchi_bindings/js/node_js \
-&& dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js || exit 1
+&& dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js src/lib/snarky_js_bindings/snarky_js_types.exe || exit 1
 
-# todo declare this file as a dune target somehow
-dune exec src/lib/snarky_js_bindings/snarky_js_types.exe > "$SNARKY_JS_PATH"/src/snarky/jsLayout.json
+# auto-generate js types from field derivers
+# todo declare these files as a dune target somehow
+dune exec src/lib/snarky_js_bindings/snarky_js_types.exe > "$SNARKY_JS_PATH"/src/build/jsLayout.json
+node "$SNARKY_JS_PATH"/src/build/jsLayoutToTypes.mjs
 
 BINDINGS_PATH="$SNARKY_JS_PATH"/dist/server/node_bindings/
 mkdir -p "$BINDINGS_PATH"
