@@ -73,13 +73,7 @@ end
 module Proof : sig
   type ('max_width, 'mlmb) t
 
-  val dummy :
-       'w Nat.t
-    -> 'm Nat.t
-    -> _ Nat.t
-    -> proofs_verified:Composition_types.Branch_data.Proofs_verified.t
-    -> domain_log2:int
-    -> ('w, 'm) t
+  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> domain_log2:int -> ('w, 'm) t
 
   module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
     type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]

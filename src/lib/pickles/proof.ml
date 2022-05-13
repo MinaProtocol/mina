@@ -114,7 +114,7 @@ end
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
 let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
-    (most_recent_width : r Nat.t) ~proofs_verified ~domain_log2 : (w, h) t =
+    (most_recent_width : r Nat.t) ~domain_log2 : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -128,7 +128,16 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 ; combined_inner_product = Shifted_value (tick ())
                 ; b = Shifted_value (tick ())
                 ; branch_data =
-                    { proofs_verified
+                    { proofs_verified =
+                        ( match most_recent_width with
+                        | Z ->
+                            N0
+                        | S Z ->
+                            N1
+                        | S (S Z) ->
+                            N2
+                        | _ ->
+                            assert false )
                     ; domain_log2 =
                         Branch_data.Domain_log2.of_int_exn domain_log2
                     }

@@ -1143,7 +1143,6 @@ let%test_module "test no side-loaded" =
         let s_neg_one = Field.Constant.(negate one) in
         let b_neg_one : (Nat.N1.n, Nat.N1.n) Proof0.t =
           Proof0.dummy Nat.N1.n Nat.N1.n Nat.N1.n ~domain_log2:14
-            ~proofs_verified:N1
         in
         let b0 =
           Common.time "b0" (fun () ->
@@ -1213,7 +1212,6 @@ let%test_module "test no side-loaded" =
         let s_neg_one = Field.Constant.(negate one) in
         let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
           Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
-            ~proofs_verified:N2
         in
         let b0 =
           Common.time "tree b0" (fun () ->
