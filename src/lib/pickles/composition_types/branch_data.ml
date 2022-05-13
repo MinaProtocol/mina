@@ -118,8 +118,6 @@ module Checked = struct
     }
   [@@deriving hlist]
 
-  (* TODO: Make sure the typ checks the number of bits and so on *)
-
   let pack (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
       ({ proofs_verified_mask; domain_log2 } : f t) : Impl.Field.t =
