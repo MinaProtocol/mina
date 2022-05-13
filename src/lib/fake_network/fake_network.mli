@@ -28,16 +28,15 @@ type peer_state =
          , Marlin_plonk_bindings_pasta_fp.t )
          With_hash.t
          Envelope.Incoming.t
-      -> ( Mina_transition.External_transition.t
-         , State_body_hash.t list * Mina_transition.External_transition.t )
+      -> ( Mina_block.t
+         , State_body_hash.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
   ; get_best_tip :
          unit Envelope.Incoming.t
-      -> ( Mina_transition.External_transition.t
-         , Marlin_plonk_bindings_pasta_fp.t list
-           * Mina_transition.External_transition.t )
+      -> ( Mina_block.t
+         , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -56,7 +55,7 @@ type peer_state =
          Deferred.t
   ; get_transition_chain :
          Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
-      -> Mina_transition.External_transition.t list option Deferred.t
+      -> Mina_block.t list option Deferred.t
   }
 
 type peer_network =
@@ -98,50 +97,48 @@ module Generator : sig
              * Pending_coinbase.t
              * Mina_state.Protocol_state.value list )
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_some_initial_peers:
          (unit Envelope.Incoming.t -> Peer.t list Deferred.t)
     -> ?answer_sync_ledger_query:
          (   (Marlin_plonk_bindings_pasta_fp.t * Sync_ledger.Query.t)
              Envelope.Incoming.t
-          -> (Sync_ledger.Answer.t, Error.t) result Deferred.t)
+          -> (Sync_ledger.Answer.t, Error.t) result Deferred.t )
     -> ?get_ancestry:
          (   ( Consensus.Data.Consensus_state.Value.t
              , Marlin_plonk_bindings_pasta_fp.t )
              With_hash.t
              Envelope.Incoming.t
-          -> ( Mina_transition.External_transition.t
-             , State_body_hash.t list * Mina_transition.External_transition.t
-             )
+          -> ( Mina_block.t
+             , State_body_hash.t list * Mina_block.t )
              Proof_carrying_data.t
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
-          -> ( Mina_transition.External_transition.t
-             , Marlin_plonk_bindings_pasta_fp.t list
-               * Mina_transition.External_transition.t )
+          -> ( Mina_block.t
+             , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_node_status:
          (   unit Envelope.Incoming.t
           -> ( Mina_networking.Rpcs.Get_node_status.Node_status.t
              , Error.t )
              result
-             Deferred.t)
+             Deferred.t )
     -> ?get_transition_knowledge:
          (   unit Envelope.Incoming.t
-          -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t)
+          -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t )
     -> ?get_transition_chain_proof:
          (   Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
           -> ( Marlin_plonk_bindings_pasta_fp.t
              * Marlin_plonk_bindings_pasta_fp.t list )
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_transition_chain:
          (   Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
-          -> Mina_transition.External_transition.t list option Deferred.t)
+          -> Mina_block.t list option Deferred.t )
     -> peer_config
 
   val fresh_peer : peer_config
@@ -155,50 +152,48 @@ module Generator : sig
              * Pending_coinbase.t
              * Mina_state.Protocol_state.value list )
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_some_initial_peers:
          (unit Envelope.Incoming.t -> Peer.t list Deferred.t)
     -> ?answer_sync_ledger_query:
          (   (Marlin_plonk_bindings_pasta_fp.t * Sync_ledger.Query.t)
              Envelope.Incoming.t
-          -> (Sync_ledger.Answer.t, Error.t) result Deferred.t)
+          -> (Sync_ledger.Answer.t, Error.t) result Deferred.t )
     -> ?get_ancestry:
          (   ( Consensus.Data.Consensus_state.Value.t
              , Marlin_plonk_bindings_pasta_fp.t )
              With_hash.t
              Envelope.Incoming.t
-          -> ( Mina_transition.External_transition.t
-             , State_body_hash.t list * Mina_transition.External_transition.t
-             )
+          -> ( Mina_block.t
+             , State_body_hash.t list * Mina_block.t )
              Proof_carrying_data.t
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
-          -> ( Mina_transition.External_transition.t
-             , Marlin_plonk_bindings_pasta_fp.t list
-               * Mina_transition.External_transition.t )
+          -> ( Mina_block.t
+             , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_node_status:
          (   unit Envelope.Incoming.t
           -> ( Mina_networking.Rpcs.Get_node_status.Node_status.t
              , Error.t )
              result
-             Deferred.t)
+             Deferred.t )
     -> ?get_transition_knowledge:
          (   unit Envelope.Incoming.t
-          -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t)
+          -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t )
     -> ?get_transition_chain_proof:
          (   Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
           -> ( Marlin_plonk_bindings_pasta_fp.t
              * Marlin_plonk_bindings_pasta_fp.t list )
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_transition_chain:
          (   Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
-          -> Mina_transition.External_transition.t list option Deferred.t)
+          -> Mina_block.t list option Deferred.t )
     -> peer_config
 
   val peer_with_branch : frontier_branch_size:int -> peer_config

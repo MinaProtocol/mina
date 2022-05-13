@@ -36,7 +36,7 @@
    genesis_ledger_helper
    one_or_two
    mina_base
-   mina_transition
+   mina_block
    transition_frontier
    logger
    mina_metrics

@@ -87,7 +87,7 @@ module Accounts = struct
           ~f:(fun { token_owned; disable_new_accounts; account_disabled } ->
             if token_owned then
               Mina_base.Token_permissions.Token_owned { disable_new_accounts }
-            else Not_owned { account_disabled })
+            else Not_owned { account_disabled } )
       in
       let%map snapp =
         match t.snapp with
@@ -119,15 +119,15 @@ module Accounts = struct
                            Error.createf
                              !"Could not parse verification key account \
                                %{sexp:Runtime_config.Accounts.Single.t}: %s"
-                             t s)
+                             t s )
                     |> Result.map
                          ~f:
                            (Binable.of_string
                               ( module Pickles.Side_loaded.Verification_key
                                        .Stable
-                                       .Latest ))
+                                       .Latest ) )
                   in
-                  Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk))
+                  Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk) )
             in
             Some { Snapp_account.verification_key; app_state }
       in
@@ -228,16 +228,16 @@ module Accounts = struct
                   |> Binable.to_string
                        ( module Pickles.Side_loaded.Verification_key.Stable
                                 .Latest )
-                  |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet)
+                  |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet )
             in
             { Runtime_config.Accounts.Single.Snapp_account.state
             ; verification_key
-            })
+            } )
       in
       { pk =
           Some
             (Signature_lib.Public_key.Compressed.to_base58_check
-               account.public_key)
+               account.public_key )
       ; sk = Option.map ~f:Signature_lib.Private_key.to_base58_check sk
       ; balance = account.balance
       ; delegate =
@@ -250,7 +250,7 @@ module Accounts = struct
       ; receipt_chain_hash =
           Some
             (Mina_base.Receipt.Chain_hash.to_base58_check
-               account.receipt_chain_hash)
+               account.receipt_chain_hash )
       ; voting_for =
           Some (Mina_base.State_hash.to_base58_check account.voting_for)
       ; snapp
@@ -282,14 +282,14 @@ module Accounts = struct
                 (Quickcheck.random_value
                    ~seed:
                      (`Deterministic
-                       ("fake pk for genesis ledger " ^ string_of_int i))
-                   Public_key.Compressed.gen)
+                       ("fake pk for genesis ledger " ^ string_of_int i) )
+                   Public_key.Compressed.gen )
         in
         let account =
           Single.to_account_with_pk { account_config with pk = Some pk }
           |> Or_error.ok_exn
         in
-        (sk, account))
+        (sk, account) )
 
   let gen_with_balance balance :
       (Private_key.t option * Account.t) Quickcheck.Generator.t =
@@ -334,7 +334,7 @@ module Accounts = struct
                 | (n, balance) :: balances_tl ->
                     gen_balances_rev n balance balances_tl accounts
             in
-            gen_balances_rev n balance balances_tl [])
+            gen_balances_rev n balance balances_tl [] )
 
   let pad_with_rev_balances balances accounts =
     let balances_accounts =
@@ -362,7 +362,7 @@ module Accounts = struct
           List.fold ~init:([], 0) accounts ~f:(fun (acc, count) account ->
               let count = count + 1 in
               if count >= n then raise Stop ;
-              (account :: acc, count + 1))
+              (account :: acc, count + 1) )
         in
         (* [rev_append] is tail-recursive, and we've already reversed the list,
            so we can avoid calling [append] which may internally reverse the
@@ -472,7 +472,7 @@ let runtime_config_of_constraint_constants
           ; previous_length = Mina_numbers.Length.to_int previous_length
           ; previous_global_slot =
               Mina_numbers.Global_slot.to_int previous_global_slot
-          })
+          } )
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
@@ -525,8 +525,8 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
         ~f:(fun num_accounts -> Some num_accounts)
   }
 
-let runtime_config_of_genesis_constants
-    (genesis_constants : Genesis_constants.t) : Runtime_config.Genesis.t =
+let runtime_config_of_genesis_constants (genesis_constants : Genesis_constants.t)
+    : Runtime_config.Genesis.t =
   { k = Some genesis_constants.protocol.k
   ; delta = Some genesis_constants.protocol.delta
   ; slots_per_epoch = Some genesis_constants.protocol.slots_per_epoch
@@ -534,7 +534,7 @@ let runtime_config_of_genesis_constants
   ; genesis_state_timestamp =
       Some
         (Genesis_constants.genesis_timestamp_to_string
-           genesis_constants.protocol.genesis_state_timestamp)
+           genesis_constants.protocol.genesis_state_timestamp )
   }
 
 let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
@@ -549,12 +549,12 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
     ; genesis =
         Some
           (runtime_config_of_genesis_constants
-             precomputed_values.genesis_constants)
+             precomputed_values.genesis_constants )
     ; proof =
         Some
           (runtime_config_of_constraint_constants
              ~proof_level:precomputed_values.proof_level
-             precomputed_values.constraint_constants)
+             precomputed_values.constraint_constants )
     ; ledger = None
     ; epoch_data = None
     }

@@ -53,5 +53,5 @@ module With_state_hashes = struct
 
   let state_body_hash { hash; data } ~compute_hashes =
     State_hashes.state_body_hash hash ~compute_hashes:(fun () ->
-        compute_hashes data)
+        compute_hashes data )
 end

@@ -18,7 +18,7 @@ module BytesWr = struct
         | Error e ->
             Error
               (sprintf "Bytes.of_yojson, bad Base58Check: %s"
-                 (Error.to_string_hum e))
+                 (Error.to_string_hum e) )
         | Ok x ->
             Ok (Bytes.of_string x) )
     | _ ->
@@ -110,13 +110,13 @@ let decrypt ~(password : Bytes.t)
       (`Corrupted_privkey
         (Error.createf
            !"don't know how to handle a %s secret_box"
-           box_primitive))
+           box_primitive ) )
   else if not (String.equal pw_primitive Password_hash.primitive) then
     Error
       (`Corrupted_privkey
         (Error.createf
            !"don't know how to handle a %s password_hash"
-           pw_primitive))
+           pw_primitive ) )
   else
     let nonce = Secret_box.Bytes.to_nonce nonce in
     let salt = Password_hash.Bytes.to_salt pwsalt in
@@ -136,7 +136,7 @@ let%test_unit "successful roundtrip" =
     ~f:(fun (password, plaintext) ->
       let enc = encrypt ~password:(Bytes.copy password) ~plaintext in
       let dec = Option.value_exn (decrypt enc ~password |> Result.ok) in
-      [%test_eq: Bytes.t] dec plaintext)
+      [%test_eq: Bytes.t] dec plaintext )
 
 let%test "bad password fails" =
   let enc =

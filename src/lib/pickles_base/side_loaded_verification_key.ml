@@ -245,12 +245,12 @@ let to_input : _ Poly.t -> _ =
     List.reduce_exn ~f:append
       [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
             map_reduce [| h |] ~f:(fun (Pow_2_roots_of_unity x) ->
-                bits ~len:max_log2_degree x))
+                bits ~len:max_log2_degree x ) )
       ; Array.map (Vector.to_array step_widths) ~f:Width.to_bits |> bitstrings
       ; bitstring (Width.to_bits max_width)
       ; wrap_index_to_input
           (Fn.compose Array.of_list
-             (List.concat_map ~f:(fun (x, y) -> [ x; y ])))
+             (List.concat_map ~f:(fun (x, y) -> [ x; y ])) )
           wrap_index
       ; num_branches
       ]

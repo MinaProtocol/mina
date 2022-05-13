@@ -37,7 +37,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let%bind snarked_ledger_hash_str =
     query_db
       ~f:(fun db ->
-        Sql.Snarked_ledger_hashes.run db block.snarked_ledger_hash_id)
+        Sql.Snarked_ledger_hashes.run db block.snarked_ledger_hash_id )
       ~item:"snarked ledger hash"
   in
   let snarked_ledger_hash =
@@ -54,7 +54,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let%bind staking_epoch_ledger_hash_str =
     query_db
       ~f:(fun db ->
-        Sql.Snarked_ledger_hashes.run db staking_epoch_ledger_hash_id)
+        Sql.Snarked_ledger_hashes.run db staking_epoch_ledger_hash_id )
       ~item:"staking epoch ledger hash"
   in
   let staking_epoch_ledger_hash =
@@ -120,23 +120,23 @@ let fill_in_user_commands pool block_state_hash =
   let balance_of_id_opt id_opt ~item =
     Option.value_map id_opt ~default:(Deferred.return None) ~f:(fun id ->
         let%map balance = balance_of_id id ~item in
-        Some balance)
+        Some balance )
   in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~item:"blocks" ~f:(fun db ->
-        Processor.Block.find db ~state_hash:block_state_hash)
+        Processor.Block.find db ~state_hash:block_state_hash )
   in
   let%bind user_command_ids_and_sequence_nos =
     query_db ~item:"user command id, sequence no" ~f:(fun db ->
-        Sql.Blocks_and_user_commands.run db ~block_id)
+        Sql.Blocks_and_user_commands.run db ~block_id )
   in
   (* create extensional user command for each id, seq no *)
   Deferred.List.map user_command_ids_and_sequence_nos
     ~f:(fun (user_command_id, sequence_no) ->
       let%bind user_cmd =
         query_db ~item:"user commands" ~f:(fun db ->
-            Processor.User_command.Signed_command.load db ~id:user_command_id)
+            Processor.User_command.Signed_command.load db ~id:user_command_id )
       in
       let typ = user_cmd.typ in
       let%bind fee_payer = pk_of_id ~item:"fee payer" user_cmd.fee_payer_id in
@@ -151,21 +151,21 @@ let fill_in_user_commands pool block_state_hash =
       let nonce = user_cmd.nonce |> Account.Nonce.of_int in
       let amount =
         Option.map user_cmd.amount ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
+            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
       in
       let fee =
         user_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
       in
       let valid_until =
         Option.map user_cmd.valid_until ~f:(fun valid ->
-            Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32)
+            Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32 )
       in
       let memo = user_cmd.memo |> Signed_command_memo.of_base58_check_exn in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_user_cmd =
         query_db ~item:"block user commands" ~f:(fun db ->
             Processor.Block_and_signed_command.load db ~block_id
-              ~user_command_id)
+              ~user_command_id )
       in
       let status = block_user_cmd.status in
       let failure_reason =
@@ -175,7 +175,7 @@ let fill_in_user_commands pool block_state_hash =
                 s
             | Error err ->
                 failwithf "Not a transaction status failure: %s, error: %s" s
-                  err ())
+                  err () )
       in
       let%bind source_balance =
         balance_of_id_opt block_user_cmd.source_balance_id
@@ -184,7 +184,7 @@ let fill_in_user_commands pool block_state_hash =
       let fee_payer_account_creation_fee_paid =
         Option.map block_user_cmd.fee_payer_account_creation_fee_paid
           ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
+            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
       in
       let%bind fee_payer_balance =
         balance_of_id block_user_cmd.fee_payer_balance_id
@@ -193,7 +193,7 @@ let fill_in_user_commands pool block_state_hash =
       let receiver_account_creation_fee_paid =
         Option.map block_user_cmd.receiver_account_creation_fee_paid
           ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64)
+            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
       in
       let%bind receiver_balance =
         balance_of_id_opt block_user_cmd.receiver_balance_id
@@ -201,7 +201,7 @@ let fill_in_user_commands pool block_state_hash =
       in
       let created_token =
         Option.map block_user_cmd.created_token ~f:(fun tok ->
-            Unsigned.UInt64.of_int64 tok |> Token_id.of_uint64)
+            Unsigned.UInt64.of_int64 tok |> Token_id.of_uint64 )
       in
       return
         { Extensional.User_command.sequence_no
@@ -225,7 +225,7 @@ let fill_in_user_commands pool block_state_hash =
         ; receiver_account_creation_fee_paid
         ; receiver_balance
         ; created_token
-        })
+        } )
 
 let fill_in_internal_commands pool block_state_hash =
   let query_db ~item ~f = query_db pool ~item ~f in
@@ -236,14 +236,14 @@ let fill_in_internal_commands pool block_state_hash =
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~item:"blocks" ~f:(fun db ->
-        Processor.Block.find db ~state_hash:block_state_hash)
+        Processor.Block.find db ~state_hash:block_state_hash )
   in
   let%bind internal_cmd_info =
     query_db
       ~item:
         "internal command id, global_slot, sequence no, secondary sequence no, \
          receiver_balance_id" ~f:(fun db ->
-        Sql.Blocks_and_internal_commands.run db ~block_id)
+        Sql.Blocks_and_internal_commands.run db ~block_id )
   in
   Deferred.List.map internal_cmd_info
     ~f:(fun
@@ -256,7 +256,7 @@ let fill_in_internal_commands pool block_state_hash =
        ->
       let%bind { balance = receiver_balance_int64; _ } =
         query_db ~item:"receiver balance" ~f:(fun db ->
-            Processor.Balance.load db ~id:receiver_balance_id)
+            Processor.Balance.load db ~id:receiver_balance_id )
       in
       let receiver_balance =
         Unsigned.UInt64.of_int64 receiver_balance_int64
@@ -265,7 +265,7 @@ let fill_in_internal_commands pool block_state_hash =
       (* pieces from the internal_commands table *)
       let%bind internal_cmd =
         query_db ~item:"blocks internal commands" ~f:(fun db ->
-            Processor.Internal_command.load db ~id:internal_command_id)
+            Processor.Internal_command.load db ~id:internal_command_id )
       in
       let typ = internal_cmd.typ in
       let%bind receiver = pk_of_id ~item:"receiver" internal_cmd.receiver_id in
@@ -278,7 +278,7 @@ let fill_in_internal_commands pool block_state_hash =
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let receiver_account_creation_fee_paid =
         Option.map receiver_account_creation_fee_paid ~f:(fun fee ->
-            fee |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64)
+            fee |> Unsigned.UInt64.of_int64 |> Currency.Amount.of_uint64 )
       in
       let cmd =
         { Extensional.Internal_command.sequence_no
@@ -292,7 +292,7 @@ let fill_in_internal_commands pool block_state_hash =
         ; hash
         }
       in
-      return cmd)
+      return cmd )
 
 let check_state_hash ~logger state_hash_opt =
   match state_hash_opt with
@@ -346,12 +346,12 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
               let%map blocks =
                 query_db pool
                   ~f:(fun db ->
-                    Sql.Subchain.start_from_unparented db ~end_state_hash)
+                    Sql.Subchain.start_from_unparented db ~end_state_hash )
                   ~item:"blocks starting from unparented"
               in
               let end_block_found =
                 List.exists blocks ~f:(fun block ->
-                    String.equal block.state_hash end_state_hash)
+                    String.equal block.state_hash end_state_hash )
               in
               if not end_block_found then (
                 [%log error]
@@ -367,16 +367,16 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
                 query_db pool
                   ~f:(fun db ->
                     Sql.Subchain.start_from_specified db ~start_state_hash
-                      ~end_state_hash)
+                      ~end_state_hash )
                   ~item:"blocks starting from specified"
               in
               let start_block_found =
                 List.exists blocks ~f:(fun block ->
-                    String.equal block.state_hash start_state_hash)
+                    String.equal block.state_hash start_state_hash )
               in
               let end_block_found =
                 List.exists blocks ~f:(fun block ->
-                    String.equal block.state_hash end_state_hash)
+                    String.equal block.state_hash end_state_hash )
               in
               if not (start_block_found && end_block_found) then (
                 [%log error]
@@ -406,9 +406,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             let user_cmds =
               List.sort unsorted_user_cmds
                 ~compare:(fun (cmd1 : Extensional.User_command.t) cmd2 ->
-                  Int.compare cmd1.sequence_no cmd2.sequence_no)
+                  Int.compare cmd1.sequence_no cmd2.sequence_no )
             in
-            { block with user_cmds })
+            { block with user_cmds } )
       in
       [%log info] "Querying for internal commands in blocks" ;
       let%bind blocks_with_all_cmds =
@@ -422,9 +422,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
                 ~compare:(fun (cmd1 : Extensional.Internal_command.t) cmd2 ->
                   [%compare: int * int]
                     (cmd1.sequence_no, cmd1.secondary_sequence_no)
-                    (cmd2.sequence_no, cmd2.secondary_sequence_no))
+                    (cmd2.sequence_no, cmd2.secondary_sequence_no) )
             in
-            { block with internal_cmds })
+            { block with internal_cmds } )
       in
       [%log info] "Writing blocks" ;
       let%map () =
@@ -439,7 +439,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
                 return
                   (Async.fprintf writer "%s\n%!"
                      ( Extensional.Block.to_yojson block
-                     |> Yojson.Safe.pretty_to_string ))))
+                     |> Yojson.Safe.pretty_to_string ) ) ) )
       in
       ()
 
@@ -472,4 +472,5 @@ let () =
            Param.flag "--all-blocks" Param.no_arg
              ~doc:"Extract all blocks in the archive database"
          in
-         main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks)))
+         main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
+        )))

@@ -12,8 +12,7 @@ open Ast_helper
    expands to
 
      let x,y,z = M.(x,y,z)
-
- *)
+*)
 
 let name = "define_locally"
 

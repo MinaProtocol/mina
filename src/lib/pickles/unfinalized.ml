@@ -50,7 +50,7 @@ module Constant = struct
                     (Plonk_checks.domain
                        (module Tock.Field)
                        wrap_domains.h ~shifts:Common.tock_shifts
-                       ~domain_generator:Tock.Field.domain_generator)
+                       ~domain_generator:Tock.Field.domain_generator )
                   { alpha = Common.Ipa.Wrap.endo_to_field alpha
                   ; beta = Challenge.Constant.to_tock_field beta
                   ; gamma = Challenge.Constant.to_tock_field gamma

@@ -148,7 +148,7 @@ module Network_config = struct
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
-          })
+          } )
     in
     let bp_accounts =
       List.map (List.zip_exn block_producers bp_keypairs)
@@ -176,7 +176,7 @@ module Network_config = struct
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
-          })
+          } )
     in
     (* DAEMON CONFIG *)
     let constraint_constants =
@@ -211,7 +211,7 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants.compiled runtime_config)
+           ~default:Genesis_constants.compiled runtime_config )
     in
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }
@@ -227,9 +227,11 @@ module Network_config = struct
       ; libp2p_secret = ""
       }
     in
-    let mina_archive_schema =
-      "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+    let mina_archive_base_url =
+      "https://raw.githubusercontent.com/MinaProtocol/mina/"
+      ^ Mina_version.commit_id ^ "/src/app/archive/"
     in
+    let mina_archive_schema = mina_archive_base_url ^ "create_schema.sql" in
     let mk_net_keypair index (pk, sk) =
       let secret_name = "test-keypair-" ^ Int.to_string index in
       let keypair =
@@ -370,7 +372,7 @@ module Network_manager = struct
             Deferred.return
               ([%log info]
                  "Existing namespace of same name detected; removing to start \
-                  clean")
+                  clean" )
         in
         Util.run_cmd_exn "/" "kubectl"
           [ "delete"; "namespace"; network_config.terraform.testnet_name ]
@@ -400,7 +402,7 @@ module Network_manager = struct
       ~f:(fun ch ->
         Network_config.to_terraform network_config
         |> Terraform.to_string
-        |> Out_channel.output_string ch) ;
+        |> Out_channel.output_string ch ) ;
     let testnet_log_filter = Network_config.testnet_log_filter network_config in
     let cons_workload workload_id node_info : Kubernetes_network.Workload.t =
       { workload_id; node_info }
@@ -416,7 +418,7 @@ module Network_manager = struct
         (String.sub network_config.terraform.snark_worker_public_key
            ~pos:
              (String.length network_config.terraform.snark_worker_public_key - 6)
-           ~len:6)
+           ~len:6 )
     in
     let snark_coordinator_workloads =
       if network_config.terraform.snark_worker_replicas > 0 then
@@ -431,7 +433,7 @@ module Network_manager = struct
         [ cons_workload
             ("snark-worker-" ^ snark_coordinator_id)
             (List.init network_config.terraform.snark_worker_replicas
-               ~f:(fun _i -> cons_node_info "worker"))
+               ~f:(fun _i -> cons_node_info "worker") )
         ]
       else []
     in
@@ -439,13 +441,13 @@ module Network_manager = struct
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
           cons_workload bp_config.name
-            [ cons_node_info ~network_keypair:bp_config.keypair "mina" ])
+            [ cons_node_info ~network_keypair:bp_config.keypair "mina" ] )
     in
     let archive_workloads =
       List.init network_config.terraform.archive_node_count ~f:(fun i ->
           cons_workload
             (sprintf "archive-%d" (i + 1))
-            [ cons_node_info ~has_archive_container:true "mina" ])
+            [ cons_node_info ~has_archive_container:true "mina" ] )
     in
     let workloads_by_id =
       let all_workloads =

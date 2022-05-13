@@ -49,7 +49,7 @@
    node_addrs_and_ports
    network_peer
    mina_base
-   mina_transition
+   mina_block
    user_command_input
    signature_lib
    transition_frontier

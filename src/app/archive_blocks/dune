@@ -20,7 +20,7 @@
    async.async_command
    ;; local libraries
    logger
-   mina_transition
+   mina_block
    genesis_constants
    archive_lib
  )

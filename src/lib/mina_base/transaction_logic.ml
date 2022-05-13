@@ -461,7 +461,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         (sprintf
            !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
              transaction amount %{sexp: Currency.Amount.t} insufficient"
-           fee amount)
+           fee amount )
         Amount.(sub amount (of_fee fee))
     else Ok amount
 
@@ -489,10 +489,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       match varying with
       | Command (Signed_command uc) ->
           With_status.map uc.common.user_command ~f:(fun cmd ->
-              Transaction.Command (User_command.Signed_command cmd))
+              Transaction.Command (User_command.Signed_command cmd) )
       | Command (Snapp_command s) ->
           With_status.map s.command ~f:(fun c ->
-              Transaction.Command (User_command.Snapp_command c))
+              Transaction.Command (User_command.Snapp_command c) )
       | Fee_transfer f ->
           { data = Fee_transfer f.fee_transfer
           ; status =
@@ -684,13 +684,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let balance =
         Option.value_exn
           (Balance.sub_amount account.balance
-             (Amount.of_fee constraint_constants.account_creation_fee))
+             (Amount.of_fee constraint_constants.account_creation_fee) )
       in
       let account = { account with balance } in
       let timing =
         Or_error.ok_exn
           (validate_timing ~txn_amount:Amount.zero
-             ~txn_global_slot:current_global_slot ~account)
+             ~txn_global_slot:current_global_slot ~account )
       in
       { account with timing }
     in
@@ -806,7 +806,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 let%map balance =
                   Result.map_error (sub_amount account.balance amount)
                     ~f:(fun _ ->
-                      Transaction_status.Failure.Source_insufficient_balance)
+                      Transaction_status.Failure.Source_insufficient_balance )
                 in
                 (location, source_timing, { account with timing; balance })
             in
@@ -821,7 +821,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   raise
                     (Reject
                        (Error.createf "%s"
-                          (Transaction_status.Failure.describe failure)))
+                          (Transaction_status.Failure.describe failure) ) )
             else ret
           in
           (* Charge the account creation fee. *)
@@ -835,7 +835,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   sub_account_creation_fee ~constraint_constants `Added amount
                   |> Result.map_error ~f:(fun _ ->
                          Transaction_status.Failure
-                         .Amount_insufficient_to_create_account)
+                         .Amount_insufficient_to_create_account )
                 else
                   Result.fail
                     Transaction_status.Failure.Cannot_pay_creation_fee_in_token
@@ -852,8 +852,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 , { Transaction_status.Auxiliary_data.empty with
                     receiver_account_creation_fee_paid =
                       Some
-                        (Amount.of_fee
-                           constraint_constants.account_creation_fee)
+                        (Amount.of_fee constraint_constants.account_creation_fee)
                   } )
           in
           ( [ (receiver_location, receiver_account)
@@ -867,7 +866,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (* NOTE: source and receiver are definitionally equal here. *)
           let fee_payer_account =
             Or_error.try_with (fun () ->
-                charge_account_creation_fee_exn fee_payer_account)
+                charge_account_creation_fee_exn fee_payer_account )
             |> ok_or_reject
           in
           let receiver_location, receiver_account =
@@ -906,10 +905,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             raise
               (Reject
                  (Error.createf
-                    "Cannot open a disabled account in the default token")) ;
+                    "Cannot open a disabled account in the default token" ) ) ;
           let fee_payer_account =
             Or_error.try_with (fun () ->
-                charge_account_creation_fee_exn fee_payer_account)
+                charge_account_creation_fee_exn fee_payer_account )
             |> ok_or_reject
           in
           let receiver_location, receiver_account =
@@ -1064,7 +1063,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           List.fold located_accounts ~init:(Ok ())
             ~f:(fun acc (location, account) ->
               let%bind () = acc in
-              set_with_location ledger location account)
+              set_with_location ledger location account )
         in
         let applied_common =
           { applied_common with
@@ -1123,7 +1122,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
        ; update = { app_state; delegate; verification_key; permissions }
        ; delta
        } :
-        Snapp_command.Party.Body.t) (a : Account.t) : (Account.t, _) Result.t =
+        Snapp_command.Party.Body.t ) (a : Account.t) : (Account.t, _) Result.t =
     let open Snapp_basic in
     let open Result.Let_syntax in
     let%bind balance =
@@ -1142,7 +1141,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            | Pos ->
                a.permissions.receive
            | Neg ->
-               a.permissions.send ))
+               a.permissions.send ) )
     in
     (* Check timing. *)
     let%bind timing =
@@ -1169,7 +1168,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       if Token_id.(equal default) a.token_id then
         update a.permissions.set_delegate delegate a.delegate
           ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
-            match u with Keep -> x | Set y -> Some y)
+            match u with Keep -> x | Set y -> Some y )
       else return a.delegate
     in
     let%bind snapp =
@@ -1180,7 +1179,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       and verification_key =
         update a.permissions.set_verification_key verification_key
           init.verification_key ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
-            match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
+            match (u, x) with Keep, _ -> x | Set x, _ -> Some x )
       in
       let t : Snapp_account.t = { app_state; verification_key } in
       if Snapp_account.(equal default t) then None else Some t
@@ -1193,8 +1192,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let apply_snapp_command_unchecked ledger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(state_view : Snapp_predicate.Protocol_state.View.t)
-      (c : Snapp_command.t) =
+      ~(state_view : Snapp_predicate.Protocol_state.View.t) (c : Snapp_command.t)
+      =
     let open Snapp_command in
     let current_global_slot = state_view.global_slot_since_genesis in
     let open Result.Let_syntax in
@@ -1234,7 +1233,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%bind () =
                 List.fold accts ~init:(Ok ()) ~f:(fun acc (location, account) ->
                     let%bind () = acc in
-                    set_with_location ledger location account)
+                    set_with_location ledger location account )
               in
               Ok applied
         in
@@ -1311,8 +1310,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ({ token_id; fee_payment; one; two } :
               ( ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t
               , ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option )
-              Inner.t) ~check_predicate1 ~check_predicate2 ~account2_should_step
-            =
+              Inner.t ) ~check_predicate1 ~check_predicate2
+            ~account2_should_step =
           let account_id1 = Account_id.create one.data.body.pk token_id in
           let loc1, acct1 =
             get_with_location ledger account_id1 |> ok_or_reject
@@ -1322,7 +1321,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             Option.map two ~f:(fun two ->
                 get_with_location ledger
                   (Account_id.create two.data.body.pk token_id)
-                |> ok_or_reject)
+                |> ok_or_reject )
           in
           (* Pay the fee, step both accounts. *)
           let acct1', acct2', one, two, fee_payer_info, fee_payer_pk =
@@ -1350,7 +1349,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                     let acct1, one = party_fee_payer loc1 acct1 one in
                     ( acct1
                     , Option.map lacct2 ~f:(fun (_, a) ->
-                          if account2_should_step then step a else a)
+                          if account2_should_step then step a else a )
                     , one
                     , two
                     , None
@@ -1372,7 +1371,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | Some { payload; signature = _ } ->
                 ( step acct1
                 , Option.map lacct2 ~f:(fun (_, a) ->
-                      if account2_should_step then step a else a)
+                      if account2_should_step then step a else a )
                 , one
                 , two
                 , Some (pay_fee payload)
@@ -1431,28 +1430,29 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             apply_body ~is_new:false
               ~check_auth:
                 (Fn.flip Permissions.Auth_required.check
-                   (Control.tag one.authorization))
+                   (Control.tag one.authorization) )
               one.data.body acct1'
           in
           let applied_per_account loc (a : Account.t) =
             ( Account_id.create a.public_key fee_token_id
             , match loc with `New -> None | `Existing _ -> Some a )
           in
-          ( ( [ (loc1, acct1') ] @ Option.to_list lacct2'
+          ( ( [ (loc1, acct1') ]
+            @ Option.to_list lacct2'
             @ Option.(
                 to_list
                   (map fee_payer_info ~f:(fun (loc, _, fp_acct') ->
-                       (loc, fp_acct')))) )
+                       (loc, fp_acct') ) )) )
           , applied
               ( (account_id1, Some acct1)
                 :: Option.(
                      to_list
                        (map lacct2 ~f:(fun (loc, a) ->
-                            applied_per_account loc a)))
+                            applied_per_account loc a ) ))
               @ Option.(
                   to_list
                     (map fee_payer_info ~f:(fun (loc, a, _) ->
-                         applied_per_account loc a))) ) )
+                         applied_per_account loc a ) )) ) )
         in
         let check_nonce nonce ~state_view:_ ~(self : Account.t) ~other_prev:_
             ~other_next:_ ~fee_payer_pk:_ =
@@ -1485,7 +1485,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               { r with
                 two =
                   Option.map r.two ~f:(fun two ->
-                      { two with authorization = Control.None_given })
+                      { two with authorization = Control.None_given } )
               }
               ~check_predicate1:Predicate.check ~check_predicate2:no_check
               ~account2_should_step:false
@@ -1494,7 +1494,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               { r with
                 two =
                   Option.map r.two ~f:(fun two ->
-                      { two with authorization = Control.None_given })
+                      { two with authorization = Control.None_given } )
               ; one =
                   { r.one with authorization = Signature r.one.authorization }
               }
@@ -1513,7 +1513,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               (wrap_two (signed_one (signed_two r)))
               ~check_predicate1:check_nonce ~check_predicate2:check_nonce
               ~account2_should_step:true )
-        |> finish)
+        |> finish )
 
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
@@ -1586,9 +1586,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let amount = Amount.of_fee f in
             sub_account_creation_fee ~constraint_constants action amount
           in
-          add_amount b amount)
+          add_amount b amount )
         ~modify_timing:(fun acc ->
-          update_timing_when_no_deduction ~txn_global_slot acc)
+          update_timing_when_no_deduction ~txn_global_slot acc )
     in
     let compute_balance account_id =
       match get_user_account_with_location t account_id with
@@ -1622,7 +1622,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let undo_fee_transfer ~constraint_constants t
       ({ previous_empty_accounts; fee_transfer; receiver_timing; balances = _ } :
-        Transaction_applied.Fee_transfer_applied.t) =
+        Transaction_applied.Fee_transfer_applied.t ) =
     let open Or_error.Let_syntax in
     let%map _ =
       process_fee_transfer t fee_transfer
@@ -1636,15 +1636,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             sub_account_creation_fee ~constraint_constants action
               (Amount.of_fee f)
           in
-          sub_amount b amount)
+          sub_amount b amount )
         ~modify_timing:(fun _ -> Ok receiver_timing)
     in
     remove_accounts_exn t previous_empty_accounts
 
   let apply_coinbase ~constraint_constants ~txn_global_slot t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-        ({ receiver; fee_transfer; amount = coinbase_amount } as cb :
-          Coinbase.t) =
+        ({ receiver; fee_transfer; amount = coinbase_amount } as cb : Coinbase.t)
+      =
     let open Or_error.Let_syntax in
     let%bind receiver_reward, emptys1, transferee_update, transferee_timing_prev
         =
@@ -1909,7 +1909,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let balance =
             Option.value_exn
               (Balance.add_amount fee_payer_account.balance
-                 (Amount.of_fee constraint_constants.account_creation_fee))
+                 (Amount.of_fee constraint_constants.account_creation_fee) )
           in
           { fee_payer_account with balance }
         in
@@ -1968,7 +1968,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       { Transaction_applied.Snapp_command_applied.accounts; command = _ } =
     let to_update, to_delete =
       List.partition_map accounts ~f:(fun (id, a) ->
-          match a with Some a -> `Fst (id, a) | None -> `Snd id)
+          match a with Some a -> `Fst (id, a) | None -> `Snd id )
     in
     let to_update =
       List.dedup_and_sort
@@ -1981,12 +1981,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let%map loc =
             location_of_account' ledger (sprintf !"%{sexp:Account_id.t}" id) id
           in
-          (`Existing loc, a))
+          (`Existing loc, a) )
       |> Or_error.all
     in
     remove_accounts_exn ledger to_delete ;
     List.iter to_update ~f:(fun (location, account) ->
-        ignore @@ set_with_location ledger location account)
+        ignore @@ set_with_location ledger location account )
 
   let undo :
          constraint_constants:Genesis_constants.Constraint_constants.t
@@ -2008,7 +2008,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Ok ()
     in
     Debug_assert.debug_assert (fun () ->
-        [%test_eq: Ledger_hash.t] applied.previous_hash (merkle_root ledger)) ;
+        [%test_eq: Ledger_hash.t] applied.previous_hash (merkle_root ledger) ) ;
     res
 
   let apply_transaction ~constraint_constants
@@ -2022,31 +2022,31 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           | Command (Signed_command txn) ->
               Or_error.map
                 (apply_user_command_unchecked ~constraint_constants
-                   ~txn_global_slot ledger txn) ~f:(fun applied ->
-                  Transaction_applied.Varying.Command (Signed_command applied))
+                   ~txn_global_slot ledger txn ) ~f:(fun applied ->
+                  Transaction_applied.Varying.Command (Signed_command applied) )
           | Command (Snapp_command txn) ->
               Or_error.map
                 (apply_snapp_command_unchecked ~state_view:txn_state_view
-                   ~constraint_constants ledger txn) ~f:(fun applied ->
-                  Transaction_applied.Varying.Command (Snapp_command applied))
+                   ~constraint_constants ledger txn ) ~f:(fun applied ->
+                  Transaction_applied.Varying.Command (Snapp_command applied) )
           | Fee_transfer t ->
               Or_error.map
                 (apply_fee_transfer ~constraint_constants ~txn_global_slot
-                   ledger t) ~f:(fun applied ->
-                  Transaction_applied.Varying.Fee_transfer applied)
+                   ledger t ) ~f:(fun applied ->
+                  Transaction_applied.Varying.Fee_transfer applied )
           | Coinbase t ->
               Or_error.map
                 (apply_coinbase ~constraint_constants ~txn_global_slot ledger t)
                 ~f:(fun applied -> Transaction_applied.Varying.Coinbase applied)
           )
-          ~f:(fun varying -> { Transaction_applied.previous_hash; varying }))
+          ~f:(fun varying -> { Transaction_applied.previous_hash; varying }) )
 
   let merkle_root_after_snapp_command_exn ~constraint_constants ~txn_state_view
       ledger payment =
     let applied =
       Or_error.ok_exn
         (apply_snapp_command_unchecked ~constraint_constants
-           ~state_view:txn_state_view ledger payment)
+           ~state_view:txn_state_view ledger payment )
     in
     let root = merkle_root ledger in
     let next_available_token = next_available_token ledger in
@@ -2058,7 +2058,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let applied =
       Or_error.ok_exn
         (apply_user_command ~constraint_constants ~txn_global_slot ledger
-           payment)
+           payment )
     in
     let root = merkle_root ledger in
     let next_available_token = next_available_token ledger in

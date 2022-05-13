@@ -422,7 +422,7 @@ module Dlog_based = struct
 
     let of_hlist
         ([ app_state; dlog_plonk_index; sg; old_bulletproof_challenges ] :
-          (unit, _) t) =
+          (unit, _) t ) =
       { app_state; dlog_plonk_index; sg; old_bulletproof_challenges }
 
     let typ comm g s chal branching =
@@ -567,7 +567,7 @@ module Dlog_based = struct
                }
            ; pass_through
            } :
-            _ t) =
+            _ t ) =
         let open Vector in
         let fp =
           [ combined_inner_product
@@ -839,7 +839,7 @@ module Pairing_based = struct
              ; should_finalize
              ; sponge_digest_before_evaluations
              } :
-              _ t) =
+              _ t ) =
           let open Vector in
           let fq =
             [ combined_inner_product

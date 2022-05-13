@@ -9,7 +9,7 @@
    core_kernel
    ;; local libraries
    transition_frontier_extensions
-   mina_transition
+   mina_block
    mina_state
    mina_intf
    mina_base
@@ -17,4 +17,5 @@
    merkle_list_prover
    transition_frontier_base
    data_hash_lib
+   with_hash
 ))

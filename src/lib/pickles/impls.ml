@@ -73,7 +73,7 @@ module Step = struct
       in
       let str_list =
         List.map forbidden_shifted_values ~f:(fun (a, b) ->
-            (Tick.Field.to_string a, b))
+            (Tick.Field.to_string a, b) )
       in
       assert ([%equal: (string * bool) list] str_list expected_list)
 
@@ -83,10 +83,10 @@ module Step = struct
           (Typ.tuple2 Field.typ Boolean.typ)
           ~there:(fun x ->
             let low, high = Util.split_last (Tock.Field.to_bits x) in
-            (Field.Constant.project low, high))
+            (Field.Constant.project low, high) )
           ~back:(fun (low, high) ->
             let low, _ = Util.split_last (Field.Constant.unpack low) in
-            Tock.Field.of_bits (low @ [ high ]))
+            Tock.Field.of_bits (low @ [ high ]) )
       in
       let check t =
         let open Internal_Basic in
@@ -120,7 +120,7 @@ module Step = struct
            ( Shifted_value.typ Other_field.typ_unchecked
            , fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
-               t ))
+               t ) )
         spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
@@ -201,7 +201,7 @@ module Wrap = struct
            ( Shifted_value.typ fp
            , fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
-               t ))
+               t ) )
         In_circuit.spec
     in
     let typ =

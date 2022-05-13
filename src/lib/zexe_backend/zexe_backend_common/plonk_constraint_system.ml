@@ -194,7 +194,7 @@ struct
               Bytes.set int_buf i
                 (Char.of_int_exn ((index lsr (8 * i)) land 255))
             done ;
-            H.feed_bytes acc int_buf)
+            H.feed_bytes acc int_buf )
     in
     let cvars xs =
       List.concat_map xs ~f:(fun x ->
@@ -203,7 +203,7 @@ struct
               Snarky_backendless.Cvar.to_constant_and_terms x ~equal ~add ~mul
                 ~zero ~one)
           in
-          Option.value_map c ~default:[] ~f:(fun c -> [ (c, 0) ]) @ ts)
+          Option.value_map c ~default:[] ~f:(fun c -> [ (c, 0) ]) @ ts )
       |> lc
     in
     match constr with
@@ -237,12 +237,12 @@ struct
             let t = H.feed_string t "ec_scale" in
             Array.fold state ~init:t
               ~f:(fun acc { xt; b; yt; xp; l1; yp; xs; ys } ->
-                cvars [ xt; b; yt; xp; l1; yp; xs; ys ] acc)
+                cvars [ xt; b; yt; xp; l1; yp; xs; ys ] acc )
         | EC_endoscale { state } ->
             let t = H.feed_string t "ec_endoscale" in
             Array.fold state ~init:t
               ~f:(fun acc { b2i1; xt; b2i; xq; yt; xp; l1; yp; xs; ys } ->
-                cvars [ b2i1; xt; b2i; xq; yt; xp; l1; yp; xs; ys ] acc) )
+                cvars [ b2i1; xt; b2i; xq; yt; xp; l1; yp; xs; ys ] acc ) )
     | _ ->
         failwith "Unsupported constraint"
 
@@ -272,7 +272,7 @@ struct
             | Internal x ->
                 find internal_values x
           in
-          Fp.(acc + (s * x)))
+          Fp.(acc + (s * x)) )
     in
     List.iteri (List.rev sys.rows_rev) ~f:(fun i_after_input row ->
         let i = i_after_input + public_input_size in
@@ -286,7 +286,7 @@ struct
                 let lc = find sys.internal_vars v in
                 let value = compute lc in
                 res.(i).(j) <- value ;
-                Hashtbl.set internal_values ~key:v ~data:value)) ;
+                Hashtbl.set internal_values ~key:v ~data:value ) ) ;
     for r = 0 to zk_rows - 1 do
       for c = 0 to 2 do
         res.(num_rows - 1 - r).(c) <- Fp.random ()
@@ -387,7 +387,7 @@ struct
                   ; orow = row
                   ; ocol = O
                   ; coeffs = zeroes
-                  })
+                  } )
           in
           List.rev_append !pub_input_gate_specs_rev
             (rev_map_append gates random_rows ~f:offset)
@@ -403,7 +403,7 @@ struct
                   ; o = { row = orow; col = ocol }
                   }
               ; c = coeffs
-              }) ;
+              } ) ;
         g
 
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
@@ -412,7 +412,7 @@ struct
     Sequence.of_list terms
     |> Sequence.fold ~init:(c0, i0, [], 0) ~f:(fun (acc, i, ts, n) (c, j) ->
            if Int.equal i j then (Fp.add acc c, i, ts, n)
-           else (c, j, (acc, i) :: ts, n + 1))
+           else (c, j, (acc, i) :: ts, n + 1) )
 
   let canonicalize x =
     let c, terms =
@@ -557,7 +557,7 @@ struct
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
-        Snarky_backendless.Constraint.basic) =
+        Snarky_backendless.Constraint.basic ) =
     let index_to_col = function
       | 0 ->
           Plonk_gate.Col.L
@@ -753,7 +753,7 @@ struct
         let add_round_state array ind =
           let prev =
             Array.mapi array ~f:(fun i x ->
-                wire sys x sys.next_row (index_to_col i))
+                wire sys x sys.next_row (index_to_col i) )
           in
           add_row sys
             (Array.map array ~f:(fun x -> Some x))
@@ -765,18 +765,18 @@ struct
             if i = Array.length state - 1 then
               let prev =
                 Array.mapi perm ~f:(fun i x ->
-                    wire sys x sys.next_row (index_to_col i))
+                    wire sys x sys.next_row (index_to_col i) )
               in
               add_row sys
                 (Array.map perm ~f:(fun x -> Some x))
                 Zero prev.(0) prev.(1) prev.(2)
                 [| Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero |]
-            else add_round_state perm i)
+            else add_round_state perm i )
           state
     | Plonk_constraint.T (EC_add { p1; p2; p3 }) ->
         let red =
           Array.map [| p1; p2; p3 |] ~f:(fun (x, y) ->
-              (reduce_to_v x, reduce_to_v y))
+              (reduce_to_v x, reduce_to_v y) )
         in
         let y =
           Array.mapi

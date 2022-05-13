@@ -124,7 +124,7 @@ module Body = struct
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:Hash_prefix.protocol_state_body (pack_input input)
-          |> State_body_hash.var_of_hash_packed))
+          |> State_body_hash.var_of_hash_packed) )
 
   let consensus_state { Poly.consensus_state; _ } = consensus_state
 
@@ -248,7 +248,7 @@ let hash_checked ({ previous_state_hash; body } : var) =
           [| Hash.var_to_hash_packed previous_state_hash
            ; State_body_hash.var_to_hash_packed body
           |]
-        |> State_hash.var_of_hash_packed)
+        |> State_hash.var_of_hash_packed )
   in
   (hash, body)
 
@@ -302,7 +302,7 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
               (Mina_base.Ledger.merkle_root (Lazy.force genesis_ledger))
             ~snarked_next_available_token:
               (Mina_base.Ledger.next_available_token
-                 (Lazy.force genesis_ledger))
+                 (Lazy.force genesis_ledger) )
       ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
       ; consensus_state =
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger

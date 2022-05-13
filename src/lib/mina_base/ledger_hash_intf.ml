@@ -43,7 +43,7 @@ module type S = sig
     -> f:
          (   is_empty_and_writeable:Boolean.var
           -> Account.var
-          -> (Account.var, 's) Checked.t)
+          -> (Account.var, 's) Checked.t )
     -> (var, 's) Checked.t
 
   val modify_account_recv :
@@ -53,6 +53,6 @@ module type S = sig
     -> f:
          (   is_empty_and_writeable:Boolean.var
           -> Account.var
-          -> (Account.var, 's) Checked.t)
+          -> (Account.var, 's) Checked.t )
     -> (var, 's) Checked.t
 end

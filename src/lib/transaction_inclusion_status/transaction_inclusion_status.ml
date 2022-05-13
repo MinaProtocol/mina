@@ -31,7 +31,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
       ~error:(Error.of_string "Invalid signature")
     |> Result.map ~f:(fun x ->
            Transaction_hash.User_command_with_valid_signature.create
-             (Signed_command x))
+             (Signed_command x) )
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
@@ -43,13 +43,15 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             Transition_frontier.best_tip_path transition_frontier
           in
           let in_breadcrumb breadcrumb =
-            List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
-              ~f:(fun { data = cmd'; _ } ->
-                match cmd' with
-                | Snapp_command _ ->
-                    false
-                | Signed_command cmd' ->
-                    Signed_command.equal cmd (Signed_command.forget_check cmd'))
+            breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+            |> Mina_block.Validated.valid_commands
+            |> List.exists ~f:(fun { data = cmd'; _ } ->
+                   match cmd' with
+                   | Snapp_command _ ->
+                       false
+                   | Signed_command cmd' ->
+                       Signed_command.equal cmd
+                         (Signed_command.forget_check cmd') )
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
             return State.Included ;
@@ -59,7 +61,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
           then return State.Pending ;
           if Transaction_pool.Resource_pool.member resource_pool check_cmd then
             return State.Pending ;
-          State.Unknown)
+          State.Unknown )
 
 let%test_module "transaction_status" =
   ( module struct
@@ -90,7 +92,7 @@ let%test_module "transaction_status" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()))
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     let key_gen =
       let open Quickcheck.Generator in
@@ -132,7 +134,7 @@ let%test_module "transaction_status" =
                    , Transaction_pool.Resource_pool.Diff.to_yojson transactions
                    )
                  ] ;
-             Deferred.unit) ;
+             Deferred.unit ) ;
       (* Need to wait for transaction_pool to see the transition_frontier *)
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
       (transaction_pool, local_sink)
@@ -155,7 +157,7 @@ let%test_module "transaction_status" =
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     user_command )))
+                     user_command ) ) )
 
     let%test_unit "A pending transaction is either in the transition frontier \
                    or transaction pool, but not in the best path of the \
@@ -181,7 +183,7 @@ let%test_module "transaction_status" =
                      user_command
               in
               [%log info] "Computing status" ;
-              [%test_eq: State.t] ~equal:State.equal State.Pending status))
+              [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
 
     let%test_unit "An unknown transaction does not appear in the transition \
                    frontier or transaction pool " =
@@ -210,7 +212,7 @@ let%test_module "transaction_status" =
               let%bind () =
                 Transaction_pool.Local_sink.push local_diffs_writer
                   ( List.map pool_user_commands ~f:(fun x ->
-                        User_command.Signed_command x)
+                        User_command.Signed_command x )
                   , Fn.const () )
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
@@ -218,5 +220,5 @@ let%test_module "transaction_status" =
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     unknown_user_command )))
+                     unknown_user_command ) ) )
   end )

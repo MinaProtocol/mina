@@ -91,7 +91,7 @@ let typ : (Checked.t, t) Typ.t =
           | None ->
               Pickles.Side_loaded.Verification_key.dummy
           | Some x ->
-              With_hash.data x)
+              With_hash.data x )
         ~back:(fun x -> Some (With_hash.of_data x ~hash_data:digest_vk))
       |> Typ.transport_var ~there:With_hash.data
            ~back:
@@ -113,7 +113,7 @@ let to_input (t : t) =
     ~verification_key:
       (f
          (Fn.compose field
-            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
+            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =

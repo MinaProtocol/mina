@@ -87,11 +87,11 @@ end = struct
       (Vector.typ Boolean.typ Length.n)
       ~there:(fun x ->
         let x = to_int x in
-        Vector.init Length.n ~f:(fun i -> (x lsr i) land 1 = 1))
+        Vector.init Length.n ~f:(fun i -> (x lsr i) land 1 = 1) )
       ~back:(fun v ->
         Vector.foldi v ~init:0 ~f:(fun i acc b ->
-            if b then acc lor (1 lsl i) else acc)
-        |> of_int_exn)
+            if b then acc lor (1 lsl i) else acc )
+        |> of_int_exn )
 end
 
 module Domain = struct
@@ -108,7 +108,7 @@ module Domains = struct
     let dom =
       Typ.transport Typ.field
         ~there:(fun (Plonk_checks.Domain.Pow_2_roots_of_unity n) ->
-          Field.Constant.of_int n)
+          Field.Constant.of_int n )
         ~back:(fun _ -> assert false)
       |> Typ.transport_var
            ~there:(fun (Domain.Pow_2_roots_of_unity n) -> n)
@@ -129,7 +129,7 @@ let max_domains_with_x =
     Plonk_checks.Domain.Pow_2_roots_of_unity
       (Int.ceil_log2
          (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-            (Nat.to_int Width.Max.n)))
+            (Nat.to_int Width.Max.n) ) )
   in
   { Ds.h = conv max_domains.h; x }
 
@@ -168,55 +168,52 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    include Binable.Of_binable
-              (R.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable
+        (R.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                module Repr_conv = struct
-                  include Vk
+          module Repr_conv = struct
+            include Vk
 
-                  let of_repr
-                      { Repr.Stable.V1.step_data; max_width; wrap_index = c } :
-                      Impls.Wrap.Verification_key.t =
-                    let d = Common.wrap_domains.h in
-                    let log2_size = Import.Domain.log2_size d in
-                    let max_quot_size =
-                      Common.max_quot_size_int (Import.Domain.size d)
-                    in
-                    { domain =
-                        { log_size_of_group = log2_size
-                        ; group_gen =
-                            Backend.Tock.Field.domain_generator log2_size
-                        }
-                    ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
-                    ; max_quot_size
-                    ; urs = Backend.Tock.Keypair.load_urs ()
-                    ; evals =
-                        Plonk_verification_key_evals.map c ~f:(fun unshifted ->
-                            { Marlin_plonk_bindings.Types.Poly_comm.shifted =
-                                None
-                            ; unshifted =
-                                Array.of_list_map unshifted ~f:(fun x ->
-                                    Or_infinity.Finite x)
-                            })
-                    ; shifts = Common.tock_shifts ~log2_size
-                    }
-                end
-
-                let to_binable
-                    { Poly.step_data; max_width; wrap_index; wrap_vk = _ } =
-                  { Repr.Stable.V1.step_data; max_width; wrap_index }
-
-                let of_binable
-                    ( { Repr.Stable.V1.step_data; max_width; wrap_index = c } as
-                    t ) =
-                  { Poly.step_data
-                  ; max_width
-                  ; wrap_index = c
-                  ; wrap_vk = Some (Repr_conv.of_repr t)
+            let of_repr { Repr.Stable.V1.step_data; max_width; wrap_index = c }
+                : Impls.Wrap.Verification_key.t =
+              let d = Common.wrap_domains.h in
+              let log2_size = Import.Domain.log2_size d in
+              let max_quot_size =
+                Common.max_quot_size_int (Import.Domain.size d)
+              in
+              { domain =
+                  { log_size_of_group = log2_size
+                  ; group_gen = Backend.Tock.Field.domain_generator log2_size
                   }
-              end)
+              ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+              ; max_quot_size
+              ; urs = Backend.Tock.Keypair.load_urs ()
+              ; evals =
+                  Plonk_verification_key_evals.map c ~f:(fun unshifted ->
+                      { Marlin_plonk_bindings.Types.Poly_comm.shifted = None
+                      ; unshifted =
+                          Array.of_list_map unshifted ~f:(fun x ->
+                              Or_infinity.Finite x )
+                      } )
+              ; shifts = Common.tock_shifts ~log2_size
+              }
+          end
+
+          let to_binable { Poly.step_data; max_width; wrap_index; wrap_vk = _ }
+              =
+            { Repr.Stable.V1.step_data; max_width; wrap_index }
+
+          let of_binable
+              ({ Repr.Stable.V1.step_data; max_width; wrap_index = c } as t) =
+            { Poly.step_data
+            ; max_width
+            ; wrap_index = c
+            ; wrap_vk = Some (Repr_conv.of_repr t)
+            }
+        end)
   end
 end]
 
@@ -243,7 +240,7 @@ let dummy : t =
        ; emul1_comm = g
        ; emul2_comm = g
        ; emul3_comm = g
-       })
+       } )
   ; wrap_vk = None
   }
 
@@ -268,13 +265,13 @@ module Checked = struct
       List.reduce_exn ~f:append
         [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
               map_reduce [| h |] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
-                  bitstring (Field.unpack x ~length:max_log2_degree)))
+                  bitstring (Field.unpack x ~length:max_log2_degree) ) )
         ; Array.map (Vector.to_array step_widths) ~f:Width.Checked.to_bits
           |> bitstrings
         ; bitstring (Width.Checked.to_bits max_width)
         ; wrap_index_to_input
             (Array.concat_map
-               ~f:(Fn.compose Array.of_list Inner_curve.to_field_elements))
+               ~f:(Fn.compose Array.of_list Inner_curve.to_field_elements) )
             wrap_index
         ; bitstring (Vector.to_list num_branches)
         ]
@@ -290,7 +287,7 @@ let%test_unit "input_size" =
          let (T (typ, conv)) =
            Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
          in
-         Impls.Step.Data_spec.size [ typ ]))
+         Impls.Step.Data_spec.size [ typ ] ) )
 
 let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
@@ -303,12 +300,12 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
         (Typ.array Inner_curve.typ
            ~length:
              (index_commitment_length ~max_degree:Max_degree.wrap
-                Common.wrap_domains.h))
+                Common.wrap_domains.h ) )
     ; Vector.typ Boolean.typ Max_branches.Log2.n
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
-      failwith "Side_loaded_verification_key: value_of_hlist")
+      failwith "Side_loaded_verification_key: value_of_hlist" )
     ~value_to_hlist:(fun { Poly.step_data; wrap_index; max_width; _ } ->
       [ At_most.extend_to_vector
           (At_most.map step_data ~f:fst)
@@ -319,5 +316,5 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
       ; max_width
       ; Plonk_verification_key_evals.map ~f:Array.of_list wrap_index
       ; (let n = At_most.length step_data in
-         Vector.init Max_branches.Log2.n ~f:(fun i -> (n lsr i) land 1 = 1))
-      ])
+         Vector.init Max_branches.Log2.n ~f:(fun i -> (n lsr i) land 1 = 1) )
+      ] )

@@ -102,7 +102,8 @@ let create () : t =
   Snarkette.Pasta.Fq.of_bigint
     (Snarkette.Nat.of_bytes
        (String.init 32 ~f:(fun i ->
-            Char.of_int_exn (Js.Optdef.get (Js.array_get x i) byte_undefined))))
+            Char.of_int_exn (Js.Optdef.get (Js.array_get x i) byte_undefined) )
+       ) )
 
 [%%endif]
 

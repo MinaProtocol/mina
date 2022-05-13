@@ -531,7 +531,7 @@ module Failure = struct
            ; update_not_permitted
            ; incorrect_nonce
            } :
-            As_record.var) : t =
+            As_record.var ) : t =
         let user_command_failure =
           Boolean.Unsafe.of_cvar
             (Field.Var.sum
@@ -550,7 +550,7 @@ module Failure = struct
                ; (snapp_account_not_present :> Field.Var.t)
                ; (update_not_permitted :> Field.Var.t)
                ; (incorrect_nonce :> Field.Var.t)
-               ])
+               ] )
         in
         { user_command_failure }
 
@@ -673,7 +673,7 @@ module Failure = struct
 
   let typ : (var, t) Typ.t =
     Typ.transport Var.typ ~there:to_record ~back:(fun x ->
-        Option.value_exn (of_record_opt x))
+        Option.value_exn (of_record_opt x) )
 
   let typ_opt : (var, t option) Typ.t =
     Typ.transport Var.typ ~there:to_record_opt ~back:of_record_opt

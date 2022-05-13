@@ -99,7 +99,7 @@ end = struct
       let h, to_add = go [] ancestor ancestor_length proof in
       let%map () = check (State_hash.equal h descendant) "Bad merkle proof" in
       List.iter to_add ~f:(fun (prev, h, length, body) ->
-          add t ~prev_hash:prev ~hash:h ~length ~body_hash:body)
+          add t ~prev_hash:prev ~hash:h ~length ~body_hash:body )
 
   let prove (t : t) { Input.descendant; generations } :
       (Output.t * Proof.t) option =
@@ -125,7 +125,7 @@ let%test_unit "completeness" =
             in
             Prover.add prover ~prev_hash:prev ~hash:hs.state_hash ~length
               ~body_hash:body ;
-            ((hs.state_hash, length), hs.state_hash))
+            ((hs.state_hash, length), hs.state_hash) )
       in
       List.iteri hashes ~f:(fun i h ->
           let input = { Input.generations = i + 1; descendant = h } in
@@ -134,4 +134,4 @@ let%test_unit "completeness" =
             |> Option.value_exn ?here:None ?error:None ?message:None
           in
           [%test_eq: State_hash.t] a ancestor ;
-          assert (verify input a proof)))
+          assert (verify input a proof) ) )

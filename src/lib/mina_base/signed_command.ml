@@ -197,7 +197,7 @@ module Gen = struct
         ?fee_token ?payment_token ~fee_range =
       with_random_participants ~keys ~gen:(fun ~key_gen ->
           gen ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-            ~fee_range)
+            ~fee_range )
   end
 
   module Stake_delegation = struct
@@ -209,7 +209,7 @@ module Gen = struct
                (Set_delegate
                   { delegator = Public_key.compress signer
                   ; new_delegate = Public_key.compress new_delegate
-                  }))
+                  } ) )
 
     let gen_with_random_participants ~keys ?nonce ?fee_token ~fee_range =
       with_random_participants ~keys ~gen:(gen ?nonce ?fee_token ~fee_range)
@@ -252,7 +252,7 @@ module Gen = struct
          let%bind command_senders =
            Quickcheck_lib.shuffle
            @@ List.concat_mapi command_splits ~f:(fun idx cmds ->
-                  List.init cmds ~f:(Fn.const idx))
+                  List.init cmds ~f:(Fn.const idx) )
          in
          (* within the accounts, how will the currency be split into separate
             payments? *)
@@ -266,10 +266,10 @@ module Gen = struct
                  else Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
                in
                Quickcheck_lib.gen_division_currency amount_to_spend
-                 command_splits'.(i))
+                 command_splits'.(i) )
              n_accounts
          in
-         return (command_senders, currency_splits))
+         return (command_senders, currency_splits) )
         |> (* We need to ensure each command has enough currency for a fee of 2
               or more, so it'll be enough to buy the requisite transaction
               snarks. It's important that the backtracking from filter goes and
@@ -279,7 +279,7 @@ module Gen = struct
         Quickcheck.Generator.filter ~f:(fun (_, splits) ->
             Array.for_all splits ~f:(fun split ->
                 List.for_all split ~f:(fun amt ->
-                    Currency.Amount.(amt >= of_int 2_000_000_000))))
+                    Currency.Amount.(amt >= of_int 2_000_000_000) ) ) )
       in
       let account_nonces =
         Array.map ~f:(fun (_, _, nonce, _) -> nonce) account_info
@@ -303,7 +303,7 @@ module Gen = struct
             Currency.Fee.(
               gen_incl (of_string "6000000000")
                 (min (of_string "10000000000")
-                   (Currency.Amount.to_fee this_split)))
+                   (Currency.Amount.to_fee this_split) ))
           in
           let amount =
             Option.value_exn Currency.Amount.(this_split - of_fee fee)
@@ -311,7 +311,7 @@ module Gen = struct
           let%bind receiver =
             map ~f:(fun idx ->
                 let kp, _, _, _ = account_info.(idx) in
-                Public_key.compress kp.public_key)
+                Public_key.compress kp.public_key )
             @@ Int.gen_uniform_incl 0 (n_accounts - 1)
           in
           let memo = Signed_command_memo.dummy in
@@ -325,12 +325,12 @@ module Gen = struct
                    ; receiver_pk = receiver
                    ; token_id = Token_id.default
                    ; amount
-                   })
+                   } )
           in
           let sign' =
             match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign
           in
-          return @@ sign' sender_pk payload)
+          return @@ sign' sender_pk payload )
 end
 
 module With_valid_signature = struct
@@ -371,7 +371,7 @@ let check_valid_keys t =
   let source = source_pk t in
   let receiver = receiver_pk t in
   List.for_all [ fee_payer; source; receiver ] ~f:(fun pk ->
-      Option.is_some (Public_key.decompress pk))
+      Option.is_some (Public_key.decompress pk) )
 
 let create_with_signature_checked ?signature_kind signature signer payload =
   let open Option.Let_syntax in
@@ -392,7 +392,7 @@ let%test_unit "completeness" =
 
 let%test_unit "json" =
   Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
-      assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t))
+      assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t) )
 
 let check t = Option.some_if (check_signature t && check_valid_keys t) t
 
@@ -405,4 +405,4 @@ let filter_by_participant user_commands public_key =
         ~f:
           (Fn.compose
              (Public_key.Compressed.equal public_key)
-             Account_id.public_key))
+             Account_id.public_key ) )

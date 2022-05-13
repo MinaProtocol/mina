@@ -62,7 +62,7 @@ let gen_symm_dirichlet : int -> float list Quickcheck.Generator.t =
         (* technically this should be (0, 1] and not (0, 1) but I expect it
            doesn't matter for our purposes. *)
         let%map uniform = Float.gen_uniform_excl 0. 1. in
-        Float.log uniform)
+        Float.log uniform )
   in
   let sum = List.fold gammas ~init:0. ~f:(fun x y -> x +. y) in
   List.map gammas ~f:(fun gamma -> gamma /. sum)
@@ -151,11 +151,11 @@ let gen_imperative_rose_tree ?(p = 0.75) (root_gen : 'a t)
           in
           let%map forks =
             map_gens positive_fork_sizes ~f:(fun s ->
-                tuple2 node_gen (with_size ~size:(s - 1) self))
+                tuple2 node_gen (with_size ~size:(s - 1) self) )
           in
           fun parent ->
             Rose_tree.T
-              (parent, List.map forks ~f:(fun (this, f) -> f (this parent))))
+              (parent, List.map forks ~f:(fun (this, f) -> f (this parent))) )
 
 let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t) (node_gen : ('a -> 'a) t)
     =
@@ -177,7 +177,7 @@ let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t) (node_gen : ('a -> 'a) t)
           in
           fun parent ->
             let x = this parent in
-            x :: List.bind forks ~f:(fun f -> f x))
+            x :: List.bind forks ~f:(fun f -> f x) )
 
 let gen_imperative_list (root_gen : 'a t) (node_gen : ('a -> 'a) t) =
   let%bind root = root_gen in
@@ -188,7 +188,7 @@ let gen_imperative_list (root_gen : 'a t) (node_gen : ('a -> 'a) t) =
       | n ->
           let%bind this = node_gen in
           let%map f = with_size ~size:(n - 1) self in
-          fun parent -> parent :: f (this parent))
+          fun parent -> parent :: f (this parent) )
 
 let%test_module "Quickcheck lib tests" =
   ( module struct
@@ -214,7 +214,7 @@ let%test_module "Quickcheck lib tests" =
                     else
                       Or_error.errorf
                         !"elements do not add up correctly %d %d"
-                        elem next_elem)
+                        elem next_elem )
               in
-              assert (Result.is_ok result))
+              assert (Result.is_ok result) )
   end )

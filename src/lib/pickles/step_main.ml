@@ -17,7 +17,7 @@ let step_main :
            and type local_branches = local_branches
            and type statement = a_value
            and type prev_values = prev_values
-           and type max_branching = max_branching)
+           and type max_branching = max_branching )
     -> (module Nat.Add.Intf with type n = max_branching)
     -> self_branches:self_branches Nat.t
     -> local_signature:local_signature H1.T(Nat).t
@@ -42,7 +42,7 @@ let step_main :
            , Field.t
            , (Field.t, max_branching) Vector.t )
            Types.Pairing_based.Statement.t
-        -> unit)
+        -> unit )
        Staged.t =
  fun (module Req) (module Max_branching) ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length ~branching
@@ -93,10 +93,10 @@ let step_main :
                         (* TODO: This replication to please the type checker is
                            pointless... *)
                         ( Vector.init d.permanent.branches ~f:(fun _ ->
-                              Side_loaded_verification_key.max_domains_with_x)
+                              Side_loaded_verification_key.max_domains_with_x )
                         , d.permanent.typ ) )
               in
-              typ)
+              typ )
               d
           in
           let t = Per_proof_witness.typ ~step_domains typ n1 n2 in
@@ -128,12 +128,12 @@ let step_main :
                (Typ.array Inner_curve.typ
                   ~length:
                     (index_commitment_length ~max_degree:Max_degree.wrap
-                       basic.wrap_domains.h)))
+                       basic.wrap_domains.h ) ) )
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         let prevs =
           exists (Prev_typ.f prev_typs) ~request:(fun () ->
-              Req.Proof_with_datas)
+              Req.Proof_with_datas )
         in
         let prev_statements =
           let module M =
@@ -201,13 +201,11 @@ let step_main :
         let pass_throughs =
           with_label "pass_throughs" (fun () ->
               let module V = H1.Of_vector (Digest) in
-              V.f branching (Vector.trim stmt.pass_through lte))
+              V.f branching (Vector.trim stmt.pass_through lte) )
         in
         let sgs =
           let module M =
-            H3.Map
-              (Per_proof_witness)
-              (E03 (Inner_curve))
+            H3.Map (Per_proof_witness) (E03 (Inner_curve))
               (struct
                 let f :
                     type a b c. (a, b, c) Per_proof_witness.t -> Inner_curve.t =
@@ -271,7 +269,7 @@ let step_main :
                             ~max_width:d.max_width ~step_widths:d.branchings
                             ~step_domains:d.step_domains ~sponge
                             ~old_bulletproof_challenges state.deferred_values
-                            prev_evals)
+                            prev_evals )
                     in
                     let which_branch = state.deferred_values.which_branch in
                     let state =
@@ -286,7 +284,7 @@ let step_main :
                                     ~f:Fn.id
                                   |> Types.Index.of_field (module Impl)
                               }
-                          })
+                          } )
                     in
                     let statement =
                       let prev_me_only =
@@ -295,7 +293,7 @@ let step_main :
                               (* TODO: Don't rehash when it's not necessary *)
                               unstage
                                 (hash_me_only_opt ~index:d.wrap_key
-                                   d.var_to_field_elements)
+                                   d.var_to_field_elements )
                             in
                             hash ~widths:d.branchings
                               ~max_width:(Nat.Add.n d.max_branching)
@@ -305,7 +303,7 @@ let step_main :
                               ; dlog_plonk_index = d.wrap_key
                               ; sg = sg_old
                               ; old_bulletproof_challenges
-                              })
+                              } )
                       in
                       { Types.Dlog_based.Statement.pass_through = prev_me_only
                       ; proof_state = { state with me_only = pass_through }
@@ -317,7 +315,7 @@ let step_main :
                             ~wrap_domain:d.wrap_domains.h
                             ~is_base_case:should_verify ~sg_old ~opening
                             ~messages ~wrap_verification_key:d.wrap_key
-                            statement unfinalized)
+                            statement unfinalized )
                     in
                     if debug then
                       as_prover
@@ -343,14 +341,14 @@ let step_main :
                 go prevs datas pass_throughs unfinalized_proofs
                   proofs_should_verify branching
               in
-              Boolean.Assert.all vs ; chalss)
+              Boolean.Assert.all vs ; chalss )
         in
         let () =
           with_label "hash_me_only" (fun () ->
               let hash_me_only =
                 unstage
                   (hash_me_only ~index:dlog_plonk_index
-                     basic.var_to_field_elements)
+                     basic.var_to_field_elements )
               in
               Field.Assert.equal stmt.proof_state.me_only
                 (hash_me_only
@@ -360,8 +358,8 @@ let step_main :
                    ; old_bulletproof_challenges =
                        (* Note: the bulletproof_challenges here are unpadded! *)
                        bulletproof_challenges
-                   }))
+                   } ) )
         in
-        ())
+        () )
   in
   stage main

@@ -24,7 +24,7 @@
    consensus
    genesis_constants
    mina_numbers
-   mina_transition
+   mina_block
    logger
    transition_frontier_full_frontier
    transition_frontier_persistent_root
@@ -44,6 +44,7 @@
    with_hash
    rose_tree
    quickcheck_lib
+   protocol_version
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_compare ppx_deriving_yojson)))

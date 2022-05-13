@@ -95,8 +95,8 @@ struct
         Or_error.error_string
           (error_str
              (sprintf "version byte \\x%02X, expected \\x%02X" (Char.to_int ch)
-                (Char.to_int version_byte))
-             str)
+                (Char.to_int version_byte) )
+             str )
 end
 
 module Version_bytes = Version_bytes

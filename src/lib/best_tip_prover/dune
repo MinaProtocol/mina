@@ -19,7 +19,7 @@
    mina_base
    mina_intf
    mina_state
-   mina_transition
+   mina_block
    data_hash_lib
    transition_frontier_base
    merkle_list_prover

@@ -73,4 +73,4 @@ let log_memory_stats logger ~process =
        let%bind () = after interval in
        loop ()
      in
-     loop ())
+     loop () )

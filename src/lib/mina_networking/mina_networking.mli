@@ -1,7 +1,6 @@
 open Async
 open Core
 open Mina_base
-open Mina_transition
 open Network_pool
 open Pipe_lib
 open Network_peer
@@ -38,7 +37,7 @@ module Rpcs : sig
   module Get_transition_chain : sig
     type query = State_hash.t list
 
-    type response = External_transition.t list option
+    type response = Mina_block.t list option
   end
 
   module Get_transition_knowledge : sig
@@ -58,8 +57,8 @@ module Rpcs : sig
       (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
     type response =
-      ( External_transition.t
-      , State_body_hash.t list * External_transition.t )
+      ( Mina_block.t
+      , State_body_hash.t list * Mina_block.t )
       Proof_carrying_data.t
       option
   end
@@ -74,8 +73,8 @@ module Rpcs : sig
     type query = unit [@@deriving sexp, to_yojson]
 
     type response =
-      ( External_transition.t
-      , State_body_hash.t list * External_transition.t )
+      ( Mina_block.t
+      , State_body_hash.t list * Mina_block.t )
       Proof_carrying_data.t
       option
   end
@@ -199,9 +198,7 @@ val get_ancestry :
      t
   -> Peer.Id.t
   -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
-  -> ( External_transition.t
-     , State_body_hash.t list * External_transition.t )
-     Proof_carrying_data.t
+  -> (Mina_block.t, State_body_hash.t list * Mina_block.t) Proof_carrying_data.t
      Envelope.Incoming.t
      Deferred.Or_error.t
 
@@ -210,9 +207,7 @@ val get_best_tip :
   -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
-  -> ( External_transition.t
-     , State_body_hash.t list * External_transition.t )
-     Proof_carrying_data.t
+  -> (Mina_block.t, State_body_hash.t list * Mina_block.t) Proof_carrying_data.t
      Deferred.Or_error.t
 
 val get_transition_chain_proof :
@@ -229,7 +224,7 @@ val get_transition_chain :
   -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
-  -> External_transition.t list Deferred.Or_error.t
+  -> Mina_block.t list Deferred.Or_error.t
 
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
@@ -244,7 +239,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
 val broadcast_state :
-  t -> External_transition.t State_hash.With_state_hashes.t -> unit Deferred.t
+  t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
   t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
@@ -288,31 +283,31 @@ val create :
   -> sinks:Sinks.t
   -> get_some_initial_peers:
        (   Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
-        -> Rpcs.Get_some_initial_peers.response Deferred.t)
+        -> Rpcs.Get_some_initial_peers.response Deferred.t )
   -> get_staged_ledger_aux_and_pending_coinbases_at_hash:
        (   Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
            Envelope.Incoming.t
         -> Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response
-           Deferred.t)
+           Deferred.t )
   -> answer_sync_ledger_query:
        (   Rpcs.Answer_sync_ledger_query.query Envelope.Incoming.t
-        -> Rpcs.Answer_sync_ledger_query.response Deferred.t)
+        -> Rpcs.Answer_sync_ledger_query.response Deferred.t )
   -> get_ancestry:
        (   Rpcs.Get_ancestry.query Envelope.Incoming.t
-        -> Rpcs.Get_ancestry.response Deferred.t)
+        -> Rpcs.Get_ancestry.response Deferred.t )
   -> get_best_tip:
        (   Rpcs.Get_best_tip.query Envelope.Incoming.t
-        -> Rpcs.Get_best_tip.response Deferred.t)
+        -> Rpcs.Get_best_tip.response Deferred.t )
   -> get_node_status:
        (   Rpcs.Get_node_status.query Envelope.Incoming.t
-        -> Rpcs.Get_node_status.response Deferred.t)
+        -> Rpcs.Get_node_status.response Deferred.t )
   -> get_transition_chain_proof:
        (   Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_chain_proof.response Deferred.t)
+        -> Rpcs.Get_transition_chain_proof.response Deferred.t )
   -> get_transition_chain:
        (   Rpcs.Get_transition_chain.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_chain.response Deferred.t)
+        -> Rpcs.Get_transition_chain.response Deferred.t )
   -> get_transition_knowledge:
        (   Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
-        -> Rpcs.Get_transition_knowledge.response Deferred.t)
+        -> Rpcs.Get_transition_knowledge.response Deferred.t )
   -> t Deferred.t

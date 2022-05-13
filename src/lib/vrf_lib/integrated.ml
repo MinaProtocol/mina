@@ -115,7 +115,7 @@ end = struct
            Group.Checked.scale_generator
              (module Shifted)
              private_key ~init:Shifted.zero
-           >>= Shifted.Assert.equal public_key_shifted)
+           >>= Shifted.Assert.equal public_key_shifted )
       in
       eval (module Shifted) ~private_key message
   end

@@ -55,24 +55,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Wait_condition.with_timeouts
                 ~hard_timeout:
                   (Network_time_span.Literal
-                     (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
+                     (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
     in
     let print_chains (labeled_chain_list : (string * string list) list) =
       List.iter labeled_chain_list ~f:(fun labeled_chain ->
           let label, chain = labeled_chain in
           let chain_str = String.concat ~sep:"\n" chain in
-          [%log info] "\nchain of %s:\n %s" label chain_str)
+          [%log info] "\nchain of %s:\n %s" label chain_str )
     in
     section "common prefix of all nodes is no farther back than 1 block"
       (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
       (let%bind (labeled_chains : (string * string list) list) =
          Malleable_error.List.map all_nodes ~f:(fun node ->
              let%map chain = Network.Node.must_get_best_chain ~logger node in
-             (Node.id node, List.map ~f:(fun b -> b.state_hash) chain))
+             (Node.id node, List.map ~f:(fun b -> b.state_hash) chain) )
        in
        let (chains : string list list) =
          List.map labeled_chains ~f:(fun (_, chain) -> chain)
        in
        print_chains labeled_chains ;
-       Util.check_common_prefixes chains ~tolerance:1 ~logger)
+       Util.check_common_prefixes chains ~tolerance:1 ~logger )
 end
