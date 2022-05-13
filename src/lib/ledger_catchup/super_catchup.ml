@@ -1075,13 +1075,10 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
     Downloader.set_check_invariant (fun downloader ->
         check_invariant ~downloader t )
   in
-  (*
   every ~stop (Time.Span.of_sec 10.) (fun () ->
-      (* HERE!!! *)
       [%log debug]
         ~metadata:[ ("states", to_yojson t) ]
-        "Catchup states $states") ;
-  *)
+        "Catchup states $states" ) ;
   let run_state_machine =
     setup_state_machine_runner ~t ~verifier ~downloader ~logger
       ~precomputed_values ~trust_system ~frontier ~unprocessed_transition_cache
