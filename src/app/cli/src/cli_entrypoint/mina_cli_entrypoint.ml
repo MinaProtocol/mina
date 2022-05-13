@@ -481,7 +481,13 @@ let setup_daemon logger =
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-rejected-blocks.log"
-               ~max_size:rejected_blocks_log_size ~num_rotate:50 ) ;
+               ~max_size:rejected_blocks_log_size ~num_rotate:50) ;
+        Logger.Consumer_registry.register ~id:Logger.Logger_id.oversized_logs
+          ~processor:(Logger.Processor.raw ())
+          ~transport:
+            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+               ~log_filename:"mina-oversized-logs.log"
+               ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate) ;
         let version_metadata =
           [ ("commit", `String Mina_version.commit_id)
           ; ("branch", `String Mina_version.branch)
