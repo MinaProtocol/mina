@@ -2987,7 +2987,11 @@ module Ledger = struct
 
   let field_of_base58 (field : Js.js_string Js.t) : field_class Js.t =
     to_js_field @@ Field.constant @@ Mina_base.Account_id.Digest.to_field
-    @@ Mina_base.Account_id.Digest.of_string @@ Js.to_string @@ field
+    @@ Mina_base.Account_id.Digest.of_string @@ Js.to_string field
+
+  let memo_to_base58 (memo : Js.js_string Js.t) : Js.js_string Js.t =
+    Js.string @@ Mina_base.Signed_command_memo.to_base58_check
+    @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
   let add_account_exn (l : L.t) pk (balance : string) =
     let account_id = account_id pk in
@@ -3117,6 +3121,7 @@ module Ledger = struct
     static_method "privateKeyOfString" private_key_of_string ;
     static_method "fieldToBase58" field_to_base58 ;
     static_method "fieldOfBase58" field_of_base58 ;
+    static_method "memoToBase58" memo_to_base58 ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;
