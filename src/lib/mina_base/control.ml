@@ -24,7 +24,7 @@ let gen_with_dummies : t Quickcheck.Generator.t Lazy.t =
     (Quickcheck.Generator.of_list
        (let dummy_proof =
           let n2 = Pickles_types.Nat.N2.n in
-          let proof = Pickles.Proof.dummy n2 n2 n2 in
+          let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
           Proof proof
         in
         let dummy_signature = Signature Signature.dummy in
@@ -83,7 +83,7 @@ let tag : t -> Tag.t = function
 let dummy_of_tag : Tag.t -> t = function
   | Proof ->
       let n2 = Pickles_types.Nat.N2.n in
-      let proof = Pickles.Proof.dummy n2 n2 n2 in
+      let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
       Proof proof
   | Signature ->
       Signature Signature.dummy

@@ -178,8 +178,12 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
         data.staking.ledger
   in
   let open Pickles_types in
-  let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
-  let txn_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n in
+  let blockchain_dummy =
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+  in
+  let txn_dummy =
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n ~domain_log2:16
+  in
   B.step
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
