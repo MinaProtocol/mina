@@ -196,6 +196,22 @@ let%test_module "Zkapp tokens tests" =
                                 (mk_party_body Call token_account2
                                    custom_token_id 30 )
                                 []
+                            ; node
+                                (mk_party_body Call token_account1
+                                   custom_token_id (-10) )
+                                []
+                            ; node
+                                (mk_party_body Call token_account2
+                                   custom_token_id 10 )
+                                []
+                            ; node
+                                (mk_party_body Call token_account2
+                                   custom_token_id (-5) )
+                                []
+                            ; node
+                                (mk_party_body Call token_account1
+                                   custom_token_id 5 )
+                                []
                             ]
                         ]
                       |> mk_parties_transaction ledger
@@ -207,7 +223,7 @@ let%test_module "Zkapp tokens tests" =
                     U.check_parties_with_merges_exn ledger
                       [ token_transfer_parties ]
                   in
-                  check_token_balance token_account1 70 ;
-                  check_token_balance token_account2 30 ;
+                  check_token_balance token_account1 65 ;
+                  check_token_balance token_account2 35 ;
                   Async.Deferred.unit ) ) )
   end )
