@@ -5,12 +5,12 @@ module Setup_test (Backend : Snarky_backendless.Backend_intf.S) = struct
   let main x () =
     let y =
       exists Field.typ ~compute:(fun () ->
-          Field.Constant.sqrt (As_prover.read_var x))
+          Field.Constant.sqrt (As_prover.read_var x) )
     in
     assert_r1cs y y x ;
     let z =
       exists Field.typ ~compute:(fun () ->
-          Field.Constant.square (As_prover.read_var x))
+          Field.Constant.square (As_prover.read_var x) )
     in
     assert_r1cs x x z
 end

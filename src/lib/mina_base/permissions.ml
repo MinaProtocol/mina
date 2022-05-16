@@ -45,7 +45,7 @@ module Ledger_hash = Ledger_hash0
 
      "Making sense" can be captured by the idea that these are the *increasing*
      boolean functions on the type { has_valid_signature: bool; has_valid_proof: bool }.
-  *)
+*)
 module Auth_required = struct
   [%%versioned
   module Stable = struct
@@ -209,7 +209,7 @@ module Auth_required = struct
 
   let%test_unit "decode encode" =
     List.iter [ Impossible; Proof; Signature; Either ] ~f:(fun t ->
-        [%test_eq: t] t (decode (encode t)))
+        [%test_eq: t] t (decode (encode t)) )
 
   [%%ifdef consensus_mechanism]
 
@@ -220,7 +220,7 @@ module Auth_required = struct
 
     let to_input : t -> _ =
       Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
-          (b :> Field.Var.t))
+          (b :> Field.Var.t) )
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 

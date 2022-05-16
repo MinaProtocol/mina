@@ -60,8 +60,7 @@ module Time_with_json = struct
   let of_yojson = function
     | `String time ->
         Ok
-          (Time.of_string_gen ~if_no_timezone:(`Use_this_one Time.Zone.utc)
-             time)
+          (Time.of_string_gen ~if_no_timezone:(`Use_this_one Time.Zone.utc) time)
     | _ ->
         Error "Trust_system.Peer_trust: Could not parse time"
 end
@@ -126,18 +125,18 @@ module Make0 (Inputs : Input_intf) = struct
     Option.value_map db ~default:[] ~f:(fun db' ->
         Db.to_alist db'
         |> List.map ~f:(fun (peer, record) ->
-               (peer, Record_inst.to_peer_status record)))
+               (peer, Record_inst.to_peer_status record) ) )
 
   let lookup_ip t ip =
     List.filter (peer_statuses t) ~f:(fun (p, _status) ->
-        Unix.Inet_addr.equal (Peer_id.ip p) ip)
+        Unix.Inet_addr.equal (Peer_id.ip p) ip )
 
   let reset_ip ({ db; _ } as t) ip =
     Option.value_map db ~default:() ~f:(fun db' ->
         List.map
           ~f:(fun (id, _status) -> Db.remove db' ~key:id)
           (lookup_ip t ip)
-        |> ignore) ;
+        |> ignore ) ;
     lookup_ip t ip
 
   let close { db; bans_writer; _ } =
@@ -278,7 +277,7 @@ let%test_module "peer_trust" =
       let res = Peer_trust_test.create () in
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback res.bans_reader ~f:(fun v ->
-             ban_pipe_out := v :: !ban_pipe_out) ;
+             ban_pipe_out := v :: !ban_pipe_out ) ;
       res
 
     let nolog = Logger.null ()
@@ -309,7 +308,7 @@ let%test_module "peer_trust" =
                 assert_ban_pipe [ 0 ] ;
                 true
             | _ ->
-                false)
+                false )
 
     let%test "trust decays by half in 24 hours" =
       Run_in_thread.block_on_async_exn (fun () ->
@@ -328,7 +327,7 @@ let%test_module "peer_trust" =
               | _ ->
                   false )
           | _ ->
-              false)
+              false )
 
     let do_constant_rate rate f =
       (* Simulate running the function at the specified rate, in actions/sec,
@@ -357,7 +356,7 @@ let%test_module "peer_trust" =
           | [ (_, { banned = Unbanned; _ }) ] ->
               assert_ban_pipe [] ; true
           | _ ->
-              false)
+              false )
 
     let%test "peers do get banned for acting faster than the maximum rate" =
       if tmp_bans_are_disabled then true
@@ -372,7 +371,7 @@ let%test_module "peer_trust" =
             | [ (_, { banned = Unbanned; _ }) ] ->
                 false
             | _ ->
-                false)
+                false )
 
     let%test "good cancels bad" =
       Run_in_thread.block_on_async_exn (fun () ->
@@ -382,7 +381,7 @@ let%test_module "peer_trust" =
                 let%bind () =
                   Peer_trust_test.record db nolog 0 Action.Slow_punish
                 in
-                Peer_trust_test.record db nolog 0 Action.Slow_credit)
+                Peer_trust_test.record db nolog 0 Action.Slow_credit )
           in
           match Peer_trust_test.lookup_ip db peer0 with
           | [ (_, { banned = Banned_until _; _ }) ] ->
@@ -390,7 +389,7 @@ let%test_module "peer_trust" =
           | [ (_, { banned = Unbanned; _ }) ] ->
               assert_ban_pipe [] ; true
           | _ ->
-              false)
+              false )
 
     let%test "insta-bans ignore positive trust" =
       if tmp_bans_are_disabled then true
@@ -416,7 +415,7 @@ let%test_module "peer_trust" =
             | [ (_, { banned = Unbanned; _ }) ] ->
                 failwith "Peer not banned"
             | _ ->
-                false)
+                false )
 
     let%test "multiple peers getting banned causes multiple ban events" =
       if tmp_bans_are_disabled then true
@@ -426,7 +425,7 @@ let%test_module "peer_trust" =
             let%bind () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
             let%map () = Peer_trust_test.record db nolog 1 Action.Insta_ban in
             assert_ban_pipe [ 1; 0 ] (* Reverse order since it's a snoc list. *) ;
-            true)
+            true )
 
     let%test_unit "actions are written to the pipe" =
       Run_in_thread.block_on_async_exn (fun () ->
@@ -447,7 +446,7 @@ let%test_module "peer_trust" =
               assert (List.is_empty db.actions_writers) ;
               Deferred.unit
           | _ ->
-              failwith "wrong number of actions written to pipe")
+              failwith "wrong number of actions written to pipe" )
   end )
 
 module Make (Action : Action_intf) = Make0 (struct

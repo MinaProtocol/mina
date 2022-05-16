@@ -24,7 +24,7 @@ module Poly : sig
             , 'consensus_transition
             , 'pending_coinbase_update )
             V1.t =
-        ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t
+    ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t
 end
 
 module Value : sig

@@ -166,7 +166,7 @@ end = struct
   let add_path (t : t) path account_id account =
     let index =
       List.foldi path ~init:0 ~f:(fun i acc x ->
-          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc)
+          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
     in
     { t with
       tree = add_path t.depth t.tree path account
@@ -374,7 +374,7 @@ let%test_module "sparse-ledger-test" =
                 ~message:
                   "Iteri index should be contained in the indexes auxillary \
                    structure"
-                ~expect:true (Int.Set.mem indexes i)))
+                ~expect:true (Int.Set.mem indexes i) ) )
 
     let%test_unit "path_test" =
       Quickcheck.test gen ~f:(fun t ->
@@ -382,7 +382,7 @@ let%test_module "sparse-ledger-test" =
           let t' =
             List.fold t.indexes ~init:root ~f:(fun acc (_, index) ->
                 let account = get_exn t index in
-                add_path acc (path_exn t index) (Account.key account) account)
+                add_path acc (path_exn t index) (Account.key account) account )
           in
-          assert (Tree.equal Hash.equal Account.equal t'.tree t.tree))
+          assert (Tree.equal Hash.equal Account.equal t'.tree t.tree) )
   end )

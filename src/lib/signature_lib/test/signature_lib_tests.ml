@@ -26,7 +26,7 @@ let%test_module "Signatures are unchanged test" =
       let signature_got =
         Schnorr.Legacy.sign privkey
           (Random_oracle_input.Legacy.field_elements
-             [| fst signature_expected |])
+             [| fst signature_expected |] )
       in
       let signature_expected =
         ( Snark_params.Tick.Field.of_string

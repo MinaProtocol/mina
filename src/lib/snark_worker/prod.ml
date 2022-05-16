@@ -121,20 +121,20 @@ module Inputs = struct
                                         }
                                     , parties )
                                   ]
-                                |> fst |> List.rev)
+                                |> fst |> List.rev )
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for parties : \
                                        %s: %s"
                                      ( Parties.to_yojson parties
                                      |> Yojson.Safe.to_string )
-                                     (Error.to_string_hum e))
+                                     (Error.to_string_hum e) )
                             |> Deferred.return
                           in
                           let log_base_snark f ~statement ~spec ~all_inputs =
                             match%map.Deferred
                               Deferred.Or_error.try_with (fun () ->
-                                  f ~statement ~spec)
+                                  f ~statement ~spec )
                             with
                             | Ok p ->
                                 Ok p
@@ -191,7 +191,7 @@ module Inputs = struct
                                   ~statement:{ stmt with sok_digest } ~spec
                                   ~all_inputs:inputs
                                   (M.of_parties_segment_exn ~snapp_statement
-                                     ~witness)
+                                     ~witness )
                               in
 
                               let%map (p : Ledger_proof.t) =
@@ -208,10 +208,10 @@ module Inputs = struct
                                         ~statement:{ stmt with sok_digest }
                                         ~spec ~all_inputs:inputs
                                         (M.of_parties_segment_exn
-                                           ~snapp_statement ~witness)
+                                           ~snapp_statement ~witness )
                                     in
                                     log_merge_snark ~sok_digest prev curr
-                                      ~all_inputs:inputs)
+                                      ~all_inputs:inputs )
                               in
                               if
                                 Transaction_snark.Statement.equal
@@ -264,7 +264,7 @@ module Inputs = struct
                                 }
                                 ~init_stack:w.init_stack
                                 (unstage
-                                   (Mina_ledger.Sparse_ledger.handler w.ledger))))
+                                   (Mina_ledger.Sparse_ledger.handler w.ledger) ) ) )
               | Merge (_, proof1, proof2) ->
                   process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
       | Check | None ->

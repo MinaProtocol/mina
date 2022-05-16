@@ -55,12 +55,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~txn_hash:hash ~node_included_in:`Any_node))
+              ~txn_hash:hash ~node_included_in:`Any_node ) )
     in
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
            (List.hd_exn @@ Network.archive_nodes network)
        in
-       check_replayer_logs ~logger logs)
+       check_replayer_logs ~logger logs )
 end

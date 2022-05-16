@@ -116,7 +116,7 @@ let generate_dhall_type type_decl =
             [%e
               elist
                 (List.map ctor_decls
-                   ~f:dhall_variant_from_constructor_declaration)]]
+                   ~f:dhall_variant_from_constructor_declaration )]]
     | Ptype_record label_decls ->
         [%expr
           Ppx_dhall_type.Dhall_type.Record
@@ -144,7 +144,7 @@ let generate_dhall_type type_decl =
                 pvar a
             | _ ->
                 Location.raise_errorf ~loc:type_decl.ptype_loc
-                  "Type parameter not a type variable")
+                  "Type parameter not a type variable" )
       in
       let abs = eabstract args dhall_type in
       [%stri let [%p ty_name] = [%e abs]]

@@ -49,7 +49,7 @@ module Block = struct
             ; zone >>| field "zone"
             ]
           in
-          `Assoc (List.filter_map fields ~f:Fn.id))
+          `Assoc (List.filter_map fields ~f:Fn.id) )
   end
 
   module Module = struct
@@ -68,7 +68,7 @@ module Block = struct
             ; ("source", `String source)
             ]
           in
-          `Assoc (const_fields @ args))
+          `Assoc (const_fields @ args) )
   end
 
   module Data = struct

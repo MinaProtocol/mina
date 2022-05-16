@@ -158,8 +158,8 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
 
 let rec fold_until ~(init : 'accum)
     ~(f :
-       'accum -> 'a -> ('accum, 'final) Continue_or_stop.t Deferred.Or_error.t)
-    ~(finish : 'accum -> 'final Deferred.Or_error.t) :
+       'accum -> 'a -> ('accum, 'final) Continue_or_stop.t Deferred.Or_error.t
+       ) ~(finish : 'accum -> 'final Deferred.Or_error.t) :
     'a list -> 'final Deferred.Or_error.t = function
   | [] ->
       finish init
@@ -182,7 +182,7 @@ let find_map_ok l ~f =
             | Error current_error ->
                 `Repeat (tl, current_error :: errors)
             | Ok result ->
-                `Finished (Ok result)))
+                `Finished (Ok result) ) )
 
 type download_state_hashes_error =
   [ `Peer_moves_too_fast of Error.t
@@ -273,7 +273,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
                    (Ok (peer, Frontier_base.Breadcrumb.state_hash final, acc))
              | None ->
                  Continue_or_stop.Continue
-                   (Unsigned.UInt32.pred blockchain_length, hash :: acc))
+                   (Unsigned.UInt32.pred blockchain_length, hash :: acc) )
            ~finish:(fun (blockchain_length, acc) ->
              let module T = struct
                type t = State_hash.t list [@@deriving to_yojson]
@@ -299,17 +299,17 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
                @@ `No_common_ancestor
                     (Error.of_string
                        "Requested block doesn't have a path to the root of our \
-                        frontier")
+                        frontier" )
              else
                let err_msg =
                  sprintf !"Peer %{sexp:Network_peer.Peer.t} moves too fast" peer
                in
-               Result.fail @@ `Peer_moves_too_fast (Error.of_string err_msg)))
+               Result.fail @@ `Peer_moves_too_fast (Error.of_string err_msg) ) )
   >>| fun (peer, final, hashes) ->
   let (_ : State_hash.t) =
     List.fold hashes ~init:final ~f:(fun parent h ->
         Transition_frontier.Catchup_hash_tree.add hash_tree h ~parent ~job ;
-        h)
+        h )
   in
   (peer, hashes)
 
@@ -318,7 +318,7 @@ let verify_against_hashes transitions hashes =
   && List.for_all2_exn transitions hashes ~f:(fun transition hash ->
          State_hash.equal
            (State_hash.With_state_hashes.state_hash transition)
-           hash)
+           hash )
 
 let rec partition size = function
   | [] ->
@@ -373,7 +373,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
   let busy = Peer.Hash_set.create () in
   Deferred.Or_error.List.concat_map
     (partition Transition_frontier.max_catchup_chunk_length
-       hashes_of_missing_transitions) ~how:`Parallel ~f:(fun hashes ->
+       hashes_of_missing_transitions ) ~how:`Parallel ~f:(fun hashes ->
       let%bind.Async.Deferred peers = Mina_networking.peers network in
       let peers =
         Peers_pool.create ~busy ~preferred:[ preferred_peer ]
@@ -434,7 +434,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                            ~hash_data:
                              (Fn.compose Mina_state.Protocol_state.hashes
                                 (Fn.compose Header.protocol_state
-                                   Mina_block.header)))
+                                   Mina_block.header ) ) )
                   in
                   if not @@ verify_against_hashes hashed_transitions hashes then (
                     let error_msg =
@@ -451,7 +451,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                   else
                     Deferred.Or_error.return
                     @@ List.map hashed_transitions ~f:(fun data ->
-                           Envelope.Incoming.wrap_peer ~data ~sender:peer))
+                           Envelope.Incoming.wrap_peer ~data ~sender:peer ) )
             in
             Hash_set.remove busy peer ;
             match res with
@@ -460,7 +460,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
             | Error e ->
                 go (e :: errs) )
       in
-      go [])
+      go [] )
 
 let verify_transitions_and_build_breadcrumbs ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
@@ -478,14 +478,14 @@ let verify_transitions_and_build_breadcrumbs ~logger
       match%bind
         Validation.validate_proofs ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
-               Validation.wrap (Envelope.Incoming.data t)))
+               Validation.wrap (Envelope.Incoming.data t) ) )
       with
       | Ok tvs ->
           return
             (Ok
                (List.map2_exn transitions tvs ~f:(fun e data ->
                     (* this does not update the envelope timestamps *)
-                    { e with data })))
+                    { e with data } ) ) )
       | Error (`Verifier_error error) ->
           [%log warn]
             ~metadata:[ ("error", Error_json.error_to_yojson error) ]
@@ -529,7 +529,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
         | Ok (`Building_path transition_with_initial_validation) ->
             Deferred.Or_error.return
             @@ Continue_or_stop.Continue
-                 (transition_with_initial_validation :: acc))
+                 (transition_with_initial_validation :: acc) )
       ~finish:(fun acc ->
         let validation_end_time = Core.Time.now () in
         [%log debug]
@@ -553,13 +553,13 @@ let verify_transitions_and_build_breadcrumbs ~logger
             |> Header.protocol_state
             |> Mina_state.Protocol_state.previous_state_hash
           in
-          Deferred.Or_error.return (acc, initial_state_hash))
+          Deferred.Or_error.return (acc, initial_state_hash) )
   in
   let build_start_time = Core.Time.now () in
   let trees_of_transitions =
     Option.fold (Non_empty_list.of_list_opt transitions_with_initial_validation)
       ~init:subtrees ~f:(fun _ transitions ->
-        [ Rose_tree.of_non_empty_list ~subtrees transitions ])
+        [ Rose_tree.of_non_empty_list ~subtrees transitions ] )
   in
   let open Deferred.Let_syntax in
   match%bind
@@ -602,7 +602,7 @@ let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
       ignore
         ( Rose_tree.map subtree ~f:Cached.invalidate_with_failure
-          : 'a Rose_tree.t )) ;
+          : 'a Rose_tree.t ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
@@ -613,7 +613,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , Strict_pipe.crash Strict_pipe.buffered
        , unit )
-       Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
+       Strict_pipe.Writer.t ) ~unprocessed_transition_cache : unit =
   let hash_tree =
     match Transition_frontier.catchup_tree frontier with
     | Hash t ->
@@ -655,9 +655,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                          | Local ->
                              acc_inner
                          | Remote peer ->
-                             peer :: acc_inner)
+                             peer :: acc_inner )
                    in
-                   cached_peers @ acc_outer)
+                   cached_peers @ acc_outer )
                |> List.dedup_and_sort ~compare:Peer.compare
              in
              match%bind
@@ -680,7 +680,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                          [ ( "errors"
                            , `List
                                (List.map errors ~f:(fun err ->
-                                    `String (display_error err))) )
+                                    `String (display_error err) ) ) )
                          ] ;
                      let%bind random_peers =
                        Mina_networking.peers network >>| List.permute
@@ -699,7 +699,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                              [ ( "errors"
                                , `List
                                    (List.map errors ~f:(fun err ->
-                                        `String (display_error err))) )
+                                        `String (display_error err) ) ) )
                              ] ;
                          if contains_no_common_ancestor errors then
                            List.iter subtrees ~f:(fun subtree ->
@@ -718,14 +718,14 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                      Cached.peek cached_transition
                                      |> Envelope.Incoming.data
                                      |> Validation.block_with_hash
-                                     |> State_hash.With_state_hashes.state_hash)
+                                     |> State_hash.With_state_hashes.state_hash )
                                in
                                [%log error]
                                  ~metadata:
                                    [ ( "state_hashes_of_children"
                                      , `List
                                          (List.map children_state_hashes
-                                            ~f:State_hash.to_yojson) )
+                                            ~f:State_hash.to_yojson ) )
                                    ; ( "state_hash"
                                      , State_hash.to_yojson
                                          ( transition
@@ -749,7 +749,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                Mina_metrics.(
                                  Counter.inc Rejected_blocks.no_common_ancestor
                                    ( Float.of_int
-                                   @@ (1 + List.length children_transitions) ))) ;
+                                   @@ (1 + List.length children_transitions) )) ) ;
                          return
                            (Error (Error.of_list @@ List.map errors ~f:to_error))
                      )
@@ -762,7 +762,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                    [ ( "hashes_of_missing_transitions"
                      , `List
                          (List.map hashes_of_missing_transitions
-                            ~f:State_hash.to_yojson) )
+                            ~f:State_hash.to_yojson ) )
                    ]
                  !"Number of missing transitions is %d"
                  num_of_missing_transitions ;
@@ -791,8 +791,8 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                   (fun breadcrumb ->
                                     Cached.peek breadcrumb
                                     |> Transition_frontier.Breadcrumb.state_hash
-                                    |> State_hash.to_yojson)
-                                  tree)) )
+                                    |> State_hash.to_yojson )
+                                  tree ) ) )
                      ]
                    "about to write to the catchup breadcrumbs pipe" ;
                  if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
@@ -826,7 +826,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                  Mina_metrics.(
                    Gauge.set Transition_frontier_controller.catchup_time_ms
                      Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
-                 Catchup_jobs.decr ())))
+                 Catchup_jobs.decr () ) ) )
 
 (* Unit tests *)
 
@@ -856,7 +856,7 @@ let%test_module "Ledger_catchup tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()))
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     let downcast_transition transition =
       let transition =
@@ -956,9 +956,9 @@ let%test_module "Ledger_catchup tests" =
           catchup_breadcrumbs ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
             Mina_block.Validated.equal
               (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree1)
+                 breadcrumb_tree1 )
               (Transition_frontier.Breadcrumb.validated_transition
-                 breadcrumb_tree2))
+                 breadcrumb_tree2 ) )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith
@@ -987,7 +987,7 @@ let%test_module "Ledger_catchup tests" =
                 (best_tip peer_net.state.frontier))
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path))
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
@@ -1003,7 +1003,7 @@ let%test_module "Ledger_catchup tests" =
             [ Transition_frontier.best_tip peer_net.state.frontier ]
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path))
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
@@ -1054,7 +1054,8 @@ let%test_module "Ledger_catchup tests" =
                   (Ivar.read (Cache_lib.Cached.final_state cached_transition))
               in
               if not ([%equal: [ `Failed | `Success of _ ]] result `Failed) then
-                failwith "expected ledger catchup to fail, but it succeeded"))
+                failwith "expected ledger catchup to fail, but it succeeded" )
+          )
 
     (* TODO: fix and re-enable *)
     (*

@@ -41,7 +41,7 @@ type ( 'a_var
               and type max_proofs_verified = 'max_proofs_verified
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
-              and type local_branches = 'local_heights)
+              and type local_branches = 'local_heights )
       }
       -> ( 'a_var
          , 'a_value
@@ -56,7 +56,7 @@ type ( 'a_var
 (* Compile an inductive rule. *)
 let create
     (type branches max_proofs_verified local_signature local_branches a_var
-    a_value prev_vars prev_values) ~index
+    a_value prev_vars prev_values ) ~index
     ~(self : (a_var, a_value, max_proofs_verified, branches) Tag.t)
     ~wrap_domains ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)

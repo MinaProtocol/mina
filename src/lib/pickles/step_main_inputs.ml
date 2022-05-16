@@ -18,7 +18,7 @@ let unrelated_g =
     unstage
       (group_map
          (module Tick.Field)
-         ~a:Tick.Inner_curve.Params.a ~b:Tick.Inner_curve.Params.b)
+         ~a:Tick.Inner_curve.Params.a ~b:Tick.Inner_curve.Params.b )
   and str = Fn.compose bits_to_bytes Tick.Field.to_bits in
   fun (x, y) -> group_map (tick_field_random_oracle (str x ^ str y))
 
@@ -88,11 +88,11 @@ module Input_domain = struct
                let v =
                  (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
                     (Backend.Tock.Keypair.load_urs ())
-                    domain_size i)
+                    domain_size i )
                    .unshifted
                in
                assert (Array.length v = 1) ;
-               v.(0) |> Common.finite_exn)))
+               v.(0) |> Common.finite_exn ) ) )
 end
 
 module Inner_curve = struct
@@ -179,7 +179,7 @@ module Inner_curve = struct
 
   let scale t bs =
     with_label __LOC__ (fun () ->
-        T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs))
+        T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
 
   let to_field_elements (x, y) = [ x; y ]
 
@@ -195,7 +195,7 @@ module Inner_curve = struct
               C.scale
                 (C.of_affine (read typ t))
                 (Tock.Field.inv
-                   (Tock.Field.of_bits (List.map ~f:(read Boolean.typ) bs)))
+                   (Tock.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
               |> C.to_affine_exn)
     in
     assert_equal t (scale res bs) ;
@@ -231,7 +231,8 @@ let%test_unit "scale fast 2'" =
         (Typ.tuple2 G.typ Field.typ)
         G.typ
         (fun (g, s) ->
-          make_checked (fun () -> Ops.scale_fast2' ~num_bits:n (module F) g s))
+          make_checked (fun () -> Ops.scale_fast2' ~num_bits:n (module F) g s)
+          )
         (fun (g, _) ->
           let x =
             let chunks_needed = Ops.chunks_needed ~num_bits:(n - 1) in
@@ -243,8 +244,8 @@ let%test_unit "scale fast 2'" =
             |> G.Constant.Scalar.( + )
                  (G.Constant.Scalar.project (Field.Constant.unpack s))
           in
-          G.Constant.scale g x)
-        (G.Constant.random (), s))
+          G.Constant.scale g x )
+        (G.Constant.random (), s) )
 
 let%test_unit "scale fast 2 small" =
   let open Impl in
@@ -270,7 +271,8 @@ let%test_unit "scale fast 2 small" =
         (Typ.tuple2 G.typ Field.typ)
         G.typ
         (fun (g, s) ->
-          make_checked (fun () -> Ops.scale_fast2' ~num_bits:n (module F) g s))
+          make_checked (fun () -> Ops.scale_fast2' ~num_bits:n (module F) g s)
+          )
         (fun (g, _) ->
           let x =
             let chunks_needed = Ops.chunks_needed ~num_bits:(n - 1) in
@@ -282,8 +284,8 @@ let%test_unit "scale fast 2 small" =
             |> G.Constant.Scalar.( + )
                  (G.Constant.Scalar.project (Field.Constant.unpack s))
           in
-          G.Constant.scale g x)
-        (G.Constant.random (), s))
+          G.Constant.scale g x )
+        (G.Constant.random (), s) )
 
 module Generators = struct
   let h =

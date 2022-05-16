@@ -47,4 +47,4 @@ let command =
          ~doc:"the waiting time after the nodes coming back alive"
          (optional_with_default 120 int)
      in
-     main num_block_producers waiting_time)
+     main num_block_producers waiting_time )

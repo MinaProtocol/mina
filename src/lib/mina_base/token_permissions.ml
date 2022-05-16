@@ -54,10 +54,10 @@ let typ : (var, t) Typ.t =
          | Token_owned { disable_new_accounts } ->
              (true, disable_new_accounts)
          | Not_owned { account_disabled } ->
-             (false, account_disabled))
+             (false, account_disabled) )
        ~back:(fun (token_owner, token_locked) ->
          if token_owner then Token_owned { disable_new_accounts = token_locked }
-         else Not_owned { account_disabled = token_locked })
+         else Not_owned { account_disabled = token_locked } )
 
 let var_to_input { token_owner; token_locked } =
   let bs = [ token_owner; token_locked ] in

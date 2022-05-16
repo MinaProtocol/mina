@@ -39,7 +39,7 @@ let%test_module "Zkapp payments tests" =
                 ; update =
                     { app_state =
                         Pickles_types.Vector.map new_state ~f:(fun x ->
-                            Zkapp_basic.Set_or_keep.Set x)
+                            Zkapp_basic.Set_or_keep.Set x )
                     ; delegate = Keep
                     ; verification_key = Keep
                     ; permissions = Keep
@@ -108,7 +108,7 @@ let%test_module "Zkapp payments tests" =
                 ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
-                    account) ;
+                    account ) ;
               let t1 =
                 let i, j = (1, 2) in
                 signed_signed ~wallets i j
@@ -121,7 +121,7 @@ let%test_module "Zkapp payments tests" =
                 merkle_root_after_parties_exn ledger ~txn_state_view t1
               in
               let hash_post = Ledger.merkle_root ledger in
-              [%test_eq: Field.t] hash_pre hash_post))
+              [%test_eq: Field.t] hash_pre hash_post ) )
 
     let%test_unit "zkapps-based payment" =
       let open Mina_transaction_logic.For_tests in
@@ -131,8 +131,8 @@ let%test_module "Zkapp payments tests" =
                 party_send ~constraint_constants (List.hd_exn specs)
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ])
-          |> fun _ -> ())
+              U.apply_parties ledger [ parties ] )
+          |> fun _ -> () )
 
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
@@ -144,11 +144,11 @@ let%test_module "Zkapp payments tests" =
                     let use_full_commitment =
                       Quickcheck.random_value Bool.quickcheck_generator
                     in
-                    party_send ~constraint_constants ~use_full_commitment s)
+                    party_send ~constraint_constants ~use_full_commitment s )
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger partiess |> fun _ -> ()))
+              U.apply_parties ledger partiess |> fun _ -> () ) )
 
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in
@@ -170,7 +170,7 @@ let%test_module "Zkapp payments tests" =
                     Option.value_exn
                       (Amount.sub amount
                          (Amount.of_fee
-                            constraint_constants.account_creation_fee))
+                            constraint_constants.account_creation_fee ) )
                   in
                   let test_spec : Spec.t =
                     { sender = spec.sender
@@ -199,7 +199,7 @@ let%test_module "Zkapp payments tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_parties_with_merges_exn ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ] ) ) )
 
     let%test_unit "zkapps payments failed due to insufficient funds" =
       let open Mina_transaction_logic.For_tests in
@@ -266,5 +266,5 @@ let%test_module "Zkapp payments tests" =
                   in
                   U.check_parties_with_merges_exn
                     ~expected_failure:Transaction_status.Failure.Overflow ledger
-                    [ parties ])))
+                    [ parties ] ) ) )
   end )

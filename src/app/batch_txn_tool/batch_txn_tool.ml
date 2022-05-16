@@ -21,7 +21,7 @@ let output_keys =
      in
      fun () ->
        List.iter (gen_keys count) ~f:(fun pk ->
-           Format.printf "%s@." (Public_key.Compressed.to_base58_check pk)))
+           Format.printf "%s@." (Public_key.Compressed.to_base58_check pk) ) )
 
 let output_cmds =
   let open Command.Let_syntax in
@@ -87,11 +87,11 @@ let output_cmds =
                  Format.printf "sleep %f@."
                    Float.(of_int rate_limit_interval /. 1000.) ;
                  batch_count := 0 )
-               else incr batch_count) ;
+               else incr batch_count ) ;
            Format.printf
              "mina client send-payment --amount 1 --receiver %s --sender %s@."
              (Public_key.Compressed.to_base58_check pk)
-             sender_key))
+             sender_key ) )
 
 let pk_to_str pk =
   pk |> Public_key.compress |> Public_key.Compressed.to_base58_check
@@ -124,7 +124,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
             (Format.printf
                "txn burst tool: rate limiting, pausing for %d milliseconds... \
                 @."
-               rate_limit_interval)
+               rate_limit_interval )
         in
         let%bind () =
           Async.after (Time.Span.create ~ms:rate_limit_interval ())
@@ -143,7 +143,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
           (Option.value_exn
              (Currency.Amount.scale
                 (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee)
-                10))
+                10 ) )
     | Some f ->
         Currency.Amount.to_fee (Currency.Amount.of_formatted_string f)
   in
@@ -157,7 +157,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
       Option.value_exn
         (Currency.Amount.scale
            (Currency.Amount.of_fee fee_amount)
-           num_txn_per_acct)
+           num_txn_per_acct )
     in
     (* let total_acct_creation_fee =
          Option.value_exn
@@ -244,7 +244,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
       | Error e ->
           return
             (Format.printf "txn burst tool: txn failed with error %s@."
-               (Error.to_string_hum e))
+               (Error.to_string_hum e) )
     in
     limit ()
   in
@@ -255,7 +255,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
         let%bind origin_nonce = get_nonce origin_keypair.public_key in
         (* we could also get the origin nonce outside the iter and then just increment by 1 every iter *)
-        do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce:origin_nonce)
+        do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce:origin_nonce )
   in
 
   (* and back again... *)
@@ -272,7 +272,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
           in
           if n > 1 then do_command (n - 1) else return ()
         in
-        do_command num_txn_per_acct)
+        do_command num_txn_per_acct )
   in
   return ()
 
@@ -366,7 +366,7 @@ let output_there_and_back_cmds =
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
        ~returner_secret_key_path ~returner_secret_key_pw_option
-       ~graphql_target_node_option)
+       ~graphql_target_node_option )
 
 let () =
   Command.run
@@ -375,4 +375,4 @@ let () =
        [ ("gen-keys", output_keys)
        ; ("gen-txns", output_cmds)
        ; ("gen-there-and-back-txns", output_there_and_back_cmds)
-       ])
+       ] )

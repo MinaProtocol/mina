@@ -8,7 +8,7 @@ let start =
   Common.when_profiling
     (fun loc ->
       r := Time.now () ;
-      l := loc)
+      l := loc )
     ignore
 
 let clock =
@@ -18,5 +18,5 @@ let clock =
       printf "%s -> %s: %s\n%!" !l loc
         (Time.Span.to_string_hum (Time.diff t !r)) ;
       r := t ;
-      l := loc)
+      l := loc )
     ignore

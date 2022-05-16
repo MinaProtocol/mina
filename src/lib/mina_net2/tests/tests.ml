@@ -135,14 +135,14 @@ let%test_module "coda network tests" =
                     else
                       failwith
                         (Printf.sprintf "Unexpected string %s not matches %d" s
-                           !j)
+                           !j )
                   done ;
                   go !j
               in
               go 1000
               >>| fun () ->
               Pipe.close w ;
-              Ivar.fill handler_finished ())
+              Ivar.fill handler_finished () )
           >>| Or_error.ok_exn
         in
         let%bind stream =
@@ -176,7 +176,7 @@ let%test_module "coda network tests" =
               let r, w = Libp2p_stream.pipes stream in
               let%map () = Pipe.transfer r w ~f:Fn.id in
               Pipe.close w ;
-              Ivar.fill_if_empty handler_finished ())
+              Ivar.fill_if_empty handler_finished () )
           |> Deferred.Or_error.ok_exn
         in
         let%bind stream =

@@ -65,7 +65,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     repeat_seq ~n ~f:(fun () ->
         Network.Node.must_send_payment ~logger sender ~sender_pub_key
           ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-        >>| ignore)
+        >>| ignore )
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -77,7 +77,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t
            (Wait_condition.nodes_to_initialize
               ( Network.seeds network @ block_producer_nodes
-              @ Network.snark_coordinators network )))
+              @ Network.snark_coordinators network ) ) )
     in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants =
@@ -94,7 +94,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       List.map zkapp_keypairs ~f:(fun zkapp_keypair ->
           Account_id.create
             (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
-            Token_id.default)
+            Token_id.default )
     in
     let%bind parties_create_account =
       (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
@@ -188,7 +188,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let fields =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length len
-               Snark_params.Tick.Field.gen)
+               Snark_params.Tick.Field.gen )
         in
         List.map fields ~f:(fun field -> Zkapp_basic.Set_or_keep.Set field)
         |> Zkapp_state.V.of_list_exn
@@ -291,7 +291,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                         Control.Proof Mina_base.Proof.blockchain_dummy
                     }
                 | _ ->
-                    other_p)
+                    other_p )
         }
     in
     let%bind.Deferred parties_nonexistent_fee_payer =
@@ -355,7 +355,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
         in
         List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
-            compatible req ledg ~equal:Pickles.Backend.Tick.Field.equal)
+            compatible req ledg ~equal:Pickles.Backend.Tick.Field.equal )
       in
       let delegates_compat =
         compatible requested_update.delegate ledger_update.delegate
@@ -461,12 +461,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ] ;
                Malleable_error.hard_error
                  (Error.of_string
-                    "Ledger permissions do not match update permissions") )))
+                    "Ledger permissions do not match update permissions" ) ) )
+        )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
         (send_invalid_zkapp ~logger node parties_insufficient_fee
-           "at least one user command had an insufficient fee")
+           "at least one user command had an insufficient fee" )
     in
     (*Won't be accepted until the previous transactions are applied*)
     let%bind () =
@@ -476,12 +477,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Send a zkapp with an invalid proof"
         (send_invalid_zkapp ~logger node parties_invalid_proof
-           "Verification_failed")
+           "Verification_failed" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient replace fee"
         (send_invalid_zkapp ~logger node parties_insufficient_replace_fee
-           "Insufficient_replace_fee")
+           "Insufficient_replace_fee" )
     in
     let%bind () =
       section_hard
@@ -496,12 +497,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger node parties_invalid_signature
-           "Verification_failed")
+           "Verification_failed" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction with a nonexistent fee payer"
         (send_invalid_zkapp ~logger node parties_nonexistent_fee_payer
-           "Fee_payer_account_not_found")
+           "Fee_payer_account_not_found" )
     in
     let%bind () =
       section_hard "Verify zkApp transaction updates in ledger"
@@ -527,17 +528,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ] ;
                Malleable_error.hard_error
                  (Error.of_string
-                    "Ledger update and requested update are incompatible") )))
+                    "Ledger update and requested update are incompatible" ) ) )
+        )
     in
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
     in
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
            (List.hd_exn @@ Network.archive_nodes network)
        in
-       check_replayer_logs ~logger logs)
+       check_replayer_logs ~logger logs )
 end
