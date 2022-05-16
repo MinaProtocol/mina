@@ -18,6 +18,8 @@ type t =
   ; staged_ledger_diff : Staged_ledger_diff.t
   ; delta_transition_chain_proof :
       Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+  ; accounts_accessed : (int * Account.t) list
+  ; accounts_created : (Account_id.t * Currency.Fee.t) list
   }
 [@@deriving sexp, yojson]
 
@@ -25,18 +27,25 @@ type t =
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V1 : sig
+  module V2 : sig
     type nonrec t = t =
       { scheduled_time : Block_time.Stable.V1.t
-      ; protocol_state : Protocol_state.Value.Stable.V1.t
-      ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-      ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+      ; protocol_state : Protocol_state.Value.Stable.V2.t
+      ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
+      ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+      ; accounts_accessed : (int * Account.Stable.V2.t) list
+      ; accounts_created :
+          (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       }
-
-    val to_latest : t -> t
   end
 end]
 
-val of_block : scheduled_time:Block_time.Time.t -> Block.t -> t
+val of_block :
+     logger:Logger.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> scheduled_time:Block_time.Time.t
+  -> staged_ledger:Staged_ledger.t
+  -> Block.t
+  -> t

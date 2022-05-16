@@ -18,6 +18,7 @@
    bin_prot.shape
    ppx_inline_test.config
    ;; local libraries
+   mina_generators
    sgn
    transition_frontier_base
    staged_ledger
@@ -30,6 +31,7 @@
    transaction_snark_work
    genesis_constants
    mina_numbers
+   mina_transaction_logic
    transition_frontier
    ledger_proof
    verifier
@@ -37,6 +39,7 @@
    one_or_two
    quickcheck_lib
    mina_base
+   mina_transaction
    transaction_snark
    consensus
    network_peer
@@ -52,6 +55,9 @@
    interruptible
    merkle_ledger
    data_hash_lib
+   mina_ledger
+   mina_base.import
+   snark_params
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

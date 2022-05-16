@@ -1,5 +1,6 @@
-open Core
-open Import
+open Core_kernel
+open Mina_base_util
+open Mina_base_import
 
 [%%versioned
 module Stable = struct
@@ -39,11 +40,15 @@ module Digest = struct
               s
           end)
 
+      open Snark_params.Tick
+
       let to_input t =
-        Random_oracle.Input.bitstring Fold_lib.Fold.(to_list (string_bits t))
+        Random_oracle.Input.Chunked.packeds
+          (Array.of_list_map
+             Fold_lib.Fold.(to_list (string_bits t))
+             ~f:(fun b -> (field_of_bool b, 1)) )
 
       let typ =
-        let open Snark_params.Tick in
         Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ
         |> Typ.transport ~there:Blake2.string_to_bits
              ~back:Blake2.bits_to_string
@@ -55,7 +60,9 @@ module Digest = struct
 
     type t = Boolean.var array
 
-    let to_input t = Random_oracle.Input.bitstring (Array.to_list t)
+    let to_input (t : t) =
+      Random_oracle.Input.Chunked.packeds
+        (Array.map t ~f:(fun b -> ((b :> Field.Var.t), 1)))
   end
 
   [%%define_locally Stable.Latest.(to_input, typ)]

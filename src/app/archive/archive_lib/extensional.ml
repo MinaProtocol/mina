@@ -2,6 +2,7 @@
 
 open Core_kernel
 open Mina_base
+open Mina_transaction
 open Signature_lib
 
 (* the tables in the archive db uses foreign keys to refer to other
@@ -21,11 +22,9 @@ module User_command = struct
   type t =
     { sequence_no : int
     ; typ : string
-    ; fee_payer : Public_key.Compressed.Stable.Latest.t
-    ; source : Public_key.Compressed.Stable.Latest.t
-    ; receiver : Public_key.Compressed.Stable.Latest.t
-    ; fee_token : Token_id.Stable.Latest.t
-    ; token : Token_id.Stable.Latest.t
+    ; fee_payer : Account_id.Stable.Latest.t
+    ; source : Account_id.Stable.Latest.t
+    ; receiver : Account_id.Stable.Latest.t
     ; nonce : Account.Nonce.Stable.Latest.t
     ; amount : Currency.Amount.Stable.Latest.t option
     ; fee : Currency.Fee.Stable.Latest.t
@@ -36,14 +35,6 @@ module User_command = struct
           [@of_yojson Transaction_hash.of_yojson]
     ; status : string
     ; failure_reason : Transaction_status.Failure.Stable.Latest.t option
-    ; source_balance : Currency.Balance.Stable.Latest.t option
-    ; fee_payer_account_creation_fee_paid :
-        Currency.Amount.Stable.Latest.t option
-    ; fee_payer_balance : Currency.Balance.Stable.Latest.t
-    ; receiver_account_creation_fee_paid :
-        Currency.Amount.Stable.Latest.t option
-    ; receiver_balance : Currency.Balance.Stable.Latest.t option
-    ; created_token : Token_id.Stable.Latest.t option
     }
   [@@deriving yojson, equal, bin_io_unversioned]
 end
@@ -56,12 +47,8 @@ module Internal_command = struct
     { sequence_no : int
     ; secondary_sequence_no : int
     ; typ : string
-    ; receiver : Public_key.Compressed.Stable.Latest.t
-    ; receiver_account_creation_fee_paid :
-        Currency.Amount.Stable.Latest.t option
-    ; receiver_balance : Currency.Balance.Stable.Latest.t
+    ; receiver : Account_id.Stable.Latest.t
     ; fee : Currency.Fee.Stable.Latest.t
-    ; token : Token_id.Stable.Latest.t
     ; hash : Transaction_hash.Stable.Latest.t
           [@to_yojson Transaction_hash.to_yojson]
           [@of_yojson Transaction_hash.of_yojson]
@@ -69,17 +56,34 @@ module Internal_command = struct
   [@@deriving yojson, equal, bin_io_unversioned]
 end
 
+(* for fee payer, other parties, authorizations are omitted; signatures, proofs not in archive db *)
+module Zkapp_command = struct
+  type t =
+    { sequence_no : int
+    ; fee_payer : Party.Body.Fee_payer.Stable.Latest.t
+    ; other_parties : Party.Body.Wire.Stable.Latest.t list
+    ; memo : Signed_command_memo.Stable.Latest.t
+    ; hash : Transaction_hash.Stable.Latest.t
+          [@to_yojson Transaction_hash.to_yojson]
+          [@of_yojson Transaction_hash.of_yojson]
+    ; status : string
+    ; failure_reasons : Transaction_status.Failure.Collection.display option
+    }
+  [@@deriving yojson, equal, bin_io_unversioned]
+end
+
 module Block = struct
+  (* in accounts_accessed, the int is the ledger index *)
   type t =
     { state_hash : State_hash.Stable.Latest.t
     ; parent_hash : State_hash.Stable.Latest.t
     ; creator : Public_key.Compressed.Stable.Latest.t
     ; block_winner : Public_key.Compressed.Stable.Latest.t
     ; snarked_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
-    ; staking_epoch_seed : Epoch_seed.Stable.Latest.t
-    ; staking_epoch_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
-    ; next_epoch_seed : Epoch_seed.Stable.Latest.t
-    ; next_epoch_ledger_hash : Frozen_ledger_hash.Stable.Latest.t
+    ; staking_epoch_data : Mina_base.Epoch_data.Value.Stable.Latest.t
+    ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.Latest.t
+    ; min_window_density : Mina_numbers.Length.Stable.Latest.t
+    ; total_currency : Currency.Amount.Stable.Latest.t
     ; ledger_hash : Ledger_hash.Stable.Latest.t
     ; height : Unsigned_extended.UInt32.Stable.Latest.t
     ; global_slot_since_hard_fork : Mina_numbers.Global_slot.Stable.Latest.t
@@ -87,7 +91,12 @@ module Block = struct
     ; timestamp : Block_time.Stable.Latest.t
     ; user_cmds : User_command.t list
     ; internal_cmds : Internal_command.t list
+    ; zkapp_cmds : Zkapp_command.t list
     ; chain_status : Chain_status.t
+    ; accounts_accessed : (int * Account.Stable.Latest.t) list
+    ; accounts_created :
+        (Account_id.Stable.Latest.t * Currency.Fee.Stable.Latest.t) list
+          (* TODO: list of created token ids and owners *)
     }
   [@@deriving yojson, equal, bin_io_unversioned]
 end
