@@ -1755,7 +1755,14 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     val getVerificationKeyArtifact =
       fun () ->
         let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
-        Pickles.Side_loaded.Verification_key.to_base58_check vk |> Js.string
+        object%js
+          val data =
+            Pickles.Side_loaded.Verification_key.to_base58_check vk |> Js.string
+
+          val hash =
+            Mina_base.Zkapp_account.digest_vk vk
+            |> Field.Constant.to_string |> Js.string
+        end
 
     val getVerificationKey =
       fun () ->
@@ -1765,8 +1772,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   end
 
 let proof_to_string proof =
-  proof |> Pickles.Side_loaded.Proof.to_yojson |> Yojson.Safe.to_string
-  |> Js.string
+  proof |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
 
 let pickles =
   object%js
@@ -2198,8 +2204,7 @@ module Ledger = struct
     let ( ^ ) = Fn.compose in
     { snarked_ledger_hash = or_ignore field p##.snarkedLedgerHash
     ; timestamp =
-        Ignore
-        (* Check (closed_interval (Block_time.of_uint64 ^ uint64) p##.timestamp) *)
+        Check (closed_interval (Block_time.of_uint64 ^ uint64) p##.timestamp)
     ; blockchain_length =
         Check
           (closed_interval
@@ -2387,11 +2392,10 @@ module Ledger = struct
           (Mina_base.Signature.of_base58_check_exn (Js.to_string signature))
     | "proof" -> (
         let proof_string = Js.to_string @@ Obj.magic a##.value in
-        let proof_yojson = Yojson.Safe.from_string proof_string in
-        match Pickles.Side_loaded.Proof.of_yojson proof_yojson with
-        | Ppx_deriving_yojson_runtime.Result.Ok p ->
+        match Pickles.Side_loaded.Proof.of_base64 proof_string with
+        | Result.Ok p ->
             Proof p
-        | Ppx_deriving_yojson_runtime.Result.Error s ->
+        | Result.Error s ->
             failwith s )
     | s ->
         failwithf "bad authorization type: %s" s ()
