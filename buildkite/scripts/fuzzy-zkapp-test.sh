@@ -14,7 +14,6 @@ source ~/.profile
 
 echo "--- Make build"
 export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go 
-time make build
 
 # Note: By attempting a re-run on failure here, we can avoid rebuilding and
 # skip running all of the tests that have already succeeded, since dune will
