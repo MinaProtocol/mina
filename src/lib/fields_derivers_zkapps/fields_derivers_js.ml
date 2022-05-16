@@ -73,7 +73,7 @@ module Js_layout = struct
     obj
 
   let bool obj =
-    obj#js_layout := leaftype "boolean" ;
+    obj#js_layout := leaftype "Bool" ;
     obj
 
   let list x obj : _ Input.t =
