@@ -88,16 +88,21 @@ let rec prompt_continue prompt_string =
   else prompt_continue prompt_string
 
 module Make (Engine : Intf.Engine.S) = struct
-  let pub_key_of_node node =
-    let open Signature_lib in
+  let make_get_key ~f node =
     match Engine.Network.Node.network_keypair node with
     | Some nk ->
-        Malleable_error.return (nk.keypair.public_key |> Public_key.compress)
+        Malleable_error.return (f nk)
     | None ->
         Malleable_error.hard_error_format
           "Node '%s' did not have a network keypair, if node is a block \
            producer this should not happen"
           (Engine.Network.Node.id node)
+
+  let pub_key_of_node =
+    make_get_key ~f:(fun nk ->
+        nk.keypair.public_key |> Signature_lib.Public_key.compress )
+
+  let priv_key_of_node = make_get_key ~f:(fun nk -> nk.keypair.private_key)
 
   let check_common_prefixes ~tolerance ~logger chains =
     assert (List.length chains > 1) ;
