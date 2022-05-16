@@ -47,7 +47,7 @@ The [Developer docs](https://docs.minaprotocol.com/en/developers) contain all th
 
 ## Follow our work
 
-We use Zenhub to track our tasks and get metrics about our team's efforts. Zenhub is a third-party product that adds an abstraction layer with more functionalities on top of Github. You can follow our work in the following boards:
+We use ZenHub to track our tasks and get metrics about our team's efforts. ZenHub is a third-party product that adds an abstraction layer with more functionalities on top of GitHub. You can follow our work in the following boards:
 
 - [zkApps](https://app.zenhub.com/workspaces/unified-zkapp-6244b2acba5b64001dfe6ba6/board)
 - [Core Crypto](https://app.zenhub.com/workspaces/core-crypto-621fcb82b7d49700156fd060/board)
