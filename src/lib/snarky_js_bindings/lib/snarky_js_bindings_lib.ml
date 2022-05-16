@@ -2812,14 +2812,6 @@ module Ledger = struct
   let hash_party_checked p =
     p |> Checked.party |> Party.Checked.digest |> to_js_field
 
-  let hash_protocol_state (p : protocol_state_predicate) =
-    p |> protocol_state |> Zkapp_precondition.Protocol_state.digest
-    |> Field.constant |> to_js_field
-
-  let hash_protocol_state_checked (p : protocol_state_predicate) =
-    p |> Checked.protocol_state
-    |> Zkapp_precondition.Protocol_state.Checked.digest |> to_js_field
-
   let forest_digest_of_field : Field.Constant.t -> Parties.Digest.Forest.t =
     Obj.magic
 
@@ -3099,11 +3091,9 @@ module Ledger = struct
     static_method "create" create ;
 
     static_method "hashParty" hash_party ;
-    static_method "hashProtocolState" hash_protocol_state ;
     static_method "hashTransaction" hash_transaction ;
 
     static_method "hashPartyChecked" hash_party_checked ;
-    static_method "hashProtocolStateChecked" hash_protocol_state_checked ;
     static_method "hashTransactionChecked" hash_transaction_checked ;
 
     static_method "transactionCommitments" transaction_commitments ;
