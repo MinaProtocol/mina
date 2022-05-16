@@ -118,7 +118,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     val typ_nullable : unit -> ('a, t option) typ
 
-    val of_json : Yojson.Basic.t -> t
+    val response_of_json : Yojson.Basic.t -> t
   end) =
   struct
     type 'a final_option_modifier = 'a
@@ -133,7 +133,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     let typ () = non_null (typ_nullable ())
 
-    let response_of_json = Input.of_json
+    let response_of_json = Input.response_of_json
   end
 
   module Gql_int = Make_non_null_scalar (struct
@@ -141,7 +141,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     let typ_nullable () = int
 
-    let of_json = Json.get_int
+    let response_of_json = Json.get_int
   end)
 
   module Gql_string = Make_non_null_scalar (struct
@@ -149,6 +149,46 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     let typ_nullable () = string
 
-    let of_json = Json.get_string
+    let response_of_json = function
+      | `String s ->
+          s
+      | json ->
+          Json.fail_parsing "string" json
+  end)
+
+  module Gql_float = Make_non_null_scalar (struct
+    type t = float
+
+    let typ_nullable () = float
+
+    let response_of_json = function
+      | `Float f ->
+          f
+      | json ->
+          Json.fail_parsing "float" json
+  end)
+
+  module Gql_bool = Make_non_null_scalar (struct
+    type t = bool
+
+    let typ_nullable () = bool
+
+    let response_of_json = function
+      | `Bool b ->
+          b
+      | json ->
+          Json.fail_parsing "bool" json
+  end)
+
+  module Gql_guid = Make_non_null_scalar (struct
+    type t = string
+
+    let typ_nullable () = guid
+
+    let response_of_json = function
+      | `String s ->
+          s
+      | json ->
+          Json.fail_parsing "guid (as string)" json
   end)
 end

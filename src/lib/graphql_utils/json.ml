@@ -42,3 +42,8 @@ let nullable of_json query json =
 
 let list_of_json elem_of_json query json =
   nullable (non_null_list_of_json elem_of_json) query json
+
+let fail_parsing kind json =
+  failwith
+  @@ Format.asprintf "expecting a %s when parsing json\n%s\n" kind
+       (Yojson.Basic.to_string json)
