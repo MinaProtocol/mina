@@ -3051,11 +3051,6 @@ module Ledger = struct
     ; next_epoch_data = epoch_data
     }
 
-  let deriver () = Parties.deriver @@ Fields_derivers_zkapps.Derivers.o ()
-
-  let parties_to_json ps =
-    parties ps |> !((deriver ())#to_json) |> Yojson.Safe.to_string |> Js.string
-
   let apply_parties_transaction l (txn : Parties.t)
       (account_creation_fee : string) =
     check_party_signatures txn ;
@@ -3085,10 +3080,6 @@ module Ledger = struct
       List.map accounts ~f:(fun (_, a) -> To_js.option To_js.account a)
     in
     Js.array @@ Array.of_list account_list
-
-  let apply_js_transaction l (p : parties)
-      (account_creation_fee : Js.js_string Js.t) =
-    apply_parties_transaction l (parties p) (Js.to_string account_creation_fee)
 
   let apply_json_transaction l (tx_json : Js.js_string Js.t)
       (account_creation_fee : Js.js_string Js.t) =
@@ -3129,15 +3120,7 @@ module Ledger = struct
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;
-    method_ "applyPartiesTransaction" apply_js_transaction ;
-    method_ "applyJsonTransaction" apply_json_transaction ;
-
-    static_method "partiesToJson" parties_to_json ;
-    let parties_to_graphql ps =
-      parties ps |> Parties.arg_query_string |> Js.string
-    in
-    (* TODO is this even needed? *)
-    static_method "partiesToGraphQL" parties_to_graphql
+    method_ "applyJsonTransaction" apply_json_transaction
 end
 
 let export () =
