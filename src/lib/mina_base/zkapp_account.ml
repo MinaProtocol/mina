@@ -6,7 +6,7 @@ open Zkapp_basic
 
 module Events = struct
   module Event = struct
-    (* Arbitrary hash input, encoding determined by the snapp's developer. *)
+    (* Arbitrary hash input, encoding determined by the zkApp's developer. *)
     type t = Field.t array
 
     let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
@@ -56,11 +56,11 @@ module Events = struct
           | [] ->
               failwith "Attempted to pop an empty stack"
           | event :: events ->
-              (event, events))
+              (event, events) )
     in
     Field.Assert.equal
       (Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_events
-         [| Data_as_hash.hash tl; Data_as_hash.hash hd |])
+         [| Data_as_hash.hash tl; Data_as_hash.hash hd |] )
       (Data_as_hash.hash events) ;
     (hd, tl)
 
@@ -72,11 +72,11 @@ module Events = struct
           let hd =
             As_prover.read (Typ.array ~length:(Array.length e) Field.typ) e
           in
-          hd :: tl)
+          hd :: tl )
     in
     Field.Assert.equal
       (Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_events
-         [| Data_as_hash.hash events; Event.hash_var e |])
+         [| Data_as_hash.hash events; Event.hash_var e |] )
       (Data_as_hash.hash res) ;
     res
 
@@ -136,6 +136,8 @@ type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool) t_ =
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       ( Zkapp_state.Value.Stable.V1.t
@@ -153,6 +155,20 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t =
+  ( Zkapp_state.Value.t
+  , (Side_loaded_verification_key.t, F.t) With_hash.t option
+  , Mina_numbers.Zkapp_version.t
+  , F.t
+  , Mina_numbers.Global_slot.t
+  , bool )
+  Poly.t
+[@@deriving sexp, equal, compare, hash, yojson]
+
+let () =
+  let _f : unit -> (t, Stable.Latest.t) Type_equal.t = fun () -> Type_equal.T in
+  ()
 
 open Pickles_types
 
@@ -187,14 +203,13 @@ module Checked = struct
     in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
-      ~zkapp_version:
-        (f (fun x -> Mina_numbers.Zkapp_version.Checked.to_input x))
+      ~zkapp_version:(f (fun x -> Mina_numbers.Zkapp_version.Checked.to_input x))
       ~sequence_state:(f app_state)
       ~last_sequence_slot:
         (f (fun x -> Mina_numbers.Global_slot.Checked.to_input x))
       ~proved_state:
         (f (fun (b : Boolean.var) ->
-             Random_oracle.Input.Chunked.packed ((b :> Field.Var.t), 1)))
+             Random_oracle.Input.Chunked.packed ((b :> Field.Var.t), 1) ) )
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
@@ -246,7 +261,7 @@ let to_input (t : t) =
     ~verification_key:
       (f
          (Fn.compose field
-            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
+            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
     ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
     ~sequence_state:(f app_state)
     ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
@@ -261,7 +276,7 @@ let default : _ Poly.t =
   ; zkapp_version = Mina_numbers.Zkapp_version.zero
   ; sequence_state =
       (let empty = Lazy.force Sequence_events.empty_hash in
-       [ empty; empty; empty; empty; empty ])
+       [ empty; empty; empty; empty; empty ] )
   ; last_sequence_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false
   }

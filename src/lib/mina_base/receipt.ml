@@ -92,7 +92,7 @@ module Chain_hash = struct
       make_checked (fun () ->
           hash ~init:Hash_prefix.receipt_chain_user_command
             (pack_input Input.(append x (field (var_to_hash_packed t))))
-          |> var_of_hash_packed)
+          |> var_of_hash_packed )
   end
 
   let%test_unit "checked-unchecked equivalence" =
@@ -114,11 +114,11 @@ module Chain_hash = struct
           in
           Or_error.ok_exn (run_and_check comp)
         in
-        assert (equal unchecked checked))
+        assert (equal unchecked checked) )
 
   let%test_unit "json" =
     Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->
-        assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t))
+        assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t) )
 
   [%%endif]
 end

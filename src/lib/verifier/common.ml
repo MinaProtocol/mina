@@ -13,7 +13,7 @@ type invalid =
 let invalid_to_string (invalid : invalid) =
   let keys_to_string keys =
     List.map keys ~f:(fun key ->
-        Signature_lib.Public_key.Compressed.to_base58_check key)
+        Signature_lib.Public_key.Compressed.to_base58_check key )
     |> String.concat ~sep:";"
   in
   match invalid with
@@ -45,13 +45,10 @@ let check :
           let other_parties_hash = Parties.Call_forest.hash other_parties in
           let tx_commitment =
             Parties.Transaction_commitment.create ~other_parties_hash
-              ~protocol_state_predicate_hash:
-                (Zkapp_precondition.Protocol_state.digest
-                   fee_payer.body.protocol_state_precondition)
-              ~memo_hash:(Signed_command_memo.hash memo)
           in
           let full_tx_commitment =
-            Parties.Transaction_commitment.with_fee_payer tx_commitment
+            Parties.Transaction_commitment.create_complete tx_commitment
+              ~memo_hash:(Signed_command_memo.hash memo)
               ~fee_payer_hash:
                 (Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
           in
@@ -64,11 +61,10 @@ let check :
                   not
                     (Signature_lib.Schnorr.Chunked.verify s
                        (Backend.Tick.Inner_curve.of_affine pk)
-                       (Random_oracle_input.Chunked.field msg))
+                       (Random_oracle_input.Chunked.field msg) )
                 then
                   return
-                    (`Invalid_signature
-                      [ Signature_lib.Public_key.compress pk ])
+                    (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
           check_signature fee_payer.authorization fee_payer.body.public_key
@@ -95,16 +91,16 @@ let check :
                     | None ->
                         return
                           (`Missing_verification_key
-                            [ Account_id.public_key @@ Party.account_id p ])
+                            [ Account_id.public_key @@ Party.account_id p ] )
                     | Some vk ->
                         let stmt =
                           { Zkapp_statement.Poly.transaction = commitment
                           ; at_party = (at_party :> Snark_params.Tick.Field.t)
                           }
                         in
-                        Some (vk, stmt, pi) ))
+                        Some (vk, stmt, pi) ) )
           in
-          let v =
+          let v : User_command.Valid.t =
             User_command.Poly.Parties
               { Parties.fee_payer
               ; other_parties =
@@ -116,4 +112,4 @@ let check :
           | [] ->
               `Valid v
           | _ :: _ ->
-              `Valid_assuming (v, valid_assuming))
+              `Valid_assuming (v, valid_assuming) )

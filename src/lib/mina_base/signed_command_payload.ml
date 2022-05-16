@@ -197,7 +197,7 @@ module Body = struct
     map
       (variant2
          (Payment_payload.gen ?source_pk ~max_amount)
-         stake_delegation_gen)
+         stake_delegation_gen )
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
 
   let source_pk (t : t) =

@@ -23,13 +23,13 @@ let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
     (module Zkapp_statement)
     ~typ:Zkapp_statement.typ
     ~branches:(module Nat.N2)
-    ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
+    ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
     ~name:"empty_update"
     ~constraint_constants:
       (Genesis_constants.Constraint_constants.to_snark_keys_header
-         constraint_constants)
+         constraint_constants )
     ~choices:(fun ~self ->
-      [ Zkapps_empty_update.rule pk_compressed; dummy_rule self ])
+      [ Zkapps_empty_update.rule pk_compressed; dummy_rule self ] )
 
 module P = (val p_module)
 
@@ -43,7 +43,7 @@ let party_proof =
       prover []
         { transaction = Party.Body.digest party_body
         ; at_party = Parties.Call_forest.empty
-        })
+        } )
 
 let party : Party.t = { body = party_body; authorization = Proof party_proof }
 
@@ -86,19 +86,14 @@ let memo = Signed_command_memo.empty
 let transaction_commitment : Parties.Transaction_commitment.t =
   (* TODO: This is a pain. *)
   let other_parties_hash = Parties.Call_forest.hash ps in
-  let protocol_state_predicate_hash =
-    Zkapp_precondition.Protocol_state.digest protocol_state_precondition
-  in
-  let memo_hash = Signed_command_memo.hash memo in
   Parties.Transaction_commitment.create ~other_parties_hash
-    ~protocol_state_predicate_hash ~memo_hash
 
 let fee_payer =
   (* TODO: This is a pain. *)
   { Party.Fee_payer.body =
       { Party.Body.Fee_payer.dummy with
         public_key = pk_compressed
-      ; balance_change = Currency.Fee.(of_int 100)
+      ; fee = Currency.Fee.(of_int 100)
       ; protocol_state_precondition
       }
   ; authorization = Signature.dummy
@@ -106,7 +101,8 @@ let fee_payer =
 
 let full_commitment =
   (* TODO: This is a pain. *)
-  Parties.Transaction_commitment.with_fee_payer transaction_commitment
+  Parties.Transaction_commitment.create_complete transaction_commitment
+    ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:(Parties.Digest.Party.create (Party.of_fee_payer fee_payer))
 
 (* TODO: Make this better. *)
@@ -128,7 +124,7 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
          } as party :
-          Party.t)
+          Party.t )
         when Public_key.Compressed.equal public_key pk_compressed ->
           let commitment =
             if use_full_commitment then full_commitment
@@ -138,10 +134,10 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
             authorization =
               Control.Signature
                 (Schnorr.Chunked.sign sk
-                   (Random_oracle.Input.Chunked.field commitment))
+                   (Random_oracle.Input.Chunked.field commitment) )
           }
       | party ->
-          party)
+          party )
   in
   { fee_payer; other_parties; memo }
 
@@ -161,6 +157,6 @@ let () =
         Ledger.get_or_create_account ledger account_id
           (Account.create account_id
              Currency.Balance.(
-               Option.value_exn (add_amount zero (Currency.Amount.of_int 500))))
+               Option.value_exn (add_amount zero (Currency.Amount.of_int 500))) )
       in
-      apply_parties ledger [ parties ])
+      ignore (apply_parties ledger [ parties ] : Sparse_ledger.t) )

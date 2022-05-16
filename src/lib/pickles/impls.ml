@@ -88,7 +88,7 @@ module Step = struct
       in
       let str_list =
         List.map forbidden_shifted_values ~f:(fun (a, b) ->
-            (Tick.Field.to_string a, b))
+            (Tick.Field.to_string a, b) )
       in
       assert ([%equal: (string * bool) list] str_list expected_list)
 
@@ -100,10 +100,10 @@ module Step = struct
           | [] ->
               assert false
           | low :: high ->
-              (Field.Constant.project high, low))
+              (Field.Constant.project high, low) )
         ~back:(fun (high, low) ->
           let high = Field.Constant.unpack high in
-          Tock.Field.of_bits (low :: high))
+          Tock.Field.of_bits (low :: high) )
 
     let check t =
       let open Internal_Basic in
@@ -128,9 +128,9 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~branching ~wrap_rounds =
+  let input ~proofs_verified ~wrap_rounds =
     let open Types.Step.Statement in
-    let spec = spec branching wrap_rounds in
+    let spec = spec proofs_verified wrap_rounds in
     let (T (typ, f)) =
       Spec.packed_typ
         (module Impl)
@@ -138,7 +138,7 @@ module Step = struct
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , fun (Shifted_value.Type2.Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
-               t ))
+               t ) )
         spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
@@ -234,7 +234,7 @@ module Wrap = struct
            ( Shifted_value.Type1.typ fp
            , fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
-               t ))
+               t ) )
         In_circuit.spec
     in
     let typ =

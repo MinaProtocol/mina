@@ -339,13 +339,13 @@ struct
               Relative_position.Hash_set.of_list data
           | Some ps ->
               List.iter ~f:(Hash_set.add ps) data ;
-              ps)) ;
+              ps ) ) ;
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
         let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
         let ps = Hash_set.to_list ps in
         List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
-            Hashtbl.add_exn res ~key:input ~data:output)) ;
+            Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
 
   (** Compute the witness, given the constraint system `sys` 
@@ -360,7 +360,7 @@ struct
     let num_rows = public_input_size + sys.next_row in
     let res =
       Array.init Constants.columns ~f:(fun _ ->
-          Array.create ~len:num_rows Fp.zero)
+          Array.create ~len:num_rows Fp.zero )
     in
     (* Public input *)
     for i = 0 to public_input_size - 1 do
@@ -383,7 +383,7 @@ struct
             | Internal x ->
                 find internal_values x
           in
-          Fp.(acc + (s * x)))
+          Fp.(acc + (s * x)) )
     in
     (* Update the witness table with the value of the variables from each row. *)
     List.iteri (List.rev sys.rows_rev) ~f:(fun i_after_input cols ->
@@ -398,13 +398,13 @@ struct
                 let lc = find sys.internal_vars var in
                 let value = compute lc in
                 res.(col_idx).(row_idx) <- value ;
-                Hashtbl.set internal_values ~key:var ~data:value)) ;
+                Hashtbl.set internal_values ~key:var ~data:value ) ) ;
     (* Return the witness. *)
     res
 
   let union_find sys v =
     Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
-        Union_find.create v)
+        Union_find.create v )
 
   (** Creates an internal variable and assigns it the value lc and constant. *)
   let create_internal ?constant sys lc : V.t =
@@ -469,7 +469,7 @@ struct
         let num_vars = min Constants.permutation_cols (Array.length vars) in
         let vars_for_perm = Array.slice vars 0 num_vars in
         Array.iteri vars_for_perm ~f:(fun col x ->
-            Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
+            Option.iter x ~f:(fun x -> wire sys x sys.next_row col) ) ;
         (* Add to gates. *)
         let open Position in
         sys.gates <- Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
@@ -522,7 +522,7 @@ struct
           { gate with
             wired_to =
               Array.init Constants.permutation_cols ~f:(fun col ->
-                  permutation { row; col })
+                  permutation { row; col } )
           }
         in
 
@@ -531,7 +531,7 @@ struct
         let public_gates =
           List.mapi public_gates ~f:(fun absolute_row gate ->
               update_gate_with_permutation_info (Row.Public_input absolute_row)
-                gate)
+                gate )
         in
 
         (* construct all the other gates (except zero-knowledge rows) *)
@@ -539,7 +539,7 @@ struct
         let gates =
           List.mapi gates ~f:(fun relative_row gate ->
               update_gate_with_permutation_info
-                (Row.After_public_input relative_row) gate)
+                (Row.After_public_input relative_row) gate )
         in
 
         (* concatenate and convert to absolute rows *)
@@ -551,7 +551,7 @@ struct
         let add_gates gates =
           List.iter gates ~f:(fun g ->
               let g = to_absolute_row g in
-              Gates.add rust_gates (Gate_spec.to_rust_gate g))
+              Gates.add rust_gates (Gate_spec.to_rust_gate g) )
         in
         add_gates public_gates ;
         add_gates gates ;
@@ -590,7 +590,7 @@ struct
     List.fold terms ~init:Int.Map.empty ~f:(fun acc (x, i) ->
         Map.change acc i ~f:(fun y ->
             let res = match y with None -> x | Some y -> Fp.add x y in
-            if Fp.(equal zero res) then None else Some res))
+            if Fp.(equal zero res) then None else Some res ) )
 
   (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
       if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
@@ -610,7 +610,7 @@ struct
     let terms = accumulate_terms terms in
     let terms_list =
       Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
-          (data, key) :: acc)
+          (data, key) :: acc )
     in
     Some (terms_list, Map.length terms, has_constant_term)
 
@@ -677,7 +677,7 @@ struct
     let terms = accumulate_terms terms in
     let terms_list =
       Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
-          (data, key) :: acc)
+          (data, key) :: acc )
     in
     match (constant, Map.is_empty terms) with
     | Some c, true ->
@@ -725,7 +725,7 @@ struct
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
-        Snarky_backendless.Constraint.basic) =
+        Snarky_backendless.Constraint.basic ) =
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
@@ -1165,7 +1165,7 @@ struct
         Array.iter state
           ~f:
             (Fn.compose add_endoscale_scalar_round
-               (Endoscale_scalar_round.map ~f:reduce_to_v))
+               (Endoscale_scalar_round.map ~f:reduce_to_v) )
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))

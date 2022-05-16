@@ -68,7 +68,7 @@ let apply_parties ledger parties =
         [ ( `Pending_coinbase_init_stack init_stack
           , `Pending_coinbase_of_statement
               (pending_coinbase_state_stack
-                 ~state_body_hash:genesis_state_body_hash)
+                 ~state_body_hash:genesis_state_body_hash )
           , ps )
         ]
     | ps1 :: ps2 :: rest ->
@@ -76,7 +76,7 @@ let apply_parties ledger parties =
           ( `Pending_coinbase_init_stack init_stack
           , `Pending_coinbase_of_statement
               (pending_coinbase_state_stack
-                 ~state_body_hash:genesis_state_body_hash)
+                 ~state_body_hash:genesis_state_body_hash )
           , ps1 )
         in
         let pending_coinbase_state_stack =
@@ -93,39 +93,40 @@ let apply_parties ledger parties =
         let ps2 = unchanged_stack_state ps2 in
         ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
   in
-  let witnesses =
+  let witnesses, final_ledger =
     Transaction_snark.parties_witnesses_exn ~constraint_constants
       ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
       (`Ledger ledger) parties
   in
   let open Impl in
-  List.iter witnesses ~f:(fun (witness, spec, statement, snapp_stmt) ->
+  List.iter (List.rev witnesses)
+    ~f:(fun (witness, spec, statement, snapp_stmt) ->
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
           in
           let snapp_stmt =
             Option.value_map ~default:[] snapp_stmt ~f:(fun (i, stmt) ->
-                [ (i, exists Zkapp_statement.typ ~compute:(fun () -> stmt)) ])
+                [ (i, exists Zkapp_statement.typ ~compute:(fun () -> stmt)) ] )
           in
           Transaction_snark.Base.Parties_snark.main ~constraint_constants
             (Parties_segment.Basic.to_single_list spec)
             snapp_stmt s ~witness ;
-          fun () -> ())
-      |> Or_error.ok_exn)
+          fun () -> () )
+      |> Or_error.ok_exn ) ;
+  final_ledger
 
 let trivial_snapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let check_parties_with_merges_exn ?(expected_failure = None)
-    ?(state_body = genesis_state_body)
-    ?(state_view = Mina_state.Protocol_state.Body.view genesis_state_body)
-    ledger partiess =
+let check_parties_with_merges_exn ?expected_failure
+    ?(state_body = genesis_state_body) ledger partiess =
   (*TODO: merge multiple snapp transactions*)
+  let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
-      let witnesses =
+      let witnesses, _final_ledger =
         match
           Or_error.try_with (fun () ->
               Transaction_snark.parties_witnesses_exn ~constraint_constants
@@ -134,16 +135,15 @@ let check_parties_with_merges_exn ?(expected_failure = None)
                   , `Pending_coinbase_of_statement
                       (pending_coinbase_state_stack ~state_body_hash)
                   , parties )
-                ])
+                ] )
         with
         | Ok a ->
             a
         | Error e ->
             failwith
               (sprintf "parties_witnesses_exn failed with %s"
-                 (Error.to_string_hum e))
+                 (Error.to_string_hum e) )
       in
-      let deferred_or_error d = Async.Deferred.map d ~f:(fun p -> Ok p) in
       let open Async.Deferred.Let_syntax in
       let%map p =
         match List.rev witnesses with
@@ -152,24 +152,24 @@ let check_parties_with_merges_exn ?(expected_failure = None)
         | (witness, spec, stmt, snapp_statement) :: rest ->
             let open Async.Deferred.Or_error.Let_syntax in
             let%bind p1 =
-              T.of_parties_segment_exn ~statement:stmt ~witness ~spec
-                ~snapp_statement
-              |> deferred_or_error
+              Async.Deferred.Or_error.try_with (fun () ->
+                  T.of_parties_segment_exn ~statement:stmt ~witness ~spec
+                    ~snapp_statement )
             in
             Async.Deferred.List.fold ~init:(Ok p1) rest
               ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
                 let%bind prev = Async.Deferred.return acc in
                 let%bind curr =
-                  T.of_parties_segment_exn ~statement:stmt ~witness ~spec
-                    ~snapp_statement
-                  |> deferred_or_error
+                  Async.Deferred.Or_error.try_with (fun () ->
+                      T.of_parties_segment_exn ~statement:stmt ~witness ~spec
+                        ~snapp_statement )
                 in
                 let sok_digest =
                   Sok_message.create ~fee:Fee.zero
                     ~prover:(Quickcheck.random_value Public_key.Compressed.gen)
                   |> Sok_message.digest
                 in
-                T.merge ~sok_digest prev curr)
+                T.merge ~sok_digest prev curr )
       in
       let p = Or_error.ok_exn p in
       let target_ledger_root_snark =
@@ -184,24 +184,34 @@ let check_parties_with_merges_exn ?(expected_failure = None)
       ( match applied.varying with
       | Command (Parties { command; _ }) -> (
           match command.status with
-          | Applied _ ->
-              ()
-          | Failed (failure_tbl, _) -> (
+          | Applied -> (
+              match expected_failure with
+              | Some failure ->
+                  failwith
+                    (sprintf
+                       !"Application did not fail as expected. Expected \
+                         failure: \
+                         %{sexp:Mina_base.Transaction_status.Failure.t}"
+                       failure )
+              | None ->
+                  () )
+          | Failed failure_tbl -> (
               match expected_failure with
               | None ->
                   failwith
                     (sprintf
                        !"Application failed. Failure statuses: %{sexp: \
                          Mina_base.Transaction_status.Failure.Collection.t}"
-                       failure_tbl)
+                       failure_tbl )
               | Some failure ->
                   let failures = List.concat failure_tbl in
                   assert (not (List.is_empty failures)) ;
                   let failed_as_expected =
-                    List.fold failures ~init:true ~f:(fun acc f ->
+                    (*Check that there's at least the expected failure*)
+                    List.fold failures ~init:false ~f:(fun acc f ->
                         acc
-                        && Mina_base.Transaction_status.Failure.(
-                             equal failure f))
+                        || Mina_base.Transaction_status.Failure.(
+                             equal failure f) )
                   in
                   if not failed_as_expected then
                     failwith
@@ -211,11 +221,11 @@ let check_parties_with_merges_exn ?(expected_failure = None)
                            %{sexp:Mina_base.Transaction_status.Failure.t} \
                            Failure statuses: %{sexp: \
                            Mina_base.Transaction_status.Failure.Collection.t}"
-                         failure failure_tbl) ) )
+                         failure failure_tbl ) ) )
       | _ ->
           failwith "parties expected" ) ;
       let target_ledger_root = Ledger.merkle_root ledger in
-      [%test_eq: Ledger_hash.t] target_ledger_root target_ledger_root_snark)
+      [%test_eq: Ledger_hash.t] target_ledger_root target_ledger_root_snark )
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   let open Tick in
@@ -236,7 +246,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
                Pickles_types.Hlist0.H1
                  (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                .t ->
-        [ Boolean.true_; Boolean.true_ ])
+        [ Boolean.true_; Boolean.true_ ] )
   }
 
 let gen_snapp_ledger =
@@ -246,18 +256,18 @@ let gen_snapp_ledger =
   let pks =
     Public_key.Compressed.Set.of_list
       (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
-           Public_key.compress (fst s).public_key))
+           Public_key.compress (fst s).public_key ) )
   in
   let%map kp =
     Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
         not
           (Public_key.Compressed.Set.mem pks
-             (Public_key.compress kp.public_key)))
+             (Public_key.compress kp.public_key) ) )
   in
   (test_spec, kp)
 
-let test_snapp_update ?expected_failure ?snapp_permissions ~vk ~snapp_prover
-    test_spec ~init_ledger ~snapp_pk =
+let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
+    ~snapp_prover test_spec ~init_ledger ~snapp_pk =
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -270,7 +280,8 @@ let test_snapp_update ?expected_failure ?snapp_permissions ~vk ~snapp_prover
             Transaction_snark.For_tests.update_states ~snapp_prover
               ~constraint_constants test_spec
           in
-          check_parties_with_merges_exn ?expected_failure ledger [ parties ]))
+          check_parties_with_merges_exn ?expected_failure ?state_body ledger
+            [ parties ] ) )
 
 let permissions_from_update (update : Party.Update.t) ~auth =
   let default = Permissions.user_default in

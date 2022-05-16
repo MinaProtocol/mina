@@ -692,7 +692,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Field",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -716,7 +716,7 @@
               "deprecationReason": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "args": [],
               "type": {
@@ -792,34 +792,6 @@
               "deprecationReason": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
@@ -836,7 +808,7 @@
               "deprecationReason": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "args": [],
               "type": {
@@ -861,7 +833,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Field",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -882,7 +854,7 @@
               "defaultValue": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -952,30 +924,6 @@
               "defaultValue": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "defaultValue": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "type": {
@@ -990,7 +938,7 @@
               "defaultValue": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -1685,7 +1633,11 @@
               "name": "delegate",
               "description": null,
               "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -1776,7 +1728,11 @@
             {
               "name": "delegate",
               "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
               "defaultValue": null
             },
             {
@@ -2750,18 +2706,14 @@
               "deprecationReason": null
             },
             {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "delegate",
               "description": null,
               "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -2830,15 +2782,13 @@
               "defaultValue": null
             },
             {
-              "name": "publicKey",
-              "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "defaultValue": null
-            },
-            {
               "name": "delegate",
               "description": null,
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
               "defaultValue": null
             },
             {
@@ -2890,7 +2840,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Field",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -3127,7 +3077,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Field",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -6869,18 +6819,14 @@
               "deprecationReason": null
             },
             {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "delegate",
               "description": null,
               "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -6993,7 +6939,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Field",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -8070,6 +8016,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Field",
+          "description": "String representing an Fp Field element",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "PartyUpdate",
           "description": null,
@@ -8098,7 +8054,11 @@
               "name": "delegate",
               "description": null,
               "args": [],
-              "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -8169,16 +8129,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Field",
-          "description": "String representing a public key in base58",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "FeePayerPartyBody",
           "description": null,
@@ -8192,7 +8142,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "Field",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -8216,7 +8166,7 @@
               "deprecationReason": null
             },
             {
-              "name": "balanceChange",
+              "name": "fee",
               "description": null,
               "args": [],
               "type": {
@@ -8292,34 +8242,6 @@
               "deprecationReason": null
             },
             {
-              "name": "callData",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "callDepth",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "protocolStatePrecondition",
               "description": null,
               "args": [],
@@ -8336,7 +8258,7 @@
               "deprecationReason": null
             },
             {
-              "name": "accountPrecondition",
+              "name": "nonce",
               "description": null,
               "args": [],
               "type": {
@@ -13085,6 +13007,45 @@
                 "kind": "OBJECT",
                 "name": "AccountId",
                 "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "tokenAccounts",
+              "description": "Find all accounts for a token ID",
+              "args": [
+                {
+                  "name": "tokenId",
+                  "description": "Token ID to find accounts for",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "TokenId",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Account",
+                      "ofType": null
+                    }
+                  }
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null

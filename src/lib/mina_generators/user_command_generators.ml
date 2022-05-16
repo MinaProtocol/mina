@@ -28,13 +28,13 @@ let parties_with_ledger () =
     List.fold keypairs ~init:Public_key.Compressed.Map.empty
       ~f:(fun map { public_key; private_key } ->
         let key = Public_key.compress public_key in
-        Public_key.Compressed.Map.add_exn map ~key ~data:private_key)
+        Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
   in
   let num_keypairs_in_ledger = Parties_generators.max_other_parties + 1 in
   let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
-        Account_id.create (Public_key.compress public_key) Token_id.default)
+        Account_id.create (Public_key.compress public_key) Token_id.default )
   in
   let%bind balances =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
@@ -87,7 +87,7 @@ let parties_with_ledger () =
   let accounts =
     List.mapi account_ids_and_balances ~f:(fun ndx (account_id, balance) ->
         let account = Account.create account_id balance in
-        if ndx mod 2 = 0 then account else snappify_account account)
+        if ndx mod 2 = 0 then account else snappify_account account )
   in
   let fee_payer_keypair = List.hd_exn keypairs in
   let ledger = Ledger.create ~depth:ledger_depth () in
@@ -103,7 +103,7 @@ let parties_with_ledger () =
             (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
             ()
       | Ok (`Added, _) ->
-          ()) ;
+          () ) ;
   let%bind parties =
     Parties_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger ()
   in
@@ -130,7 +130,7 @@ let sequence_parties_with_ledger ?length () =
             failwith "Account already existed in target ledger"
         | Error err ->
             failwithf "Could not add account to target ledger: %s"
-              (Error.to_string_hum err) ())
+              (Error.to_string_hum err) () )
   in
   let init_ledger = Ledger.create ~depth:ledger_depth () in
   let rec go parties_and_fee_payer_keypairs n =

@@ -4,7 +4,7 @@ open Mina_transaction
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-      List.equal equal [ h ] (List.find_all_dups ~compare ls))
+      List.equal equal [ h ] (List.find_all_dups ~compare ls) )
 
 module Make
     (Engine : Intf.Engine.S)
@@ -63,7 +63,7 @@ struct
       ~f:(fun (state : Network_state.t) ->
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false))
+            |> Option.value ~default:false ) )
     |> with_timeouts
          ~soft_timeout:(Literal (Time.Span.of_min 10.0))
          ~hard_timeout:(Literal (Time.Span.of_min 15.0))
@@ -101,7 +101,7 @@ struct
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find state.best_tips_by_node (Node.id node))
+            String.Map.find state.best_tips_by_node (Node.id node) )
       in
       if
         List.for_all best_tips ~f:Option.is_some
@@ -156,6 +156,22 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
+  let ledger_proofs_emitted_since_genesis ~num_proofs =
+    let open Network_state in
+    let check () (state : Network_state.t) =
+      if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let description =
+      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
+        num_proofs
+    in
+    { description
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = Slots 15
+    ; hard_timeout = Slots 20
+    }
+
   let snapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
@@ -169,14 +185,14 @@ struct
       let snapp_opt =
         List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
             cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_parties)
+            |> command_matches_parties )
       in
       match snapp_opt with
       | Some cmd_with_status ->
           let actual_status = cmd_with_status.With_status.status in
           let successful =
             match actual_status with
-            | Transaction_status.Applied _ ->
+            | Transaction_status.Applied ->
                 not has_failures
             | Failed _ ->
                 has_failures
@@ -186,7 +202,7 @@ struct
             Predicate_failure
               (Error.createf "Unexpected status in matching payment: %s"
                  ( Transaction_status.to_yojson actual_status
-                 |> Yojson.Safe.to_string ))
+                 |> Yojson.Safe.to_string ) )
       | None ->
           Predicate_continuation ()
     in
@@ -195,7 +211,7 @@ struct
     { description =
         sprintf "snapp with fee payer %s and other parties (%s)"
           (Signature_lib.Public_key.Compressed.to_base58_check
-             parties.fee_payer.body.public_key)
+             parties.fee_payer.body.public_key )
           (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
              ~f:(fun acc party ->
                let str =
@@ -205,7 +221,7 @@ struct
                if !is_first then (
                  is_first := false ;
                  str )
-               else acc ^ ", " ^ str))
+               else acc ^ ", " ^ str ) )
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

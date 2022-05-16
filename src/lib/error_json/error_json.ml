@@ -19,7 +19,7 @@ let rec sexp_of_yojson (json : Yojson.Safe.t) : (Sexp.t, string) Result.t =
             | Ok sexp ->
                 Continue (sexp :: sexps)
             | Error str ->
-                Stop (Error str))
+                Stop (Error str) )
       in
       Result.map ~f:(fun l -> Sexp.List (List.rev l)) rev_sexps
   | _ ->

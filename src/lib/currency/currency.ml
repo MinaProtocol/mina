@@ -178,13 +178,22 @@ end = struct
 
   let () = assert (Int.(length_in_bits mod 16 = 0))
 
-  let range_check' (t : var) =
+  (** UNSAFE. Take the field element formed by the final [length_in_bits] bits
+      of the argument.
+
+      WARNING: The returned value may be chosen arbitrarily by a malicious
+      prover, and this is really only useful for the more-efficient bit
+      projection. Users of this function must manually assert the relationship
+      between the argument and the return value, or the circuit will be
+      underconstrained.
+  *)
+  let image_from_bits_unsafe (t : var) =
     make_checked (fun () ->
         let _, _, actual_packed =
           Pickles.Scalar_challenge.to_field_checked' ~num_bits:length_in_bits m
             (Kimchi_backend_common.Scalar_challenge.create t)
         in
-        actual_packed)
+        actual_packed )
 
   (** [range_check t] asserts that [0 <= t < 2^length_in_bits].
 
@@ -192,22 +201,8 @@ end = struct
       this assertion.
   *)
   let range_check t =
-    let%bind actual = range_check' t in
-    Field.Checked.Assert.equal actual t
-
-  (** [range_check_flag t] returns a [Boolean.var] that is true when
-      [0 <= t < 2^length_in_bits], and false otherwise.
-
-      This function MUST NOT be used to constrain return values. Use
-      [range_adjust_flagged] instead.
-
-      This function should only be used for comparison operations, where the
-      result of an addition or subtraction is unused. For example,
-      [let ( <= ) x y = range_check_flag (Field.Var.sub y x)].
-  *)
-  let range_check_flag t =
-    let%bind actual = range_check' t in
-    Field.Checked.equal actual t
+    let%bind actual = image_from_bits_unsafe t in
+    with_label "range_check" (Field.Checked.Assert.equal actual t)
 
   let seal x = make_checked (fun () -> Pickles.Util.seal Tick.m x)
 
@@ -217,7 +212,7 @@ end = struct
   let double_modulus_as_field =
     lazy (Field.(mul (of_int 2)) (Lazy.force modulus_as_field))
 
-  (** [range_adjust_flagged kind t] returns [t'] that fits in [length_in_bits]
+  (** [range_check_flagged kind t] returns [t'] that fits in [length_in_bits]
       bits, and satisfies [t' = t + k * 2^length_in_bits] for some [k].
       The [`Overflow b] return value is false iff [t' = t].
 
@@ -236,7 +231,7 @@ end = struct
       * if [kind] is [`Add_or_sub],
         [- 2^length_in_bits < t < 2 * 2^length_in_bits - 1].
   *)
-  let range_adjust_flagged (kind : [ `Add | `Sub | `Add_or_sub ]) t =
+  let range_check_flagged (kind : [ `Add | `Sub | `Add_or_sub ]) t =
     let%bind adjustment_factor =
       exists Field.typ
         ~compute:
@@ -309,11 +304,7 @@ end = struct
       add t (scale adjustment_factor (Lazy.force modulus_as_field))
     in
     let%bind t_adjusted = seal t_adjusted in
-    let%bind actual = range_check' t_adjusted in
-    let%map () =
-      with_label "range_adjust_flagged"
-        (Field.Checked.Assert.equal actual t_adjusted)
-    in
+    let%map () = range_check t_adjusted in
     (t_adjusted, `Overflow out_of_range)
 
   let of_field (x : Field.t) : t =
@@ -422,7 +413,7 @@ end = struct
     let gen =
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
           if Unsigned.(equal zero magnitude) then zero
-          else create ~magnitude ~sgn)
+          else create ~magnitude ~sgn )
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
@@ -551,7 +542,7 @@ end = struct
         { value = Option.map t.value ~f:Field.Var.negate
         ; repr =
             (let { magnitude; sgn } = t.repr in
-             { magnitude; sgn = Sgn.Checked.negate sgn })
+             { magnitude; sgn = Sgn.Checked.negate sgn } )
         }
 
       let if_repr cond ~then_ ~else_ =
@@ -595,7 +586,7 @@ end = struct
                   | Sgn.Neg, Sgn.Neg ->
                       (* Ensure that we provide a value in the range
                          [-modulus_as_field < magnitude < 2*modulus_as_field]
-                         for [range_adjust_flagged].
+                         for [range_check_flagged].
                       *)
                       Sgn.Neg
                   | _ ->
@@ -606,7 +597,7 @@ end = struct
           Tick.Field.Checked.mul (sgn :> Field.Var.t) value
         in
         let%bind res_magnitude, `Overflow overflow =
-          range_adjust_flagged `Add_or_sub magnitude
+          range_check_flagged `Add_or_sub magnitude
         in
         (* Recompute the result from [res_magnitude], since it may have been
            adjusted.
@@ -668,29 +659,12 @@ end = struct
 
     let sub_flagged x y =
       let%bind z = seal (Field.Var.sub x y) in
-      let%map z, `Overflow underflow = range_adjust_flagged `Sub z in
+      let%map z, `Overflow underflow = range_check_flagged `Sub z in
       (z, `Underflow underflow)
 
     let sub_or_zero x y =
-      make_checked (fun () ->
-          let open Tick.Run in
-          let res = Pickles.Util.seal Tick.m Field.(x - y) in
-          let neg_res = Pickles.Util.seal Tick.m (Field.negate res) in
-          let x_gte_y = run_checked (range_check_flag res) in
-          let y_gte_x = run_checked (range_check_flag neg_res) in
-          Boolean.Assert.any [ x_gte_y; y_gte_x ] ;
-          (* If y_gte_x is false, then x_gte_y is true, so x >= y and
-             thus there was no underflow.
-
-             If y_gte_x is true, then y >= x, which means there was underflow
-             iff y != x.
-
-             Thus, underflow = (neg_res_good && y != x)
-          *)
-          let underflow =
-            Boolean.( &&& ) y_gte_x (Boolean.not (Field.equal x y))
-          in
-          Field.if_ underflow ~then_:Field.zero ~else_:res)
+      let%bind res, `Underflow underflow = sub_flagged x y in
+      Field.Checked.if_ underflow ~then_:Field.(Var.constant zero) ~else_:res
 
     let assert_equal x y = Field.Checked.Assert.equal x y
 
@@ -698,16 +672,19 @@ end = struct
 
     let ( = ) = equal
 
-    (* x <= y iff range_check_flag (y - x) *)
-    let ( <= ) x y = range_check_flag (Field.Var.sub y x)
+    let ( < ) x y =
+      let%bind diff = seal (Field.Var.sub x y) in
+      (* [lt] is true iff [x - y < 0], ie. [x < y] *)
+      let%map _res, `Overflow lt = range_check_flagged `Sub diff in
+      lt
+
+    (* x <= y iff not (y < x) *)
+    let ( <= ) x y =
+      let%map y_lt_x = y < x in
+      Boolean.not y_lt_x
 
     (* x >= y iff y <= x *)
     let ( >= ) x y = y <= x
-
-    let ( < ) x y =
-      let%bind x_lt_y = x <= y in
-      let%bind eq = x = y in
-      Boolean.( &&& ) x_lt_y (Boolean.not eq)
 
     let ( > ) x y = y < x
 
@@ -719,7 +696,7 @@ end = struct
 
     let add_flagged x y =
       let%bind z = seal (Field.Var.add x y) in
-      let%map z, `Overflow overflow = range_adjust_flagged `Add z in
+      let%map z, `Overflow overflow = range_check_flagged `Add z in
       (z, `Overflow overflow)
 
     let ( - ) = sub
@@ -735,7 +712,7 @@ end = struct
     let add_signed_flagged (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       let%bind res = seal (Field.Var.add t d) in
-      let%map res, `Overflow overflow = range_adjust_flagged `Add_or_sub res in
+      let%map res, `Overflow overflow = range_check_flagged `Add_or_sub res in
       (res, `Overflow overflow)
 
     let scale (f : Field.Var.t) (t : var) =
@@ -768,7 +745,7 @@ end = struct
                   if Unsigned.equal i Unsigned.zero then None
                   else
                     let n = Unsigned.div i (Unsigned.of_int 10) in
-                    Some (n, n)))
+                    Some (n, n) ) )
 
         (* TODO: When we do something to make snarks run fast for tests, increase the trials *)
         let qc_test_fast = Quickcheck.test ~trials:100
@@ -783,7 +760,7 @@ end = struct
           qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_success
                 (sprintf !"subtraction: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-                (var_of_t lo - var_of_t hi))
+                (var_of_t lo - var_of_t hi) )
 
         let%test_unit "subtraction_soundness" =
           let generator =
@@ -795,7 +772,7 @@ end = struct
           qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_failure
                 (sprintf !"underflow: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-                (var_of_t lo - var_of_t hi))
+                (var_of_t lo - var_of_t hi) )
 
         let%test_unit "addition_completeness" =
           let generator =
@@ -807,7 +784,7 @@ end = struct
           qc_test_fast generator ~f:(fun (x, y) ->
               expect_success
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-                (var_of_t x + var_of_t y))
+                (var_of_t x + var_of_t y) )
 
         let%test_unit "addition_soundness" =
           let generator =
@@ -821,7 +798,7 @@ end = struct
           qc_test_fast generator ~f:(fun (x, y) ->
               expect_failure
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-                (var_of_t x + var_of_t y))
+                (var_of_t x + var_of_t y) )
 
         let%test_unit "formatting_roundtrip" =
           let generator = gen_incl Unsigned.zero Unsigned.max_int in
@@ -836,14 +813,14 @@ end = struct
                            (sprintf
                               !"formatting: num=%{Unsigned} middle=%{String} \
                                 after=%{Unsigned}"
-                              num (to_formatted_string num) after_format)))
+                              num (to_formatted_string num) after_format ) ))
               | exception e ->
                   let err = Error.of_exn e in
                   Error.(
                     raise
                       (tag
                          ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
-                         err)))
+                         err )) )
 
         let%test_unit "formatting_trailing_zeros" =
           let generator = gen_incl Unsigned.zero Unsigned.max_int in
@@ -857,7 +834,7 @@ end = struct
                     (of_string
                        (sprintf
                           !"formatting: num=%{Unsigned} formatted=%{String}"
-                          num (to_formatted_string num)))))
+                          num (to_formatted_string num) ) )) )
       end )
   end
 
@@ -1157,7 +1134,7 @@ let%test_module "sub_flagged module" =
           let m, u = sub_flagged_unchecked p in
           let m_checked, u_checked = sub_flagged_checked p in
           assert (Bool.equal u u_checked) ;
-          if not u then [%test_eq: M.magnitude] m m_checked)
+          if not u then [%test_eq: M.magnitude] m m_checked )
 
     let%test_unit "fee sub_flagged" = run_test (module Fee)
 

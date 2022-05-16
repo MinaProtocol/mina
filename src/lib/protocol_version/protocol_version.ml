@@ -22,7 +22,7 @@ let set_proposed_opt t_opt = proposed_protocol_version_opt := t_opt
 
 (* we set current protocol version on daemon startup, so we should not see errors
    due to current_protocol_version = None in get_current and create_exn
- *)
+*)
 let get_current () = Option.value_exn !current_protocol_version
 
 let get_proposed_opt () = !proposed_protocol_version_opt

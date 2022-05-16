@@ -22,7 +22,7 @@ val check :
      Witness.t
   -> ?handler:
        (   Snarky_backendless.Request.request
-        -> Snarky_backendless.Request.response)
+        -> Snarky_backendless.Request.response )
   -> proof_level:Genesis_constants.Proof_level.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> Transaction_snark.Statement.With_sok.t
@@ -45,7 +45,7 @@ module type S = sig
        Witness.t
     -> ( Protocol_state.Value.t * (Transaction_snark.Statement.With_sok.t * unit)
        , N2.n * (N2.n * unit)
-       , N1.n * (N6.n * unit)
+       , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
        , Proof.t Async.Deferred.t )
        Pickles.Prover.t

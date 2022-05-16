@@ -45,7 +45,7 @@ end
        be in this particular bundle. The easiest way would be to
        SOK with
        H(all_statements_in_bundle || fee || public_key)
-    *)
+*)
 
 type t =
   { fee : Fee.t

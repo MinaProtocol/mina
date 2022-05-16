@@ -20,12 +20,15 @@ let%test_module "Archive node unit tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()))
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
     let archive_uri =
-      Uri.of_string "postgres://admin:codarules@localhost:5432/archiver"
+      Uri.of_string
+        (Option.value
+           (Sys.getenv "MINA_TEST_POSTGRES")
+           ~default:"postgres://admin:codarules@localhost:5432/archiver" )
 
     let conn_lazy =
       lazy
@@ -65,7 +68,7 @@ let%test_module "Archive node unit tests" =
       let fee_payer_keypair = keys.(fee_payer_key_index) in
       let keymap =
         Array.map keys ~f:(fun { public_key; private_key } ->
-            (Public_key.compress public_key, private_key))
+            (Public_key.compress public_key, private_key) )
         |> Array.to_list |> Public_key.Compressed.Map.of_alist_exn
       in
       let ledger = Mina_ledger.Ledger.create ~depth:10 () in
@@ -92,7 +95,7 @@ let%test_module "Archive node unit tests" =
       Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100
         ~fee_transfer:
           (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-             ~min_fee:Currency.Fee.zero)
+             ~min_fee:Currency.Fee.zero )
 
     let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
@@ -120,7 +123,7 @@ let%test_module "Archive node unit tests" =
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     let%test_unit "User_command: read and write zkapp command" =
       let conn = Lazy.force conn_lazy in
@@ -148,7 +151,7 @@ let%test_module "Archive node unit tests" =
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     let%test_unit "Fee_transfer: read and write" =
       let kind_gen =
@@ -173,7 +176,7 @@ let%test_module "Archive node unit tests" =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
             in
             let%map result =
-              Processor.Internal_command.find conn ~transaction_hash
+              Processor.Internal_command.find_opt conn ~transaction_hash
                 ~typ:(Processor.Fee_transfer.Kind.to_string kind)
             in
             [%test_result: int] ~expect:fee_transfer_id
@@ -182,7 +185,7 @@ let%test_module "Archive node unit tests" =
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     let%test_unit "Coinbase: read and write" =
       let conn = Lazy.force conn_lazy in
@@ -197,7 +200,7 @@ let%test_module "Archive node unit tests" =
               Processor.Coinbase.add_if_doesn't_exist conn coinbase
             in
             let%map result =
-              Processor.Internal_command.find conn ~transaction_hash
+              Processor.Internal_command.find_opt conn ~transaction_hash
                 ~typ:Processor.Coinbase.coinbase_typ
             in
             [%test_result: int] ~expect:coinbase_id (Option.value_exn result)
@@ -205,7 +208,7 @@ let%test_module "Archive node unit tests" =
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     let%test_unit "Block: read and write" =
       let pool = Lazy.force conn_pool_lazy in
@@ -213,10 +216,10 @@ let%test_module "Archive node unit tests" =
         ( Quickcheck.Generator.with_size ~size:10
         @@ Quickcheck_lib.gen_imperative_list
              (Transition_frontier.For_tests.gen_genesis_breadcrumb
-                ~precomputed_values ~verifier ())
+                ~precomputed_values ~verifier () )
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
                 ?logger:None ~precomputed_values ~verifier ?trust_system:None
-                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts))
+                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts) )
         )
         ~f:(fun breadcrumbs ->
           Thread_safe.block_on_async_exn
@@ -234,7 +237,8 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added breadcrumb))
+                  (Diff.Builder.breadcrumb_added ~precomputed_values breadcrumb)
+                )
               breadcrumbs
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
@@ -257,25 +261,26 @@ let%test_module "Archive node unit tests" =
                         in
                         if
                           Unsigned.UInt32.compare
-                            (Transition_frontier.Breadcrumb.blockchain_length
-                               breadcrumb)
+                            ( Consensus.Data.Consensus_state.blockchain_length
+                            @@ Transition_frontier.Breadcrumb.consensus_state
+                                 breadcrumb )
                             (Unsigned.UInt32.of_int 1)
                           > 0
                         then
                           Processor.For_test.assert_parent_exist ~parent_id
                             ~parent_hash:
                               (Transition_frontier.Breadcrumb.parent_hash
-                                 breadcrumb)
+                                 breadcrumb )
                             conn
                         else Deferred.Result.return ()
                     | None ->
-                        failwith "Failed to find saved block in database")
-                  pool)
+                        failwith "Failed to find saved block in database" )
+                  pool )
           with
           | Ok () ->
               ()
           | Error e ->
-              failwith @@ Caqti_error.show e)
+              failwith @@ Caqti_error.show e )
 
     (*
     let%test_unit "Block: read and write with pruning" =

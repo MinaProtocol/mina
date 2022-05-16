@@ -18,11 +18,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        { Block_producer.balance = "9999999"; timing = Untimed }
-        :: List.init 4
-             ~f:(const { Block_producer.balance = "0"; timing = Untimed })
+        { Wallet.balance = "9999999"; timing = Untimed }
+        :: List.init 4 ~f:(const { Wallet.balance = "0"; timing = Untimed })
     ; num_snark_workers = 25
-    ; aux_account_balance = Some "1000"
+    ; extra_genesis_accounts =
+        [ { balance = "1000"; timing = Untimed } ]
+        (* ; aux_account_balance = Some "1000" *)
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
     }
@@ -56,7 +57,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       Malleable_error.List.iter senders ~f:(fun s ->
           let%map pk = Util.pub_key_of_node s in
-          [%log info] "sender: %s" (pk_to_string pk))
+          [%log info] "sender: %s" (pk_to_string pk) )
     in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
@@ -67,7 +68,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ( Network.seeds network
            @ Network.block_producers network
            @ Network.snark_coordinators network )
-           ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize))
+           ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize) )
     in
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"
@@ -102,8 +103,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              let keys0, rest = List.split_n keys keys_per_sender in
              Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
                ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node
-             >>| const rest)
-         >>| const ())
+             >>| const rest )
+         >>| const () )
     in
     let%bind () =
       section "wait for payments to be processed"
@@ -145,10 +146,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                           [ `String b.state_hash
                           ; `Int b.command_transaction_count
                           ; `String b.creator_pk
-                          ])) )
+                          ] ) ) )
              ] ;
          (* TODO Use protocol constants to derive 125 *)
-         ok_if_true "blocks are not full (median test)" (tx_counts_med = 125))
+         ok_if_true "blocks are not full (median test)" (tx_counts_med = 125) )
     in
     let get_metrics node =
       Async_kernel.Deferred.bind
@@ -164,7 +165,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            List.fold ~init:0 ~f:( + ) @@ List.drop rcv_delay 1
          in
          (* First two slots might be delayed because of test's bootstrap, so we have 2 as a threshold *)
-         ok_if_true "block production was delayed" (rcv_delay_rest <= 2))
+         ok_if_true "block production was delayed" (rcv_delay_rest <= 2) )
     in
     section "retrieve metrics of tx sender nodes"
       (* We omit the result because we just want to query senders to see some useful
@@ -172,5 +173,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (Malleable_error.List.iter senders
          ~f:
            (Fn.compose Malleable_error.soften_error
-              (Fn.compose Malleable_error.ignore_m get_metrics)))
+              (Fn.compose Malleable_error.ignore_m get_metrics) ) )
 end

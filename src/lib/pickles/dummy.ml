@@ -10,7 +10,7 @@ let evals =
   let open Plonk_types in
   let e () =
     Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
-        Array.create n (Ro.tock ()))
+        Array.create n (Ro.tock ()) )
   in
   let ex () =
     { All_evals.With_public_input.evals = e (); public_input = Ro.tock () }
@@ -26,11 +26,11 @@ module Ipa = struct
     let challenges =
       Vector.init Tock.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          { Bulletproof_challenge.prechallenge })
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
       Vector.map challenges ~f:(fun { prechallenge } : Tock.Field.t ->
-          Ipa.Wrap.compute_challenge prechallenge)
+          Ipa.Wrap.compute_challenge prechallenge )
 
     let sg =
       lazy
@@ -41,11 +41,11 @@ module Ipa = struct
     let challenges =
       Vector.init Tick.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          { Bulletproof_challenge.prechallenge })
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
       Vector.map challenges ~f:(fun { prechallenge } : Tick.Field.t ->
-          Ipa.Step.compute_challenge prechallenge)
+          Ipa.Step.compute_challenge prechallenge )
 
     let sg =
       lazy

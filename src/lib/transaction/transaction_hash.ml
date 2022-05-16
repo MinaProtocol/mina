@@ -26,7 +26,7 @@ let of_yojson = function
   | `String str ->
       Result.map_error (of_base58_check str) ~f:(fun _ ->
           "Transaction_hash.of_yojson: Error decoding string from base58_check \
-           format")
+           format" )
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
@@ -53,10 +53,8 @@ module User_command_with_valid_signature = struct
   module Stable = struct
     module V2 = struct
       type t =
-        ( (User_command.Valid.Stable.V2.t
-        [@hash.ignore])
-        , (T.Stable.V1.t
-        [@to_yojson hash_to_yojson]) )
+        ( (User_command.Valid.Stable.V2.t[@hash.ignore])
+        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
         With_hash.Stable.V1.t
       [@@deriving sexp, hash, to_yojson]
 
@@ -97,10 +95,8 @@ module User_command = struct
   module Stable = struct
     module V2 = struct
       type t =
-        ( (User_command.Stable.V2.t
-        [@hash.ignore])
-        , (T.Stable.V1.t
-        [@to_yojson hash_to_yojson]) )
+        ( (User_command.Stable.V2.t[@hash.ignore])
+        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
         With_hash.Stable.V1.t
       [@@deriving sexp, hash, to_yojson]
 

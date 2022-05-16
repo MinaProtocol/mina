@@ -1,5 +1,5 @@
 open Mina_base
-open Mina_transition
+open Mina_block
 
 type full = Full
 
@@ -34,7 +34,7 @@ end
 
 module Node_list : sig
   type full_node =
-    { transition : External_transition.Validated.t
+    { transition : Mina_block.Validated.t
     ; scan_state : Staged_ledger.Scan_state.t
     }
 

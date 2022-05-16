@@ -43,7 +43,8 @@ module Node = struct
     Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
-  let run_in_container ?container_id ~cmd { pod_id; config; info; _ } =
+  let run_in_container ?container_id ~cmd t =
+    let { pod_id; config; info; _ } = t in
     let container_id =
       Option.value container_id ~default:info.primary_container_id
     in
@@ -52,6 +53,22 @@ module Node = struct
       ( base_kube_args config
       @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
       @ cmd )
+
+  let cp_string_to_container_file ?container_id ~str ~dest t =
+    let { pod_id; config; info; _ } = t in
+    let container_id =
+      Option.value container_id ~default:info.primary_container_id
+    in
+    let tmp_file, oc =
+      Caml.Filename.open_temp_file ~temp_dir:Filename.temp_dir_name
+        "integration_test_cp_string" ".tmp"
+    in
+    Out_channel.output_string oc str ;
+    Out_channel.close oc ;
+    let%bind cwd = Unix.getcwd () in
+    let dest_file = sprintf "%s/%s:%s" config.namespace pod_id dest in
+    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
+      (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Deferred.Let_syntax in
@@ -391,7 +408,7 @@ module Node = struct
                          pk
                      | _ ->
                          "unknown" )
-                 })
+                 } )
              (Array.to_list chain)
 
   let must_get_best_chain ?max_length ~logger t =
@@ -486,6 +503,8 @@ module Node = struct
     ; set_voting_for = to_auth_required account_permissions#setVotingFor
     }
 
+  let graphql_uri node = Graphql.ingress_uri node |> Uri.to_string
+
   let get_account_permissions ~logger t ~account_id =
     let open Deferred.Or_error in
     let open Let_syntax in
@@ -519,7 +538,7 @@ module Node = struct
               let fields =
                 Array.to_list strs
                 |> Base.List.map ~f:(fun s ->
-                       Set (Pickles.Backend.Tick.Field.of_string s))
+                       Set (Pickles.Backend.Tick.Field.of_string s) )
               in
               return (Mina_base.Zkapp_state.V.of_list_exn fields)
           | None ->
@@ -529,7 +548,7 @@ module Node = struct
                       "Expected zkApp account with an app state for public key \
                        %s"
                       (Signature_lib.Public_key.Compressed.to_base58_check
-                         (Mina_base.Account_id.public_key account_id))))
+                         (Mina_base.Account_id.public_key account_id) ) ) )
         in
         let%bind delegate =
           match account#delegate with
@@ -540,7 +559,7 @@ module Node = struct
               fail
                 (Error.of_string
                    (sprintf "Expected string encoding of delegate, got %s"
-                      (Yojson.Basic.to_string json)))
+                      (Yojson.Basic.to_string json) ) )
           | None ->
               fail (Error.of_string "Expected delegate in account")
         in
@@ -560,7 +579,7 @@ module Node = struct
                       "Expected zkApp account with a verification key for \
                        public_key %s"
                       (Signature_lib.Public_key.Compressed.to_base58_check
-                         (Mina_base.Account_id.public_key account_id))))
+                         (Mina_base.Account_id.public_key account_id) ) ) )
         in
         let%bind permissions =
           match account#permissions with
@@ -607,7 +626,7 @@ module Node = struct
                 | _ ->
                     fail
                       (Error.of_string
-                         "Expected string for cliff amount in account timing")
+                         "Expected string for cliff amount in account timing" )
               in
               let%bind cliff_time =
                 match tm with
@@ -616,7 +635,7 @@ module Node = struct
                 | _ ->
                     fail
                       (Error.of_string
-                         "Expected string for cliff time in account timing")
+                         "Expected string for cliff time in account timing" )
               in
               let%bind vesting_period =
                 match period with
@@ -625,7 +644,7 @@ module Node = struct
                 | _ ->
                     fail
                       (Error.of_string
-                         "Expected string for vesting period in account timing")
+                         "Expected string for vesting period in account timing" )
               in
               let%bind vesting_increment =
                 match incr with
@@ -635,7 +654,7 @@ module Node = struct
                     fail
                       (Error.of_string
                          "Expected string for vesting increment in account \
-                          timing")
+                          timing" )
               in
               let%bind initial_minimum_balance =
                 match bal with
@@ -645,7 +664,7 @@ module Node = struct
                     fail
                       (Error.of_string
                          "Expected string for vesting increment in account \
-                          timing")
+                          timing" )
               in
               return
                 (Set
@@ -655,7 +674,7 @@ module Node = struct
                      ; vesting_period
                      ; vesting_increment
                      }
-                     : Mina_base.Party.Update.Timing_info.t ))
+                     : Mina_base.Party.Update.Timing_info.t ) )
           | _ ->
               fail (Error.of_string "Some pieces of account timing are missing")
         in
@@ -771,10 +790,10 @@ module Node = struct
                       , Array.map
                           ~f:(fun s ->
                             Mina_base.Transaction_status.Failure.of_string s
-                            |> Result.ok_or_failwith)
+                            |> Result.ok_or_failwith )
                           f#failures
                         |> Array.to_list |> List.rev )
-                      :: acc)
+                      :: acc )
             |> Mina_base.Transaction_status.Failure.Collection.display_to_yojson
             |> Yojson.Safe.to_string )
     in
@@ -889,7 +908,7 @@ module Node = struct
         Graphql.Send_test_payments.make
           ~senders:
             (Array.of_list
-               (List.map ~f:Signature_lib.Private_key.to_yojson senders))
+               (List.map ~f:Signature_lib.Private_key.to_yojson senders) )
           ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
           ~amount:(Graphql_lib.Encoders.amount amount)
           ~fee:(Graphql_lib.Encoders.fee fee)
@@ -926,11 +945,44 @@ module Node = struct
              ; "--create"
              ; "--no-owner"
              ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
-             ])
+             ] )
     in
     [%log info] "Dumping archive data to file %s" data_file ;
     Out_channel.with_file data_file ~f:(fun out_ch ->
-        Out_channel.output_string out_ch data)
+        Out_channel.output_string out_ch data )
+
+  let run_replayer ~logger (t : t) =
+    [%log info] "Running replayer on archived data (node: %s, container: %s)"
+      t.pod_id mina_archive_container_id ;
+    let open Malleable_error.Let_syntax in
+    let%bind accounts =
+      Deferred.bind ~f:Malleable_error.return
+        (run_in_container t
+           ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/config/daemon.json" ] )
+    in
+    let replayer_input =
+      sprintf
+        {| { "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
+        accounts
+    in
+    let dest = "replayer-input.json" in
+    let%bind _res =
+      Deferred.bind ~f:Malleable_error.return
+        (cp_string_to_container_file t ~container_id:mina_archive_container_id
+           ~str:replayer_input ~dest )
+    in
+    Deferred.bind ~f:Malleable_error.return
+      (run_in_container t ~container_id:mina_archive_container_id
+         ~cmd:
+           [ "mina-replayer"
+           ; "--archive-uri"
+           ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+           ; "--input-file"
+           ; dest
+           ; "--output-file"
+           ; "/dev/null"
+           ; "--continue-on-error"
+           ] )
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
@@ -941,7 +993,7 @@ module Node = struct
     in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
-        Out_channel.output_string out_ch logs)
+        Out_channel.output_string out_ch logs )
 
   let dump_precomputed_blocks ~logger (t : t) =
     let open Malleable_error.Let_syntax in
@@ -971,7 +1023,7 @@ module Node = struct
           | other ->
               failwithf "Expected log line to be a JSON record, got: %s"
                 (Yojson.Safe.to_string other)
-                ())
+                () )
     in
     let state_hash_and_blocks =
       List.fold metadata_jsons ~init:[] ~f:(fun acc json ->
@@ -995,7 +1047,7 @@ module Node = struct
           | other ->
               failwithf "Expected log line to be a JSON record, got: %s"
                 (Yojson.Safe.to_string other)
-                ())
+                () )
     in
     let%bind.Deferred () =
       Deferred.List.iter state_hash_and_blocks
@@ -1019,7 +1071,7 @@ module Node = struct
                 "Dumping precomputed block with state hash %s to file %s"
                 state_hash filename ;
               Out_channel.with_file filename ~f:(fun out_ch ->
-                  Out_channel.output_string out_ch block))
+                  Out_channel.output_string out_ch block ) )
     in
     Malleable_error.return ()
 
@@ -1102,8 +1154,9 @@ type t =
   ; snark_coordinators : Node.t list
   ; snark_workers : Node.t list
   ; archive_nodes : Node.t list
-  ; testnet_log_filter : string
-  ; keypairs : Signature_lib.Keypair.t list
+  ; testnet_log_filter : string (* ; keypairs : Signature_lib.Keypair.t list *)
+  ; block_producer_keypairs : Signature_lib.Keypair.t list
+  ; extra_genesis_keypairs : Signature_lib.Keypair.t list
   ; nodes_by_pod_id : Node.t String.Map.t
   }
 
@@ -1145,7 +1198,14 @@ let all_non_seed_pods
   List.concat
     [ block_producers; snark_coordinators; snark_workers; archive_nodes ]
 
-let keypairs { keypairs; _ } = keypairs
+let all_keypairs { block_producer_keypairs; extra_genesis_keypairs; _ } =
+  block_producer_keypairs @ extra_genesis_keypairs
+
+let block_producer_keypairs { block_producer_keypairs; _ } =
+  block_producer_keypairs
+
+let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
+  extra_genesis_keypairs
 
 let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 
@@ -1176,7 +1236,7 @@ let initialize_infra ~logger network =
     |> List.map ~f:(fun line ->
            let parts = String.split line ~on:':' in
            assert (List.length parts = 2) ;
-           (List.nth_exn parts 0, List.nth_exn parts 1))
+           (List.nth_exn parts 0, List.nth_exn parts 1) )
     |> List.filter ~f:(fun (pod_name, _) -> String.Set.mem all_pods pod_name)
     |> String.Map.of_alist_exn
   in
@@ -1200,7 +1260,7 @@ let initialize_infra ~logger network =
         let pod_statuses = parse_pod_statuses str in
         let all_pods_are_present =
           List.for_all (String.Set.elements all_pods) ~f:(fun pod_id ->
-              String.Map.mem pod_statuses pod_id)
+              String.Map.mem pod_statuses pod_id )
         in
         let any_pods_are_not_running =
           List.exists

@@ -54,6 +54,8 @@ exception Libp2p_helper_died_unexpectedly
 (** Handle to all network functionality. *)
 type t
 
+module Bitswap_block = Bitswap_block
+
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
 
     They generally look like paths, and are read left-to-right. Each protocol
@@ -205,9 +207,7 @@ module Pubsub : sig
        t
     -> string
     -> handle_and_validate_incoming_message:
-         (   string Envelope.Incoming.t
-          -> Validation_callback.t
-          -> unit Deferred.t)
+         (string Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t)
     -> string subscription Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify

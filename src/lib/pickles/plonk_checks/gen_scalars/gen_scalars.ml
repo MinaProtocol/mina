@@ -129,7 +129,7 @@ let () =
       output_string col ;
       output_string ", lazy (" ;
       output_string expr ;
-      output_string "))")
+      output_string "))" )
 
 let () = output_string {ocaml|
       ]
@@ -204,7 +204,7 @@ let () =
       output_string col ;
       output_string ", lazy (" ;
       output_string expr ;
-      output_string "))")
+      output_string "))" )
 
 let () = output_string {ocaml|
       ]

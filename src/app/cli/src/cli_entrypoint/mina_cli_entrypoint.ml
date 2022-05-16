@@ -141,7 +141,7 @@ let setup_daemon logger =
       ~doc:
         (sprintf
            "INTERVAL in mins for collecting GC stats for metrics (Default: %f)"
-           !Mina_metrics.Runtime.gc_stat_interval_mins)
+           !Mina_metrics.Runtime.gc_stat_interval_mins )
   and libp2p_metrics_port =
     flag "--libp2p-metrics-port" ~aliases:[ "libp2p-metrics-port" ]
       ~doc:
@@ -179,7 +179,7 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_int Mina_compile_config.default_snark_worker_fee))
+           (Currency.Fee.to_int Mina_compile_config.default_snark_worker_fee) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -188,7 +188,7 @@ let setup_daemon logger =
       ~doc:
         (sprintf
            "WAIT-TIME in ms before a snark-work is reassigned (default: %dms)"
-           Cli_lib.Default.work_reassignment_wait)
+           Cli_lib.Default.work_reassignment_wait )
   and enable_tracing =
     flag "--tracing" ~aliases:[ "tracing" ] no_arg
       ~doc:"Trace into $config-directory/trace/$pid.trace"
@@ -262,7 +262,7 @@ let setup_daemon logger =
         (Printf.sprintf
            "NN min number of connections that this peer will have to neighbors \
             in the gossip network (default: %d)"
-           Cli_lib.Default.min_connections)
+           Cli_lib.Default.min_connections )
       (optional int)
   and max_connections =
     flag "--max-connections" ~aliases:[ "max-connections" ]
@@ -272,7 +272,7 @@ let setup_daemon logger =
             in the gossip network. Tuning this higher will strengthen your \
             connection to the network in exchange for using more RAM (default: \
             %d)"
-           Cli_lib.Default.max_connections)
+           Cli_lib.Default.max_connections )
       (optional int)
   and validation_queue_size =
     flag "--validation-queue-size"
@@ -286,7 +286,7 @@ let setup_daemon logger =
             net. If this queue is too small, we will drop messages without \
             validating them. If it is too large, we are susceptible to DoS \
             attacks on memory. (default: %d)"
-           Cli_lib.Default.validation_queue_size)
+           Cli_lib.Default.validation_queue_size )
       (optional int)
   and direct_peers_raw =
     flag "--direct-peer" ~aliases:[ "direct-peer" ]
@@ -378,7 +378,7 @@ let setup_daemon logger =
            "UPTIME in hours after which the daemon stops itself (only if there \
             were no slots won within an hour after the stop time) (Default: \
             %d)"
-           Cli_lib.Default.stop_time)
+           Cli_lib.Default.stop_time )
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:[ "upload-blocks-to-gcloud" ]
@@ -411,7 +411,7 @@ let setup_daemon logger =
                if String.length s < 200 then Some s
                else
                  Mina_user_error.raisef
-                   "The length of contact info exceeds 200 characters:\n %s" s))
+                   "The length of contact info exceeds 200 characters:\n %s" s ) )
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
       ~doc:"URL URL of the uptime service of the Mina delegation program"
@@ -468,21 +468,21 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
-               ~num_rotate:logrotate_num_rotate) ;
+               ~num_rotate:logrotate_num_rotate ) ;
         let best_tip_diff_log_size = 1024 * 1024 * 5 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-best-tip.log"
-               ~max_size:best_tip_diff_log_size ~num_rotate:1) ;
+               ~max_size:best_tip_diff_log_size ~num_rotate:1 ) ;
         let rejected_blocks_log_size = 1024 * 1024 * 5 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.rejected_blocks
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-rejected-blocks.log"
-               ~max_size:rejected_blocks_log_size ~num_rotate:50) ;
+               ~max_size:rejected_blocks_log_size ~num_rotate:50 ) ;
         let version_metadata =
           [ ("commit", `String Mina_version.commit_id)
           ; ("branch", `String Mina_version.branch)
@@ -509,7 +509,7 @@ let setup_daemon logger =
           Clock.run_at tm
             (fun () ->
               [%log info] "Daemon has expired, shutting down" ;
-              Core.exit 0)
+              Core.exit 0 )
             () ) ;
         [%log info] "Booting may take several seconds, please wait" ;
         let wallets_disk_location = conf_dir ^/ "wallets" in
@@ -530,7 +530,7 @@ let setup_daemon logger =
                       [%log warn]
                         "I think -discovery-keypair is in the old format, but \
                          I failed to parse it! Using it as a path..." ;
-                    None)
+                    None )
           in
           match libp2p_keypair_old_format with
           | Some kp ->
@@ -564,7 +564,7 @@ let setup_daemon logger =
                         Or_error.errorf "commit not found in version file %s"
                           version_filename )
                 | _ ->
-                    Or_error.errorf "Unexpected value in %s" version_filename)
+                    Or_error.errorf "Unexpected value in %s" version_filename )
           with
           | Ok c ->
               if String.equal c Mina_version.commit_id then return ()
@@ -615,7 +615,7 @@ let setup_daemon logger =
                   | `Yes ->
                       Stop (Some f)
                   | _ ->
-                      Continue None)
+                      Continue None )
                 ~finish:Fn.id
             in
             match config_file_installed with
@@ -638,12 +638,12 @@ let setup_daemon logger =
             Option.to_list config_file_installed
             @ (config_file_configdir :: Option.to_list config_file_envvar)
             @ List.map config_files ~f:(fun config_file ->
-                  (config_file, `Must_exist))
+                  (config_file, `Must_exist) )
           in
           let%bind config_jsons =
             let config_files_paths =
               List.map config_files ~f:(fun (config_file, _) ->
-                  `String config_file)
+                  `String config_file )
             in
             [%log info] "Reading configuration files $config_files"
               ~metadata:[ ("config_files", `List config_files_paths) ] ;
@@ -672,7 +672,7 @@ let setup_daemon logger =
                             [ ("config_file", `String config_file)
                             ; ("error", Error_json.error_to_yojson err)
                             ] ;
-                        return None ))
+                        return None ) )
           in
           let config =
             List.fold ~init:Runtime_config.default config_jsons
@@ -688,7 +688,7 @@ let setup_daemon logger =
                         ; ("config_json", config_json)
                         ; ("error", `String err)
                         ] ;
-                    failwithf "Could not parse configuration file: %s" err ())
+                    failwithf "Could not parse configuration file: %s" err () )
           in
           let genesis_dir =
             Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
@@ -715,7 +715,7 @@ let setup_daemon logger =
                 Option.map
                   YJ.Util.(
                     to_option Fn.id (YJ.Util.member "daemon" config_json))
-                  ~f:(fun daemon_config -> (config_file, daemon_config)))
+                  ~f:(fun daemon_config -> (config_file, daemon_config)) )
           in
           let maybe_from_config (type a) (f : YJ.t -> a option)
               (keyname : string) (actual_value : a option) : a option =
@@ -736,7 +736,7 @@ let setup_daemon logger =
                         to_option Fn.id (member keyname daemon_config)
                       in
                       let%map data = f json_val in
-                      (config_file, data))
+                      (config_file, data) )
                 in
                 [%log debug] "Key $key being used from config file $config_file"
                   ~metadata:
@@ -791,7 +791,7 @@ let setup_daemon logger =
           let work_selection_method =
             or_from_config
               (Fn.compose Option.return
-                 (Fn.compose work_selection_method_val YJ.Util.to_string))
+                 (Fn.compose work_selection_method_val YJ.Util.to_string) )
               "work-selection"
               ~default:Cli_lib.Arg_type.Work_selection_method.Random
               work_selection_method_flag
@@ -836,7 +836,7 @@ let setup_daemon logger =
                    | Error _e ->
                        Mina_user_error.raisef ~where:"decoding a public key"
                          "The %s public key %s could not be decoded." which
-                         pk_str)
+                         pk_str )
           in
           let run_snark_worker_flag =
             maybe_from_config
@@ -893,7 +893,7 @@ let setup_daemon logger =
                      on command-line or daemon.json. Using value from $envkey"
                     ~metadata:[ ("envkey", `String Secrets.Keypair.env) ]
               | _ ->
-                  Unix.putenv ~key:Secrets.Keypair.env ~data:password)
+                  Unix.putenv ~key:Secrets.Keypair.env ~data:password )
             block_production_password ;
           let%bind block_production_keypair =
             match (block_production_key, block_production_pubkey) with
@@ -916,7 +916,7 @@ let setup_daemon logger =
                     ~which:"block producer keypair"
                     ~read_from_env_exn:
                       (Secrets.Keypair.Terminal_stdin.read_exn
-                         ~should_prompt_user:false ~should_reask:false)
+                         ~should_prompt_user:false ~should_reask:false )
                     ~conf_dir tracked_pubkey
                 in
                 Some kp
@@ -938,7 +938,7 @@ let setup_daemon logger =
                          [%log warn] "Could not parse address $address in %s"
                            env_var
                            ~metadata:[ ("address", `String str) ] ;
-                         None)
+                         None )
               in
               Some
                 (List.append cidrs (Option.value ~default:[] client_trustlist))
@@ -951,7 +951,7 @@ let setup_daemon logger =
           in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
-               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
+               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest) )
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
               let rec get_monitors accum monitor =
@@ -965,7 +965,7 @@ let setup_daemon logger =
               let monitor_infos =
                 List.map monitors ~f:(fun monitor ->
                     Async_kernel.Monitor.sexp_of_t monitor
-                    |> Error_json.sexp_to_yojson)
+                    |> Error_json.sexp_to_yojson )
               in
               [%log debug]
                 ~metadata:
@@ -975,7 +975,7 @@ let setup_daemon logger =
                 "Long async cycle, $long_async_cycle seconds" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
-                  secs)) ;
+                  secs) ) ;
           Stream.iter Async_kernel.Async_kernel_scheduler.long_jobs_with_context
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
@@ -988,11 +988,11 @@ let setup_daemon logger =
                            (List.map ~f:Backtrace.to_string
                               (List.take
                                  (Execution_context.backtrace_history context)
-                                 2))) )
+                                 2 ) ) ) )
                   ]
                 "Long async job, $long_async_job seconds" ;
               Mina_metrics.(
-                Runtime.Long_job_histogram.observe Runtime.long_async_job secs)) ;
+                Runtime.Long_job_histogram.observe Runtime.long_async_job secs) ) ;
           let trace_database_initialization typ location =
             (* can't use %log ppx here, because we're using the passed-in location *)
             Logger.trace logger ~module_:__MODULE__ "Creating %s at %s"
@@ -1013,7 +1013,7 @@ let setup_daemon logger =
           let block_production_keypairs =
             block_production_keypair
             |> Option.map ~f:(fun kp ->
-                   (kp, Public_key.compress kp.Keypair.public_key))
+                   (kp, Public_key.compress kp.Keypair.public_key) )
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
@@ -1025,7 +1025,7 @@ let setup_daemon logger =
               ~epoch_ledger_location
               ( Option.map block_production_keypair ~f:(fun keypair ->
                     let open Keypair in
-                    Public_key.compress keypair.public_key)
+                    Public_key.compress keypair.public_key )
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
               ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
               ~genesis_state_hash:
@@ -1040,7 +1040,7 @@ let setup_daemon logger =
             | Some file -> (
                 match%bind
                   Monitor.try_with_or_error ~here:[%here] (fun () ->
-                      Reader.file_contents file)
+                      Reader.file_contents file )
                 with
                 | Ok contents ->
                     return (Mina_net2.Multiaddr.of_file_contents contents)
@@ -1058,7 +1058,7 @@ let setup_daemon logger =
                 Mina_user_error.raisef ~where:"decoding peer as a multiaddress"
                   "The given peer \"%s\" is not a valid multiaddress (ex: \
                    /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
-                  raw_peer) ;
+                  raw_peer ) ;
           let initial_peers =
             List.concat
               [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
@@ -1066,7 +1066,7 @@ let setup_daemon logger =
               ; List.map ~f:Mina_net2.Multiaddr.of_string
                 @@ or_from_config
                      (Fn.compose Option.some
-                        (YJ.Util.convert_each YJ.Util.to_string))
+                        (YJ.Util.convert_each YJ.Util.to_string) )
                      "peers" None ~default:[]
               ]
           in
@@ -1106,7 +1106,7 @@ let setup_daemon logger =
               ~default:
                 (Option.bind config.daemon
                    ~f:(fun { Runtime_config.Daemon.peer_list_url; _ } ->
-                     peer_list_url))
+                     peer_list_url ) )
           in
           if is_seed then [%log info] "Starting node as a seed node"
           else if demo_mode then [%log info] "Starting node in demo mode"
@@ -1209,7 +1209,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 | Error err ->
                     Mina_user_error.raisef
                       "Invalid public key %s for uptime submitter, %s" s
-                      (Error.to_string_hum err) ())
+                      (Error.to_string_hum err) () )
           in
           let%bind uptime_submitter_keypair =
             match (uptime_submitter_key, uptime_submitter_opt) with
@@ -1221,7 +1221,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                     ~which:"uptime submitter keypair"
                     ~read_from_env_exn:
                       (Secrets.Uptime_keypair.Terminal_stdin.read_exn
-                         ~should_prompt_user:false ~should_reask:false)
+                         ~should_prompt_user:false ~should_reask:false )
                     ~conf_dir pk
                 in
                 Some kp
@@ -1249,7 +1249,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~proposed_protocol_version_opt
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
-                      work_selection_method)
+                      work_selection_method )
                  ~snark_worker_config:
                    { Mina_lib.Config.Snark_worker_config
                      .initial_snark_worker_key = run_snark_worker_flag
@@ -1268,7 +1268,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url ())
+                 ~uptime_submitter_keypair ~stop_time ~node_status_url () )
           in
           { Coda_initialization.coda
           ; client_trustlist
@@ -1295,7 +1295,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         don't_wait_for
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
              (Mina_lib.validated_transitions coda)
-             ~f:ignore) ;
+             ~f:ignore ) ;
         Coda_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
           coda ;
@@ -1304,16 +1304,16 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               let forward_uri =
                 Option.map libp2p_metrics_port ~f:(fun port ->
                     Uri.with_uri ~scheme:(Some "http") ~host:(Some "127.0.0.1")
-                      ~port:(Some port) ~path:(Some "/metrics") Uri.empty)
+                      ~port:(Some port) ~path:(Some "/metrics") Uri.empty )
               in
               Mina_metrics.Runtime.(
                 gc_stat_interval_mins :=
                   Option.value ~default:!gc_stat_interval_mins gc_stat_interval) ;
-              Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore)
+              Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
           |> Option.value ~default:Deferred.unit
         in
         let () = Mina_plugins.init_plugins ~logger coda plugins in
-        return coda)
+        return coda )
 
 let daemon logger =
   Command.async ~summary:"Mina daemon"
@@ -1323,7 +1323,7 @@ let daemon logger =
          let%bind coda = setup_daemon () in
          let%bind () = Mina_lib.start coda in
          [%log info] "Daemon ready. Clients can now connect" ;
-         Async.never ()))
+         Async.never () ) )
 
 let replay_blocks logger =
   let replay_flag =
@@ -1347,8 +1347,7 @@ let replay_blocks logger =
                fun line ->
                  match
                    Yojson.Safe.from_string line
-                   |> Mina_transition.External_transition.Precomputed_block
-                      .of_yojson
+                   |> Mina_block.Precomputed.of_yojson
                  with
                  | Ok block ->
                      block
@@ -1356,9 +1355,7 @@ let replay_blocks logger =
                      failwithf "Could not read block: %s" err () )
            | Some "sexp" ->
                fun line ->
-                 Sexp.of_string_conv_exn line
-                   Mina_transition.External_transition.Precomputed_block
-                   .t_of_sexp
+                 Sexp.of_string_conv_exn line Mina_block.Precomputed.t_of_sexp
            | _ ->
                failwith "Expected one of 'json', 'sexp' for -format flag"
          in
@@ -1370,13 +1367,13 @@ let replay_blocks logger =
                    Some (read_block_line line, blocks_file)
                | None ->
                    In_channel.close blocks_file ;
-                   None)
+                   None )
          in
          let%bind coda = setup_daemon () in
          let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
          [%log info]
            "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
-         Async.never ()))
+         Async.never () ) )
 
 [%%if force_updates]
 
@@ -1392,7 +1389,7 @@ let rec ensure_testnet_id_still_good logger =
   let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
   match%bind
     Monitor.try_with_or_error ~here:[%here] (fun () ->
-        Client.get (Uri.of_string "http://updates.o1test.net/testnet_id"))
+        Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->
       [%log error]
@@ -1441,7 +1438,7 @@ let rec ensure_testnet_id_still_good logger =
         | Some sha ->
             if
               List.exists valid_ids ~f:(fun remote_id ->
-                  Git_sha.equal sha remote_id)
+                  Git_sha.equal sha remote_id )
             then ( try_later recheck_later ; Deferred.unit )
             else finish commit_id body_string )
 
@@ -1469,7 +1466,7 @@ let snark_hashes =
                      (* Throw away the constraint system ID to avoid changing the
                         format of the output here.
                      *)
-                     Md5.to_hex digest)
+                     Md5.to_hex digest )
           | None ->
               []
         in
@@ -1498,7 +1495,7 @@ let internal_commands logger =
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
-                 failwith "early EOF while reading sexp")) )
+                 failwith "early EOF while reading sexp" ) ) )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"
@@ -1553,12 +1550,12 @@ let internal_commands logger =
                     `Transaction
                       (List.t_of_sexp
                          (Tuple2.t_of_sexp Ledger_proof.t_of_sexp
-                            Sok_message.t_of_sexp)
-                         input_sexp)
+                            Sok_message.t_of_sexp )
+                         input_sexp )
                 | `Blockchain ->
                     `Blockchain
                       (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
-                         input_sexp) )
+                         input_sexp ) )
             | `Json -> (
                 let%map input_line =
                   match%map Reader.read_line (Lazy.force Reader.stdin) with
@@ -1738,7 +1735,7 @@ let () =
    | _ ->
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger))) ;
+            (mina_commands logger) ) ) ;
   Core.exit 0
 
 let linkme = ()

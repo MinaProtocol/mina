@@ -43,10 +43,12 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key))
+          ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with proof" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -67,13 +69,15 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Proof)
           test_spec ~init_ledger ~vk ~snapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key))
+          ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with None permission" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -95,12 +99,14 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
           ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
           test_spec ~init_ledger ~vk ~snapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key))
+          ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with None permission and Signature auth"
       =
@@ -123,12 +129,14 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
           ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
           test_spec ~init_ledger ~vk ~snapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key))
+          ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with None permission and Proof auth" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -150,12 +158,14 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
           ~snapp_permissions:(U.permissions_from_update snapp_update ~auth:None)
           test_spec ~init_ledger ~vk ~snapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key))
+          ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with Either permission and Signature \
                  auth" =
@@ -178,13 +188,15 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~snapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key))
+          ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with Either permission and Proof auth" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -206,13 +218,15 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
         U.test_snapp_update
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~snapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key))
+          ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with Either permission and None auth" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -234,13 +248,15 @@ module Make (Input : Input_intf) = struct
           ; call_data = Snark_params.Tick.Field.zero
           ; events = []
           ; sequence_events = []
+          ; protocol_state_precondition = None
+          ; account_precondition = None
           }
         in
-        U.test_snapp_update ~expected_failure:(Some failure_expected)
+        U.test_snapp_update ~expected_failure:failure_expected
           ~snapp_permissions:
             (U.permissions_from_update snapp_update ~auth:Either)
           test_spec ~init_ledger ~vk ~snapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key))
+          ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "Update when not permitted but transaction is applied" =
     let open Mina_transaction_logic.For_tests in
@@ -264,6 +280,8 @@ module Make (Input : Input_intf) = struct
               ; call_data = Snark_params.Tick.Field.zero
               ; events = []
               ; sequence_events = []
+              ; protocol_state_precondition = None
+              ; account_precondition = None
               }
             in
             let snapp_pk = Public_key.compress new_kp.public_key in
@@ -274,8 +292,8 @@ module Make (Input : Input_intf) = struct
               ~vk ~ledger snapp_pk ;
             (*Ledger.apply_transaction should be successful if fee payer update
               is successful*)
-            U.test_snapp_update ~expected_failure:(Some failure_expected)
+            U.test_snapp_update ~expected_failure:failure_expected
               ~snapp_permissions:
                 (U.permissions_from_update snapp_update ~auth:Proof)
-              ~vk ~snapp_prover test_spec ~init_ledger ~snapp_pk))
+              ~vk ~snapp_prover test_spec ~init_ledger ~snapp_pk ) )
 end

@@ -41,7 +41,7 @@ module Gen_make (C : Signed_command_intf.Gen_intf) = struct
       ~fee_range () =
     to_signed_command
       (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-         ~fee_range ())
+         ~fee_range () )
 
   let stake_delegation ~key_gen ?nonce ~fee_range () =
     to_signed_command (stake_delegation ~key_gen ?nonce ~fee_range ())
@@ -146,7 +146,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         let account : Account.t =
           !(get ledger !(location_of_account ledger id))
         in
-        !(!(account.zkapp).verification_key).data)
+        !(!(account.zkapp).verification_key).data )
   in
   match t with
   | Signed_command c ->
@@ -257,7 +257,7 @@ let filter_by_participant (commands : t list) public_key =
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)
-             Account_id.public_key))
+             Account_id.public_key ) )
 
 (* A metric on user commands that should correspond roughly to resource costs
    for validation/application *)

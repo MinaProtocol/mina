@@ -33,6 +33,8 @@ let%test_module "Snapp deploy tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
                     }
                   in
                   let parties =
@@ -42,7 +44,7 @@ let%test_module "Snapp deploy tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_parties_with_merges_exn ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ] ) ) )
 
     let%test_unit "deploy multiple ZkApps" =
       let open Mina_transaction_logic.For_tests in
@@ -74,6 +76,8 @@ let%test_module "Snapp deploy tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
                     }
                   in
                   let parties =
@@ -83,7 +87,7 @@ let%test_module "Snapp deploy tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_parties_with_merges_exn ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ] ) ) )
 
     let%test_unit "change a non-snapp account to snapp account/deploy a smart \
                    contract" =
@@ -103,12 +107,14 @@ let%test_module "Snapp deploy tests" =
                     ; amount
                     ; zkapp_account_keypairs = [ fst spec.sender ]
                     ; memo
-                    ; new_zkapp_account = true
+                    ; new_zkapp_account = false
                     ; snapp_update = Party.Update.dummy
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
                     }
                   in
                   let parties =
@@ -118,7 +124,7 @@ let%test_module "Snapp deploy tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_parties_with_merges_exn ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ] ) ) )
 
     let%test_unit "change a non-snapp account to snapp account/deploy a smart \
                    contract- different fee payer" =
@@ -139,12 +145,14 @@ let%test_module "Snapp deploy tests" =
                     ; amount
                     ; zkapp_account_keypairs = [ fst spec1.sender ]
                     ; memo
-                    ; new_zkapp_account = true
+                    ; new_zkapp_account = false
                     ; snapp_update = Party.Update.dummy
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
                     }
                   in
                   let parties =
@@ -154,5 +162,44 @@ let%test_module "Snapp deploy tests" =
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  U.check_parties_with_merges_exn ledger [ parties ])))
+                  U.check_parties_with_merges_exn ledger [ parties ] ) ) )
+
+    let%test_unit "Fails to deploy if the account is not present and amount is \
+                   insufficient" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let spec = List.hd_exn specs in
+                  let fee = Currency.Fee.of_int 1_000_000 in
+                  (*transfering zero should cause the transaction to fail if the account is not already created*)
+                  let amount = Currency.Amount.zero in
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; fee_payer = None
+                    ; receivers = []
+                    ; amount
+                    ; zkapp_account_keypairs = [ new_kp ]
+                    ; memo
+                    ; new_zkapp_account = false
+                    ; snapp_update = Party.Update.dummy
+                    ; current_auth = Permissions.Auth_required.Signature
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; sequence_events = []
+                    ; protocol_state_precondition = None
+                    ; account_precondition = None
+                    }
+                  in
+                  let parties =
+                    Transaction_snark.For_tests.deploy_snapp test_spec
+                      ~constraint_constants
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.check_parties_with_merges_exn ledger
+                    ~expected_failure:Invalid_fee_excess [ parties ] ) ) )
   end )

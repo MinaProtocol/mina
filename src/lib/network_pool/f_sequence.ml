@@ -42,7 +42,7 @@ module Digit = struct
         1
     | Three (x1, x2, x3), Three (y1, y2, y3) ->
         fallthrough (cmp_e x1 y1) ~f:(fun () ->
-            fallthrough (cmp_e x2 y2) ~f:(fun () -> cmp_e x3 y3))
+            fallthrough (cmp_e x2 y2) ~f:(fun () -> cmp_e x3 y3) )
     | Three _, _ ->
         -1
     | _, Three _ ->
@@ -50,7 +50,7 @@ module Digit = struct
     | Four (x1, x2, x3, x4), Four (y1, y2, y3, y4) ->
         fallthrough (cmp_e x1 y1) ~f:(fun () ->
             fallthrough (cmp_e x2 y2) ~f:(fun () ->
-                fallthrough (cmp_e x3 y3) ~f:(fun () -> cmp_e x4 y4)))
+                fallthrough (cmp_e x3 y3) ~f:(fun () -> cmp_e x4 y4) ) )
     | Four _, _ ->
         .
     | _, Four _ ->
@@ -222,16 +222,16 @@ module Digit = struct
                 in
                 (Some (Mk_any_r cons_res'), m, rhs)
             | None, m, rhs ->
-                (Some (Mk_any_r (One head)), m, rhs))
+                (Some (Mk_any_r (One head)), m, rhs) )
         (fun (One a) ->
           if acc + measure' a >= target then (None, a, None)
-          else failwith "Digit.split index out of bounds")
+          else failwith "Digit.split index out of bounds" )
         t
     in
     addable_elim
       (fun t' ->
         let lhs, m, rhs = split_addable acc t' in
-        (Option.map ~f:broaden_any_r lhs, m, Option.map ~f:broaden_any_r rhs))
+        (Option.map ~f:broaden_any_r lhs, m, Option.map ~f:broaden_any_r rhs) )
       (fun t' ->
         let head, Mk_any_r tail = uncons t' in
         if acc + measure' head >= target then (None, head, Some (Mk_any_ar tail))
@@ -243,7 +243,7 @@ module Digit = struct
           | Some (Mk_any_r lhs') ->
               ( Some (broaden_any_a (cons head lhs'))
               , m
-              , Option.map ~f:broaden_any_r rhs ))
+              , Option.map ~f:broaden_any_r rhs ) )
       t
 
   let opt_to_list : 'a t_any_ar option -> 'a list = function
@@ -261,7 +261,7 @@ module Digit = struct
       ~f:(fun (Mk_any_ar dig, target) ->
         let lhs_opt, m, rhs_opt = split Fn.id target 0 dig in
         let lhs', rhs' = (opt_to_list lhs_opt, opt_to_list rhs_opt) in
-        [%test_eq: int list] (lhs' @ [ m ] @ rhs') (to_list dig))
+        [%test_eq: int list] (lhs' @ [ m ] @ rhs') (to_list dig) )
 
   let%test_unit "Digit.split matches list implementation" =
     Quickcheck.test
@@ -269,7 +269,7 @@ module Digit = struct
         Tuple2.sexp_of_t
           (List.sexp_of_t Int.sexp_of_t)
           Int.sexp_of_t
-          (to_list dig, idx))
+          (to_list dig, idx) )
       (let open Quickcheck.Generator.Let_syntax in
       let%bind (Mk_any_ar dig) = gen_any_ar in
       let%bind idx = Int.gen_incl 1 (List.length @@ to_list dig) in
@@ -289,7 +289,7 @@ module Digit = struct
         [%test_eq: int] m_list m_fseq ;
         [%test_eq: int list] rhs_list rhs_fseq' ;
         [%test_eq: int] (List.length lhs_fseq') (idx - 1) ;
-        [%test_eq: int] (List.length rhs_fseq') (List.length as_list - idx))
+        [%test_eq: int] (List.length rhs_fseq') (List.length as_list - idx) )
 
   (* See comment below about measures for why index 0 is an edge case. *)
   let%test_unit "Digit.split with index 0 is trivial" =
@@ -304,7 +304,7 @@ module Digit = struct
         | None ->
             [%test_eq: int list] [] (List.tl_exn as_list)
         | Some (Mk_any_ar rhs') ->
-            [%test_eq: int list] (to_list rhs') (List.tl_exn as_list))
+            [%test_eq: int list] (to_list rhs') (List.tl_exn as_list) )
 
   let%test _ =
     match split Fn.id 1 0 (One 1) with None, 1, None -> true | _ -> false
@@ -477,12 +477,12 @@ let rec cons' : 'e. ('e -> int) -> 'e -> 'e t -> 'e t =
       Digit.addable_elim
         (fun prefix' ->
           let (Mk_any_a prefix'') = Digit.cons v prefix' in
-          deep measure' prefix'' (Lazy.force middle) suffix)
+          deep measure' prefix'' (Lazy.force middle) suffix )
         (fun (Four (a, b, c, d)) ->
           deep measure'
             (Digit.Two (v, a))
             (cons' Node.measure (Node.mk_3 measure' b c d) @@ Lazy.force middle)
-            suffix)
+            suffix )
         prefix
 
 let cons : 'e -> 'e t -> 'e t = fun x xs -> cons' (Fn.const 1) x xs
@@ -499,11 +499,11 @@ let rec snoc' : 'e. ('e -> int) -> 'e t -> 'e -> 'e t =
       Digit.addable_elim
         (fun digit ->
           let (Mk_any_a digit') = Digit.snoc digit v in
-          deep measure' prefix (Lazy.force middle) digit')
+          deep measure' prefix (Lazy.force middle) digit' )
         (fun (Four (a, b, c, d)) ->
           deep measure' prefix
             (snoc' Node.measure (Lazy.force middle) @@ Node.mk_3 measure' a b c)
-            (Digit.Two (d, v)))
+            (Digit.Two (d, v)) )
         suffix
 
 let snoc : 'e t -> 'e -> 'e t = fun xs x -> snoc' (Fn.const 1) xs x
@@ -525,13 +525,13 @@ let rec uncons' : 'e. ('e -> int) -> 'e t -> ('e * 'e t) option =
       Digit.removable_elim
         (fun prefix' ->
           let head, Mk_any_r prefix_rest = Digit.uncons prefix' in
-          Some (head, deep measure' prefix_rest (force middle) suffix))
+          Some (head, deep measure' prefix_rest (force middle) suffix) )
         (fun (One e) ->
           match uncons' Node.measure (force middle) with
           | None ->
               Some (e, tree_of_digit measure' suffix)
           | Some (node, rest) ->
-              Some (e, deep measure' (Node.to_digit node) rest suffix))
+              Some (e, deep measure' (Node.to_digit node) rest suffix) )
         prefix
 
 (** Uncons for the top level trees. *)
@@ -549,13 +549,13 @@ let rec unsnoc' : 'e. ('e -> int) -> 'e t -> ('e t * 'e) option =
       Digit.removable_elim
         (fun suffix' ->
           let Mk_any_r liat, deah = Digit.unsnoc suffix' in
-          Some (deep measure' prefix (force middle) liat, deah))
+          Some (deep measure' prefix (force middle) liat, deah) )
         (fun (One e) ->
           match unsnoc' Node.measure (force middle) with
           | None ->
               Some (tree_of_digit measure' prefix, e)
           | Some (rest, node) ->
-              Some (deep measure' prefix rest (Node.to_digit node), e))
+              Some (deep measure' prefix rest (Node.to_digit node), e) )
         suffix
 
 (** Mirror of uncons. *)
@@ -607,7 +607,7 @@ let findi t ~f =
         | `Not_found i ->
             if f x then `Found i else `Not_found (i + 1)
         | `Found i ->
-            `Found i)
+            `Found i )
   with
   | `Not_found _ ->
       None
@@ -776,14 +776,14 @@ let%test_unit "list isomorphism - cons" =
       let xs_fseq = List.fold_right xs ~f:cons ~init:empty in
       assert_measure (Fn.const 1) xs_fseq ;
       [%test_eq: int list] xs (to_list xs_fseq) ;
-      [%test_eq: int] (List.length xs) (length xs_fseq))
+      [%test_eq: int] (List.length xs) (length xs_fseq) )
 
 let%test_unit "list isomorphism - snoc" =
   Quickcheck.test (big_list Int.quickcheck_generator) ~f:(fun xs ->
       let xs_fseq = List.fold_left xs ~init:empty ~f:snoc in
       assert_measure (Fn.const 1) xs_fseq ;
       [%test_eq: int list] xs (to_list xs_fseq) ;
-      [%test_eq: int] (List.length xs) (length xs_fseq))
+      [%test_eq: int] (List.length xs) (length xs_fseq) )
 
 let%test_unit "alternating cons/snoc" =
   Quickcheck.test
@@ -801,7 +801,7 @@ let%test_unit "alternating cons/snoc" =
         | `B x :: rest ->
             go (list @ [ x ]) (snoc fseq x) rest
       in
-      go [] empty cmds)
+      go [] empty cmds )
 
 let%test_unit "split properties" =
   let gen =
@@ -819,7 +819,7 @@ let%test_unit "split properties" =
           ( Sequence.range ~start:`inclusive ~stop:`inclusive 1 5
           |> Sequence.filter_map ~f:(fun offset ->
                  let res = idx - offset in
-                 if res >= 0 then Some (xs, res) else None) ))
+                 if res >= 0 then Some (xs, res) else None ) ) )
   in
   Quickcheck.test gen ~shrink_attempts:`Exhaustive
     ~sexp_of:[%sexp_of: int list * int] ~shrinker ~f:(fun (xs, idx) ->
@@ -838,7 +838,7 @@ let%test_unit "split properties" =
       [%test_eq: int list] split_r_list split_r_fseq' ;
       [%test_eq: int] (List.length split_l_fseq') (length split_l_fseq) ;
       [%test_eq: int] (List.length split_r_fseq') (length split_r_fseq) ;
-      [%test_eq: int] (length split_l_fseq + length split_r_fseq) len)
+      [%test_eq: int] (length split_l_fseq + length split_r_fseq) len )
 
 (* Exercise all the functions that generate sequences, in random combinations. *)
 let%test_module "random sequence generation, with splits" =
@@ -887,7 +887,7 @@ let%test_module "random sequence generation, with splits" =
                 ; List.take acts (List.length acts - 1)
                 ; List.map acts ~f:(function `Snoc x -> `Cons x | x -> x)
                 ; List.map acts ~f:(function `Cons x -> `Snoc x | x -> x)
-                ])
+                ] )
       in
       Quickcheck.test gen ~trials:100_000 ~shrinker
         ~sexp_of:(List.sexp_of_t sexp_of_action) ~f:(fun acts ->
@@ -908,5 +908,5 @@ let%test_module "random sequence generation, with splits" =
             | `Split_take_right idx :: acts_rest ->
                 go (assert_m @@ Tuple2.get2 @@ split_at fseq idx) acts_rest
           in
-          go empty acts)
+          go empty acts )
   end )
