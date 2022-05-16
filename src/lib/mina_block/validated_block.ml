@@ -36,7 +36,7 @@ let valid_commands (block, _) =
          let (`If_this_is_used_it_should_have_a_comment_justifying_it data) =
            User_command.to_valid_unsafe cmd.data
          in
-         { cmd with data })
+         { cmd with data } )
 
 let unsafe_of_trusted_block ~delta_block_chain_proof
     (`This_block_is_trusted_to_be_safe b) =
@@ -48,7 +48,7 @@ let state_body_hash (t, _) =
   State_hash.With_state_hashes.state_body_hash t
     ~compute_hashes:
       (Fn.compose Mina_state.Protocol_state.hashes
-         (Fn.compose Header.protocol_state Block.header))
+         (Fn.compose Header.protocol_state Block.header) )
 
 let header t = t |> forget |> With_hash.data |> Block.header
 

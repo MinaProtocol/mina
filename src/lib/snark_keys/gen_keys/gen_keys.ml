@@ -33,7 +33,7 @@ let from_disk_expr ~loc id =
         (Sexp.of_string_conv_exn
            [%e
              estring (Pickles.Verification_key.Id.sexp_of_t id |> Sexp.to_string)]
-           Pickles.Verification_key.Id.t_of_sexp)
+           Pickles.Verification_key.Id.t_of_sexp )
       >>| Or_error.ok_exn
     in
     t]
@@ -160,7 +160,7 @@ let str ~proof_level ~constraint_constants ~loc =
                      ( Pickles.Verification_key.Id.sexp_of_t
                          (Lazy.force B.Proof.id)
                      |> Sexp.to_string )]
-                 Pickles.Verification_key.Id.t_of_sexp)
+                 Pickles.Verification_key.Id.t_of_sexp )
           in
           fun () -> Lazy.force t]
       ~transaction_snark:(from_disk_expr ~loc (Lazy.force T.id))
@@ -173,7 +173,7 @@ let str ~proof_level ~constraint_constants ~loc =
       (str ~loc ~constraint_constants
          ~blockchain_verification_key_id:
            [%expr Pickles.Verification_key.Id.dummy] ~transaction_snark:e
-         ~blockchain_snark:e)
+         ~blockchain_snark:e )
 
 let main () =
   (* Wrap any junk we print to stdout in a comment.. *)

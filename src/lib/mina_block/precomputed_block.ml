@@ -37,7 +37,7 @@ module Proof = struct
         Or_error.try_with (fun () -> of_bin_string str)
         |> Result.map_error ~f:(fun err ->
                sprintf "Precomputed_block.Proof.of_yojson: %s"
-                 (Error.to_string_hum err))
+                 (Error.to_string_hum err) )
     | json ->
         Proof.of_yojson json
 end
@@ -104,7 +104,7 @@ let of_block ~logger
               [ ("account_id", Account_id.to_yojson acct_id)
               ; ("exception", `String (Exn.to_string exn))
               ] ;
-          None)
+          None )
   in
   let header = Block.header block in
   let accounts_created =
@@ -115,8 +115,8 @@ let of_block ~logger
     in
     List.map
       (Staged_ledger.latest_block_accounts_created staged_ledger
-         ~previous_block_state_hash) ~f:(fun acct_id ->
-        (acct_id, account_creation_fee))
+         ~previous_block_state_hash ) ~f:(fun acct_id ->
+        (acct_id, account_creation_fee) )
   in
   { scheduled_time
   ; protocol_state = Header.protocol_state header

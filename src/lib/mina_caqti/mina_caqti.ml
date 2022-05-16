@@ -25,8 +25,8 @@ module Type_spec = struct
          Caqti_type.tup2 rep (to_rep spec)
 
   let rec hlist_to_tuple :
-            'hlist 'tuple.    ('hlist, 'tuple) t -> (unit, 'hlist) H_list.t
-            -> 'tuple =
+            'hlist 'tuple.
+            ('hlist, 'tuple) t -> (unit, 'hlist) H_list.t -> 'tuple =
     fun (type hlist tuple) (spec : (hlist, tuple) t)
         (l : (unit, hlist) H_list.t) ->
      match (spec, l) with
@@ -36,8 +36,8 @@ module Type_spec = struct
          ((x, hlist_to_tuple spec l) : tuple)
 
   let rec tuple_to_hlist :
-            'hlist 'tuple.    ('hlist, 'tuple) t -> 'tuple
-            -> (unit, 'hlist) H_list.t =
+            'hlist 'tuple.
+            ('hlist, 'tuple) t -> 'tuple -> (unit, 'hlist) H_list.t =
     fun (type hlist tuple) (spec : (hlist, tuple) t) (t : tuple) ->
      match (spec, t) with
      | [], () ->
@@ -123,7 +123,7 @@ let () =
   define_coding Array_nullable_string { get_coding }
 
 (* this type may require type annotations in queries, eg.
-  `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
 *)
 let array_nullable_int_typ : int option array Caqti_type.t =
   Caqti_type.field Array_nullable_int
@@ -140,7 +140,7 @@ let array_int_typ : int array Caqti_type.t =
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
 
 (* this type may require type annotations in queries, e.g.
-  `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
 *)
 let array_nullable_string_typ : string option array Caqti_type.t =
   Caqti_type.field Array_nullable_string
@@ -175,7 +175,7 @@ let deferred_result_list_mapi ~f xs =
   let open Deferred.Result.Let_syntax in
   deferred_result_list_fold xs ~init:(0, []) ~f:(fun (index, acc) x ->
       let%map res = f index x in
-      (Int.succ index, res :: acc))
+      (Int.succ index, res :: acc) )
   >>| snd >>| List.rev
 
 let deferred_result_list_map ~f = deferred_result_list_mapi ~f:(Fn.const f)
@@ -213,7 +213,7 @@ let select_cols ~(select : string) ~(table_name : string)
         match tannot col with None -> "" | Some tannot -> "::" ^ tannot
       in
       sprintf "(%s = $%d%s OR (%s IS NULL AND $%d IS NULL))" col param annot col
-        param)
+        param )
   |> String.concat ~sep:" AND "
   |> sprintf "SELECT %s FROM %s WHERE %s" select table_name
 
@@ -235,7 +235,7 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     : string =
   let values =
     List.map cols ~f:(fun col ->
-        match tannot col with None -> "?" | Some tannot -> "?::" ^ tannot)
+        match tannot col with None -> "?" | Some tannot -> "?::" ^ tannot )
     |> String.concat ~sep:", "
   in
   sprintf "INSERT INTO %s (%s) VALUES (%s) RETURNING %s" table_name
@@ -278,7 +278,7 @@ let make_get_opt ~of_option ~f item_opt =
         | Ok v ->
             Some v
         | Error msg ->
-            failwithf "Error querying db, error: %s" (Caqti_error.show msg) ())
+            failwithf "Error querying db, error: %s" (Caqti_error.show msg) () )
   in
   of_option res_opt
 

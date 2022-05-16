@@ -46,7 +46,7 @@ let send_node_error_data ~logger ~url node_error_data =
     Async.try_with (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-          url)
+          url )
   with
   | Ok ({ status; _ }, body) ->
       let metadata =
@@ -111,7 +111,7 @@ let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
             | Full catchup_tree ->
                 Some
                   (Transition_frontier.Full_catchup_tree.to_node_status_report
-                     catchup_tree)
+                     catchup_tree )
             | _ ->
                 None )
       in
@@ -120,7 +120,7 @@ let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
         |> Participating_state.map ~f:(fun b ->
                Transition_frontier.Breadcrumb.consensus_state b
                |> Consensus.Data.Consensus_state.blockchain_length
-               |> Mina_numbers.Length.to_uint32)
+               |> Mina_numbers.Length.to_uint32 )
         |> Participating_state.map ~f:Unsigned.UInt32.to_int
         |> Participating_state.active
       in
@@ -156,5 +156,5 @@ let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
               Span.to_string_hum
               @@ Time.diff (now ())
                    (Time_ns.to_time_float_round_nearest_microsecond
-                      Mina_lib.daemon_start_time))
+                      Mina_lib.daemon_start_time ))
         }

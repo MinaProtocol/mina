@@ -30,4 +30,4 @@ let command =
        flag "--who-produces" ~aliases:[ "who-produces" ]
          ~doc:"ID node number which will be producing blocks" (required int)
      in
-     main who_produces)
+     main who_produces )

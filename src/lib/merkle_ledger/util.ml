@@ -72,17 +72,17 @@ end = struct
     let result =
       Location.Addr.Range.fold
         (Location.Addr.Range.subtree_range ~ledger_depth:(Inputs.ledger_depth t)
-           address)
+           address )
         ~init:[]
         ~f:(fun bit_index acc ->
           let account = Base.get t (location_of_account_addr bit_index) in
-          (bit_index, account) :: acc)
+          (bit_index, account) :: acc )
     in
     List.rev_filter_map result ~f:(function
       | _, None ->
           None
       | addr, Some account ->
-          Some (addr, account))
+          Some (addr, account) )
 
   let rec compute_affected_locations_and_hashes t locations_and_hashes acc =
     let ledger_depth = Inputs.ledger_depth t in
@@ -118,7 +118,7 @@ end = struct
                     (* This is the first child of its parent that we have
                        encountered.
                     *)
-                    `One_side (location, hash)))
+                    `One_side (location, hash) ) )
         in
         let rev_parent_locations_and_hashes =
           Map.fold parents_to_children ~init:[] ~f:(fun ~key ~data acc ->
@@ -138,7 +138,7 @@ end = struct
                   (key, parent_hash) :: acc
               | `Hash parent_hash ->
                   (* We have already computed the hash above. *)
-                  (key, parent_hash) :: acc)
+                  (key, parent_hash) :: acc )
         in
         compute_affected_locations_and_hashes t rev_parent_locations_and_hashes
           (List.rev_append rev_parent_locations_and_hashes acc)
@@ -148,7 +148,7 @@ end = struct
   let set_hash_batch t locations_and_hashes =
     Inputs.set_raw_hash_batch t
       (compute_affected_locations_and_hashes t locations_and_hashes
-         locations_and_hashes)
+         locations_and_hashes )
 
   let compute_last_index addresses =
     Non_empty_list.map addresses
@@ -162,7 +162,7 @@ end = struct
         let key_locations =
           Non_empty_list.map nonempty_addresses_and_accounts
             ~f:(fun (address, account) ->
-              (Inputs.Account.identifier account, address))
+              (Inputs.Account.identifier account, address) )
         in
         let new_last_location =
           let current_last_index =
@@ -183,7 +183,7 @@ end = struct
             Account (Addr.of_int_exn ~ledger_depth max_index_in_all_accounts))
         in
         let last_location = new_last_location in
-        Inputs.set_location_batch ~last_location t key_locations)
+        Inputs.set_location_batch ~last_location t key_locations )
 
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
      simulatenously for full atomicity. *)
@@ -193,12 +193,12 @@ end = struct
     set_hash_batch t
     @@ List.map locations_and_accounts ~f:(fun (location, account) ->
            ( Inputs.location_of_hash_addr (Inputs.Location.to_path_exn location)
-           , Inputs.Hash.hash_account account ))
+           , Inputs.Hash.hash_account account ) )
 
   let set_batch_accounts t addresses_and_accounts =
     set_batch t
     @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
-           (Inputs.location_of_account_addr addr, account))
+           (Inputs.location_of_account_addr addr, account) )
 
   let set_all_accounts_rooted_at_exn t address accounts =
     let addresses =

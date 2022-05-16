@@ -55,7 +55,7 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
           ; zkapp =
               Some { Zkapp_account.default with verification_key = Some vk }
           }
-        |> Or_error.ok_exn |> ignore)
+        |> Or_error.ok_exn |> ignore )
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
@@ -105,11 +105,11 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
                Transaction_snark.Parties_segment.Basic.t * \
                Transaction_snark.Statement.With_sok.t * (int * \
                Zkapp_statement.t)option) }%!"
-             w) ;
+             w ) ;
         let%map _ =
           T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
         in
-        ((), ()))
+        ((), ()) )
   in
   ()
 
@@ -161,7 +161,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   List.iter (Ledger.to_list ledger) ~f:(fun acc ->
       printf "Account: %s\n%!"
         ( Genesis_ledger_helper_lib.Accounts.Single.of_account acc None
-        |> Runtime_config.Accounts.Single.to_yojson |> Yojson.Safe.to_string )) ;
+        |> Runtime_config.Accounts.Single.to_yojson |> Yojson.Safe.to_string ) ) ;
   let state_body =
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
@@ -199,11 +199,11 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
                Transaction_snark.Parties_segment.Basic.t * \
                Transaction_snark.Statement.With_sok.t * (int * \
                Zkapp_statement.t)option) }%!"
-             w) ;
+             w ) ;
         let%map _ =
           T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
         in
-        ((), ()))
+        ((), ()) )
   in
   ()
 
@@ -216,7 +216,7 @@ module App_state = struct
         Zkapp_basic.Set_or_keep.Keep
     | _ ->
         parse_field_element_or_hash_string str ~f:(fun result ->
-            Zkapp_basic.Set_or_keep.Set result)
+            Zkapp_basic.Set_or_keep.Set result )
 end
 
 module Events = struct
@@ -228,7 +228,7 @@ module Events = struct
         | "" ->
             Snark_params.Tick.Field.zero
         | _ ->
-            parse_field_element_or_hash_string s ~f:Fn.id)
+            parse_field_element_or_hash_string s ~f:Fn.id )
 end
 
 module Util = struct
@@ -247,14 +247,14 @@ module Util = struct
 
   let memo =
     Option.value_map ~default:Signed_command_memo.empty ~f:(fun m ->
-        Signed_command_memo.create_from_string_exn m)
+        Signed_command_memo.create_from_string_exn m )
 
   let app_state_of_list lst =
     let app_state = List.map ~f:App_state.of_string lst in
     List.append app_state
       (List.init
          (8 - List.length app_state)
-         ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep))
+         ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep) )
     |> Zkapp_state.V.of_list_exn
 
   let sequence_state_of_list array_lst : Snark_params.Tick.Field.t array list =
@@ -370,8 +370,8 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       gen_proof parties
         ~zkapp_account:
           (Some
-             (Signature_lib.Public_key.compress
-                zkapp_account_keypair.public_key))
+             (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
+          )
     else return ()
   in
   parties
@@ -381,7 +381,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
   let%bind receivers = receivers in
   let amount =
     List.fold ~init:Currency.Amount.zero receivers ~f:(fun acc (_, a) ->
-        Option.value_exn (Currency.Amount.add acc a))
+        Option.value_exn (Currency.Amount.add acc a) )
   in
   let%bind keypair = Util.keypair_of_file keyfile in
   let spec =
@@ -477,8 +477,8 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
       gen_proof parties
         ~zkapp_account:
           (Some
-             (Signature_lib.Public_key.compress
-                zkapp_account_keypair.public_key))
+             (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
+          )
     else return ()
   in
   parties
@@ -553,8 +553,8 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
       gen_proof parties
         ~zkapp_account:
           (Some
-             (Signature_lib.Public_key.compress
-                zkapp_account_keypair.public_key))
+             (Signature_lib.Public_key.compress zkapp_account_keypair.public_key)
+          )
     else return ()
   in
   parties
@@ -702,10 +702,10 @@ let%test_module "ZkApps test transaction" =
                     , print_diff_yojson
                         ~path:[ string_of_int i; "other_parties" ]
                         (Party.to_yojson expected) (Party.to_yojson got)
-                      && ok ))
+                      && ok ) )
               in
               if ok_fee_payer && ok_other_parties then return (Ok "Passed")
-              else return (Error "invalid snapp transaction generated")))
+              else return (Error "invalid snapp transaction generated") ))
       in
       let schema =
         Graphql_async.Schema.(
@@ -742,7 +742,7 @@ let%test_module "ZkApps test transaction" =
                         q
                         (Parties.to_yojson p |> Yojson.Safe.to_string)
                         e ;
-                      failwith "Invalid graphql query")
+                      failwith "Invalid graphql query" )
           | Signed_command _ ->
-              failwith "Expected a Parties command")
+              failwith "Expected a Parties command" )
   end )

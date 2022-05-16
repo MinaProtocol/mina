@@ -15,7 +15,7 @@ let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
     Impl.generate_witness_conv
       ~f:(fun { Impl.Proof_inputs.auxiliary_inputs; public_inputs } _ ->
         Backend.Proof.create pk ~auxiliary:auxiliary_inputs
-          ~primary:public_inputs)
+          ~primary:public_inputs )
       spec
       ~return_typ:(Snarky_backendless.Typ.unit ())
       (main ?w:priv) pub

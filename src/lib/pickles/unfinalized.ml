@@ -64,19 +64,19 @@ module Constant = struct
         ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
         ~field_of_hex:
           (Core_kernel.Fn.compose Tock.Field.of_bigint
-             Kimchi_pasta.Pasta.Bigint256.of_hex_string)
+             Kimchi_pasta.Pasta.Bigint256.of_hex_string )
         ~domain:
           (Plonk_checks.domain
              (module Tock.Field)
              (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
-             ~domain_generator:Tock.Field.domain_generator)
+             ~domain_generator:Tock.Field.domain_generator )
         chals evals
     in
     { deferred_values =
         { plonk =
             { (Plonk_checks.derive_plonk
                  (module Tock.Field)
-                 ~env ~shift chals evals)
+                 ~env ~shift chals evals )
               with
               alpha
             ; beta

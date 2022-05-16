@@ -25,7 +25,7 @@ let rec absorb :
   | With_degree_bound ->
       Array.iter t.unshifted ~f:(fun t ->
           absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt
-            PC (mask_g1_opt t)) ;
+            PC (mask_g1_opt t) ) ;
       absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt PC
         (mask_g1_opt t.shifted)
   | ty1 :: ty2 ->
@@ -105,7 +105,7 @@ let lowest_128_bits (type f) ~constrain_low_bits ~assert_128_bits
           Field.Constant.unpack (As_prover.read_var x)
           |> Fn.flip List.split_n 128
         in
-        (Field.Constant.project lo, Field.Constant.project hi))
+        (Field.Constant.project lo, Field.Constant.project hi) )
   in
   assert_128_bits hi ;
   if constrain_low_bits then assert_128_bits lo ;

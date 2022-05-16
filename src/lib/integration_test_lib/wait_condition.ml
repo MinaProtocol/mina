@@ -4,7 +4,7 @@ open Mina_transaction
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-      List.equal equal [ h ] (List.find_all_dups ~compare ls))
+      List.equal equal [ h ] (List.find_all_dups ~compare ls) )
 
 module Make
     (Engine : Intf.Engine.S)
@@ -63,7 +63,7 @@ struct
       ~f:(fun (state : Network_state.t) ->
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false))
+            |> Option.value ~default:false ) )
     |> with_timeouts
          ~soft_timeout:(Literal (Time.Span.of_min 10.0))
          ~hard_timeout:(Literal (Time.Span.of_min 15.0))
@@ -101,7 +101,7 @@ struct
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find state.best_tips_by_node (Node.id node))
+            String.Map.find state.best_tips_by_node (Node.id node) )
       in
       if
         List.for_all best_tips ~f:Option.is_some
@@ -185,7 +185,7 @@ struct
       let snapp_opt =
         List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
             cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_parties)
+            |> command_matches_parties )
       in
       match snapp_opt with
       | Some cmd_with_status ->
@@ -202,7 +202,7 @@ struct
             Predicate_failure
               (Error.createf "Unexpected status in matching payment: %s"
                  ( Transaction_status.to_yojson actual_status
-                 |> Yojson.Safe.to_string ))
+                 |> Yojson.Safe.to_string ) )
       | None ->
           Predicate_continuation ()
     in
@@ -211,7 +211,7 @@ struct
     { description =
         sprintf "snapp with fee payer %s and other parties (%s)"
           (Signature_lib.Public_key.Compressed.to_base58_check
-             parties.fee_payer.body.public_key)
+             parties.fee_payer.body.public_key )
           (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
              ~f:(fun acc party ->
                let str =
@@ -221,7 +221,7 @@ struct
                if !is_first then (
                  is_first := false ;
                  str )
-               else acc ^ ", " ^ str))
+               else acc ^ ", " ^ str ) )
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

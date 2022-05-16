@@ -12988,6 +12988,45 @@
               "deprecationReason": null
             },
             {
+              "name": "tokenAccounts",
+              "description": "Find all accounts for a token ID",
+              "args": [
+                {
+                  "name": "tokenId",
+                  "description": "Token ID to find accounts for",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "TokenId",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Account",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "currentSnarkWorker",
               "description": "Get information about the current snark worker",
               "args": [],

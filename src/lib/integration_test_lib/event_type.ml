@@ -8,7 +8,7 @@ let or_error_list_fold ls ~init ~f =
   let open Or_error.Let_syntax in
   List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
       let%bind acc = acc_or_error in
-      f acc el)
+      f acc el )
 
 let get_metadata (message : Logger.Message.t) key =
   match String.Map.find message.metadata key with
@@ -19,7 +19,7 @@ let get_metadata (message : Logger.Message.t) key =
 
 let parse id (m : Logger.Message.t) =
   Or_error.try_with (fun () ->
-      Structured_log_events.parse_exn id (Map.to_alist m.metadata))
+      Structured_log_events.parse_exn id (Map.to_alist m.metadata) )
 
 let bad_parse = Or_error.error_string "bad parse"
 
@@ -127,7 +127,7 @@ module Transition_frontier_diff_application = struct
                 Or_error.error_string "unexpected transition frontier diff name"
             )
         | _ ->
-            Or_error.error_string "unexpected transition frontier diff format")
+            Or_error.error_string "unexpected transition frontier diff format" )
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -462,7 +462,7 @@ let structured_events_table =
   all_event_types
   |> List.filter_map ~f:(fun t ->
          let%map event_id = to_structured_event_id t in
-         (Structured_log_events.string_of_id event_id, t))
+         (Structured_log_events.string_of_id event_id, t) )
   |> String.Table.of_alist_exn
 
 let of_structured_event_id id =
@@ -479,7 +479,7 @@ let puppeteer_events_table =
   all_event_types
   |> List.filter_map ~f:(fun t ->
          let%map event_id = to_puppeteer_event_string t in
-         (event_id, t))
+         (event_id, t) )
   |> String.Table.of_alist_exn
 
 let of_puppeteer_event_string id = String.Table.find puppeteer_events_table id
@@ -540,7 +540,7 @@ let parse_puppeteer_event (message : Puppeteer_message.t) =
            "the events emitting from the puppeteer script are either not \
             formatted correctly, or are trying to emit an event_type which is \
             not actually recognized by the integration test framework.  this \
-            should not happen and is a programmer error")
+            should not happen and is a programmer error" )
 
 let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
  fun t1 e t2 h ->

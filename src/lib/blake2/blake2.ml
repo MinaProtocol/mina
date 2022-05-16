@@ -69,14 +69,14 @@ module Make () = struct
       ~f:(fun i ->
         let c = Char.to_int s.[i / 8] in
         let j = i mod 8 in
-        Int.((c lsr j) land 1 = 1))
+        Int.((c lsr j) land 1 = 1) )
 end
 
 include Make ()
 
 (* values come from external library digestif, and serialization relies on raw string functions in that library,
    so check serialization is stable
- *)
+*)
 let%test "serialization test V1" =
   let blake2s = T0.digest_string "serialization test V1" in
   let known_good_digest = "562733d10582c5832e541fb60e38e7c8" in
@@ -91,4 +91,4 @@ let%test_unit "bits_to_string" =
 
 let%test_unit "string to bits" =
   Quickcheck.test ~trials:5 String.quickcheck_generator ~f:(fun s ->
-      [%test_eq: string] s (bits_to_string (string_to_bits s)))
+      [%test_eq: string] s (bits_to_string (string_to_bits s)) )

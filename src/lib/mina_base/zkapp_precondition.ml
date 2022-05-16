@@ -262,7 +262,7 @@ module Numeric = struct
 
     let check { lte_checked = ( <= ); _ } (t : 'a t) (x : 'a) =
       Or_ignore.Checked.check t ~f:(fun { lower; upper } ->
-          Boolean.all [ lower <= x; x <= upper ])
+          Boolean.all [ lower <= x; x <= upper ] )
 
     let is_constant { eq_checked = ( = ); _ } (t : 'a t) =
       let is_constant ({ lower; upper } : _ Closed_interval.t) =
@@ -270,7 +270,7 @@ module Numeric = struct
       in
       Or_ignore.Checked.map t ~f_implicit:is_constant
         ~f_explicit:(fun { is_some; data } ->
-          Boolean.( &&& ) is_some (is_constant data))
+          Boolean.( &&& ) is_some (is_constant data) )
   end
 
   let typ { equal = eq; zero; max_value; typ; _ } =
@@ -533,7 +533,7 @@ module Account = struct
            ; delegate
            ; state
            } :
-            t) : V2.t =
+            t ) : V2.t =
         { balance
         ; nonce
         ; receipt_chain_hash
@@ -621,7 +621,7 @@ module Account = struct
        ; sequence_state
        ; proved_state
        } :
-        t) =
+        t ) =
     let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Numeric.(to_input Tc.balance balance)
@@ -661,7 +661,7 @@ module Account = struct
          ; sequence_state
          ; proved_state
          } :
-          t) =
+          t ) =
       let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Numeric.(Checked.to_input Tc.balance balance)
@@ -686,7 +686,7 @@ module Account = struct
          ; sequence_state = _
          ; proved_state = _
          } :
-          t) (a : Account.Checked.Unhashed.t) =
+          t ) (a : Account.Checked.Unhashed.t) =
       [ Numeric.(Checked.check Tc.balance balance a.balance)
       ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
       ; Eq_data.(
@@ -706,14 +706,14 @@ module Account = struct
          ; sequence_state
          ; proved_state
          } :
-          t) (snapp : Zkapp_account.Checked.t) =
+          t ) (snapp : Zkapp_account.Checked.t) =
       Boolean.any
         Vector.(
           to_list
             (map snapp.sequence_state
                ~f:
                  Eq_data.(
-                   check_checked (Lazy.force Tc.sequence_state) sequence_state)))
+                   check_checked (Lazy.force Tc.sequence_state) sequence_state) ))
       :: Eq_data.(check_checked Tc.boolean proved_state snapp.proved_state)
       :: Vector.(
            to_list
@@ -753,7 +753,7 @@ module Account = struct
        ; sequence_state
        ; proved_state
        } :
-        t) (a : Account.t) =
+        t ) (a : Account.t) =
     let open Or_error.Let_syntax in
     let%bind () =
       Numeric.(check ~label:"balance" Tc.balance balance a.balance)
@@ -782,7 +782,7 @@ module Account = struct
                 let%map () =
                   Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
                 in
-                i + 1)
+                i + 1 )
           in
           let%bind () =
             Eq_data.(
@@ -796,7 +796,7 @@ module Account = struct
                      check
                        (Lazy.force Tc.sequence_state)
                        ~label:"" sequence_state state)
-                   |> Or_error.is_ok)
+                   |> Or_error.is_ok )
           then Ok ()
           else Or_error.errorf "Equality check failed: sequence_state"
     in
@@ -888,7 +888,7 @@ module Protocol_state = struct
         Numeric.gen
           (Length.gen_incl
              (Length.of_int min_epoch_length)
-             (Length.of_int max_epoch_length))
+             (Length.of_int max_epoch_length) )
           Length.compare
       in
       { Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length }
@@ -900,7 +900,7 @@ module Protocol_state = struct
          ; lock_checkpoint
          ; epoch_length
          } :
-          t) =
+          t ) =
       let open Random_oracle.Input.Chunked in
       List.reduce_exn ~f:append
         [ Hash.(to_input Tc.frozen_ledger_hash hash)
@@ -929,7 +929,7 @@ module Protocol_state = struct
            ; lock_checkpoint
            ; epoch_length
            } :
-            t) =
+            t ) =
         let open Random_oracle.Input.Chunked in
         List.reduce_exn ~f:append
           [ Hash.(to_input_checked Tc.frozen_ledger_hash hash)
@@ -1073,7 +1073,7 @@ module Protocol_state = struct
        ; staking_epoch_data
        ; next_epoch_data
        } :
-        t) =
+        t ) =
     let open Random_oracle.Input.Chunked in
     let () = last_vrf_output in
     let length = Numeric.(to_input Tc.length) in
@@ -1161,7 +1161,7 @@ module Protocol_state = struct
          ; staking_epoch_data
          ; next_epoch_data
          } :
-          t) =
+          t ) =
       let open Random_oracle.Input.Chunked in
       let () = last_vrf_output in
       let length = Numeric.(Checked.to_input Tc.length) in
@@ -1195,7 +1195,7 @@ module Protocol_state = struct
            ; staking_epoch_data
            ; next_epoch_data
            } :
-            t) (s : View.Checked.t) =
+            t ) (s : View.Checked.t) =
       let open Impl in
       let epoch_ledger ({ hash; total_currency } : _ Epoch_ledger.Poly.t)
           (t : Epoch_ledger.var) =
@@ -1205,7 +1205,7 @@ module Protocol_state = struct
       in
       let epoch_data
           ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
-            _ Epoch_data.Poly.t) (t : _ Epoch_data.Poly.t) =
+            _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
         ignore seed ;
         epoch_ledger ledger t.ledger
         @ [ Hash.(check_checked Tc.state_hash)
@@ -1324,7 +1324,7 @@ module Protocol_state = struct
          ; staking_epoch_data
          ; next_epoch_data
          } :
-          t) (s : View.t) =
+          t ) (s : View.t) =
     let open Or_error.Let_syntax in
     let epoch_ledger ({ hash; total_currency } : _ Epoch_ledger.Poly.t)
         (t : Epoch_ledger.Value.t) =
@@ -1340,7 +1340,7 @@ module Protocol_state = struct
     in
     let epoch_data label
         ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
-          _ Epoch_data.Poly.t) (t : _ Epoch_data.Poly.t) =
+          _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
       let l s = sprintf "%s_%s" label s in
       let%bind () = epoch_ledger ledger t.ledger in
       ignore seed ;
@@ -1458,7 +1458,7 @@ module Account_type = struct
       let open Random_oracle_input.Chunked in
       Array.reduce_exn ~f:append
         (Array.map [| user; zkapp |] ~f:(fun b ->
-             packed ((b :> Field.Var.t), 1)))
+             packed ((b :> Field.Var.t), 1) ) )
 
     let constant =
       let open Boolean in
@@ -1491,7 +1491,7 @@ module Account_type = struct
         | None ->
             [ false; false ]
         | Any ->
-            [ true; true ])
+            [ true; true ] )
       ~value_of_hlist:(fun [ user; zkapp ] ->
         match (user, zkapp) with
         | true, false ->
@@ -1501,7 +1501,7 @@ module Account_type = struct
         | false, false ->
             None
         | true, true ->
-            Any)
+            Any )
 end
 
 module Other = struct
@@ -1645,8 +1645,8 @@ end]
 
 module Digested = F
 
-let to_input
-    ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) =
+let to_input ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
+    =
   let open Random_oracle_input.Chunked in
   List.reduce_exn ~f:append
     [ Account.to_input self_predicate
@@ -1692,7 +1692,7 @@ let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
             Hash.(check ~label:"other_account_vk" Tc.field)
               other.account_vk
               (Option.value_map ~f:With_hash.hash zkapp.verification_key
-                 ~default:Field.zero) )
+                 ~default:Field.zero ) )
   in
   return ()
 

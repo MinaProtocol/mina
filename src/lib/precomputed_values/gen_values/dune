@@ -1,5 +1,6 @@
 (executable
  (name gen_values)
+ (flags -w -32)
  (libraries
    ;; opam libraries
    stdio

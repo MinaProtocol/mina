@@ -135,7 +135,7 @@ module Base
                             , Envelope.Sender.to_yojson
                               @@ Envelope.Incoming.sender verified_diff )
                           ] ;
-                      Deferred.return (Some verified_diff)))
+                      Deferred.return (Some verified_diff) ) )
 
   let push t (msg, cb) =
     match t with
@@ -180,7 +180,7 @@ module Base
                  | Some verified_env ->
                      let m' = wrap (verified_env, cb') in
                      Option.value ~default:Deferred.unit
-                       (Strict_pipe.Writer.write w m'))) ;
+                       (Strict_pipe.Writer.write w m') ) ) ;
         Deferred.unit
     | Void ->
         Deferred.unit
@@ -191,7 +191,7 @@ module Base
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered
            ( `Capacity verified_pipe_capacity
-           , `Overflow (Call (on_overflow ~unwrap logger)) ))
+           , `Overflow (Call (on_overflow ~unwrap logger)) ) )
     in
 
     let rate_limiter =
@@ -227,8 +227,8 @@ module Local_sink
     with type pool := Diff.pool
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
      and type msg :=
-          BC.resource_pool_diff
-          * ((BC.resource_pool_diff * BC.rejected_diff) Or_error.t -> unit) =
+      BC.resource_pool_diff
+      * ((BC.resource_pool_diff * BC.rejected_diff) Or_error.t -> unit) =
   Base (Diff) (BC)
     (struct
       type raw_msg = BC.resource_pool_diff
@@ -250,8 +250,8 @@ module Remote_sink
     with type pool := Diff.pool
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
      and type msg :=
-          BC.resource_pool_diff Envelope.Incoming.t
-          * Mina_net2.Validation_callback.t =
+      BC.resource_pool_diff Envelope.Incoming.t
+      * Mina_net2.Validation_callback.t =
   Base (Diff) (BC)
     (struct
       type raw_msg = BC.resource_pool_diff Envelope.Incoming.t

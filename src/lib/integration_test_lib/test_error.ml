@@ -47,15 +47,15 @@ module Error_accumulator = struct
         in
         let errors_by_time =
           List.fold new_errors ~init:errors.errors_by_time ~f:(fun acc error ->
-              Time.Map.add_multi acc ~key:(time_of_error error) ~data:error)
+              Time.Map.add_multi acc ~key:(time_of_error error) ~data:error )
         in
-        { errors with errors_by_time })
+        { errors with errors_by_time } )
 
   let error_count { from_current_context; contextualized_errors } =
     let num_current_context = List.length from_current_context in
     let num_contextualized =
       String.Map.fold contextualized_errors ~init:0 ~f:(fun ~key:_ ~data sum ->
-          Time.Map.length data.errors_by_time + sum)
+          Time.Map.length data.errors_by_time + sum )
     in
     num_current_context + num_contextualized
 
@@ -63,7 +63,7 @@ module Error_accumulator = struct
     let context_errors =
       String.Map.data contextualized_errors
       |> List.bind ~f:(fun { errors_by_time; _ } ->
-             Time.Map.data errors_by_time)
+             Time.Map.data errors_by_time )
       |> List.concat
     in
     from_current_context @ context_errors
@@ -107,7 +107,7 @@ module Error_accumulator = struct
             { errors with
               errors_by_time =
                 Time.Map.map errors.errors_by_time ~f:(List.map ~f)
-            })
+            } )
     }
 
   (* This only iterates over contextualized errors. You must check errors in the current context manually *)
@@ -115,12 +115,12 @@ module Error_accumulator = struct
     let contexts_by_time =
       contextualized_errors |> String.Map.to_alist
       |> List.map ~f:(fun (ctx, errors) ->
-             (errors.introduction_time, (ctx, errors)))
+             (errors.introduction_time, (ctx, errors)) )
       |> Time.Map.of_alist_multi
     in
     let f =
       List.iter ~f:(fun (context, { errors_by_time; _ }) ->
-          errors_by_time |> Time.Map.data |> List.concat |> f context)
+          errors_by_time |> Time.Map.data |> List.concat |> f context )
     in
     Time.Map.iter contexts_by_time ~f
 
@@ -139,7 +139,7 @@ module Error_accumulator = struct
               | None ->
                   data
               | Some data' ->
-                  resolve_conflict data' data))
+                  resolve_conflict data' data ) )
       in
       let merge_contextualized_errors a_errors b_errors =
         { introduction_time =
@@ -168,7 +168,7 @@ module Error_accumulator = struct
           ~init:(Map.empty cmp, Map.empty cmp)
           ~f:(fun ~key ~data (left, right) ->
             let l, r = f data in
-            (Map.add_exn left ~key ~data:l, Map.add_exn right ~key ~data:r))
+            (Map.add_exn left ~key ~data:l, Map.add_exn right ~key ~data:r) )
       in
       partition_map
         (module String)
@@ -180,7 +180,7 @@ module Error_accumulator = struct
               ctx_errors.errors_by_time ~f:(List.partition_tf ~f)
           in
           ( { ctx_errors with errors_by_time = l }
-          , { ctx_errors with errors_by_time = r } ))
+          , { ctx_errors with errors_by_time = r } ) )
     in
     let a =
       { from_current_context = from_current_context_a
