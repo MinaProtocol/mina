@@ -47,14 +47,14 @@ module To_yojson = struct
          `Assoc
            ( List.filter_map to_json_accumulator
                ~f:(Option.map ~f:(fun (name, f) -> (name, f t)))
-           |> List.rev )) ;
+           |> List.rev ) ) ;
     obj
 
   let skip obj =
     obj#skip := true ;
     obj#contramap := Fn.id ;
     (obj#to_json :=
-       fun _ -> failwith "Unexpected: This obj#to_json should be skipped") ;
+       fun _ -> failwith "Unexpected: This obj#to_json should be skipped" ) ;
     obj
 
   let int obj =
@@ -80,7 +80,7 @@ module To_yojson = struct
   let option x obj =
     obj#contramap := Option.map ~f:!(x#contramap) ;
     (obj#to_json :=
-       fun a_opt -> match a_opt with Some a -> !(x#to_json) a | None -> `Null) ;
+       fun a_opt -> match a_opt with Some a -> !(x#to_json) a | None -> `Null ) ;
     obj
 
   let contramap ~f x obj =
@@ -136,7 +136,7 @@ module Of_yojson = struct
              | None ->
                  raise (Field_not_found name)
              | Some x ->
-                 x) )
+                 x ) )
     in
     (creator, acc_obj)
 
@@ -160,24 +160,24 @@ module Of_yojson = struct
   let skip obj =
     obj#contramap := Fn.id ;
     (obj#of_json :=
-       fun _ -> failwith "Unexpected: This obj#of_json should be skipped") ;
+       fun _ -> failwith "Unexpected: This obj#of_json should be skipped" ) ;
     obj
 
   let int obj =
     (obj#of_json :=
-       function `Int x -> x | _ -> raise (Invalid_json_scalar `Int)) ;
+       function `Int x -> x | _ -> raise (Invalid_json_scalar `Int) ) ;
     obj#map := Fn.id ;
     obj
 
   let string obj =
     (obj#of_json :=
-       function `String x -> x | _ -> raise (Invalid_json_scalar `String)) ;
+       function `String x -> x | _ -> raise (Invalid_json_scalar `String) ) ;
     obj#map := Fn.id ;
     obj
 
   let bool obj =
     (obj#of_json :=
-       function `Bool x -> x | _ -> raise (Invalid_json_scalar `Bool)) ;
+       function `Bool x -> x | _ -> raise (Invalid_json_scalar `Bool) ) ;
     obj#map := Fn.id ;
     obj
 
@@ -187,13 +187,13 @@ module Of_yojson = struct
        | `List xs ->
            List.map xs ~f:!(x#of_json)
        | _ ->
-           raise (Invalid_json_scalar `List)) ;
+           raise (Invalid_json_scalar `List) ) ;
     obj#map := List.map ~f:!(x#map) ;
     obj
 
   let option x obj =
     (obj#of_json :=
-       function `Null -> None | other -> Some (!(x#of_json) other)) ;
+       function `Null -> None | other -> Some (!(x#of_json) other) ) ;
     obj#map := Option.map ~f:!(x#map) ;
     obj
 

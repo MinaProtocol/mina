@@ -14,10 +14,10 @@ let dispatch ?(max_tries = 5)
                  "Could not send archive diff data to archive process after %d \
                   tries. The process may not be running, please check the \
                   daemon-argument"
-                 max_tries)
+                 max_tries )
               ( ("host_and_port", archive_location.value)
               , ("daemon-argument", archive_location.name) )
-              [%sexp_of: (string * Host_and_port.t) * (string * string)]))
+              [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
     else
       match%bind
         Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff
@@ -42,10 +42,10 @@ let make_dispatch_block rpc ?(max_tries = 5)
                  "Could not send block data to archive process after %d tries. \
                   The process may not be running, please check the \
                   daemon-argument"
-                 max_tries)
+                 max_tries )
               ( ("host_and_port", archive_location.value)
               , ("daemon-argument", archive_location.name) )
-              [%sexp_of: (string * Host_and_port.t) * (string * string)]))
+              [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
     else
       match%bind
         Daemon_rpcs.Client.dispatch rpc block archive_location.value
@@ -66,7 +66,7 @@ let dispatch_extensional_block =
 let transfer ~logger ~precomputed_values ~archive_location
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view
-      Broadcast_pipe.Reader.t) =
+      Broadcast_pipe.Reader.t ) =
   Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
       Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
           let diff =
@@ -83,11 +83,11 @@ let transfer ~logger ~precomputed_values ~archive_location
                   ; ( "breadcrumb"
                     , Transition_frontier.Breadcrumb.to_yojson breadcrumb )
                   ]
-                "Could not send breadcrumb to archive: $error"))
+                "Could not send breadcrumb to archive: $error" ) )
 
 let run ~logger ~precomputed_values
     ~(frontier_broadcast_pipe :
-       Transition_frontier.t option Broadcast_pipe.Reader.t) archive_location =
+       Transition_frontier.t option Broadcast_pipe.Reader.t ) archive_location =
   O1trace.background_thread "send_diffs_to_archiver" (fun () ->
       Broadcast_pipe.Reader.iter frontier_broadcast_pipe
         ~f:
@@ -101,4 +101,4 @@ let run ~logger ~precomputed_values
                    Transition_frontier.Extensions.New_breadcrumbs
                in
                transfer ~logger ~precomputed_values ~archive_location
-                 breadcrumb_reader)))
+                 breadcrumb_reader ) ) )

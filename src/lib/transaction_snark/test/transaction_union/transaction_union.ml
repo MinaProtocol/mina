@@ -74,7 +74,7 @@ let%test_module "Transaction union tests" =
             let txn =
               Transaction.Command
                 (User_command.Signed_command
-                   (Signed_command.forget_check user_command))
+                   (Signed_command.forget_check user_command) )
             in
             Transaction_snark.Statement.Poly.with_empty_local_state ~source
               ~target ~sok_digest
@@ -84,7 +84,7 @@ let%test_module "Transaction union tests" =
               ~pending_coinbase_stack_state
           in
           U.T.of_user_command ~init_stack ~statement user_command_in_block
-            handler)
+            handler )
 
     let coinbase_test state_body ~carryforward =
       let mk_pubkey () =
@@ -105,7 +105,7 @@ let%test_module "Transaction union tests" =
           ~fee_transfer:
             (Some
                (Coinbase.Fee_transfer.create ~receiver_pk:other
-                  ~fee:U.constraint_constants.account_creation_fee))
+                  ~fee:U.constraint_constants.account_creation_fee ) )
         |> Or_error.ok_exn
       in
       let transaction = Mina_transaction.Transaction.Coinbase cb in
@@ -142,21 +142,21 @@ let%test_module "Transaction union tests" =
             ~constraint_constants:U.constraint_constants
             ~sok_message:
               (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
-                 ~prover:Public_key.Compressed.empty)
+                 ~prover:Public_key.Compressed.empty )
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~zkapp_account1:None ~zkapp_account2:None)
+            ~zkapp_account1:None ~zkapp_account2:None )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
-          coinbase_test state_body ~carryforward:false)
+          coinbase_test state_body ~carryforward:false )
 
     let%test_unit "coinbase with carry-forward state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
-          coinbase_test state_body ~carryforward:true)
+          coinbase_test state_body ~carryforward:true )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -167,7 +167,7 @@ let%test_module "Transaction union tests" =
                 ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
-                    account) ;
+                    account ) ;
               let t1 =
                 U.Wallet.user_command_with_wallet wallets ~sender:1 ~receiver:0
                   8_000_000_000
@@ -175,7 +175,7 @@ let%test_module "Transaction union tests" =
                   Account.Nonce.zero
                   (Signed_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:Signed_command_memo.max_digestible_string_length))
+                        ~len:Signed_command_memo.max_digestible_string_length ) )
               in
               let current_global_slot =
                 Mina_state.Protocol_state.Body.consensus_state state_body
@@ -213,7 +213,7 @@ let%test_module "Transaction union tests" =
                 ~target ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
                 { transaction = t1; block_data = state_body }
-                (unstage @@ Sparse_ledger.handler sparse_ledger)))
+                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee = Fee.to_int constraint_constants.account_creation_fee
 
@@ -245,7 +245,7 @@ let%test_module "Transaction union tests" =
                   ~consensus_state:consensus_state_at_slot
                   ~constants:
                     (Protocol_constants_checked.value_of_t
-                       Genesis_constants.compiled.protocol))
+                       Genesis_constants.compiled.protocol ))
                 .body
             in
             let state_body_hash =
@@ -312,7 +312,7 @@ let%test_module "Transaction union tests" =
           let memo =
             Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:Signed_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length )
           in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let _, ucs =
@@ -329,7 +329,7 @@ let%test_module "Transaction union tests" =
                         ~receiver_pk:(Account.public_key receiver.account)
                         amount (Fee.of_int txn_fee) nonce memo
                     in
-                    (Account.Nonce.succ nonce, txns @ [ uc ]))
+                    (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
               Ledger.create_new_account_exn ledger
                 (Account.identifier sender.account)
@@ -337,19 +337,19 @@ let%test_module "Transaction union tests" =
               let () =
                 List.iter ucs ~f:(fun uc ->
                     test_transaction ~constraint_constants ledger
-                      (Transaction.Command (Signed_command uc)))
+                      (Transaction.Command (Signed_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
                   U.check_balance
                     (Account.identifier receiver.account)
                     ((amount * txns_per_receiver) - account_fee)
-                    ledger) ;
+                    ledger ) ;
               U.check_balance
                 (Account.identifier sender.account)
                 ( Balance.to_int sender.account.balance
                 - (amount + txn_fee) * txns_per_receiver * List.length receivers
                 )
-                ledger))
+                ledger ) )
 
     let%test_unit "account creation fee - fee transfers" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -371,20 +371,20 @@ let%test_module "Transaction union tests" =
                              Fee_transfer.Single.create
                                ~receiver_pk:receiver.account.public_key
                                ~fee:(Currency.Fee.of_int fee)
-                               ~fee_token:receiver.account.token_id)
+                               ~fee_token:receiver.account.token_id )
                     in
-                    txns @ [ ft ])
+                    txns @ [ ft ] )
               in
               let () =
                 List.iter fts ~f:(fun ft ->
                     let txn = Mina_transaction.Transaction.Fee_transfer ft in
-                    test_transaction ~constraint_constants ledger txn)
+                    test_transaction ~constraint_constants ledger txn )
               in
               List.iter receivers ~f:(fun receiver ->
                   U.check_balance
                     (Account.identifier receiver.account)
                     ((fee * txns_per_receiver) - account_fee)
-                    ledger)))
+                    ledger ) ) )
 
     let%test_unit "account creation fee - coinbase" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -402,7 +402,7 @@ let%test_module "Transaction union tests" =
                   List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
                       Coinbase.Fee_transfer.create
                         ~receiver_pk:other.account.public_key
-                        ~fee:constraint_constants.account_creation_fee)
+                        ~fee:constraint_constants.account_creation_fee )
                 in
                 List.fold ~init:(fts, []) (List.init coinbase_count ~f:Fn.id)
                   ~f:(fun (fts, cbs) _ ->
@@ -413,7 +413,7 @@ let%test_module "Transaction union tests" =
                         ~fee_transfer:(List.hd fts)
                       |> Or_error.ok_exn
                     in
-                    (Option.value ~default:[] (List.tl fts), cb :: cbs))
+                    (Option.value ~default:[] (List.tl fts), cb :: cbs) )
               in
               Ledger.create_new_account_exn ledger
                 (Account.identifier dummy_account.account)
@@ -421,7 +421,7 @@ let%test_module "Transaction union tests" =
               let () =
                 List.iter cbs ~f:(fun cb ->
                     let txn = Mina_transaction.Transaction.Coinbase cb in
-                    test_transaction ~constraint_constants ledger txn)
+                    test_transaction ~constraint_constants ledger txn )
               in
               let fees = fee * ft_count in
               U.check_balance
@@ -430,7 +430,7 @@ let%test_module "Transaction union tests" =
                 ledger ;
               U.check_balance
                 (Account.identifier other.account)
-                (fees - account_fee) ledger))
+                (fees - account_fee) ledger ) )
 
     module Pc_with_init_stack = struct
       type t =
@@ -451,11 +451,11 @@ let%test_module "Transaction union tests" =
               Array.iter wallets ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
                     (Account.identifier account)
-                    account) ;
+                    account ) ;
               let memo =
                 Signed_command_memo.create_by_digesting_string_exn
                   (Test_util.arbitrary_string
-                     ~len:Signed_command_memo.max_digestible_string_length)
+                     ~len:Signed_command_memo.max_digestible_string_length )
               in
               let t1 =
                 U.Wallet.user_command_with_wallet wallets ~sender:0 ~receiver:1
@@ -483,8 +483,8 @@ let%test_module "Transaction union tests" =
                           that these are payments in this test.
                        *)
                        Signed_command.accounts_accessed
-                         (Signed_command.forget_check t))
-                     [ t1; t2 ])
+                         (Signed_command.forget_check t) )
+                     [ t1; t2 ] )
               in
               let init_stack1 = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_state1 =
@@ -588,12 +588,12 @@ let%test_module "Transaction union tests" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof13 =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    U.T.merge ~sok_digest proof12 proof23)
+                    U.T.merge ~sok_digest proof12 proof23 )
                 |> Or_error.ok_exn
               in
               Async.Thread_safe.block_on_async (fun () ->
-                  U.T.verify_against_digest proof13)
-              |> Result.ok_exn))
+                  U.T.verify_against_digest proof13 )
+              |> Result.ok_exn ) )
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
               carryforward the state from a previous transaction t0 in b1" =
@@ -665,12 +665,12 @@ let%test_module "Transaction union tests" =
         | None ->
             Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:Signed_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length )
       in
       Array.iter accounts ~f:(fun account ->
           Ledger.create_new_account_exn ledger
             (Account.identifier account)
-            account) ;
+            account ) ;
       let get_account aid =
         Option.bind
           (Ledger.location_of_account ledger aid)
@@ -929,7 +929,8 @@ let%test_module "Transaction union tests" =
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Stake_delegation
                      (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk }))
+                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let source_account = Option.value_exn source_account in
@@ -943,7 +944,7 @@ let%test_module "Transaction union tests" =
                 Public_key.Compressed.equal
                   (Option.value_exn source_account.delegate)
                   source_pk ) ;
-              assert (Option.is_none receiver_account)))
+              assert (Option.is_none receiver_account) ) )
 
     let%test_unit "delegation delegator does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -968,7 +969,8 @@ let%test_module "Transaction union tests" =
                   ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
                   (Stake_delegation
                      (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk }))
+                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
               let expected_fee_payer_balance =
@@ -978,7 +980,7 @@ let%test_module "Transaction union tests" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Option.is_none source_account) ;
-              assert (Option.is_some receiver_account)))
+              assert (Option.is_some receiver_account) ) )
 
     let%test_unit "timed account - transactions" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -991,7 +993,7 @@ let%test_module "Transaction union tests" =
           let memo =
             Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:Signed_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length )
           in
           let balance = Balance.of_int 100_000_000_000_000 in
           let initial_minimum_balance = Balance.of_int 80_000_000_000_000 in
@@ -1026,7 +1028,7 @@ let%test_module "Transaction union tests" =
                       U.Wallet.user_command_with_wallet wallets ~sender:0
                         ~receiver amount (Fee.of_int txn_fee) nonce memo
                     in
-                    (Account.Nonce.succ nonce, txns @ [ uc ]))
+                    (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
               Ledger.create_new_account_exn ledger
                 (Account.identifier sender.account)
@@ -1034,19 +1036,19 @@ let%test_module "Transaction union tests" =
               let () =
                 List.iter ucs ~f:(fun uc ->
                     test_transaction ~constraint_constants ~txn_global_slot
-                      ledger (Transaction.Command (Signed_command uc)))
+                      ledger (Transaction.Command (Signed_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
                   U.check_balance
                     (Account.identifier receiver.account)
                     ((amount * txns_per_receiver) - account_fee)
-                    ledger) ;
+                    ledger ) ;
               U.check_balance
                 (Account.identifier sender.account)
                 ( Balance.to_int sender.account.balance
                 - (amount + txn_fee) * txns_per_receiver * List.length receivers
                 )
-                ledger))
+                ledger ) )
 
     (*TODO: use zkApp transactions for tokens*)
     (*let%test_unit "create own new token" =
@@ -1930,7 +1932,7 @@ let%test_module "Transaction union tests" =
           let receivers =
             Array.init 2 ~f:(fun _ ->
                 Public_key.of_private_key_exn (Private_key.create ())
-                |> Public_key.compress)
+                |> Public_key.compress )
           in
           let timed_account pk =
             let account_id = Account_id.create pk Token_id.default in
@@ -1983,12 +1985,12 @@ let%test_module "Transaction union tests" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               List.iter [ timed_account1; timed_account2 ] ~f:(fun acc ->
                   Ledger.create_new_account_exn ledger (Account.identifier acc)
-                    acc) ;
+                    acc ) ;
               (* well over the vesting period, the timing field shouldn't change*)
               let txn_global_slot = Mina_numbers.Global_slot.of_int 100 in
               List.iter transactions ~f:(fun txn ->
                   test_transaction ~txn_global_slot ~constraint_constants ledger
-                    txn)))
+                    txn ) ) )
   end )
 
 let%test_module "transaction_undos" =
@@ -2022,11 +2024,11 @@ let%test_module "transaction_undos" =
             let account_id = Account_id.create sender_pk Token_id.default in
             if
               List.find cmds ~f:(fun cmd ->
-                  Account_id.equal (User_command.fee_payer cmd) account_id)
+                  Account_id.equal (User_command.fee_payer cmd) account_id )
               |> Option.is_some
             then None
             else if Currency.Amount.(balance >= amount) then Some s
-            else None)
+            else None )
       in
       let new_cmds =
         let source_accounts =
@@ -2035,7 +2037,7 @@ let%test_module "transaction_undos" =
         assert (not (List.is_empty source_accounts)) ;
         let new_keys =
           List.init (List.length source_accounts) ~f:(fun _ ->
-              Signature_lib.Keypair.create ())
+              Signature_lib.Keypair.create () )
         in
         List.map (List.zip_exn source_accounts new_keys)
           ~f:(fun ((s, _, nonce, _), r) ->
@@ -2048,7 +2050,7 @@ let%test_module "transaction_undos" =
                 ~body:(Payment { source_pk = sender_pk; receiver_pk; amount })
             in
             let c = Signed_command.sign s payload in
-            User_command.Signed_command (Signed_command.forget_check c))
+            User_command.Signed_command (Signed_command.forget_check c) )
       in
       List.map
         ~f:(fun c -> Mina_transaction.Transaction.Command c)
@@ -2074,7 +2076,7 @@ let%test_module "transaction_undos" =
           Quickcheck.Generator.list_with_length count
             (Fee_transfer.Single.Gen.with_random_receivers ~keys:accounts
                ~max_fee ~min_fee
-               ~token:(Quickcheck.Generator.return Token_id.default))
+               ~token:(Quickcheck.Generator.return Token_id.default) )
         in
         One_or_two.group_list singles
         |> List.map ~f:(Fn.compose Or_error.ok_exn Fee_transfer.of_singles)
@@ -2089,7 +2091,7 @@ let%test_module "transaction_undos" =
                let keypair, _, _, _ =
                  Array.random_element_exn ledger_init_state
                in
-               keypair))
+               keypair ) )
           remaining
       in
       List.map
@@ -2102,7 +2104,7 @@ let%test_module "transaction_undos" =
       let%bind coinbase_new_accounts =
         Quickcheck.Generator.list_with_length count
           (Quickcheck.Generator.map ~f:fst
-             (Coinbase.Gen.gen ~constraint_constants))
+             (Coinbase.Gen.gen ~constraint_constants) )
       in
       let%map coinbase_existing_accounts =
         let remaining = max count (length - count) in
@@ -2111,7 +2113,7 @@ let%test_module "transaction_undos" =
               let keypair, _, _, _ =
                 Array.random_element_exn ledger_init_state
               in
-              keypair)
+              keypair )
         in
         let min_amount =
           Option.value_exn
@@ -2125,7 +2127,7 @@ let%test_module "transaction_undos" =
           (Coinbase.Gen.with_random_receivers ~keys ~min_amount ~max_amount
              ~fee_transfer:
                (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-                  ~min_fee:constraint_constants.account_creation_fee))
+                  ~min_fee:constraint_constants.account_creation_fee ) )
       in
       List.map
         ~f:(fun c -> Mina_transaction.Transaction.Coinbase c)
@@ -2151,13 +2153,13 @@ let%test_module "transaction_undos" =
     let test_undos ledger transactions =
       let res =
         List.fold ~init:[] transactions ~f:(fun acc t ->
-            test_undo ledger t :: acc)
+            test_undo ledger t :: acc )
       in
       List.iter res ~f:(fun (root_before, u) ->
           let () =
             Ledger.undo ~constraint_constants ledger u |> Or_error.ok_exn
           in
-          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before))
+          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before) )
 
     let%test_unit "undo_coinbase" =
       let gen =
@@ -2172,7 +2174,7 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger coinbase_list))
+              test_undos ledger coinbase_list ) )
 
     let%test_unit "undo_fee_transfers" =
       let gen =
@@ -2187,7 +2189,7 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger ft_list))
+              test_undos ledger ft_list ) )
 
     let%test_unit "undo_user_commands" =
       let gen =
@@ -2202,7 +2204,7 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger cmd_list))
+              test_undos ledger cmd_list ) )
 
     let%test_unit "undo_all_txns" =
       let gen =
@@ -2226,5 +2228,5 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger txn_list))
+              test_undos ledger txn_list ) )
   end )

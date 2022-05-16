@@ -20,7 +20,7 @@ open Asttypes
      module T = struct
        [%%define_from_scope x,y]
      end
- *)
+*)
 
 let name = "define_from_scope"
 

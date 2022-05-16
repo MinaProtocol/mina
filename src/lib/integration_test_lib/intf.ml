@@ -150,7 +150,7 @@ module Engine = struct
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> account_data Async_kernel.Deferred.Or_error.t
+        -> account_data Deferred.Or_error.t
 
       val must_get_account_data :
            logger:Logger.t
@@ -174,9 +174,7 @@ module Engine = struct
         -> Mina_base.Party.Update.t Deferred.Or_error.t
 
       val get_peer_id :
-           logger:Logger.t
-        -> t
-        -> (string * string list) Async_kernel.Deferred.Or_error.t
+        logger:Logger.t -> t -> (string * string list) Deferred.Or_error.t
 
       val must_get_peer_id :
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
@@ -185,7 +183,7 @@ module Engine = struct
            ?max_length:int
         -> logger:Logger.t
         -> t
-        -> best_chain_block list Async_kernel.Deferred.Or_error.t
+        -> best_chain_block list Deferred.Or_error.t
 
       val must_get_best_chain :
            ?max_length:int
@@ -196,14 +194,15 @@ module Engine = struct
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
+      val run_replayer : logger:Logger.t -> t -> string Malleable_error.t
+
       val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
 
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
 
-      val get_metrics :
-        logger:Logger.t -> t -> metrics_t Async_kernel.Deferred.Or_error.t
+      val get_metrics : logger:Logger.t -> t -> metrics_t Deferred.Or_error.t
     end
 
     type t
@@ -394,7 +393,7 @@ module Dsl = struct
       -> ( unit Malleable_error.Result_accumulator.t
          , Malleable_error.Hard_fail.t )
          result
-         Async_kernel.Deferred.t
+         Deferred.t
 
     val fetch_connectivity_data :
          logger:Logger.t

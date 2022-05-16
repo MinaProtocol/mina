@@ -1,4 +1,4 @@
-open Mina_transition
+open Mina_block
 open Core_kernel
 open Mina_base
 module Breadcrumb = Transition_frontier.Breadcrumb
@@ -46,17 +46,15 @@ type t =
 
 module Builder = struct
   let breadcrumb_added ~(precomputed_values : Precomputed_values.t) breadcrumb =
-    let ((block, _) as validated_block) =
-      Breadcrumb.validated_transition breadcrumb
-    in
-    let commands = External_transition.Validated.commands validated_block in
+    let validated_block = Breadcrumb.validated_transition breadcrumb in
+    let commands = Mina_block.Validated.valid_commands validated_block in
     let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
     let ledger = Staged_ledger.ledger staged_ledger in
     let sender_receipt_chains_from_parent_ledger =
       let senders =
         commands
         |> List.map ~f:(fun { data; _ } ->
-               User_command.(fee_payer (forget_check data)))
+               User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       Set.to_list senders
@@ -69,36 +67,36 @@ module Builder = struct
                let%map { receipt_chain_hash; _ } =
                  Mina_ledger.Ledger.get ledger ledger_location
                in
-               (sender, receipt_chain_hash)))
+               (sender, receipt_chain_hash)) )
     in
+    let block_with_hash = Mina_block.Validated.forget validated_block in
+    let block = With_hash.data block_with_hash in
     let accounts_accessed =
-      let account_ids_accessed =
-        External_transition.Validated.account_ids_accessed validated_block
-      in
+      let account_ids_accessed = Mina_block.account_ids_accessed block in
       List.filter_map account_ids_accessed ~f:(fun acct_id ->
           (* an accessed account may not be the ledger *)
           let%bind.Option index =
             Option.try_with (fun () ->
-                Mina_ledger.Ledger.index_of_account_exn ledger acct_id)
+                Mina_ledger.Ledger.index_of_account_exn ledger acct_id )
           in
           let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
-          Some (index, account))
+          Some (index, account) )
     in
     let accounts_created =
       let account_creation_fee =
         precomputed_values.constraint_constants.account_creation_fee
       in
       let previous_block_state_hash =
-        External_transition.Validated.protocol_state validated_block
+        Mina_block.header block |> Header.protocol_state
         |> Mina_state.Protocol_state.previous_state_hash
       in
       List.map
         (Staged_ledger.latest_block_accounts_created staged_ledger
-           ~previous_block_state_hash) ~f:(fun acct_id ->
-          (acct_id, account_creation_fee))
+           ~previous_block_state_hash ) ~f:(fun acct_id ->
+          (acct_id, account_creation_fee) )
     in
     Transition_frontier.Breadcrumb_added
-      { block = With_hash.map ~f:External_transition.compose block
+      { block = With_hash.map ~f:External_transition.compose block_with_hash
       ; accounts_accessed
       ; accounts_created
       ; sender_receipt_chains_from_parent_ledger

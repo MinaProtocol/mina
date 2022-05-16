@@ -57,7 +57,7 @@ struct
         Some
           (Bitstring.Lsb_first.of_list
              (List.init M.length_in_bits ~f:(fun i ->
-                  Boolean.var_of_value (Bigint.test_bit n i))))
+                  Boolean.var_of_value (Bigint.test_bit n i) ) ) )
     }
 
   open Let_syntax

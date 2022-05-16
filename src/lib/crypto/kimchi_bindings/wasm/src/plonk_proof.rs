@@ -12,10 +12,7 @@ use wasm_bindgen::prelude::*;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use kimchi::{
-    // nolookup::constraints::{zk_polynomial, zk_w3, Shifts},
-    circuits::wires::COLUMNS,
-};
+use kimchi::circuits::wires::COLUMNS;
 // use std::path::Path;
 use commitment_dlog::{
     commitment::{CommitmentCurve, PolyComm},

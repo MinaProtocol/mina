@@ -27,17 +27,18 @@ module Digest = struct
 
       let to_latest = Fn.id
 
-      include Binable.Of_binable
-                (Core_kernel.String.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Core_kernel.String.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = Fn.id
+            let to_binable = Fn.id
 
-                  let of_binable s =
-                    assert (String.length s = length_in_bytes) ;
-                    s
-                end)
+            let of_binable s =
+              assert (String.length s = length_in_bytes) ;
+              s
+          end)
 
       open Snark_params.Tick
 
@@ -45,7 +46,7 @@ module Digest = struct
         Random_oracle.Input.Chunked.packeds
           (Array.of_list_map
              Fold_lib.Fold.(to_list (string_bits t))
-             ~f:(fun b -> (field_of_bool b, 1)))
+             ~f:(fun b -> (field_of_bool b, 1)) )
 
       let typ =
         Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ

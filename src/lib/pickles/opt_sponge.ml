@@ -102,7 +102,7 @@ struct
                   else a_j)
         in
         assert_r1cs x (i_equals_j :> Field.t) Field.(a_j' - a.(j)) ;
-        a.(j) <- a_j')
+        a.(j) <- a_j' )
 
   let consume ~needs_final_permute_if_empty ~params ~start_pos input state =
     assert (Array.length state = m) ;
@@ -269,7 +269,7 @@ struct
                   make_checked (fun () ->
                       let s = init () in
                       List.iter xs ~f:(S.absorb s) ;
-                      S.squeeze s))
+                      S.squeeze s ) )
                 filtered
             in
             let opt_res =
@@ -284,7 +284,7 @@ struct
                         else of_sponge (init ())
                       in
                       List.iter xs ~f:(absorb s) ;
-                      squeeze s))
+                      squeeze s ) )
                 ps
             in
             if not (Field.Constant.equal filtered_res opt_res) then
@@ -292,6 +292,6 @@ struct
                 !"hash(%{sexp:Field.Constant.t list}) = %{sexp:Field.Constant.t}\n\
                   hash(%{sexp:(bool * Field.Constant.t) list}) = \
                   %{sexp:Field.Constant.t}"
-                filtered filtered_res ps opt_res ())
+                filtered filtered_res ps opt_res () )
     end )
 end

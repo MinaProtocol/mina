@@ -19,7 +19,6 @@ open Asttypes
 
    The variants `%str_log` and `%str_log'` generate the module `Logger.Structured`
    instead of `Logger`.
-
 *)
 
 module type Ppxinfo = sig

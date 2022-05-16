@@ -23,7 +23,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; block_producers =
         List.init n ~f:(fun _ ->
-            { Wallet.balance = block_producer_balance; timing = Untimed })
+            { Wallet.balance = block_producer_balance; timing = Untimed } )
     }
 
   let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
@@ -57,7 +57,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           let%map () =
             wait_for dsl
               (Wait_condition.signed_command_to_be_included_in_frontier
-                 ~txn_hash:hash ~node_included_in:`Any_node)
+                 ~txn_hash:hash ~node_included_in:`Any_node )
           in
           [%log info]
             "gossip_consistency test: payment #%d with hash %s successfully \
@@ -117,7 +117,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Printf.sprintf
                "transactions seen = %d, which is less than (numpayments = %d) \
                 - 1"
-               num_transactions_seen num_payments)
+               num_transactions_seen num_payments )
         in
         [%log error]
           "gossip_consistency test: TEST FAILURE.  transactions seen = %d, \
@@ -146,7 +146,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Malleable_error.soft_error_string ~value:()
             (Printf.sprintf
                "consistency ratio = %f, which is less than threshold = %f" ratio
-               threshold)
+               threshold )
         in
         [%log error]
           "gossip_consistency test: TEST FAILURE. consistency ratio = %f, \

@@ -30,7 +30,7 @@ module Stable = struct
         Allocation_functor.Intf.Output.Bin_io_and_sexp_intf
           with type t := T.t
            and type 'a creator :=
-                state:Protocol_state.Value.t -> proof:Proof.t -> 'a )
+            state:Protocol_state.Value.t -> proof:Proof.t -> 'a )
   end
 end]
 

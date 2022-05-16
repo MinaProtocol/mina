@@ -13,7 +13,7 @@ let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
         (List.filter l ~f:(fun (fld, _) ->
-             Array.mem ~equal:String.equal keep_fields fld))
+             Array.mem ~equal:String.equal keep_fields fld ) )
   | json ->
       json
 
@@ -24,9 +24,9 @@ let yojson_rename_fields ~alternates = function
              let fld =
                Option.value ~default:fld
                  (Array.find_map alternates ~f:(fun (alt, orig) ->
-                      if String.equal fld alt then Some orig else None))
+                      if String.equal fld alt then Some orig else None ) )
              in
-             (fld, json)))
+             (fld, json) ) )
   | json ->
       json
 
@@ -42,7 +42,7 @@ let result_opt ~f x =
 
 let dump_on_error yojson x =
   Result.map_error x ~f:(fun str ->
-      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson)
+      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson )
 
 let of_yojson_generic ~fields of_yojson json =
   dump_on_error json @@ of_yojson
@@ -549,7 +549,7 @@ module Accounts = struct
              | Ok x ->
                  x
              | Error err ->
-                 raise (Stop err))
+                 raise (Stop err) )
     with Stop err -> Error err
 
   let to_yojson x = Json_layout.Accounts.to_yojson (to_json_layout x)
@@ -580,7 +580,7 @@ module Ledger = struct
       Json_layout.Ledger.t =
     let balances =
       List.map balances ~f:(fun (number, balance) ->
-          { Json_layout.Ledger.Balance_spec.number; balance })
+          { Json_layout.Ledger.Balance_spec.number; balance } )
     in
     let without_base : Json_layout.Ledger.t =
       { accounts = None
@@ -601,7 +601,7 @@ module Ledger = struct
 
   let of_json_layout
       ({ accounts; num_accounts; balances; hash; name; add_genesis_winner } :
-        Json_layout.Ledger.t) : (t, string) Result.t =
+        Json_layout.Ledger.t ) : (t, string) Result.t =
     let open Result.Let_syntax in
     let%map base =
       match accounts with
@@ -624,7 +624,7 @@ module Ledger = struct
     let balances =
       List.map balances
         ~f:(fun { Json_layout.Ledger.Balance_spec.number; balance } ->
-          (number, balance))
+          (number, balance) )
     in
     { base; num_accounts; balances; hash; name; add_genesis_winner }
 
@@ -662,7 +662,7 @@ module Proof_keys = struct
     let of_json_layout str =
       Result.map_error (of_string str) ~f:(fun err ->
           "Runtime_config.Proof_keys.Level.of_json_layout: Could not decode \
-           field 'level'. " ^ err)
+           field 'level'. " ^ err )
 
     let to_yojson x = `String (to_json_layout x)
 
@@ -890,7 +890,7 @@ module Epoch_data = struct
       Option.map next ~f:(fun n ->
           { Json_layout.Epoch_data.Data.accounts = accounts n.ledger
           ; seed = n.seed
-          })
+          } )
     in
     { Json_layout.Epoch_data.staking; next }
 

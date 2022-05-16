@@ -1,6 +1,6 @@
 (* test_signatures.ml -- generate signatures for some transactions,
     for comparison against signatures generated in client SDK
- *)
+*)
 
 open Core_kernel
 open Snark_params.Tick
@@ -121,26 +121,26 @@ let main () =
                 Signed_command.t}\n\
                 %!"
               i signature ;
-            exit 1 )) ;
+            exit 1 ) ) ;
       List.iteri string_signatures ~f:(fun i signature ->
           if
             not
               (String_sign.verify ~signature_kind signature keypair.public_key
-                 (List.nth_exn strings i))
+                 (List.nth_exn strings i) )
           then (
             eprintf
               !"Signature (%d) failed to verify for string: %s\n%!"
               i (List.nth_exn strings i) ;
-            exit 1 )) ;
+            exit 1 ) ) ;
       printf "[\n" ;
       List.iter txn_signatures ~f:(fun signature ->
           let Signed_command.Poly.{ signature = field, scalar; _ } =
             (signature :> Signed_command.t)
           in
-          print_signature field scalar) ;
+          print_signature field scalar ) ;
       List.iter string_signatures ~f:(fun signature ->
           let field, scalar = signature in
-          print_signature field scalar) ;
-      printf "]\n")
+          print_signature field scalar ) ;
+      printf "]\n" )
 
 let _ = main ()

@@ -29,7 +29,7 @@
    mina_state
    pipe_lib
    staged_ledger
-   mina_transition
+   mina_block
    consensus
    perf_histograms
    mina_base

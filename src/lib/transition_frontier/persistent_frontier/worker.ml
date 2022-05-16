@@ -2,7 +2,7 @@ open Async
 open Core
 open Otp_lib
 open Mina_base
-open Mina_transition
+open Mina_block
 open Frontier_base
 
 type input = Diff.Lite.E.t list
@@ -67,10 +67,11 @@ module Worker = struct
       Result.map_error result ~f:(fun err ->
           [%log' error t.logger] "error applying %s diff: %s" diff_type_name
             (apply_diff_error_internal_to_string err) ;
-          `Apply_diff diff_type)
+          `Apply_diff diff_type )
     in
     match diff with
     | New_node (Lite transition) -> (
+        let transition = External_transition.Validated.lower transition in
         let r =
           ( Database.add t.db ~transition
             :> (mutant, apply_diff_error_internal) Result.t )
@@ -86,8 +87,7 @@ module Worker = struct
                 [ ( "hash"
                   , `String
                       (State_hash.to_base58_check
-                         (External_transition.Validated.state_hashes transition)
-                           .state_hash) )
+                         (Mina_block.Validated.state_hash transition) ) )
                 ; ("parent", `String (State_hash.to_base58_check h))
                 ] ;
             Ok ()
@@ -135,7 +135,7 @@ module Worker = struct
          * applied during the same scheduler cycle.
       *)
       deferred_result_list_fold input ~init:() ~f:(fun () diff ->
-          Deferred.return (handle_diff t diff))
+          Deferred.return (handle_diff t diff) )
     with
     | Ok () ->
         ()

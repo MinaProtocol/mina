@@ -11,11 +11,11 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   in
   let fee_payer_pks =
     Array.map fee_payer_keypairs ~f:(fun fee_payer_keypair ->
-        Public_key.compress fee_payer_keypair.public_key)
+        Public_key.compress fee_payer_keypair.public_key )
   in
   let fee_payer_account_ids =
     Array.map fee_payer_pks ~f:(fun fee_payer_pk ->
-        Account_id.create fee_payer_pk Token_id.default)
+        Account_id.create fee_payer_pk Token_id.default )
   in
   let (initial_balance : Currency.Balance.t) =
     Currency.Balance.of_int 1_000_000_000_000_000
@@ -33,10 +33,10 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
           Account.create_timed fee_payer_account_id initial_balance
             ~initial_minimum_balance ~cliff_time ~cliff_amount ~vesting_period
             ~vesting_increment
-          |> Or_error.ok_exn)
+          |> Or_error.ok_exn )
     else
       Array.map fee_payer_account_ids ~f:(fun fee_payer_account_id ->
-          Account.create fee_payer_account_id initial_balance)
+          Account.create fee_payer_account_id initial_balance )
   in
   let ledger = Mina_ledger.Ledger.create ~depth:10 () in
   Array.iter2_exn fee_payer_accounts fee_payer_account_ids
@@ -44,13 +44,13 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
       Mina_ledger.Ledger.get_or_create_account ledger fee_payer_account_id
         fee_payer_account
       |> Or_error.ok_exn
-      |> fun _ -> ()) ;
+      |> fun _ -> () ) ;
   let keys = List.init 1000 ~f:(fun _ -> Keypair.create ()) in
   let keymap =
     List.map
       (Array.to_list fee_payer_keypairs @ keys)
       ~f:(fun { public_key; private_key } ->
-        (Public_key.compress public_key, private_key))
+        (Public_key.compress public_key, private_key) )
     |> Public_key.Compressed.Map.of_alist_exn
   in
   (ledger, fee_payer_keypairs, keymap)
@@ -69,14 +69,14 @@ let generate_parties_and_apply_them_consecutively () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
-                U.check_parties_with_merges_exn ledger [ parties ]))
+                U.check_parties_with_merges_exn ledger [ parties ] ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let generate_parties_and_apply_them_freshly () =
   let num_of_fee_payers = 5 in
@@ -90,14 +90,14 @@ let generate_parties_and_apply_them_freshly () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
-                U.check_parties_with_merges_exn ledger [ parties ]))
+                U.check_parties_with_merges_exn ledger [ parties ] ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_invalid_protocol_state_precondition () =
   let num_of_fee_payers = 5 in
@@ -112,7 +112,7 @@ let test_invalid_protocol_state_precondition () =
              ~invalid_protocol_state_precondition:true
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -122,11 +122,11 @@ let test_invalid_protocol_state_precondition () =
                   ~expected_failure:
                     Transaction_status.Failure
                     .Protocol_state_precondition_unsatisfied ledger [ parties ]
-                  ~state_body:U.genesis_state_body))
+                  ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_update_delegate_not_permitted () =
   let num_of_fee_payers = 5 in
@@ -141,7 +141,7 @@ let test_update_delegate_not_permitted () =
              ~invalid_update:(Some `Delegate)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -150,11 +150,11 @@ let test_update_delegate_not_permitted () =
                 U.check_parties_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Update_not_permitted_delegate
-                  ledger [ parties ] ~state_body:U.genesis_state_body))
+                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_edit_state_not_permitted () =
   let num_of_fee_payers = 5 in
@@ -169,7 +169,7 @@ let test_edit_state_not_permitted () =
              ~invalid_update:(Some `App_state)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -178,11 +178,11 @@ let test_edit_state_not_permitted () =
                 U.check_parties_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Update_not_permitted_app_state
-                  ledger [ parties ] ~state_body:U.genesis_state_body))
+                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_update_voting_for_not_permitted () =
   let num_of_fee_payers = 5 in
@@ -197,7 +197,7 @@ let test_update_voting_for_not_permitted () =
              ~invalid_update:(Some `Voting_for)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -206,11 +206,11 @@ let test_update_voting_for_not_permitted () =
                 U.check_parties_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Update_not_permitted_voting_for
-                  ledger [ parties ] ~state_body:U.genesis_state_body))
+                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_update_vk_not_permitted () =
   let num_of_fee_payers = 5 in
@@ -225,7 +225,7 @@ let test_update_vk_not_permitted () =
              ~invalid_update:(Some `Verification_key)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -235,11 +235,11 @@ let test_update_vk_not_permitted () =
                   ~expected_failure:
                     Transaction_status.Failure
                     .Update_not_permitted_verification_key ledger [ parties ]
-                  ~state_body:U.genesis_state_body))
+                  ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_update_zkapp_uri_not_permitted () =
   let num_of_fee_payers = 5 in
@@ -254,7 +254,7 @@ let test_update_zkapp_uri_not_permitted () =
              ~invalid_update:(Some `Zkapp_uri)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -263,11 +263,11 @@ let test_update_zkapp_uri_not_permitted () =
                 U.check_parties_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Update_not_permitted_zkapp_uri
-                  ledger [ parties ] ~state_body:U.genesis_state_body))
+                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_update_token_symbol_not_permitted () =
   let num_of_fee_payers = 5 in
@@ -282,7 +282,7 @@ let test_update_token_symbol_not_permitted () =
              ~invalid_update:(Some `Token_symbol)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -291,11 +291,11 @@ let test_update_token_symbol_not_permitted () =
                 U.check_parties_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Update_not_permitted_token_symbol
-                  ledger [ parties ] ~state_body:U.genesis_state_body))
+                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_update_token_symbol_not_permitted () =
   let num_of_fee_payers = 5 in
@@ -310,7 +310,7 @@ let test_update_token_symbol_not_permitted () =
              ~invalid_update:(Some `Token_symbol)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -319,11 +319,11 @@ let test_update_token_symbol_not_permitted () =
                 U.check_parties_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Update_not_permitted_token_symbol
-                  ledger [ parties ] ~state_body:U.genesis_state_body))
+                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_update_balance_not_permitted () =
   let num_of_fee_payers = 5 in
@@ -338,7 +338,7 @@ let test_update_balance_not_permitted () =
              ~invalid_update:(Some `Balance)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -347,11 +347,11 @@ let test_update_balance_not_permitted () =
                 U.check_parties_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Update_not_permitted_balance
-                  ledger [ parties ] ~state_body:U.genesis_state_body))
+                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let test_timed_account () =
   let num_of_fee_payers = 5 in
@@ -365,7 +365,7 @@ let test_timed_account () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover ())
+             ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -374,11 +374,11 @@ let test_timed_account () =
                 U.check_parties_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Source_minimum_balance_violation
-                  ledger [ parties ] ~state_body:U.genesis_state_body))
+                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
         test i
-      done)
+      done )
 
 let () =
   generate_parties_and_apply_them_consecutively () ;

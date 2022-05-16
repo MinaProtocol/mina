@@ -13,15 +13,22 @@ module Step = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('s, 'sgs, 'bpcs) t =
-        { app_state : 's; sg : 'sgs; old_bulletproof_challenges : 'bpcs }
+      type ('s, 'challenge_polynomial_commitments, 'bpcs) t =
+        { app_state : 's
+        ; challenge_polynomial_commitments : 'challenge_polynomial_commitments
+        ; old_bulletproof_challenges : 'bpcs
+        }
       [@@deriving sexp, yojson, sexp, compare, hash, equal]
     end
   end]
 
-  let prepare ~dlog_plonk_index { app_state; sg; old_bulletproof_challenges } =
+  let prepare ~dlog_plonk_index
+      { app_state
+      ; challenge_polynomial_commitments
+      ; old_bulletproof_challenges
+      } =
     { Types.Step.Proof_state.Me_only.app_state
-    ; sg
+    ; challenge_polynomial_commitments
     ; dlog_plonk_index
     ; old_bulletproof_challenges =
         Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges
@@ -62,20 +69,22 @@ module Wrap = struct
     end
   end
 
-  type 'max_local_max_branching t =
+  type 'max_local_max_proofs_verified t =
     ( Tock.Inner_curve.Affine.t
-    , (Challenges_vector.t, 'max_local_max_branching) Vector.t )
+    , (Challenges_vector.t, 'max_local_max_proofs_verified) Vector.t )
     Types.Wrap.Proof_state.Me_only.t
 
   module Prepared = struct
-    type 'max_local_max_branching t =
+    type 'max_local_max_proofs_verified t =
       ( Tock.Inner_curve.Affine.t
-      , (Challenges_vector.Prepared.t, 'max_local_max_branching) Vector.t )
+      , (Challenges_vector.Prepared.t, 'max_local_max_proofs_verified) Vector.t
+      )
       Types.Wrap.Proof_state.Me_only.t
   end
 
-  let prepare ({ sg; old_bulletproof_challenges } : _ t) =
-    { Types.Wrap.Proof_state.Me_only.sg
+  let prepare
+      ({ challenge_polynomial_commitment; old_bulletproof_challenges } : _ t) =
+    { Types.Wrap.Proof_state.Me_only.challenge_polynomial_commitment
     ; old_bulletproof_challenges =
         Vector.map ~f:Ipa.Wrap.compute_challenges old_bulletproof_challenges
     }

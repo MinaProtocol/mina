@@ -30,7 +30,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
             (fun x ->
               Snarky_backendless.Checked.bind (typ.check x) ~f:(fun () ->
                   make_checked (fun () ->
-                      Boolean.Assert.exactly_one (Vector.to_list x))))
+                      Boolean.Assert.exactly_one (Vector.to_list x) ) ) )
         }
     in
     Typ.transport typ
@@ -39,5 +39,5 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
         let i, _ =
           List.findi (Vector.to_list v) ~f:(fun _ b -> b) |> Option.value_exn
         in
-        i)
+        i )
 end

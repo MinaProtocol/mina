@@ -33,7 +33,7 @@
    mina_base
    mina_transaction
    mina_transaction_logic
-   mina_transition
+   mina_block
    consensus
    interruptible
    o1trace
