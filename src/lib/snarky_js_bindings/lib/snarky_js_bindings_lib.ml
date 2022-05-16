@@ -2796,17 +2796,18 @@ module Ledger = struct
       Js.Optdef.option (Option.map x ~f:transform)
   end
 
+  let party_of_json =
+    let deriver = Party.deriver @@ Fields_derivers_zkapps.Derivers.o () in
+    let party_of_json (party : Js.js_string Js.t) : Party.t =
+      Fields_derivers_zkapps.of_json deriver
+        (party |> Js.to_string |> Yojson.Safe.from_string)
+    in
+    party_of_json
+
   (* TODO hash two parties together in the correct way *)
 
-  let hash_party (p : party) =
-    let party =
-      (*using dummy authorization to construct Party.t. Alternatively, one
-        could use Party.Body.digest which is what Party.digest calls*)
-      { Party.body = p |> party_body
-      ; authorization = Signature Mina_base.Signature.dummy
-      }
-    in
-    Party.digest party |> Field.constant |> to_js_field
+  let hash_party (p : Js.js_string Js.t) =
+    Party.digest (p |> party_of_json) |> Field.constant |> to_js_field
 
   let hash_party_checked p =
     p |> Checked.party |> Party.Checked.digest |> to_js_field
