@@ -472,12 +472,30 @@ let%test_unit "tokens test" =
     let execute_parties_transaction
         (parties : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t) : unit
         =
-      let _res =
+      match
         apply_parties_unchecked ~constraint_constants ~state_view:view ledger
           (mk_parties_transaction ledger parties)
-        |> Or_error.ok_exn
-      in
-      ()
+      with
+      | Ok ({ command = { status; _ }; _ }, _) -> (
+          match status with
+          | Transaction_status.Applied ->
+              ()
+          | Failed failures ->
+              let indexed_failures :
+                  (int * Transaction_status.Failure.t list) list =
+                Transaction_status.Failure.Collection.to_display failures
+              in
+              let formatted_failures =
+                List.map indexed_failures ~f:(fun (ndx, fails) ->
+                    sprintf "Index: %d  Failures: %s" ndx
+                      ( List.map fails ~f:Transaction_status.Failure.to_string
+                      |> String.concat ~sep:"," ) )
+                |> String.concat ~sep:"; "
+              in
+              failwithf "Transaction failed: %s" formatted_failures () )
+      | Error err ->
+          failwithf "Error executing transaction: %s" (Error.to_string_hum err)
+            ()
     in
     let mk_party_body caller kp token_id balance_change : Party.Body.Wire.t =
       { update = Party.Update.noop
@@ -541,13 +559,17 @@ let%test_unit "tokens test" =
             [ node (mk_party_body Call token_account1 custom_token_id 100) [] ]
         ]
     in
-    let token_transfer =
+    let token_transfers =
       forest
         [ node
             (mk_party_body Call token_owner Token_id.default
                (-account_creation_fee) )
             [ node (mk_party_body Call token_account1 custom_token_id (-30)) []
             ; node (mk_party_body Call token_account2 custom_token_id 30) []
+            ; node (mk_party_body Call token_account1 custom_token_id (-10)) []
+            ; node (mk_party_body Call token_account2 custom_token_id 10) []
+            ; node (mk_party_body Call token_account2 custom_token_id (-5)) []
+            ; node (mk_party_body Call token_account1 custom_token_id 5) []
             ]
         ]
     in
@@ -567,9 +589,9 @@ let%test_unit "tokens test" =
     |> ignore ;
     execute_parties_transaction token_minting ;
     check_token_balance token_account1 100 ;
-    execute_parties_transaction token_transfer ;
-    check_token_balance token_account1 70 ;
-    check_token_balance token_account2 30
+    execute_parties_transaction token_transfers ;
+    check_token_balance token_account1 65 ;
+    check_token_balance token_account2 35
   in
   Ledger_inner.with_ledger ~depth ~f:(fun ledger ->
       Init_ledger.init
