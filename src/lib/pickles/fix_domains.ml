@@ -35,6 +35,6 @@ let domains (type field rust_gates)
                                            , rust_gates )
                                            Kimchi_backend_common
                                            .Plonk_constraint_system
-                                           .t) typ return_typ main =
+                                           .t ) typ return_typ main =
   let main x () : unit = main x in
   domains (Impl.constraint_system ~exposing:[ typ ] ~return_typ main)
