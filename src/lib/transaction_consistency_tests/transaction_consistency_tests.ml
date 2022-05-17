@@ -68,7 +68,7 @@ let%test_module "transaction logic consistency" =
       let count = ref 0 in
       List.iter account_ids ~f:(fun account_id ->
           let (_ : _ * _) = Ledger.create_empty_exn base_ledger account_id in
-          incr count) ;
+          incr count ) ;
       Sparse_ledger.of_ledger_subset_exn base_ledger account_ids
 
     (* Helpers for applying transactions *)
@@ -78,7 +78,7 @@ let%test_module "transaction logic consistency" =
     let sparse_ledger ledger t =
       Or_error.try_with ~backtrace:true (fun () ->
           Sparse_ledger.apply_transaction_exn ~constraint_constants
-            ~txn_state_view ledger (Transaction.forget t))
+            ~txn_state_view ledger (Transaction.forget t) )
 
     let transaction_logic ledger t =
       let ledger = ref ledger in
@@ -111,7 +111,7 @@ let%test_module "transaction logic consistency" =
               (Sparse_ledger.next_available_token target)
             ~zkapp_account1:None ~zkapp_account2:None
             { transaction; block_data }
-            (unstage (Sparse_ledger.handler source)))
+            (unstage (Sparse_ledger.handler source)) )
 
     let check_consistent source transaction =
       let res_sparse =
@@ -146,7 +146,7 @@ let%test_module "transaction logic consistency" =
                         ; Atom
                             ( Sparse_ledger.merkle_root target2
                             |> Snark_params.Tick.Field.to_string )
-                        ])) )
+                        ] ) ) )
         | Ok target, _ | _, Ok target ->
             (target, None)
       in
@@ -175,7 +175,7 @@ let%test_module "transaction logic consistency" =
         Some
           (Account.create
              (Account_id.create public_key Token_id.default)
-             balance)
+             balance )
       in
       let timed cliff_time vesting_period =
         let%bind balance = Balance.gen in
@@ -201,8 +201,7 @@ let%test_module "transaction logic consistency" =
       ; timed 5 1 (* vesting, already hit cliff *)
       ; timed 5 16 (* not yet vesting, already hit cliff *)
       ; timed 15 1 (* not yet vesting, just hit cliff *)
-      ; timed 30 1
-        (* not yet vesting, hasn't hit cliff *)
+      ; timed 30 1 (* not yet vesting, hasn't hit cliff *)
       ]
 
     let gen_account pk =
@@ -289,7 +288,7 @@ let%test_module "transaction logic consistency" =
           return
             (Transaction.Coinbase
                ( Coinbase.create ~amount ~receiver:sender ~fee_transfer:None
-               |> Or_error.ok_exn ))
+               |> Or_error.ok_exn ) )
       in
       let fee_transfer =
         let single_ft pk =
@@ -342,7 +341,7 @@ let%test_module "transaction logic consistency" =
             Sparse_ledger.L.get_or_create_account ledger
               (Account_id.create pk Token_id.default)
               account
-            |> Or_error.ok_exn |> ignore)
+            |> Or_error.ok_exn |> ignore )
       in
       add_to_ledger pk1 account1 ;
       add_to_ledger pk2 account2 ;
@@ -368,9 +367,9 @@ let%test_module "transaction logic consistency" =
               "The following transaction was inconsistently \
                applied:@.%s@.%s@.%s@."
               (Yojson.Safe.pretty_to_string
-                 (Transaction.Valid.to_yojson transaction))
+                 (Transaction.Valid.to_yojson transaction) )
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))
-              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error))) ;
+              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error)) ) ;
       !passed
 
     let txn_jsons =
@@ -594,8 +593,8 @@ let%test_module "transaction logic consistency" =
               "The following transaction was inconsistently \
                applied:@.%s@.%s@.%s@."
               (Yojson.Safe.pretty_to_string
-                 (Transaction.Valid.to_yojson transaction))
+                 (Transaction.Valid.to_yojson transaction) )
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))
-              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error))) ;
+              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error)) ) ;
       !passed
   end )

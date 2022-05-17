@@ -76,7 +76,7 @@ let open_ballot i (commitment : Ballot.Closed.var) =
   let%map _, vote =
     request Ballot.Opened.typ (Open_ballot i) ~such_that:(fun opened ->
         let%bind implied = close_ballot_var opened in
-        Ballot.Closed.assert_equal commitment implied)
+        Ballot.Closed.assert_equal commitment implied )
   in
   vote
 
@@ -88,7 +88,7 @@ let count_pepperoni_votes vs =
       let%bind pepperoni_vote = Vote.(v = var Pepperoni) in
       Number.if_ pepperoni_vote
         ~then_:(acc + constant Field.one)
-        ~else_:(acc + constant Field.zero))
+        ~else_:(acc + constant Field.zero) )
 
 (* Aside for experts: This function could be much more efficient since a Candidate
    is just a bool which can be coerced to a cvar (thus requiring literally no constraints
@@ -125,7 +125,7 @@ let winner (ballots : Ballot.Opened.t array) =
       | _, Pepperoni ->
           true
       | _, Mushroom ->
-          false)
+          false )
   in
   if pepperoni_votes > Array.length ballots / 2 then Vote.Pepperoni
   else Mushroom
@@ -139,12 +139,12 @@ let handled_check (ballots : Ballot.Opened.t array) commitments claimed_winner =
       | Open_ballot i ->
           respond (Provide ballots.(i))
       | _ ->
-          unhandled)
+          unhandled )
 
 let tally_and_prove (ballots : Ballot.Opened.t array) =
   let commitments =
     List.init number_of_voters ~f:(fun i ->
-        Hash.hash (Ballot.Opened.to_bits ballots.(i)))
+        Hash.hash (Ballot.Opened.to_bits ballots.(i)) )
   in
   let winner = winner ballots in
   ( commitments

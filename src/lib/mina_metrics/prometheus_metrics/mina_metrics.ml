@@ -97,7 +97,7 @@ module TextFormat_0_0_4 = struct
         Fmt.pf f "#HELP %a %a@.#TYPE %a %a@.%a" MetricName.pp name
           output_unquoted help MetricName.pp name output_metric_type metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
-          samples)
+          samples )
 end
 
 module type Histogram = sig
@@ -251,7 +251,7 @@ module Runtime = struct
   let process_uptime_ms_total =
     simple_metric ~metric_type:Counter "process_uptime_ms_total"
       (fun () ->
-        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
+        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time) )
       ~help:"Total time the process has been running for in milliseconds."
 
   let metrics =
@@ -278,7 +278,7 @@ module Runtime = struct
   let () =
     let open CollectorRegistry in
     List.iter metrics ~f:(fun (info, collector) ->
-        register default info collector)
+        register default info collector )
 end
 
 module Cryptography = struct
@@ -1330,7 +1330,7 @@ module Block_latency = struct
           let total_sum, count_sum =
             List.fold buckets ~init:(0.0, 0)
               ~f:(fun (total_sum, count_sum) (total, count) ->
-                (total_sum +. total, count_sum + count))
+                (total_sum +. total, count_sum + count) )
           in
           total_sum /. Float.of_int count_sum
       end)
@@ -1505,7 +1505,7 @@ module Execution_times = struct
     O1trace.Thread.iter_threads ~f:(fun thread ->
         let name = O1trace.Thread.name thread in
         if not (Hashtbl.mem tracked_metrics name) then
-          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread))
+          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread) )
 
   let () = CollectorRegistry.(register_pre_collect default sync_metrics)
 end
@@ -1567,7 +1567,7 @@ let server ?forward_uri ~port ~logger () =
   O1trace.background_thread "collect_gc_metrics" Runtime.gc_stat ;
   O1trace.thread "serve_metrics"
     (generic_server ?forward_uri ~port ~logger
-       ~registry:CollectorRegistry.default)
+       ~registry:CollectorRegistry.default )
 
 module Archive = struct
   type t =

@@ -15,7 +15,7 @@ end]
 
 let gen =
   Quickcheck.Generator.map Bool.quickcheck_generator ~f:(fun b ->
-      if b then Pos else Neg)
+      if b then Pos else Neg )
 
 let negate = function Pos -> Neg | Neg -> Pos
 

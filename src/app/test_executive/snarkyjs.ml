@@ -68,7 +68,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Mina_base.Account_id.create my_pk Mina_base.Token_id.default
     in
     let ({ private_key = zkapp_sk; public_key = zkapp_pk }
-          : Signature_lib.Keypair.t) =
+          : Signature_lib.Keypair.t ) =
       Signature_lib.Keypair.create ()
     in
     let zkapp_pk = Signature_lib.Public_key.compress zkapp_pk in
@@ -100,7 +100,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ]
                ()
            in
-           wait_and_stdout ~logger process)
+           wait_and_stdout ~logger process )
           (wait_for t (Wait_condition.node_to_initialize node))
       in
       let parties_contract =
@@ -163,7 +163,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ] ;
               Malleable_error.hard_error
                 (Error.of_string
-                   "State update not witnessed from smart contract execution")
+                   "State update not witnessed from smart contract execution" )
           in
           if Currency.Balance.(equal zkapp_balance zkapp_target_balance) then (
             [%log info] "Ledger sees balance change from zkapp execution" ;
@@ -177,7 +177,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ] ;
             Malleable_error.hard_error
               (Error.of_string
-                 "Balance changes not witnessed from smart contract execution")
+                 "Balance changes not witnessed from smart contract execution" )
             ) )
     in
     return ()

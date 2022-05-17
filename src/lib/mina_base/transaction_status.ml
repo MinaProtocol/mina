@@ -74,7 +74,7 @@ module Failure = struct
       let _, display =
         List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
             if List.is_empty bucket then (index + 1, acc)
-            else (index + 1, (index, bucket) :: acc))
+            else (index + 1, (index, bucket) :: acc) )
       in
       display
 
@@ -114,7 +114,7 @@ module Failure = struct
       ~account_delegate_precondition_unsatisfied:add
       ~account_sequence_state_precondition_unsatisfied:add
       ~account_app_state_precondition_unsatisfied:(fun acc var ->
-        List.init 8 ~f:var.constructor @ acc)
+        List.init 8 ~f:var.constructor @ acc )
       ~account_proved_state_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
       ~invalid_fee_excess:add
@@ -293,7 +293,7 @@ module Failure = struct
                   done ;
                   parse
                     (String.sub str ~pos:(String.length prefix)
-                       ~len:(String.length str - String.length suffix))))
+                       ~len:(String.length str - String.length suffix) ) ) )
             [ ( "Account_app_state"
               , "precondition_unsatisfied"
               , fun str ->
@@ -311,7 +311,7 @@ module Failure = struct
     List.iter all ~f:(fun failure ->
         [%test_eq: (t, string) Result.t]
           (of_string (to_string failure))
-          (Ok failure))
+          (Ok failure) )
 
   let describe = function
     | Predicate ->

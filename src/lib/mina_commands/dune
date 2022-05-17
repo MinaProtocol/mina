@@ -39,7 +39,7 @@
    non_empty_list
    genesis_constants
    block_time
-   mina_transition
+   mina_block
    mina_incremental
    gossip_net
    data_hash_lib

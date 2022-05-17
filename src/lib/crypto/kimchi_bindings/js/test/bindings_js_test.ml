@@ -15,7 +15,7 @@ module Pasta_fp_verifier_index = Protocol.VerifierIndex.Fp
 module Pasta_fq_verifier_index = Protocol.VerifierIndex.Fq
 
 (* NOTE: For nodejs, we need to manually add the following line to the javascript bindings, after imports['env'] has been declared.
-imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
+   imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
 *)
 
 type a = { a : int; b : bool; c : int option option }
@@ -71,7 +71,7 @@ let _ =
        method bytesOfJsString x = Js.to_string x |> Bytes.of_string
 
        method bytesToJsString x = Bytes.to_string x |> Js.string
-    end)
+    end )
 
 let _ =
   let open Bigint_256 in
@@ -100,7 +100,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Pasta_fp in
@@ -165,7 +165,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Pasta_fq in
@@ -230,7 +230,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Bigint_256 in
@@ -258,7 +258,7 @@ let _ =
          let ten_bytes = to_bytes ten in
          assert (compare (of_bytes ten_bytes) ten = 0) ;
          assert (compare (deep_copy six) six = 0)
-    end)
+    end )
 
 let _ =
   let open Pasta_fp in
@@ -271,8 +271,7 @@ let _ =
          assert (
            String.equal
              (Bigint_256.to_string size)
-             "28948022309329048855892746252171976963363056481941560715954676764349967630337"
-         ) ;
+             "28948022309329048855892746252171976963363056481941560715954676764349967630337" ) ;
          let one = of_int 1 in
          let two = of_string "2" in
          let rand1 = random () in
@@ -317,7 +316,7 @@ let _ =
          let gen = domain_generator 2 in
          assert (equal (of_bytes (to_bytes gen)) gen) ;
          assert (equal (deep_copy rand2) rand2)
-    end)
+    end )
 
 let _ =
   let open Pasta_fq in
@@ -330,8 +329,7 @@ let _ =
          assert (
            String.equal
              (Bigint_256.to_string size)
-             "28948022309329048855892746252171976963363056481941647379679742748393362948097"
-         ) ;
+             "28948022309329048855892746252171976963363056481941647379679742748393362948097" ) ;
          let one = of_int 1 in
          let two = of_string "2" in
          let rand1 = random () in
@@ -376,7 +374,7 @@ let _ =
          let gen = domain_generator 2 in
          assert (equal (of_bytes (to_bytes gen)) gen) ;
          assert (equal (deep_copy rand2) rand2)
-    end)
+    end )
 
 let _ =
   let open Pasta_fp_vector in
@@ -404,7 +402,7 @@ let _ =
          assert (Pasta_fp.equal (Pasta_fp.of_int 10) (get first 1)) ;
          assert (Pasta_fp.equal (Pasta_fp.of_int 30) (get first 2)) ;
          assert (Pasta_fp.equal (Pasta_fp.of_int 1) (get second 0))
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_vector in
@@ -432,7 +430,7 @@ let _ =
          assert (Pasta_fq.equal (Pasta_fq.of_int 10) (get first 1)) ;
          assert (Pasta_fq.equal (Pasta_fq.of_int 30) (get first 2)) ;
          assert (Pasta_fq.equal (Pasta_fq.of_int 1) (get second 0))
-    end)
+    end )
 
 let eq_affine ~field_equal x y =
   match (x, y) with
@@ -506,14 +504,12 @@ let _ =
          assert (
            String.equal
              (Pasta_fp.to_string endo_base)
-             "20444556541222657078399132219657928148671392403212669005631716460534733845831"
-         ) ;
+             "20444556541222657078399132219657928148671392403212669005631716460534733845831" ) ;
          let endo_scalar = endo_scalar () in
          assert (
            String.equal
              (Pasta_fq.to_string endo_scalar)
-             "26005156700822196841419187675678338661165322343552424574062261873906994770353"
-         ) ;
+             "26005156700822196841419187675678338661165322343552424574062261873906994770353" ) ;
          let one_copied = deep_copy affine_one in
          assert (eq affine_one one_copied) ;
          let infinity_copied = deep_copy affine_infinity in
@@ -521,7 +517,7 @@ let _ =
          assert (eq affine_infinity Infinity) ;
          let infinity_copied_ = deep_copy Infinity in
          assert (eq infinity_copied_ Infinity)
-    end)
+    end )
 
 let _ =
   let open Pasta_vesta in
@@ -586,14 +582,12 @@ let _ =
          assert (
            String.equal
              (Pasta_fq.to_string endo_base)
-             "2942865608506852014473558576493638302197734138389222805617480874486368177743"
-         ) ;
+             "2942865608506852014473558576493638302197734138389222805617480874486368177743" ) ;
          let endo_scalar = endo_scalar () in
          assert (
            String.equal
              (Pasta_fp.to_string endo_scalar)
-             "8503465768106391777493614032514048814691664078728891710322960303815233784505"
-         ) ;
+             "8503465768106391777493614032514048814691664078728891710322960303815233784505" ) ;
          let one_copied = deep_copy affine_one in
          assert (eq affine_one one_copied) ;
          let infinity_copied = deep_copy affine_infinity in
@@ -601,7 +595,7 @@ let _ =
          assert (eq affine_infinity Infinity) ;
          let infinity_copied_ = deep_copy Foundations.Infinity in
          assert (eq infinity_copied_ Infinity)
-    end)
+    end )
 
 let eq_poly_comm ~field_equal (x : _ Protocol.poly_comm)
     (y : _ Protocol.poly_comm) =
@@ -628,7 +622,7 @@ let _ =
            let stop = new%js Js_of_ocaml.Js.date_now in
            log
              (Core_kernel.ksprintf Js.string "%s: %f seconds" label
-                ((stop##getTime -. start##getTime) /. 1000.)) ;
+                ((stop##getTime -. start##getTime) /. 1000.) ) ;
            x
          in
          let open Impl in
@@ -642,11 +636,11 @@ let _ =
          let input = Data_spec.[ Typ.field ] in
          let _pk =
            time "generate_keypair" (fun () ->
-               constraint_system ~exposing:input main |> Backend.Keypair.create)
+               constraint_system ~exposing:input main |> Backend.Keypair.create )
          in
          let pk =
            time "generate_keypair2" (fun () ->
-               constraint_system ~exposing:input main |> Backend.Keypair.create)
+               constraint_system ~exposing:input main |> Backend.Keypair.create )
          in
          let x = Backend.Field.of_int 2 in
          let pi =
@@ -655,14 +649,14 @@ let _ =
                  ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } ->
                    time "create proof" (fun () ->
                        Backend.Proof.create pk ~auxiliary:auxiliary_inputs
-                         ~primary:public_inputs))
-                 () x)
+                         ~primary:public_inputs ) )
+                 () x )
          in
          let vk = Backend.Keypair.vk pk in
          let vec = Backend.Field.Vector.create () in
          Backend.Field.Vector.emplace_back vec x ;
          assert (time "verify proof" (fun () -> Backend.Proof.verify pi vk vec))
-    end)
+    end )
 
 let _ =
   let open Pasta_fp_urs in
@@ -676,7 +670,7 @@ let _ =
             let log x = (Js.Unsafe.js_expr "console.log" : _ -> unit) x in
             log
               (Core_kernel.ksprintf Js.string "%s: %f seconds" label
-                 ((stop##getTime -. start##getTime) /. 1000.)) ;
+                 ((stop##getTime -. start##getTime) /. 1000.) ) ;
             x
           in
           let n = 131072 in
@@ -690,7 +684,7 @@ let _ =
             let xs = Array.init log_n (fun _ -> Pasta_fp.random ()) in
             time "b_poly" (fun () -> b_poly_commitment urs xs)
           in
-          ()) ;
+          () ) ;
          let eq_affine x y = eq_affine ~field_equal:Pasta_fq.equal x y in
          let eq = eq_poly_comm ~field_equal:Pasta_fq.equal in
          let first = create 10 in
@@ -706,7 +700,7 @@ let _ =
          let affines =
            Array.init 16 (fun i ->
                try lcomm1.unshifted.(i)
-               with _ -> Pasta_vesta.random () |> Pasta_vesta.to_affine)
+               with _ -> Pasta_vesta.random () |> Pasta_vesta.to_affine )
          in
          let res = batch_accumulator_check second affines inputs2 in
          assert (res || not res) ;
@@ -716,7 +710,7 @@ let _ =
          let h_second_again = Pasta_vesta.deep_copy h_second in
          assert (eq_affine h_first h_first_again) ;
          assert (eq_affine h_second h_second_again)
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_urs in
@@ -738,7 +732,7 @@ let _ =
          let affines =
            Array.init 16 (fun i ->
                try lcomm1.unshifted.(i)
-               with _ -> Pasta_pallas.random () |> Pasta_pallas.to_affine)
+               with _ -> Pasta_pallas.random () |> Pasta_pallas.to_affine )
          in
          let res = batch_accumulator_check second affines inputs2 in
          assert (res || not res) ;
@@ -748,7 +742,7 @@ let _ =
          let h_second_again = Pasta_pallas.deep_copy h_second in
          assert (eq_affine h_first h_first_again) ;
          assert (eq_affine h_second h_second_again)
-    end)
+    end )
 
 let mk_wires typ i (r1, c1) (r2, c2) (r3, c3) coeffs : _ Protocol.circuit_gate =
   { typ
@@ -848,7 +842,7 @@ let _ =
              (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs)
          in
          test_vec vec1 ; test_vec vec2
-    end)
+    end )
 
 let _ =
   let open Protocol.Gates.Vector.Fq in
@@ -912,15 +906,13 @@ let _ =
            let l, r, o, _, _, _, _ = zero.wires in
            wrap vec l r ;
            assert (
-             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs)
-           ) ;
+             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs) ) ;
            wrap vec o l ;
            assert (
-             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs)
-           )
+             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs) )
          in
          test_vec vec1 ; test_vec vec2
-    end)
+    end )
 
 let _ =
   let open Pasta_fp_index in
@@ -964,7 +956,7 @@ let _ =
          assert (domain_d4_size index2 = 64) ;
          assert (domain_d8_size index0 = 128) ;
          assert (domain_d8_size index2 = 128)
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_index in
@@ -1036,7 +1028,7 @@ let _ =
          assert (domain_d4_size index2 = 64) ;
          assert (domain_d8_size index0 = 128) ;
          assert (domain_d8_size index2 = 128)
-    end)
+    end )
 
 let eq_verification_shifts ~field_equal l r = Array.for_all2 field_equal l r
 
@@ -1131,7 +1123,7 @@ let _ =
          List.iter
            (fun x -> assert (eq (deep_copy x) x))
            [ vindex0_0; vindex2_0; dummy0 ]
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_verifier_index in
@@ -1181,6 +1173,6 @@ let _ =
          List.iter
            (fun x -> assert (eq (deep_copy x) x))
            [ vindex0_0; vindex2_0; dummy0 ]
-    end)
+    end )
 
 let linkme = ()

@@ -37,7 +37,7 @@ module Subchain = struct
       (make_sql
          ~join_condition:
            "b.id = chain.parent_id AND (chain.state_hash <> $2 OR b.state_hash \
-            = $2)")
+            = $2)" )
 
   let start_from_unparented (module Conn : Caqti_async.CONNECTION)
       ~end_state_hash =

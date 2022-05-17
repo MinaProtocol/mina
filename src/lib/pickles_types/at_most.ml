@@ -105,15 +105,16 @@ module At_most_2 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N2.n) at_most
 
-      include Binable.Of_binable1
-                (Core_kernel.List.Stable.V1)
-                (struct
-                  type nonrec 'a t = 'a t
+      include
+        Binable.Of_binable1
+          (Core_kernel.List.Stable.V1)
+          (struct
+            type nonrec 'a t = 'a t
 
-                  let to_binable = to_list
+            let to_binable = to_list
 
-                  let of_binable xs = of_list_and_length_exn xs Nat.N2.n
-                end)
+            let of_binable xs = of_list_and_length_exn xs Nat.N2.n
+          end)
 
       include (
         With_length
@@ -133,15 +134,16 @@ module At_most_8 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N8.n) at_most
 
-      include Binable.Of_binable1
-                (Core_kernel.List.Stable.V1)
-                (struct
-                  type nonrec 'a t = 'a t
+      include
+        Binable.Of_binable1
+          (Core_kernel.List.Stable.V1)
+          (struct
+            type nonrec 'a t = 'a t
 
-                  let to_binable = to_list
+            let to_binable = to_list
 
-                  let of_binable xs = of_list_and_length_exn xs Nat.N8.n
-                end)
+            let of_binable xs = of_list_and_length_exn xs Nat.N8.n
+          end)
 
       include (
         With_length

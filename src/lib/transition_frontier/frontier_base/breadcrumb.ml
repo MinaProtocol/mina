@@ -2,7 +2,7 @@ open Async_kernel
 open Core
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Network_peer
 
 module T = struct
@@ -27,7 +27,7 @@ module T = struct
       ~just_emitted_a_proof ~transition_receipt_time =
     f
       (creator ~validated_transition ~staged_ledger ~just_emitted_a_proof
-         ~transition_receipt_time)
+         ~transition_receipt_time )
 
   let create ~validated_transition ~staged_ledger ~just_emitted_a_proof
       ~transition_receipt_time =
@@ -51,7 +51,7 @@ module T = struct
       ; ( "transition_receipt_time"
         , `String
             (Option.value_map transition_receipt_time ~default:"<not available>"
-               ~f:(Time.to_string_iso8601_basic ~zone:Time.Zone.utc)) )
+               ~f:(Time.to_string_iso8601_basic ~zone:Time.Zone.utc) ) )
       ]
 end
 
@@ -89,7 +89,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                ~validated_transition:
                  (Mina_block.Validated.lift fully_valid_block)
                ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
-               ~transition_receipt_time)
+               ~transition_receipt_time )
       | Error (`Invalid_staged_ledger_diff errors) ->
           let reasons =
             String.concat ~sep:" && "
@@ -97,7 +97,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                 | `Incorrect_target_staged_ledger_hash ->
                     "staged ledger hash"
                 | `Incorrect_target_snarked_ledger_hash ->
-                    "snarked ledger hash"))
+                    "snarked ledger hash" ) )
           in
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
           let%map () =
@@ -146,11 +146,12 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                       | Unexpected _ ->
                           make_actions Gossiped_invalid_transition
                     in
-                    Trust_system.record trust_system logger peer action)
+                    Trust_system.record trust_system logger peer action )
           in
           Error
             (`Invalid_staged_ledger_diff
-              (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error)))
+              (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error)
+              ) )
 
 let block_with_hash =
   Fn.compose Mina_block.Validated.forget validated_transition
@@ -172,7 +173,7 @@ let consensus_state_with_hashes breadcrumb =
   breadcrumb |> block_with_hash
   |> With_hash.map ~f:(fun block ->
          block |> Mina_block.header |> Mina_block.Header.protocol_state
-         |> Protocol_state.consensus_state)
+         |> Protocol_state.consensus_state )
 
 let parent_hash b = b |> protocol_state |> Protocol_state.previous_state_hash
 
@@ -227,7 +228,7 @@ module For_tests = struct
       Signed_command.With_valid_signature.t Sequence.t =
     let account_ids =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
-          Account.identifier account)
+          Account.identifier account )
     in
     Sequence.filter_map (accounts_with_secret_keys |> Sequence.of_list)
       ~f:(fun (sender_sk, sender_account) ->
@@ -265,9 +266,9 @@ module For_tests = struct
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:
               (Payment
-                 { source_pk = sender_pk; receiver_pk; amount = send_amount })
+                 { source_pk = sender_pk; receiver_pk; amount = send_amount } )
         in
-        Signed_command.sign sender_keypair payload)
+        Signed_command.sign sender_keypair payload )
 
   let gen ?(logger = Logger.null ())
       ~(precomputed_values : Precomputed_values.t) ~verifier
@@ -305,7 +306,7 @@ module For_tests = struct
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:Sok_message.Digest.default
-                      ~proof:Proof.transaction_dummy)
+                      ~proof:Proof.transaction_dummy )
             ; prover
             }
       in
@@ -359,7 +360,7 @@ module For_tests = struct
           ~f:(fun (proof, _) ->
             { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
               pending_coinbase_stack = ()
-            })
+            } )
           ~default:previous_registers
       in
       let genesis_ledger_hash =
@@ -455,7 +456,7 @@ module For_tests = struct
     let gen_list =
       List.gen_with_length n
         (gen ?logger ~precomputed_values ~verifier ?trust_system
-           ~accounts_with_secret_keys)
+           ~accounts_with_secret_keys )
     in
     let%map breadcrumbs_constructors = gen_list in
     fun root ->
@@ -464,7 +465,7 @@ module For_tests = struct
         Deferred.List.fold breadcrumbs_constructors ~init:(root, [])
           ~f:(fun (previous, acc) make_breadcrumb ->
             let%map breadcrumb = make_breadcrumb previous in
-            (breadcrumb, breadcrumb :: acc))
+            (breadcrumb, breadcrumb :: acc) )
       in
       List.rev ls
 

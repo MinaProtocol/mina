@@ -42,7 +42,7 @@
    mina_generators
    mina_base
    mina_ledger
-   mina_transition
+   mina_block
    transition_frontier
    logger
    mina_metrics
@@ -62,6 +62,8 @@
    quickcheck_lib
    snark_params
    mina_transaction
+   protocol_version
+   mina_version
  )
  (inline_tests)
  (modes native)

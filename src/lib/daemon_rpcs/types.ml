@@ -30,7 +30,7 @@ module Status = struct
           let padding =
             String.init (max_key_length - String.length s) ~f:(fun _ -> ' ')
           in
-          sprintf "%s: %s %s" s padding x)
+          sprintf "%s: %s %s" s padding x )
       |> String.concat ~sep:"\n"
     in
     title ^ "\n" ^ output ^ "\n"
@@ -47,13 +47,13 @@ module Status = struct
       List.map best ~f:(fun (v, (lo, hi)) ->
           Printf.sprintf
             !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
-            lo hi v)
+            lo hi v )
     in
     let total = List.sum (module Int) values ~f:Fn.id in
     List.fold msgs
       ~init:
         (Printf.sprintf "\n\tTotal: %d (overflow:%d) (underflow:%d)\n\t" total
-           overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x)
+           overflow underflow ) ~f:(fun acc x -> acc ^ "\n\t" ^ x)
     ^ "\n\t..."
 
   module Rpc_timings = struct
@@ -91,14 +91,14 @@ module Status = struct
         let f x = Field.get x s in
         Fields.fold ~init:[]
           ~get_staged_ledger_aux:(fun acc x ->
-            add_rpcs ~name:"Get Staged Ledger Aux" (f x) acc)
+            add_rpcs ~name:"Get Staged Ledger Aux" (f x) acc )
           ~answer_sync_ledger_query:(fun acc x ->
-            add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc)
+            add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
           ~get_ancestry:(fun acc x -> add_rpcs ~name:"Get Ancestry" (f x) acc)
           ~get_transition_chain_proof:(fun acc x ->
-            add_rpcs ~name:"Get transition chain proof" (f x) acc)
+            add_rpcs ~name:"Get transition chain proof" (f x) acc )
           ~get_transition_chain:(fun acc x ->
-            add_rpcs ~name:"Get transition chain" (f x) acc)
+            add_rpcs ~name:"Get transition chain" (f x) acc )
         |> List.rev
       in
       digest_entries ~title:"RPCs" entries
@@ -120,13 +120,13 @@ module Status = struct
         let f x = Field.get x s in
         Fields.fold ~init:[]
           ~rpc_timings:(fun acc x ->
-            ("RPC Timings", Rpc_timings.to_text (f x)) :: acc)
+            ("RPC Timings", Rpc_timings.to_text (f x)) :: acc )
           ~external_transition_latency:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Block Latencies (hist.)", summarize_report report) :: acc)
+                ("Block Latencies (hist.)", summarize_report report) :: acc )
           ~accepted_transition_local_latency:(fun acc x ->
             match f x with
             | None ->
@@ -134,7 +134,7 @@ module Status = struct
             | Some report ->
                 ( "Accepted local block Latencies (hist.)"
                 , summarize_report report )
-                :: acc)
+                :: acc )
           ~accepted_transition_remote_latency:(fun acc x ->
             match f x with
             | None ->
@@ -142,19 +142,20 @@ module Status = struct
             | Some report ->
                 ( "Accepted remote block Latencies (hist.)"
                 , summarize_report report )
-                :: acc)
+                :: acc )
           ~snark_worker_transition_time:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker a->b (hist.)", summarize_report report) :: acc)
+                ("Snark Worker a->b (hist.)", summarize_report report) :: acc )
           ~snark_worker_merge_time:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker Merge (hist.)", summarize_report report) :: acc)
+                ("Snark Worker Merge (hist.)", summarize_report report) :: acc
+            )
       in
       digest_entries ~title:"Performance Histograms" entries
   end
@@ -236,7 +237,7 @@ module Status = struct
 
     let uptime_secs =
       map_entry "Local uptime" ~f:(fun secs ->
-          Time.Span.to_string (Time.Span.of_int_sec secs))
+          Time.Span.to_string (Time.Span.of_int_sec secs) )
 
     let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
@@ -270,7 +271,7 @@ module Status = struct
         | None ->
             "Block producer"
         | Some pk ->
-            pk)
+            pk )
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
@@ -293,8 +294,7 @@ module Status = struct
           let slot_str (slot : Next_producer_timing.slot) =
             sprintf "slot: %s slot-since-genesis: %s"
               (Mina_numbers.Global_slot.to_string slot.slot)
-              (Mina_numbers.Global_slot.to_string
-                 slot.global_slot_since_genesis)
+              (Mina_numbers.Global_slot.to_string slot.global_slot_since_genesis)
           in
           let generated_from =
             sprintf "Generated from consensus at %s"
@@ -312,7 +312,7 @@ module Status = struct
               sprintf "%s for %s (%s)" (str time) (slot_str for_slot)
                 generated_from
           | Produce_now { for_slot; _ } ->
-              sprintf "Now (for %s %s)" (slot_str for_slot) generated_from)
+              sprintf "Now (for %s %s)" (slot_str for_slot) generated_from )
 
     let consensus_time_best_tip =
       option_entry "Best tip consensus time"
@@ -364,7 +364,7 @@ module Status = struct
             | Some peer ->
                 [ ("Libp2p PeerID", peer.peer_id) ]
             | None ->
-                [])
+                [] )
         |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
@@ -395,7 +395,7 @@ module Status = struct
               | Wait_for_parent ->
                   "Waiting for parent to finish"
             in
-            ("\t" ^ s, Int.to_string n))
+            ("\t" ^ s, Int.to_string n) )
         |> digest_entries ~title:""
       in
       option_entry "Catchup status" ~f:render

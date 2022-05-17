@@ -163,14 +163,13 @@ module type Network_pool_base_intf = sig
   module Local_sink :
     Mina_net2.Sink.S_with_void
       with type msg :=
-            resource_pool_diff
-            * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+        resource_pool_diff
+        * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
 
   module Remote_sink :
     Mina_net2.Sink.S_with_void
       with type msg :=
-            resource_pool_diff Envelope.Incoming.t
-            * Mina_net2.Validation_callback.t
+        resource_pool_diff Envelope.Incoming.t * Mina_net2.Validation_callback.t
 
   module Broadcast_callback :
     Broadcast_callback

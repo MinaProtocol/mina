@@ -88,7 +88,7 @@ let%test_module "Command line tests" =
             Core.Printf.printf
               !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
               contents ) ;
-          remove_config_directory config_dir genesis_ledger_dir)
+          remove_config_directory config_dir genesis_ledger_dir )
         (fun () ->
           match%map
             let open Deferred.Or_error.Let_syntax in
@@ -122,7 +122,7 @@ let%test_module "Command line tests" =
               true
           | Error err ->
               test_failed := true ;
-              Error.raise err)
+              Error.raise err )
 
     let%test "The mina daemon works in background mode" =
       match Core.Sys.is_file coda_exe with

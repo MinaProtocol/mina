@@ -704,7 +704,7 @@ ALTER SEQUENCE public.zkapp_balance_bounds_id_seq OWNED BY public.zkapp_balance_
 
 CREATE TABLE public.zkapp_commands (
     id integer NOT NULL,
-    zkapp_fee_payer_id integer NOT NULL,
+    zkapp_fee_payer_body_id integer NOT NULL,
     zkapp_other_parties_ids integer[] NOT NULL,
     memo text NOT NULL,
     hash text NOT NULL
@@ -860,37 +860,6 @@ CREATE SEQUENCE public.zkapp_fee_payer_body_id_seq
 --
 
 ALTER SEQUENCE public.zkapp_fee_payer_body_id_seq OWNED BY public.zkapp_fee_payer_body.id;
-
-
---
--- Name: zkapp_fee_payers; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.zkapp_fee_payers (
-    id integer NOT NULL,
-    body_id integer NOT NULL
-);
-
-
---
--- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.zkapp_fee_payers_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.zkapp_fee_payers_id_seq OWNED BY public.zkapp_fee_payers.id;
-
 
 --
 -- Name: zkapp_global_slot_bounds; Type: TABLE; Schema: public; Owner: -
@@ -1657,13 +1626,6 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body ALTER COLUMN id SET DEFAULT nextval
 
 
 --
--- Name: zkapp_fee_payers id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_fee_payers ALTER COLUMN id SET DEFAULT nextval('public.zkapp_fee_payers_id_seq'::regclass);
-
-
---
 -- Name: zkapp_global_slot_bounds id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2329,7 +2291,7 @@ COPY public.zkapp_balance_bounds (id, balance_lower_bound, balance_upper_bound) 
 -- Data for Name: zkapp_commands; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.zkapp_commands (id, zkapp_fee_payer_id, zkapp_other_parties_ids, memo, hash) FROM stdin;
+COPY public.zkapp_commands (id, zkapp_fee_payer_body_id, zkapp_other_parties_ids, memo, hash) FROM stdin;
 1	1	{1,2}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZBMeciXqFVuGDtGLHLbhMNKZukmYHoSqMWYYXUWgWxnvX6ZaMu
 2	2	{3}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpaFUKBY891HvtBAfMKayPSzyCYcGiqU8Mvs3LWoKBXSBpyG6JEZ
 3	3	{4}	E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH	CkpZqhmFm7hKcpfqa9yFHZbBqNzDNcXpmzyXBMwf4jkuJU9B3L7Q6
@@ -2407,18 +2369,6 @@ COPY public.zkapp_fee_payer_body (id, account_identifier_id, update_id, fee, eve
 2	4	4	1000000000	1	1	4	2
 3	4	6	1000000000	1	1	6	3
 4	4	8	1000000000	1	1	8	4
-\.
-
-
---
--- Data for Name: zkapp_fee_payers; Type: TABLE DATA; Schema: public; Owner: -
---
-
-COPY public.zkapp_fee_payers (id, body_id) FROM stdin;
-1	1
-2	2
-3	3
-4	4
 \.
 
 
@@ -2740,13 +2690,6 @@ SELECT pg_catalog.setval('public.zkapp_events_id_seq', 1, true);
 --
 
 SELECT pg_catalog.setval('public.zkapp_fee_payer_body_id_seq', 4, true);
-
-
---
--- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.zkapp_fee_payers_id_seq', 4, true);
 
 
 --
@@ -3152,14 +3095,6 @@ ALTER TABLE ONLY public.zkapp_events
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
     ADD CONSTRAINT zkapp_fee_payer_body_pkey PRIMARY KEY (id);
-
-
---
--- Name: zkapp_fee_payers zkapp_fee_payers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_fee_payers
-    ADD CONSTRAINT zkapp_fee_payers_pkey PRIMARY KEY (id);
 
 
 --
@@ -3790,11 +3725,11 @@ ALTER TABLE ONLY public.zkapp_accounts
 
 
 --
--- Name: zkapp_commands zkapp_commands_zkapp_fee_payer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_commands zkapp_commands_zkapp_fee_payer_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.zkapp_commands
-    ADD CONSTRAINT zkapp_commands_zkapp_fee_payer_id_fkey FOREIGN KEY (zkapp_fee_payer_id) REFERENCES public.zkapp_fee_payers(id);
+    ADD CONSTRAINT zkapp_commands_zkapp_fee_payer_body_id_fkey FOREIGN KEY (zkapp_fee_payer_body_id) REFERENCES public.zkapp_fee_payer_body(id);
 
 
 --
@@ -3867,14 +3802,6 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
     ADD CONSTRAINT zkapp_fee_payer_body_zkapp_protocol_state_precondition_id_fkey FOREIGN KEY (zkapp_protocol_state_precondition_id) REFERENCES public.zkapp_protocol_state_precondition(id);
-
-
---
--- Name: zkapp_fee_payers zkapp_fee_payers_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_fee_payers
-    ADD CONSTRAINT zkapp_fee_payers_body_id_fkey FOREIGN KEY (body_id) REFERENCES public.zkapp_fee_payer_body(id);
 
 
 --

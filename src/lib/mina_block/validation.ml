@@ -323,7 +323,7 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
           Some
             (Blockchain_snark.Blockchain.create
                ~state:(Header.protocol_state header)
-               ~proof:(Header.protocol_state_proof header)))
+               ~proof:(Header.protocol_state_proof header) ) )
   in
   match%map
     match to_verify with
@@ -337,7 +337,7 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
       if verified then
         Ok
           (List.map tvs ~f:(fun (t, validation) ->
-               (t, Unsafe.set_valid_proof validation)))
+               (t, Unsafe.set_valid_proof validation) ) )
       else Error `Invalid_proof
   | Error e ->
       Error (`Verifier_error e)
@@ -407,7 +407,7 @@ let validate_frontier_dependencies ~logger ~consensus_constants ~root_block
                [ ( "selection_context"
                  , `String
                      "Mina_block.Validation.validate_frontier_dependencies" )
-               ])
+               ] )
           ~existing:(With_hash.map ~f:consensus_state root_block)
           ~candidate:(With_hash.map ~f:consensus_state t) )
       ~error:`Not_selected_over_frontier_root
@@ -422,7 +422,7 @@ let validate_frontier_dependencies ~logger ~consensus_constants ~root_block
 let skip_frontier_dependencies_validation
     (_ :
       [ `This_block_belongs_to_a_detached_subtree
-      | `This_block_was_loaded_from_persistence ]) (t, validation) =
+      | `This_block_was_loaded_from_persistence ] ) (t, validation) =
   (t, Unsafe.set_valid_frontier_dependencies validation)
 
 let reset_frontier_dependencies_validation (transition_with_hash, validation) =
@@ -475,12 +475,12 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
          in
          ( (Protocol_state.hashes_with_body parent_protocol_state ~body_hash)
              .state_hash
-         , body_hash ))
+         , body_hash ) )
       ~coinbase_receiver:(Consensus_state.coinbase_receiver consensus_state)
       ~supercharge_coinbase:
         (Consensus_state.supercharge_coinbase consensus_state)
     |> Deferred.Result.map_error ~f:(fun e ->
-           `Staged_ledger_application_failed e)
+           `Staged_ledger_application_failed e )
   in
   [%log debug]
     ~metadata:
@@ -506,12 +506,12 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       [ Option.some_if
           (not
              (Staged_ledger_hash.equal staged_ledger_hash
-                (Blockchain_state.staged_ledger_hash blockchain_state)))
+                (Blockchain_state.staged_ledger_hash blockchain_state) ) )
           `Incorrect_target_staged_ledger_hash
       ; Option.some_if
           (not
              (Frozen_ledger_hash.equal target_ledger_hash
-                (Blockchain_state.snarked_ledger_hash blockchain_state)))
+                (Blockchain_state.snarked_ledger_hash blockchain_state) ) )
           `Incorrect_target_snarked_ledger_hash
       ]
   in

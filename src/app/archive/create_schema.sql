@@ -49,13 +49,11 @@ CREATE TABLE account_identifiers
 , UNIQUE (public_key_id,token_id)
 );
 
-/* the initial balance is the balance at genesis, whether the account is timed or not
-   for untimed accounts, the fields other than id, account_identifier_id, and token are 0
+/* for untimed accounts, the fields other than id, account_identifier_id, and token are 0
 */
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
 , account_identifier_id   int       NOT NULL UNIQUE REFERENCES account_identifiers(id)
-, initial_balance         bigint    NOT NULL
 , initial_minimum_balance bigint    NOT NULL
 , cliff_time              bigint    NOT NULL
 , cliff_amount            bigint    NOT NULL
@@ -108,13 +106,18 @@ CREATE INDEX idx_voting_for_value ON voting_for(value);
 /* import supporting Zkapp-related tables */
 \ir zkapp_tables.sql
 
-/* zkapp_other_parties_ids refers to a list of ids in zkapp_party.
+/* in OCaml, there's a Fee_payer type, which contains a
+   a signature and a reference to the fee payer body. Because
+   we don't store a signature, the fee payer here refers
+   directly to the fee payer body.
+
+   zkapp_other_parties_ids refers to a list of ids in zkapp_party.
    The values in zkapp_other_parties_ids are unenforced foreign keys
    that reference zkapp_party_body(id), and not NULL.
 */
 CREATE TABLE zkapp_commands
 ( id                                    serial         PRIMARY KEY
-, zkapp_fee_payer_id                    int            NOT NULL REFERENCES zkapp_fee_payers(id)
+, zkapp_fee_payer_body_id               int            NOT NULL REFERENCES zkapp_fee_payer_body(id)
 , zkapp_other_parties_ids               int[]          NOT NULL
 , memo                                  text           NOT NULL
 , hash                                  text           NOT NULL UNIQUE
@@ -152,7 +155,6 @@ CREATE TABLE blocks
 , chain_status                 chain_status_type NOT NULL
 );
 
-CREATE INDEX idx_blocks_id         ON blocks(id);
 CREATE INDEX idx_blocks_parent_id  ON blocks(parent_id);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);

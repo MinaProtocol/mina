@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Blockchain_snark
 
 module type S = Intf.S
@@ -120,7 +120,7 @@ module Worker_state = struct
                            ~handler:
                              (Consensus.Data.Prover_state.handler
                                 ~constraint_constants state_for_handler
-                                ~pending_coinbase)
+                                ~pending_coinbase )
                            { transition = block
                            ; prev_state =
                                Blockchain_snark.Blockchain.state chain
@@ -132,12 +132,12 @@ module Worker_state = struct
                            next_state
                        in
                        Blockchain_snark.Blockchain.create ~state:next_state
-                         ~proof)
+                         ~proof )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
                        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                       "Prover threw an error while extending block: $error") ;
+                       "Prover threw an error while extending block: $error" ) ;
                  res
 
                let verify state proof = B.Proof.verify [ (state, proof) ]
@@ -159,16 +159,16 @@ module Worker_state = struct
                      }
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
-                          ~constraint_constants ~pending_coinbase)
+                          ~constraint_constants ~pending_coinbase )
                      t (Protocol_state.hashes next_state).state_hash
                    |> Or_error.map ~f:(fun () ->
                           Blockchain_snark.Blockchain.create ~state:next_state
-                            ~proof:Mina_base.Proof.blockchain_dummy)
+                            ~proof:Mina_base.Proof.blockchain_dummy )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
                        ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                       "Prover threw an error while extending block: $error") ;
+                       "Prover threw an error while extending block: $error" ) ;
                  Async.Deferred.return res
 
                let verify _state _proof = Deferred.return true
@@ -183,13 +183,13 @@ module Worker_state = struct
                  @@ Ok
                       (Blockchain_snark.Blockchain.create
                          ~proof:Mina_base.Proof.blockchain_dummy
-                         ~state:next_state)
+                         ~state:next_state )
 
                let verify _ _ = Deferred.return true
              end : S )
        in
        Memory_stats.log_memory_stats logger ~process:"prover" ;
-       m)
+       m )
 
   let get = Fn.id
 end
@@ -205,7 +205,7 @@ module Functions = struct
   let initialized =
     create bin_unit [%bin_type_class: [ `Initialized ]] (fun w () ->
         let (module W) = Worker_state.get w in
-        Deferred.return `Initialized)
+        Deferred.return `Initialized )
 
   let extend_blockchain =
     create Extend_blockchain_input.Stable.Latest.bin_t
@@ -222,14 +222,14 @@ module Functions = struct
       ->
         let (module W) = Worker_state.get w in
         W.extend_blockchain chain next_state block ledger_proof prover_state
-          pending_coinbase)
+          pending_coinbase )
 
   let verify_blockchain =
     create Blockchain.Stable.Latest.bin_t bin_bool (fun w chain ->
         let (module W) = Worker_state.get w in
         W.verify
           (Blockchain_snark.Blockchain.state chain)
-          (Blockchain_snark.Blockchain.proof chain))
+          (Blockchain_snark.Blockchain.proof chain) )
 end
 
 module Worker = struct
@@ -277,7 +277,7 @@ module Worker = struct
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
-               ~log_filename:"mina-prover.log" ~max_size ~num_rotate) ;
+               ~log_filename:"mina-prover.log" ~max_size ~num_rotate ) ;
         [%log info] "Prover started" ;
         Worker_state.create
           { conf_dir; logger; proof_level; constraint_constants }
@@ -302,7 +302,7 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
+      ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
       { conf_dir; logger; proof_level; constraint_constants }
   in
   [%log info]
@@ -344,14 +344,14 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
        ~f:(fun stdout ->
          return
          @@ [%log debug] "Prover stdout: $stdout"
-              ~metadata:[ ("stdout", `String stdout) ]) ;
+              ~metadata:[ ("stdout", `String stdout) ] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
          @@ [%log error] "Prover stderr: $stderr"
-              ~metadata:[ ("stderr", `String stderr) ]) ;
+              ~metadata:[ ("stderr", `String stderr) ] ) ;
   { connection; process; logger }
 
 let initialized { connection; _ } =
@@ -401,7 +401,7 @@ let extend_blockchain { connection; logger; _ } chain next_state block
                 (Base64.encode_exn
                    (Binable.to_string
                       (module Extend_blockchain_input.Stable.Latest)
-                      input)) )
+                      input ) ) )
           ; ("error", Error_json.error_to_yojson e)
           ]
         "Prover failed: $error" ;

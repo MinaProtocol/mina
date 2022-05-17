@@ -122,7 +122,7 @@ module Body = struct
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:Hash_prefix.protocol_state_body (pack_input input)
-          |> State_body_hash.var_of_hash_packed))
+          |> State_body_hash.var_of_hash_packed) )
 
   let consensus_state { Poly.consensus_state; _ } = consensus_state
 
@@ -248,7 +248,7 @@ let hash_checked ({ previous_state_hash; body } : var) =
           [| Hash.var_to_hash_packed previous_state_hash
            ; State_body_hash.var_to_hash_packed body
           |]
-        |> State_hash.var_of_hash_packed)
+        |> State_hash.var_of_hash_packed )
   in
   (hash, body)
 

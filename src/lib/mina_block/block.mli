@@ -38,3 +38,5 @@ val transactions :
 val payments : t -> Signed_command.t With_status.t list
 
 val equal : t -> t -> bool
+
+val account_ids_accessed : t -> Account_id.t list

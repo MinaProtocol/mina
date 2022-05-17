@@ -246,7 +246,7 @@ end
 
 module Zkapp_command = struct
   type t =
-    { zkapp_fee_payer_id : int
+    { zkapp_fee_payer_body_id : int
     ; zkapp_other_parties_ids : int array
     ; memo : string
     ; block_id : int
@@ -272,7 +272,7 @@ module Zkapp_command = struct
 
   let query =
     Caqti_request.collect Caqti_type.int typ
-      {sql| SELECT zkapp_fee_payer_id,zkapp_other_parties_ids,memo,
+      {sql| SELECT zkapp_fee_payer_body_id,zkapp_other_parties_ids,memo,
                    blocks.id,blocks.global_slot_since_genesis,
                    parent.global_slot_since_genesis,
                    sequence_no,hash

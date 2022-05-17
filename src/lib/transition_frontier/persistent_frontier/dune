@@ -32,7 +32,7 @@
    mina_base
    mina_transaction_logic
    rocksdb
-   mina_transition
+   mina_block
    mina_state
    genesis_constants
    verifier
