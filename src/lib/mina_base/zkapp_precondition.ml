@@ -180,7 +180,7 @@ module Numeric = struct
 
   let deriver name inner obj =
     let closed_interval obj' = Closed_interval.deriver ~name inner obj' in
-    Or_ignore.deriver closed_interval obj
+    Or_ignore.deriver_implicit closed_interval obj
 
   module Derivers = struct
     open Fields_derivers_zkapps.Derivers

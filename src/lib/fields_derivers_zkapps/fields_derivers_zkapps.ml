@@ -212,12 +212,12 @@ module Make (Schema : Graphql_intf.Schema) = struct
     iso_string obj ~name:"Balance" ~to_string:Currency.Balance.to_string
       ~of_string:(except ~f:Currency.Balance.of_string `Balance)
 
-  let option (x : _ Unified_input.t) obj : _ Unified_input.t =
+  let option (x : _ Unified_input.t) ~js_type obj : _ Unified_input.t =
     let _a = Graphql.Fields.option x obj in
     let _b = Graphql.Args.option x obj in
     let _c = Fields_derivers_json.To_yojson.option x obj in
     let _d = Fields_derivers_graphql.Graphql_query.option x obj in
-    let _e = Fields_derivers_js.Js_layout.option x obj in
+    let _e = Fields_derivers_js.Js_layout.option ~js_type x obj in
     Fields_derivers_json.Of_yojson.option x obj
 
   let list (x : _ Unified_input.t) obj : _ Unified_input.t =
@@ -566,7 +566,7 @@ let%test_module "Test" =
 
       let derived inner init =
         iso ~map:of_option ~contramap:to_option
-          ((option @@ inner @@ o ()) (o ()))
+          ((option ~js_type:`Flagged_option @@ inner @@ o ()) (o ()))
           init
     end
 

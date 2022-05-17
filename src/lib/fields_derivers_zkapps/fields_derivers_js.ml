@@ -81,11 +81,24 @@ module Js_layout = struct
     obj#js_layout := `Assoc [ ("type", `String "array"); ("inner", inner) ] ;
     obj
 
-  let option x obj : _ Input.t =
+  let option x obj ~(js_type : [ `Implicit | `Flagged_option | `Or_undefined ])
+      : _ Input.t =
     let inner = !(x#js_layout) in
-    (* print_endline ("option: " ^ (inner |> Yojson.Safe.to_string)) ; *)
+    let js_type =
+      match js_type with
+      | `Implicit ->
+          "implicit"
+      | `Flagged_option ->
+          "flaggedOption"
+      | `Or_undefined ->
+          "orUndefined"
+    in
     obj#js_layout :=
-      `Assoc [ ("type", `String "orundefined"); ("inner", inner) ] ;
+      `Assoc
+        [ ("type", `String "option")
+        ; ("optionType", `String js_type)
+        ; ("inner", inner)
+        ] ;
     obj
 
   let wrapped x obj =

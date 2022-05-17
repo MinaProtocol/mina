@@ -106,8 +106,8 @@ module As_record = struct
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
-      ~proof:!.(option @@ proof @@ o ())
-      ~signature:!.(option @@ signature_deriver @@ o ())
+      ~proof:!.(option ~js_type:`Or_undefined @@ proof @@ o ())
+      ~signature:!.(option ~js_type:`Or_undefined @@ signature_deriver @@ o ())
     |> finish "Control" ~t_toplevel_annots
 end
 
