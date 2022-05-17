@@ -246,9 +246,14 @@ let gen_account_precondition_from ?(failure = None) ~account_id ~ledger () =
       | Some account ->
           gen_account_precondition_from_account ~failure account )
 
-let gen_fee (_account : Account.t) =
+let gen_fee (account : Account.t) =
   let lo_fee = Mina_compile_config.minimum_user_command_fee in
-  let hi_fee = Option.value_exn (Currency.Fee.scale lo_fee 5) in
+  let hi_fee =
+    Currency.(
+      Fee.min
+        (Option.value_exn (Currency.Fee.scale lo_fee 5))
+        (Amount.to_fee (Balance.to_amount account.balance)))
+  in
   Currency.Fee.gen_incl lo_fee hi_fee
 
 let fee_to_amt fee = Currency.Amount.(Signed.of_unsigned (of_fee fee))
