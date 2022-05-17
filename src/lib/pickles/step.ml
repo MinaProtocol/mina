@@ -621,7 +621,7 @@ struct
             ~return_typ:(Snarky_backendless.Typ.unit ())
             (fun x () : unit ->
               Impls.Step.handle
-                (fun () : unit -> branch_data.main ~step_domains (conv x))
+                (fun () : unit -> branch_data.main ~step_domains x)
                 handler )
             next_statement_hashed )
     in
