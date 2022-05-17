@@ -31,6 +31,7 @@
    transaction_snark_tests
    test_util
    mina_transaction_logic
+   mina_transaction
    )
   (library_flags -linkall)
   (inline_tests)

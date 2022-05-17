@@ -619,14 +619,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   let get_user_account_with_location ledger account_id =
     let open Or_error.Let_syntax in
-    let%bind ((_, acct) as r) = get_with_location ledger account_id in
-    let%map () =
-      check
-        (Option.is_none acct.zkapp)
-        !"Expected account %{sexp: Account_id.t} to be a user account, got a \
-          snapp account."
-        account_id
-    in
+    let%map ((_, _acct) as r) = get_with_location ledger account_id in
+    (*let%map () =
+        check
+          (Option.is_none acct.zkapp)
+          !"Expected account %{sexp: Account_id.t} to be a user account, got a \
+            snapp account."
+          account_id
+      in*)
     r
 
   let failure (e : Transaction_status.Failure.t) = e
@@ -637,6 +637,27 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         Ok { acct with balance }
     | Error _ ->
         Result.fail (failure Overflow)
+
+  let account_has_permission ~to_ (account : Account.t) =
+    match to_ with
+    | `Send ->
+        printf
+          !"Check send, account %s\n%!"
+          (Account.to_yojson account |> Yojson.Safe.to_string) ;
+        Permissions.Auth_required.check account.permissions.send
+          Control.Tag.Signature
+    | `Receive ->
+        printf
+          !"Check receive, account %s\n%!"
+          (Account.to_yojson account |> Yojson.Safe.to_string) ;
+        Permissions.Auth_required.check account.permissions.receive
+          Control.Tag.None_given
+    | `Set_delegate ->
+        printf
+          !"Check delegate, account %s\n%!"
+          (Account.to_yojson account |> Yojson.Safe.to_string) ;
+        Permissions.Auth_required.check account.permissions.set_delegate
+          Control.Tag.Signature
 
   (* Helper function for [apply_user_command_unchecked] *)
   let pay_fee' ~command ~nonce ~fee_payer ~fee ~ledger ~current_global_slot =
@@ -735,6 +756,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let%bind fee_payer_location, fee_payer_account, applied_common =
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
+    let%bind () =
+      if account_has_permission ~to_:`Send fee_payer_account then Ok ()
+      else
+        Or_error.error_string
+          Transaction_status.Failure.(describe Update_not_permitted_balance)
+    in
     (* Charge the fee. This must happen, whether or not the command itself
        succeeds, to ensure that the network is compensated for processing this
        command.
@@ -759,6 +786,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           let source_location, source_account =
             get_with_location ledger source |> ok_or_reject
+          in
+          let%bind () =
+            if account_has_permission ~to_:`Set_delegate source_account then
+              Ok ()
+            else Error Transaction_status.Failure.Update_not_permitted_delegate
           in
           let%bind () =
             match (source_location, receiver_location) with
@@ -792,6 +824,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Payment { amount; _ } ->
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
+          in
+          let%bind () =
+            if account_has_permission ~to_:`Receive receiver_account then Ok ()
+            else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           let%bind source_location, source_timing, source_account =
             let ret =
@@ -848,6 +884,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                        (Error.createf "%s"
                           (Transaction_status.Failure.describe failure) ) )
             else ret
+          in
+          let%bind () =
+            if account_has_permission ~to_:`Send source_account then Ok ()
+            else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =
@@ -1661,6 +1701,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
 
+  let check_permission_to_receive receiver_account =
+    if account_has_permission ~to_:`Receive receiver_account then Ok ()
+    else
+      Or_error.error_string
+        Transaction_status.Failure.(
+          describe Transaction_status.Failure.Update_not_permitted_balance)
+
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance
       ~modify_timing =
     let open Or_error.Let_syntax in
@@ -1681,6 +1728,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
            thus the creation fee has been paid.
         *)
         let%bind action, a, loc = get_or_create t account_id in
+        let%bind () = check_permission_to_receive a in
         let emptys = previous_empty_accounts action account_id in
         let%bind timing = modify_timing a in
         let%map balance = modify_balance action account_id a.balance ft.fee in
@@ -1693,6 +1741,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
            thus the creation fee has been paid.
         *)
         let%bind action1, a1, l1 = get_or_create t account_id1 in
+        let%bind () = check_permission_to_receive a1 in
         let emptys1 = previous_empty_accounts action1 account_id1 in
         let account_id2 = Fee_transfer.Single.receiver ft2 in
         if Account_id.equal account_id1 account_id2 then (
@@ -1707,6 +1756,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
              and thus the creation fee has been paid.
           *)
           let%bind action2, a2, l2 = get_or_create t account_id2 in
+          let%bind () = check_permission_to_receive a2 in
           let emptys2 = previous_empty_accounts action2 account_id2 in
           let%bind balance1 =
             modify_balance action1 account_id1 a1.balance ft1.fee
@@ -1782,6 +1832,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             *)
             get_or_create t transferee_id
           in
+          let%bind () = check_permission_to_receive transferee_account in
           let emptys = previous_empty_accounts action transferee_id in
           let%bind timing =
             update_timing_when_no_deduction ~txn_global_slot transferee_account
@@ -1806,6 +1857,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       *)
       get_or_create t receiver_id
     in
+    let%bind () = check_permission_to_receive receiver_account in
     let emptys2 = previous_empty_accounts action2 receiver_id in
     (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
     let%bind receiver_timing_for_applied, coinbase_receiver_timing =
