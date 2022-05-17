@@ -73,7 +73,9 @@ module Zkapp_command = struct
 end
 
 module Block = struct
-  (* in accounts_accessed, the int is the ledger index *)
+  (* in accounts_accessed, the int is the ledger index
+     in tokens_used, the account id is the token owner
+  *)
   type t =
     { state_hash : State_hash.Stable.Latest.t
     ; parent_hash : State_hash.Stable.Latest.t
@@ -96,7 +98,8 @@ module Block = struct
     ; accounts_accessed : (int * Account.Stable.Latest.t) list
     ; accounts_created :
         (Account_id.Stable.Latest.t * Currency.Fee.Stable.Latest.t) list
-          (* TODO: list of created token ids and owners *)
+    ; tokens_used :
+        (Token_id.Stable.Latest.t * Account_id.Stable.Latest.t option) list
     }
   [@@deriving yojson, equal, bin_io_unversioned]
 end

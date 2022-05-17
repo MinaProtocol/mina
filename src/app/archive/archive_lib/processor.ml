@@ -51,6 +51,18 @@ module Public_key = struct
           public_key
 end
 
+module Token_owners = struct
+  (* hash table of token owners, updated for each block *)
+  let owner_tbl : Account_id.t Token_id.Table.t = Token_id.Table.create ()
+
+  let add_if_doesn't_exist token_id owner =
+    match Token_id.Table.add owner_tbl ~key:token_id ~data:owner with
+    | `Ok | `Duplicate ->
+        ()
+
+  let find_owner token_id = Token_id.Table.find owner_tbl token_id
+end
+
 module Token = struct
   type t =
     { value : string
@@ -82,11 +94,10 @@ module Token = struct
   let find_opt (module Conn : CONNECTION) =
     make_finder Conn.find_opt Caqti_request.find_opt
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
-      ~(owner : Account_id.t option) token_id =
+  let add_if_doesn't_exist (module Conn : CONNECTION) token_id =
     let open Deferred.Result.Let_syntax in
     let value = Token_id.(to_string token_id) in
-    match owner with
+    match Token_owners.find_owner token_id with
     | None ->
         assert (Token_id.(equal default) token_id) ;
         Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -165,16 +176,14 @@ module Account_identifiers = struct
 
   let table_name = "account_identifiers"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~token_owner account_id =
+  let add_if_doesn't_exist (module Conn : CONNECTION) account_id =
     let open Deferred.Result.Let_syntax in
     let pk = Account_id.public_key account_id in
     (* this token_id is Token_id.t *)
     let token_id = Account_id.token_id account_id in
     let%bind public_key_id = Public_key.add_if_doesn't_exist (module Conn) pk in
     (* this token_id is a Postgresql table id *)
-    let%bind token_id =
-      Token.add_if_doesn't_exist (module Conn) ~owner:token_owner token_id
-    in
+    let%bind token_id = Token.add_if_doesn't_exist (module Conn) token_id in
     let t = { public_key_id; token_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -1367,11 +1376,8 @@ module Zkapp_other_party_body = struct
       =
     let open Deferred.Result.Let_syntax in
     let account_identifier = Account_id.create body.public_key body.token_id in
-    (* TODO: TEMP!!!! get real token owner *)
     let%bind account_identifier_id =
-      Account_identifiers.add_if_doesn't_exist
-        (module Conn)
-        ~token_owner:None account_identifier
+      Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
     let%bind update_id =
       Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
@@ -1519,9 +1525,7 @@ module Zkapp_fee_payer_body = struct
       Account_id.create body.public_key Token_id.default
     in
     let%bind account_identifier_id =
-      Account_identifiers.add_if_doesn't_exist
-        (module Conn)
-        ~token_owner:None account_identifier
+      Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
     let%bind update_id =
       Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
@@ -1677,27 +1681,21 @@ module User_command = struct
         let token_id = Signed_command.fee_token t in
         assert (Token_id.(equal default) token_id) ;
         let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist
-          (module Conn)
-          ~token_owner:None acct_id
+        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
       in
       let%bind source_id =
         let pk = Signed_command.source_pk t in
         let token_id = Signed_command.token t in
         assert (Token_id.(equal default) token_id) ;
         let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist
-          (module Conn)
-          ~token_owner:None acct_id
+        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
       in
       let%map receiver_id =
         let pk = Signed_command.receiver_pk t in
         let token_id = Signed_command.token t in
         assert (Token_id.(equal default) token_id) ;
         let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist
-          (module Conn)
-          ~token_owner:None acct_id
+        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
       in
       { fee_payer_id; source_id; receiver_id }
 
@@ -1764,21 +1762,20 @@ module User_command = struct
               ~f:(Fn.compose Unsigned.UInt64.to_int64 Currency.Amount.to_uint64)
           in
           let open Deferred.Result.Let_syntax in
-          (* TODO : use real token owners *)
           let%bind fee_payer_id =
             Account_identifiers.add_if_doesn't_exist
               (module Conn)
-              ~token_owner:None user_cmd.fee_payer
+              user_cmd.fee_payer
           in
           let%bind source_id =
             Account_identifiers.add_if_doesn't_exist
               (module Conn)
-              ~token_owner:None user_cmd.source
+              user_cmd.source
           in
           let%bind receiver_id =
             Account_identifiers.add_if_doesn't_exist
               (module Conn)
-              ~token_owner:None user_cmd.receiver
+              user_cmd.receiver
           in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -1860,16 +1857,6 @@ module User_command = struct
         { zkapp_fee_payer_body_id; zkapp_other_parties_ids; memo; hash }
   end
 
-  let as_signed_command (t : User_command.t) : Mina_base.Signed_command.t =
-    match t with
-    | Signed_command c ->
-        c
-    | Parties _ ->
-        let `Needs_some_work_for_zkapps_on_mainnet =
-          Mina_base.Util.todo_zkapps
-        in
-        failwith "TODO"
-
   let via (t : User_command.t) : [ `Parties | `Ident ] =
     match t with Signed_command _ -> `Ident | Parties _ -> `Parties
 
@@ -1935,7 +1922,7 @@ module Internal_command = struct
         let%bind receiver_id =
           Account_identifiers.add_if_doesn't_exist
             (module Conn)
-            ~token_owner:None internal_cmd.receiver
+            internal_cmd.receiver
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2004,9 +1991,7 @@ module Fee_transfer = struct
               (Fee_transfer.Single.receiver_pk t)
               Token_id.default
           in
-          Account_identifiers.add_if_doesn't_exist
-            (module Conn)
-            ~token_owner:None account_id
+          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2052,9 +2037,7 @@ module Coinbase = struct
           let account_id =
             Account_id.create (Coinbase.receiver_pk t) Token_id.default
           in
-          Account_identifiers.add_if_doesn't_exist
-            (module Conn)
-            ~token_owner:None account_id
+          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2303,6 +2286,14 @@ module Block_and_zkapp_command = struct
             ~cols:[ "block_id"; "zkapp_command_id"; "sequence_no" ]
             () ) )
       (block_id, zkapp_command_id, sequence_no)
+
+  let all_from_block (module Conn : CONNECTION) ~block_id =
+    let comma_cols = String.concat Fields.names ~sep:"," in
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.int typ
+         (Mina_caqti.select_cols ~table_name ~select:comma_cols
+            ~cols:[ "block_id" ] () ) )
+      block_id
 end
 
 module Zkapp_account = struct
@@ -2432,11 +2423,8 @@ module Accounts_accessed = struct
       (ledger_index, (account : Account.t)) =
     let open Deferred.Result.Let_syntax in
     let account_id = Account_id.create account.public_key account.token_id in
-    (* TODO!!! TEMP!!!! need to get real token owner *)
     let%bind account_identifier_id =
-      Account_identifiers.add_if_doesn't_exist
-        (module Conn)
-        ~token_owner:None account_id
+      Account_identifiers.add_if_doesn't_exist (module Conn) account_id
     in
     match%bind find_opt (module Conn) ~block_id ~account_identifier_id with
     | Some result ->
@@ -2531,10 +2519,7 @@ module Accounts_created = struct
       creation_fee =
     let open Deferred.Result.Let_syntax in
     let%bind account_identifier_id =
-      (* TODO: TEMP!!!! -- add real token owner *)
-      Account_identifiers.add_if_doesn't_exist
-        (module Conn)
-        ~token_owner:None account_id
+      Account_identifiers.add_if_doesn't_exist (module Conn) account_id
     in
     let creation_fee =
       Currency.Fee.to_uint64 creation_fee |> Unsigned.UInt64.to_int64
@@ -3289,7 +3274,7 @@ let retry ~f ~logger ~error_str retries =
   go retries
 
 let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
-    ~delete_older_than ~accounts_accessed ~accounts_created block =
+    ~delete_older_than ~accounts_accessed ~accounts_created ~tokens_used block =
   let state_hash = hash block in
 
   (* the block itself is added in a single transaction with a transaction block
@@ -3300,6 +3285,15 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
      transaction block
   *)
   let add () =
+    [%log info]
+      "Populating token owners table for block with state hash $state_hash"
+      ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
+    List.iter tokens_used ~f:(fun (token_id, owner) ->
+        match owner with
+        | None ->
+            ()
+        | Some acct_id ->
+            Token_owners.add_if_doesn't_exist token_id acct_id ) ;
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
         let%bind res =
@@ -3424,26 +3418,28 @@ let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~accounts_accessed:block.Precomputed.accounts_accessed
-    ~accounts_created:block.Precomputed.accounts_created block
+    ~accounts_created:block.Precomputed.accounts_created
+    ~tokens_used:block.Precomputed.tokens_used block
 
 let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:Block.add_from_extensional
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~accounts_accessed:block.Extensional.Block.accounts_accessed
-    ~accounts_created:block.Extensional.Block.accounts_created block
+    ~accounts_created:block.Extensional.Block.accounts_created
+    ~tokens_used:block.Extensional.Block.tokens_used block
 
 let run pool reader ~constraint_constants ~logger ~delete_older_than :
     unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
-        (Breadcrumb_added { block; accounts_accessed; accounts_created; _ })
-      -> (
+        (Breadcrumb_added
+          { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
         match%bind
           add_block_aux ~logger ~pool ~delete_older_than ~hash ~add_block
-            ~accounts_accessed ~accounts_created
+            ~accounts_accessed ~accounts_created ~tokens_used
             (With_hash.map ~f:External_transition.decompose block)
         with
         | Error e ->

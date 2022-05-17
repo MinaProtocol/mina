@@ -105,7 +105,8 @@ let create ~logger ~pids : t Deferred.t =
   [%log info] "Starting a new uptime service SNARK worker process" ;
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() logger
+      ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
+      logger
   in
   [%log info]
     "Daemon started process of kind $process_kind with pid \
