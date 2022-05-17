@@ -12,6 +12,7 @@
    transaction_snark
    mina_ledger
    mina_base
+   mina_generators
    currency
    pickles
    mina_numbers

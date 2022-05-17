@@ -148,8 +148,8 @@ let%test_module "Zkapp tokens tests" =
                         ]
                       |> mk_parties_transaction ledger
                     in
-                    Parties.For_tests.replace_signatures ~keymap
-                      with_dummy_signatures
+                    Mina_generators.Parties_generators.replace_authorizations
+                      ~keymap with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger
@@ -174,8 +174,8 @@ let%test_module "Zkapp tokens tests" =
                         ]
                       |> mk_parties_transaction ledger
                     in
-                    Parties.For_tests.replace_signatures ~keymap
-                      with_dummy_signatures
+                    Mina_generators.Parties_generators.replace_authorizations
+                      ~keymap with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger
@@ -216,8 +216,8 @@ let%test_module "Zkapp tokens tests" =
                         ]
                       |> mk_parties_transaction ledger
                     in
-                    Parties.For_tests.replace_signatures ~keymap
-                      with_dummy_signatures
+                    Mina_generators.Parties_generators.replace_authorizations
+                      ~keymap with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger

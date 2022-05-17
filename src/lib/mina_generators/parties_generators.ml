@@ -8,6 +8,110 @@ open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
+(* replace dummy signatures, proofs with valid ones for fee payer, other parties
+   [keymap] maps compressed public keys to private keys
+*)
+let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
+  let memo_hash = Signed_command_memo.hash parties.memo in
+  let fee_payer_hash =
+    Party.of_fee_payer parties.fee_payer |> Parties.Digest.Party.create
+  in
+  let fee_payer_sk =
+    Signature_lib.Public_key.Compressed.Map.find_exn keymap
+      parties.fee_payer.body.public_key
+  in
+  let fee_payer_signature =
+    Signature_lib.Schnorr.Chunked.sign fee_payer_sk
+      (Random_oracle.Input.Chunked.field
+         ( Parties.commitment parties
+         |> Parties.Transaction_commitment.create_complete ~memo_hash
+              ~fee_payer_hash ) )
+  in
+  let fee_payer_with_valid_signature =
+    { parties.fee_payer with authorization = fee_payer_signature }
+  in
+  let other_parties_hash = Parties.other_parties_hash parties in
+  let tx_commitment =
+    Parties.Transaction_commitment.create ~other_parties_hash
+  in
+  let full_tx_commitment =
+    Parties.Transaction_commitment.create_complete tx_commitment ~memo_hash
+      ~fee_payer_hash
+  in
+  let sign_for_other_party ~use_full_commitment sk =
+    let commitment =
+      if use_full_commitment then full_tx_commitment else tx_commitment
+    in
+    Signature_lib.Schnorr.Chunked.sign sk
+      (Random_oracle.Input.Chunked.field commitment)
+  in
+  let other_parties_with_valid_signatures =
+    Parties.Call_forest.mapi parties.other_parties
+      ~f:(fun ndx ({ body; authorization } : Party.t) ->
+        let authorization_with_valid_signature =
+          match authorization with
+          | Control.Signature _dummy ->
+              let pk = body.public_key in
+              let sk =
+                match
+                  Signature_lib.Public_key.Compressed.Map.find keymap pk
+                with
+                | Some sk ->
+                    sk
+                | None ->
+                    failwithf
+                      "Could not find private key for public key %s in keymap"
+                      (Signature_lib.Public_key.Compressed.to_base58_check pk)
+                      ()
+              in
+              let use_full_commitment = body.use_full_commitment in
+              let signature = sign_for_other_party ~use_full_commitment sk in
+              Control.Signature signature
+          | Proof _ -> (
+              match prover with
+              | None ->
+                  authorization
+              | Some prover ->
+                  let proof_party =
+                    Parties.Call_forest.hash
+                      (List.drop parties.other_parties ndx)
+                  in
+                  let txn_stmt : Zkapp_statement.t =
+                    let commitment =
+                      if body.use_full_commitment then full_tx_commitment
+                      else tx_commitment
+                    in
+                    { transaction = commitment
+                    ; at_party = (proof_party :> Snark_params.Tick.Field.t)
+                    }
+                  in
+                  let handler
+                      (Snarky_backendless.Request.With { request; respond }) =
+                    match request with _ -> respond Unhandled
+                  in
+                  let proof =
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        prover ?handler:(Some handler)
+                          ( []
+                            : ( unit
+                              , unit
+                              , unit )
+                              Pickles_types.Hlist.H3.T
+                                (Pickles.Statement_with_proof)
+                              .t )
+                          txn_stmt )
+                  in
+                  Control.Proof proof )
+          | None_given ->
+              authorization
+        in
+        { Party.body; authorization = authorization_with_valid_signature } )
+  in
+  { parties with
+    fee_payer = fee_payer_with_valid_signature
+  ; other_parties = other_parties_with_valid_signatures
+  }
+
 let gen_account_precondition_from_account ?(succeed = true) account =
   let open Quickcheck.Let_syntax in
   let%bind b = Quickcheck.Generator.bool in
@@ -936,7 +1040,7 @@ let gen_parties_from ?(succeed = true)
     in
     go [] num_parties
   in
-  (* at least 1 party, so that `succeed` affects at least one predicate *)
+  (* at least 1 party *)
   let%bind num_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
   let num_old_parties = num_parties - num_new_accounts in
@@ -997,5 +1101,4 @@ let gen_parties_from ?(succeed = true)
     | `Ok keymap' ->
         keymap'
   in
-  return
-  @@ Parties.For_tests.replace_signatures ~keymap parties_dummy_signatures
+  return @@ replace_authorizations ?prover ~keymap parties_dummy_signatures
