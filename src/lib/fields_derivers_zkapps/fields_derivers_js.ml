@@ -69,7 +69,7 @@ module Js_layout = struct
     obj
 
   let string obj =
-    obj#js_layout := leaftype "string" ;
+    obj#js_layout := leaftype "StringWithHash" ;
     obj
 
   let bool obj =
