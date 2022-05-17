@@ -761,6 +761,11 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
           in
           run_node node
         in
+        [%log' debug t.logger] "Supercatchup for $state_hash: state $state"
+          ~metadata:
+            [ ("state_hash", State_hash.to_yojson state_hash)
+            ; ("state", Node.State.Enum.to_yojson (Node.State.enum node.state))
+            ] ;
         match node.state with
         | Failed | Finished | Root _ ->
             return ()
@@ -832,6 +837,16 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
                     set_state t node (To_verify (tv, None)) ;
                     run_node node ) )
         | To_verify (tv, valid_cb) -> (
+            (let metadata =
+               [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+             in
+             Option.value_map valid_cb
+               ~default:(fun () ->
+                 [%log debug] "To_verify $state_hash without callback" ~metadata
+                 )
+               ~f:(fun _ () ->
+                 [%log debug] "To_verify $state_hash with callback" ~metadata )
+               () ) ;
             let start_time = Time.now () in
             let iv = Cached.peek tv in
             (* TODO: Set up job to invalidate tv on catchup_breadcrumbs_writer closing *)
@@ -882,6 +897,17 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
                     set_state t node (Wait_for_parent (av, valid_cb)) ;
                     run_node node ) )
         | Wait_for_parent (av, valid_cb) ->
+            (let metadata =
+               [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+             in
+             Option.value_map valid_cb
+               ~default:(fun () ->
+                 [%log debug] "Wait_for_parent $state_hash without callback"
+                   ~metadata )
+               ~f:(fun _ () ->
+                 [%log debug] "Wait_for_parent $state_hash with callback"
+                   ~metadata )
+               () ) ;
             let%bind parent =
               step
                 (let parent = Hashtbl.find_exn t.nodes node.parent in
@@ -899,6 +925,17 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
             set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
             run_node node
         | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) -> (
+            (let metadata =
+               [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+             in
+             Option.value_map valid_cb
+               ~default:(fun () ->
+                 [%log debug] "To_build_breadcrumb $state_hash without callback"
+                   ~metadata )
+               ~f:(fun _ () ->
+                 [%log debug] "To_build_breadcrumb $state_hash with callback"
+                   ~metadata )
+               () ) ;
             let start_time = Time.now () in
             let transition_receipt_time = Some start_time in
             let av = Cached.peek c in
@@ -1134,7 +1171,6 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
                 match
                   List.find_map (List.concat_map ~f:Rose_tree.flatten forest)
                     ~f:(fun (c, _vc) ->
-                      (* TODO Shall we pass validation callback somewhere ? *)
                       let h =
                         State_hash.With_state_hashes.state_hash
                           (Validation.block_with_hash (Cached.peek c).data)
@@ -1166,7 +1202,6 @@ let run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~build_func
                     let preferred_peers =
                       List.fold (List.concat_map ~f:Rose_tree.flatten forest)
                         ~init:Peer.Set.empty ~f:(fun acc (c, _vc) ->
-                          (* TODO Shall we pass validation callback somewhere ? *)
                           match (Cached.peek c).sender with
                           | Local ->
                               acc

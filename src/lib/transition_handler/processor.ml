@@ -43,6 +43,18 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
+  (let metadata =
+     [ ( "state_hash"
+       , Transition_frontier.Breadcrumb.state_hash breadcrumb
+         |> State_hash.to_yojson )
+     ]
+   in
+   Option.value_map valid_cb
+     ~default:(fun () ->
+       [%log debug] "add_and_finalize $state_hash without callback" ~metadata )
+     ~f:(fun _ () ->
+       [%log debug] "add_and_finalize $state_hash with callback" ~metadata )
+     () ) ;
   let%map () =
     if only_if_present then (
       let parent_hash = Transition_frontier.Breadcrumb.parent_hash breadcrumb in
