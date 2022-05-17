@@ -105,21 +105,21 @@ struct
 
         exception Invalid_curve_point of t
 
-        include Binable.Of_binable
-                  (T)
-                  (struct
-                    let on_curve (x, y) =
-                      BaseField.Stable.Latest.equal (y_squared x)
-                        (BaseField.square y)
+        include
+          Binable.Of_binable
+            (T)
+            (struct
+              let on_curve (x, y) =
+                BaseField.Stable.Latest.equal (y_squared x) (BaseField.square y)
 
-                    type t = T.t
+              type t = T.t
 
-                    let to_binable = Fn.id
+              let to_binable = Fn.id
 
-                    let of_binable t =
-                      if not (on_curve t) then raise (Invalid_curve_point t) ;
-                      t
-                  end)
+              let of_binable t =
+                if not (on_curve t) then raise (Invalid_curve_point t) ;
+                t
+            end)
       end
 
       module Latest = V1
@@ -182,15 +182,16 @@ struct
 
   let of_affine (x, y) = C.of_affine_coordinates x y
 
-  include Binable.Of_binable
-            (Affine)
-            (struct
-              type nonrec t = t
+  include
+    Binable.Of_binable
+      (Affine)
+      (struct
+        type nonrec t = t
 
-              let to_binable = to_affine_exn
+        let to_binable = to_affine_exn
 
-              let of_binable = of_affine
-            end)
+        let of_binable = of_affine
+      end)
 
   let ( + ) = add
 

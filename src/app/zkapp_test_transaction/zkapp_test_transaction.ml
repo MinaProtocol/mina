@@ -22,7 +22,7 @@ module Flags = struct
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string default_fee)
-           (Currency.Fee.to_formatted_string min_fee))
+           (Currency.Fee.to_formatted_string min_fee) )
       (Param.optional txn_fee)
 
   let amount =
@@ -77,8 +77,9 @@ let create_zkapp_account =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo))
+              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
+       create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo
+      ))
 
 let upgrade_zkapp =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -119,10 +120,10 @@ let upgrade_zkapp =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~verification_key ~zkapp_uri ~auth))
+         ~verification_key ~zkapp_uri ~auth ))
 
 let transfer_funds =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers () =
@@ -187,7 +188,7 @@ let transfer_funds =
            () ;
        let max_keys = 10 in
        let receivers = read_key_and_amount max_keys in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers))
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers ))
 
 let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
@@ -219,9 +220,9 @@ let update_state =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~app_state))
+         ~app_state ))
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
@@ -259,9 +260,9 @@ let update_zkapp_uri =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~zkapp_uri ~auth))
+         ~zkapp_uri ~auth ))
 
 let update_sequence_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -289,34 +290,33 @@ let update_sequence_state =
            Param.(
              required
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string))
+                  ~strip_whitespace:true string ))
        and sequence_state1 =
          Param.flag "--sequence-state1"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string))
+                  ~strip_whitespace:true string ))
        and sequence_state2 =
          Param.flag "--sequence-state2"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string))
+                  ~strip_whitespace:true string ))
        and sequence_state3 =
          Param.flag "--sequence-state3"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string))
+                  ~strip_whitespace:true string ))
        in
        let fee = Option.value ~default:Flags.default_fee fee in
        let sequence_state =
          List.filter_map
-           ~f:(fun s ->
-             if List.is_empty s then None else Some (Array.of_list s))
+           ~f:(fun s -> if List.is_empty s then None else Some (Array.of_list s))
            [ sequence_state0
            ; sequence_state1
            ; sequence_state2
@@ -326,9 +326,9 @@ let update_sequence_state =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~sequence_state))
+         ~sequence_state ))
 
 let update_token_symbol =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
@@ -366,9 +366,9 @@ let update_token_symbol =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~token_symbol ~auth))
+         ~token_symbol ~auth ))
 
 let update_permissions =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
@@ -451,10 +451,10 @@ let update_permissions =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_formatted_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
          ~permissions
-         ~current_auth:(Util.auth_of_string current_auth)))
+         ~current_auth:(Util.auth_of_string current_auth) ))
 
 let test_zkapp_with_genesis_ledger =
   Command.(
@@ -479,7 +479,7 @@ let test_zkapp_with_genesis_ledger =
              "PATH path to a configuration file consisting the genesis ledger"
            Param.(required string)
        in
-       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file))
+       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ))
 
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)
@@ -496,4 +496,4 @@ let txn_commands =
 let () =
   Command.run
     (Command.group ~summary:"ZkApp test transaction"
-       ~preserve_subcommand_order:() txn_commands)
+       ~preserve_subcommand_order:() txn_commands )

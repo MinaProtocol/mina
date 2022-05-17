@@ -208,13 +208,13 @@ end = struct
       Impl.Typ.of_hlistable
         [ Discrete_log_equality.typ; Group.typ ]
         ~var_to_hlist:(fun { discrete_log_equality; scaled_message_hash } ->
-          [ discrete_log_equality; scaled_message_hash ])
+          [ discrete_log_equality; scaled_message_hash ] )
         ~value_to_hlist:(fun { discrete_log_equality; scaled_message_hash } ->
-          [ discrete_log_equality; scaled_message_hash ])
+          [ discrete_log_equality; scaled_message_hash ] )
         ~value_of_hlist:(fun [ discrete_log_equality; scaled_message_hash ] ->
-          { discrete_log_equality; scaled_message_hash })
+          { discrete_log_equality; scaled_message_hash } )
         ~var_of_hlist:(fun [ discrete_log_equality; scaled_message_hash ] ->
-          { discrete_log_equality; scaled_message_hash })
+          { discrete_log_equality; scaled_message_hash } )
 
     let create (k : Private_key.t) message : t =
       let public_key = Group.scale Group.generator k in
@@ -243,14 +243,14 @@ end = struct
         Scalar.equal c
           (Hash.hash_for_proof message public_key
              ((s * g) + (c * Group.negate public_key))
-             ((s * message_hash) + (c * Group.negate scaled_message_hash)))
+             ((s * message_hash) + (c * Group.negate scaled_message_hash)) )
       in
       if dleq then Some (Output_hash.hash message scaled_message_hash) else None
 
     module Checked = struct
       let verified_output (type shifted)
           ((module Shifted) as shifted :
-            (module Group.Checked.Shifted.S with type t = shifted))
+            (module Group.Checked.Shifted.S with type t = shifted) )
           ({ scaled_message_hash; discrete_log_equality = { c; s } } : var)
           ({ message; public_key } : Context.var) =
         let open Impl.Checked in
@@ -301,7 +301,7 @@ struct
     let pack_char bs =
       Char.of_int_exn
         (List.foldi bs ~init:0 ~f:(fun i acc b ->
-             if b then acc lor (1 lsl i) else acc))
+             if b then acc lor (1 lsl i) else acc ) )
     in
     String.of_char_list (List.map ~f:pack_char (List.chunks_of ~length:8 bs))
     |> Z.of_bits |> Bigint.of_zarith_bigint
@@ -319,7 +319,7 @@ struct
 
   let%test_unit "add is correct" =
     Quickcheck.test (Quickcheck.Generator.tuple2 gen gen) ~f:(fun (x, y) ->
-        assert (equal (add x y) ((x + y) % modulus)))
+        assert (equal (add x y) ((x + y) % modulus)) )
 
   let mul x y = x * y % modulus
 
@@ -329,7 +329,7 @@ struct
 
   let of_bits bs =
     List.fold_left bs ~init:(zero, one) ~f:(fun (acc, pt) b ->
-        ((if b then add acc pt else acc), add pt pt))
+        ((if b then add acc pt else acc), add pt pt) )
     |> fst
 
   let%test_unit "of_bits . to_bits = identity" =
@@ -344,7 +344,7 @@ struct
     transport
       (list ~length:length_in_bits Boolean.typ)
       ~there:(fun n ->
-        List.init length_in_bits ~f:(Z.testbit (to_zarith_bigint n)))
+        List.init length_in_bits ~f:(Z.testbit (to_zarith_bigint n)) )
       ~back:pack
 
   module Checked = struct

@@ -43,7 +43,7 @@ struct
                a rule in proof system i. max_local_max_proof_verifieds is the max of the N_i.
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
-      local_widths local_heights prevs_length) ?handler
+      local_widths local_heights prevs_length ) ?handler
       (T branch_data :
         ( A.t
         , A_value.t
@@ -53,15 +53,15 @@ struct
         , prev_values
         , local_widths
         , local_heights )
-        Step_branch_data.t) (next_state : A_value.t)
+        Step_branch_data.t ) (next_state : A_value.t)
       ~maxes:
         (module Maxes : Pickles_types.Hlist.Maxes.S
           with type length = Max_proofs_verified.n
-           and type ns = max_local_max_proof_verifieds)
+           and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
       ~self_dlog_plonk_index pk self_dlog_vk
       (prev_with_proofs :
-        (prev_values, local_widths, local_heights) H3.T(P.With_data).t) :
+        (prev_values, local_widths, local_heights) H3.T(P.With_data).t ) :
       ( A_value.t
       , (_, Max_proofs_verified.n) Vector.t
       , (_, prevs_length) Vector.t
@@ -177,18 +177,18 @@ struct
               ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
               ~field_of_hex:(fun s ->
                 Kimchi_pasta.Pasta.Bigint256.of_hex_string s
-                |> Kimchi_pasta.Pasta.Fp.of_bigint)
+                |> Kimchi_pasta.Pasta.Fp.of_bigint )
               ~domain:
                 (Plonk_checks.domain
                    (module Tick.Field)
                    domain ~shifts:Common.tick_shifts
-                   ~domain_generator:Backend.Tick.Field.domain_generator)
+                   ~domain_generator:Backend.Tick.Field.domain_generator )
               plonk_minimal combined_evals
           in
           time "plonk_checks" (fun () ->
               Plonk_checks.Type1.derive_plonk
                 (module Tick.Field)
-                ~env ~shift:Shifts.tick1 plonk_minimal combined_evals)
+                ~env ~shift:Shifts.tick1 plonk_minimal combined_evals )
         in
         let data = Types_map.lookup_basic tag in
         let (module Local_max_proofs_verified) = data.max_proofs_verified in
@@ -214,7 +214,7 @@ struct
               (* TODO: Only do this hashing when necessary *)
               Common.hash_step_me_only
                 (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
-                   statement.pass_through)
+                   statement.pass_through )
                 ~app_state:data.value_to_field_elements
           ; proof_state =
               { statement.proof_state with
@@ -249,13 +249,13 @@ struct
                 (Vector.extend_exn
                    statement.pass_through.challenge_polynomial_commitments
                    Local_max_proofs_verified.n
-                   (Lazy.force Dummy.Ipa.Wrap.sg))
+                   (Lazy.force Dummy.Ipa.Wrap.sg) )
                 (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
                 prev_challenges
                 ~f:(fun commitment chals ->
                   { Tock.Proof.Challenge_polynomial.commitment
                   ; challenges = Vector.to_array chals
-                  })
+                  } )
               |> to_list)
             public_input t.proof
         in
@@ -296,7 +296,7 @@ struct
         let new_bulletproof_challenges, b =
           let prechals =
             Array.map (O.opening_prechallenges o) ~f:(fun x ->
-                Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x)
+                Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x )
           in
           let chals =
             Array.map prechals ~f:(fun x -> Ipa.Wrap.compute_challenge x)
@@ -310,7 +310,7 @@ struct
           let prechals =
             Vector.of_list_and_length_exn
               ( Array.map prechals ~f:(fun x ->
-                    { Bulletproof_challenge.prechallenge = x })
+                    { Bulletproof_challenge.prechallenge = x } )
               |> Array.to_list )
               Tock.Rounds.n
           in
@@ -334,7 +334,7 @@ struct
           ; prev_challenges =
               Vector.extend_exn
                 (Vector.map t.statement.pass_through.old_bulletproof_challenges
-                   ~f:Ipa.Step.compute_challenges)
+                   ~f:Ipa.Step.compute_challenges )
                 Local_max_proofs_verified.n Dummy.Ipa.Step.challenges_computed
           ; wrap_proof =
               { opening =
@@ -366,7 +366,7 @@ struct
             ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
             ~field_of_hex:(fun s ->
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
-              |> Kimchi_pasta.Pasta.Fq.of_bigint)
+              |> Kimchi_pasta.Pasta.Fq.of_bigint )
             ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
             tock_plonk_minimal tock_combined_evals
         in
@@ -375,7 +375,7 @@ struct
           let b_polys =
             Vector.map
               ~f:(fun chals ->
-                unstage (challenge_polynomial (Vector.to_array chals)))
+                unstage (challenge_polynomial (Vector.to_array chals)) )
               prev_challenges
           in
           let open As_field in
@@ -395,7 +395,7 @@ struct
               ~evaluation_point:pt
               ~shifted_pow:(fun deg x ->
                 Pcs_batch.pow ~one ~mul x
-                  Int.(Max_degree.wrap - (deg mod Max_degree.wrap)))
+                  Int.(Max_degree.wrap - (deg mod Max_degree.wrap)) )
               v b
           in
           let ft_eval0 =
@@ -497,9 +497,7 @@ struct
             Step_bp_vec.t
         end in
         let module M =
-          H3.Map
-            (P.With_data)
-            (E03 (VV))
+          H3.Map (P.With_data) (E03 (VV))
             (struct
               let f (T t : _ P.With_data.t) : VV.t =
                 t.statement.proof_state.deferred_values.bulletproof_challenges
@@ -560,7 +558,7 @@ struct
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
                   Vector.init Max_proofs_verified.n ~f:(fun _ ->
-                      Dummy.Ipa.Wrap.challenges_computed)
+                      Dummy.Ipa.Wrap.challenges_computed )
               }
             in
             Common.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
@@ -575,16 +573,14 @@ struct
           (* TODO: Use the same pad_pass_through function as in wrap *)
           pad
             (Vector.map statements_with_hashes ~f:(fun s ->
-                 s.proof_state.me_only))
+                 s.proof_state.me_only ) )
             Maxes.maxes Maxes.length
       }
     in
     let prev_challenge_polynomial_commitments =
       let to_fold_in =
         let module M =
-          H3.Map
-            (P.With_data)
-            (E03 (Tick.Curve.Affine))
+          H3.Map (P.With_data) (E03 (Tick.Curve.Affine))
             (struct
               let f (T t : _ P.With_data.t) =
                 t.statement.proof_state.me_only.challenge_polynomial_commitment
@@ -599,7 +595,7 @@ struct
           ~f:(fun commitment chals ->
             { Tick.Proof.Challenge_polynomial.commitment
             ; challenges = Vector.to_array chals
-            })
+            } )
         |> to_list)
     in
     let%map.Promise (next_proof : Tick.Proof.t) =
@@ -616,25 +612,22 @@ struct
         (Index.to_int branch_data.index) (Domain.size h) (Domain.size x)
         (fun () ->
           Impls.Step.generate_witness_conv
-            ~f:
-              (fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
-                   () ->
+            ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
+                    () ->
               Backend.Tick.Proof.create_async ~primary:public_inputs
                 ~auxiliary:auxiliary_inputs
-                ~message:prev_challenge_polynomial_commitments pk)
+                ~message:prev_challenge_polynomial_commitments pk )
             [ input ]
             ~return_typ:(Snarky_backendless.Typ.unit ())
             (fun x () : unit ->
               Impls.Step.handle
-                (fun () : unit -> branch_data.main ~step_domains x)
-                handler)
-            next_statement_hashed)
+                (fun () : unit -> branch_data.main ~step_domains (conv x))
+                handler )
+            next_statement_hashed )
     in
     let prev_evals =
       let module M =
-        H3.Map
-          (P.With_data)
-          (E03 (E))
+        H3.Map (P.With_data) (E03 (E))
           (struct
             let f (T t : _ P.With_data.t) =
               (t.proof.openings.evals, t.proof.openings.ft_eval1)
@@ -653,8 +646,8 @@ struct
                  { ft_eval1
                  ; evals =
                      Double.map2 es x_hat ~f:(fun es x_hat ->
-                         { With_public_input.evals = es; public_input = x_hat })
-                 }))
+                         { With_public_input.evals = es; public_input = x_hat } )
+                 } ) )
           lte Max_proofs_verified.n Dummy.evals
     }
 end

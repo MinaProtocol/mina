@@ -68,7 +68,7 @@ module Failure = struct
       let _, display =
         List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
             if List.is_empty bucket then (index + 1, acc)
-            else (index + 1, (index, bucket) :: acc))
+            else (index + 1, (index, bucket) :: acc) )
       in
       display
 

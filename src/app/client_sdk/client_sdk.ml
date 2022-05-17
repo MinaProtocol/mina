@@ -377,7 +377,7 @@ let _ =
            let bits_to_bytes bits =
              let byte_of_bits bs =
                List.foldi bs ~init:0 ~f:(fun i acc b ->
-                   if b then acc lor (1 lsl i) else acc)
+                   if b then acc lor (1 lsl i) else acc )
                |> Char.of_int_exn
              in
              List.map
@@ -390,9 +390,9 @@ let _ =
                   Bigint.(
                     equal
                       (shift_right Snark_params.Tick.Field.size i land one)
-                      one)))
+                      one) ) )
          in
          Hex.encode @@ field_order_bytes
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
-    end)
+    end )

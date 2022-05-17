@@ -45,7 +45,7 @@ module Input = struct
                 Option.map msg.event_id ~f:(fun e ->
                     Structured_log_events.equal_id e
                       Transition_frontier.Extensions.Best_tip_diff.Log_event
-                      .new_best_tip_event_structured_events_id)
+                      .new_best_tip_event_structured_events_id )
               in
               match tf_event_id with
               | Some true ->
@@ -88,7 +88,7 @@ module Input = struct
                               | Some node ->
                                   { state = node.state
                                   ; peer_ids = Set.add node.peer_ids peer_id
-                                  }) ;
+                                  } ) ;
                           seen_state_hashes
                         in
                         Hashtbl.update t.all_states parent_hash ~f:(function
@@ -104,8 +104,8 @@ module Input = struct
                                     ~data:
                                       { state
                                       ; peer_ids = Set.add peer_ids peer_id
-                                      } )) ;
-                        { acc'' with seen_state_hashes })
+                                      } ) ) ;
+                        { acc'' with seen_state_hashes } )
                   in
                   (* remove any previous roots for which there are ancestors now*)
                   List.iter (Hashtbl.keys acc'.init_states) ~f:(fun root ->
@@ -115,7 +115,7 @@ module Input = struct
                       in
                       if State_hash.Set.mem acc'.seen_state_hashes parent then
                         (* no longer a root because a node for its parent was seen*)
-                        Hashtbl.remove acc'.init_states root) ;
+                        Hashtbl.remove acc'.init_states root ) ;
                   { acc' with peers }
               | None | Some false ->
                   [%log error]
@@ -126,7 +126,7 @@ module Input = struct
           | Error err ->
               [%log error] "Could not process log line $line: $error"
                 ~metadata:[ ("line", `String line); ("error", `String err) ] ;
-              acc)
+              acc )
     in
     [%log info] "Finished processing log file: %s" log_file ;
     res
@@ -146,11 +146,11 @@ module Output = struct
         ~f:(fun map root_state ->
           Map.update map
             (Mina_state.Protocol_state.previous_state_hash
-               root_state.state.protocol_state) ~f:(function
+               root_state.state.protocol_state ) ~f:(function
             | Some peer_ids ->
                 Set.union peer_ids root_state.peer_ids
             | None ->
-                root_state.peer_ids))
+                root_state.peer_ids ) )
     in
     List.fold ~init:[] (Map.to_alist roots)
       ~f:(fun acc_trees (root, peer_ids) ->
@@ -163,18 +163,18 @@ module Output = struct
           let successors_with_min_peers =
             if min_peers > 1 then
               List.filter successors ~f:(fun s ->
-                  Set.length s.peer_ids >= min_peers)
+                  Set.length s.peer_ids >= min_peers )
             else successors
           in
           List.map successors_with_min_peers ~f:(fun s ->
               Rose_tree.T
                 ( Node { state = s.state; peer_ids = s.peer_ids }
-                , go s.state.state_hash ))
+                , go s.state.state_hash ) )
         in
         let root_node =
           Rose_tree.T (Root { state = root; peer_ids }, go root)
         in
-        root_node :: acc_trees)
+        root_node :: acc_trees )
 end
 
 module type Graph_node_intf = sig
@@ -211,7 +211,7 @@ module Display = struct
             | Root s ->
                 { state = Root s.state; peers = Set.length s.peer_ids }
             | Node s ->
-                { state = Node s.state; peers = Set.length s.peer_ids }))
+                { state = Node s.state; peers = Set.length s.peer_ids } ) )
 end
 
 module Compact_display = struct
@@ -250,7 +250,7 @@ module Compact_display = struct
                         |> Consensus.Data.Consensus_state.curr_global_slot
                     }
                 in
-                { state; peers = Set.length t.peer_ids }))
+                { state; peers = Set.length t.peer_ids } ) )
 end
 
 module Graph_node = struct
@@ -316,7 +316,7 @@ module Visualization = struct
       List.fold ~init:graph_with_node subtrees
         ~f:(fun gr (T (child_node, _) as child_tree) ->
           let gr' = add_edge gr node (to_graph_node child_node) in
-          go child_tree gr')
+          go child_tree gr' )
     in
     go t empty
 
@@ -325,7 +325,7 @@ module Visualization = struct
         let filename = output_dir ^/ "tree_" ^ Int.to_string i ^ ".dot" in
         Out_channel.with_file filename ~f:(fun output_channel ->
             let graph = to_graph tree in
-            output_graph output_channel graph))
+            output_graph output_channel graph ) )
 end
 
 let main ~input_dir ~output_dir ~output_format ~min_peers () =
@@ -333,7 +333,7 @@ let main ~input_dir ~output_dir ~output_format ~min_peers () =
     Sys.ls_dir input_dir
     >>| List.filter_map ~f:(fun n ->
             if Filename.check_suffix n ".log" then Some (input_dir ^/ n)
-            else None)
+            else None )
   in
   let t : Input.t =
     { Input.all_states = Hashtbl.create (module State_hash)
@@ -349,11 +349,11 @@ let main ~input_dir ~output_dir ~output_format ~min_peers () =
     ~transport:
       (Logger_file_system.dumb_logrotate ~directory:output_dir
          ~log_filename:"mina-best-tip-merger.log" ~max_size:logrotate_max_size
-         ~num_rotate) ;
+         ~num_rotate ) ;
   let logger = Logger.create () in
   let t' =
     List.fold ~init:t files ~f:(fun t log_file ->
-        Input.of_logs ~logger ~log_file t)
+        Input.of_logs ~logger ~log_file t )
   in
   [%log info] "Consolidating best-tip history.." ;
   let output = Output.of_input t' ~min_peers in
@@ -417,7 +417,7 @@ let () =
                  (sprintf
                     "Invalid value %s for output-format. Currently supported \
                      formats are Full or Compact"
-                    x)
+                    x )
          in
          let min_peers =
            match min_peers with
@@ -429,4 +429,4 @@ let () =
                failwith "Invalid value for min-peers"
          in
          Cli_lib.Stdout_log.setup log_json log_level ;
-         main ~input_dir ~output_dir ~output_format ~min_peers)))
+         main ~input_dir ~output_dir ~output_format ~min_peers )))

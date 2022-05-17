@@ -197,7 +197,7 @@ let coda_status coda_ref =
       (Deferred.return (`String "Shutdown before Coda instance was created"))
     ~f:(fun t ->
       Mina_commands.get_status ~flag:`Performance t
-      >>| Daemon_rpcs.Types.Status.to_yojson)
+      >>| Daemon_rpcs.Types.Status.to_yojson )
 
 let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
@@ -228,7 +228,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
               let len = In_channel.length in_chan in
               In_channel.seek in_chan
                 Int64.(max 0L (Int64.( + ) len (Int64.neg log_size))) ;
-              In_channel.input_all in_chan)
+              In_channel.input_all in_chan )
         in
         Out_channel.write_all coda_short_log ~data:log
     | _ ->
@@ -257,7 +257,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
     ; "daemon.json"
     ]
     |> List.filter ~f:(fun f ->
-           eq (Core.Sys.file_exists (temp_config ^/ f)) `Yes)
+           eq (Core.Sys.file_exists (temp_config ^/ f)) `Yes )
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
@@ -277,12 +277,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ref
       (Unix.Cidr.Set.of_list
          ( Unix.Cidr.create ~base_address:Unix.Inet_addr.localhost ~bits:8
-         :: client_trustlist ))
+         :: client_trustlist ) )
   in
   (* Setup RPC server for client interactions *)
   let implement rpc f =
     Rpc.Rpc.implement rpc (fun () input ->
-        O1trace.thread ("serve_" ^ Rpc.Rpc.name rpc) (fun () -> f () input))
+        O1trace.thread ("serve_" ^ Rpc.Rpc.name rpc) (fun () -> f () input) )
   in
   let implement_notrace = Rpc.Rpc.implement in
   let logger =
@@ -295,51 +295,51 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Deferred.map
             ( Mina_commands.setup_and_submit_user_commands coda ts
             |> Participating_state.to_deferred_or_error )
-            ~f:Or_error.join)
+            ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
           return
             ( Mina_commands.get_balance coda aid
-            |> Participating_state.active_error ))
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
-          return (Mina_commands.get_trust_status coda ip_address))
+          return (Mina_commands.get_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Get_trust_status_all.rpc (fun () () ->
-          return (Mina_commands.get_trust_status_all coda))
+          return (Mina_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
-          return (Mina_commands.reset_trust_status coda ip_address))
+          return (Mina_commands.reset_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Chain_id_inputs.rpc (fun () () ->
-          return (Mina_commands.chain_id_inputs coda))
+          return (Mina_commands.chain_id_inputs coda) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
             ( Mina_commands.verify_payment coda aid tx proof
-            |> Participating_state.active_error |> Or_error.join ))
+            |> Participating_state.active_error |> Or_error.join ) )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
           return
             ( Mina_commands.get_keys_with_details coda
-            |> Participating_state.active_error ))
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
           return
             ( Mina_commands.get_public_keys coda
-            |> Participating_state.active_error ))
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
             ( Mina_commands.get_nonce coda aid
-            |> Participating_state.active_error ))
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () aid ->
           return
             ( Mina_lib.get_inferred_nonce_from_transaction_pool_and_ledger coda
                 aid
-            |> Participating_state.active_error ))
+            |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
-          Mina_commands.get_status ~flag coda)
+          Mina_commands.get_status ~flag coda )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-          Mina_commands.clear_hist_status ~flag coda)
+          Mina_commands.clear_hist_status ~flag coda )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
           (* getting the ledger may take more time than a heartbeat timeout
              run in thread to allow RPC heartbeats to proceed
           *)
-          Async.In_thread.run (fun () -> Mina_lib.get_ledger coda lh))
+          Async.In_thread.run (fun () -> Mina_lib.get_ledger coda lh) )
     ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
-          Mina_lib.get_snarked_ledger coda lh |> return)
+          Mina_lib.get_snarked_ledger coda lh |> return )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
           ( match which with
           | Next ->
@@ -351,7 +351,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     Ok ledger
                 | `Notfinalized ->
                     Or_error.error_string
-                      "next staking ledger is not finalized yet")
+                      "next staking ledger is not finalized yet" )
           | Current ->
               Option.value_map
                 (Mina_lib.staking_ledger coda)
@@ -362,25 +362,25 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                | Genesis_epoch_ledger l ->
                    Mina_ledger.Ledger.to_list l
                | Ledger_db db ->
-                   Mina_ledger.Ledger.Db.to_list db)
-          |> Deferred.return)
+                   Mina_ledger.Ledger.Db.to_list db )
+          |> Deferred.return )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
-          Deferred.unit)
+          Deferred.unit )
     ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
-          return (snark_job_list_json coda |> Participating_state.active_error))
+          return (snark_job_list_json coda |> Participating_state.active_error) )
     ; implement Daemon_rpcs.Snark_pool_list.rpc (fun () () ->
-          return (snark_pool_list coda))
+          return (snark_pool_list coda) )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Mina_lib.Config in
-          Coda_tracing.start (Mina_lib.config coda).conf_dir)
+          Coda_tracing.start (Mina_lib.config coda).conf_dir )
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
-          Coda_tracing.stop () ; Deferred.unit)
+          Coda_tracing.stop () ; Deferred.unit )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
-          return (Mina_lib.visualize_frontier ~filename coda))
+          return (Mina_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
         (fun () filename ->
-          return (Mina_ledger.Ledger.Debug.visualize ~filename))
+          return (Mina_ledger.Ledger.Debug.visualize ~filename) )
     ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
           return
             (let cidr_str = Unix.Cidr.to_string cidr in
@@ -388,7 +388,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Or_error.errorf "%s already present in trustlist" cidr_str
              else (
                client_trustlist := Unix.Cidr.Set.add !client_trustlist cidr ;
-               Ok () )))
+               Ok () ) ) )
     ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () cidr ->
           return
             (let cidr_str = Unix.Cidr.to_string cidr in
@@ -396,14 +396,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Or_error.errorf "%s not present in trustlist" cidr_str
              else (
                client_trustlist := Unix.Cidr.Set.remove !client_trustlist cidr ;
-               Ok () )))
+               Ok () ) ) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
-          return (Set.to_list !client_trustlist))
+          return (Set.to_list !client_trustlist) )
     ; implement Daemon_rpcs.Get_node_status.rpc (fun () peers ->
-          Node_status.get_node_status_from_peers (Mina_lib.net coda) peers)
+          Node_status.get_node_status_from_peers (Mina_lib.net coda) peers )
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
-            (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()))
+            (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
     ]
   in
   let snark_worker_impls =
@@ -421,7 +421,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson r) ]
               "responding to a Get_work request with some new work" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (r, key)))
+            (r, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Mina_metrics.(
@@ -435,8 +435,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   Perf_histograms.add_span ~name:"snark_worker_merge_time" total
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
-                    total) ;
-          Deferred.return @@ Mina_lib.add_work coda work)
+                    total ) ;
+          Deferred.return @@ Mina_lib.add_work coda work )
     ]
   in
   let create_graphql_server ~bind_to_address ~schema ~server_description port =
@@ -453,7 +453,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 ~metadata:
                   [ ("error", `String (Exn.to_string_mach exn))
                   ; ("context", `String "rest_server")
-                  ]))
+                  ] ) )
         (Tcp.Where_to_listen.bind_to bind_to_address (On_port port))
         (fun ~body _sock req ->
           let uri = Cohttp.Request.uri req in
@@ -484,11 +484,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               status `Performance >>| lift
           | _ ->
               Server.respond_string ~status:`Not_found "Route not found"
-              >>| lift))
+              >>| lift ))
     |> Deferred.map ~f:(fun _ ->
            [%log info]
              !"Created %s at: http://localhost:%i/graphql"
-             server_description port)
+             server_description port )
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_graphql" (fun () ->
@@ -497,7 +497,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               Tcp.Bind_to_address.(
                 if insecure_rest_server then All_addresses else Localhost)
             ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
-            rest_server_port)) ;
+            rest_server_port ) ) ;
   (*Second graphql server with limited queries exposed*)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_limited_graphql" (fun () ->
@@ -507,7 +507,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 if open_limited_graphql_port then All_addresses else Localhost)
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
-            rest_server_port)) ;
+            rest_server_port ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port coda))
@@ -523,14 +523,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                    ~metadata:
                      [ ("error", `String (Exn.to_string_mach exn))
                      ; ("context", `String "rpc_tcp_server")
-                     ]))
+                     ] ) )
            where_to_listen
            (fun address reader writer ->
              let address = Socket.Address.Inet.addr address in
              if
                not
                  (Set.exists !client_trustlist ~f:(fun cidr ->
-                      Unix.Cidr.does_match cidr address))
+                      Unix.Cidr.does_match cidr address ) )
              then (
                [%log error]
                  !"Rejecting client connection from $address, it is not \
@@ -542,21 +542,21 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Rpc.Connection.server_with_close
                  ~handshake_timeout:
                    (Time.Span.of_sec
-                      Mina_compile_config.rpc_handshake_timeout_sec)
+                      Mina_compile_config.rpc_handshake_timeout_sec )
                  ~heartbeat_config:
                    (Rpc.Connection.Heartbeat_config.create
                       ~timeout:
                         (Time_ns.Span.of_sec
-                           Mina_compile_config.rpc_heartbeat_timeout_sec)
+                           Mina_compile_config.rpc_heartbeat_timeout_sec )
                       ~send_every:
                         (Time_ns.Span.of_sec
-                           Mina_compile_config.rpc_heartbeat_send_every_sec)
-                      ())
+                           Mina_compile_config.rpc_heartbeat_send_every_sec )
+                      () )
                  reader writer
                  ~implementations:
                    (Rpc.Implementations.create_exn
                       ~implementations:(client_impls @ snark_worker_impls)
-                      ~on_unknown_rpc:`Raise)
+                      ~on_unknown_rpc:`Raise )
                  ~connection_state:(fun _ -> ())
                  ~on_handshake_error:
                    (`Call
@@ -570,7 +570,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                            ; ( "address"
                              , `String (Unix.Inet_addr.to_string address) )
                            ] ;
-                       Deferred.unit)))))
+                       Deferred.unit ) ) ) ) )
 
 let coda_crash_message ~log_issue ~action ~error =
   let followup =
@@ -610,7 +610,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
   (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
   Hashtbl.keys child_pids
   |> List.iter ~f:(fun pid ->
-         ignore (Signal.send Signal.kill (`Pid pid) : [ `No_such_process | `Ok ])) ;
+         ignore (Signal.send Signal.kill (`Pid pid) : [ `No_such_process | `Ok ]) ) ;
   let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
@@ -709,7 +709,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref
          in
-         Stdlib.exit 1)) ;
+         Stdlib.exit 1 ) ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
         log_shutdown ~conf_dir ~top_logger coda_ref ;
@@ -721,4 +721,4 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
           !"Mina process was interrupted by $signal"
           ~metadata:[ ("signal", `String (to_string signal)) ] ;
         (* causes async shutdown and at_exit handlers to run *)
-        Async.shutdown 130))
+        Async.shutdown 130 ))

@@ -17,8 +17,8 @@ type validation_error =
   | `Invalid_protocol_version ]
 
 let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
-    ~trust_system ~sender ~transition_with_hash ~delta
-    (error : validation_error) =
+    ~trust_system ~sender ~transition_with_hash ~delta (error : validation_error)
+    =
   let open Trust_system.Actions in
   let state_hash =
     State_hash.With_state_hashes.state_hash transition_with_hash
@@ -28,7 +28,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     let message' =
       "external transition with state hash $state_hash"
       ^ Option.value_map message ~default:"" ~f:(fun (txt, _) ->
-            sprintf ", %s" txt)
+            sprintf ", %s" txt )
     in
     let metadata =
       ("state_hash", State_hash.to_yojson state_hash)
@@ -76,7 +76,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
       , `String
           (Time.to_string_abs
              (Block_time.to_time time_received)
-             ~zone:Time.Zone.utc) )
+             ~zone:Time.Zone.utc ) )
     ]
     @ metadata
   in
@@ -128,7 +128,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         (Gossiped_old_transition (slot_diff, delta))
         (Some
            ( "off by $slot_diff slots"
-           , [ ("slot_diff", `String (Int64.to_string slot_diff)) ] ))
+           , [ ("slot_diff", `String (Int64.to_string slot_diff)) ] ) )
   | `Invalid_protocol_version ->
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_protocol_version) ;
@@ -219,7 +219,7 @@ module Duplicate_block_detector = struct
               , `String
                   (Time.to_string_abs
                      (Block_time.to_time time_received)
-                     ~zone:Time.Zone.utc) )
+                     ~zone:Time.Zone.utc ) )
             ]
           in
           let msg : (_, unit, string, unit) format4 =
@@ -264,7 +264,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                 |> With_hash.of_data
                      ~hash_data:
                        (Fn.compose Protocol_state.hashes
-                          (Fn.compose Header.protocol_state Mina_block.header))
+                          (Fn.compose Header.protocol_state Mina_block.header) )
               in
               Duplicate_block_detector.check ~precomputed_values
                 ~rejected_blocks_logger ~time_received duplicate_checker logger
@@ -285,14 +285,13 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     wrap transition_with_hash
                     |> defer
                          (validate_time_received ~precomputed_values
-                            ~time_received)
+                            ~time_received )
                     >>= defer
                           (validate_genesis_protocol_state ~genesis_state_hash)
                     >>= (fun x ->
                           Interruptible.uninterruptible
-                            (validate_proofs ~verifier ~genesis_state_hash
-                               [ x ])
-                          >>| List.hd_exn)
+                            (validate_proofs ~verifier ~genesis_state_hash [ x ])
+                          >>| List.hd_exn )
                     >>= defer validate_delta_block_chain
                     >>= defer validate_protocol_versions)
                 with
@@ -300,7 +299,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     Writer.write valid_transition_writer
                       ( `Block
                           (Envelope.Incoming.wrap ~data:verified_transition
-                             ~sender)
+                             ~sender )
                       , `Valid_cb valid_cb ) ;
                     Mina_metrics.Transition_frontier
                     .update_max_blocklength_observed blockchain_length ;
@@ -337,9 +336,9 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     , `String
                         (Time.to_string_abs
                            (Block_time.to_time time_received)
-                           ~zone:Time.Zone.utc) )
+                           ~zone:Time.Zone.utc ) )
                   ]
                 in
                 [%log error] ~metadata
                   "Dropping blocks because libp2p validation expired" )
-          else Deferred.unit))
+          else Deferred.unit ) )

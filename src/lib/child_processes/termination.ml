@@ -31,8 +31,9 @@ let get_signal_cause_opt =
   List.iter
     [ (kill, "Process killed because out of memory")
     ; (int, "Process interrupted by user or other program")
-    ] ~f:(fun (signal, msg) ->
-      Base.ignore (Table.add signal_causes_tbl ~key:signal ~data:msg)) ;
+    ]
+    ~f:(fun (signal, msg) ->
+      Base.ignore (Table.add signal_causes_tbl ~key:signal ~data:msg) ) ;
   fun signal -> Signal.Table.find signal_causes_tbl signal
 
 (** wait for a [process], which may resolve immediately or in a Deferred.t,
@@ -56,7 +57,7 @@ let wait_for_process_log_errors ~logger process ~module_ ~location ~here =
                   let err = Error.of_exn exn in
                   Logger.error logger ~module_ ~location
                     "Saw a deferred exception $exn after waiting for process"
-                    ~metadata:[ ("exn", Error_json.error_to_yojson err) ]))
+                    ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
             (fun () -> Process.wait process)
         in
         don't_wait_for
@@ -67,7 +68,7 @@ let wait_for_process_log_errors ~logger process ~module_ ~location ~here =
               let err = Error.of_exn exn in
               Logger.error logger ~module_ ~location
                 "Saw a deferred exception $exn while waiting for process"
-                ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ))
+                ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
   with
   | Ok _ ->
       ()
@@ -107,10 +108,11 @@ let wait_safe ~logger process ~module_ ~location ~here =
                   Logger.warn logger ~module_ ~location
                     "Saw an error from Process.wait in wait_safe: $err"
                     ~metadata:
-                      [ ("err", Error_json.error_to_yojson (Error.of_exn exn)) ]))
+                      [ ("err", Error_json.error_to_yojson (Error.of_exn exn)) ]
+                  ) )
             (fun () -> Process.wait process)
         in
-        Deferred.Result.map_error ~f:Error.of_exn deferred_wait)
+        Deferred.Result.map_error ~f:Error.of_exn deferred_wait )
   with
   | Ok x ->
       x

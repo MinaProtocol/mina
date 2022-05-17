@@ -32,9 +32,9 @@ module SetGatingConfig : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.SetGatingConfig.Request.t
+        Builder.Libp2pHelperInterface.SetGatingConfig.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.SetGatingConfig.Response.t
+        Reader.Libp2pHelperInterface.SetGatingConfig.Response.t
 
   val create_request : gating_config:gating_config -> Request.t
 end
@@ -52,9 +52,9 @@ module GetListeningAddrs : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.GetListeningAddrs.Request.t
+        Builder.Libp2pHelperInterface.GetListeningAddrs.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.GetListeningAddrs.Response.t
+        Reader.Libp2pHelperInterface.GetListeningAddrs.Response.t
 
   val create_request : unit -> Request.t
 end
@@ -63,9 +63,9 @@ module BeginAdvertising : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.BeginAdvertising.Request.t
+        Builder.Libp2pHelperInterface.BeginAdvertising.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.BeginAdvertising.Response.t
+        Reader.Libp2pHelperInterface.BeginAdvertising.Response.t
 
   val create_request : unit -> Request.t
 end
@@ -92,9 +92,9 @@ module BandwidthInfo : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.BandwidthInfo.Request.t
+        Builder.Libp2pHelperInterface.BandwidthInfo.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.BandwidthInfo.Response.t
+        Reader.Libp2pHelperInterface.BandwidthInfo.Response.t
 
   val create_request : unit -> Request.t
 end
@@ -103,9 +103,9 @@ module GenerateKeypair : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.GenerateKeypair.Request.t
+        Builder.Libp2pHelperInterface.GenerateKeypair.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.GenerateKeypair.Response.t
+        Reader.Libp2pHelperInterface.GenerateKeypair.Response.t
 
   val create_request : unit -> Request.t
 end
@@ -142,9 +142,9 @@ module AddStreamHandler : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.AddStreamHandler.Request.t
+        Builder.Libp2pHelperInterface.AddStreamHandler.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.AddStreamHandler.Response.t
+        Reader.Libp2pHelperInterface.AddStreamHandler.Response.t
 
   val create_request : protocol:string -> Request.t
 end
@@ -153,9 +153,9 @@ module RemoveStreamHandler : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.RemoveStreamHandler.Request.t
+        Builder.Libp2pHelperInterface.RemoveStreamHandler.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.RemoveStreamHandler.Response.t
+        Reader.Libp2pHelperInterface.RemoveStreamHandler.Response.t
 
   val create_request : protocol:string -> Request.t
 end
@@ -200,9 +200,9 @@ module SetNodeStatus : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.SetNodeStatus.Request.t
+        Builder.Libp2pHelperInterface.SetNodeStatus.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.SetNodeStatus.Response.t
+        Reader.Libp2pHelperInterface.SetNodeStatus.Response.t
 
   val create_request : data:string -> Request.t
 end
@@ -211,9 +211,9 @@ module GetPeerNodeStatus : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.GetPeerNodeStatus.Request.t
+        Builder.Libp2pHelperInterface.GetPeerNodeStatus.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.GetPeerNodeStatus.Response.t
+        Reader.Libp2pHelperInterface.GetPeerNodeStatus.Response.t
 
   val create_request : peer_multiaddr:multiaddr -> Request.t
 end
@@ -222,9 +222,9 @@ module TestDecodeBitswapBlocks : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.TestDecodeBitswapBlocks.Request.t
+        Builder.Libp2pHelperInterface.TestDecodeBitswapBlocks.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.TestDecodeBitswapBlocks.Response.t
+        Reader.Libp2pHelperInterface.TestDecodeBitswapBlocks.Response.t
 
   val create_request :
     blocks:(Blake2.t * string) list -> root_block_hash:Blake2.t -> Request.t
@@ -234,9 +234,9 @@ module TestEncodeBitswapBlocks : sig
   include
     Rpc_intf
       with type Request.t =
-            Builder.Libp2pHelperInterface.TestEncodeBitswapBlocks.Request.t
+        Builder.Libp2pHelperInterface.TestEncodeBitswapBlocks.Request.t
        and type Response.t =
-            Reader.Libp2pHelperInterface.TestEncodeBitswapBlocks.Response.t
+        Reader.Libp2pHelperInterface.TestEncodeBitswapBlocks.Response.t
 
   val create_request : max_block_size:int -> data:string -> Request.t
 end

@@ -194,17 +194,17 @@ module Set_or_keep = struct
           | Set x ->
               { Flagged_option.is_some = true; data = of_option (Some x) }
           | Keep ->
-              { Flagged_option.is_some = false; data = of_option None })
+              { Flagged_option.is_some = false; data = of_option None } )
         ~back:(function
           | { Flagged_option.is_some = true; data = x } ->
               Set (Option.value_exn (to_option x))
           | { Flagged_option.is_some = false; data = x } ->
               assert (Option.is_none (to_option x)) ;
-              Keep)
+              Keep )
 
     let to_input (t : _ t) ~f =
       Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
-          (b :> Field.Var.t))
+          (b :> Field.Var.t) )
 
     let make_unsafe is_keep data = { Flagged_option.is_some = is_keep; data }
 
@@ -293,7 +293,7 @@ module Or_ignore = struct
           f x
       | Explicit t ->
           Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
-              (b :> Field.Var.t))
+              (b :> Field.Var.t) )
 
     let check t ~f =
       match t with
@@ -390,7 +390,7 @@ module Account_state = struct
 
     let to_input (t : t) =
       Encoding.to_input t ~field_of_bool:(fun (b : Boolean.var) ->
-          (b :> Field.t))
+          (b :> Field.t) )
 
     let check (t : t) ~is_empty =
       Boolean.(
