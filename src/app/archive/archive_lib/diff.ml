@@ -21,6 +21,8 @@ module Transition_frontier = struct
         ; accounts_accessed : (int * Mina_base.Account.Stable.Latest.t) list
         ; accounts_created :
             (Account_id.Stable.Latest.t * Currency.Fee.Stable.Latest.t) list
+        ; tokens_used :
+            (Token_id.Stable.Latest.t * Account_id.Stable.Latest.t option) list
         ; sender_receipt_chains_from_parent_ledger :
             (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             list
@@ -95,10 +97,19 @@ module Builder = struct
            ~previous_block_state_hash ) ~f:(fun acct_id ->
           (acct_id, account_creation_fee) )
     in
+    let tokens_used =
+      List.map accounts_accessed ~f:(fun (_ndx, acct) ->
+          let token_id = acct.token_id in
+          let owner = Mina_ledger.Ledger.token_owner ledger token_id in
+          (token_id, owner) )
+      |> List.dedup_and_sort
+           ~compare:[%compare: Token_id.t * Account_id.t option]
+    in
     Transition_frontier.Breadcrumb_added
       { block = With_hash.map ~f:External_transition.compose block_with_hash
       ; accounts_accessed
       ; accounts_created
+      ; tokens_used
       ; sender_receipt_chains_from_parent_ledger
       }
 
