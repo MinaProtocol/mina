@@ -10,7 +10,8 @@ open Mina_base
 
 let%test_module "Zkapp payments tests" =
   ( module struct
-    let memo = Signed_command_memo.create_from_string_exn "Zkapp payments tests"
+    let _memo =
+      Signed_command_memo.create_from_string_exn "Zkapp payments tests"
 
     let _constraint_constants = U.constraint_constants
 
@@ -271,53 +272,188 @@ let%test_module "Zkapp payments tests" =
                       ~expected_failure:Transaction_status.Failure.Overflow ledger
                       [ parties ] ) ) )*)
 
-    let account ledger pk =
-      let location =
-        Option.value_exn
-          (Ledger.location_of_account ledger
-             (Account_id.create pk Token_id.default) )
-      in
-      Option.value_exn (Ledger.get ledger location)
+    (*let account ledger pk =
+        let location =
+          Option.value_exn
+            (Ledger.location_of_account ledger
+               (Account_id.create pk Token_id.default) )
+        in
+        Option.value_exn (Ledger.get ledger location)
 
-    let test_legacy_transaction ?expected_failure_sender
-        ?expected_failure_receiver ~(new_kp : Signature_lib.Keypair.t)
+      let test_user_commands ?expected_failure_sender
+          ?expected_failure_receiver ~(new_kp : Signature_lib.Keypair.t)
+          ~(spec : Mina_transaction_logic.For_tests.Transaction_spec.t)
+          ?permissions ledger =
+        let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
+        Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
+          ~ledger snapp_pk ;
+        let txn_fee = Fee.of_int 1000000 in
+        let amount = 100 in
+        (*send from a zkApp account*)
+        let signed_command1 =
+          let fee_payer =
+            { U.Wallet.private_key = new_kp.private_key
+            ; account = account ledger snapp_pk
+            }
+          in
+          U.Wallet.user_command ~fee_payer ~source_pk:snapp_pk
+            ~receiver_pk:spec.receiver amount txn_fee Account.Nonce.zero memo
+        in
+        U.test_transaction ?expected_failure:expected_failure_sender ledger
+          (Mina_transaction.Transaction.Command (Signed_command signed_command1)) ;
+        let sender_kp, sender_nonce = spec.sender in
+        (*send to a zkApp account*)
+        let signed_command2 =
+          let source_pk =
+            Signature_lib.Public_key.compress sender_kp.public_key
+          in
+          let fee_payer =
+            { U.Wallet.private_key = sender_kp.private_key
+            ; account = account ledger source_pk
+            }
+          in
+          U.Wallet.user_command ~fee_payer ~source_pk ~receiver_pk:snapp_pk amount
+            txn_fee sender_nonce memo
+        in
+        U.test_transaction ?expected_failure:expected_failure_receiver ledger
+          (Mina_transaction.Transaction.Command (Signed_command signed_command2))
+
+      let%test_unit "Successful payments from zkapp accounts- Signature, None" =
+        let open Mina_transaction_logic.For_tests in
+        Quickcheck.test ~trials:5 U.gen_snapp_ledger
+          ~f:(fun ({ init_ledger; specs }, new_kp) ->
+            Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Init_ledger.init
+                      (module Ledger.Ledger_inner)
+                      init_ledger ledger ;
+                    let spec = List.hd_exn specs in
+                    let permissions =
+                      Some
+                        { Permissions.user_default with
+                          send = Permissions.Auth_required.Signature
+                        ; receive = Permissions.Auth_required.None
+                        }
+                    in
+                    test_user_commands ?permissions ~new_kp ~spec ledger ;
+                    Async.Deferred.return () ) ) )
+
+      let%test_unit "Successful payments from zkapp accounts- None,None" =
+        let open Mina_transaction_logic.For_tests in
+        Quickcheck.test ~trials:5 U.gen_snapp_ledger
+          ~f:(fun ({ init_ledger; specs }, new_kp) ->
+            Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Init_ledger.init
+                      (module Ledger.Ledger_inner)
+                      init_ledger ledger ;
+                    let spec = List.hd_exn specs in
+                    let permissions =
+                      Some
+                        { Permissions.user_default with
+                          send = Permissions.Auth_required.None
+                        ; receive = Permissions.Auth_required.None
+                        }
+                    in
+                    test_user_commands ?permissions ~new_kp ~spec ledger ;
+                    Async.Deferred.return () ) ) )
+
+      let%test_unit "Failed payments from zkapp accounts- Proof,None" =
+        let open Mina_transaction_logic.For_tests in
+        Quickcheck.test ~trials:5 U.gen_snapp_ledger
+          ~f:(fun ({ init_ledger; specs }, new_kp) ->
+            Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Init_ledger.init
+                      (module Ledger.Ledger_inner)
+                      init_ledger ledger ;
+                    let spec = List.hd_exn specs in
+                    let permissions =
+                      Some
+                        { Permissions.user_default with
+                          send = Permissions.Auth_required.Proof
+                        ; receive = Permissions.Auth_required.None
+                        }
+                    in
+                    test_user_commands ?permissions
+                      ~expected_failure_sender:
+                        Transaction_status.Failure.Update_not_permitted_balance
+                      ~new_kp ~spec ledger ;
+                    Async.Deferred.return () ) ) )
+
+      let%test_unit "Failed payments from zkapp accounts- Signature,Signature" =
+        let open Mina_transaction_logic.For_tests in
+        Quickcheck.test ~trials:5 U.gen_snapp_ledger
+          ~f:(fun ({ init_ledger; specs }, new_kp) ->
+            Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Init_ledger.init
+                      (module Ledger.Ledger_inner)
+                      init_ledger ledger ;
+                    let spec = List.hd_exn specs in
+                    let permissions =
+                      Some
+                        { Permissions.user_default with
+                          send = Permissions.Auth_required.Signature
+                        ; receive = Permissions.Auth_required.Signature
+                        }
+                    in
+                    test_user_commands ?permissions
+                      ~expected_failure_receiver:
+                        Transaction_status.Failure.Update_not_permitted_balance
+                      ~new_kp ~spec ledger ;
+                    Async.Deferred.return () ) ) )
+
+      let%test_unit "Failed payments from zkapp accounts- Signature,Proof" =
+        let open Mina_transaction_logic.For_tests in
+        Quickcheck.test ~trials:5 U.gen_snapp_ledger
+          ~f:(fun ({ init_ledger; specs }, new_kp) ->
+            Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Init_ledger.init
+                      (module Ledger.Ledger_inner)
+                      init_ledger ledger ;
+                    let spec = List.hd_exn specs in
+                    let permissions =
+                      Some
+                        { Permissions.user_default with
+                          send = Permissions.Auth_required.Signature
+                        ; receive = Permissions.Auth_required.Proof
+                        }
+                    in
+                    test_user_commands ?permissions
+                      ~expected_failure_receiver:
+                        Transaction_status.Failure.Update_not_permitted_balance
+                      ~new_kp ~spec ledger ;
+                    Async.Deferred.return () ) ) )*)
+
+    let test_coinbase ?expected_failure_fee_receiver
+        ~(new_kp : Signature_lib.Keypair.t)
         ~(spec : Mina_transaction_logic.For_tests.Transaction_spec.t)
         ?permissions ledger =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
-      let txn_fee = Fee.of_int 1000000 in
-      let amount = 100 in
-      (*send from a zkApp account*)
-      let signed_command1 =
-        let fee_payer =
-          { U.Wallet.private_key = new_kp.private_key
-          ; account = account ledger snapp_pk
-          }
-        in
-        U.Wallet.user_command ~fee_payer ~source_pk:snapp_pk
-          ~receiver_pk:spec.receiver amount txn_fee Account.Nonce.zero memo
+      let fee = Fee.of_int 1000000 in
+      let amount = U.constraint_constants.coinbase_amount in
+      (*send coinbase reward to a zkApp account*)
+      let coinbase1 =
+        let ft = Coinbase.Fee_transfer.create ~receiver_pk:spec.receiver ~fee in
+        Coinbase.create ~amount ~receiver:snapp_pk ~fee_transfer:(Some ft)
+        |> Or_error.ok_exn
       in
-      U.test_transaction ?expected_failure:expected_failure_sender ledger
-        (Mina_transaction.Transaction.Command (Signed_command signed_command1)) ;
-      let sender_kp, sender_nonce = spec.sender in
-      (*send to a zkApp account*)
-      let signed_command2 =
-        let source_pk =
-          Signature_lib.Public_key.compress sender_kp.public_key
-        in
-        let fee_payer =
-          { U.Wallet.private_key = sender_kp.private_key
-          ; account = account ledger source_pk
-          }
-        in
-        U.Wallet.user_command ~fee_payer ~source_pk ~receiver_pk:snapp_pk amount
-          txn_fee sender_nonce memo
+      U.test_transaction ?expected_failure:expected_failure_fee_receiver ledger
+        (Mina_transaction.Transaction.Coinbase coinbase1) ;
+      (*coinbase fee transfer to a zkApp account*)
+      let coinbase2 =
+        let ft = Coinbase.Fee_transfer.create ~receiver_pk:snapp_pk ~fee in
+        Coinbase.create ~amount ~receiver:spec.receiver ~fee_transfer:(Some ft)
+        |> Or_error.ok_exn
       in
-      U.test_transaction ?expected_failure:expected_failure_receiver ledger
-        (Mina_transaction.Transaction.Command (Signed_command signed_command2))
+      U.test_transaction ?expected_failure:expected_failure_fee_receiver ledger
+        (Mina_transaction.Transaction.Coinbase coinbase2)
 
-    let%test_unit "Successful payments from zkapp accounts- Signature, None" =
+    let%test_unit "Successful coinbase to zkapp accounts" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -330,14 +466,13 @@ let%test_module "Zkapp payments tests" =
                   let permissions =
                     Some
                       { Permissions.user_default with
-                        send = Permissions.Auth_required.Signature
-                      ; receive = Permissions.Auth_required.None
+                        receive = Permissions.Auth_required.None
                       }
                   in
-                  test_legacy_transaction ?permissions ~new_kp ~spec ledger ;
+                  test_coinbase ?permissions ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Successful payments from zkapp accounts- None,None" =
+    let%test_unit "Failed coinbase to zkapp accounts- with proof auth" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -350,37 +485,16 @@ let%test_module "Zkapp payments tests" =
                   let permissions =
                     Some
                       { Permissions.user_default with
-                        send = Permissions.Auth_required.None
-                      ; receive = Permissions.Auth_required.None
+                        receive = Permissions.Auth_required.Proof
                       }
                   in
-                  test_legacy_transaction ?permissions ~new_kp ~spec ledger ;
-                  Async.Deferred.return () ) ) )
-
-    let%test_unit "Failed payments from zkapp accounts- Proof,None" =
-      let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:5 U.gen_snapp_ledger
-        ~f:(fun ({ init_ledger; specs }, new_kp) ->
-          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              Async.Thread_safe.block_on_async_exn (fun () ->
-                  Init_ledger.init
-                    (module Ledger.Ledger_inner)
-                    init_ledger ledger ;
-                  let spec = List.hd_exn specs in
-                  let permissions =
-                    Some
-                      { Permissions.user_default with
-                        send = Permissions.Auth_required.Proof
-                      ; receive = Permissions.Auth_required.None
-                      }
-                  in
-                  test_legacy_transaction ?permissions
-                    ~expected_failure_sender:
+                  test_coinbase ?permissions
+                    ~expected_failure_fee_receiver:
                       Transaction_status.Failure.Update_not_permitted_balance
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed payments from zkapp accounts- Signature,Signature" =
+    let%test_unit "Failed coinbase to zkapp accounts- with signature Auth" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -393,17 +507,57 @@ let%test_module "Zkapp payments tests" =
                   let permissions =
                     Some
                       { Permissions.user_default with
-                        send = Permissions.Auth_required.Signature
-                      ; receive = Permissions.Auth_required.Signature
+                        receive = Permissions.Auth_required.Signature
                       }
                   in
-                  test_legacy_transaction ?permissions
-                    ~expected_failure_receiver:
+                  test_coinbase ?permissions
+                    ~expected_failure_fee_receiver:
                       Transaction_status.Failure.Update_not_permitted_balance
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
-    let%test_unit "Failed payments from zkapp accounts- Signature,Proof" =
+    let test_fee_transfers ?expected_failure_fee_receiver
+        ~(new_kp : Signature_lib.Keypair.t)
+        ~(spec : Mina_transaction_logic.For_tests.Transaction_spec.t)
+        ?permissions ledger =
+      let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
+      Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
+        ~ledger snapp_pk ;
+      let fee = U.constraint_constants.account_creation_fee in
+      (*send first one to a zkApp account*)
+      let ft1, ft2 =
+        let single1 =
+          Fee_transfer.Single.create ~receiver_pk:snapp_pk ~fee
+            ~fee_token:Token_id.default
+        in
+        let single2 =
+          Fee_transfer.Single.create ~receiver_pk:spec.receiver ~fee
+            ~fee_token:Token_id.default
+        in
+        ( Fee_transfer.create single1 (Some single2) |> Or_error.ok_exn
+        , Fee_transfer.create single1 None |> Or_error.ok_exn )
+      in
+      List.iter [ ft1; ft2 ] ~f:(fun ft ->
+          U.test_transaction ?expected_failure:expected_failure_fee_receiver
+            ledger (Mina_transaction.Transaction.Fee_transfer ft) ) ;
+      (*send the second one to a zkApp account*)
+      let ft3, ft4 =
+        let single1 =
+          Fee_transfer.Single.create ~receiver_pk:spec.receiver ~fee
+            ~fee_token:Token_id.default
+        in
+        let single2 =
+          Fee_transfer.Single.create ~receiver_pk:snapp_pk ~fee
+            ~fee_token:Token_id.default
+        in
+        ( Fee_transfer.create single1 (Some single2) |> Or_error.ok_exn
+        , Fee_transfer.create single1 None |> Or_error.ok_exn )
+      in
+      List.iter [ ft3; ft4 ] ~f:(fun ft ->
+          U.test_transaction ?expected_failure:expected_failure_fee_receiver
+            ledger (Mina_transaction.Transaction.Fee_transfer ft) )
+
+    let%test_unit "Successful fee transfers to zkapp accounts" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -416,12 +570,53 @@ let%test_module "Zkapp payments tests" =
                   let permissions =
                     Some
                       { Permissions.user_default with
-                        send = Permissions.Auth_required.Signature
-                      ; receive = Permissions.Auth_required.Proof
+                        receive = Permissions.Auth_required.None
                       }
                   in
-                  test_legacy_transaction ?permissions
-                    ~expected_failure_receiver:
+                  test_fee_transfers ?permissions ~new_kp ~spec ledger ;
+                  Async.Deferred.return () ) ) )
+
+    let%test_unit "Failed fee transfers to zkapp accounts- with proof auth" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:5 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let spec = List.hd_exn specs in
+                  let permissions =
+                    Some
+                      { Permissions.user_default with
+                        receive = Permissions.Auth_required.Proof
+                      }
+                  in
+                  test_fee_transfers ?permissions
+                    ~expected_failure_fee_receiver:
+                      Transaction_status.Failure.Update_not_permitted_balance
+                    ~new_kp ~spec ledger ;
+                  Async.Deferred.return () ) ) )
+
+    let%test_unit "Failed fee transfers to zkapp accounts- with signature Auth"
+        =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:5 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let spec = List.hd_exn specs in
+                  let permissions =
+                    Some
+                      { Permissions.user_default with
+                        receive = Permissions.Auth_required.Signature
+                      }
+                  in
+                  test_fee_transfers ?permissions
+                    ~expected_failure_fee_receiver:
                       Transaction_status.Failure.Update_not_permitted_balance
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )

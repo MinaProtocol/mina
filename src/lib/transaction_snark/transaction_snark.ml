@@ -509,24 +509,24 @@ let dummy_constraints () =
             : Field.t * Field.t ))
 
 module Base = struct
-  module User_command_failure = struct
-    (** The various ways that a user command may fail. These should be computed
+  module Transaction_failure = struct
+    (** The various ways that a transaction may fail. These should be computed
         before applying the snark, to ensure that only the base fee is charged
         to the fee-payer if executing the user command will later fail.
     *)
     type 'bool t =
-      { predicate_failed : 'bool (* All *)
-      ; source_not_present : 'bool (* All *)
+      { predicate_failed : 'bool (* User commands *)
+      ; source_not_present : 'bool (* User commands *)
       ; receiver_not_present : 'bool (* Delegate, Mint_tokens *)
       ; amount_insufficient_to_create : 'bool (* Payment only *)
       ; token_cannot_create : 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance : 'bool (* Payment only *)
       ; source_minimum_balance_violation : 'bool (* Payment only *)
       ; source_bad_timing : 'bool (* Payment only *)
-      ; fee_payer_balance_update_not_allowed : 'bool
-      ; source_balance_update_not_allowed : 'bool
-      ; receiver_balance_update_not_allowed : 'bool
-      ; stake_delegation_update_not_allowed : 'bool
+      ; fee_payer_balance_update_not_allowed : 'bool (*All*)
+      ; source_balance_update_not_allowed : 'bool (*All*)
+      ; receiver_balance_update_not_allowed : 'bool (*All*)
+      ; stake_delegation_update_not_allowed : 'bool (*Delegate only*)
       }
 
     let num_fields = 12
@@ -588,7 +588,7 @@ module Base = struct
           }
       | _ ->
           failwith
-            "Transaction_snark.Base.User_command_failure.to_list: bad length"
+            "Transaction_snark.Base.Transaction_failure.to_list: bad length"
 
     let typ : (Boolean.var t, bool t) Typ.t =
       let open Typ in
@@ -631,13 +631,34 @@ module Base = struct
         ({ payload; signature = _; signer = _ } : Transaction_union.t) =
       match payload.body.tag with
       | Fee_transfer | Coinbase ->
-          (* Not user commands, return no failure. *)
-          of_list (List.init num_fields ~f:(fun _ -> false))
+          (*Check if all the accounts can receive*)
+          let fee_payer_balance_update_not_allowed =
+            not (account_has_permission ~to_:`Receive fee_payer_account)
+          in
+          let source_balance_update_not_allowed =
+            not (account_has_permission ~to_:`Receive source_account)
+          in
+          let receiver_balance_update_not_allowed =
+            not (account_has_permission ~to_:`Receive receiver_account)
+          in
+          (*Check balance update permissions*)
+          { predicate_failed = false
+          ; source_not_present = false
+          ; receiver_not_present = false
+          ; amount_insufficient_to_create = false
+          ; token_cannot_create = false
+          ; source_insufficient_balance = false
+          ; source_minimum_balance_violation = false
+          ; source_bad_timing = false
+          ; fee_payer_balance_update_not_allowed
+          ; source_balance_update_not_allowed
+          ; receiver_balance_update_not_allowed
+          ; stake_delegation_update_not_allowed = false
+          }
       | _ -> (
           let fail s =
             failwithf
-              "Transaction_snark.Base.User_command_failure.compute_unchecked: \
-               %s"
+              "Transaction_snark.Base.Transaction_failure.compute_unchecked: %s"
               s ()
           in
           let fee_token = payload.common.fee_token in
@@ -2419,9 +2440,9 @@ module Base = struct
       Mina_state.Protocol_state.Body.consensus_state state_body
       |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
     in
-    (* Query user command predicted failure/success. *)
-    let%bind user_command_failure =
-      User_command_failure.compute_as_prover ~constraint_constants
+    (* Query predicted failure/success. *)
+    let%bind transaction_failure =
+      Transaction_failure.compute_as_prover ~constraint_constants
         ~txn_global_slot:current_global_slot txn
     in
     let%bind () =
@@ -2431,14 +2452,15 @@ module Base = struct
            Boolean.all
              [ is_user_command
              ; Boolean.not
-                 user_command_failure.fee_payer_balance_update_not_allowed
+                 transaction_failure.fee_payer_balance_update_not_allowed
              ]
          in
          Boolean.Assert.any [ Boolean.not is_user_command; valid_user_command ]
         )
     in
     let%bind user_command_fails =
-      User_command_failure.any user_command_failure
+      let%bind fails = Transaction_failure.any transaction_failure in
+      Boolean.all [ is_user_command; fails ]
     in
     let fee = payload.common.fee in
     let receiver = Account_id.Checked.create payload.body.receiver_pk token in
@@ -2555,7 +2577,7 @@ module Base = struct
          assert_r1cs
            (predicate_failed :> Field.Var.t)
            (is_user_command :> Field.Var.t)
-           (user_command_failure.predicate_failed :> Field.Var.t) )
+           (transaction_failure.predicate_failed :> Field.Var.t) )
     in
     let account_creation_amount =
       Amount.Checked.of_fee
@@ -2610,7 +2632,7 @@ module Base = struct
                  ~else_:current
              in
              let don't_update_account =
-               user_command_failure.fee_payer_balance_update_not_allowed
+               transaction_failure.fee_payer_balance_update_not_allowed
              in
              let%bind is_empty_and_writeable =
                (* 1. If this is a coinbase with zero fee, do not create the
@@ -2768,7 +2790,7 @@ module Base = struct
              *)
              let%bind don't_update_account =
                Boolean.if_ is_stake_delegation ~then_:Boolean.false_
-                 ~else_:user_command_failure.receiver_balance_update_not_allowed
+                 ~else_:transaction_failure.receiver_balance_update_not_allowed
              in
              let%bind is_empty_failure =
                let%bind must_not_be_empty =
@@ -2779,7 +2801,7 @@ module Base = struct
              let%bind () =
                [%with_label "Receiver existence failure matches predicted"]
                  (Boolean.Assert.( = ) is_empty_failure
-                    user_command_failure.receiver_not_present )
+                    transaction_failure.receiver_not_present )
              in
              let%bind is_empty_and_writeable =
                Boolean.(
@@ -2819,7 +2841,7 @@ module Base = struct
                   in
                   [%with_label "equal token_cannot_create"]
                     (Boolean.Assert.( = ) token_cannot_create
-                       user_command_failure.token_cannot_create ) )
+                       transaction_failure.token_cannot_create ) )
              in
              let%bind balance =
                (* [receiver_increase] will be zero in the stake delegation
@@ -2839,7 +2861,7 @@ module Base = struct
                    [%with_label
                      "Receiver creation fee failure matches predicted"]
                      (Boolean.Assert.( = ) underflow
-                        user_command_failure.amount_insufficient_to_create )
+                        transaction_failure.amount_insufficient_to_create )
                  in
                  Currency.Amount.Checked.if_ user_command_fails
                    ~then_:Amount.(var_of_t zero)
@@ -2939,7 +2961,7 @@ module Base = struct
            ~depth:constraint_constants.ledger_depth
            ~is_writeable:
              (* [modify_account_send] does this failure check for us. *)
-             user_command_failure.source_not_present root_after_receiver_update
+             transaction_failure.source_not_present root_after_receiver_update
            source ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                 - the source for payments
@@ -2952,7 +2974,7 @@ module Base = struct
              let%bind () =
                [%with_label "Check source presence failure matches predicted"]
                  (Boolean.Assert.( = ) is_empty_and_writeable
-                    user_command_failure.source_not_present )
+                    transaction_failure.source_not_present )
              in
              let%bind () =
                [%with_label
@@ -2961,8 +2983,8 @@ module Base = struct
                  (let num_failures =
                     let open Field.Var in
                     add
-                      (user_command_failure.source_insufficient_balance :> t)
-                      (user_command_failure.source_bad_timing :> t)
+                      (transaction_failure.source_insufficient_balance :> t)
+                      (transaction_failure.source_bad_timing :> t)
                   in
                   let not_fee_payer_is_source =
                     (Boolean.not fee_payer_is_source :> Field.Var.t)
@@ -2982,8 +3004,7 @@ module Base = struct
                let%bind affect_balance =
                  Boolean.(
                    all
-                     [ not
-                         user_command_failure.source_balance_update_not_allowed
+                     [ not transaction_failure.source_balance_update_not_allowed
                      ; is_payment
                      ])
                in
@@ -2993,8 +3014,8 @@ module Base = struct
              let txn_global_slot = current_global_slot in
              let%bind don't_update_account =
                Boolean.if_ is_stake_delegation
-                 ~then_:user_command_failure.stake_delegation_update_not_allowed
-                 ~else_:user_command_failure.source_balance_update_not_allowed
+                 ~then_:transaction_failure.stake_delegation_update_not_allowed
+                 ~else_:transaction_failure.source_balance_update_not_allowed
              in
              let%bind timing =
                [%with_label "Check source timing"]
@@ -3003,7 +3024,7 @@ module Base = struct
                       "Check source balance failure matches predicted"]
                       (Boolean.Assert.( = ) ok
                          (Boolean.not
-                            user_command_failure.source_insufficient_balance ) )
+                            transaction_failure.source_insufficient_balance ) )
                   in
                   let timed_balance_check ok =
                     [%with_label
@@ -3012,11 +3033,10 @@ module Base = struct
                          Boolean.(
                            (not ok)
                            &&& not
-                                 user_command_failure
-                                   .source_insufficient_balance)
+                                 transaction_failure.source_insufficient_balance)
                        in
                        Boolean.Assert.( = ) not_ok
-                         user_command_failure.source_bad_timing )
+                         transaction_failure.source_bad_timing )
                   in
                   let%bind `Min_balance _, timing =
                     check_timing ~balance_check ~timed_balance_check ~account
@@ -3034,7 +3054,7 @@ module Base = struct
                *)
                [%with_label "Check source balance failure matches predicted"]
                  (Boolean.Assert.( = ) underflow
-                    user_command_failure.source_insufficient_balance )
+                    transaction_failure.source_insufficient_balance )
              in
              let%map delegate =
                let%bind update_delegate =
@@ -3042,8 +3062,7 @@ module Base = struct
                    all
                      [ is_stake_delegation
                      ; not
-                         user_command_failure
-                           .stake_delegation_update_not_allowed
+                         transaction_failure.stake_delegation_update_not_allowed
                      ])
                in
                Public_key.Compressed.Checked.if_ update_delegate
