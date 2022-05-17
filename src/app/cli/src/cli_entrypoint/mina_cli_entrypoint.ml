@@ -1678,31 +1678,6 @@ let mina_commands logger =
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
 
-[%%if integration_tests]
-
-module type Integration_test = sig
-  val name : string
-
-  val command : Async.Command.t
-end
-
-let mina_commands logger =
-  let open Tests in
-  let group =
-    List.map
-      ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (module Coda_shared_state_test)
-        ; (module Coda_transitive_peers_test)
-        ; (module Coda_bootstrap_test)
-        ; (module Coda_change_snark_worker_test)
-        ]
-        : (module Integration_test) list )
-  in
-  mina_commands logger
-  @ [ ("integration-tests", Command.group ~summary:"Integration tests" group) ]
-
-[%%endif]
-
 let print_version_help coda_exe version =
   (* mimic Jane Street command help *)
   let lines =
