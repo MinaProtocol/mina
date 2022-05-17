@@ -127,11 +127,34 @@ let check_parties_with_merges_exn ?expected_failure
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
       match
-        Ledger.apply_transaction ~constraint_constants
-          ~txn_state_view:state_view ledger
-          (Mina_transaction.Transaction.Command (Parties parties))
+        Or_error.try_with (fun () ->
+            Transaction_snark.parties_witnesses_exn ~constraint_constants
+              ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+              [ ( `Pending_coinbase_init_stack init_stack
+                , `Pending_coinbase_of_statement
+                    (pending_coinbase_state_stack ~state_body_hash)
+                , parties )
+              ] )
       with
-      | Ok applied -> (
+      | Error e -> (
+          match expected_failure with
+          | Some failure ->
+              assert (
+                String.is_substring (Error.to_string_hum e)
+                  ~substring:(Transaction_status.Failure.to_string failure) ) ;
+              Async.Deferred.unit
+          | None ->
+              failwith
+                (sprintf "apply_transaction failed with %s"
+                   (Error.to_string_hum e) ) )
+      | Ok (witnesses, _) -> (
+          let open Async.Deferred.Let_syntax in
+          let applied =
+            Ledger.apply_transaction ~constraint_constants
+              ~txn_state_view:state_view ledger
+              (Mina_transaction.Transaction.Command (Parties parties))
+            |> Or_error.ok_exn
+          in
           match applied.varying with
           | Command (Parties { command; _ }) -> (
               match command.status with
@@ -145,27 +168,6 @@ let check_parties_with_merges_exn ?expected_failure
                              %{sexp:Mina_base.Transaction_status.Failure.t}"
                            failure )
                   | None ->
-                      let witnesses, _final_ledger =
-                        match
-                          Or_error.try_with (fun () ->
-                              Transaction_snark.parties_witnesses_exn
-                                ~constraint_constants ~state_body
-                                ~fee_excess:Amount.Signed.zero (`Ledger ledger)
-                                [ ( `Pending_coinbase_init_stack init_stack
-                                  , `Pending_coinbase_of_statement
-                                      (pending_coinbase_state_stack
-                                         ~state_body_hash )
-                                  , parties )
-                                ] )
-                        with
-                        | Ok a ->
-                            a
-                        | Error e ->
-                            failwith
-                              (sprintf "parties_witnesses_exn failed with %s"
-                                 (Error.to_string_hum e) )
-                      in
-                      let open Async.Deferred.Let_syntax in
                       let%map p =
                         match List.rev witnesses with
                         | [] ->
@@ -231,21 +233,7 @@ let check_parties_with_merges_exn ?expected_failure
                              failure failure_tbl )
                       else Async.Deferred.unit ) )
           | _ ->
-              failwith "parties expected" )
-      | Error e -> (
-          match expected_failure with
-          | Some failure ->
-              assert (
-                Str.string_match
-                  (Str.regexp
-                     (sprintf {|.*\(%s\).*|}
-                        Transaction_status.Failure.(to_string failure) ) )
-                  (Error.to_string_hum e) 0 ) ;
-              Async.Deferred.unit
-          | None ->
-              failwith
-                (sprintf "apply_transaction failed with %s"
-                   (Error.to_string_hum e) ) ) )
+              failwith "parties expected" ) )
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   let open Tick in

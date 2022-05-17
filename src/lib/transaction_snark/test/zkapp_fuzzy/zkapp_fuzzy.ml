@@ -58,7 +58,6 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
 
 let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
-(*
 let generate_parties_and_apply_them_consecutively () =
   let num_of_fee_payers = 5 in
   let trials = 6 in
@@ -74,6 +73,21 @@ let generate_parties_and_apply_them_consecutively () =
              ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
+                [%log info]
+                  ~metadata:
+                    [ ("parties", Parties.to_yojson parties)
+                    ; ( "accounts"
+                      , `List
+                          (List.map
+                             (Mina_ledger.Ledger.accounts ledger |> Set.to_list)
+                             ~f:(fun account_id ->
+                               Mina_ledger.Ledger.location_of_account ledger
+                                 account_id
+                               |> Option.value_exn
+                               |> Mina_ledger.Ledger.get ledger
+                               |> Option.value_exn |> Account.to_yojson ) ) )
+                    ]
+                  "generated parties" ;
                 U.check_parties_with_merges_exn ledger [ parties ] ) )
       in
       for i = 0 to trials - 1 do
@@ -100,7 +114,6 @@ let generate_parties_and_apply_them_freshly () =
       for i = 0 to trials - 1 do
         test i
       done )
-*)
 
 let test_invalid_protocol_state_precondition () =
   let num_of_fee_payers = 5 in
@@ -356,10 +369,8 @@ let test_timed_account () =
       done )
 
 let () =
-  (*
   generate_parties_and_apply_them_consecutively () ;
   generate_parties_and_apply_them_freshly () ;
-*)
   test_invalid_protocol_state_precondition () ;
   test_update_delegate_not_permitted () ;
   test_edit_state_not_permitted () ;
