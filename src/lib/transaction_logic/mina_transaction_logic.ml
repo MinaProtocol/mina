@@ -341,20 +341,6 @@ module type S = sig
     -> Transaction.t
     -> Transaction_applied.t Or_error.t
 
-  val merkle_root_after_parties_exn :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
-    -> ledger
-    -> Parties.Valid.t
-    -> Ledger_hash.t
-
-  val merkle_root_after_user_command_exn :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
-    -> ledger
-    -> Signed_command.With_valid_signature.t
-    -> Ledger_hash.t
-
   val has_locked_tokens :
        global_slot:Global_slot.t
     -> account_id:Account_id.t
@@ -1806,22 +1792,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (apply_coinbase ~constraint_constants ~txn_global_slot ledger t)
             ~f:(fun applied -> Transaction_applied.Varying.Coinbase applied) )
       ~f:(fun varying -> { Transaction_applied.previous_hash; varying })
-
-  let merkle_root_after_parties_exn ~constraint_constants ~txn_state_view ledger
-      payment =
-    ignore
-      (Or_error.ok_exn
-         (apply_parties_unchecked ~constraint_constants
-            ~state_view:txn_state_view ledger payment ) ) ;
-    merkle_root ledger
-
-  let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
-      ledger payment =
-    ignore
-      (Or_error.ok_exn
-         (apply_user_command ~constraint_constants ~txn_global_slot ledger
-            payment ) ) ;
-    merkle_root ledger
 
   module For_tests = struct
     let validate_timing_with_min_balance = validate_timing_with_min_balance
