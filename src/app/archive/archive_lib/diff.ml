@@ -73,8 +73,8 @@ module Builder = struct
     in
     let block_with_hash = Mina_block.Validated.forget validated_block in
     let block = With_hash.data block_with_hash in
+    let account_ids_accessed = Mina_block.account_ids_accessed block in
     let accounts_accessed =
-      let account_ids_accessed = Mina_block.account_ids_accessed block in
       List.filter_map account_ids_accessed ~f:(fun acct_id ->
           (* an accessed account may not be the ledger *)
           let%bind.Option index =
@@ -98,12 +98,13 @@ module Builder = struct
           (acct_id, account_creation_fee) )
     in
     let tokens_used =
-      List.map accounts_accessed ~f:(fun (_ndx, acct) ->
-          let token_id = acct.token_id in
+      let unique_tokens =
+        List.map account_ids_accessed ~f:Account_id.token_id
+        |> List.dedup_and_sort ~compare:Token_id.compare
+      in
+      List.map unique_tokens ~f:(fun token_id ->
           let owner = Mina_ledger.Ledger.token_owner ledger token_id in
           (token_id, owner) )
-      |> List.dedup_and_sort
-           ~compare:[%compare: Token_id.t * Account_id.t option]
     in
     Transition_frontier.Breadcrumb_added
       { block = With_hash.map ~f:External_transition.compose block_with_hash

@@ -123,11 +123,13 @@ let of_block ~logger
         (acct_id, account_creation_fee) )
   in
   let tokens_used =
-    List.map accounts_accessed ~f:(fun (_ndx, acct) ->
-        let token_id = acct.token_id in
+    let unique_tokens =
+      List.map account_ids_accessed ~f:Account_id.token_id
+      |> List.dedup_and_sort ~compare:Token_id.compare
+    in
+    List.map unique_tokens ~f:(fun token_id ->
         let owner = Mina_ledger.Ledger.token_owner ledger token_id in
         (token_id, owner) )
-    |> List.dedup_and_sort ~compare:[%compare: Token_id.t * Account_id.t option]
   in
   { scheduled_time
   ; protocol_state = Header.protocol_state header
