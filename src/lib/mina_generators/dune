@@ -9,6 +9,8 @@
    core_kernel
    base_quickcheck
    core
+   async
+   async_unix
    base
    ;; local libraries
    sgn
@@ -30,4 +32,5 @@
    pickles.backend
    random_oracle_input
    snark_params
+   snarky.backendless
 ))
