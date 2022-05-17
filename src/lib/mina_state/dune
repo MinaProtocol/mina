@@ -25,6 +25,7 @@
    genesis_constants
    block_time
    mina_base
+   mina_transaction_logic
    snark_params
    consensus
    bitstring_lib
@@ -38,7 +39,11 @@
    visualization
    linked_tree
    mina_numbers
+   kimchi_backend.pasta
+   kimchi_backend
+   mina_base.util
+   mina_ledger
    unsigned_extended
-   pasta
+   sgn
    )
 )

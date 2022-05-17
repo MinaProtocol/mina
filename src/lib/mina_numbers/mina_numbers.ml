@@ -3,3 +3,4 @@ module Length = Length
 module Nat = Nat
 module Global_slot = Global_slot
 module Hd_index = Hd_index
+module Zkapp_version = Zkapp_version

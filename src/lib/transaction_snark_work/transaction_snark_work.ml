@@ -6,8 +6,8 @@ module Statement = struct
   module Arg = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
+      module V2 = struct
+        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
         [@@deriving hash, sexp, compare]
 
         let to_latest = Fn.id
@@ -19,15 +19,15 @@ module Statement = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
-      type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
+    module V2 = struct
+      type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
       [@@deriving equal, compare, hash, sexp, yojson]
 
       let to_latest = Fn.id
 
-      type _unused = unit constraint t = Arg.Stable.V1.t
+      type _unused = unit constraint t = Arg.Stable.V2.t
 
-      include Hashable.Make_binable (Arg.Stable.V1)
+      include Hashable.Make_binable (Arg.Stable.V2)
     end
   end]
 
@@ -51,9 +51,9 @@ module Info = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        { statements : Statement.Stable.V1.t
+        { statements : Statement.Stable.V2.t
         ; work_ids : int One_or_two.Stable.V1.t
         ; fee : Fee.Stable.V1.t
         ; prover : Public_key.Compressed.Stable.V1.t
@@ -78,10 +78,10 @@ module T = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
         { fee : Fee.Stable.V1.t
-        ; proofs : Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+        ; proofs : Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
         ; prover : Public_key.Compressed.Stable.V1.t
         }
       [@@deriving compare, sexp, yojson]
