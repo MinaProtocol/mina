@@ -2,6 +2,7 @@ open Core
 open Signature_lib
 open Mina_base
 module U = Transaction_snark_tests.Util
+open Mina_generators.Parties_generators
 
 let logger = Logger.create ()
 
@@ -57,6 +58,7 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
 
 let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
+(*
 let generate_parties_and_apply_them_consecutively () =
   let num_of_fee_payers = 5 in
   let trials = 6 in
@@ -98,6 +100,7 @@ let generate_parties_and_apply_them_freshly () =
       for i = 0 to trials - 1 do
         test i
       done )
+*)
 
 let test_invalid_protocol_state_precondition () =
   let num_of_fee_payers = 5 in
@@ -109,7 +112,7 @@ let test_invalid_protocol_state_precondition () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_protocol_state_precondition:true
+             ~failure:(Some Invalid_protocol_state_precondition)
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
@@ -138,7 +141,7 @@ let test_update_delegate_not_permitted () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_update:(Some `Delegate)
+             ~failure:(Some (Update_not_permitted `Delegate))
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
@@ -166,7 +169,7 @@ let test_edit_state_not_permitted () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_update:(Some `App_state)
+             ~failure:(Some (Update_not_permitted `App_state))
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
@@ -194,7 +197,7 @@ let test_update_voting_for_not_permitted () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_update:(Some `Voting_for)
+             ~failure:(Some (Update_not_permitted `Voting_for))
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
@@ -222,7 +225,7 @@ let test_update_vk_not_permitted () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_update:(Some `Verification_key)
+             ~failure:(Some (Update_not_permitted `Verification_key))
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
@@ -251,7 +254,7 @@ let test_update_zkapp_uri_not_permitted () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_update:(Some `Zkapp_uri)
+             ~failure:(Some (Update_not_permitted `Zkapp_uri))
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
@@ -279,35 +282,7 @@ let test_update_token_symbol_not_permitted () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_update:(Some `Token_symbol)
-             ~protocol_state_view:U.genesis_state_view
-             ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
-            Async.Thread_safe.block_on_async_exn (fun () ->
-                [%log info]
-                  ~metadata:[ ("parties", Parties.to_yojson parties) ]
-                  "generated parties" ;
-                U.check_parties_with_merges_exn
-                  ~expected_failure:
-                    Transaction_status.Failure.Update_not_permitted_token_symbol
-                  ledger [ parties ] ~state_body:U.genesis_state_body ) )
-      in
-      for i = 0 to trials - 1 do
-        test i
-      done )
-
-let test_update_token_symbol_not_permitted () =
-  let num_of_fee_payers = 5 in
-  let trials = 1 in
-  Test_util.with_randomness 123456789 (fun () ->
-      let test i =
-        let ledger, fee_payer_keypairs, keymap =
-          mk_ledgers_and_fee_payers ~num_of_fee_payers ()
-        in
-        Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_update:(Some `Token_symbol)
+             ~failure:(Some (Update_not_permitted `Token_symbol))
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
@@ -335,7 +310,7 @@ let test_update_balance_not_permitted () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~invalid_update:(Some `Balance)
+             ~failure:(Some (Update_not_permitted `Balance))
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
@@ -381,8 +356,10 @@ let test_timed_account () =
       done )
 
 let () =
+  (*
   generate_parties_and_apply_them_consecutively () ;
   generate_parties_and_apply_them_freshly () ;
+*)
   test_invalid_protocol_state_precondition () ;
   test_update_delegate_not_permitted () ;
   test_edit_state_not_permitted () ;
