@@ -80,6 +80,12 @@ module Events = struct
       (Data_as_hash.hash res) ;
     res
 
+  let deriver obj =
+    let open Fields_derivers_zkapps in
+    let events = list @@ array field (o ()) in
+    events obj
+    |> with_checked ~checked:(Data_as_hash.deriver events) ~name:"Events"
+
   [%%endif]
 end
 

@@ -755,9 +755,7 @@ module Body = struct
       in
       let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-        ~fee:!.fee
-        ~events:!.(list @@ array field @@ o ())
-        ~sequence_events:!.(list @@ array field @@ o ())
+        ~fee:!.fee ~events:!.Events.deriver ~sequence_events:!.Events.deriver
         ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
         ~nonce:!.uint32
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
@@ -938,10 +936,8 @@ module Body = struct
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
       ~token_id:!.token_id_deriver ~balance_change:!.balance_change
-      ~increment_nonce:!.bool
-      ~events:!.(list @@ array field @@ o ())
-      ~sequence_events:!.(list @@ array field @@ o ())
-      ~call_data:!.field ~call_depth:!.int
+      ~increment_nonce:!.bool ~events:!.Events.deriver
+      ~sequence_events:!.Events.deriver ~call_data:!.field ~call_depth:!.int
       ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
       ~account_precondition:!.Account_precondition.deriver
       ~use_full_commitment:!.bool ~caller:!.token_id_deriver
