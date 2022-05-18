@@ -3,7 +3,10 @@ open Fieldslib
 
 module Js_layout = struct
   module Input = struct
-    type 'a t = < js_layout : Yojson.Safe.t ref ; .. > as 'a
+    type 'a t =
+      < js_layout : [> `Assoc of (string * Yojson.Safe.t) list ] ref ; .. >
+      as
+      'a
   end
 
   module Accumulator = struct
@@ -16,7 +19,7 @@ module Js_layout = struct
       constraint 'a t = 'a Input.t
   end
 
-  let leaftype (s : string) : Yojson.Safe.t = `Assoc [ ("type", `String s) ]
+  let leaftype (s : string) = `Assoc [ ("type", `String s) ]
 
   let docs (s : Fields_derivers.Annotations.Fields.T.t) : Yojson.Safe.t =
     match s.doc with Some t -> `String t | None -> `Null
@@ -104,4 +107,18 @@ module Js_layout = struct
   let wrapped x obj =
     obj#js_layout := !(x#js_layout) ;
     obj
+
+  let with_checked ~name (x : _ Input.t) (obj : _ Input.t) =
+    (* TODO: how to tell the type checker that obj#js_layout is of variant `Assoc? *)
+    match !(obj#js_layout) with
+    | `Assoc layout ->
+        obj#js_layout :=
+          `Assoc
+            ( layout
+            @ [ ("checkedType", !(x#js_layout))
+              ; ("checkedTypeName", `String name)
+              ] ) ;
+        obj
+    | _ ->
+        failwith "impossible"
 end

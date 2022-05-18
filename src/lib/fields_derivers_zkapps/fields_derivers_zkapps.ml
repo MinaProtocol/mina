@@ -286,6 +286,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
     in
     Fields_derivers_json.Of_yojson.finish ((fun x -> f (`Right x)), acc)
 
+  let with_checked ~checked ~name obj =
+    Fields_derivers_js.Js_layout.with_checked ~name (checked @@ o ()) obj
+
   let balance_change obj =
     let sign_to_string = function
       | Sgn.Pos ->
