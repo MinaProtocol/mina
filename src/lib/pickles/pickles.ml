@@ -878,7 +878,7 @@ module Side_loaded = struct
               { commitments = vk.wrap_index
               ; step_domains =
                   Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
-                      { Domains.h = d.h })
+                      { Domains.h = d.h } )
               ; index =
                   ( match vk.wrap_vk with
                   | None ->

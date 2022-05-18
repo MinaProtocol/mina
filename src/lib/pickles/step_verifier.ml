@@ -798,7 +798,7 @@ struct
           | `Known domains ->
               `Known domains
           | `Side_loaded ds ->
-              `Side_loaded (side_loaded_domains ds which_branch))
+              `Side_loaded (side_loaded_domains ds which_branch) )
     in
     let actual_width = Pseudo.choose (which_branch, step_widths) ~f:Fn.id in
     let T = Proofs_verified.eq in
