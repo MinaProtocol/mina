@@ -1080,10 +1080,15 @@ module Make (Inputs : Inputs_intf) = struct
     (* Set account timing for new accounts, if specified. *)
     let a, local_state =
       let timing = Party.Update.timing party in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_timing a)
+      in
       let local_state =
         Local_state.add_check local_state
           Update_not_permitted_timing_existing_account
-          Bool.(account_is_new ||| Set_or_keep.is_keep timing)
+          Bool.(
+            has_permission &&& (account_is_new ||| Set_or_keep.is_keep timing))
       in
       let timing =
         Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)
