@@ -548,7 +548,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
-              let (T (typ, conv)) = etyp in
+              let (T (typ, conv, _conv_inv)) = etyp in
               let main x () : unit =
                 b.main
                   (Impls.Step.with_label "conv" (fun () -> conv x))
@@ -652,7 +652,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      let (T (typ, conv)) = input () in
+      let (T (typ, conv, _conv_inv)) = input () in
       let main x () : unit = wrap_main (conv x) in
       let () = if true then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
