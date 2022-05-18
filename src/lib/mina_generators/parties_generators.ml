@@ -20,7 +20,7 @@ type failure =
       | `Token_symbol
       | `Balance ]
 
-let gen_account_precondition_from_account ?(failure = None) account =
+let gen_account_precondition_from_account ?failure account =
   let open Quickcheck.Let_syntax in
   let%bind b = Quickcheck.Generator.bool in
   let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
@@ -217,7 +217,7 @@ let gen_account_precondition_from_account ?(failure = None) account =
     | _ ->
         return (Party.Account_precondition.Nonce nonce)
 
-let gen_account_precondition_from ?(failure = None) ~account_id ~ledger () =
+let gen_account_precondition_from ?failure ~account_id ~ledger () =
   (* construct account_precondition using pk and ledger
      don't return Accept, which would ignore those inputs
   *)
@@ -672,9 +672,9 @@ end
    fee payer, and `Token_id.t` for other parties.
 *)
 let gen_party_body_components (type a b c d) ?(update = None) ?account_id
-    ?balances_tbl ?vk ?(failure = None) ?(new_account = false)
-    ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ?permissions_auth ?(required_balance_change : a option)
+    ?balances_tbl ?vk ?failure ?(new_account = false) ?(zkapp_account = false)
+    ?(is_fee_payer = false) ?available_public_keys ?permissions_auth
+    ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option) ?protocol_state_view
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment : b Quickcheck.Generator.t)
@@ -915,7 +915,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   ; caller
   }
 
-let gen_party_from ?(update = None) ?(failure = None) ?(new_account = false)
+let gen_party_from ?(update = None) ?failure ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
     ?required_balance_change ?required_balance ~authorization
     ~available_public_keys ~ledger ~balances_tbl ?vk () =
@@ -948,9 +948,8 @@ let gen_party_from ?(update = None) ?(failure = None) ?(new_account = false)
   return { Party.Wire.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_body_fee_payer ?(failure = None) ?permissions_auth ~account_id
-    ~ledger ?vk ?protocol_state_view () :
-    Party.Body.Fee_payer.t Quickcheck.Generator.t =
+let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
+    ?protocol_state_view () : Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let account_precondition_gen account_id ledger () =
     let account =
@@ -982,7 +981,7 @@ let gen_party_body_fee_payer ?(failure = None) ?permissions_auth ~account_id
   in
   Party_body_components.to_fee_payer body_components
 
-let gen_fee_payer ?(failure = None) ?permissions_auth ~account_id ~ledger
+let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
     ?protocol_state_view ?vk () : Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
