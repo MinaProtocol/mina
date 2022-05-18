@@ -21,6 +21,7 @@
    graphql_parser
    ;; local libraries
    network_pool
+   cli_lib
    kimchi_backend.pasta
    mina_base.util
    mina_ledger

@@ -49,10 +49,7 @@ let plugin_flag = Command.Param.return []
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
-  let receiver_key_note =
-    "Note: Ensure this address is a non-zkApp account or has the permission to \
-     receive funds set as None"
-  in
+  let receiver_key_warning = Cli_lib.Default.receiver_key_warning in
   let%map_open conf_dir = Cli_lib.Flag.conf_dir
   and block_production_key =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
@@ -61,7 +58,7 @@ let setup_daemon logger =
            "KEYFILE Private key file for the block producer. You cannot \
             provide both `block-producer-key` and `block-producer-pubkey`. \
             (default: don't produce blocks). %s"
-           receiver_key_note )
+           receiver_key_warning )
       (optional string)
   and block_production_pubkey =
     flag "--block-producer-pubkey"
@@ -72,7 +69,7 @@ let setup_daemon logger =
             tracked by this daemon. You cannot provide both \
             `block-producer-key` and `block-producer-pubkey`. (default: don't \
             produce blocks). %s"
-           receiver_key_note )
+           receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
     flag "--block-producer-password"
@@ -96,7 +93,7 @@ let setup_daemon logger =
            "PUBLICKEY Address to send coinbase rewards to (if this node is \
             producing blocks). If not provided, coinbase rewards will be sent \
             to the producer of a block. %s"
-           receiver_key_note )
+           receiver_key_warning )
       (optional public_key_compressed)
   and genesis_dir =
     flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
@@ -108,7 +105,7 @@ let setup_daemon logger =
     flag "--run-snark-worker" ~aliases:[ "run-snark-worker" ]
       ~doc:
         (sprintf "PUBLICKEY Run the SNARK worker with this public key. %s"
-           receiver_key_note )
+           receiver_key_warning )
       (optional public_key_compressed)
   and run_snark_coordinator_flag =
     flag "--run-snark-coordinator"
@@ -117,7 +114,7 @@ let setup_daemon logger =
         (sprintf
            "PUBLICKEY Run a SNARK coordinator with this public key (ignored if \
             the run-snark-worker is set). %s"
-           receiver_key_note )
+           receiver_key_warning )
       (optional public_key_compressed)
   and snark_worker_parallelism_flag =
     flag "--snark-worker-parallelism"

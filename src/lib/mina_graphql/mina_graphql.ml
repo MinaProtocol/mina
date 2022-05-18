@@ -2547,8 +2547,11 @@ module Types = struct
         ~fields:
           [ arg "publicKey" ~typ:public_key_arg
               ~doc:
-                "Public key of the account to receive coinbases. Block \
-                 production keys will receive the coinbases if none is given"
+                (sprintf
+                   "Public key of the account to receive coinbases. Block \
+                    production keys will receive the coinbases if none is \
+                    given. %s"
+                   Cli_lib.Default.receiver_key_warning )
           ]
 
     let set_snark_work_fee =
@@ -2562,8 +2565,10 @@ module Types = struct
         ~fields:
           [ arg "publicKey" ~typ:public_key_arg
               ~doc:
-                "Public key you wish to start snark-working on; null to stop \
-                 doing any snark work"
+                (sprintf
+                   "Public key you wish to start snark-working on; null to \
+                    stop doing any snark work. %s"
+                   Cli_lib.Default.receiver_key_warning )
           ]
 
     module AddPaymentReceipt = struct
