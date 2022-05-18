@@ -1151,6 +1151,9 @@ module Base = struct
           let set_voting_for : t -> controller =
            fun a -> a.data.permissions.set_voting_for
 
+          let set_timing : t -> controller =
+           fun a -> a.data.permissions.set_timing
+
           type t = Permissions.Checked.t
 
           let if_ b ~then_ ~else_ = Permissions.Checked.if_ b ~then_ ~else_

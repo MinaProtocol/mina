@@ -1165,6 +1165,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let set_voting_for : t -> Controller.t =
          fun a -> a.permissions.set_voting_for
 
+        let set_timing : t -> Controller.t = fun a -> a.permissions.set_timing
+
         type t = Permissions.t
 
         let if_ = Parties.value_if

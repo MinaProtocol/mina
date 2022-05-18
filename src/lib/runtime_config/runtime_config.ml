@@ -121,6 +121,7 @@ module Json_layout = struct
           ; set_token_symbol : Auth_required.t [@default None]
           ; increment_nonce : Auth_required.t [@default None]
           ; set_voting_for : Auth_required.t [@default None]
+          ; set_timing : Auth_required.t [@default None]
           }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
@@ -136,6 +137,7 @@ module Json_layout = struct
            ; "set_token_symbol"
            ; "increment_nonce"
            ; "set_voting_for"
+           ; "set_timing"
           |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json

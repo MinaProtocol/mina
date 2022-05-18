@@ -55,6 +55,7 @@ module Poly : sig
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
         ; set_voting_for : 'controller
+        ; set_timing : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end

@@ -425,6 +425,9 @@ let update_permissions =
        and set_voting_for =
          Param.flag "--set-voting-for" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
+       and set_timing =
+         Param.flag "--set-timing" ~doc:"Proof|Signature|Either|None"
+           Param.(required string)
        and current_auth =
          Param.flag "--current-auth"
            ~doc:
@@ -446,6 +449,7 @@ let update_permissions =
            ; set_token_symbol = Util.auth_of_string set_token_symbol
            ; increment_nonce = Util.auth_of_string increment_nonce
            ; set_voting_for = Util.auth_of_string set_voting_for
+           ; set_timing = Util.auth_of_string set_timing
            }
        in
        if Currency.Fee.(fee < Flags.min_fee) then

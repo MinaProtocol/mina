@@ -174,6 +174,7 @@ let update_of_id pool update_id =
                   ; set_token_symbol
                   ; increment_nonce
                   ; set_voting_for
+                  ; set_timing
                   } =
             query_db ~f:(fun db -> Processor.Zkapp_permissions.load db id)
           in
@@ -190,6 +191,7 @@ let update_of_id pool update_id =
               ; set_token_symbol
               ; increment_nonce
               ; set_voting_for
+              ; set_timing
               }
               : Permissions.t ) )
     in
@@ -746,6 +748,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; set_token_symbol
             ; increment_nonce
             ; set_voting_for
+            ; set_timing
             } =
       query_db ~f:(fun db -> Processor.Zkapp_permissions.load db permissions_id)
     in
@@ -760,6 +763,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ; set_token_symbol
       ; increment_nonce
       ; set_voting_for
+      ; set_timing
       }
       : Permissions.t )
   in

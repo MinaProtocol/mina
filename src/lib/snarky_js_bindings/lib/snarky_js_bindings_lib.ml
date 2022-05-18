@@ -1841,7 +1841,8 @@ module Ledger = struct
     ; editSequenceState : auth_required Js.prop
     ; setTokenSymbol : auth_required Js.prop
     ; incrementNonce : auth_required Js.prop
-    ; setVotingFor : auth_required Js.prop >
+    ; setVotingFor : auth_required Js.prop
+    ; setTiming : auth_required Js.prop >
     Js.t
 
   type party_update =
@@ -1957,6 +1958,7 @@ module Ledger = struct
     ; set_token_symbol = None
     ; increment_nonce = None
     ; set_voting_for = None
+    ; set_timing = None
     }
 
   module L : Mina_base.Ledger_intf.S = struct
@@ -2278,6 +2280,7 @@ module Ledger = struct
     ; set_token_symbol = auth_required p##.setTokenSymbol
     ; increment_nonce = auth_required p##.incrementNonce
     ; set_voting_for = auth_required p##.setVotingFor
+    ; set_timing = auth_required p##.setTiming
     }
 
   let update (u : party_update) : Party.Update.t =
