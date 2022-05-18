@@ -16,18 +16,6 @@ let rough_domains : Domains.t =
   let d = Domain.Pow_2_roots_of_unity 20 in
   { h = d; x = Pow_2_roots_of_unity 6 }
 
-let domains_etyp (type field rust_gates)
-    (module Impl : Snarky_backendless.Snark_intf.Run
-      with type field = field
-       and type R1CS_constraint_system.t = ( field
-                                           , rust_gates )
-                                           Kimchi_backend_common
-                                           .Plonk_constraint_system
-                                           .t ) (Spec.ETyp.T (typ, conv))
-    return_typ main =
-  let main x () : unit = main (conv x) in
-  domains (Impl.constraint_system ~exposing:[ typ ] ~return_typ main)
-
 let domains (type field rust_gates)
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type field = field
@@ -35,6 +23,7 @@ let domains (type field rust_gates)
                                            , rust_gates )
                                            Kimchi_backend_common
                                            .Plonk_constraint_system
-                                           .t ) typ return_typ main =
-  let main x () : unit = main x in
+                                           .t )
+    (Spec.ETyp.T (typ, conv, _conv_inv)) return_typ main =
+  let main x () : unit = main (conv x) in
   domains (Impl.constraint_system ~exposing:[ typ ] ~return_typ main)

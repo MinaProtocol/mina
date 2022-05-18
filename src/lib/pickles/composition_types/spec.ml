@@ -139,7 +139,9 @@ type generic_spec = { spec : 'env. 'env exists }
 module ETyp = struct
   type ('var, 'value, 'f) t =
     | T :
-        ('inner, 'value, 'f) Snarky_backendless.Typ.t * ('inner -> 'var)
+        ('inner, 'value, 'f) Snarky_backendless.Typ.t
+        * ('inner -> 'var)
+        * ('var -> 'inner)
         -> ('var, 'value, 'f) t
 end
 
@@ -157,29 +159,33 @@ let rec etyp :
     | B spec ->
         e.etyp spec
     | Scalar chal ->
-        let (T (typ, f)) = e.etyp chal in
-        T (Sc.typ typ, Sc.map ~f)
+        let (T (typ, f, f_inv)) = e.etyp chal in
+        T (Sc.typ typ, Sc.map ~f, Sc.map ~f:f_inv)
     | Vector (spec, n) ->
-        let (T (typ, f)) = etyp e spec in
-        T (Vector.typ typ n, Vector.map ~f)
+        let (T (typ, f, f_inv)) = etyp e spec in
+        T (Vector.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
     | Array (spec, n) ->
-        let (T (typ, f)) = etyp e spec in
-        T (array ~length:n typ, Array.map ~f)
+        let (T (typ, f, f_inv)) = etyp e spec in
+        T (array ~length:n typ, Array.map ~f, Array.map ~f:f_inv)
     | Struct [] ->
         let open Hlist.HlistId in
         let there [] = () in
         let back () = [] in
-        T (transport (unit ()) ~there ~back |> transport_var ~there ~back, Fn.id)
+        T
+          ( transport (unit ()) ~there ~back |> transport_var ~there ~back
+          , Fn.id
+          , Fn.id )
     | Struct (spec :: specs) ->
         let open Hlist.HlistId in
-        let (T (t1, f1)) = etyp e spec in
-        let (T (t2, f2)) = etyp e (Struct specs) in
+        let (T (t1, f1, f1_inv)) = etyp e spec in
+        let (T (t2, f2, f2_inv)) = etyp e (Struct specs) in
         T
           ( tuple2 t1 t2
             |> transport
                  ~there:(fun (x :: xs) -> (x, xs))
                  ~back:(fun (x, xs) -> x :: xs)
-          , fun (x, xs) -> f1 x :: f2 xs )
+          , (fun (x, xs) -> f1 x :: f2 xs)
+          , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
 
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
@@ -299,13 +305,13 @@ let packed_typ_basic (type field other_field other_field_var)
     | Field ->
         field
     | Bool ->
-        T (Boolean.typ, Fn.id)
+        T (Boolean.typ, Fn.id, Fn.id)
     | Digest ->
-        T (Digest.typ, Fn.id)
+        T (Digest.typ, Fn.id, Fn.id)
     | Challenge ->
-        T (Challenge.typ, Fn.id)
+        T (Challenge.typ, Fn.id, Fn.id)
     | Index ->
-        T (Index.packed_typ (module Impl), Fn.id)
+        T (Index.packed_typ (module Impl), Fn.id, Fn.id)
     | Bulletproof_challenge ->
         let typ =
           let there { Bulletproof_challenge.prechallenge = { Sc.inner = pre } }
@@ -318,7 +324,7 @@ let packed_typ_basic (type field other_field other_field_var)
           Typ.transport Challenge.typ ~there ~back
           |> Typ.transport_var ~there ~back
         in
-        T (typ, Fn.id)
+        T (typ, Fn.id, Fn.id)
   in
   { etyp }
 

@@ -599,7 +599,7 @@ struct
         |> to_list)
     in
     let%map.Promise (next_proof : Tick.Proof.t) =
-      let input =
+      let (T (input, conv, _conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
       in
@@ -621,7 +621,7 @@ struct
             ~return_typ:(Snarky_backendless.Typ.unit ())
             (fun x () : unit ->
               Impls.Step.handle
-                (fun () : unit -> branch_data.main ~step_domains x)
+                (fun () : unit -> branch_data.main ~step_domains (conv x))
                 handler )
             next_statement_hashed )
     in
