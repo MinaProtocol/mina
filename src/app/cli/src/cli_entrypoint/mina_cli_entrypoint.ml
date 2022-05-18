@@ -49,21 +49,30 @@ let plugin_flag = Command.Param.return []
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
+  let receiver_key_note =
+    "Note: Ensure this address is a non-zkApp account or has the permission to \
+     receive funds set as None"
+  in
   let%map_open conf_dir = Cli_lib.Flag.conf_dir
   and block_production_key =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
-        "KEYFILE Private key file for the block producer. You cannot provide \
-         both `block-producer-key` and `block-producer-pubkey`. (default: \
-         don't produce blocks)"
+        (sprintf
+           "KEYFILE Private key file for the block producer. You cannot \
+            provide both `block-producer-key` and `block-producer-pubkey`. \
+            (default: don't produce blocks). %s"
+           receiver_key_note )
       (optional string)
   and block_production_pubkey =
     flag "--block-producer-pubkey"
       ~aliases:[ "block-producer-pubkey" ]
       ~doc:
-        "PUBLICKEY Public key for the associated private key that is being \
-         tracked by this daemon. You cannot provide both `block-producer-key` \
-         and `block-producer-pubkey`. (default: don't produce blocks)"
+        (sprintf
+           "PUBLICKEY Public key for the associated private key that is being \
+            tracked by this daemon. You cannot provide both \
+            `block-producer-key` and `block-producer-pubkey`. (default: don't \
+            produce blocks). %s"
+           receiver_key_note )
       (optional public_key_compressed)
   and block_production_password =
     flag "--block-producer-password"
@@ -83,9 +92,11 @@ let setup_daemon logger =
   and coinbase_receiver_flag =
     flag "--coinbase-receiver" ~aliases:[ "coinbase-receiver" ]
       ~doc:
-        "PUBLICKEY Address to send coinbase rewards to (if this node is \
-         producing blocks). If not provided, coinbase rewards will be sent to \
-         the producer of a block."
+        (sprintf
+           "PUBLICKEY Address to send coinbase rewards to (if this node is \
+            producing blocks). If not provided, coinbase rewards will be sent \
+            to the producer of a block. %s"
+           receiver_key_note )
       (optional public_key_compressed)
   and genesis_dir =
     flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
@@ -95,14 +106,18 @@ let setup_daemon logger =
       (optional string)
   and run_snark_worker_flag =
     flag "--run-snark-worker" ~aliases:[ "run-snark-worker" ]
-      ~doc:"PUBLICKEY Run the SNARK worker with this public key"
+      ~doc:
+        (sprintf "PUBLICKEY Run the SNARK worker with this public key. %s"
+           receiver_key_note )
       (optional public_key_compressed)
   and run_snark_coordinator_flag =
     flag "--run-snark-coordinator"
       ~aliases:[ "run-snark-coordinator" ]
       ~doc:
-        "PUBLICKEY Run a SNARK coordinator with this public key (ignored if \
-         the run-snark-worker is set)"
+        (sprintf
+           "PUBLICKEY Run a SNARK coordinator with this public key (ignored if \
+            the run-snark-worker is set). %s"
+           receiver_key_note )
       (optional public_key_compressed)
   and snark_worker_parallelism_flag =
     flag "--snark-worker-parallelism"
