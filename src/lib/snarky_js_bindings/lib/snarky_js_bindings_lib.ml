@@ -1875,7 +1875,7 @@ module Ledger = struct
     ; publicKey : public_key or_ignore Js.prop
     ; delegate : public_key or_ignore Js.prop
     ; state : js_field or_ignore Js.js_array Js.t Js.prop
-    ; sequenceState : js_field or_ignore Js.prop
+    ; sequenceState : js_field Js.prop
     ; provedState : bool_class Js.t or_ignore Js.prop >
     Js.t
 
@@ -2135,6 +2135,48 @@ module Ledger = struct
      see: party update
   *)
   module Checked = struct
+    let fields_to_hash_checked
+        (typ : ('var, 'value, Field.Constant.t, _) Impl.Internal_Basic.Typ.typ)
+        (digest : 'var -> Field.t) (fields : field_class Js.t Js.js_array Js.t)
+        =
+      let fields = fields |> Js.to_array |> Array.map ~f:of_js_field in
+      let (Typ typ) = typ in
+      let variable =
+        typ.var_of_fields (fields, typ.constraint_system_auxiliary ())
+      in
+      digest variable |> to_js_field
+
+    (* helper function to check whether the fields we produce from JS are correct *)
+    let fields_of_json
+        (typ :
+          ('var, 'value, Field.Constant.t, 'tmp) Impl.Internal_Basic.Typ.typ )
+        deriver (json : Js.js_string Js.t) : field_class Js.t Js.js_array Js.t =
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let obj = deriver @@ Fields_derivers_zkapps.o () in
+      let value = Fields_derivers_zkapps.of_json obj json in
+      let (Typ typ) = typ in
+      let fields, _ = typ.value_to_fields value in
+      Js.array
+      @@ Array.map ~f:(fun x -> x |> Field.constant |> to_js_field) fields
+
+    (* TODO: need to construct `aux` in JS, which has some extra data needed for `value_of_fields`  *)
+    let fields_to_json
+        (typ : ('var, 'value, Field.Constant.t, _) Impl.Internal_Basic.Typ.typ)
+        deriver (fields : field_class Js.t Js.js_array Js.t) aux :
+        Js.js_string Js.t =
+      let fields =
+        fields |> Js.to_array
+        |> Array.map ~f:(fun x -> x |> of_js_field |> to_unchecked)
+      in
+      let (Typ typ) = typ in
+      let value = typ.value_of_fields (fields, Obj.magic aux) in
+      let json =
+        Fields_derivers_zkapps.to_json
+          (deriver @@ Fields_derivers_zkapps.o ())
+          value
+      in
+      json |> Yojson.Safe.to_string |> Js.string
+
     let field_value = field
 
     let field (x : js_field) = x##.value
@@ -2293,7 +2335,9 @@ module Ledger = struct
           ; state =
               Pickles_types.Vector.init Zkapp_state.Max_state_size.n
                 ~f:(fun i -> or_ignore field (array_get_exn p##.state i))
-          ; sequence_state = or_ignore field p##.sequenceState
+          ; sequence_state =
+              Zkapp_basic.Or_ignore.Checked.make_unsafe_implicit
+                (field p##.sequenceState)
           ; proved_state = or_ignore bool p##.provedState
           }
       | s ->
@@ -2795,6 +2839,21 @@ module Ledger = struct
     static_method "fieldToBase58" field_to_base58 ;
     static_method "fieldOfBase58" field_of_base58 ;
     static_method "memoToBase58" memo_to_base58 ;
+
+    static_method "hashPartyFromFields"
+      (Checked.fields_to_hash_checked
+         (Mina_base.Party.Body.typ ())
+         Mina_base.Party.Checked.digest ) ;
+
+    (* TODO this is for debugging, maybe remove later *)
+    static_method "fieldsToJson"
+      (Checked.fields_to_json
+         (Mina_base.Party.Body.typ ())
+         Mina_base.Party.Body.deriver ) ;
+    static_method "fieldsOfJson"
+      (Checked.fields_of_json
+         (Mina_base.Party.Body.typ ())
+         Mina_base.Party.Body.deriver ) ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;

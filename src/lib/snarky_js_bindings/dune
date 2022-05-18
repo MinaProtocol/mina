@@ -34,7 +34,7 @@
  (name snarky_js_types)
  (modules snarky_js_types)
  (modes native)
- (libraries core_kernel mina_base fields_derivers_zkapps yojson)
+ (libraries mina_base fields_derivers_zkapps yojson)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

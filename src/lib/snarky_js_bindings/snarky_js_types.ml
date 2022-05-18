@@ -1,13 +1,12 @@
-open Core_kernel
-module Parties = Mina_base.Parties
+open Mina_base
 
 let () =
+  let layout = Fields_derivers_zkapps.js_layout in
   let js_layout =
     `Assoc
-      [ ("Parties", Fields_derivers_zkapps.js_layout Parties.deriver)
-      ; ( "BalanceChange"
-        , Fields_derivers_zkapps.js_layout
-            Fields_derivers_zkapps.Derivers.balance_change )
+      [ ("Parties", layout Parties.deriver)
+      ; ("BalanceChange", layout Fields_derivers_zkapps.Derivers.balance_change)
+      ; ("Party", layout Party.deriver)
       ]
   in
   print_endline (js_layout |> Yojson.Safe.pretty_to_string)
