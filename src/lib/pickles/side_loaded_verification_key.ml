@@ -41,7 +41,7 @@ let input_size ~of_int ~add ~mul w =
   let open Composition_types in
   (* This should be an affine function in [a]. *)
   let size a =
-    let typ =
+    let (T (typ, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Impls.Step.Data_spec.size [ typ ]
@@ -357,7 +357,7 @@ let%test_unit "input_size" =
       [%test_eq: int]
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Nat.of_int n in
-         let typ =
+         let (T (typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
              ~wrap_rounds:Backend.Tock.Rounds.n
          in

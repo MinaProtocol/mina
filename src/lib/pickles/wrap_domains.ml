@@ -64,10 +64,10 @@ module Make (A : T0) (A_value : T0) = struct
     in
     Timer.clock __LOC__ ;
     let t =
-      Fix_domains.domains_etyp
+      Fix_domains.domains
         (module Impls.Wrap)
         (Impls.Wrap.input ())
-        (Snarky_backendless.Typ.unit ())
+        (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
         main
     in
     Timer.clock __LOC__ ; t

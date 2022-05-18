@@ -123,14 +123,14 @@ let create
         ~step_domains:
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
     in
-    let typ =
+    let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
         ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Fix_domains.domains
       (module Impls.Step)
-      (Snarky_backendless.Typ.unit ())
-      typ main
+      (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
+      etyp main
   in
   Timer.clock __LOC__ ;
   T

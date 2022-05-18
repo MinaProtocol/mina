@@ -592,7 +592,7 @@ struct
         |> to_list)
     in
     let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
-      let input =
+      let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
       in
@@ -616,7 +616,7 @@ struct
             [] ~return_typ:input
             (fun () ->
               Impls.Step.handle
-                (fun () -> branch_data.main ~step_domains ())
+                (fun () -> conv_inv (branch_data.main ~step_domains ()))
                 handler ) )
     in
     let prev_evals =
