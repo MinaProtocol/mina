@@ -56,7 +56,7 @@ val check_parties_with_merges_exn :
   -> unit Async.Deferred.t
 
 (** Verification key of a trivial smart contract *)
-val trivial_snapp :
+val trivial_zkapp :
   ( [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
   * [> `Prover of
        ( unit

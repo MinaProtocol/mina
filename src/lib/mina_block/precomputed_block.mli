@@ -11,24 +11,12 @@ module Proof : sig
   val of_bin_string : string -> t
 end
 
-type t =
-  { scheduled_time : Block_time.Time.t
-  ; protocol_state : Protocol_state.value
-  ; protocol_state_proof : Proof.t
-  ; staged_ledger_diff : Staged_ledger_diff.t
-  ; delta_transition_chain_proof :
-      Frozen_ledger_hash.t * Frozen_ledger_hash.t list
-  ; accounts_accessed : (int * Account.t) list
-  ; accounts_created : (Account_id.t * Currency.Fee.t) list
-  }
-[@@deriving sexp, yojson]
-
 [%%versioned:
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V2 : sig
-    type nonrec t = t =
+    type t =
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
@@ -38,9 +26,24 @@ module Stable : sig
       ; accounts_accessed : (int * Account.Stable.V2.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+      ; tokens_used :
+          (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
       }
   end
 end]
+
+type t = Stable.Latest.t =
+  { scheduled_time : Block_time.Time.t
+  ; protocol_state : Protocol_state.value
+  ; protocol_state_proof : Proof.t
+  ; staged_ledger_diff : Staged_ledger_diff.t
+  ; delta_transition_chain_proof :
+      Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+  ; accounts_accessed : (int * Account.t) list
+  ; accounts_created : (Account_id.t * Currency.Fee.t) list
+  ; tokens_used : (Token_id.t * Account_id.t option) list
+  }
+[@@deriving sexp, yojson]
 
 val of_block :
      logger:Logger.t
