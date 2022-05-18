@@ -845,6 +845,18 @@ let has_locked_tokens ~global_slot (account : t) =
       in
       Balance.(curr_min_balance > zero)
 
+let has_permission ~to_ (account : t) =
+  match to_ with
+  | `Send ->
+      Permissions.Auth_required.check account.permissions.send
+        Control.Tag.Signature
+  | `Receive ->
+      Permissions.Auth_required.check account.permissions.receive
+        Control.Tag.None_given
+  | `Set_delegate ->
+      Permissions.Auth_required.check account.permissions.set_delegate
+        Control.Tag.Signature
+
 let gen =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in

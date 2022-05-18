@@ -598,27 +598,6 @@ module Base = struct
 
     let any t = Boolean.any (to_list t)
 
-    let account_has_permission ~to_ (account : Account.t) =
-      match to_ with
-      | `Send ->
-          printf
-            !"Snark Check send, account %s\n%!"
-            (Account.to_yojson account |> Yojson.Safe.to_string) ;
-          Permissions.Auth_required.check account.permissions.send
-            Control.Tag.Signature
-      | `Receive ->
-          printf
-            !"SnARK Check receive, account %s\n%!"
-            (Account.to_yojson account |> Yojson.Safe.to_string) ;
-          Permissions.Auth_required.check account.permissions.receive
-            Control.Tag.None_given
-      | `Set_delegate ->
-          printf
-            !"Snark Check delegate, account %s\n%!"
-            (Account.to_yojson account |> Yojson.Safe.to_string) ;
-          Permissions.Auth_required.check account.permissions.set_delegate
-            Control.Tag.Signature
-
     (** Compute which -- if any -- of the failure cases will be hit when
         evaluating the given user command, and indicate whether the fee-payer
         would need to pay the account creation fee if the user command were to
@@ -633,13 +612,13 @@ module Base = struct
       | Fee_transfer | Coinbase ->
           (*Check if all the accounts can receive*)
           let fee_payer_balance_update_not_allowed =
-            not (account_has_permission ~to_:`Receive fee_payer_account)
+            not (Account.has_permission ~to_:`Receive fee_payer_account)
           in
           let source_balance_update_not_allowed =
-            not (account_has_permission ~to_:`Receive source_account)
+            not (Account.has_permission ~to_:`Receive source_account)
           in
           let receiver_balance_update_not_allowed =
-            not (account_has_permission ~to_:`Receive receiver_account)
+            not (Account.has_permission ~to_:`Receive receiver_account)
           in
           (*Check balance update permissions*)
           { predicate_failed = false
@@ -669,7 +648,7 @@ module Base = struct
           let source = Account_id.create payload.body.source_pk token in
           let receiver = Account_id.create payload.body.receiver_pk token in
           let fee_payer_balance_update_not_allowed =
-            not (account_has_permission ~to_:`Send fee_payer_account)
+            not (Account.has_permission ~to_:`Send fee_payer_account)
           in
           (* This should shadow the logic in [Sparse_ledger]. *)
           let fee_payer_account =
@@ -722,7 +701,7 @@ module Base = struct
                 else fail "bad source account ID"
               in
               let stake_delegation_update_not_allowed =
-                not (account_has_permission ~to_:`Set_delegate source_account)
+                not (Account.has_permission ~to_:`Set_delegate source_account)
               in
               { predicate_failed
               ; source_not_present
@@ -743,7 +722,7 @@ module Base = struct
                 else receiver_account
               in
               let receiver_balance_update_not_allowed =
-                not (account_has_permission ~to_:`Receive receiver_account)
+                not (Account.has_permission ~to_:`Receive receiver_account)
               in
               let receiver_needs_creating =
                 let id = Account.identifier receiver_account in
@@ -775,7 +754,7 @@ module Base = struct
                 else fail "bad source account ID"
               in
               let source_balance_update_not_allowed =
-                not (account_has_permission ~to_:`Send source_account)
+                not (Account.has_permission ~to_:`Send source_account)
               in
               let source_insufficient_balance =
                 (* This failure is fatal if fee-payer and source account are
@@ -2631,7 +2610,7 @@ module Base = struct
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
              in
-             let don't_update_account =
+             let update_not_permitted =
                transaction_failure.fee_payer_balance_update_not_allowed
              in
              let%bind is_empty_and_writeable =
@@ -2643,7 +2622,7 @@ module Base = struct
                  all
                    [ is_empty_and_writeable
                    ; not is_zero_fee
-                   ; not don't_update_account
+                   ; not update_not_permitted
                    ])
              in
              let%bind should_pay_to_create =
@@ -2699,7 +2678,7 @@ module Base = struct
                     check_timing ~balance_check ~timed_balance_check ~account
                       ~txn_amount:(Some txn_amount) ~txn_global_slot
                   in
-                  Account_timing.if_ don't_update_account ~then_:timing
+                  Account_timing.if_ update_not_permitted ~then_:timing
                     ~else_:account.timing )
              in
              let%bind balance =
@@ -2707,7 +2686,7 @@ module Base = struct
                  (let%bind updated_balance =
                     Balance.Checked.add_signed_amount account.balance amount
                   in
-                  Balance.Checked.if_ don't_update_account
+                  Balance.Checked.if_ update_not_permitted
                     ~then_:account.balance ~else_:updated_balance )
              in
              let%map public_key =
@@ -2724,30 +2703,20 @@ module Base = struct
                  ~then_:(Account_id.Checked.public_key fee_payer)
                  ~else_:account.delegate
              in
-             let a =
-               { Account.Poly.balance
-               ; public_key
-               ; token_id
-               ; token_permissions = account.token_permissions
-               ; token_symbol = account.token_symbol
-               ; nonce = next_nonce
-               ; receipt_chain_hash
-               ; delegate
-               ; voting_for = account.voting_for
-               ; timing
-               ; permissions = account.permissions
-               ; zkapp = account.zkapp
-               ; zkapp_uri = account.zkapp_uri
-               }
-             in
-             let () =
-               Impl.as_prover (fun () ->
-                   let acc = Impl.As_prover.read Account.typ a in
-                   Core.printf
-                     !"Fee payer Account %s\n%!"
-                     (Account.to_yojson acc |> Yojson.Safe.to_string) )
-             in
-             a ) )
+             { Account.Poly.balance
+             ; public_key
+             ; token_id
+             ; token_permissions = account.token_permissions
+             ; token_symbol = account.token_symbol
+             ; nonce = next_nonce
+             ; receipt_chain_hash
+             ; delegate
+             ; voting_for = account.voting_for
+             ; timing
+             ; permissions = account.permissions
+             ; zkapp = account.zkapp
+             ; zkapp_uri = account.zkapp_uri
+             } ) )
     in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
@@ -2788,7 +2757,7 @@ module Base = struct
                 - the receiver for a coinbase
                 - the first receiver for a fee transfer
              *)
-             let%bind don't_update_account =
+             let%bind update_not_permitted =
                Boolean.if_ is_stake_delegation ~then_:Boolean.false_
                  ~else_:transaction_failure.receiver_balance_update_not_allowed
              in
@@ -2808,7 +2777,7 @@ module Base = struct
                  all
                    [ is_empty_and_writeable
                    ; not is_empty_failure
-                   ; not don't_update_account
+                   ; not update_not_permitted
                    ])
              in
              let%bind should_pay_to_create =
@@ -2926,30 +2895,21 @@ module Base = struct
                  ~then_:payload.body.token_locked
                  ~else_:account.token_permissions.token_locked
              in
-             let a =
-               { Account.Poly.balance
-               ; public_key
-               ; token_id
-               ; token_permissions =
-                   { Token_permissions.token_owner; token_locked }
-               ; token_symbol = account.token_symbol
-               ; nonce = account.nonce
-               ; receipt_chain_hash = account.receipt_chain_hash
-               ; delegate
-               ; voting_for = account.voting_for
-               ; timing = account.timing
-               ; permissions = account.permissions
-               ; zkapp = account.zkapp
-               ; zkapp_uri = account.zkapp_uri
-               }
-             in
-             let () =
-               Impl.as_prover (fun _ ->
-                   let acc = Impl.As_prover.read Account.typ a in
-                   Core.printf !"Receiver Account %s\n%!"
-                     (Account.to_yojson acc |> Yojson.Safe.to_string) )
-             in
-             a ) )
+             { Account.Poly.balance
+             ; public_key
+             ; token_id
+             ; token_permissions =
+                 { Token_permissions.token_owner; token_locked }
+             ; token_symbol = account.token_symbol
+             ; nonce = account.nonce
+             ; receipt_chain_hash = account.receipt_chain_hash
+             ; delegate
+             ; voting_for = account.voting_for
+             ; timing = account.timing
+             ; permissions = account.permissions
+             ; zkapp = account.zkapp
+             ; zkapp_uri = account.zkapp_uri
+             } ) )
     in
     let%bind user_command_fails =
       Boolean.(!receiver_overflow ||| user_command_fails)
@@ -3012,7 +2972,7 @@ module Base = struct
                  ~else_:Amount.(var_of_t zero)
              in
              let txn_global_slot = current_global_slot in
-             let%bind don't_update_account =
+             let%bind update_not_permitted =
                Boolean.if_ is_stake_delegation
                  ~then_:transaction_failure.stake_delegation_update_not_allowed
                  ~else_:transaction_failure.source_balance_update_not_allowed
@@ -3042,7 +3002,7 @@ module Base = struct
                     check_timing ~balance_check ~timed_balance_check ~account
                       ~txn_amount:(Some amount) ~txn_global_slot
                   in
-                  Account_timing.if_ don't_update_account ~then_:account.timing
+                  Account_timing.if_ update_not_permitted ~then_:account.timing
                     ~else_:timing )
              in
              let%bind balance, `Underflow underflow =
@@ -3073,29 +3033,20 @@ module Base = struct
                 of [user_command_fails], but we throw the resulting hash away
                 in [final_root] below, so it shouldn't matter.
              *)
-             let a =
-               { Account.Poly.balance
-               ; public_key = account.public_key
-               ; token_id = account.token_id
-               ; token_permissions = account.token_permissions
-               ; token_symbol = account.token_symbol
-               ; nonce = account.nonce
-               ; receipt_chain_hash = account.receipt_chain_hash
-               ; delegate
-               ; voting_for = account.voting_for
-               ; timing
-               ; permissions = account.permissions
-               ; zkapp = account.zkapp
-               ; zkapp_uri = account.zkapp_uri
-               }
-             in
-             let () =
-               Impl.as_prover (fun () ->
-                   let acc = Impl.As_prover.read Account.typ a in
-                   Core.printf !"Source Account %s\n%!"
-                     (Account.to_yojson acc |> Yojson.Safe.to_string) )
-             in
-             a ) )
+             { Account.Poly.balance
+             ; public_key = account.public_key
+             ; token_id = account.token_id
+             ; token_permissions = account.token_permissions
+             ; token_symbol = account.token_symbol
+             ; nonce = account.nonce
+             ; receipt_chain_hash = account.receipt_chain_hash
+             ; delegate
+             ; voting_for = account.voting_for
+             ; timing
+             ; permissions = account.permissions
+             ; zkapp = account.zkapp
+             ; zkapp_uri = account.zkapp_uri
+             } ) )
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee

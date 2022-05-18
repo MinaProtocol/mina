@@ -617,18 +617,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let%map _, account = get_with_location ledger account_id in
     Account.has_locked_tokens ~global_slot account
 
-  let get_user_account_with_location ledger account_id =
-    let open Or_error.Let_syntax in
-    let%map ((_, _acct) as r) = get_with_location ledger account_id in
-    (*let%map () =
-        check
-          (Option.is_none acct.zkapp)
-          !"Expected account %{sexp: Account_id.t} to be a user account, got a \
-            snapp account."
-          account_id
-      in*)
-    r
-
   let failure (e : Transaction_status.Failure.t) = e
 
   let incr_balance (acct : Account.t) amt =
@@ -638,34 +626,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     | Error _ ->
         Result.fail (failure Overflow)
 
-  let account_has_permission ~to_ (account : Account.t) =
-    match to_ with
-    | `Send ->
-        printf
-          !"Check send, account %s\n%!"
-          (Account.to_yojson account |> Yojson.Safe.to_string) ;
-        Permissions.Auth_required.check account.permissions.send
-          Control.Tag.Signature
-    | `Receive ->
-        printf
-          !"Check receive, account %s\n%!"
-          (Account.to_yojson account |> Yojson.Safe.to_string) ;
-        Permissions.Auth_required.check account.permissions.receive
-          Control.Tag.None_given
-    | `Set_delegate ->
-        printf
-          !"Check delegate, account %s\n%!"
-          (Account.to_yojson account |> Yojson.Safe.to_string) ;
-        Permissions.Auth_required.check account.permissions.set_delegate
-          Control.Tag.Signature
-
   (* Helper function for [apply_user_command_unchecked] *)
   let pay_fee' ~command ~nonce ~fee_payer ~fee ~ledger ~current_global_slot =
     let open Or_error.Let_syntax in
     (* Fee-payer information *)
-    let%bind location, account =
-      get_user_account_with_location ledger fee_payer
-    in
+    let%bind location, account = get_with_location ledger fee_payer in
     let%bind () =
       match location with
       | `Existing _ ->
@@ -757,7 +722,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
     let%bind () =
-      if account_has_permission ~to_:`Send fee_payer_account then Ok ()
+      if Account.has_permission ~to_:`Send fee_payer_account then Ok ()
       else
         Or_error.error_string
           Transaction_status.Failure.(describe Update_not_permitted_balance)
@@ -788,7 +753,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             get_with_location ledger source |> ok_or_reject
           in
           let%bind () =
-            if account_has_permission ~to_:`Set_delegate source_account then
+            if Account.has_permission ~to_:`Set_delegate source_account then
               Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_delegate
           in
@@ -826,7 +791,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
-            if account_has_permission ~to_:`Receive receiver_account then Ok ()
+            if Account.has_permission ~to_:`Receive receiver_account then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           let%bind source_location, source_timing, source_account =
@@ -886,7 +851,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             else ret
           in
           let%bind () =
-            if account_has_permission ~to_:`Send source_account then Ok ()
+            if Account.has_permission ~to_:`Send source_account then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           (* Charge the account creation fee. *)
@@ -1702,7 +1667,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
 
   let check_permission_to_receive receiver_account =
-    if account_has_permission ~to_:`Receive receiver_account then Ok ()
+    if Account.has_permission ~to_:`Receive receiver_account then Ok ()
     else
       Or_error.error_string
         Transaction_status.Failure.(

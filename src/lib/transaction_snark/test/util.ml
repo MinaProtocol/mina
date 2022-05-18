@@ -336,7 +336,8 @@ module Wallet = struct
     in
     Array.init n ~f:(fun _ -> random_wallet ())
 
-  let user_command ~fee_payer ~source_pk ~receiver_pk amt fee nonce memo =
+  let user_command ~fee_payer ~receiver_pk amt fee nonce memo =
+    let source_pk = Account.public_key fee_payer.account in
     let payload : Signed_command.Payload.t =
       Signed_command.Payload.create ~fee
         ~fee_payer_pk:(Account.public_key fee_payer.account)
@@ -352,12 +353,31 @@ module Wallet = struct
         }
     |> Option.value_exn
 
+  let stake_delegation ~fee_payer ~delegate_pk fee nonce memo =
+    let source_pk = Account.public_key fee_payer.account in
+    let payload : Signed_command.Payload.t =
+      Signed_command.Payload.create ~fee
+        ~fee_payer_pk:(Account.public_key fee_payer.account)
+        ~nonce ~memo ~valid_until:None
+        ~body:
+          (Stake_delegation
+             (Set_delegate { delegator = source_pk; new_delegate = delegate_pk })
+          )
+    in
+    let signature = Signed_command.sign_payload fee_payer.private_key payload in
+    Signed_command.check
+      Signed_command.Poly.Stable.Latest.
+        { payload
+        ; signer = Public_key.of_private_key_exn fee_payer.private_key
+        ; signature
+        }
+    |> Option.value_exn
+
   let user_command_with_wallet wallets ~sender:i ~receiver:j amt fee nonce memo
       =
     let fee_payer = wallets.(i) in
     let receiver = wallets.(j) in
     user_command ~fee_payer
-      ~source_pk:(Account.public_key fee_payer.account)
       ~receiver_pk:(Account.public_key receiver.account)
       amt fee nonce memo
 end

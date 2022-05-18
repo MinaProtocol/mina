@@ -118,9 +118,16 @@ module Wallet : sig
 
   val user_command :
        fee_payer:t
-    -> source_pk:Signature_lib.Public_key.Compressed.t
     -> receiver_pk:Signature_lib.Public_key.Compressed.t
     -> int
+    -> Currency.Fee.t
+    -> Mina_numbers.Account_nonce.t
+    -> Mina_base.Signed_command_memo.t
+    -> Mina_base.Signed_command.With_valid_signature.t
+
+  val stake_delegation :
+       fee_payer:t
+    -> delegate_pk:Signature_lib.Public_key.Compressed.t
     -> Currency.Fee.t
     -> Mina_numbers.Account_nonce.t
     -> Mina_base.Signed_command_memo.t
