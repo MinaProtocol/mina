@@ -591,7 +591,7 @@ struct
       | Req.Wrap_index ->
           k self_dlog_plonk_index
       | Req.App_state ->
-          k (Lazy.force next_me_only_prepared).app_state
+          k next_state
       | Req.Unfinalized_proofs ->
           k (Lazy.force unfinalized_proofs_extended)
       | Req.Pass_through ->

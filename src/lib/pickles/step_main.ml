@@ -237,6 +237,7 @@ let step_main :
         let prev_statements =
           exists prev_values_typs ~request:(fun () -> Req.Prev_inputs)
         in
+        let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         (* Compute proof parts outside of the prover before requesting values.
         *)
         exists Typ.unit ~request:(fun () -> Req.Compute_prev_proof_parts) ;
@@ -244,7 +245,6 @@ let step_main :
           exists
             ~request:(fun () -> Req.Wrap_index)
             (Plonk_verification_key_evals.typ Inner_curve.typ)
-        and app_state = exists basic.typ ~request:(fun () -> Req.App_state)
         and prevs =
           exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
               Req.Proof_with_datas )
