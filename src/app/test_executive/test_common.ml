@@ -43,6 +43,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             "ZkApp transaction failed: %s, but expected \"%s\"" err_str
             substring )
 
+  let send_invalid_payment ~logger node ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
+      ~expected_failure : unit Malleable_error.t =
+    [%log info] "Sending payment, expected to fail" ;
+    match%bind.Deferred
+      Network.Node.send_payment_with_raw_sig ~logger node ~sender_pub_key
+        ~receiver_pub_key ~amount ~fee ~nonce ~memo ~token ~valid_until
+        ~raw_signature
+    with
+    | Ok _ ->
+        [%log error] "Payment succeeded, expected error \"%s\"" expected_failure ;
+        Malleable_error.hard_error_format
+          "Payment transaction succeeded, expected error \"%s\""
+          expected_failure
+    | Error err ->
+        let err_str = Error.to_string_mach err in
+        if String.is_substring ~substring:expected_failure err_str then (
+          [%log info] "Payment failed as expected"
+            ~metadata:[ ("error", `String err_str) ] ;
+          Malleable_error.return () )
+        else (
+          [%log error]
+            "Error sending payment, for a reason other than the expected \"%s\""
+            expected_failure
+            ~metadata:[ ("error", `String err_str) ] ;
+          Malleable_error.hard_error_format
+            "Payment failed: %s, but expected \"%s\"" err_str expected_failure )
+
   let get_account_permissions ~logger node account_id =
     [%log info] "Getting permissions for account"
       ~metadata:[ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
