@@ -547,14 +547,6 @@ struct
       ; old_bulletproof_challenges
       }
     in
-    let next_statement : _ Types.Step.Statement.t =
-      { proof_state =
-          { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
-          ; me_only = next_statement_me_only
-          }
-      ; pass_through
-      }
-    in
     let next_me_only_prepared =
       Reduced_me_only.Step.prepare ~dlog_plonk_index:self_dlog_plonk_index
         next_statement_me_only
@@ -665,6 +657,14 @@ struct
           let f (T t : _ P.t) =
             (t.proof.openings.evals, t.proof.openings.ft_eval1)
         end )
+    in
+    let next_statement : _ Types.Step.Statement.t =
+      { proof_state =
+          { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
+          ; me_only = next_statement_me_only
+          }
+      ; pass_through
+      }
     in
     { P.Base.Step.proof = next_proof
     ; statement = next_statement
