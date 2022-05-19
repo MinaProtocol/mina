@@ -116,8 +116,10 @@ struct
            * Unfinalized.Constant.t
            * Statement_with_hashes.t
            * X_hat.t
-           * (value, local_max_proofs_verified, m) Per_proof_witness.Constant.t
-        =
+           * ( value
+             , local_max_proofs_verified
+             , m )
+             Per_proof_witness.Constant.No_app_state.t =
      fun dlog_vk dlog_index app_state (T t) tag ~must_verify ->
       let t =
         { t with
@@ -311,8 +313,8 @@ struct
         if not must_verify then Ipa.Wrap.compute_sg new_bulletproof_challenges
         else t.proof.openings.proof.challenge_polynomial_commitment
       in
-      let witness : _ Per_proof_witness.Constant.t =
-        { app_state = t.P.Base.Wrap.statement.pass_through.app_state
+      let witness : _ Per_proof_witness.Constant.No_app_state.t =
+        { app_state = ()
         ; proof_state =
             { prev_statement_with_hashes.proof_state with me_only = () }
         ; prev_proof_evals = t.prev_evals
@@ -451,7 +453,10 @@ struct
                * (Unfinalized.Constant.t, k) Vector.t
                * (Statement_with_hashes.t, k) Vector.t
                * (X_hat.t, k) Vector.t
-               * (values, ns, ms) H3.T(Per_proof_witness.Constant).t =
+               * ( values
+                 , ns
+                 , ms )
+                 H3.T(Per_proof_witness.Constant.No_app_state).t =
          fun app_states ps ts must_verifys l ->
           match (app_states, ps, ts, must_verifys, l) with
           | [], [], [], [], Z ->
@@ -579,6 +584,8 @@ struct
       | Req.Compute_prev_proof_parts ->
           compute_prev_proof_parts () ;
           k ()
+      | Req.Prev_inputs ->
+          k prev_values
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
