@@ -12,6 +12,7 @@
    bin_prot.shape
    base
    base.base_internalhash_types
+   sexplib0
    ;;local libraries
    base58_check
    codable
