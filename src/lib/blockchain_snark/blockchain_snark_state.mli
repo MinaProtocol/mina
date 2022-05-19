@@ -7,6 +7,7 @@ module Witness : sig
   type t =
     { prev_state : Protocol_state.Value.t
     ; transition : Snark_transition.Value.t
+    ; txn_snark : Transaction_snark.Statement.With_sok.t
     }
 end
 
@@ -25,7 +26,6 @@ val check :
         -> Snarky_backendless.Request.response )
   -> proof_level:Genesis_constants.Proof_level.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> Transaction_snark.Statement.With_sok.t
   -> State_hash.t
   -> unit Or_error.t
 

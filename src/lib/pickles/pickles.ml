@@ -1079,7 +1079,7 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = []
                   ; main =
-                      (fun [] self ->
+                      (fun self ->
                         dummy_constraints () ;
                         Field.Assert.equal self Field.zero ;
                         [] )
@@ -1101,6 +1101,17 @@ let%test_module "test no side-loaded" =
 
     module Simple_chain = struct
       module Statement = Statement
+
+      type _ Snarky_backendless.Request.t +=
+        | Prev_input : Field.Constant.t Snarky_backendless.Request.t
+
+      let handler (prev_input : Field.Constant.t)
+          (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | Prev_input ->
+            respond (Provide prev_input)
+        | _ ->
+            respond Unhandled
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
@@ -1128,12 +1139,15 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ self ]
                   ; main =
-                      (fun [ prev ] self ->
+                      (fun self ->
+                        let prev =
+                          exists Field.typ ~request:(fun () -> Prev_input)
+                        in
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ proof_must_verify ] )
+                        [ { public_input = prev; proof_must_verify } ] )
                   }
                 ] ) )
 
@@ -1147,7 +1161,9 @@ let%test_module "test no side-loaded" =
         let b0 =
           Common.time "b0" (fun () ->
               Promise.block_on_async_exn (fun () ->
-                  step [ (s_neg_one, b_neg_one) ] Field.Constant.zero ) )
+                  step ~handler:(handler s_neg_one)
+                    [ (s_neg_one, b_neg_one) ]
+                    Field.Constant.zero ) )
         in
         (*
         assert (
@@ -1157,7 +1173,10 @@ let%test_module "test no side-loaded" =
         let b1 =
           Common.time "b1" (fun () ->
               Promise.block_on_async_exn (fun () ->
-                  step [ (Field.Constant.zero, b0) ] Field.Constant.one ) )
+                  step
+                    ~handler:(handler Field.Constant.zero)
+                    [ (Field.Constant.zero, b0) ]
+                    Field.Constant.one ) )
         in
         assert (
           Promise.block_on_async_exn (fun () ->
@@ -1166,6 +1185,21 @@ let%test_module "test no side-loaded" =
     end
 
     module Tree_proof = struct
+      type _ Snarky_backendless.Request.t +=
+        | No_recursion_input : Field.Constant.t Snarky_backendless.Request.t
+        | Recursive_input : Field.Constant.t Snarky_backendless.Request.t
+
+      let handler (no_recursion_input : Field.Constant.t)
+          (recursion_input : Field.Constant.t)
+          (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | No_recursion_input ->
+            respond (Provide no_recursion_input)
+        | Recursive_input ->
+            respond (Provide recursion_input)
+        | _ ->
+            respond Unhandled
+
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
             compile_promise
@@ -1192,12 +1226,23 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ No_recursion.tag; self ]
                   ; main =
-                      (fun [ _; prev ] self ->
+                      (fun self ->
+                        let no_recursive_input =
+                          exists Field.typ ~request:(fun () ->
+                              No_recursion_input )
+                        in
+                        let prev =
+                          exists Field.typ ~request:(fun () -> Recursive_input)
+                        in
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ Boolean.true_; proof_must_verify ] )
+                        [ { public_input = no_recursive_input
+                          ; proof_must_verify = Boolean.true_
+                          }
+                        ; { public_input = prev; proof_must_verify }
+                        ] )
                   }
                 ] ) )
 
@@ -1212,6 +1257,7 @@ let%test_module "test no side-loaded" =
           Common.time "tree b0" (fun () ->
               Promise.block_on_async_exn (fun () ->
                   step
+                    ~handler:(handler (fst No_recursion.example) s_neg_one)
                     [ No_recursion.example; (s_neg_one, b_neg_one) ]
                     Field.Constant.zero ) )
         in
@@ -1222,6 +1268,8 @@ let%test_module "test no side-loaded" =
           Common.time "tree b1" (fun () ->
               Promise.block_on_async_exn (fun () ->
                   step
+                    ~handler:
+                      (handler (fst No_recursion.example) Field.Constant.zero)
                     [ No_recursion.example; (Field.Constant.zero, b0) ]
                     Field.Constant.one ) )
         in

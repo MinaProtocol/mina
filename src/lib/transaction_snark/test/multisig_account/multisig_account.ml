@@ -204,14 +204,8 @@ let%test_module "multisig_account" =
                   { identifier = "multisig-rule"
                   ; prevs = []
                   ; main =
-                      (fun [] x ->
-                        multisig_main x |> Run.run_checked
-                        |> fun _ :
-                               unit
-                               Pickles_types.Hlist0.H1
-                                 (Pickles_types.Hlist.E01
-                                    (Pickles.Inductive_rule.B))
-                               .t ->
+                      (fun x ->
+                        Run.run_checked @@ multisig_main x ;
                         [] )
                   }
                 in
@@ -231,23 +225,26 @@ let%test_module "multisig_account" =
                     ; { identifier = "dummy"
                       ; prevs = [ self; self ]
                       ; main =
-                          (fun [ _; _ ] _ ->
+                          (fun _ ->
+                            let s =
+                              Run.exists Field.typ ~compute:(fun () ->
+                                  Run.Field.Constant.zero )
+                            in
+                            let public_input =
+                              Run.exists Zkapp_statement.typ ~compute:(fun () ->
+                                  assert false )
+                            in
                             Impl.run_checked
-                              (Transaction_snark.dummy_constraints ())
-                            |> fun () ->
+                              (Transaction_snark.dummy_constraints ()) ;
                             (* Unsatisfiable. *)
-                            Run.exists Field.typ ~compute:(fun () ->
-                                Run.Field.Constant.zero )
-                            |> fun s ->
-                            Run.Field.(Assert.equal s (s + one))
-                            |> fun () :
-                                   ( Zkapp_statement.Checked.t
-                                   * (Zkapp_statement.Checked.t * unit) )
-                                   Pickles_types.Hlist0.H1
-                                     (Pickles_types.Hlist.E01
-                                        (Pickles.Inductive_rule.B))
-                                   .t ->
-                            [ Boolean.true_; Boolean.true_ ] )
+                            Run.Field.(Assert.equal s (s + one)) ;
+                            [ { public_input
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ; { public_input
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ] )
                       }
                     ] )
               in

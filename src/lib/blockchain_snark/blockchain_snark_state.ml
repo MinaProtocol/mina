@@ -11,16 +11,19 @@ include struct
   type _ t +=
     | Prev_state : Protocol_state.Value.t t
     | Transition : Snark_transition.Value.t t
+    | Txn_snark : Transaction_snark.Statement.With_sok.t t
 end
 
 module Witness = struct
   type t =
     { prev_state : Protocol_state.Value.t
     ; transition : Snark_transition.Value.t
+    ; txn_snark : Transaction_snark.Statement.With_sok.t
     }
 end
 
-let blockchain_handler on_unhandled { Witness.prev_state; transition } =
+let blockchain_handler on_unhandled
+    { Witness.prev_state; transition; txn_snark } =
   let open Snarky_backendless.Request in
   fun (With { request; respond } as r) ->
     let k x = respond (Provide x) in
@@ -29,6 +32,8 @@ let blockchain_handler on_unhandled { Witness.prev_state; transition } =
         k prev_state
     | Transition ->
         k transition
+    | Txn_snark ->
+        k txn_snark
     | _ ->
         on_unhandled r
 
@@ -86,26 +91,25 @@ let non_pc_registers_equal_var t1 t2 =
 let%snarkydef step ~(logger : Logger.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    Hlist.HlistId.
-      [ previous_state_hash
-      ; (txn_snark : Transaction_snark.Statement.With_sok.Checked.t)
-      ] new_state_hash : _ Tick.Checked.t =
+    new_state_hash : _ Tick.Checked.t =
   let%bind transition =
     with_label __LOC__
       (exists Snark_transition.typ ~request:(As_prover.return Transition))
   in
-  let%bind previous_state, previous_state_body_hash =
+  let%bind txn_snark =
+    with_label __LOC__
+      (exists Transaction_snark.Statement.With_sok.typ
+         ~request:(As_prover.return Txn_snark) )
+  in
+  let%bind previous_state, previous_state_hash, previous_state_body_hash =
     let%bind t =
       with_label __LOC__
         (exists
            (Protocol_state.typ ~constraint_constants)
            ~request:(As_prover.return Prev_state) )
     in
-    let%bind h, body = Protocol_state.hash_checked t in
-    let%map () =
-      with_label __LOC__ (State_hash.assert_equal h previous_state_hash)
-    in
-    (t, body)
+    let%map previous_state_hash, body = Protocol_state.hash_checked t in
+    (t, previous_state_hash, body)
   in
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__
@@ -280,38 +284,37 @@ let%snarkydef step ~(logger : Logger.t)
         Boolean.not is_base_case
   in
   let%map () = Boolean.Assert.any [ is_base_case; success ] in
-  (prev_should_verify, txn_snark_should_verify)
+  ( { Pickles.Inductive_rule.Previous_proof_statement.public_input =
+        previous_state_hash
+    ; proof_must_verify = prev_should_verify
+    }
+  , { Pickles.Inductive_rule.Previous_proof_statement.public_input = txn_snark
+    ; proof_must_verify = txn_snark_should_verify
+    } )
 
-let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash
-    : unit Or_error.t =
+let check w ?handler ~proof_level ~constraint_constants new_state_hash :
+    unit Or_error.t =
   let open Tick in
   check
     (Fn.flip handle (wrap_handler handler w)
-       (let%bind prev =
-          exists State_hash.typ
-            ~compute:
-              (As_prover.return (Protocol_state.hashes w.prev_state).state_hash)
-        and curr =
+       (let%bind curr =
           exists State_hash.typ ~compute:(As_prover.return new_state_hash)
-        and txn_snark =
-          exists Transaction_snark.Statement.With_sok.typ
-            ~compute:(As_prover.return txn_snark)
         in
-        step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-          [ prev; txn_snark ] curr ) )
+        step ~proof_level ~constraint_constants ~logger:(Logger.create ()) curr
+       ) )
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
   { identifier = "step"
   ; prevs = [ self; transaction_snark ]
   ; main =
-      (fun [ x1; x2 ] x ->
-        let b1, b2 =
+      (fun x ->
+        let prev_blockchain_stmt, txn_snark_stmt =
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               [ x1; x2 ] x )
+               x )
         in
-        [ b1; b2 ] )
+        [ prev_blockchain_stmt; txn_snark_stmt ] )
   }
 
 module Statement = struct
@@ -367,11 +370,9 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
     , digest
         (let main x =
            let open Tick in
-           let%bind x1 = exists Mina_base.State_hash.typ in
-           let%bind x2 = exists Transaction_snark.Statement.With_sok.typ in
            let%map _ =
              step ~proof_level ~constraint_constants ~logger:(Logger.create ())
-               [ x1; x2 ] x
+               x
            in
            ()
          in

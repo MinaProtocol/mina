@@ -396,9 +396,8 @@ let dummy_constraints () =
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
-let party_circuit f ([] : _ H1.T(Id).t)
-    ({ transaction; at_party } : Zkapp_statement.Checked.t) :
-    _ H1.T(E01(Pickles.Inductive_rule.B)).t =
+let party_circuit f ({ transaction; at_party } : Zkapp_statement.Checked.t) :
+    _ H1.T(Pickles.Inductive_rule.Previous_proof_statement).t =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in

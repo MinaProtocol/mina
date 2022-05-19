@@ -491,9 +491,8 @@ module Base : sig
          ?witness:Parties_segment.Witness.t
       -> Parties_segment.Spec.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
-      -> (int * Zkapp_statement.Checked.t) list
       -> Statement.With_sok.var
-      -> unit
+      -> Zkapp_statement.Checked.t option
   end
 end
 

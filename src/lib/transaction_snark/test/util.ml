@@ -100,18 +100,16 @@ let apply_parties ledger parties =
   in
   let open Impl in
   List.iter (List.rev witnesses)
-    ~f:(fun (witness, spec, statement, snapp_stmt) ->
+    ~f:(fun (witness, spec, statement, _snapp_stmt) ->
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
           in
-          let snapp_stmt =
-            Option.value_map ~default:[] snapp_stmt ~f:(fun (i, stmt) ->
-                [ (i, exists Zkapp_statement.typ ~compute:(fun () -> stmt)) ] )
+          let _opt_snapp_stmt =
+            Transaction_snark.Base.Parties_snark.main ~constraint_constants
+              (Parties_segment.Basic.to_single_list spec)
+              s ~witness
           in
-          Transaction_snark.Base.Parties_snark.main ~constraint_constants
-            (Parties_segment.Basic.to_single_list spec)
-            snapp_stmt s ~witness ;
           fun () -> () )
       |> Or_error.ok_exn ) ;
   final_ledger
@@ -232,20 +230,19 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
   ; prevs = [ self; self ]
   ; main =
-      (fun [ _; _ ] _ ->
-        Transaction_snark.dummy_constraints ()
-        |> Snark_params.Tick.Run.run_checked
-        |> fun () ->
+      (fun _ ->
+        let s =
+          Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
+        in
+        let public_input =
+          Run.exists Zkapp_statement.typ ~compute:(fun () -> assert false)
+        in
+        Impl.run_checked (Transaction_snark.dummy_constraints ()) ;
         (* Unsatisfiable. *)
-        Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
-        |> fun s ->
-        Run.Field.(Assert.equal s (s + one))
-        |> fun () :
-               (Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit))
-               Pickles_types.Hlist0.H1
-                 (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-               .t ->
-        [ Boolean.true_; Boolean.true_ ] )
+        Run.Field.(Assert.equal s (s + one)) ;
+        [ { public_input; proof_must_verify = Boolean.true_ }
+        ; { public_input; proof_must_verify = Boolean.true_ }
+        ] )
   }
 
 let gen_snapp_ledger =
