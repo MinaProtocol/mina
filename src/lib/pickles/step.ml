@@ -486,7 +486,6 @@ struct
       x_hats := Some x_hats' ;
       witnesses := Some witnesses'
     in
-    compute_prev_proof_parts () ;
     let unfinalized_proofs_extended =
       lazy
         (Vector.extend
@@ -577,6 +576,9 @@ struct
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
+      | Req.Compute_prev_proof_parts ->
+          compute_prev_proof_parts () ;
+          k ()
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->

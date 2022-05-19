@@ -217,6 +217,9 @@ let step_main :
     let open Impls.Step in
     with_label "step_main" (fun () ->
         let T = Max_proofs_verified.eq in
+        (* Compute proof parts outside of the prover before requesting values.
+        *)
+        exists Typ.unit ~request:(fun () -> Req.Compute_prev_proof_parts) ;
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)

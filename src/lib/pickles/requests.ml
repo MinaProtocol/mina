@@ -111,6 +111,7 @@ module Step = struct
     type local_branches
 
     type _ t +=
+      | Compute_prev_proof_parts : unit t
       | Proof_with_datas :
           ( prev_values
           , local_signature
@@ -146,6 +147,7 @@ module Step = struct
       type nonrec local_branches = local_branches
 
       type _ t +=
+        | Compute_prev_proof_parts : unit t
         | Proof_with_datas :
             ( prev_values
             , local_signature
