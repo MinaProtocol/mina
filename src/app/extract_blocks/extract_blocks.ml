@@ -95,7 +95,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let timestamp = Block_time.of_int64 block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
-  (* commands, accounts_accessed, accounts_created to be filled in later *)
+  (* commands, accounts_accessed, accounts_created, tokens_used to be filled in later *)
   return
     { Extensional.Block.state_hash
     ; parent_hash
@@ -117,6 +117,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; chain_status
     ; accounts_accessed = []
     ; accounts_created = []
+    ; tokens_used = []
     }
 
 let fill_in_accounts_accessed pool block_state_hash =
@@ -169,6 +170,95 @@ let fill_in_accounts_created pool block_state_hash =
         creation_fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
       in
       return (account_id, fee) )
+
+let fill_in_tokens_used pool block_state_hash =
+  let query_db = Mina_caqti.query pool in
+  let open Deferred.Let_syntax in
+  let%bind block_id =
+    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+  in
+  let get_token_owner
+      ({ value; owner_public_key_id; owner_token_id } : Processor.Token.t) =
+    let token_id = Token_id.of_string value in
+    match (owner_public_key_id, owner_token_id) with
+    | None, None ->
+        return (token_id, None)
+    | Some owner_pk_id, Some owner_tok_id ->
+        let%bind owner_pk =
+          let%map pk_str =
+            query_db ~f:(fun db ->
+                Processor.Public_key.find_by_id db owner_pk_id )
+          in
+          Public_key.Compressed.of_base58_check_exn pk_str
+        in
+        let%bind owner_token_id =
+          let%map owner_token =
+            query_db ~f:(fun db -> Processor.Token.find_by_id db owner_tok_id)
+          in
+          Token_id.of_string owner_token.value
+        in
+        return (token_id, Some (Account_id.create owner_pk owner_token_id))
+    | _ ->
+        failwith "Owner public key and token must both be Some or both None"
+  in
+  let%bind internal_cmd_tokens =
+    query_db ~f:(fun db -> Sql.Block_internal_command_tokens.run db ~block_id)
+  in
+  let%bind internal_cmd_tokens_used =
+    Deferred.List.map internal_cmd_tokens ~f:get_token_owner
+  in
+  let%bind user_cmd_tokens =
+    query_db ~f:(fun db -> Sql.Block_user_command_tokens.run db ~block_id)
+  in
+  let%bind user_cmd_tokens_used =
+    Deferred.List.map user_cmd_tokens ~f:get_token_owner
+  in
+  let%bind zkapps_in_block =
+    query_db ~f:(fun db ->
+        Processor.Block_and_zkapp_command.all_from_block db ~block_id )
+  in
+  let%bind zkapp_cmd_tokens =
+    let%bind zkapp_cmds =
+      Deferred.List.map zkapps_in_block ~f:(fun { zkapp_command_id; _ } ->
+          query_db ~f:(fun db ->
+              Processor.User_command.Zkapp_command.load db zkapp_command_id ) )
+    in
+    let%bind fee_payer_token =
+      let%bind default_id =
+        query_db ~f:(fun db -> Processor.Token.find db Token_id.default)
+      in
+      query_db ~f:(fun db -> Processor.Token.find_by_id db default_id)
+    in
+    let%map other_parties_tokenss =
+      Deferred.List.map zkapp_cmds ~f:(fun { zkapp_other_parties_ids; _ } ->
+          let%bind other_party_bodies =
+            Deferred.List.map (Array.to_list zkapp_other_parties_ids)
+              ~f:(fun other_party_id ->
+                let%bind { body_id; _ } =
+                  query_db ~f:(fun db ->
+                      Processor.Zkapp_other_party.load db other_party_id )
+                in
+                query_db ~f:(fun db ->
+                    Processor.Zkapp_other_party_body.load db body_id ) )
+          in
+          Deferred.List.map other_party_bodies
+            ~f:(fun { account_identifier_id; _ } ->
+              let%bind { token_id; _ } =
+                query_db ~f:(fun db ->
+                    Processor.Account_identifiers.load db account_identifier_id )
+              in
+              query_db ~f:(fun db -> Processor.Token.find_by_id db token_id) ) )
+    in
+    fee_payer_token :: List.concat other_parties_tokenss
+  in
+  let%bind zkapp_cmd_tokens_used =
+    Deferred.List.map zkapp_cmd_tokens ~f:get_token_owner
+  in
+  let tokens_used =
+    internal_cmd_tokens_used @ user_cmd_tokens_used @ zkapp_cmd_tokens_used
+    |> List.dedup_and_sort ~compare:[%compare: Token_id.t * Account_id.t option]
+  in
+  return tokens_used
 
 let fill_in_user_commands pool block_state_hash =
   let query_db = Mina_caqti.query pool in
@@ -494,6 +584,12 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
               fill_in_accounts_created pool block.state_hash
             in
             { block with accounts_created } )
+      in
+      [%log info] "Querying for tokens used in blocks" ;
+      let%bind blocks_with_accounts_created =
+        Deferred.List.map blocks_with_accounts_created ~f:(fun block ->
+            let%map tokens_used = fill_in_tokens_used pool block.state_hash in
+            { block with tokens_used } )
       in
       [%log info] "Writing blocks" ;
       let%map () =

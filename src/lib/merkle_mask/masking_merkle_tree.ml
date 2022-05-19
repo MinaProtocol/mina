@@ -40,7 +40,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type t =
     { uuid : Uuid.Stable.V1.t
     ; account_tbl : Account.t Location_binable.Table.t
-    ; token_owners : Account_id.Stable.Latest.t Token_id.Table.t
+    ; token_owners : Account_id.t Token_id.Table.t
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
     ; hash_tbl : Hash.t Addr.Table.t
