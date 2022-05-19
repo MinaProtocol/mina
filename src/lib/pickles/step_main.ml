@@ -245,7 +245,23 @@ let step_main :
         in
         (* Compute proof parts outside of the prover before requesting values.
         *)
-        exists Typ.unit ~request:(fun () -> Req.Compute_prev_proof_parts) ;
+        exists Typ.unit ~request:(fun () ->
+            let inners_must_verify =
+              let rec go :
+                  type prev_vars prev_values ns1 ns2.
+                     prev_vars H1.T(E01(B)).t
+                  -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
+                  -> prev_values H1.T(E01(Bool)).t =
+               fun bs tags ->
+                match (bs, tags) with
+                | [], [] ->
+                    []
+                | b :: bs, _tag :: tags ->
+                    As_prover.read Boolean.typ b :: go bs tags
+              in
+              go proofs_should_verify rule.prevs
+            in
+            Req.Compute_prev_proof_parts inners_must_verify ) ;
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)

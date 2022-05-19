@@ -81,9 +81,6 @@ struct
       L12.f branch_data.rule.prevs prev_vars_length
     in
     let lte = branch_data.lte in
-    let inners_must_verify =
-      branch_data.rule.main_value prev_values next_state
-    in
     let module X_hat = struct
       type t = Tock.Field.t Double.t
     end in
@@ -436,7 +433,7 @@ struct
     let statements_with_hashes = ref None in
     let x_hats = ref None in
     let witnesses = ref None in
-    let compute_prev_proof_parts () =
+    let compute_prev_proof_parts inners_must_verify =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
@@ -447,7 +444,7 @@ struct
                values H1.T(Id).t
             -> (ns, ns) H2.T(Proof).t
             -> (vars, values, ns, ms) H4.T(Tag).t
-            -> vars H1.T(E01(Bool)).t
+            -> values H1.T(E01(Bool)).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t
@@ -581,8 +578,8 @@ struct
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
-      | Req.Compute_prev_proof_parts ->
-          compute_prev_proof_parts () ;
+      | Req.Compute_prev_proof_parts inners_must_verify ->
+          compute_prev_proof_parts inners_must_verify ;
           k ()
       | Req.Prev_inputs ->
           k prev_values
