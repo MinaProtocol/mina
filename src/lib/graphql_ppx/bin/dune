@@ -1,0 +1,5 @@
+(library
+ (name graphql2)
+ (kind ppx_rewriter)
+ (libraries ppxlib base sexplib0)
+ (preprocess (pps ppxlib.metaquot)))

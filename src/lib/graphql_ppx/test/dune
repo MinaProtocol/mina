@@ -1,0 +1,19 @@
+(executable
+  (name example)
+  (preprocess (pps graphql2))
+  (flags -w -34-37)
+  (modules example))
+
+(executable
+  (name pp)
+  (libraries graphql2 ppxlib)
+  (modules pp))
+
+(rule
+  (targets example.translation.ml)
+  (deps (:pp pp.exe) (:input example.ml))
+  (action (run ./%{pp} --impl %{input} -o %{targets})))
+
+(rule
+  (alias runtest)
+  (action (diff example.expected.ml example.translation.ml)))
