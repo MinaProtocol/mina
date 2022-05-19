@@ -494,16 +494,6 @@ struct
            lte Max_proofs_verified.n
            (Unfinalized.Constant.dummy ()) )
     in
-    let pass_through =
-      let rec go : type a a. (a, a) H2.T(P).t -> a H1.T(P.Base.Me_only.Wrap).t =
-        function
-        | [] ->
-            []
-        | T t :: tl ->
-            t.statement.proof_state.me_only :: go tl
-      in
-      go prev_proofs
-    in
     let module Extract = struct
       module type S = sig
         type res
@@ -660,6 +650,16 @@ struct
           let f (T t : _ P.t) =
             (t.proof.openings.evals, t.proof.openings.ft_eval1)
         end )
+    in
+    let pass_through =
+      let rec go : type a a. (a, a) H2.T(P).t -> a H1.T(P.Base.Me_only.Wrap).t =
+        function
+        | [] ->
+            []
+        | T t :: tl ->
+            t.statement.proof_state.me_only :: go tl
+      in
+      go prev_proofs
     in
     let next_statement : _ Types.Step.Statement.t =
       { proof_state =
