@@ -43,6 +43,18 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
+  (let metadata =
+     [ ( "state_hash"
+       , Transition_frontier.Breadcrumb.state_hash breadcrumb
+         |> State_hash.to_yojson )
+     ]
+   in
+   Option.value_map valid_cb
+     ~default:(fun () ->
+       [%log debug] "add_and_finalize $state_hash without callback" ~metadata )
+     ~f:(fun _ () ->
+       [%log debug] "add_and_finalize $state_hash with callback" ~metadata )
+     () ) ;
   let%map () =
     if only_if_present then (
       let parent_hash = Transition_frontier.Breadcrumb.parent_hash breadcrumb in
@@ -161,7 +173,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                   ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
-                ~cached_transition:cached_initially_validated_transition ;
+                ~cached_transition:cached_initially_validated_transition
+                ~valid_cb ;
               return (Error ()) )
     in
     (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
@@ -210,24 +223,18 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Reader.t )
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
-    ~(clean_up_catchup_scheduler : unit Ivar.t)
-    ~(catchup_job_writer :
-       ( State_hash.t
-         * ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-           Rose_tree.t
-           list
-       , crash buffered
-       , unit )
-       Writer.t )
+    ~(clean_up_catchup_scheduler : unit Ivar.t) ~catchup_job_writer
     ~(catchup_breadcrumbs_reader :
-       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
+       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
+         * Mina_net2.Validation_callback.t option )
+         Rose_tree.t
          list
        * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ] )
        Reader.t )
     ~(catchup_breadcrumbs_writer :
-       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
+       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
+         * Mina_net2.Validation_callback.t option )
+         Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
@@ -279,16 +286,17 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                             subtree
                             (* It could be the case that by the time we try and
                                * add the breadcrumb, it's no longer relevant when
-                               * we're catching up *)
-                            ~f:
-                              (add_and_finalize ~logger ~only_if_present:true
-                                 ~source:`Catchup ~valid_cb:None ) )
+                               * we're catching up *) ~f:(fun (b, valid_cb) ->
+                              add_and_finalize ~logger ~only_if_present:true
+                                ~source:`Catchup ~valid_cb b ) )
                     with
                   | Ok () ->
                       ()
                   | Error err ->
                       List.iter breadcrumb_subtrees ~f:(fun tree ->
-                          Rose_tree.iter tree ~f:(fun cached_breadcrumb ->
+                          Rose_tree.iter tree
+                            ~f:(fun (cached_breadcrumb, _vc) ->
+                              (* TODO reject callback? *)
                               let (_ : Transition_frontier.Breadcrumb.t) =
                                 Cached.invalidate_with_failure cached_breadcrumb
                               in

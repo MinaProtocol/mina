@@ -51,18 +51,21 @@ module Node = struct
       | To_download of Downloader_job.t
       | To_initial_validate of Mina_block.t Envelope.Incoming.t
       | To_verify of
-          ( Mina_block.initial_valid_block Envelope.Incoming.t
-          , State_hash.t )
-          Cached.t
+          ( ( Mina_block.initial_valid_block Envelope.Incoming.t
+            , State_hash.t )
+            Cached.t
+          * Mina_net2.Validation_callback.t option )
       | Wait_for_parent of
-          ( Mina_block.almost_valid_block Envelope.Incoming.t
-          , State_hash.t )
-          Cached.t
+          ( ( Mina_block.almost_valid_block Envelope.Incoming.t
+            , State_hash.t )
+            Cached.t
+          * Mina_net2.Validation_callback.t option )
       | To_build_breadcrumb of
           ( [ `Parent of State_hash.t ]
           * ( Mina_block.almost_valid_block Envelope.Incoming.t
             , State_hash.t )
-            Cached.t )
+            Cached.t
+          * Mina_net2.Validation_callback.t option )
       (* TODO: Name this to Initial_root *)
       | Root of Breadcrumb.t Ivar.t
 
@@ -296,11 +299,13 @@ let remove_node' t (node : Node.t) =
       ()
   | To_initial_validate _ ->
       ()
-  | To_verify c ->
+  | To_verify (c, _vc) ->
+      (* TODO should we reject the validation callback? *)
       ignore
         ( Cached.invalidate_with_failure c
           : Mina_block.initial_valid_block Envelope.Incoming.t )
-  | To_build_breadcrumb (_parent, c) ->
+  | To_build_breadcrumb (_parent, c, _vc) ->
+      (* TODO should we reject the validation callback? *)
       ignore
         ( Cached.invalidate_with_failure c
           : Mina_block.almost_valid_block Envelope.Incoming.t )

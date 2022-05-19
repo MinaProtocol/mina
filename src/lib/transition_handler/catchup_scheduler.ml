@@ -19,15 +19,17 @@ open Otp_lib
 open Mina_base
 open Mina_block
 open Network_peer
+open Mina_net2
 
 type t =
   { logger : Logger.t
   ; time_controller : Block_time.Controller.t
   ; catchup_job_writer :
       ( State_hash.t
-        * ( Mina_block.initial_valid_block Envelope.Incoming.t
-          , State_hash.t )
-          Cached.t
+        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
+            , State_hash.t )
+            Cached.t
+          * Mina_net2.Validation_callback.t option )
           Rose_tree.t
           list
       , crash buffered
@@ -45,34 +47,29 @@ type t =
       Cached.t
       list
       State_hash.Table.t
+        (* Validation callbacks for state hashes that are being processed *)
+  ; validation_callbacks : Mina_net2.Validation_callback.t State_hash.Table.t
         (** `parent_root_timeouts` stores the timeouts for catchup job. The
             keys are the missing transitions, and the values are the
             timeouts. *)
   ; parent_root_timeouts : unit Block_time.Timeout.t State_hash.Table.t
   ; breadcrumb_builder_supervisor :
       ( State_hash.t
-      * ( Mina_block.initial_valid_block Envelope.Incoming.t
-        , State_hash.t )
-        Cached.t
+      * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
+          , State_hash.t )
+          Cached.t
+        * Mina_net2.Validation_callback.t option )
         Rose_tree.t
         list )
       Capped_supervisor.t
   }
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
-    ~time_controller
-    ~(catchup_job_writer :
-       ( State_hash.t
-         * ( Mina_block.initial_valid_block Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-           Rose_tree.t
-           list
-       , crash buffered
-       , unit )
-       Writer.t )
+    ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
-       ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
+       ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
+         * Validation_callback.t option )
+         Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
@@ -80,10 +77,10 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
        Writer.t ) ~clean_up_signal =
   let collected_transitions = State_hash.Table.create () in
   let parent_root_timeouts = State_hash.Table.create () in
+  let validation_callbacks = State_hash.Table.create () in
   upon (Ivar.read clean_up_signal) (fun () ->
-      Hashtbl.iter collected_transitions ~f:(fun cached_transitions ->
-          List.iter cached_transitions
-            ~f:(Fn.compose ignore Cached.invalidate_with_failure) ) ;
+      Hashtbl.iter collected_transitions
+        ~f:(List.iter ~f:(Fn.compose ignore Cached.invalidate_with_failure)) ;
       Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
           Block_time.Timeout.cancel time_controller timeout () ) ) ;
   let breadcrumb_builder_supervisor =
@@ -107,7 +104,8 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
-                Rose_tree.iter subtree ~f:(fun cached_transition ->
+                Rose_tree.iter subtree ~f:(fun (cached_transition, _vc) ->
+                    (* TODO reject callback? *)
                     ignore
                       ( Cached.invalidate_with_failure cached_transition
                         : Mina_block.initial_valid_block Envelope.Incoming.t ) ) ) )
@@ -118,6 +116,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   ; catchup_job_writer
   ; parent_root_timeouts
   ; breadcrumb_builder_supervisor
+  ; validation_callbacks
   }
 
 let mem t transition =
@@ -159,7 +158,9 @@ let rec extract_subtree t cached_transition =
   let successors =
     Option.value ~default:[] (Hashtbl.find t.collected_transitions hash)
   in
-  Rose_tree.T (cached_transition, List.map successors ~f:(extract_subtree t))
+  Rose_tree.T
+    ( (cached_transition, Hashtbl.find t.validation_callbacks hash)
+    , List.map successors ~f:(extract_subtree t) )
 
 let extract_forest t hash =
   let successors =
@@ -179,7 +180,7 @@ let rec remove_tree t parent_hash =
       let transition, _ = Envelope.Incoming.data (Cached.peek child) in
       remove_tree t (State_hash.With_state_hashes.state_hash transition) )
 
-let watch t ~timeout_duration ~cached_transition =
+let watch t ~timeout_duration ~cached_transition ~valid_cb =
   let transition_with_hash, _ =
     Envelope.Incoming.data (Cached.peek cached_transition)
   in
@@ -189,8 +190,20 @@ let watch t ~timeout_duration ~cached_transition =
     |> Mina_block.header |> Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
+  Option.value_map valid_cb ~default:() ~f:(fun data ->
+      match Hashtbl.add t.validation_callbacks ~key:hash ~data with
+      | `Ok ->
+          don't_wait_for
+            (* Clean up entry upon callback resolution *)
+            (let%bind.Deferred _ = Mina_net2.Validation_callback.await data in
+             Hashtbl.remove t.validation_callbacks hash ;
+             Deferred.unit )
+      | `Duplicate ->
+          [%log' warn t.logger] "Double validation callback for $state_hash"
+            ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson hash) ] ) ;
   let make_timeout duration =
     Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
+        (* TODO inject valid_cb ? *)
         let forest = extract_forest t parent_hash in
         Hashtbl.remove t.parent_root_timeouts parent_hash ;
         Mina_metrics.(
@@ -336,7 +349,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
-          watch scheduler ~timeout_duration
+          watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
               (Cached.pure @@ downcast_breadcrumb disjoint_breadcrumb) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -394,7 +407,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
-          watch scheduler ~timeout_duration
+          watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
               (Cached.transform ~f:downcast_breadcrumb breadcrumb_2) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -433,7 +446,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   failwith "pipe closed unexpectedly"
               | `Ok
                   (`Ok
-                    ( [ Rose_tree.T (received_breadcrumb, []) ]
+                    ( [ Rose_tree.T ((received_breadcrumb, _vc), []) ]
                     , `Catchup_scheduler ) ) ->
                   [%test_eq: State_hash.t]
                     (Transition_frontier.Breadcrumb.state_hash
@@ -473,7 +486,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch
           in
-          watch scheduler ~timeout_duration
+          watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
               (Cached.pure @@ downcast_breadcrumb oldest_breadcrumb) ;
           assert (
@@ -482,7 +495,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           ignore
             ( List.fold dependent_breadcrumbs ~init:oldest_breadcrumb
                 ~f:(fun prev_breadcrumb curr_breadcrumb ->
-                  watch scheduler ~timeout_duration
+                  watch scheduler ~timeout_duration ~valid_cb:None
                     ~cached_transition:
                       (Cached.pure @@ downcast_breadcrumb curr_breadcrumb) ;
                   assert (
