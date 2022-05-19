@@ -105,9 +105,8 @@ struct
       Tock.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
     in
     let expand_proof :
-        type var value max local_max_proofs_verified m.
-           max Nat.t
-        -> Impls.Wrap.Verification_key.t
+        type var value local_max_proofs_verified m.
+           Impls.Wrap.Verification_key.t
         -> 'a
         -> value
         -> (local_max_proofs_verified, local_max_proofs_verified) P.t
@@ -119,7 +118,7 @@ struct
            * X_hat.t
            * (value, local_max_proofs_verified, m) Per_proof_witness.Constant.t
         =
-     fun max dlog_vk dlog_index app_state (T t) tag ~must_verify ->
+     fun dlog_vk dlog_index app_state (T t) tag ~must_verify ->
       let t =
         { t with
           statement =
@@ -436,10 +435,9 @@ struct
         , x_hats
         , witnesses ) =
       let rec go :
-          type vars values ns ms maxes k.
+          type vars values ns ms k.
              values H1.T(Id).t
           -> (ns, ns) H2.T(Proof).t
-          -> maxes H1.T(Nat).t
           -> (vars, values, ns, ms) H4.T(Tag).t
           -> vars H1.T(E01(Bool)).t
           -> (vars, k) Length.t
@@ -448,13 +446,12 @@ struct
              * (Statement_with_hashes.t, k) Vector.t
              * (X_hat.t, k) Vector.t
              * (values, ns, ms) H3.T(Per_proof_witness.Constant).t =
-       fun app_states ps maxes ts must_verifys l ->
-        match (app_states, ps, maxes, ts, must_verifys, l) with
-        | [], [], _, [], [], Z ->
+       fun app_states ps ts must_verifys l ->
+        match (app_states, ps, ts, must_verifys, l) with
+        | [], [], [], [], Z ->
             ([], [], [], [], [])
         | ( app_state :: app_states
           , p :: ps
-          , max :: maxes
           , t :: ts
           , must_verify :: must_verifys
           , S l ) ->
@@ -466,20 +463,16 @@ struct
                 (d.wrap_vk, d.wrap_key)
             in
             let `Sg sg, u, s, x, w =
-              expand_proof max dlog_vk dlog_index app_state p t ~must_verify
-            and sgs, us, ss, xs, ws =
-              go app_states ps maxes ts must_verifys l
-            in
+              expand_proof dlog_vk dlog_index app_state p t ~must_verify
+            and sgs, us, ss, xs, ws = go app_states ps ts must_verifys l in
             (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
-        | _ :: _, _ :: _, [], _ :: _, _, _ ->
-            assert false
-        | _ :: _, [], _, _, _, _ ->
+        | _ :: _, [], _, _, _ ->
             .
-        | [], _ :: _, _, _, _, _ ->
+        | [], _ :: _, _, _, _ ->
             .
       in
-      go prev_values prev_proofs Maxes.maxes branch_data.rule.prevs
-        inners_must_verify prev_vars_length
+      go prev_values prev_proofs branch_data.rule.prevs inners_must_verify
+        prev_vars_length
     in
     let unfinalized_proofs_extended =
       Vector.extend unfinalized_proofs lte Max_proofs_verified.n
