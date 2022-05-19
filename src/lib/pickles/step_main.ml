@@ -238,6 +238,11 @@ let step_main :
           exists prev_values_typs ~request:(fun () -> Req.Prev_inputs)
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
+        let proofs_should_verify =
+          (* Run the application logic of the rule on the predecessor statements *)
+          with_label "rule_main" (fun () ->
+              rule.main prev_statements app_state )
+        in
         (* Compute proof parts outside of the prover before requesting values.
         *)
         exists Typ.unit ~request:(fun () -> Req.Compute_prev_proof_parts) ;
@@ -316,10 +321,6 @@ let step_main :
                   with_label "pass_throughs" (fun () ->
                       let module V = H1.Of_vector (Digest) in
                       V.f proofs_verified (Vector.trim pass_through lte) )
-                and proofs_should_verify =
-                  (* Run the application logic of the rule on the predecessor statements *)
-                  with_label "rule_main" (fun () ->
-                      rule.main prev_statements app_state )
                 and unfinalized_proofs =
                   let module H = H1.Of_vector (Unfinalized) in
                   H.f proofs_verified (Vector.trim unfinalized_proofs lte)
