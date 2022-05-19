@@ -29,7 +29,7 @@ let initialize public_key =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
       party |> Party_under_construction.In_circuit.assert_state_unproved
-      |> Party_under_construction.In_circuit.set_full_state initial_state)
+      |> Party_under_construction.In_circuit.set_full_state initial_state )
 
 type _ Snarky_backendless.Request.t +=
   | New_state : Field.Constant.t list Snarky_backendless.Request.t
@@ -54,7 +54,7 @@ let update_state public_key =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
       in
       party |> Party_under_construction.In_circuit.assert_state_proved
-      |> Party_under_construction.In_circuit.set_full_state new_state)
+      |> Party_under_construction.In_circuit.set_full_state new_state )
 
 let main_value ([] : _ H1.T(Id).t) (_ : Zkapp_statement.t) :
     _ H1.T(E01(Core_kernel.Bool)).t =

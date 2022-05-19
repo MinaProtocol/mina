@@ -38,11 +38,11 @@ end
 include
   Snarkable.S
     with type var =
-          ( Staged_ledger_hash.var
-          , Frozen_ledger_hash.var
-          , Local_state.Checked.t
-          , Block_time.Checked.t )
-          Poly.t
+      ( Staged_ledger_hash.var
+      , Frozen_ledger_hash.var
+      , Local_state.Checked.t
+      , Block_time.Checked.t )
+      Poly.t
      and type value := Value.t
 
 val staged_ledger_hash :

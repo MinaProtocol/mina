@@ -328,7 +328,7 @@ module Statement = struct
               Or_error.errorf
                 !"%s is inconsistent between transitions (%{sexp: t} vs \
                   %{sexp: t})"
-                (Field.name f) x1 x2)
+                (Field.name f) x1 x2 )
           f
       in
       let module PC = struct
@@ -726,7 +726,7 @@ module Base = struct
                     let open Mina_base in
                     Transaction_status.Failure.equal
                       (Mina_transaction_logic
-                       .timing_error_to_user_command_status err)
+                       .timing_error_to_user_command_status err )
                       Transaction_status.Failure
                       .Source_minimum_balance_violation
               in
@@ -908,7 +908,7 @@ module Base = struct
           ~max_proofs_verified:
             (module Pickles.Side_loaded.Verification_key.Max_width)
           ~value_to_field_elements:to_field_elements
-          ~var_to_field_elements:Checked.to_field_elements)
+          ~var_to_field_elements:Checked.to_field_elements )
 
   let signature_verifies ~shifted ~payload_digest signature pk =
     let%bind pk =
@@ -943,7 +943,7 @@ module Base = struct
 
       let if_ b ~then_ ~else_ =
         create (fun () ->
-            get (if Impl.As_prover.read Boolean.typ b then then_ else else_))
+            get (if Impl.As_prover.read Boolean.typ b then then_ else else_) )
 
       let map t ~f = create (fun () -> f (get t))
     end
@@ -964,7 +964,7 @@ module Base = struct
           let l = Field.if_ b ~then_:h ~else_:acc
           and r = Field.if_ b ~then_:acc ~else_:h in
           let acc' = Ledger_hash.merge_var ~height l r in
-          acc')
+          acc' )
 
     module type Single_inputs = sig
       val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -1166,7 +1166,7 @@ module Base = struct
                        , As_prover.Ref.create (fun () -> None) )
                    }
                  in
-                 run_checked (Account.Checked.digest a)))
+                 run_checked (Account.Checked.digest a) ) )
 
         type timing = Account_timing.var
 
@@ -1194,7 +1194,7 @@ module Base = struct
             run_checked
             @@ [%with_label "Check zkapp timing"]
                  (check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:None ~txn_global_slot)
+                    ~txn_amount:None ~txn_global_slot )
           in
           (`Invalid_timing (Option.value_exn !invalid_timing), timing)
 
@@ -1282,7 +1282,7 @@ module Base = struct
 
         let or_exn x =
           with_label "or_exn is_some" (fun () ->
-              Bool.Assert.is_true (is_some x)) ;
+              Bool.Assert.is_true (is_some x) ) ;
           Flagged_option.data x
       end
 
@@ -1314,13 +1314,13 @@ module Base = struct
           with_label "Parties.pop_exn" (fun () ->
               let hd_r =
                 V.create (fun () ->
-                    V.get r |> List.hd_exn |> With_stack_hash.elt)
+                    V.get r |> List.hd_exn |> With_stack_hash.elt )
               in
               let party = V.create (fun () -> (V.get hd_r).party |> fst) in
               let auth = V.(create (fun () -> (V.get party).authorization)) in
               let party =
                 exists (Party.Body.typ ()) ~compute:(fun () ->
-                    (V.get party).body)
+                    (V.get party).body )
               in
               let party =
                 With_hash.of_data party
@@ -1330,13 +1330,13 @@ module Base = struct
                 let subforest = V.create (fun () -> (V.get hd_r).calls) in
                 let subforest_hash =
                   exists Parties.Digest.Forest.typ ~compute:(fun () ->
-                      Parties.Call_forest.hash (V.get subforest))
+                      Parties.Call_forest.hash (V.get subforest) )
                 in
                 { hash = subforest_hash; data = subforest }
               in
               let tl_hash =
                 exists Parties.Digest.Forest.typ ~compute:(fun () ->
-                    V.get r |> List.tl_exn |> Parties.Call_forest.hash)
+                    V.get r |> List.tl_exn |> Parties.Call_forest.hash )
               in
               let tree_hash =
                 Parties.Digest.Tree.Checked.create ~party:party.hash
@@ -1350,7 +1350,7 @@ module Base = struct
                 , { hash = tl_hash
                   ; data = V.(create (fun () -> List.tl_exn (get r)))
                   } )
-                : (party * t) * t ))
+                : (party * t) * t ) )
       end
 
       module Stack_frame = struct
@@ -1362,7 +1362,7 @@ module Base = struct
           { With_hash.hash =
               lazy
                 (Stack_frame.Digest.Checked.if_ b ~then_:(Lazy.force t1.hash)
-                   ~else_:(Lazy.force t2.hash))
+                   ~else_:(Lazy.force t2.hash) )
           ; data =
               Stack_frame.Checked.if_ Parties.if_ b ~then_:t1.data
                 ~else_:t2.data
@@ -1380,7 +1380,7 @@ module Base = struct
               lazy
                 (Stack_frame.Digest.Checked.create
                    ~hash_parties:(fun (calls : Parties.t) -> calls.hash)
-                   frame)
+                   frame )
           }
 
         let make ~caller ~caller_caller ~calls : t =
@@ -1393,28 +1393,28 @@ module Base = struct
               ( Mina_base.Token_id.Stable.V1.t
               , unit Mina_base.Parties.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
-              V.t) : t =
+              V.t ) : t =
           with_label "unhash" (fun () ->
               let frame : frame =
                 { caller =
                     exists Token_id.typ ~compute:(fun () ->
-                        (V.get frame).caller)
+                        (V.get frame).caller )
                 ; caller_caller =
                     exists Token_id.typ ~compute:(fun () ->
-                        (V.get frame).caller_caller)
+                        (V.get frame).caller_caller )
                 ; calls =
                     { hash =
                         exists Mina_base.Parties.Digest.Forest.typ
                           ~compute:(fun () ->
                             (V.get frame).calls
-                            |> Mina_base.Parties.Call_forest.hash)
+                            |> Mina_base.Parties.Call_forest.hash )
                     ; data = V.map frame ~f:(fun frame -> frame.calls)
                     }
                 }
               in
               let t = of_frame frame in
               Stack_frame.Digest.Checked.Assert.equal (hash (of_frame frame)) h ;
-              t)
+              t )
       end
 
       module Call_stack = struct
@@ -1444,7 +1444,7 @@ module Base = struct
                     ; caller_caller = Mina_base.Token_id.default
                     ; calls = []
                     }
-                    : Value.frame ))
+                    : Value.frame ) )
         end
 
         let hash (type a) (xs : (a, Call_stack_digest.t) With_stack_hash.t list)
@@ -1475,15 +1475,15 @@ module Base = struct
               { hash =
                   exists Mina_base.Parties.Digest.Forest.typ ~compute:(fun () ->
                       (V.get elt_ref).data.calls
-                      |> Mina_base.Parties.Call_forest.hash)
+                      |> Mina_base.Parties.Call_forest.hash )
               ; data = V.map elt_ref ~f:(fun frame -> frame.data.calls)
               }
             and caller =
               exists Mina_base.Token_id.typ ~compute:(fun () ->
-                  (V.get elt_ref).data.caller)
+                  (V.get elt_ref).data.caller )
             and caller_caller =
               exists Mina_base.Token_id.typ ~compute:(fun () ->
-                  (V.get elt_ref).data.caller_caller)
+                  (V.get elt_ref).data.caller_caller )
             in
             { caller; caller_caller; calls }
           in
@@ -1500,7 +1500,7 @@ module Base = struct
             Call_stack_digest.Checked.cons (Stack_frame.hash elt) stack
           in
           with_label __LOC__ (fun () ->
-              Call_stack_digest.Checked.Assert.equal h h') ;
+              Call_stack_digest.Checked.Assert.equal h h' ) ;
           (elt, { hash = stack; data = tl_r })
 
         let pop ({ hash = h; data = r } as t : t) : (elt * t) Opt.t =
@@ -1511,7 +1511,7 @@ module Base = struct
                 | None ->
                     Elt.default ()
                 | Some x ->
-                    x.elt)
+                    x.elt )
           in
           let tl_r =
             V.create (fun () -> V.get r |> List.tl |> Option.value ~default:[])
@@ -1524,7 +1524,7 @@ module Base = struct
           let h' = Call_stack_digest.Checked.cons stack_frame_hash stack in
           with_label __LOC__ (fun () ->
               Boolean.Assert.any
-                [ input_is_empty; Call_stack_digest.Checked.equal h h' ]) ;
+                [ input_is_empty; Call_stack_digest.Checked.equal h h' ] ) ;
           { is_some = Boolean.not input_is_empty
           ; data = (elt, { hash = stack; data = tl_r })
           }
@@ -1552,7 +1552,7 @@ module Base = struct
                     As_prover.read Call_stack_digest.typ h
                 ; elt = hd
                 }
-                :: tl)
+                :: tl )
           in
           { hash = h; data = r }
       end
@@ -1664,15 +1664,15 @@ module Base = struct
                   exists Side_loaded_verification_key.typ ~compute:(fun () ->
                       Option.value_exn
                         (As_prover.Ref.get
-                           (Data_as_hash.ref a.zkapp.verification_key.data))
-                          .data)
+                           (Data_as_hash.ref a.zkapp.verification_key.data) )
+                          .data )
                 in
                 let expected_hash =
                   Data_as_hash.hash a.zkapp.verification_key.data
                 in
                 let actual_hash = Zkapp_account.Checked.digest_vk vk in
                 Field.Assert.equal expected_hash actual_hash ;
-                Pickles.Side_loaded.in_circuit (side_loaded tag) vk)
+                Pickles.Side_loaded.in_circuit (side_loaded tag) vk )
         end
 
         module Controller = struct
@@ -1717,7 +1717,7 @@ module Base = struct
             let idx = V.map ledger ~f:(fun l -> idx l (body_id party.data)) in
             let account =
               exists Mina_base.Account.Checked.Unhashed.typ ~compute:(fun () ->
-                  Sparse_ledger.get_exn (V.get ledger) (V.get idx))
+                  Sparse_ledger.get_exn (V.get ledger) (V.get idx) )
             in
             let account = Account.account_with_hash account in
             let incl =
@@ -1733,7 +1733,7 @@ module Base = struct
                       | `Left h ->
                           (false, h)
                       | `Right h ->
-                          (true, h)))
+                          (true, h) ) )
             in
             (account, incl)
 
@@ -1754,7 +1754,7 @@ module Base = struct
             with_label __LOC__ (fun () ->
                 Field.Assert.equal
                   (implied_root account incl)
-                  (Ledger_hash.var_to_hash_packed root))
+                  (Ledger_hash.var_to_hash_packed root) )
 
           let check_account public_key token_id
               (({ data = account; _ }, _) : Account.t * _) =
@@ -1762,18 +1762,18 @@ module Base = struct
               run_checked
                 (Signature_lib.Public_key.Compressed.Checked.equal
                    account.public_key
-                   Signature_lib.Public_key.Compressed.(var_of_t empty))
+                   Signature_lib.Public_key.Compressed.(var_of_t empty) )
             in
             with_label __LOC__ (fun () ->
                 Boolean.Assert.any
                   [ is_new
                   ; run_checked
                       (Signature_lib.Public_key.Compressed.Checked.equal
-                         public_key account.public_key)
-                  ]) ;
+                         public_key account.public_key )
+                  ] ) ;
             with_label __LOC__ (fun () ->
                 Boolean.Assert.any
-                  [ is_new; Token_id.equal token_id account.token_id ]) ;
+                  [ is_new; Token_id.equal token_id account.token_id ] ) ;
             `Is_new is_new
         end
 
@@ -1814,7 +1814,7 @@ module Base = struct
                         { transaction = commitment
                         ; at_party = (at_party :> Field.t)
                         }
-                        s) ;
+                        s ) ;
                   Boolean.true_
               | (Signature | None_given), None ->
                   Boolean.false_
@@ -1835,7 +1835,7 @@ module Base = struct
                         | None_given ->
                             Signature.dummy
                         | Proof _ ->
-                            assert false)
+                            assert false )
                   in
                   run_checked
                     (let%bind (module S) =
@@ -1844,7 +1844,7 @@ module Base = struct
                      signature_verifies
                        ~shifted:(module S)
                        ~payload_digest:commitment signature
-                       party.data.public_key)
+                       party.data.public_key )
             in
             ( `Proof_verifies proof_verifies
             , `Signature_verifies signature_verifies )
@@ -2002,7 +2002,7 @@ module Base = struct
               Boolean.(equal_source ||| equal_source_with_state)
             in
             Boolean.Assert.all
-              [ correct_coinbase_target_stack; valid_init_state ]))
+              [ correct_coinbase_target_stack; valid_init_state ] ) )
 
     let main ?(witness : Witness.t option) (spec : Spec.t) ~constraint_constants
         snapp_statements (statement : Statement.With_sok.Checked.t) =
@@ -2015,7 +2015,7 @@ module Base = struct
       in
       let pending_coinbase_stack_init =
         exists Pending_coinbase.Stack.typ ~compute:(fun () ->
-            !witness.init_stack)
+            !witness.init_stack )
       in
       let module V = Prover_value in
       run_checked
@@ -2023,7 +2023,7 @@ module Base = struct
            ~pending_coinbase_stack_before:
              statement.source.pending_coinbase_stack
            ~pending_coinbase_stack_after:statement.target.pending_coinbase_stack
-           state_body) ;
+           state_body ) ;
       let init :
           Global_state.t * _ Mina_transaction_logic.Parties_logic.Local_state.t
           =
@@ -2091,11 +2091,11 @@ module Base = struct
                       []
                   | `Start p ->
                       Parties.parties p.parties
-                      |> Parties.Call_forest.map ~f:(fun party -> (party, ())))
+                      |> Parties.Call_forest.map ~f:(fun party -> (party, ())) )
               in
               let h =
                 exists Parties.Digest.Forest.typ ~compute:(fun () ->
-                    Parties.Call_forest.hash (V.get ps))
+                    Parties.Call_forest.hash (V.get ps) )
               in
               let start_data =
                 { Mina_transaction_logic.Parties_logic.Start_data.parties =
@@ -2106,7 +2106,7 @@ module Base = struct
                         | `Skip ->
                             Field.Constant.zero
                         | `Start p ->
-                            p.memo_hash)
+                            p.memo_hash )
                 }
               in
               let global_state, local_state =
@@ -2121,7 +2121,7 @@ module Base = struct
                         | `Compute_in_circuit ->
                             `Compute start_data )
                       S.{ perform }
-                      acc)
+                      acc )
               in
               (* replace any transaction failure with unit value *)
               (global_state, { local_state with failure_status_tbl = () })
@@ -2149,23 +2149,23 @@ module Base = struct
                           if should_pop then (
                             As_prover.Ref.set start_parties ps ;
                             `Start p )
-                          else `Skip)
+                          else `Skip )
                   |> finish
               | `Yes ->
                   as_prover (fun () ->
                       assert (
                         Mina_base.Parties.Call_forest.is_empty
-                          (V.get local.stack_frame.data.calls.data) )) ;
+                          (V.get local.stack_frame.data.calls.data) ) ) ;
                   V.create (fun () ->
                       match As_prover.Ref.get start_parties with
                       | [] ->
                           assert false
                       | p :: ps ->
                           As_prover.Ref.set start_parties ps ;
-                          `Start p)
+                          `Start p )
                   |> finish
             in
-            (acc', statements))
+            (acc', statements) )
       in
       with_label __LOC__ (fun () -> assert (List.is_empty snapp_statements)) ;
       let local_state_ledger =
@@ -2185,15 +2185,15 @@ module Base = struct
               stack_frame = local_state_ledger
             ; call_stack = local.call_stack.hash
             ; ledger = fst local.ledger
-            }) ;
+            } ) ;
       with_label __LOC__ (fun () ->
           run_checked
             (Frozen_ledger_hash.assert_equal (fst global.ledger)
-               statement.target.ledger)) ;
+               statement.target.ledger ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
             (Amount.Checked.assert_equal statement.supply_increase
-               Amount.(var_of_t zero))) ;
+               Amount.(var_of_t zero) ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
             (let expected = statement.fee_excess in
@@ -2205,7 +2205,7 @@ module Base = struct
                    Amount.Signed.Checked.to_fee (fst init).fee_excess
                }
              in
-             Fee_excess.assert_equal_checked expected got)) ;
+             Fee_excess.assert_equal_checked expected got ) ) ;
       let `Needs_some_work_for_zkapps_on_mainnet = Mina_base.Util.todo_zkapps in
       (* TODO: Check various consistency equalities between local and global and the statement *)
       ()
@@ -2244,7 +2244,7 @@ module Base = struct
                 main ?witness:!witness s ~constraint_constants
                   (List.mapi [ snapp_statement ] ~f:(fun i x -> (i, x)))
                   stmt ;
-                [ b ])
+                [ b ] )
           }
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
@@ -2253,7 +2253,7 @@ module Base = struct
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                [])
+                [] )
           }
       | Opt_signed ->
           { identifier = "opt_signed"
@@ -2262,7 +2262,7 @@ module Base = struct
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                [])
+                [] )
           }
   end
 
@@ -2290,7 +2290,7 @@ module Base = struct
       [%with_label "Fee-payer must sign the transaction"]
         ((* TODO: Enable multi-sig. *)
          Public_key.Compressed.Checked.Assert.equal signer_pk
-           payload.common.fee_payer_pk)
+           payload.common.fee_payer_pk )
     in
     (* Compute transaction kind. *)
     let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
@@ -2306,24 +2306,24 @@ module Base = struct
     let fee_token = payload.common.fee_token in
     let%bind fee_token_default =
       make_checked (fun () ->
-          Token_id.(Checked.equal fee_token (Checked.constant default)))
+          Token_id.(Checked.equal fee_token (Checked.constant default)) )
     in
     let token = payload.body.token_id in
     let%bind token_default =
       make_checked (fun () ->
-          Token_id.(Checked.equal token (Checked.constant default)))
+          Token_id.(Checked.equal token (Checked.constant default)) )
     in
     let%bind () =
       Checked.all_unit
         [ [%with_label
             "Token_locked value is compatible with the transaction kind"]
             (Boolean.Assert.any
-               [ Boolean.not payload.body.token_locked; is_create_account ])
+               [ Boolean.not payload.body.token_locked; is_create_account ] )
         ; [%with_label "Token_locked cannot be used with the default token"]
             (Boolean.Assert.any
                [ Boolean.not payload.body.token_locked
                ; Boolean.not token_default
-               ])
+               ] )
         ]
     in
     let%bind () = Boolean.Assert.is_true token_default in
@@ -2337,7 +2337,7 @@ module Base = struct
                   ; is_payment
                   ; is_stake_delegation
                   ; is_fee_transfer
-                  ])
+                  ] )
            ; (* TODO: Remove this check and update the transaction snark once we
                 have an exchange rate mechanism. See issue #4447.
              *)
@@ -2352,7 +2352,7 @@ module Base = struct
                    ; is_fee_transfer
                    ; is_coinbase
                    ])
-           ])
+           ] )
     in
     let current_global_slot =
       Mina_state.Protocol_state.Body.consensus_state state_body
@@ -2448,7 +2448,7 @@ module Base = struct
             in
             [%with_label "target stack and valid init state"]
               (Boolean.Assert.all
-                 [ correct_coinbase_target_stack; valid_init_state ])))
+                 [ correct_coinbase_target_stack; valid_init_state ] ) ) )
     in
     (* Interrogate failure cases. This value is created without constraints;
        the failures should be checked against potential failures to ensure
@@ -2481,7 +2481,7 @@ module Base = struct
          assert_r1cs
            (predicate_failed :> Field.Var.t)
            (is_user_command :> Field.Var.t)
-           (user_command_failure.predicate_failed :> Field.Var.t))
+           (user_command_failure.predicate_failed :> Field.Var.t) )
     in
     let account_creation_amount =
       Amount.Checked.of_fee
@@ -2524,7 +2524,7 @@ module Base = struct
                     Account.Nonce.Checked.equal nonce account.nonce
                   in
                   Boolean.Assert.any
-                    [ Boolean.not is_user_command; nonce_matches ])
+                    [ Boolean.not is_user_command; nonce_matches ] )
              in
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
@@ -2569,7 +2569,7 @@ module Base = struct
                     Amount.Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg
                   in
                   Amount.Signed.Checked.(
-                    add fee_payer_amount account_creation_fee))
+                    add fee_payer_amount account_creation_fee) )
              in
              let txn_global_slot = current_global_slot in
              let%bind `Min_balance _, timing =
@@ -2591,7 +2591,7 @@ module Base = struct
                       (Boolean.Assert.is_true ok)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:(Some txn_amount) ~txn_global_slot)
+                    ~txn_amount:(Some txn_amount) ~txn_global_slot )
              in
              let%bind balance =
                [%with_label "Check payer balance"]
@@ -2605,7 +2605,7 @@ module Base = struct
                make_checked (fun () ->
                    Token_id.Checked.if_ is_empty_and_writeable
                      ~then_:(Account_id.Checked.token_id fee_payer)
-                     ~else_:account.token_id)
+                     ~else_:account.token_id )
              and delegate =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
                  ~then_:(Account_id.Checked.public_key fee_payer)
@@ -2624,7 +2624,7 @@ module Base = struct
              ; permissions = account.permissions
              ; zkapp = account.zkapp
              ; zkapp_uri = account.zkapp_uri
-             }))
+             } ) )
     in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
@@ -2649,7 +2649,7 @@ module Base = struct
              ~then_:(Amount.Checked.of_fee fee)
              ~else_:(Amount.var_of_t Amount.zero)
          in
-         Amount.Checked.sub base_amount coinbase_receiver_fee)
+         Amount.Checked.sub base_amount coinbase_receiver_fee )
     in
     let receiver_overflow = ref Boolean.false_ in
     let%bind root_after_receiver_update =
@@ -2674,7 +2674,7 @@ module Base = struct
              let%bind () =
                [%with_label "Receiver existence failure matches predicted"]
                  (Boolean.Assert.( = ) is_empty_failure
-                    user_command_failure.receiver_not_present)
+                    user_command_failure.receiver_not_present )
              in
              let is_empty_and_writeable =
                (* is_empty_and_writable && not is_empty_failure *)
@@ -2708,11 +2708,11 @@ module Base = struct
                             transfers.
                        *)
                        Boolean.Assert.( = ) token_should_not_create
-                         token_cannot_create)
+                         token_cannot_create )
                   in
                   [%with_label "equal token_cannot_create"]
                     (Boolean.Assert.( = ) token_cannot_create
-                       user_command_failure.token_cannot_create))
+                       user_command_failure.token_cannot_create ) )
              in
              let%bind balance =
                (* [receiver_increase] will be zero in the stake delegation
@@ -2732,7 +2732,7 @@ module Base = struct
                    [%with_label
                      "Receiver creation fee failure matches predicted"]
                      (Boolean.Assert.( = ) underflow
-                        user_command_failure.amount_insufficient_to_create)
+                        user_command_failure.amount_insufficient_to_create )
                  in
                  Currency.Amount.Checked.if_ user_command_fails
                    ~then_:Amount.(var_of_t zero)
@@ -2787,7 +2787,7 @@ module Base = struct
              and token_id =
                make_checked (fun () ->
                    Token_id.Checked.if_ is_empty_and_writeable ~then_:token
-                     ~else_:account.token_id)
+                     ~else_:account.token_id )
              and token_owner =
                (* TODO: Delete token permissions *)
                Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
@@ -2811,7 +2811,7 @@ module Base = struct
              ; permissions = account.permissions
              ; zkapp = account.zkapp
              ; zkapp_uri = account.zkapp_uri
-             }))
+             } ) )
     in
     let%bind user_command_fails =
       Boolean.(!receiver_overflow ||| user_command_fails)
@@ -2836,7 +2836,7 @@ module Base = struct
              let%bind () =
                [%with_label "Check source presence failure matches predicted"]
                  (Boolean.Assert.( = ) is_empty_and_writeable
-                    user_command_failure.source_not_present)
+                    user_command_failure.source_not_present )
              in
              let%bind () =
                [%with_label
@@ -2859,7 +2859,7 @@ module Base = struct
                   *)
                   [%with_label "Check num_failures"]
                     (assert_r1cs not_fee_payer_is_source num_failures
-                       num_failures))
+                       num_failures ) )
              in
              let%bind amount =
                (* Only payments should affect the balance at this stage. *)
@@ -2874,7 +2874,7 @@ module Base = struct
                       "Check source balance failure matches predicted"]
                       (Boolean.Assert.( = ) ok
                          (Boolean.not
-                            user_command_failure.source_insufficient_balance))
+                            user_command_failure.source_insufficient_balance ) )
                   in
                   let timed_balance_check ok =
                     [%with_label
@@ -2887,10 +2887,10 @@ module Base = struct
                                    .source_insufficient_balance)
                        in
                        Boolean.Assert.( = ) not_ok
-                         user_command_failure.source_bad_timing)
+                         user_command_failure.source_bad_timing )
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:(Some amount) ~txn_global_slot)
+                    ~txn_amount:(Some amount) ~txn_global_slot )
              in
              let%bind balance, `Underflow underflow =
                Balance.Checked.sub_amount_flagged account.balance amount
@@ -2901,7 +2901,7 @@ module Base = struct
                *)
                [%with_label "Check source balance failure matches predicted"]
                  (Boolean.Assert.( = ) underflow
-                    user_command_failure.source_insufficient_balance)
+                    user_command_failure.source_insufficient_balance )
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
@@ -2925,7 +2925,7 @@ module Base = struct
              ; permissions = account.permissions
              ; zkapp = account.zkapp
              ; zkapp_uri = account.zkapp_uri
-             }))
+             } ) )
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee
@@ -2957,7 +2957,7 @@ module Base = struct
                    [ not is_fee_transfer; not fee_transfer_excess_overflowed ])
            in
            Signed.Checked.if_ is_fee_transfer ~then_:fee_transfer_excess
-             ~else_:user_command_excess)
+             ~else_:user_command_excess )
     in
     let%bind supply_increase =
       Amount.Checked.if_ is_coinbase ~then_:payload.body.amount
@@ -3031,7 +3031,7 @@ module Base = struct
         make_checked (fun () ->
             Token_id.Checked.if_ fee_excess_zero
               ~then_:Token_id.(Checked.constant default)
-              ~else_:t.payload.common.fee_token)
+              ~else_:t.payload.common.fee_token )
       in
       { Fee_excess.fee_token_l
       ; fee_excess_l = Amount.Signed.Checked.to_fee fee_excess
@@ -3043,14 +3043,14 @@ module Base = struct
       [%with_label "local state check"]
         (make_checked (fun () ->
              Local_state.Checked.assert_equal statement.source.local_state
-               statement.target.local_state))
+               statement.target.local_state ) )
     in
     Checked.all_unit
       [ [%with_label "equal roots"]
           (Frozen_ledger_hash.assert_equal root_after statement.target.ledger)
       ; [%with_label "equal supply_increases"]
           (Currency.Amount.Checked.assert_equal supply_increase
-             statement.supply_increase)
+             statement.supply_increase )
       ; [%with_label "equal fee excesses"]
           (Fee_excess.assert_equal_checked fee_excess statement.fee_excess)
       ]
@@ -3061,7 +3061,7 @@ module Base = struct
     ; main =
         (fun [] x ->
           Run.run_checked (main ~constraint_constants x) ;
-          [])
+          [] )
     ; main_value = (fun [] _ -> [])
     }
 
@@ -3105,7 +3105,7 @@ module Merge = struct
   let%snarkydef main
       ([ s1; s2 ] :
         (Statement.With_sok.var * (Statement.With_sok.var * _))
-        Pickles_types.Hlist.HlistId.t) (s : Statement.With_sok.Checked.t) =
+        Pickles_types.Hlist.HlistId.t ) (s : Statement.With_sok.Checked.t) =
     let%bind fee_excess =
       Fee_excess.combine_checked s1.Statement.fee_excess s2.Statement.fee_excess
     in
@@ -3120,7 +3120,7 @@ module Merge = struct
                ( s2.source.pending_coinbase_stack
                , s2.target.pending_coinbase_stack )
          in
-         Boolean.Assert.is_true valid_pending_coinbase_stack_transition)
+         Boolean.Assert.is_true valid_pending_coinbase_stack_transition )
     in
     let%bind supply_increase =
       Amount.Checked.add s1.supply_increase s2.supply_increase
@@ -3130,7 +3130,7 @@ module Merge = struct
           Local_state.Checked.assert_equal s.source.local_state
             s1.source.local_state ;
           Local_state.Checked.assert_equal s.target.local_state
-            s2.target.local_state)
+            s2.target.local_state )
     in
     Checked.all_unit
       [ [%with_label "equal fee excesses"]
@@ -3159,7 +3159,7 @@ module Merge = struct
     ; main =
         (fun ps x ->
           Run.run_checked (main ps x) ;
-          [ b; b ])
+          [ b; b ] )
     ; main_value = (fun _ _ -> [ prev_should_verify; prev_should_verify ])
     }
 end
@@ -3191,7 +3191,7 @@ let system ~proof_level ~constraint_constants =
         ~name:"transaction-snark"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants)
+             constraint_constants )
         ~choices:(fun ~self ->
           let parties x =
             Base.Parties_snark.rule ~constraint_constants ~proof_level x
@@ -3201,7 +3201,7 @@ let system ~proof_level ~constraint_constants =
           ; parties Opt_signed_opt_signed
           ; parties Opt_signed
           ; parties Proved
-          ]))
+          ] ) )
 
 module Verification = struct
   module type S = sig
@@ -3282,8 +3282,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
                  (let open Checked in
                  exists Statement.With_sok.typ
                    ~compute:(As_prover.return statement)
-                 >>= Base.main ~constraint_constants))
-              handler))
+                 >>= Base.main ~constraint_constants) )
+              handler ) )
       : unit )
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
@@ -3346,7 +3346,7 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
   match
     to_preunion
       (Transaction.forget
-         (Transaction_protocol_state.transaction transaction_in_block))
+         (Transaction_protocol_state.transaction transaction_in_block) )
   with
   | `Parties _ ->
       failwith "Called non-party transaction with parties transaction"
@@ -3363,7 +3363,7 @@ let verify (ts : (t * _) list) ~key =
     List.for_all ts ~f:(fun ({ statement; _ }, message) ->
         Sok_message.Digest.equal
           (Sok_message.digest message)
-          statement.sok_digest)
+          statement.sok_digest )
   then
     Pickles.verify
       (module Nat.N2)
@@ -3382,7 +3382,7 @@ let constraint_system_digests ~constraint_constants () =
               let open Tick in
               let%bind x1 = exists Statement.With_sok.typ in
               let%bind x2 = exists Statement.With_sok.typ in
-              main [ x1; x2 ] x)) )
+              main [ x1; x2 ] x )) )
   ; ( "transaction-base"
     , digest
         Base.(
@@ -3497,7 +3497,7 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~before ~after
           :: acc )
     | ( (({ authorization = a1; _ } as p)
-        :: ({ authorization = Proof _; _ } :: _ as parties))
+        :: ({ authorization = Proof _; _ } :: _ as parties) )
         :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party contains a proof, don't pair it with this party. *)
@@ -3518,7 +3518,7 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~before ~after
           :: acc )
     | ( (({ authorization = (Signature _ | None_given) as a1; _ } as p)
-        :: { authorization = (Signature _ | None_given) as a2; _ } :: parties)
+        :: { authorization = (Signature _ | None_given) as a2; _ } :: parties )
         :: partiess
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
@@ -3533,7 +3533,7 @@ let group_by_parties_rev (partiess : Party.t list list)
           :: acc )
     | ( []
         :: (({ authorization = a1; _ } as p)
-           :: ({ authorization = Proof _; _ } :: _ as parties))
+           :: ({ authorization = Proof _; _ } :: _ as parties) )
            :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party is in the next transaction, and the next party contains a
@@ -3546,7 +3546,8 @@ let group_by_parties_rev (partiess : Party.t list list)
           :: acc )
     | ( []
         :: (({ authorization = (Signature _ | None_given) as a1; _ } as p)
-           :: { authorization = (Signature _ | None_given) as a2; _ } :: parties)
+           :: { authorization = (Signature _ | None_given) as a2; _ } :: parties
+           )
            :: partiess
       , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
@@ -3589,7 +3590,7 @@ let group_by_parties_rev (partiess : Party.t list list)
     | ( []
         :: [ ({ authorization = (Signature _ | None_given) as a1; _ } as p) ]
            :: ({ authorization = (Signature _ | None_given) as a2; _ }
-              :: parties)
+              :: parties )
               :: partiess
       , [ _ ]
         :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
@@ -3658,7 +3659,7 @@ let group_by_parties_rev (partiess : Party.t list list)
     | ([] | [ _ ]) :: (_ :: _) :: _, [ _ ] ->
         failwith
           "group_by_parties_rev: No statements given for the next transaction"
-    | [] :: [ _ ] :: (_ :: _) :: _, [ _; (_ :: _ :: _) ] ->
+    | [] :: [ _ ] :: (_ :: _) :: _, [ _; _ :: _ :: _ ] ->
         failwith
           "group_by_parties_rev: No statements given for transaction after next"
   in
@@ -3683,14 +3684,14 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
       ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
       * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
       * Parties.t )
-      list) =
+      list ) =
   let sparse_ledger =
     match ledger with
     | `Ledger ledger ->
         Sparse_ledger.of_ledger_subset_exn ledger
           (List.concat_map
              ~f:(fun (_, _, parties) -> Parties.accounts_accessed parties)
-             partiess)
+             partiess )
     | `Sparse_ledger sparse_ledger ->
         sparse_ledger
   in
@@ -3704,7 +3705,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           |> Or_error.ok_exn
         in
         let final_state = fst (List.last_exn states) in
-        (final_state.fee_excess, final_state.ledger, states :: statess_rev))
+        (final_state.fee_excess, final_state.ledger, states :: statess_rev) )
   in
   let states = List.rev states_rev in
   let states_rev =
@@ -3744,7 +3745,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           , pending_coinbase_stack_state
           , { Mina_transaction_logic.Parties_logic.Start_data.parties
             ; memo_hash = Signed_command_memo.hash parties.memo
-            } ))
+            } ) )
     in
     ref partiess
   in
@@ -3820,13 +3821,13 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
                   Parties.Transaction_commitment.create_complete next_commitment
                     ~memo_hash ~fee_payer_hash
                 in
-                (next_commitment, next_full_commitment))
+                (next_commitment, next_full_commitment) )
           in
           match kind with
           | `Same ->
               let next_commitment, next_full_commitment =
                 empty_if_last (fun () ->
-                    (current_commitment, current_full_commitment))
+                    (current_commitment, current_full_commitment) )
               in
               ( []
               , next_commitment
@@ -3896,7 +3897,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
               , _
               , _
               , _ )
-              Mina_transaction_logic.Parties_logic.Local_state.t) =
+              Mina_transaction_logic.Parties_logic.Local_state.t ) =
           let stack_frame (stack_frame : Stack_frame.value) =
             { stack_frame with
               calls =
@@ -3908,9 +3909,9 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           ; call_stack =
               List.map local.call_stack ~f:(fun f ->
                   With_hash.of_data (stack_frame f)
-                    ~hash_data:Stack_frame.Digest.create)
+                    ~hash_data:Stack_frame.Digest.create )
               |> accumulate_call_stack_hashes ~hash_frame:(fun x ->
-                     x.With_hash.hash)
+                     x.With_hash.hash )
           }
         in
         let source_local =
@@ -3945,7 +3946,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
                   (sprintf
                      !"unexpected fee excess. source %{sexp: Amount.Signed.t} \
                        target %{sexp: Amount.Signed.t}"
-                     target_global.fee_excess source_global.fee_excess)
+                     target_global.fee_excess source_global.fee_excess )
             | Some balance_change ->
                 balance_change
           in
@@ -3996,7 +3997,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           ; sok_digest = Sok_message.Digest.default
           }
         in
-        (w, spec, statement, snapp_stmt) :: witnesses)
+        (w, spec, statement, snapp_stmt) :: witnesses )
   , final_ledger )
 
 module Make (Inputs : sig
@@ -4028,7 +4029,7 @@ struct
   let verify ts =
     if
       List.for_all ts ~f:(fun (p, m) ->
-          Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest)
+          Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest )
     then
       Proof.verify
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
@@ -4041,8 +4042,8 @@ struct
             List.iter witness.start_parties ~f:(fun s ->
                 Parties.Call_forest.iteri
                   ~f:(fun _i x -> return (Some x))
-                  s.parties.other_parties) ;
-            None)
+                  s.parties.other_parties ) ;
+            None )
     | xs ->
         Parties.Call_forest.hd_party xs |> Option.map ~f:fst
 
@@ -4068,7 +4069,7 @@ struct
       in
       match
         Option.value_map ~default:None account.zkapp ~f:(fun s ->
-            s.verification_key)
+            s.verification_key )
       with
       | None ->
           failwith "No verification key found in the account"
@@ -4109,7 +4110,7 @@ struct
       base []
         ~handler:
           (Base.transaction_union_handler handler transaction state_body
-             init_stack)
+             init_stack )
         statement
     in
     { statement; proof }
@@ -4137,7 +4138,7 @@ struct
         transaction =
           Command
             (Signed_command
-               (Transaction_protocol_state.transaction user_command_in_block))
+               (Transaction_protocol_state.transaction user_command_in_block) )
       }
       handler
 
@@ -4209,7 +4210,7 @@ module For_tests = struct
                      Pickles_types.Hlist0.H1
                        (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                      .t ->
-              [])
+              [] )
         ; main_value = (fun [] _ -> [])
         }
       in
@@ -4222,7 +4223,7 @@ module For_tests = struct
         ~name:"trivial"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants)
+             constraint_constants )
         ~choices:(fun ~self ->
           [ trivial_rule
           ; { identifier = "dummy"
@@ -4234,7 +4235,7 @@ module For_tests = struct
                   |> fun () ->
                   (* Unsatisfiable. *)
                   Run.exists Field.typ ~compute:(fun () ->
-                      Run.Field.Constant.zero)
+                      Run.Field.Constant.zero )
                   |> fun s ->
                   Run.Field.(Assert.equal s (s + one))
                   |> fun () :
@@ -4243,9 +4244,9 @@ module For_tests = struct
                          Pickles_types.Hlist0.H1
                            (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                          .t ->
-                  [ Boolean.true_; Boolean.true_ ])
+                  [ Boolean.true_; Boolean.true_ ] )
             }
-          ])
+          ] )
     in
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
     ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
@@ -4380,7 +4381,7 @@ module For_tests = struct
             ; authorization =
                 Control.Signature Signature.dummy (*To be updated later*)
             }
-            : Party.Wire.t ))
+            : Party.Wire.t ) )
     in
     let other_receivers =
       List.map receivers ~f:(fun (receiver, amt) : Party.Wire.t ->
@@ -4400,7 +4401,7 @@ module For_tests = struct
               ; caller = Call
               }
           ; authorization = Control.None_given
-          })
+          } )
     in
     let other_parties_data =
       Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
@@ -4441,7 +4442,7 @@ module For_tests = struct
             Signature_lib.Schnorr.Chunked.sign sender.private_key
               (Random_oracle.Input.Chunked.field commitment)
           in
-          { body = s.body; authorization = Signature sender_signature_auth })
+          { body = s.body; authorization = Signature sender_signature_auth } )
     in
     ( `Parties
         (Parties.of_wire { fee_payer; other_parties = other_receivers; memo })
@@ -4459,8 +4460,7 @@ module For_tests = struct
     *)
     assert (
       Zkapp_basic.Set_or_keep.is_keep spec.snapp_update.timing
-      || (spec.new_zkapp_account && List.length spec.zkapp_account_keypairs = 1)
-    ) ;
+      || (spec.new_zkapp_account && List.length spec.zkapp_account_keypairs = 1) ) ;
     let update_vk =
       let update = spec.snapp_update in
       { update with
@@ -4496,7 +4496,7 @@ module For_tests = struct
               (Random_oracle.Input.Chunked.field commitment)
           in
           ( { body = snapp_party.body; authorization = Signature signature }
-            : Party.Wire.t ))
+            : Party.Wire.t ) )
     in
     let other_parties = Option.to_list sender_party @ snapp_parties in
     let parties : Parties.t =
@@ -4528,7 +4528,7 @@ module For_tests = struct
                   Parties.Call_forest.With_hashes.of_parties_list
                     (List.map
                        ~f:(fun p -> (p, ()))
-                       (List.drop snapp_parties ndx))
+                       (List.drop snapp_parties ndx) )
                 in
                 Parties.Call_forest.hash ps
               in
@@ -4580,7 +4580,7 @@ module For_tests = struct
                   : Party.Wire.t )
           | _ ->
               failwith
-                "Current authorization not Proof or Signature or None_given")
+                "Current authorization not Proof or Signature or None_given" )
     in
     let other_parties = snapp_parties in
     let parties : Parties.t =

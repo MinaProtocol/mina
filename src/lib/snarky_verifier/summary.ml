@@ -37,7 +37,7 @@ module Make (Inputs : Inputs_intf) = struct
       @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.to_list x)
       @ List.concat_map gts ~f:(fun (a, _) -> Fqe.to_list a)
       |> Checked.List.map ~f:(fun x ->
-             Field.Checked.choose_preimage_var x ~length:Field.size_in_bits)
+             Field.Checked.choose_preimage_var x ~length:Field.size_in_bits )
       >>| List.concat
     and signs =
       let parity x =

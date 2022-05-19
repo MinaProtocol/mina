@@ -6,7 +6,7 @@ let padded_array_typ ~length ~dummy elt =
        ~there:(fun a ->
          let n = Array.length a in
          if n > length then failwithf "Expected %d <= %d" n length () ;
-         Array.append a (Array.create ~len:(length - n) dummy))
+         Array.append a (Array.create ~len:(length - n) dummy) )
        ~back:Fn.id
 
 let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
@@ -83,8 +83,8 @@ module Evals = struct
           |> Snarky_backendless.Typ.transport
                ~there:(fun arr ->
                  Array.append arr
-                   (Array.create ~len:(length - Array.length arr) default))
-               ~back:Fn.id)
+                   (Array.create ~len:(length - Array.length arr) default) )
+               ~back:Fn.id )
     in
     let t =
       let l1, l2 = to_vectors lengths in
@@ -105,8 +105,8 @@ module All_evals = struct
       end
     end]
 
-    let map (type a1 a2 b1 b2) (t : (a1, a2) t) ~(f1 : a1 -> b1)
-        ~(f2 : a2 -> b2) : (b1, b2) t =
+    let map (type a1 a2 b1 b2) (t : (a1, a2) t) ~(f1 : a1 -> b1) ~(f2 : a2 -> b2)
+        : (b1, b2) t =
       { public_input = f1 t.public_input; evals = Evals.map ~f:f2 t.evals }
 
     let typ lengths (elt : ('a, 'b, 'f) Snarky_backendless.Typ.t) ~default =
@@ -216,9 +216,9 @@ module Poly_comm = struct
              let a = Array.map a ~f:(fun x -> (true, x)) in
              let n = Array.length a in
              if n > length then failwithf "Expected %d <= %d" n length () ;
-             Array.append a (Array.create ~len:(length - n) (false, dummy)))
+             Array.append a (Array.create ~len:(length - n) (false, dummy)) )
            ~back:(fun a ->
-             Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None))
+             Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None) )
 
     let typ (type f g g_var bool_var)
         (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
@@ -232,7 +232,7 @@ module Poly_comm = struct
             | Or_infinity.Infinity ->
                 (false, dummy_group_element)
             | Finite x ->
-                (true, x))
+                (true, x) )
           ~back:(fun (b, x) -> if b then Infinity else Finite x)
       in
       let arr = padded_array_typ0 ~length ~dummy:Or_infinity.Infinity g_inf in

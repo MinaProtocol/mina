@@ -407,7 +407,7 @@ module Wrap = struct
         ; app_state_to_field_elements app_state
         ; Array.of_list
             (List.concat_map ~f:g
-               (Vector.to_list challenge_polynomial_commitments))
+               (Vector.to_list challenge_polynomial_commitments) )
         ; Vector.to_array old_bulletproof_challenges
           |> Array.concat_map ~f:Vector.to_array
         ]
@@ -422,7 +422,7 @@ module Wrap = struct
         [ app_state_to_field_elements app_state
         ; Array.of_list
             (List.concat_map ~f:g
-               (Vector.to_list challenge_polynomial_commitments))
+               (Vector.to_list challenge_polynomial_commitments) )
         ; Vector.to_array old_bulletproof_challenges
           |> Array.concat_map ~f:Vector.to_array
         ]
@@ -447,7 +447,7 @@ module Wrap = struct
          ; challenge_polynomial_commitments
          ; old_bulletproof_challenges
          ] :
-          (unit, _) t) =
+          (unit, _) t ) =
       { app_state
       ; dlog_plonk_index
       ; challenge_polynomial_commitments
@@ -603,7 +603,7 @@ module Wrap = struct
            ; pass_through
              (* pass_through is represented as a digest inside the circuit *)
            } :
-            _ t) =
+            _ t ) =
         let open Vector in
         let fp =
           combined_inner_product :: b :: zeta_to_srs_length
@@ -643,7 +643,8 @@ module Wrap = struct
                      :: poseidon_selector
                         :: vbmul
                            :: complete_add
-                              :: endomul :: endomul_scalar :: perm :: generic) =
+                              :: endomul :: endomul_scalar :: perm :: generic )
+            =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -868,7 +869,7 @@ module Step = struct
              ; should_finalize
              ; sponge_digest_before_evaluations
              } :
-              _ t) =
+              _ t ) =
           let open Vector in
           let fq =
             combined_inner_product :: b :: zeta_to_srs_length
@@ -972,8 +973,7 @@ module Step = struct
         Vector (Per_proof.In_circuit.spec Backend.Tock.Rounds.n, proofs_verified)
       in
       spec unfinalized_proofs (B Spec.Digest)
-      |> Spec.typ impl fq ~challenge:`Constrained
-           ~scalar_challenge:`Unconstrained
+      |> Spec.typ impl fq
       |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
       |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
   end

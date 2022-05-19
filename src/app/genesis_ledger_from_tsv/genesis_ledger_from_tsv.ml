@@ -2,8 +2,7 @@
 
 (* columns in spreadsheet:
 
- Wallet Address (Public Key)|Amount (MINA)|Initial Minimum Balance|(MINA) Cliff Time (Months)|Cliff Unlock Amount (MINA)|Unlock Frequency (0: per slot, 1: per month)|Unlock Amount (MINA)|Delegate (Public Key) [Optional]
-
+   Wallet Address (Public Key)|Amount (MINA)|Initial Minimum Balance|(MINA) Cliff Time (Months)|Cliff Unlock Amount (MINA)|Unlock Frequency (0: per slot, 1: per month)|Unlock Amount (MINA)|Delegate (Public Key) [Optional]
 *)
 
 open Core_kernel
@@ -86,7 +85,7 @@ let generate_missing_delegate_accounts ~logger =
   let delegates = String.Table.keys delegates_tbl in
   let missing_delegates =
     List.filter delegates ~f:(fun delegate ->
-        not (String.Table.mem accounts_tbl delegate))
+        not (String.Table.mem accounts_tbl delegate) )
   in
   let delegate_accounts =
     List.map missing_delegates ~f:(generate_delegate_account ~logger)
@@ -167,7 +166,7 @@ let account_of_tsv ~logger tsv =
       Some
         (runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
            ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
-           ~delegatee_pk)
+           ~delegatee_pk )
   | _ ->
       (* should not occur, we've already validated the record *)
       failwithf "TSV line does not contain expected number of fields: %s" tsv ()
@@ -231,7 +230,7 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
   let valid_str = "VALID" in
   let invalid_fields =
     List.map valid_field_descs ~f:(fun (field, valid) ->
-        if valid then valid_str else field)
+        if valid then valid_str else field )
     |> List.filter ~f:(fun field -> not (String.equal field valid_str))
     |> String.concat ~sep:","
   in
@@ -288,7 +287,7 @@ let main ~tsv_file ~output_file () =
         in
         (* skip first line *)
         let _headers = In_channel.input_line in_channel in
-        go 0 false)
+        go 0 false )
   in
   if validation_errors then (
     [%log fatal] "Input has validation errors, exiting" ;
@@ -313,7 +312,7 @@ let main ~tsv_file ~output_file () =
         in
         (* skip first line *)
         let _headers = In_channel.input_line in_channel in
-        go [] 0)
+        go [] 0 )
   in
   [%log info] "Processed %d records" num_accounts ;
   let generated_accounts, num_generated =
@@ -329,7 +328,7 @@ let main ~tsv_file ~output_file () =
       List.iter jsons ~f:(fun json ->
           Out_channel.output_string out_channel
             (Yojson.Safe.pretty_to_string json) ;
-          Out_channel.newline out_channel)) ;
+          Out_channel.newline out_channel ) ) ;
   return ()
 
 let () =
@@ -350,4 +349,4 @@ let () =
                 format"
              Param.(required string)
          in
-         main ~tsv_file ~output_file)))
+         main ~tsv_file ~output_file )))

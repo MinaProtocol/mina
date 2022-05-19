@@ -79,7 +79,7 @@ module Worker_state = struct
                    | `Invalid_signature _
                    | `Invalid_proof
                    | `Missing_verification_key _ ->
-                       [])
+                       [] )
                in
                let%map all_verified =
                  Pickles.Side_loaded.verify
@@ -98,7 +98,7 @@ module Worker_state = struct
                  | `Invalid_proof ->
                      `Invalid_proof
                  | `Missing_verification_key keys ->
-                     `Missing_verification_key keys)
+                     `Missing_verification_key keys )
 
              let verify_blockchain_snarks = B.Proof.verify
 
@@ -116,7 +116,7 @@ module Worker_state = struct
              let get_blockchain_verification_key () =
                Lazy.force B.Proof.verification_key
            end in
-          (module M : S))
+          (module M : S) )
     | Check | None ->
         Deferred.return
         @@ ( module struct
@@ -134,7 +134,7 @@ module Worker_state = struct
                    | `Invalid_proof ->
                        `Invalid_proof
                    | `Missing_verification_key keys ->
-                       `Missing_verification_key keys)
+                       `Missing_verification_key keys )
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return true
@@ -155,7 +155,7 @@ module Worker_state = struct
 
                    let proof_level = proof_level
                  end) in
-                 Lazy.force B.Proof.verification_key)
+                 Lazy.force B.Proof.verification_key )
 
              let get_blockchain_verification_key () = Lazy.force vk
            end : S )
@@ -206,7 +206,7 @@ module Worker = struct
         M.verify_blockchain_snarks
           (List.map chains ~f:(fun snark ->
                ( Blockchain_snark.Blockchain.state snark
-               , Blockchain_snark.Blockchain.proof snark )))
+               , Blockchain_snark.Blockchain.proof snark ) ) )
 
       let verify_transaction_snarks (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
@@ -269,7 +269,7 @@ module Worker = struct
             ~transport:
               (Logger_file_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
-                 ~log_filename:"mina-verifier.log" ~max_size ~num_rotate) ) ;
+                 ~log_filename:"mina-verifier.log" ~max_size ~num_rotate ) ) ;
         [%log info] "Verifier started" ;
         Worker_state.create
           { conf_dir; logger; proof_level; constraint_constants }
@@ -318,12 +318,12 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
             (fun exn ->
               let err = Error.of_exn ~backtrace:`Get exn in
               [%log error] "Error from verifier worker $err"
-                ~metadata:[ ("err", Error_json.error_to_yojson err) ]))
+                ~metadata:[ ("err", Error_json.error_to_yojson err) ] ) )
         (fun () ->
           Worker.spawn_in_foreground_exn
             ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
-            ~shutdown_on:Disconnect ~connection_state_init_arg:()
-            { conf_dir; logger; proof_level; constraint_constants })
+            ~shutdown_on:Connection_closed ~connection_state_init_arg:()
+            { conf_dir; logger; proof_level; constraint_constants } )
       |> Deferred.Result.map_error ~f:Error.of_exn
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger process
@@ -350,14 +350,14 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
          ~f:(fun stdout ->
            return
            @@ [%log debug] "Verifier stdout: $stdout"
-                ~metadata:[ ("stdout", `String stdout) ]) ;
+                ~metadata:[ ("stdout", `String stdout) ] ) ;
     don't_wait_for
     @@ Pipe.iter
          (Process.stderr process |> Reader.pipe)
          ~f:(fun stderr ->
            return
            @@ [%log error] "Verifier stderr: $stderr"
-                ~metadata:[ ("stderr", `String stderr) ]) ;
+                ~metadata:[ ("stderr", `String stderr) ] ) ;
     { connection; process; exit_or_signal }
   in
   let%map worker = create_worker () |> Deferred.Or_error.ok_exn in
@@ -383,7 +383,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
              begin creating a new process anyway.
           *)
           (let%map () = after (Time.Span.of_sec 10.) in
-           Ivar.fill_if_empty create_worker_trigger ()) ;
+           Ivar.fill_if_empty create_worker_trigger () ) ;
         let () =
           match e with
           | `Unexpected_termination ->
@@ -427,7 +427,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
                ( ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
                :: exit_metadata ) ;
            Child_processes.Termination.remove pids pid ;
-           Ivar.fill_if_empty create_worker_trigger ()) ;
+           Ivar.fill_if_empty create_worker_trigger () ) ;
         don't_wait_for
           (let%bind () = Ivar.read create_worker_trigger in
            let rec try_create_worker () =
@@ -444,7 +444,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
                  let%bind () = after Time.Span.(of_sec 5.) in
                  try_create_worker ()
            in
-           try_create_worker ()))
+           try_create_worker () ) )
   in
   on_worker worker ;
   { worker = worker_ref; logger }
@@ -489,7 +489,7 @@ let verify_blockchain_snarks { worker; logger } chains =
             ; Worker.Connection.run connection
                 ~f:Worker.functions.verify_blockchains ~arg:chains
               |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
-            ]))
+            ] ) )
 
 let verify_transaction_snarks { worker; logger } ts =
   O1trace.thread "dispatch_transaction_snark_verification" (fun () ->
@@ -501,14 +501,14 @@ let verify_transaction_snarks { worker; logger } ts =
             let%bind { connection; _ } = Ivar.read !worker in
             Worker.Connection.run connection
               ~f:Worker.functions.verify_transaction_snarks ~arg:ts
-            |> Deferred.Or_error.map ~f:(fun x -> `Continue x))
+            |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
       in
       [%log trace] "verify $n transaction_snarks (after)!"
         ~metadata:
           ( ( "result"
             , `String (Sexp.to_string ([%sexp_of: bool Or_error.t] res)) )
           :: metadata ) ;
-      res)
+      res )
 
 let verify_commands { worker; logger } ts =
   O1trace.thread "dispatch_user_command_verification" (fun () ->
@@ -516,7 +516,7 @@ let verify_commands { worker; logger } ts =
           let%bind { connection; _ } = Ivar.read !worker in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:ts
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))
+          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
 
 let get_blockchain_verification_key { worker; logger } =
   O1trace.thread "dispatch_blockchain_verification_key" (fun () ->
@@ -524,4 +524,4 @@ let get_blockchain_verification_key { worker; logger } =
           let%bind { connection; _ } = Ivar.read !worker in
           Worker.Connection.run connection
             ~f:Worker.functions.get_blockchain_verification_key ~arg:()
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x)))
+          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )

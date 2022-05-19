@@ -40,7 +40,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type t =
     { uuid : Uuid.Stable.V1.t
     ; account_tbl : Account.t Location_binable.Table.t
-    ; token_owners : Account_id.Stable.Latest.t Token_id.Table.t
+    ; token_owners : Account_id.t Token_id.Table.t
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
     ; hash_tbl : Hash.t Addr.Table.t
@@ -185,7 +185,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             | Some account ->
                 `Fst (location, Some account)
             | None ->
-                `Snd location)
+                `Snd location )
       in
       found_accounts @ Base.get_batch (get_parent t) leftover_locations
 
@@ -287,7 +287,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             | Some prev_loc ->
                 t.current_location <- Some prev_loc
             | None ->
-                t.current_location <- None) ;
+                t.current_location <- None ) ;
       (* update hashes *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
@@ -297,7 +297,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           account_hash
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          self_set_hash t addr hash)
+          self_set_hash t addr hash )
 
     (* a write writes only to the mask, parent is not involved need to update
        both account and hash pieces of the mask *)
@@ -318,7 +318,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           account_hash
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          self_set_hash t addr hash)
+          self_set_hash t addr hash )
 
     (* if the mask's parent sets an account, we can prune an entry in the mask
        if the account in the parent is the same in the mask *)
@@ -364,7 +364,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               Some account
           | None -> (
               try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
-              with _ -> None ))
+              with _ -> None ) )
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
@@ -384,7 +384,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           [%test_result: Hash.t]
             ~message:"Merkle root of the mask should delegate to the parent now"
             ~expect:(merkle_root t)
-            (Base.merkle_root (get_parent t)))
+            (Base.merkle_root (get_parent t)) )
 
     (* copy tables in t; use same parent *)
     let copy t =
@@ -420,7 +420,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               | _ ->
                   failwith
                     "last_filled: expected account locations for the parent \
-                     and mask" ))
+                     and mask" ) )
 
     include Merkle_ledger.Util.Make (struct
       module Location = Location
@@ -451,12 +451,12 @@ module Make (Inputs : Inputs_intf.S) = struct
 
       let set_raw_hash_batch t locations_and_hashes =
         List.iter locations_and_hashes ~f:(fun (location, hash) ->
-            self_set_hash t (Location.to_path_exn location) hash)
+            self_set_hash t (Location.to_path_exn location) hash )
 
       let set_location_batch ~last_location t account_to_location_list =
         t.current_location <- Some last_location ;
         Non_empty_list.iter account_to_location_list ~f:(fun (key, data) ->
-            Account_id.Table.set t.location_tbl ~key ~data)
+            Account_id.Table.set t.location_tbl ~key ~data )
 
       let set_raw_account_batch t locations_and_accounts =
         List.iter locations_and_accounts ~f:(fun (location, account) ->
@@ -464,7 +464,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             Token_id.Table.set t.token_owners
               ~key:(Account_id.derive_token_id ~owner:account_id)
               ~data:account_id ;
-            self_set_account t location account)
+            self_set_account t location account )
     end)
 
     let set_batch_accounts t addresses_and_accounts =
@@ -510,7 +510,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         |> List.filter_map ~f:(fun aid ->
                if Key.equal pk (Account_id.public_key aid) then
                  Some (Account_id.token_id aid)
-               else None)
+               else None )
         |> Token_id.Set.of_list
       in
       Set.union mask_tokens (Base.tokens (get_parent t) pk)
@@ -545,7 +545,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             | Some location ->
                 `Fst (account_id, Some location)
             | None ->
-                `Snd account_id)
+                `Snd account_id )
       in
       found_locations
       @ Base.location_of_account_batch (get_parent t) leftover_account_ids
@@ -587,7 +587,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         List.sort mask_locations ~compare:(fun loc1 loc2 ->
             let loc1 = Location.to_path_exn loc1 in
             let loc2 = Location.to_path_exn loc2 in
-            Location.Addr.compare loc2 loc1)
+            Location.Addr.compare loc2 loc1 )
       in
       List.iter rev_sorted_mask_locations
         ~f:(remove_account_and_update_hashes t)
@@ -626,9 +626,9 @@ module Make (Inputs : Inputs_intf.S) = struct
              | Account addr ->
                  (Addr.to_int addr, get t location |> Option.value_exn)
              | location ->
-                 raise (Location_is_not_account location))
+                 raise (Location_is_not_account location) )
       |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
-             Int.compare addr1 addr2)
+             Int.compare addr1 addr2 )
       |> List.map ~f:(fun (_, account) -> account)
 
     let iteri t ~f =
@@ -643,7 +643,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                      !"iter: index_of_account_exn failed, mask uuid: %{sexp: \
                        Uuid.t} account id: %{sexp: Account_id.t}, exception: \
                        %s"
-                     (get_uuid t) acct_id (Exn.to_string exn))
+                     (get_uuid t) acct_id (Exn.to_string exn) )
             in
             match location_of_account t acct_id with
             | None ->
@@ -651,7 +651,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                   (sprintf
                      !"iter: location_of_account returned None, mask uuid: \
                        %{sexp: Uuid.t} account id: %{sexp: Account_id.t}"
-                     (get_uuid t) acct_id)
+                     (get_uuid t) acct_id )
             | Some loc -> (
                 match get t loc with
                 | None ->
@@ -659,9 +659,9 @@ module Make (Inputs : Inputs_intf.S) = struct
                       (sprintf
                          !"iter: get returned None, mask uuid: %{sexp: Uuid.t} \
                            account id: %{sexp: Account_id.t}"
-                         (get_uuid t) acct_id)
+                         (get_uuid t) acct_id )
                 | Some acct ->
-                    (idx, acct) ))
+                    (idx, acct) ) )
       in
       (* in case iteration order matters *)
       let idx_account_pairs =
@@ -678,7 +678,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       (* parent should ignore accounts in this mask *)
       let mask_accounts =
         List.map locations_and_accounts ~f:(fun (_loc, acct) ->
-            Account.identifier acct)
+            Account.identifier acct )
       in
       let mask_ignored_accounts = Account_id.Set.of_list mask_accounts in
       let all_ignored_accounts =

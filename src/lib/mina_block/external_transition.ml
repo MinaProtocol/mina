@@ -84,8 +84,7 @@ module Raw = struct
               ?proposed_protocol_version_opt () =
             f
               (c ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-                 ~delta_transition_chain_proof ?proposed_protocol_version_opt
-                 ())
+                 ~delta_transition_chain_proof ?proposed_protocol_version_opt () )
         end) :
           sig
             val create :
@@ -152,7 +151,7 @@ let raw_v1_to_yojson t =
     ; ( "proposed_protocol_version"
       , `String
           (Option.value_map t.proposed_protocol_version_opt ~default:"<None>"
-             ~f:Protocol_version.to_string) )
+             ~f:Protocol_version.to_string ) )
     ]
 
 module Validated = struct

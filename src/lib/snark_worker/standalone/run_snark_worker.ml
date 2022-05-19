@@ -15,7 +15,7 @@ let command =
                [ ("Full", Genesis_constants.Proof_level.Full)
                ; ("Check", Check)
                ; ("None", None)
-               ]))
+               ] ) )
      in
      fun () ->
        let open Async in
@@ -34,6 +34,6 @@ let command =
            Caml.Format.printf
              !"Proving failed with error:@.%s"
              (Error.to_string_hum err) ;
-           exit 1)
+           exit 1 )
 
 let () = Command.run command

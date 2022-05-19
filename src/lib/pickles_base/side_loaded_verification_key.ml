@@ -215,7 +215,7 @@ let to_input (type a) ~(field_of_int : int -> a) :
     List.reduce_exn ~f:append
       [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
             map_reduce [| h |] ~f:(fun (Pow_2_roots_of_unity x) ->
-                packed (field_of_int x, max_log2_degree)))
+                packed (field_of_int x, max_log2_degree) ) )
       ; Array.map (Vector.to_array step_widths) ~f:width |> packeds
       ; packed (width max_width)
       ; wrap_index_to_input

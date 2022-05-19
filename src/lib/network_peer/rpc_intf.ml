@@ -41,7 +41,7 @@ end
 type ('query, 'response) rpc_implementation =
   (module Rpc_implementation_intf
      with type query = 'query
-      and type response = 'response)
+      and type response = 'response )
 
 module type Rpc_interface_intf = sig
   type ('query, 'response) rpc

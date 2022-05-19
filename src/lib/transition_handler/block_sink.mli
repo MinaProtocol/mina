@@ -8,9 +8,9 @@ type Structured_log_events.t +=
 include
   Mina_net2.Sink.S_with_void
     with type msg :=
-          [ `Transition of Mina_block.t Envelope.Incoming.t ]
-          * [ `Time_received of Block_time.t ]
-          * [ `Valid_cb of Mina_net2.Validation_callback.t ]
+      [ `Transition of Mina_block.t Envelope.Incoming.t ]
+      * [ `Time_received of Block_time.t ]
+      * [ `Valid_cb of Mina_net2.Validation_callback.t ]
 
 type block_sink_config =
   { logger : Logger.t

@@ -64,4 +64,4 @@ let command =
        flag "--num-block-producers" ~aliases:[ "num-block-producers" ]
          ~doc:"NUM number of block producers to have" (required int)
      in
-     main num_block_producers)
+     main num_block_producers )
