@@ -429,54 +429,70 @@ struct
       , x_hat
       , witness )
     in
-    let ( challenge_polynomial_commitments
-        , unfinalized_proofs
-        , statements_with_hashes
-        , x_hats
-        , witnesses ) =
-      let rec go :
-          type vars values ns ms k.
-             values H1.T(Id).t
-          -> (ns, ns) H2.T(Proof).t
-          -> (vars, values, ns, ms) H4.T(Tag).t
-          -> vars H1.T(E01(Bool)).t
-          -> (vars, k) Length.t
-          -> (Tock.Curve.Affine.t, k) Vector.t
-             * (Unfinalized.Constant.t, k) Vector.t
-             * (Statement_with_hashes.t, k) Vector.t
-             * (X_hat.t, k) Vector.t
-             * (values, ns, ms) H3.T(Per_proof_witness.Constant).t =
-       fun app_states ps ts must_verifys l ->
-        match (app_states, ps, ts, must_verifys, l) with
-        | [], [], [], [], Z ->
-            ([], [], [], [], [])
-        | ( app_state :: app_states
-          , p :: ps
-          , t :: ts
-          , must_verify :: must_verifys
-          , S l ) ->
-            let dlog_vk, dlog_index =
-              if Type_equal.Id.same self.Tag.id t.id then
-                (self_dlog_vk, self_dlog_plonk_index)
-              else
-                let d = Types_map.lookup_basic t in
-                (d.wrap_vk, d.wrap_key)
-            in
-            let `Sg sg, u, s, x, w =
-              expand_proof dlog_vk dlog_index app_state p t ~must_verify
-            and sgs, us, ss, xs, ws = go app_states ps ts must_verifys l in
-            (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
-        | _ :: _, [], _, _, _ ->
-            .
-        | [], _ :: _, _, _, _ ->
-            .
+    let challenge_polynomial_commitments = ref None in
+    let unfinalized_proofs = ref None in
+    let statements_with_hashes = ref None in
+    let x_hats = ref None in
+    let witnesses = ref None in
+    let compute_prev_proof_parts () =
+      let ( challenge_polynomial_commitments'
+          , unfinalized_proofs'
+          , statements_with_hashes'
+          , x_hats'
+          , witnesses' ) =
+        let rec go :
+            type vars values ns ms k.
+               values H1.T(Id).t
+            -> (ns, ns) H2.T(Proof).t
+            -> (vars, values, ns, ms) H4.T(Tag).t
+            -> vars H1.T(E01(Bool)).t
+            -> (vars, k) Length.t
+            -> (Tock.Curve.Affine.t, k) Vector.t
+               * (Unfinalized.Constant.t, k) Vector.t
+               * (Statement_with_hashes.t, k) Vector.t
+               * (X_hat.t, k) Vector.t
+               * (values, ns, ms) H3.T(Per_proof_witness.Constant).t =
+         fun app_states ps ts must_verifys l ->
+          match (app_states, ps, ts, must_verifys, l) with
+          | [], [], [], [], Z ->
+              ([], [], [], [], [])
+          | ( app_state :: app_states
+            , p :: ps
+            , t :: ts
+            , must_verify :: must_verifys
+            , S l ) ->
+              let dlog_vk, dlog_index =
+                if Type_equal.Id.same self.Tag.id t.id then
+                  (self_dlog_vk, self_dlog_plonk_index)
+                else
+                  let d = Types_map.lookup_basic t in
+                  (d.wrap_vk, d.wrap_key)
+              in
+              let `Sg sg, u, s, x, w =
+                expand_proof dlog_vk dlog_index app_state p t ~must_verify
+              and sgs, us, ss, xs, ws = go app_states ps ts must_verifys l in
+              (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
+          | _ :: _, [], _, _, _ ->
+              .
+          | [], _ :: _, _, _, _ ->
+              .
+        in
+        go prev_values prev_proofs branch_data.rule.prevs inners_must_verify
+          prev_vars_length
       in
-      go prev_values prev_proofs branch_data.rule.prevs inners_must_verify
-        prev_vars_length
+      challenge_polynomial_commitments := Some challenge_polynomial_commitments' ;
+      unfinalized_proofs := Some unfinalized_proofs' ;
+      statements_with_hashes := Some statements_with_hashes' ;
+      x_hats := Some x_hats' ;
+      witnesses := Some witnesses'
     in
+    compute_prev_proof_parts () ;
     let unfinalized_proofs_extended =
-      Vector.extend unfinalized_proofs lte Max_proofs_verified.n
-        (Unfinalized.Constant.dummy ())
+      lazy
+        (Vector.extend
+           (Option.value_exn !unfinalized_proofs)
+           lte Max_proofs_verified.n
+           (Unfinalized.Constant.dummy ()) )
     in
     let pass_through =
       let rec go : type a a. (a, a) H2.T(P).t -> a H1.T(P.Base.Me_only.Wrap).t =
@@ -527,12 +543,15 @@ struct
       let me_only : _ Reduced_me_only.Step.t =
         (* Have the sg be available in the opening proof and verify it. *)
         { app_state = next_state
-        ; challenge_polynomial_commitments
+        ; challenge_polynomial_commitments =
+            Option.value_exn !challenge_polynomial_commitments
         ; old_bulletproof_challenges
         }
       in
       { proof_state =
-          { unfinalized_proofs = unfinalized_proofs_extended; me_only }
+          { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
+          ; me_only
+          }
       ; pass_through
       }
     in
@@ -565,23 +584,25 @@ struct
             in
             Common.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
       in
-      pad
-        (Vector.map statements_with_hashes ~f:(fun s -> s.proof_state.me_only))
-        Maxes.maxes Maxes.length
+      lazy
+        (pad
+           (Vector.map (Option.value_exn !statements_with_hashes) ~f:(fun s ->
+                s.proof_state.me_only ) )
+           Maxes.maxes Maxes.length )
     in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
       | Req.Proof_with_datas ->
-          k witnesses
+          k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
           k self_dlog_plonk_index
       | Req.App_state ->
           k next_me_only_prepared.app_state
       | Req.Unfinalized_proofs ->
-          k unfinalized_proofs_extended
+          k (Lazy.force unfinalized_proofs_extended)
       | Req.Pass_through ->
-          k pass_through_padded
+          k (Lazy.force pass_through_padded)
       | _ -> (
           match handler with
           | Some f ->
@@ -650,7 +671,8 @@ struct
     ; index = branch_data.index
     ; prev_evals =
         Vector.extend
-          (Vector.map2 prev_evals x_hats ~f:(fun (es, ft_eval1) x_hat ->
+          (Vector.map2 prev_evals (Option.value_exn !x_hats)
+             ~f:(fun (es, ft_eval1) x_hat ->
                Plonk_types.All_evals.
                  { ft_eval1
                  ; evals =
