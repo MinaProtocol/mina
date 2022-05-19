@@ -709,7 +709,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
         let _, prev_vars_length = b.proofs_verified in
-        let step handler prev_values prev_proofs next_state =
+        let step handler prev_proofs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
@@ -719,25 +719,23 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         let step_vk = fst (Lazy.force step_vk) in
         let wrap ?handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
-          let app_states, prevs =
+          let prevs =
             let rec go :
                 type prev_values local_widths local_heights.
                    ( prev_values
                    , local_widths
                    , local_heights )
                    H3.T(Statement_with_proof).t
-                -> prev_values H1.T(Id).t
-                   * (local_widths, local_widths) H2.T(Proof).t = function
+                -> (local_widths, local_widths) H2.T(Proof).t = function
               | [] ->
-                  ([], [])
-              | (app_state, proof) :: tl ->
-                  let app_states, proofs = go tl in
-                  (app_state :: app_states, proof :: proofs)
+                  []
+              | (_, proof) :: tl ->
+                  proof :: go tl
             in
             go prevs
           in
           let%bind.Promise proof =
-            step handler ~maxes:(module Maxes) app_states prevs next_state
+            step handler ~maxes:(module Maxes) prevs next_state
           in
           let proof =
             { proof with
