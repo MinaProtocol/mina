@@ -850,12 +850,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ~f:(fun zkapp ->
         query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp.zkapp_uri_id) )
   in
-  (* TODO: token permissions is going away *)
   let account =
     ( { public_key
       ; token_id
-      ; token_permissions =
-          Token_permissions.Not_owned { account_disabled = false }
       ; token_symbol
       ; balance
       ; nonce

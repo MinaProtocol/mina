@@ -461,20 +461,19 @@ module Base : sig
          ( 'b
          , 'c
          , 'd
-         , 'e
          , Currency.Balance.var
+         , 'e
          , 'f
          , 'g
          , 'h
-         , 'i
          , ( Tick.Boolean.var
            , Mina_numbers.Global_slot.Checked.var
            , Currency.Balance.var
            , Currency.Amount.var )
            Account_timing.As_record.t
+         , 'i
          , 'j
-         , 'k
-         , 'l )
+         , 'k )
          Account.Poly.t
     -> txn_amount:Currency.Amount.var option
     -> txn_global_slot:Mina_numbers.Global_slot.Checked.var

@@ -839,7 +839,6 @@ module Types = struct
       let to_full_account
           { Account.Poly.public_key
           ; token_id
-          ; token_permissions
           ; token_symbol
           ; nonce
           ; balance
@@ -853,7 +852,6 @@ module Types = struct
           } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
-        let%bind token_permissions = token_permissions in
         let%bind token_symbol = token_symbol in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
@@ -865,7 +863,6 @@ module Types = struct
         let%map zkapp_uri = zkapp_uri in
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions
         ; token_symbol
         ; nonce
         ; balance
@@ -881,7 +878,6 @@ module Types = struct
       let of_full_account ?breadcrumb
           { Account.Poly.public_key
           ; token_id
-          ; token_permissions
           ; token_symbol
           ; nonce
           ; balance
@@ -895,7 +891,6 @@ module Types = struct
           } =
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions = Some token_permissions
         ; token_symbol = Some token_symbol
         ; nonce = Some nonce
         ; balance =
@@ -932,7 +927,6 @@ module Types = struct
             Account.
               { Poly.public_key = Account_id.public_key account_id
               ; token_id = Account_id.token_id account_id
-              ; token_permissions = None
               ; token_symbol = None
               ; nonce = None
               ; delegate = None
@@ -958,7 +952,6 @@ module Types = struct
       { account :
           ( Public_key.Compressed.t
           , Token_id.t
-          , Token_permissions.t option
           , Account.Token_symbol.t option
           , AnnotatedBalance.t
           , Account.Nonce.t option
@@ -1301,23 +1294,14 @@ module Types = struct
              ; field "isTokenOwner" ~typ:bool
                  ~doc:"True if this account owns its associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   match%map.Option account.token_permissions with
-                   | Token_owned _ ->
-                       true
-                   | Not_owned _ ->
-                       false )
+                 ~resolve:(fun _ { account = _; _ } -> failwith "token TODO")
              ; field "isDisabled" ~typ:bool
+                 ~deprecated:(Deprecated (Some "no longer used"))
                  ~doc:
                    "True if this account has been disabled by the owner of the \
                     associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   match%map.Option account.token_permissions with
-                   | Token_owned _ ->
-                       false
-                   | Not_owned { account_disabled } ->
-                       account_disabled )
+                 ~resolve:(fun _ _ -> None)
              ; field "index" ~typ:int
                  ~doc:
                    "The index of this account in the ledger, or null if this \

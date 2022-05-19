@@ -11313,8 +11313,8 @@
                 "True if this account has been disabled by the owner of the associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "no longer used"
             },
             {
               "name": "index",

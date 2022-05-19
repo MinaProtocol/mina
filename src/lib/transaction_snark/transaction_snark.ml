@@ -2653,7 +2653,6 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
-             ; token_permissions = account.token_permissions
              ; token_symbol = account.token_symbol
              ; nonce = next_nonce
              ; receipt_chain_hash
@@ -2853,20 +2852,10 @@ module Base = struct
                make_checked (fun () ->
                    Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                      ~else_:account.token_id )
-             and token_owner =
-               (* TODO: Delete token permissions *)
-               Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
-                 ~else_:account.token_permissions.token_owner
-             and token_locked =
-               Boolean.if_ is_empty_and_writeable
-                 ~then_:payload.body.token_locked
-                 ~else_:account.token_permissions.token_locked
              in
              { Account.Poly.balance
              ; public_key
              ; token_id
-             ; token_permissions =
-                 { Token_permissions.token_owner; token_locked }
              ; token_symbol = account.token_symbol
              ; nonce = account.nonce
              ; receipt_chain_hash = account.receipt_chain_hash
@@ -3016,7 +3005,6 @@ module Base = struct
              { Account.Poly.balance
              ; public_key = account.public_key
              ; token_id = account.token_id
-             ; token_permissions = account.token_permissions
              ; token_symbol = account.token_symbol
              ; nonce = account.nonce
              ; receipt_chain_hash = account.receipt_chain_hash

@@ -1825,7 +1825,6 @@ module For_tests = struct
     type t =
       ( Public_key.Compressed.t
       , Token_id.t
-      , Token_permissions.t
       , Account.Token_symbol.t
       , Balance.t
       , Account_nonce.t

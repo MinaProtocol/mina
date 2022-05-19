@@ -77,12 +77,7 @@ module Ledger_inner = struct
 
         let token = Account.Poly.token_id
 
-        let token_owner ({ token_permissions; _ } : t) =
-          match token_permissions with
-          | Token_owned _ ->
-              true
-          | Not_owned _ ->
-              false
+        let token_owner (_ : t) = failwith "TODO"
       end
     end]
 
