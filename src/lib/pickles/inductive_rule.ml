@@ -6,6 +6,15 @@ module B = struct
   type t = Impls.Step.Boolean.var
 end
 
+module Previous_proof_statement = struct
+  type 'prev_var t = { public_input : 'prev_var; proof_must_verify : B.t }
+
+  module Constant = struct
+    type 'prev_value t =
+      { public_input : 'prev_value; proof_must_verify : bool }
+  end
+end
+
 (* This type models an "inductive rule". It includes
    - the list of previous statements which this one assumes
    - the snarky main function

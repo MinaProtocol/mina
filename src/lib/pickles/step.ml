@@ -433,7 +433,7 @@ struct
     let statements_with_hashes = ref None in
     let x_hats = ref None in
     let witnesses = ref None in
-    let compute_prev_proof_parts inners_must_verify =
+    let compute_prev_proof_parts prev_proof_requests =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
@@ -441,10 +441,9 @@ struct
           , witnesses' ) =
         let rec go :
             type vars values ns ms k.
-               values H1.T(Id).t
-            -> (ns, ns) H2.T(Proof).t
+               (ns, ns) H2.T(Proof).t
             -> (vars, values, ns, ms) H4.T(Tag).t
-            -> values H1.T(E01(Bool)).t
+            -> values H1.T(Inductive_rule.Previous_proof_statement.Constant).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t
@@ -454,14 +453,14 @@ struct
                  , ns
                  , ms )
                  H3.T(Per_proof_witness.Constant.No_app_state).t =
-         fun app_states ps ts must_verifys l ->
-          match (app_states, ps, ts, must_verifys, l) with
-          | [], [], [], [], Z ->
+         fun ps ts prev_proof_stmts l ->
+          match (ps, ts, prev_proof_stmts, l) with
+          | [], [], [], Z ->
               ([], [], [], [], [])
-          | ( app_state :: app_states
-            , p :: ps
+          | ( p :: ps
             , t :: ts
-            , must_verify :: must_verifys
+            , { public_input = app_state; proof_must_verify = must_verify }
+              :: prev_proof_stmts
             , S l ) ->
               let dlog_vk, dlog_index =
                 if Type_equal.Id.same self.Tag.id t.id then
@@ -472,14 +471,14 @@ struct
               in
               let `Sg sg, u, s, x, w =
                 expand_proof dlog_vk dlog_index app_state p t ~must_verify
-              and sgs, us, ss, xs, ws = go app_states ps ts must_verifys l in
+              and sgs, us, ss, xs, ws = go ps ts prev_proof_stmts l in
               (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
-          | _ :: _, [], _, _, _ ->
+          | [], _, _ :: _, _ ->
               .
-          | [], _ :: _, _, _, _ ->
+          | _ :: _, _, [], _ ->
               .
         in
-        go prev_values prev_proofs branch_data.rule.prevs inners_must_verify
+        go prev_proofs branch_data.rule.prevs prev_proof_requests
           prev_vars_length
       in
       challenge_polynomial_commitments := Some challenge_polynomial_commitments' ;
@@ -578,8 +577,8 @@ struct
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
-      | Req.Compute_prev_proof_parts inners_must_verify ->
-          compute_prev_proof_parts inners_must_verify ;
+      | Req.Compute_prev_proof_parts prev_proof_requests ->
+          compute_prev_proof_parts prev_proof_requests ;
           k ()
       | Req.Prev_inputs ->
           k prev_values

@@ -111,7 +111,9 @@ module Step = struct
     type local_branches
 
     type _ t +=
-      | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
+      | Compute_prev_proof_parts :
+          prev_values H1.T(Inductive_rule.Previous_proof_statement.Constant).t
+          -> unit t
       | Prev_inputs : prev_values H1.T(Id).t t
       | Proof_with_datas :
           ( prev_values
@@ -148,7 +150,9 @@ module Step = struct
       type nonrec local_branches = local_branches
 
       type _ t +=
-        | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
+        | Compute_prev_proof_parts :
+            prev_values H1.T(Inductive_rule.Previous_proof_statement.Constant).t
+            -> unit t
         | Prev_inputs : prev_values H1.T(Id).t t
         | Proof_with_datas :
             ( prev_values

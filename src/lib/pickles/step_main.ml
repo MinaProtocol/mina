@@ -246,22 +246,40 @@ let step_main :
         (* Compute proof parts outside of the prover before requesting values.
         *)
         exists Typ.unit ~request:(fun () ->
-            let inners_must_verify =
+            let previous_proof_statements =
               let rec go :
                   type prev_vars prev_values ns1 ns2.
-                     prev_vars H1.T(E01(B)).t
+                     prev_vars H1.T(Id).t
+                  -> prev_vars H1.T(E01(B)).t
                   -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
-                  -> prev_values H1.T(E01(Bool)).t =
-               fun bs tags ->
-                match (bs, tags) with
-                | [], [] ->
+                  -> prev_values
+                     H1.T(Inductive_rule.Previous_proof_statement.Constant).t =
+               fun app_states bs tags ->
+                match (app_states, bs, tags) with
+                | [], [], [] ->
                     []
-                | b :: bs, _tag :: tags ->
-                    As_prover.read Boolean.typ b :: go bs tags
+                | app_state :: app_states, b :: bs, tag :: tags ->
+                    let public_input =
+                      (fun (type var value n m) (tag : (var, value, n, m) Tag.t)
+                           (var : var) : value ->
+                        let typ : (var, value) Typ.t =
+                          match Type_equal.Id.same_witness self.id tag.id with
+                          | Some T ->
+                              basic.typ
+                          | None ->
+                              Types_map.typ tag
+                        in
+                        As_prover.read typ var )
+                        tag app_state
+                    in
+                    { public_input
+                    ; proof_must_verify = As_prover.read Boolean.typ b
+                    }
+                    :: go app_states bs tags
               in
-              go proofs_should_verify rule.prevs
+              go prev_statements proofs_should_verify rule.prevs
             in
-            Req.Compute_prev_proof_parts inners_must_verify ) ;
+            Req.Compute_prev_proof_parts previous_proof_statements ) ;
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
