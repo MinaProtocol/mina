@@ -110,8 +110,6 @@ module Transaction_applied : sig
       type t = Transaction_applied.Signed_command_applied.Common.t =
         { user_command : Signed_command.t With_status.t
         ; previous_receipt_chain_hash : Receipt.Chain_hash.t
-        ; fee_payer_timing : Account.Timing.t
-        ; source_timing : Account.Timing.t option
         }
       [@@deriving sexp]
     end
@@ -150,17 +148,13 @@ module Transaction_applied : sig
     type t = Transaction_applied.Fee_transfer_applied.t =
       { fee_transfer : Fee_transfer.t
       ; previous_empty_accounts : Account_id.t list
-      ; receiver_timing : Account.Timing.t
       }
     [@@deriving sexp]
   end
 
   module Coinbase_applied : sig
     type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase : Coinbase.t
-      ; previous_empty_accounts : Account_id.t list
-      ; receiver_timing : Account.Timing.t
-      }
+      { coinbase : Coinbase.t; previous_empty_accounts : Account_id.t list }
     [@@deriving sexp]
   end
 
@@ -231,12 +225,6 @@ val apply_parties_unchecked :
          Mina_transaction_logic.Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t
-
-val undo :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> t
-  -> Transaction_applied.t
-  -> unit Or_error.t
 
 val has_locked_tokens :
      global_slot:Mina_numbers.Global_slot.t
