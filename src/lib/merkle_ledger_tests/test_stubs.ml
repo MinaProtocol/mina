@@ -27,8 +27,6 @@ module Account = struct
   let update_balance t bal = { t with Mina_base.Account.Poly.balance = bal }
 
   let token Mina_base.Account.Poly.{ token_id; _ } = token_id
-
-  let token_owner = failwith "TODO"
 end
 
 module Receipt = Mina_base.Receipt

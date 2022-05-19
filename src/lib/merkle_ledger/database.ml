@@ -555,17 +555,25 @@ module Make (Inputs : Inputs_intf) :
         (addresses_and_accounts : (location * Account.t) list) =
       set_bin_batch mdb Account.bin_size_t Account.bin_write_t
         addresses_and_accounts ;
+      let token_accounts =
+        Tokens.add_batch_create mdb
+          (List.fold ~init:Key.Map.empty addresses_and_accounts
+             ~f:(fun map (_, account) ->
+               let aid = Account.identifier account in
+               Map.update map (Account_id.public_key aid) ~f:(function
+                 | Some set ->
+                     Set.add set (Account_id.token_id aid)
+                 | None ->
+                     Token_id.Set.singleton (Account_id.token_id aid) ) ) )
+      in
       let token_owner_changes =
-        List.filter_map addresses_and_accounts ~f:(fun (_, account) ->
-            if Account.token_owner account then
-              let aid = Account.identifier account in
-              Some
-                (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
-                   (Account_id.token_id aid, aid) )
-            else None )
+        List.map addresses_and_accounts ~f:(fun (_, account) ->
+            let aid = Account.identifier account in
+            Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
+              (Account_id.derive_token_id ~owner:aid, aid) )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
-        ~key_data_pairs:token_owner_changes
+        ~key_data_pairs:(token_owner_changes @ token_accounts)
   end)
 
   let set_hash mdb location new_hash =

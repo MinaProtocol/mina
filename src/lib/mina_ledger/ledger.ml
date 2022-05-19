@@ -76,8 +76,6 @@ module Ledger_inner = struct
         let empty = Account.empty
 
         let token = Account.Poly.token_id
-
-        let token_owner (_ : t) = failwith "TODO"
       end
     end]
 

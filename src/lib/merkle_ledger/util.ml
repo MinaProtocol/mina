@@ -185,7 +185,7 @@ end = struct
         let last_location = new_last_location in
         Inputs.set_location_batch ~last_location t key_locations )
 
-  (* TODO: When we do batch on a database, we should add accounts, locations and hashes
+  (* TODO: When we do batch on a database, we should add accounts, locations, token owners, and hashes
      simulatenously for full atomicity. *)
   let set_batch t locations_and_accounts =
     set_raw_addresses t locations_and_accounts ;

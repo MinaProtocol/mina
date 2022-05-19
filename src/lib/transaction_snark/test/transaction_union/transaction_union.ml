@@ -952,7 +952,7 @@ let%test_module "Transaction union tests" =
                 )
                 ledger ) )
 
-    (*TODO: use zkApp transactions for tokens*)
+    (*TODO: Write the following tests using zkApp transactions*)
     (*let%test_unit "create own new token" =
         Test_util.with_randomness 123456789 (fun () ->
             Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->

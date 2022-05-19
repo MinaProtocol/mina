@@ -1294,9 +1294,22 @@ module Types = struct
              ; field "isTokenOwner" ~typ:bool
                  ~doc:"True if this account owns its associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ { account = _; _ } -> failwith "token TODO")
+                 ~resolve:(fun { ctx = coda; _ } { account; _ } ->
+                   let open Option.Let_syntax in
+                   let%bind tip =
+                     coda |> Mina_lib.best_tip |> Participating_state.active
+                   in
+                   let ledger =
+                     Transition_frontier.Breadcrumb.staged_ledger tip
+                     |> Staged_ledger.ledger
+                   in
+                   let aid = account_id account in
+                   let%map token_owner =
+                     Ledger.token_owner ledger (Account_id.token_id aid)
+                   in
+                   Account_id.equal aid token_owner )
              ; field "isDisabled" ~typ:bool
-                 ~deprecated:(Deprecated (Some "no longer used"))
+                 ~deprecated:(Deprecated (Some "No longer used"))
                  ~doc:
                    "True if this account has been disabled by the owner of the \
                     associated token"

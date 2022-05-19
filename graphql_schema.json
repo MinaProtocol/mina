@@ -11314,7 +11314,7 @@
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": true,
-              "deprecationReason": "no longer used"
+              "deprecationReason": "No longer used"
             },
             {
               "name": "index",
