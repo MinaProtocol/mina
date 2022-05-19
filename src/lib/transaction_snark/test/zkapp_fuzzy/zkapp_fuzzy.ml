@@ -2,7 +2,6 @@ open Core
 open Signature_lib
 open Mina_base
 module U = Transaction_snark_tests.Util
-open Mina_generators.Parties_generators
 
 let logger = Logger.create ()
 

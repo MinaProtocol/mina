@@ -244,7 +244,7 @@ let gen_account_precondition_from ?failure ~account_id ~ledger () =
             "gen_account_precondition_from: could not find account with known \
              location"
       | Some account ->
-          gen_account_precondition_from_account ~failure account )
+          gen_account_precondition_from_account ?failure account )
 
 let gen_fee (account : Account.t) =
   let lo_fee = Mina_compile_config.minimum_user_command_fee in
@@ -935,13 +935,13 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
         false
   in
   let%bind body_components =
-    gen_party_body_components ~update ~failure ~new_account ~zkapp_account
+    gen_party_body_components ~update ?failure ~new_account ~zkapp_account
       ~increment_nonce ?permissions_auth ?account_id ?vk ~available_public_keys
       ?required_balance_change ?required_balance ~ledger ~balances_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~balances_tbl)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_predcondition:(fun account_id ledger ->
-        gen_account_precondition_from ~failure ~account_id ~ledger )
+        gen_account_precondition_from ?failure ~account_id ~ledger )
       ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
   in
   let body = Party_body_components.to_typical_party body_components in
@@ -967,7 +967,7 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
     Quickcheck.Generator.return account.nonce
   in
   let%map body_components =
-    gen_party_body_components ~failure ?permissions_auth ~account_id ?vk
+    gen_party_body_components ?failure ?permissions_auth ~account_id ?vk
       ~is_fee_payer:true ~increment_nonce:() ~gen_balance_change:gen_fee
       ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
@@ -985,7 +985,7 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
     ?protocol_state_view ?vk () : Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
-    gen_party_body_fee_payer ~failure ?permissions_auth ~account_id ~ledger ?vk
+    gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
       ?protocol_state_view ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
@@ -1035,7 +1035,7 @@ let gen_parties_from ?(failure = None)
     tbl
   in
   let%bind fee_payer =
-    gen_fee_payer ~failure ~permissions_auth:Control.Tag.Signature
+    gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
       ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ?vk ()
   in
 
@@ -1161,7 +1161,7 @@ let gen_parties_from ?(failure = None)
           (* Signature authorization to start *)
           let authorization = Control.Signature Signature.dummy in
           let required_balance_change = Currency.Amount.Signed.zero in
-          gen_party_from ~update ~failure ~authorization
+          gen_party_from ~update ?failure ~authorization
             ~new_account:new_parties ~permissions_auth ~zkapp_account
             ~available_public_keys ~required_balance_change ~ledger
             ~balances_tbl ?vk ()
@@ -1234,7 +1234,7 @@ let gen_parties_from ?(failure = None)
           in
           (* if we use this account again, it will have a Signature authorization *)
           let permissions_auth = Control.Tag.Signature in
-          gen_party_from ~update ~failure ~account_id ~authorization
+          gen_party_from ~update ?failure ~account_id ~authorization
             ~permissions_auth ~zkapp_account ~available_public_keys ~ledger
             ~balances_tbl ?vk ()
         in
@@ -1284,7 +1284,7 @@ let gen_parties_from ?(failure = None)
           None
     in
     let authorization = Control.Signature Signature.dummy in
-    gen_party_from ~failure ~authorization ~new_account:true
+    gen_party_from ?failure ~authorization ~new_account:true
       ~available_public_keys ~ledger ~required_balance_change ?required_balance
       ~balances_tbl ?vk ()
   in
