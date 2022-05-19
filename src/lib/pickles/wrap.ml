@@ -342,7 +342,7 @@ let wrap
     P.Base.Me_only.Wrap.prepare next_statement.proof_state.me_only
   in
   let%map.Promise next_proof =
-    let (T (input, conv)) = Impls.Wrap.input () in
+    let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->

@@ -337,12 +337,12 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       let fee_transfer =
         Fee_transfer.create_single ~receiver_pk ~fee ~fee_token
       in
-      let undo_or_error =
+      let applied_or_error =
         Ledger.apply_fee_transfer ~constraint_constants ~txn_global_slot ledger
           fee_transfer
       in
-      match undo_or_error with
-      | Ok _undo ->
+      match applied_or_error with
+      | Ok _applied ->
           Deferred.unit
       | Error err ->
           fail_on_error err )
@@ -370,11 +370,11 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
             Error.tag err ~tag:"Error creating coinbase for internal command"
             |> Error.raise
       in
-      let undo_or_error =
+      let applied_or_error =
         apply_coinbase ~constraint_constants ~txn_global_slot ledger coinbase
       in
-      match undo_or_error with
-      | Ok _undo ->
+      match applied_or_error with
+      | Ok _applied ->
           Deferred.unit
       | Error err ->
           fail_on_error err )
@@ -501,7 +501,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
     Ledger.apply_user_command ~constraint_constants ~txn_global_slot ledger
       valid_signed_cmd
   with
-  | Ok _undo ->
+  | Ok _applied ->
       Deferred.unit
   | Error err ->
       Error.tag_arg err "User command failed on replay"

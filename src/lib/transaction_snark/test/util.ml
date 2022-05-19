@@ -404,7 +404,7 @@ let check_balance pk balance ledger =
   [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
 
 (** Test legacy transactions*)
-let test_transaction ?expected_failure ?txn_global_slot ledger txn =
+let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let open Mina_transaction in
   let to_preunion (t : Transaction.t) =
     match t with
@@ -464,7 +464,7 @@ let test_transaction ?expected_failure ?txn_global_slot ledger txn =
         ( Signed_command.accounts_accessed (uc :> Signed_command.t)
         , pending_coinbase_stack )
     | Command (Parties _) ->
-        failwith "Parties commands not yet supported"
+        failwith "Parties commands not supported here"
     | Fee_transfer ft ->
         (Fee_transfer.receivers ft, pending_coinbase_stack)
     | Coinbase cb ->

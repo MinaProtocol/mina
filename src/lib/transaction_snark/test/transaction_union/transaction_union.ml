@@ -239,7 +239,7 @@ let%test_module "Transaction union tests" =
                 sender.account ;
               let () =
                 List.iter ucs ~f:(fun uc ->
-                    U.test_transaction ledger
+                    U.test_transaction_union ledger
                       (Transaction.Command (Signed_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
@@ -281,7 +281,7 @@ let%test_module "Transaction union tests" =
               let () =
                 List.iter fts ~f:(fun ft ->
                     let txn = Mina_transaction.Transaction.Fee_transfer ft in
-                    U.test_transaction ledger txn )
+                    U.test_transaction_union ledger txn )
               in
               List.iter receivers ~f:(fun receiver ->
                   U.check_balance
@@ -324,7 +324,7 @@ let%test_module "Transaction union tests" =
               let () =
                 List.iter cbs ~f:(fun cb ->
                     let txn = Mina_transaction.Transaction.Coinbase cb in
-                    U.test_transaction ledger txn )
+                    U.test_transaction_union ledger txn )
               in
               let fees = fee * ft_count in
               U.check_balance
@@ -598,7 +598,7 @@ let%test_module "Transaction union tests" =
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
       let user_command = Signed_command.sign signer payload in
-      U.test_transaction ledger (Command (Signed_command user_command)) ;
+      U.test_transaction_union ledger (Command (Signed_command user_command)) ;
       let fee_payer = Signed_command.Payload.fee_payer payload in
       let source = Signed_command.Payload.source payload in
       let receiver = Signed_command.Payload.receiver payload in
@@ -937,7 +937,7 @@ let%test_module "Transaction union tests" =
                 sender.account ;
               let () =
                 List.iter ucs ~f:(fun uc ->
-                    U.test_transaction ~txn_global_slot ledger
+                    U.test_transaction_union ~txn_global_slot ledger
                       (Transaction.Command (Signed_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
@@ -1891,245 +1891,7 @@ let%test_module "Transaction union tests" =
               (* well over the vesting period, the timing field shouldn't change*)
               let txn_global_slot = Mina_numbers.Global_slot.of_int 100 in
               List.iter transactions ~f:(fun txn ->
-                  U.test_transaction ~txn_global_slot ledger txn ) ) )
-  end )
-
-let%test_module "transaction_undos" =
-  ( module struct
-    let txn_state_view =
-      Mina_state.Protocol_state.Body.view U.genesis_state_body
-
-    (* the amounts in [ledger_init_state] need to be
-       large enough to prevent nontermination in
-       Signed_command.sequence, and assure the fee calculation won't
-       have crossed bounds in Fee.gen_incl
-
-       100,000,000,000 = 100 Mina seems to be enough
-    *)
-    let gen_user_commands ~length ledger_init_state =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map cmds =
-        User_command.Valid.Gen.sequence ~length:(length / 2) ~sign_type:`Real
-          ledger_init_state
-      in
-      let cmds = List.map ~f:User_command.forget_check cmds in
-      (* Cmds with new receiver accounts *)
-      let amount =
-        Currency.Fee.scale constraint_constants.account_creation_fee 2
-        |> Option.value_exn |> Currency.Amount.of_fee
-      in
-      let senders =
-        Array.filter_map ledger_init_state
-          ~f:(fun ((keypair, balance, _, _) as s) ->
-            let sender_pk = Public_key.compress keypair.public_key in
-            let account_id = Account_id.create sender_pk Token_id.default in
-            if
-              List.find cmds ~f:(fun cmd ->
-                  Account_id.equal (User_command.fee_payer cmd) account_id )
-              |> Option.is_some
-            then None
-            else if Currency.Amount.(balance >= amount) then Some s
-            else None )
-      in
-      let new_cmds =
-        let source_accounts =
-          List.take (Array.to_list senders) (length - List.length cmds)
-        in
-        assert (not (List.is_empty source_accounts)) ;
-        let new_keys =
-          List.init (List.length source_accounts) ~f:(fun _ ->
-              Signature_lib.Keypair.create () )
-        in
-        List.map (List.zip_exn source_accounts new_keys)
-          ~f:(fun ((s, _, nonce, _), r) ->
-            let sender_pk = Public_key.compress s.public_key in
-            let receiver_pk = Public_key.compress r.public_key in
-            let fee = Currency.Fee.of_int 10 in
-            let payload : Signed_command.Payload.t =
-              Signed_command.Payload.create ~fee ~fee_payer_pk:sender_pk ~nonce
-                ~memo:Signed_command_memo.dummy ~valid_until:None
-                ~body:(Payment { source_pk = sender_pk; receiver_pk; amount })
-            in
-            let c = Signed_command.sign s payload in
-            User_command.Signed_command (Signed_command.forget_check c) )
-      in
-      List.map
-        ~f:(fun c -> Mina_transaction.Transaction.Command c)
-        (cmds @ new_cmds)
-
-    let gen_fee_transfers ~length ledger_init_state =
-      let open Quickcheck.Generator.Let_syntax in
-      let count = 3 in
-      let new_keys =
-        Array.init count ~f:(fun _ -> Signature_lib.Keypair.create ())
-      in
-      let fee_transfers ?(new_accounts = false) accounts count =
-        let max_fee =
-          Currency.Fee.scale constraint_constants.account_creation_fee 10
-          |> Option.value_exn |> Currency.Fee.to_int
-        in
-        let min_fee =
-          if new_accounts then
-            constraint_constants.account_creation_fee |> Currency.Fee.to_int
-          else 0
-        in
-        let%map singles =
-          Quickcheck.Generator.list_with_length count
-            (Fee_transfer.Single.Gen.with_random_receivers ~keys:accounts
-               ~max_fee ~min_fee
-               ~token:(Quickcheck.Generator.return Token_id.default) )
-        in
-        One_or_two.group_list singles
-        |> List.map ~f:(Fn.compose Or_error.ok_exn Fee_transfer.of_singles)
-      in
-      let%bind fee_transfer_new_accounts =
-        fee_transfers new_keys count ~new_accounts:true
-      in
-      let remaining = max count (length - count) in
-      let%map fee_transfer_existing_accounts =
-        fee_transfers
-          (Array.init remaining ~f:(fun _ ->
-               let keypair, _, _, _ =
-                 Array.random_element_exn ledger_init_state
-               in
-               keypair ) )
-          remaining
-      in
-      List.map
-        ~f:(fun c -> Mina_transaction.Transaction.Fee_transfer c)
-        (fee_transfer_new_accounts @ fee_transfer_existing_accounts)
-
-    let gen_coinbases ~length ledger_init_state =
-      let open Quickcheck.Generator.Let_syntax in
-      let count = 3 in
-      let%bind coinbase_new_accounts =
-        Quickcheck.Generator.list_with_length count
-          (Quickcheck.Generator.map ~f:fst
-             (Coinbase.Gen.gen ~constraint_constants) )
-      in
-      let%map coinbase_existing_accounts =
-        let remaining = max count (length - count) in
-        let keys =
-          Array.init remaining ~f:(fun _ ->
-              let keypair, _, _, _ =
-                Array.random_element_exn ledger_init_state
-              in
-              keypair )
-        in
-        let min_amount =
-          Option.value_exn
-            (Currency.Fee.scale constraint_constants.account_creation_fee 2)
-          |> Currency.Fee.to_int
-        in
-        let max_amount =
-          Currency.Amount.to_int constraint_constants.coinbase_amount
-        in
-        Quickcheck.Generator.list_with_length remaining
-          (Coinbase.Gen.with_random_receivers ~keys ~min_amount ~max_amount
-             ~fee_transfer:
-               (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-                  ~min_fee:constraint_constants.account_creation_fee ) )
-      in
-      List.map
-        ~f:(fun c -> Mina_transaction.Transaction.Coinbase c)
-        (coinbase_new_accounts @ coinbase_existing_accounts)
-
-    let test_undo ledger transaction =
-      let merkle_root_before = Ledger.merkle_root ledger in
-      let applied_txn =
-        Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
-          transaction
-        |> Or_error.ok_exn
-      in
-      let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
-      let new_ledger = Ledger.register_mask ledger new_mask in
-      let () =
-        Ledger.undo ~constraint_constants new_ledger applied_txn
-        |> Or_error.ok_exn
-      in
-      assert (
-        Ledger_hash.equal merkle_root_before (Ledger.merkle_root new_ledger) ) ;
-      (merkle_root_before, applied_txn)
-
-    let test_undos ledger transactions =
-      let res =
-        List.fold ~init:[] transactions ~f:(fun acc t ->
-            test_undo ledger t :: acc )
-      in
-      List.iter res ~f:(fun (root_before, u) ->
-          let () =
-            Ledger.undo ~constraint_constants ledger u |> Or_error.ok_exn
-          in
-          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before) )
-
-    let%test_unit "undo_coinbase" =
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
-        let%map coinbases = gen_coinbases ~length:5 ledger_init_state in
-        (ledger_init_state, coinbases)
-      in
-      Async.Quickcheck.test ~seed:(`Deterministic "coinbase undos")
-        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
-        gen ~f:(fun (ledger_init_state, coinbase_list) ->
-          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
-            ~f:(fun ledger ->
-              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger coinbase_list ) )
-
-    let%test_unit "undo_fee_transfers" =
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
-        let%map fts = gen_fee_transfers ~length:5 ledger_init_state in
-        (ledger_init_state, fts)
-      in
-      Async.Quickcheck.test ~seed:(`Deterministic "fee-transfer undos")
-        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
-        gen ~f:(fun (ledger_init_state, ft_list) ->
-          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
-            ~f:(fun ledger ->
-              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger ft_list ) )
-
-    let%test_unit "undo_user_commands" =
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
-        let%map cmds = gen_user_commands ~length:10 ledger_init_state in
-        (ledger_init_state, cmds)
-      in
-      Async.Quickcheck.test ~seed:(`Deterministic "user-command undo")
-        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
-        gen ~f:(fun (ledger_init_state, cmd_list) ->
-          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
-            ~f:(fun ledger ->
-              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger cmd_list ) )
-
-    let%test_unit "undo_all_txns" =
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
-        let%bind coinbase = gen_coinbases ~length:4 ledger_init_state in
-        let%bind fee_transfers =
-          gen_fee_transfers ~length:6 ledger_init_state
-        in
-        let%bind cmds = gen_user_commands ~length:6 ledger_init_state in
-        let%map txns =
-          let%map txns = Quickcheck_lib.shuffle (fee_transfers @ coinbase) in
-          List.take cmds 3 @ List.take txns 5 @ List.drop cmds 3
-          @ List.drop txns 5
-        in
-        (ledger_init_state, txns)
-      in
-      Async.Quickcheck.test ~seed:(`Deterministic "all-transaction undos")
-        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
-        gen ~f:(fun (ledger_init_state, txn_list) ->
-          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
-            ~f:(fun ledger ->
-              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger txn_list ) )
+                  U.test_transaction_union ~txn_global_slot ledger txn ) ) )
   end )
 
 let%test_module "legacy transactions using zkApp accounts" =
@@ -2165,7 +1927,7 @@ let%test_module "legacy transactions using zkApp accounts" =
         U.Wallet.user_command ~fee_payer ~receiver_pk:spec.receiver amount
           txn_fee Account.Nonce.zero memo
       in
-      U.test_transaction ?expected_failure:expected_failure_sender ledger
+      U.test_transaction_union ?expected_failure:expected_failure_sender ledger
         (Mina_transaction.Transaction.Command (Signed_command signed_command1)) ;
       let sender_kp, sender_nonce = spec.sender in
       (*send to a zkApp account*)
@@ -2181,7 +1943,8 @@ let%test_module "legacy transactions using zkApp accounts" =
         U.Wallet.user_command ~fee_payer ~receiver_pk:snapp_pk amount txn_fee
           sender_nonce memo
       in
-      U.test_transaction ?expected_failure:expected_failure_receiver ledger
+      U.test_transaction_union ?expected_failure:expected_failure_receiver
+        ledger
         (Mina_transaction.Transaction.Command (Signed_command signed_command2))
 
     let%test_unit "Successful payments from zkapp accounts- Signature, None" =
@@ -2312,7 +2075,7 @@ let%test_module "legacy transactions using zkApp accounts" =
         U.Wallet.stake_delegation ~fee_payer ~delegate_pk:spec.receiver txn_fee
           Account.Nonce.zero memo
       in
-      U.test_transaction ?expected_failure:expected_failure_sender ledger
+      U.test_transaction_union ?expected_failure:expected_failure_sender ledger
         (Mina_transaction.Transaction.Command (Signed_command stake_delegation1)) ;
       (*Delegate is a zkApp account*)
       let stake_delegation2 =
@@ -2327,7 +2090,7 @@ let%test_module "legacy transactions using zkApp accounts" =
         U.Wallet.stake_delegation ~fee_payer ~delegate_pk:snapp_pk txn_fee
           sender_nonce memo
       in
-      U.test_transaction ledger
+      U.test_transaction_union ledger
         (Mina_transaction.Transaction.Command (Signed_command stake_delegation2))
 
     let%test_unit "Successful stake delegations from zkapp accounts- Signature"
@@ -2406,16 +2169,16 @@ let%test_module "legacy transactions using zkApp accounts" =
         Coinbase.create ~amount ~receiver:snapp_pk ~fee_transfer:(Some ft)
         |> Or_error.ok_exn
       in
-      U.test_transaction ?expected_failure:expected_failure_fee_receiver ledger
-        (Mina_transaction.Transaction.Coinbase coinbase1) ;
+      U.test_transaction_union ?expected_failure:expected_failure_fee_receiver
+        ledger (Mina_transaction.Transaction.Coinbase coinbase1) ;
       (*coinbase fee transfer to a zkApp account*)
       let coinbase2 =
         let ft = Coinbase.Fee_transfer.create ~receiver_pk:snapp_pk ~fee in
         Coinbase.create ~amount ~receiver:spec.receiver ~fee_transfer:(Some ft)
         |> Or_error.ok_exn
       in
-      U.test_transaction ?expected_failure:expected_failure_fee_receiver ledger
-        (Mina_transaction.Transaction.Coinbase coinbase2)
+      U.test_transaction_union ?expected_failure:expected_failure_fee_receiver
+        ledger (Mina_transaction.Transaction.Coinbase coinbase2)
 
     let%test_unit "Successful coinbase to zkapp accounts" =
       let open Mina_transaction_logic.For_tests in
@@ -2502,8 +2265,9 @@ let%test_module "legacy transactions using zkApp accounts" =
         , Fee_transfer.create single1 None |> Or_error.ok_exn )
       in
       List.iter [ ft1; ft2 ] ~f:(fun ft ->
-          U.test_transaction ?expected_failure:expected_failure_fee_receiver
-            ledger (Mina_transaction.Transaction.Fee_transfer ft) ) ;
+          U.test_transaction_union
+            ?expected_failure:expected_failure_fee_receiver ledger
+            (Mina_transaction.Transaction.Fee_transfer ft) ) ;
       (*send the second one to a zkApp account*)
       let ft3, ft4 =
         let single1 =
@@ -2517,9 +2281,10 @@ let%test_module "legacy transactions using zkApp accounts" =
         ( Fee_transfer.create single1 (Some single2) |> Or_error.ok_exn
         , Fee_transfer.create single1 None |> Or_error.ok_exn )
       in
-      U.test_transaction ?expected_failure:expected_failure_fee_receiver ledger
-        (Mina_transaction.Transaction.Fee_transfer ft3) ;
-      U.test_transaction ledger (Mina_transaction.Transaction.Fee_transfer ft4)
+      U.test_transaction_union ?expected_failure:expected_failure_fee_receiver
+        ledger (Mina_transaction.Transaction.Fee_transfer ft3) ;
+      U.test_transaction_union ledger
+        (Mina_transaction.Transaction.Fee_transfer ft4)
 
     let%test_unit "Successful fee transfers to zkapp accounts" =
       let open Mina_transaction_logic.For_tests in
