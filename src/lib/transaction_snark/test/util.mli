@@ -136,7 +136,7 @@ end
 
 val check_balance : Account_id.t -> int -> Ledger.t -> unit
 
-val test_transaction :
+val test_transaction_union :
      ?expected_failure:Transaction_status.Failure.t
   -> ?txn_global_slot:Mina_numbers.Global_slot.t
   -> Ledger.t
