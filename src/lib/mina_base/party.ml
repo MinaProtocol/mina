@@ -52,7 +52,7 @@ module Call_type = struct
       | false ->
           Call
       | true ->
-          Delegate_call)
+          Delegate_call )
 end
 
 module Update = struct
@@ -162,7 +162,7 @@ module Update = struct
            ; vesting_period
            ; vesting_increment
            } :
-            t) =
+            t ) =
         List.reduce_exn ~f:Random_oracle_input.Chunked.append
           [ Balance.var_to_input initial_minimum_balance
           ; Global_slot.Checked.to_input cliff_time
@@ -237,7 +237,7 @@ module Update = struct
     end
   end]
 
-  let gen ?(zkapp_account = false) ?permissions_auth () :
+  let gen ?(zkapp_account = false) ?vk ?permissions_auth () :
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind app_state =
@@ -253,9 +253,13 @@ module Update = struct
       if zkapp_account then
         Set_or_keep.gen
           (Quickcheck.Generator.return
-             (let data = Pickles.Side_loaded.Verification_key.dummy in
-              let hash = Zkapp_account.digest_vk data in
-              { With_hash.data; hash }))
+             ( match vk with
+             | None ->
+                 let data = Pickles.Side_loaded.Verification_key.dummy in
+                 let hash = Zkapp_account.digest_vk data in
+                 { With_hash.data; hash }
+             | Some vk ->
+                 vk ) )
       else return Set_or_keep.Keep
     in
     let%bind permissions =
@@ -333,7 +337,7 @@ module Update = struct
          ; timing
          ; voting_for
          } :
-          t) =
+          t ) =
       let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Zkapp_state.to_input app_state
@@ -341,7 +345,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input delegate
             ~f:Public_key.Compressed.Checked.to_input
         ; Set_or_keep.Checked.to_input verification_key ~f:(fun x ->
-              field (Data_as_hash.hash x.data))
+              field (Data_as_hash.hash x.data) )
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
         ; Set_or_keep.Checked.to_input zkapp_uri ~f:Data_as_hash.to_input
@@ -376,7 +380,7 @@ module Update = struct
        ; timing
        ; voting_for
        } :
-        t) =
+        t ) =
     let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Zkapp_state.to_input app_state
@@ -413,26 +417,26 @@ module Update = struct
             | { With_hash.data = Some data; hash } ->
                 Some { With_hash.data; hash }
             | { With_hash.data = None; _ } ->
-                None)
+                None )
           ~of_option:(function
             | Some { With_hash.data; hash } ->
                 { With_hash.data = Some data; hash }
             | None ->
-                { With_hash.data = None; hash = Field.Constant.zero })
+                { With_hash.data = None; hash = Field.Constant.zero } )
         |> Typ.transport_var
              ~there:
                (Set_or_keep.Checked.map
-                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data))
+                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data) )
              ~back:(fun x ->
                Set_or_keep.Checked.map x ~f:(fun data ->
                    { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
-                   }))
+                   } ) )
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
       ; Set_or_keep.optional_typ
           (Data_as_hash.optional_typ ~hash:Account.hash_zkapp_uri
              ~non_preimage:(Account.hash_zkapp_uri_opt None)
-             ~dummy_value:"")
+             ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
           Account.Token_symbol.typ
@@ -470,7 +474,7 @@ module Update = struct
              dummy |> to_base58_check |> of_base58_check_exn)
          in
          let hash = Zkapp_account.digest_vk data in
-         { With_hash.data; hash })
+         { With_hash.data; hash } )
     in
     let update : t =
       { app_state
@@ -868,7 +872,7 @@ module Body = struct
          ; use_full_commitment
          ; caller
          } :
-          t) =
+          t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input public_key
         ; Update.Checked.to_input update
@@ -995,7 +999,7 @@ module Body = struct
        ; use_full_commitment
        ; caller
        } :
-        t) =
+        t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input public_key
       ; Update.to_input update

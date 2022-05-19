@@ -89,7 +89,7 @@ struct
     let len_prefixed_encoded_chunks =
       List.map chunks ~f:(fun chunk ->
           let encoded = encode_unchunked chunk in
-          sprintf "%04X%s" (String.length encoded) encoded)
+          sprintf "%04X%s" (String.length encoded) encoded )
     in
     String.concat (String.of_char chunk_marker :: len_prefixed_encoded_chunks)
 
@@ -180,8 +180,8 @@ struct
         Or_error.error_string
           (error_str
              (sprintf "version byte \\x%02X, expected \\x%02X" (Char.to_int ch)
-                (Char.to_int version_byte))
-             str)
+                (Char.to_int version_byte) )
+             str )
 end
 
 module Version_bytes = Version_bytes

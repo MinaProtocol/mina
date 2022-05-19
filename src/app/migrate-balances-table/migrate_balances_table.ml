@@ -44,14 +44,15 @@ let main ~archive_uri () =
           query_db pool
             ~f:(fun db ->
               Sql.find_balance_entry db ~public_key_id ~balance ~block_id
-                ~block_height ~block_sequence_no ~block_secondary_sequence_no)
+                ~block_height ~block_sequence_no ~block_secondary_sequence_no )
             ~item:"find balance entry"
         with
         | None ->
             query_db pool
               ~f:(fun db ->
                 Sql.insert_balance_entry db ~public_key_id ~balance ~block_id
-                  ~block_height ~block_sequence_no ~block_secondary_sequence_no)
+                  ~block_height ~block_sequence_no ~block_secondary_sequence_no
+                )
               ~item:"insert balance entry"
         | Some id ->
             return id
@@ -106,14 +107,14 @@ let main ~archive_uri () =
             in
             query_db pool
               ~f:(fun db -> Sql.create_temp_table_index db table col ())
-              ~item:"balances index")
+              ~item:"balances index" )
       in
       let%bind () =
         query_db pool
           ~f:(fun db ->
             Sql.create_temp_table_named_index db "balances"
               "block_height,block_sequence_no,block_secondary_sequence_no"
-              "height_seq_nos" ())
+              "height_seq_nos" () )
           ~item:"balances index"
       in
       [%log info] "Creating temporary blocks internal commands table" ;
@@ -136,7 +137,7 @@ let main ~archive_uri () =
             in
             query_db pool
               ~f:(fun db -> Sql.create_temp_table_index db table col ())
-              ~item:"create blocks internal commands index")
+              ~item:"create blocks internal commands index" )
       in
       [%log info] "Creating temporary blocks user commands table" ;
       let%bind () = mk_temp_table "blocks_user_commands" in
@@ -152,7 +153,7 @@ let main ~archive_uri () =
             in
             query_db pool
               ~f:(fun db -> Sql.create_temp_table_index db table col ())
-              ~item:"blocks user commands index")
+              ~item:"blocks user commands index" )
       in
       let internal_cmds_cursor_name = "internal_cmds" in
       let fee_payer_cursor_name = "fee_payer" in
@@ -181,7 +182,7 @@ let main ~archive_uri () =
                   ~f:(fun db -> Sql.initialize_cursor db cursor ())
                   ~item:(sprintf "Initialize cursor %s" cursor)
             | Some _ ->
-                return ())
+                return () )
       in
       [%log info] "Getting internal commands" ;
       let%bind internal_commands =
@@ -218,14 +219,14 @@ let main ~archive_uri () =
                   ~f:(fun db ->
                     Sql.update_internal_command_receiver_balance db
                       ~new_balance_id ~block_id ~internal_command_id
-                      ~block_sequence_no ~block_secondary_sequence_no)
+                      ~block_sequence_no ~block_secondary_sequence_no )
                   ~item:"update internal command receiver balance"
               in
               (* update cursor only periodically, otherwise too slow *)
               if ndx % 1000 = 0 then (
                 [%log info] "Updated internal command receiver balance: %d" ndx ;
                 update_cursor internal_cmds_cursor_name ndx )
-              else return ())
+              else return () )
       in
       [%log info] "Getting user command fee payer balance information" ;
       let%bind user_command_fee_payers =
@@ -257,13 +258,13 @@ let main ~archive_uri () =
                 query_db pool
                   ~f:(fun db ->
                     Sql.update_user_command_fee_payer_balance db ~new_balance_id
-                      ~block_id ~user_command_id ~block_sequence_no)
+                      ~block_id ~user_command_id ~block_sequence_no )
                   ~item:"update user command fee payer balance"
               in
               if ndx % 1000 = 0 then (
                 [%log info] "Updated user command fee payer balance: %d" ndx ;
                 update_cursor fee_payer_cursor_name ndx )
-              else return ())
+              else return () )
       in
       [%log info] "Getting user command source balance information" ;
       let%bind user_command_sources =
@@ -295,13 +296,13 @@ let main ~archive_uri () =
                 query_db pool
                   ~f:(fun db ->
                     Sql.update_user_command_source_balance db ~new_balance_id
-                      ~block_id ~user_command_id ~block_sequence_no)
+                      ~block_id ~user_command_id ~block_sequence_no )
                   ~item:"update user command source balance"
               in
               if ndx % 1000 = 0 then (
                 [%log info] "Updated user command source balance: %d" ndx ;
                 update_cursor source_cursor_name ndx )
-              else return ())
+              else return () )
       in
       [%log info] "Getting user command receiver balance information" ;
       let%bind user_command_receivers =
@@ -333,13 +334,13 @@ let main ~archive_uri () =
                 query_db pool
                   ~f:(fun db ->
                     Sql.update_user_command_receiver_balance db ~new_balance_id
-                      ~block_id ~user_command_id ~block_sequence_no)
+                      ~block_id ~user_command_id ~block_sequence_no )
                   ~item:"update user command receiver balance"
               in
               if ndx % 1000 = 0 then (
                 [%log info] "Updated user command receiver balance: %d" ndx ;
                 update_cursor receiver_cursor_name ndx )
-              else return ())
+              else return () )
       in
       [%log info]
         "DROP original blocks_internal_command table, overwrite with temp table" ;
@@ -355,7 +356,7 @@ let main ~archive_uri () =
           ~f:(fun db ->
             Sql.add_balances_foreign_key_constraint db
               "blocks_internal_commands" "receiver_balance"
-              "blocks_internal_commands_receiver_balance_fkey" ())
+              "blocks_internal_commands_receiver_balance_fkey" () )
           ~item:
             "Blocks_internal_commands receiver balance foreign key constraint"
       in
@@ -364,42 +365,43 @@ let main ~archive_uri () =
           ~f:(fun db ->
             Sql.add_balances_foreign_key_constraint db "blocks_user_commands"
               "fee_payer_balance" "blocks_user_commands_fee_payer_balance_fkey"
-              ())
+              () )
           ~item:"Blocks_user_commands fee payer balance foreign key constraint"
       in
       let%bind () =
         query_db pool
           ~f:(fun db ->
             Sql.add_balances_foreign_key_constraint db "blocks_user_commands"
-              "source_balance" "blocks_user_commands_source_balance_fkey" ())
+              "source_balance" "blocks_user_commands_source_balance_fkey" () )
           ~item:"Blocks_user_commands source balance foreign key constraint"
       in
       let%bind () =
         query_db pool
           ~f:(fun db ->
             Sql.add_balances_foreign_key_constraint db "blocks_user_commands"
-              "receiver_balance" "blocks_user_commands_receiver_balance_fkey" ())
+              "receiver_balance" "blocks_user_commands_receiver_balance_fkey" ()
+            )
           ~item:"Blocks_user_commands receiver balance foreign key constraint"
       in
       let%bind () =
         query_db pool
           ~f:(fun db ->
             Sql.add_blocks_foreign_key_constraint db "blocks_internal_commands"
-              "block_id" "blocks_internal_commands_block_id_fkey" ())
+              "block_id" "blocks_internal_commands_block_id_fkey" () )
           ~item:"Blocks_internal_commands block id foreign key constraint"
       in
       let%bind () =
         query_db pool
           ~f:(fun db ->
             Sql.add_blocks_foreign_key_constraint db "blocks_user_commands"
-              "block_id" "blocks_user_commands_block_id_fkey" ())
+              "block_id" "blocks_user_commands_block_id_fkey" () )
           ~item:"Blocks_user_commands block id foreign key constraint"
       in
       let%bind () =
         query_db pool
           ~f:(fun db ->
             Sql.add_blocks_foreign_key_constraint db "balances" "block_id"
-              "balances_block_id_fkey" ())
+              "balances_block_id_fkey" () )
           ~item:"Balances block id foreign key constraint"
       in
       [%log info] "Migration successful" ;
@@ -417,4 +419,4 @@ let () =
                 postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
          in
-         main ~archive_uri)))
+         main ~archive_uri )))

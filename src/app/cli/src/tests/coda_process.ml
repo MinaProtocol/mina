@@ -9,7 +9,7 @@ type t = Coda_worker.Connection.t * Process.t * Coda_worker.Input.t
 let spawn_exn (config : Coda_worker.Input.t) =
   let%bind conn, process =
     Coda_worker.spawn_in_foreground_exn ~env:config.env ~on_failure:Error.raise
-      ~cd:config.program_dir ~shutdown_on:Disconnect
+      ~cd:config.program_dir ~shutdown_on:Connection_closed
       ~connection_state_init_arg:() ~connection_timeout:(Time.Span.of_sec 30.)
       config
   in
@@ -61,7 +61,7 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
                 ~f:
                   (Fn.compose
                      (function [ a; b ] -> Some (a, b) | _ -> None)
-                     (String.split ~on:'=')) )
+                     (String.split ~on:'=') ) )
     ; block_production_key
     ; snark_worker_key
     ; work_selection_method

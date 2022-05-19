@@ -86,7 +86,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                Cohttp_async.Client.post ~headers
                  ~body:
                    (Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-                 url))
+                 url ) )
       with
       | Ok ({ status; _ }, body) ->
           let status_code = Cohttp.Code.code_of_status status in
@@ -212,7 +212,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     make_interruptible
       (with_timeout
          (Time.Span.of_min timeout_min)
-         (Bvar.wait block_produced_bvar))
+         (Bvar.wait block_produced_bvar) )
   with
   | `Timeout ->
       [%log error]
@@ -257,7 +257,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
         List.is_empty
           (Mina_block.transactions
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled best_tip_block)
+               Genesis_constants.Constraint_constants.compiled best_tip_block )
       then (
         [%log info]
           "No transactions in block, sending block without SNARK work to \
@@ -285,9 +285,9 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                     (Error.createf
                        "Could not find state_hash %s in transition frontier \
                         for uptime service"
-                       (State_hash.to_base58_check state_hash))
+                       (State_hash.to_base58_check state_hash) )
               | Some protocol_state ->
-                  Ok protocol_state)
+                  Ok protocol_state )
         with
         | Error e ->
             [%log error]
@@ -318,7 +318,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                    | Snark_work_lib.Work.Single.Spec.Transition _ ->
                        true
                    | Merge _ ->
-                       false)
+                       false )
             in
             let staged_ledger_hash =
               Mina_block.header best_tip_block
@@ -335,7 +335,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                         (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->
                       (* unreachable *)
-                      failwith "Expected Transition work, not Merge")
+                      failwith "Expected Transition work, not Merge" )
             with
             | None ->
                 [%log info]
@@ -357,7 +357,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                 match%bind
                   make_interruptible
                     (Uptime_snark_worker.perform_single snark_worker
-                       (message, single_spec))
+                       (message, single_spec) )
                 with
                 | Error e ->
                     (* error in submitting to process *)

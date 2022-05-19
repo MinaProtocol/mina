@@ -1,6 +1,7 @@
 (executable
  (package replayer)
  (name replayer)
+ (flags -w -32-34)
  (public_name replayer)
  (libraries
    ;; opam libraries

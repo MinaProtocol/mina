@@ -93,12 +93,12 @@ module Generator : sig
              * Pending_coinbase.t
              * Mina_state.Protocol_state.value list )
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_some_initial_peers:
          (unit Envelope.Incoming.t -> Peer.t list Deferred.t)
     -> ?answer_sync_ledger_query:
          (   (Pasta_bindings.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
-          -> (Sync_ledger.Answer.t, Error.t) result Deferred.t)
+          -> (Sync_ledger.Answer.t, Error.t) result Deferred.t )
     -> ?get_ancestry:
          (   ( Consensus.Data.Consensus_state.Value.t
              , Pasta_bindings.Fp.t )
@@ -108,28 +108,29 @@ module Generator : sig
              , State_body_hash.t list * Mina_block.t )
              Proof_carrying_data.t
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
           -> ( Mina_block.t
              , Pasta_bindings.Fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_node_status:
          (   unit Envelope.Incoming.t
           -> ( Mina_networking.Rpcs.Get_node_status.Node_status.t
              , Error.t )
              result
-             Deferred.t)
+             Deferred.t )
     -> ?get_transition_knowledge:
          (unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t)
     -> ?get_transition_chain_proof:
          (   Pasta_bindings.Fp.t Envelope.Incoming.t
-          -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t)
+          -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
+         )
     -> ?get_transition_chain:
          (   Pasta_bindings.Fp.t list Envelope.Incoming.t
-          -> Mina_block.t list option Deferred.t)
+          -> Mina_block.t list option Deferred.t )
     -> peer_config
 
   val fresh_peer : peer_config
@@ -143,12 +144,12 @@ module Generator : sig
              * Pending_coinbase.t
              * Mina_state.Protocol_state.value list )
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_some_initial_peers:
          (unit Envelope.Incoming.t -> Peer.t list Deferred.t)
     -> ?answer_sync_ledger_query:
          (   (Pasta_bindings.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
-          -> (Sync_ledger.Answer.t, Error.t) result Deferred.t)
+          -> (Sync_ledger.Answer.t, Error.t) result Deferred.t )
     -> ?get_ancestry:
          (   ( Consensus.Data.Consensus_state.Value.t
              , Pasta_bindings.Fp.t )
@@ -158,28 +159,29 @@ module Generator : sig
              , State_body_hash.t list * Mina_block.t )
              Proof_carrying_data.t
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
           -> ( Mina_block.t
              , Pasta_bindings.Fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
-             Deferred.t)
+             Deferred.t )
     -> ?get_node_status:
          (   unit Envelope.Incoming.t
           -> ( Mina_networking.Rpcs.Get_node_status.Node_status.t
              , Error.t )
              result
-             Deferred.t)
+             Deferred.t )
     -> ?get_transition_knowledge:
          (unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t)
     -> ?get_transition_chain_proof:
          (   Pasta_bindings.Fp.t Envelope.Incoming.t
-          -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t)
+          -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
+         )
     -> ?get_transition_chain:
          (   Pasta_bindings.Fp.t list Envelope.Incoming.t
-          -> Mina_block.t list option Deferred.t)
+          -> Mina_block.t list option Deferred.t )
     -> peer_config
 
   val peer_with_branch : frontier_branch_size:int -> peer_config

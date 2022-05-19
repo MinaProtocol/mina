@@ -104,6 +104,6 @@ type ('sink_block, 'sink_tx, 'sink_snark) sinks_impl =
   (module Sinks_intf
      with type Block_sink.t = 'sink_block
       and type Snark_sink.t = 'sink_snark
-      and type Tx_sink.t = 'sink_tx)
+      and type Tx_sink.t = 'sink_tx )
 
 type sinks = Any_sinks : ('a, 'b, 'c) sinks_impl * ('a * 'b * 'c) -> sinks

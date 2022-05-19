@@ -17,7 +17,7 @@ let optional_typ ~hash ~non_preimage ~dummy_value =
   Typ.transport
     Typ.(Field.typ * Internal.ref ())
     ~there:(function
-      | None -> (non_preimage, dummy_value) | Some s -> (hash s, s))
+      | None -> (non_preimage, dummy_value) | Some s -> (hash s, s) )
     ~back:(fun (_, s) -> Some s)
 
 let to_input (x, _) = Random_oracle_input.Chunked.field x

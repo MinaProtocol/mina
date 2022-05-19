@@ -39,4 +39,4 @@ let command =
        flag "--payments" ~aliases:[ "payments" ] no_arg
          ~doc:"enable the payment check"
      in
-     main num_block_producers enable_payments)
+     main num_block_producers enable_payments )
