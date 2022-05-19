@@ -213,7 +213,6 @@ let%test_module "multisig_account" =
                                     (Pickles.Inductive_rule.B))
                                .t ->
                         [] )
-                  ; main_value = (fun [] _ -> [])
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
@@ -231,7 +230,6 @@ let%test_module "multisig_account" =
                     [ multisig_rule
                     ; { identifier = "dummy"
                       ; prevs = [ self; self ]
-                      ; main_value = (fun [ _; _ ] _ -> [ true; true ])
                       ; main =
                           (fun [ _; _ ] _ ->
                             Impl.run_checked

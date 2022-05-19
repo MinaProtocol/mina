@@ -1083,7 +1083,6 @@ let%test_module "test no side-loaded" =
                         dummy_constraints () ;
                         Field.Assert.equal self Field.zero ;
                         [] )
-                  ; main_value = (fun _ _self -> [])
                   }
                 ] ) )
 
@@ -1134,11 +1133,6 @@ let%test_module "test no side-loaded" =
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ proof_must_verify ] )
-                  ; main_value =
-                      (fun _ self ->
-                        let is_base_case = Field.Constant.(equal zero self) in
-                        let proof_must_verify = not is_base_case in
                         [ proof_must_verify ] )
                   }
                 ] ) )
@@ -1204,11 +1198,6 @@ let%test_module "test no side-loaded" =
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
                         [ Boolean.true_; proof_must_verify ] )
-                  ; main_value =
-                      (fun _ self ->
-                        let is_base_case = Field.Constant.(equal zero self) in
-                        let proof_must_verify = not is_base_case in
-                        [ true; proof_must_verify ] )
                   }
                 ] ) )
 
@@ -1301,7 +1290,6 @@ let%test_module "test" =
             ~choices:(fun ~self ->
               (* TODO: Make it possible to have a system that doesn't use its "self" *)
               [ { prevs= []
-                ; main_value= (fun [] _ -> [])
                 ; main=
                     (fun [] s ->
                        dummy_constraints () ;
@@ -1310,7 +1298,6 @@ let%test_module "test" =
                       [] ) }
                 (* TODO: Shouldn't have to have this dummy *)
               ; { prevs= [self; self]
-                ; main_value= (fun [_; _] _ -> [true; true])
                 ; main=
                     (fun [_; _] s ->
                        dummy_constraints () ;
@@ -1356,8 +1343,7 @@ let%test_module "test" =
                     for i = 0 to 10_000 do
                       assert_r1cs t t t
                     done ;
-                    [] )
-              ; main_value= (fun [] _ -> []) }
+                    [] ) }
             ; { prevs= [side_loaded]
               ; main=
                   (fun [hash] x ->
@@ -1365,14 +1351,12 @@ let%test_module "test" =
                       (exists Side_loaded_verification_key.typ
                          ~compute:(fun () -> Know_preimage.side_loaded_vk)) ;
                     Field.Assert.equal hash x ;
-                    [Boolean.true_] )
-              ; main_value= (fun [_] _ -> [true]) }
+                    [Boolean.true_] ) }
             ; { prevs= [self; self]
               ; main=
                   (fun [l; r] res ->
                     assert_r1cs l r res ;
-                    [Boolean.true_; Boolean.true_] )
-              ; main_value= (fun _ _ -> [true; true]) } ] )
+                    [Boolean.true_; Boolean.true_] ) } ] )
 
       module Proof = (val p)
     end
@@ -1460,11 +1444,6 @@ let%test_module "test" =
                         let proof_must_verify = Boolean.not is_base_case in
                         Boolean.Assert.any
                           [Field.(equal (one + prev) self); is_base_case] ;
-                        [proof_must_verify; proof_must_verify] )
-                  ; main_value=
-                      (fun _ self ->
-                        let is_base_case = Field.Constant.(equal zero self) in
-                        let proof_must_verify = not is_base_case in
                         [proof_must_verify; proof_must_verify] ) } ] ) )
 
       module Proof = (val p)

@@ -58,7 +58,6 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
                  (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                .t ->
         [] )
-  ; main_value = (fun [] _ -> [])
   }
 
 let%test_unit "1-of-1" =
