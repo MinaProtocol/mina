@@ -114,7 +114,6 @@ module Step = struct
       | Compute_prev_proof_parts :
           prev_values H1.T(Inductive_rule.Previous_proof_statement.Constant).t
           -> unit t
-      | Prev_inputs : prev_values H1.T(Id).t t
       | Proof_with_datas :
           ( prev_values
           , local_signature
@@ -153,7 +152,6 @@ module Step = struct
         | Compute_prev_proof_parts :
             prev_values H1.T(Inductive_rule.Previous_proof_statement.Constant).t
             -> unit t
-        | Prev_inputs : prev_values H1.T(Id).t t
         | Proof_with_datas :
             ( prev_values
             , local_signature

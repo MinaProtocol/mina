@@ -60,7 +60,6 @@ struct
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
       ~self_dlog_plonk_index pk self_dlog_vk
-      (prev_values : prev_values H1.T(Id).t)
       (prev_proofs : (local_widths, local_widths) H2.T(P).t) :
       ( A_value.t
       , (_, Max_proofs_verified.n) Vector.t
@@ -580,8 +579,6 @@ struct
       | Req.Compute_prev_proof_parts prev_proof_requests ->
           compute_prev_proof_parts prev_proof_requests ;
           k ()
-      | Req.Prev_inputs ->
-          k prev_values
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->

@@ -714,7 +714,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
-            wrap_vk.index prev_values prev_proofs
+            wrap_vk.index prev_proofs
         in
         let step_vk = fst (Lazy.force step_vk) in
         let wrap ?handler prevs next_state =
