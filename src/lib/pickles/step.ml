@@ -595,24 +595,25 @@ struct
               Snarky_backendless.Request.unhandled )
     in
     let prev_challenge_polynomial_commitments =
-      let to_fold_in =
-        extract_from_proofs
-          ( module struct
-            type res = Tick.Curve.Affine.t
+      lazy
+        (let to_fold_in =
+           extract_from_proofs
+             ( module struct
+               type res = Tick.Curve.Affine.t
 
-            let f (T t : _ P.t) =
-              t.statement.proof_state.me_only.challenge_polynomial_commitment
-          end )
-      in
-      (* emphatically NOT padded with dummies *)
-      Vector.(
-        map2 to_fold_in
-          (Lazy.force next_me_only_prepared).old_bulletproof_challenges
-          ~f:(fun commitment chals ->
-            { Tick.Proof.Challenge_polynomial.commitment
-            ; challenges = Vector.to_array chals
-            } )
-        |> to_list)
+               let f (T t : _ P.t) =
+                 t.statement.proof_state.me_only.challenge_polynomial_commitment
+             end )
+         in
+         (* emphatically NOT padded with dummies *)
+         Vector.(
+           map2 to_fold_in
+             (Lazy.force next_me_only_prepared).old_bulletproof_challenges
+             ~f:(fun commitment chals ->
+               { Tick.Proof.Challenge_polynomial.commitment
+               ; challenges = Vector.to_array chals
+               } )
+           |> to_list) )
     in
     let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
@@ -633,7 +634,8 @@ struct
               let%map.Promise proof =
                 Backend.Tick.Proof.create_async ~primary:public_inputs
                   ~auxiliary:auxiliary_inputs
-                  ~message:prev_challenge_polynomial_commitments pk
+                  ~message:(Lazy.force prev_challenge_polynomial_commitments)
+                  pk
               in
               (proof, next_statement_hashed) )
             [] ~return_typ:input
