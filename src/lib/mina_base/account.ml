@@ -685,6 +685,18 @@ module Checked = struct
     in
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
+
+  let has_permission ~to_ (account : var) =
+    match to_ with
+    | `Send ->
+        Permissions.Auth_required.Checked.eval_no_proof account.permissions.send
+          ~signature_verifies:Boolean.true_
+    | `Receive ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.receive ~signature_verifies:Boolean.false_
+    | `Set_delegate ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.set_delegate ~signature_verifies:Boolean.true_
 end
 
 [%%endif]

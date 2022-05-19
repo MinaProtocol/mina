@@ -481,13 +481,13 @@ let test_transaction ?expected_failure ?txn_global_slot ledger txn =
   let sparse_ledger =
     Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
   in
-  let check_snark =
+  let expect_snark_failure =
     match
       Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
         txn_unchecked
     with
     | Ok res ->
-        if Option.is_some expected_failure then (
+        ( if Option.is_some expected_failure then
           match Ledger.Transaction_applied.user_command_status res with
           | Applied ->
               failwith
@@ -499,9 +499,8 @@ let test_transaction ?expected_failure ?txn_global_slot ledger txn =
                 Transaction_status.Failure.Collection.equal
                   (Transaction_status.Failure.Collection.of_single_failure
                      (Option.value_exn expected_failure) )
-                  f ) ;
-              true )
-        else true
+                  f ) ) ;
+        false
     | Error e ->
         if Option.is_none expected_failure then
           failwith
@@ -520,18 +519,24 @@ let test_transaction ?expected_failure ?txn_global_slot ledger txn =
                (Transaction_status.Failure.describe
                   (Option.value_exn expected_failure) )
                (Error.to_string_hum e) ) ;
-        false
+        true
   in
   let target = Ledger.merkle_root ledger in
   let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
-  if check_snark then
-    Transaction_snark.check_transaction ~constraint_constants ~sok_message
-      ~source ~target ~init_stack:pending_coinbase_stack
-      ~pending_coinbase_stack_state:
-        { Transaction_snark.Pending_coinbase_stack_state.source =
-            pending_coinbase_stack
-        ; target = pending_coinbase_stack_target
-        }
-      ~zkapp_account1:None ~zkapp_account2:None
-      { transaction = txn; block_data = state_body }
-      (unstage @@ Sparse_ledger.handler sparse_ledger)
+  match
+    Or_error.try_with (fun () ->
+        Transaction_snark.check_transaction ~constraint_constants ~sok_message
+          ~source ~target ~init_stack:pending_coinbase_stack
+          ~pending_coinbase_stack_state:
+            { Transaction_snark.Pending_coinbase_stack_state.source =
+                pending_coinbase_stack
+            ; target = pending_coinbase_stack_target
+            }
+          ~zkapp_account1:None ~zkapp_account2:None
+          { transaction = txn; block_data = state_body }
+          (unstage @@ Sparse_ledger.handler sparse_ledger) )
+  with
+  | Error _e ->
+      assert expect_snark_failure
+  | Ok _ ->
+      assert (not expect_snark_failure)
