@@ -528,28 +528,30 @@ struct
       in
       go prev_proofs branch_data.rule.prevs prev_values_length
     in
-    let next_statement_me_only : _ Reduced_me_only.Step.t =
-      let old_bulletproof_challenges =
-        extract_from_proofs
-          ( module struct
-            type res =
-              Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-              Step_bp_vec.t
+    let next_statement_me_only : _ Reduced_me_only.Step.t Lazy.t =
+      lazy
+        (let old_bulletproof_challenges =
+           extract_from_proofs
+             ( module struct
+               type res =
+                 Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+                 Step_bp_vec.t
 
-            let f (T t : _ P.t) =
-              t.statement.proof_state.deferred_values.bulletproof_challenges
-          end )
-      in
-      (* Have the sg be available in the opening proof and verify it. *)
-      { app_state = next_state
-      ; challenge_polynomial_commitments =
-          Option.value_exn !challenge_polynomial_commitments
-      ; old_bulletproof_challenges
-      }
+               let f (T t : _ P.t) =
+                 t.statement.proof_state.deferred_values.bulletproof_challenges
+             end )
+         in
+         (* Have the sg be available in the opening proof and verify it. *)
+         { app_state = next_state
+         ; challenge_polynomial_commitments =
+             Option.value_exn !challenge_polynomial_commitments
+         ; old_bulletproof_challenges
+         } )
     in
     let next_me_only_prepared =
-      Reduced_me_only.Step.prepare ~dlog_plonk_index:self_dlog_plonk_index
-        next_statement_me_only
+      lazy
+        (Reduced_me_only.Step.prepare ~dlog_plonk_index:self_dlog_plonk_index
+           (Lazy.force next_statement_me_only) )
     in
     let pass_through_padded =
       let rec pad :
@@ -590,7 +592,7 @@ struct
       | Req.Wrap_index ->
           k self_dlog_plonk_index
       | Req.App_state ->
-          k next_me_only_prepared.app_state
+          k (Lazy.force next_me_only_prepared).app_state
       | Req.Unfinalized_proofs ->
           k (Lazy.force unfinalized_proofs_extended)
       | Req.Pass_through ->
@@ -614,7 +616,8 @@ struct
       in
       (* emphatically NOT padded with dummies *)
       Vector.(
-        map2 to_fold_in next_me_only_prepared.old_bulletproof_challenges
+        map2 to_fold_in
+          (Lazy.force next_me_only_prepared).old_bulletproof_challenges
           ~f:(fun commitment chals ->
             { Tick.Proof.Challenge_polynomial.commitment
             ; challenges = Vector.to_array chals
@@ -661,7 +664,7 @@ struct
     let next_statement : _ Types.Step.Statement.t =
       { proof_state =
           { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
-          ; me_only = next_statement_me_only
+          ; me_only = Lazy.force next_statement_me_only
           }
       ; pass_through
       }
