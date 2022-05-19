@@ -498,7 +498,7 @@ let batch_send_payments =
 let send_payment_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
-  let open Graphql_lib in
+  (* let open Graphql_lib in *)
   let receiver_flag =
     flag "--receiver" ~aliases:[ "receiver" ]
       ~doc:"PUBLICKEY Public key to which you want to send money"
@@ -520,17 +520,33 @@ let send_payment_graphql =
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
             graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount, token)
+            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount, _token)
           ->
          let%map response =
+           let input : Mina_graphql.Types.Input.send_payment_input option =
+             (* it seems like the token *)
+             Some
+               { to_ = receiver
+               ; from = sender
+               ; amount
+               ; fee
+               ; memo
+               ; valid_until = None
+               ; nonce
+               }
+           in
+           (* let input = object *)
+           (*     method to_ = receiver *)
+           (*     method from = sender *)
+           (*     method amount = amount *)
+           (*     method fee = fee *)
+           (*     method memo = memo *)
+           (*     method valid_until = token *)
+           (*     method nonce = nonce *)
+           (*   end *)
+           (* in *)
            Graphql_client.query_exn
-             (Graphql_queries.Send_payment.make
-                ~receiver:(Encoders.public_key receiver)
-                ~sender:(Encoders.public_key sender)
-                ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
-                ?token:(Option.map ~f:Encoders.token token)
-                ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                ?memo ())
+             (Graphql_queries.Send_payment.make ~input ())
              graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
@@ -592,17 +608,32 @@ let cancel_transaction_graphql =
          printf "Fee to cancel transaction is %s coda.\n"
            (Currency.Fee.to_formatted_string cancel_fee) ;
          let cancel_query =
-           let open Graphql_lib.Encoders in
-           Graphql_queries.Send_payment.make
-             ~sender:(public_key cancel_sender_pk)
-             ~receiver:(public_key receiver_pk) ~fee:(fee cancel_fee)
-             ~amount:(amount Currency.Amount.zero)
-             ~nonce:
-               (uint32
-                  (Mina_numbers.Account_nonce.to_uint32
-                     (Signed_command.nonce user_command)))
-             ()
+           let input : Mina_graphql.Types.Input.send_payment_input option =
+             Some
+               { to_ = receiver_pk
+               ; from = cancel_sender_pk
+               ; amount = Currency.Amount.zero
+               ; fee = cancel_fee
+               ; memo = None
+               ; valid_until = None
+               ; nonce = Some (Signed_command.nonce user_command)
+               }
+           in
+           Graphql_queries.Send_payment.make ~input ()
          in
+
+         (* let open Graphql_lib.Encoders in *)
+         (*   Graphql_queries.Send_payment.make *)
+         (*     ~sender:(public_key cancel_sender_pk) *)
+         (*     ~receiver:(public_key receiver_pk) ~fee:(fee cancel_fee) *)
+         (*     ~amount:(amount Currency.Amount.zero) *)
+         (*     ~nonce: *)
+
+         (*       (uint32 *)
+         (*          (Mina_numbers.Account_nonce.to_uint32 *)
+         (*             (Signed_command.nonce user_command))) *)
+         (*     () *)
+         (* in *)
          let%map cancel_response =
            Graphql_client.query_exn cancel_query graphql_endpoint
          in
@@ -1563,8 +1594,9 @@ let unlock_account =
              let%map response =
                Graphql_client.query_exn
                  (Graphql_queries.Unlock_account.make
-                    ~public_key:(Graphql_lib.Encoders.public_key pk_str)
-                    ~password:(Bytes.to_string password_bytes)
+                    ~input:(Some (password_bytes, pk_str))
+                    (* ~public_key:(Graphql_lib.Encoders.public_key pk_str) *)
+                    (* ~password:(Bytes.to_string password_bytes) *)
                     ())
                  graphql_endpoint
              in

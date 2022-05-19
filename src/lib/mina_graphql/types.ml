@@ -1588,6 +1588,8 @@ module Input = struct
         ]
       ~to_string:(fun f (p : Network_peer.Peer.t) ->
         f p.peer_id (Unix.Inet_addr.to_string p.host) p.libp2p_port)
+      ~to_json:(fun f (p : Network_peer.Peer.t) ->
+        f p.peer_id (Unix.Inet_addr.to_string p.host) p.libp2p_port)
 
   let public_key_arg =
     scalar "PublicKey" ~doc:"Public key in Base58Check format"
@@ -1600,11 +1602,15 @@ module Input = struct
         | _ ->
             Error "Expected public key as a string in Base58Check format")
       ~to_string:Public_key.Compressed.to_base58_check
+      ~to_json:(function
+        | k -> `String (Public_key.Compressed.to_base58_check k))
 
   let private_key_arg =
     scalar "PrivateKey" ~doc:"Base58Check-encoded private key"
-      ~coerce:Signature_lib.Private_key.of_yojson ~to_string:(fun k ->
+      ~coerce:Signature_lib.Private_key.of_yojson
+      ~to_string:(fun k ->
         Yojson.Basic.to_string (Signature_lib.Private_key.to_yojson k))
+      ~to_json:Signature_lib.Private_key.to_yojson
 
   let token_id_arg =
     scalar "TokenId" ~doc:"String representation of a token's UInt64 identifier"
@@ -1617,97 +1623,98 @@ module Input = struct
               Error "Invalid format for token."
         with _ -> Error "Invalid format for token.")
       ~to_string:Token_id.to_string
+      ~to_json:(function i -> `String (Token_id.to_string i))
 
   let sign =
     enum "Sign"
       ~values:
         [ enum_value "PLUS" ~value:Sgn.Pos; enum_value "MINUS" ~value:Sgn.Neg ]
 
-  let field =
-    scalar "Field"
-      ~coerce:(fun field ->
-        match field with
-        | `String s ->
-            Ok (Snark_params.Tick.Field.of_string s)
-        | _ ->
-            Error "Expected a string representing a field element")
-      ~to_string:Snark_params.Tick.Field.to_string
+  (* let field = *)
+  (*   scalar "Field" *)
+  (*     ~coerce:(fun field -> *)
+  (*       match field with *)
+  (*       | `String s -> *)
+  (*           Ok (Snark_params.Tick.Field.of_string s) *)
+  (*       | _ -> *)
+  (*           Error "Expected a string representing a field element") *)
+  (*     ~to_string:Snark_params.Tick.Field.to_string *)
 
-  let nonce =
-    scalar "Nonce"
-      ~coerce:(fun nonce ->
-        (* of_string might raise *)
-        try
-          match nonce with
-          | `String s ->
-              (* a nonce is a uint32, GraphQL ints are signed int32, so use string *)
-              Ok (Mina_base.Account.Nonce.of_string s)
-          | _ ->
-              Error "Expected string for nonce"
-        with exn -> Error (Exn.to_string exn))
-      ~to_string:Mina_base.Account.Nonce.to_string
+  (* let nonce = *)
+  (*   scalar "Nonce" *)
+  (*     ~coerce:(fun nonce -> *)
+  (*       (\* of_string might raise *\) *)
+  (*       try *)
+  (*         match nonce with *)
+  (*         | `String s -> *)
+  (*             (\* a nonce is a uint32, GraphQL ints are signed int32, so use string *\) *)
+  (*             Ok (Mina_base.Account.Nonce.of_string s) *)
+  (*         | _ -> *)
+  (*             Error "Expected string for nonce" *)
+  (*       with exn -> Error (Exn.to_string exn)) *)
+  (*     ~to_string:Mina_base.Account.Nonce.to_string *)
 
-  let snarked_ledger_hash =
-    scalar "SnarkedLedgerHash"
-      ~coerce:(fun hash ->
-        match hash with
-        | `String s ->
-            Result.map_error
-              (Frozen_ledger_hash.of_base58_check s)
-              ~f:Error.to_string_hum
-        | _ ->
-            Error "Expected snarked ledger hash in Base58Check format")
-      ~to_string:Frozen_ledger_hash.to_base58_check
+  (* let snarked_ledger_hash = *)
+  (*   scalar "SnarkedLedgerHash" *)
+  (*     ~coerce:(fun hash -> *)
+  (*       match hash with *)
+  (*       | `String s -> *)
+  (*           Result.map_error *)
+  (*             (Frozen_ledger_hash.of_base58_check s) *)
+  (*             ~f:Error.to_string_hum *)
+  (*       | _ -> *)
+  (*           Error "Expected snarked ledger hash in Base58Check format") *)
+  (*     ~to_string:Frozen_ledger_hash.to_base58_check *)
 
-  let block_time =
-    scalar "BlockTime"
-      ~coerce:(fun block_time ->
-        match block_time with
-        | `String s -> (
-            try
-              (* a block time is a uint64, GraphQL ints are signed int32, so use string *)
-              (* of_string might raise *)
-              Ok (Block_time.of_string_exn s)
-            with exn -> Error (Exn.to_string exn) )
-        | _ ->
-            Error "Expected string for block time")
-      ~to_string:Block_time.to_string
+  (* let block_time = *)
+  (*   scalar "BlockTime" *)
+  (*     ~coerce:(fun block_time -> *)
+  (*       match block_time with *)
+  (*       | `String s -> ( *)
+  (*           try *)
+  (*             (\* a block time is a uint64, GraphQL ints are signed int32, so use string *\) *)
+  (*             (\* of_string might raise *\) *)
+  (*             Ok (Block_time.of_string_exn s) *)
+  (*           with exn -> Error (Exn.to_string exn) ) *)
+  (*       | _ -> *)
+  (*           Error "Expected string for block time") *)
+  (*     ~to_string:Block_time.to_string *)
 
-  let length =
-    scalar "Length"
-      ~coerce:(fun length ->
-        (* of_string might raise *)
-        match length with
-        | `String s -> (
-            try
-              (* a length is a uint32, GraphQL ints are signed int32, so use string *)
-              Ok (Mina_numbers.Length.of_string s)
-            with exn -> Error (Exn.to_string exn) )
-        | _ ->
-            Error "Expected string for length")
-      ~to_string:Mina_numbers.Length.to_string
+  (* let length = *)
+  (*   scalar "Length" *)
+  (*     ~coerce:(fun length -> *)
+  (*       (\* of_string might raise *\) *)
+  (*       match length with *)
+  (*       | `String s -> ( *)
+  (*           try *)
+  (*             (\* a length is a uint32, GraphQL ints are signed int32, so use string *\) *)
+  (*             Ok (Mina_numbers.Length.of_string s) *)
+  (*           with exn -> Error (Exn.to_string exn) ) *)
+  (*       | _ -> *)
+  (*           Error "Expected string for length") *)
+  (*     ~to_string:Mina_numbers.Length.to_string *)
 
-  let currency_amount =
-    scalar "CurrencyAmount"
-      ~coerce:(fun amt ->
-        match amt with
-        | `String s -> (
-            try Ok (Currency.Amount.of_string s)
-            with exn -> Error (Exn.to_string exn) )
-        | _ ->
-            Error "Expected string for currency amount")
-      ~to_string:Currency.Amount.to_string
+  (* let currency_amount = *)
+  (*   scalar "CurrencyAmount" *)
+  (*     ~coerce:(fun amt -> *)
+  (*       match amt with *)
+  (*       | `String s -> ( *)
+  (*           try Ok (Currency.Amount.of_string s) *)
+  (*           with exn -> Error (Exn.to_string exn) ) *)
+  (*       | _ -> *)
+  (*           Error "Expected string for currency amount") *)
+  (*     ~to_string:Currency.Amount.to_string *)
 
-  let fee =
-    scalar "Fee"
-      ~coerce:(fun fee ->
-        match fee with
-        | `String s -> (
-            try Ok (Currency.Fee.of_string s)
-            with exn -> Error (Exn.to_string exn) )
-        | _ ->
-            Error "Expected string for fee")
-      ~to_string:Currency.Fee.to_string
+  (* let fee = *)
+  (*   scalar "Fee" *)
+  (*     ~coerce:(fun fee -> *)
+  (*       match fee with *)
+  (*       | `String s -> ( *)
+  (*           try Ok (Currency.Fee.of_string s) *)
+  (*           with exn -> Error (Exn.to_string exn) ) *)
+  (*       | _ -> *)
+  (*           Error "Expected string for fee") *)
+  (*     ~to_string:Currency.Fee.to_string *)
 
   let internal_send_zkapp =
     scalar "SendTestZkappInput" ~doc:"Parties for a test zkApp"
@@ -1716,6 +1723,7 @@ module Input = struct
         Result.try_with (fun () -> Mina_base.Parties.of_json json)
         |> Result.map_error ~f:(fun ex -> Exn.to_string ex))
       ~to_string:(fun x -> Yojson.Safe.to_string (Mina_base.Parties.to_json x))
+      ~to_json:(fun x -> Yojson.Safe.to_basic @@ Mina_base.Parties.to_json x)
 
   let precomputed_block =
     scalar "PrecomputedBlock" ~doc:"Block encoded in precomputed block format"
@@ -1724,6 +1732,8 @@ module Input = struct
         Mina_block.Precomputed.of_yojson json)
       ~to_string:(fun x ->
         Yojson.Safe.to_string (Mina_block.Precomputed.to_yojson x))
+      ~to_json:(fun x ->
+        Yojson.Safe.to_basic @@ Mina_block.Precomputed.to_yojson x)
 
   let extensional_block =
     scalar "ExtensionalBlock" ~doc:"Block encoded in extensional block format"
@@ -1732,6 +1742,8 @@ module Input = struct
         Archive_lib.Extensional.Block.of_yojson json)
       ~to_string:(fun x ->
         Yojson.Safe.to_string (Archive_lib.Extensional.Block.to_yojson x))
+      ~to_json:(fun x ->
+        Yojson.Safe.to_basic @@ Archive_lib.Extensional.Block.to_yojson x)
 
   module type Numeric_type = sig
     type t
@@ -1752,7 +1764,10 @@ module Input = struct
         (sprintf
            "String or Integer representation of a %s number. If the input is a \
             string, it must represent the number in base 10"
-           lower_name) ~to_string:Numeric.to_string ~coerce:(fun key ->
+           lower_name)
+      ~to_string:Numeric.to_string
+      ~to_json:(fun n -> `String (Numeric.to_string n))
+      ~coerce:(fun key ->
         match key with
         | `String s -> (
             try
@@ -1824,6 +1839,8 @@ module Input = struct
         ]
       ~to_string:(fun f (s : Signature.t) ->
         f None None (Some (Signature.Raw.encode s)))
+      ~to_json:(fun f (s : Signature.t) ->
+        f None None (Some (Signature.Raw.encode s)))
 
   let vrf_message =
     obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
@@ -1841,6 +1858,10 @@ module Input = struct
             ~typ:(non_null int)
         ]
       ~to_string:(fun f (t : Consensus_vrf.Layout.Message.t) ->
+        f t.global_slot
+          (Mina_base.Epoch_seed.to_base58_check t.epoch_seed)
+          t.delegator_index)
+      ~to_json:(fun f (t : Consensus_vrf.Layout.Message.t) ->
         f t.global_slot
           (Mina_base.Epoch_seed.to_base58_check t.epoch_seed)
           t.delegator_index)
@@ -1873,6 +1894,10 @@ module Input = struct
         f
           (Currency.Balance.to_uint64 t.delegated_stake)
           (Currency.Amount.to_uint64 t.total_stake))
+      ~to_json:(fun f (t : Consensus_vrf.Layout.Threshold.t) ->
+        f
+          (Currency.Balance.to_uint64 t.delegated_stake)
+          (Currency.Amount.to_uint64 t.total_stake))
 
   let vrf_evaluation =
     obj "VrfEvaluationInput" ~doc:"The witness to a vrf evaluation"
@@ -1897,6 +1922,13 @@ module Input = struct
         ; arg "vrfThreshold" ~typ:vrf_threshold
         ]
       ~to_string:(fun f (x : Consensus_vrf.Layout.Evaluation.t) ->
+        f x.message
+          (Public_key.compress x.public_key)
+          (Snark_params.Tick.Inner_curve.Scalar.to_string x.c)
+          (Snark_params.Tick.Inner_curve.Scalar.to_string x.s)
+          (Consensus_vrf.Group.to_string_list_exn x.scaled_message_hash)
+          x.vrf_threshold)
+      ~to_json:(fun f (x : Consensus_vrf.Layout.Evaluation.t) ->
         f x.message
           (Public_key.compress x.public_key)
           (Snark_params.Tick.Inner_curve.Scalar.to_string x.c)
@@ -1962,6 +1994,17 @@ module Input = struct
         ~doc:"Delay with which a transaction shall be repeated"
   end
 
+  type send_payment_input =
+    { from : (Epoch_seed.t, bool) Public_key.Compressed.Poly.t
+    ; to_ : Account.key
+    ; amount : Currency.Amount.t
+    ; (* fee: uint64; *)
+      fee : Currency.Fee.t
+    ; valid_until : Unsigned.uint32 option
+    ; memo : string option
+    ; nonce : Unsigned.uint32 option
+    }
+
   let send_payment =
     let open Fields in
     obj "SendPaymentInput"
@@ -1976,7 +2019,16 @@ module Input = struct
         ; memo
         ; nonce
         ]
-      ~to_string:(fun f (x1, x2, x3, x4, x5, x6, x7) -> f x1 x2 x3 x4 x5 x6 x7)
+      ~to_string:(fun f x ->
+        f x.from x.to_
+          (Currency.Amount.to_uint64 x.amount)
+          (Currency.Fee.to_uint64 x.fee)
+          x.valid_until x.memo x.nonce)
+      ~to_json:(fun f x ->
+        f x.from x.to_
+          (Currency.Amount.to_uint64 x.amount)
+          (Currency.Fee.to_uint64 x.fee)
+          x.valid_until x.memo x.nonce)
 
   let send_zkapp =
     let conv (x : Parties.t Fields_derivers_graphql.Schema.Arg.arg_typ) :
@@ -1984,14 +2036,18 @@ module Input = struct
       Obj.magic x
     in
     let my_arg_typ =
-      { typ = Parties.arg_typ () |> conv; to_string = Parties.arg_query_string }
+      { typ = Parties.arg_typ () |> conv
+      ; to_string = Parties.arg_query_string
+      ; to_json =
+          (function x -> Yojson.Safe.to_basic @@ Parties.parties_to_json x)
+      }
     in
     obj "SendZkappInput" ~coerce:Fn.id
       ~fields:
         [ arg "parties" ~doc:"Parties structure representing the transaction"
             ~typ:my_arg_typ
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   let send_delegation =
     let open Fields in
@@ -2007,6 +2063,7 @@ module Input = struct
         ; nonce
         ]
       ~to_string:(fun f (x1, x2, x3, x4, x5, x6) -> f x1 x2 x3 x4 x5 x6)
+      ~to_json:(fun f (x1, x2, x3, x4, x5, x6) -> f x1 x2 x3 x4 x5 x6)
 
   let rosetta_transaction =
     Arg.scalar "RosettaTransaction"
@@ -2017,6 +2074,8 @@ module Input = struct
       ~to_string:(function
         | (x : Signed_command.t) ->
             Yojson.Safe.to_string (Signed_command.to_yojson x))
+      ~to_json:(function
+        | x -> Yojson.Safe.to_basic @@ Signed_command.to_yojson x)
 
   let create_account =
     obj "AddAccountInput" ~coerce:Fn.id
@@ -2024,7 +2083,7 @@ module Input = struct
         [ arg "password" ~doc:"Password used to encrypt the new account"
             ~typ:(non_null string)
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   let unlock_account =
     obj "UnlockInput"
@@ -2035,7 +2094,8 @@ module Input = struct
         ; arg "publicKey" ~doc:"Public key specifying which account to unlock"
             ~typ:(non_null public_key_arg)
         ]
-      ~to_string:(fun f (password, pk) -> f password pk)
+      ~to_string:(fun f (password, pk) -> f (Bytes.to_string password) pk)
+      ~to_json:(fun f (password, pk) -> f (Bytes.to_string password) pk)
 
   let create_hd_account =
     obj "CreateHDAccountInput" ~coerce:Fn.id
@@ -2043,7 +2103,7 @@ module Input = struct
         [ arg "index" ~doc:"Index of the account in hardware wallet"
             ~typ:(non_null uint32_arg)
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   let lock_account =
     obj "LockInput" ~coerce:Fn.id
@@ -2051,7 +2111,7 @@ module Input = struct
         [ arg "publicKey" ~doc:"Public key specifying which account to lock"
             ~typ:(non_null public_key_arg)
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   let delete_account =
     obj "DeleteAccountInput" ~coerce:Fn.id
@@ -2059,12 +2119,12 @@ module Input = struct
         [ arg "publicKey" ~doc:"Public key of account to be deleted"
             ~typ:(non_null public_key_arg)
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   let reset_trust_status =
     obj "ResetTrustStatusInput" ~coerce:Fn.id
       ~fields:[ arg "ipAddress" ~typ:(non_null string) ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   (* TODO: Treat cases where filter_input has a null argument *)
   let block_filter_input =
@@ -2076,7 +2136,7 @@ module Input = struct
               \        transaction in the block, or produced the block"
             ~typ:(non_null public_key_arg)
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   let user_command_filter_input =
     obj "UserCommandFilterType" ~coerce:Fn.id
@@ -2087,7 +2147,7 @@ module Input = struct
                looking for"
             ~typ:(non_null public_key_arg)
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   let set_coinbase_receiver =
     obj "SetCoinbaseReceiverInput" ~coerce:Fn.id
@@ -2097,12 +2157,12 @@ module Input = struct
               "Public key of the account to receive coinbases. Block \
                production keys will receive the coinbases if none is given"
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   let set_snark_work_fee =
     obj "SetSnarkWorkFee"
       ~fields:[ Fields.fee ~doc:"Fee to get rewarded for producing snark work" ]
-      ~coerce:Fn.id ~to_string:Fn.id
+      ~coerce:Fn.id ~to_string:Fn.id ~to_json:Fn.id
 
   let set_snark_worker =
     obj "SetSnarkWorkerInput" ~coerce:Fn.id
@@ -2112,7 +2172,7 @@ module Input = struct
               "Public key you wish to start snark-working on; null to stop \
                doing any snark work"
         ]
-      ~to_string:Fn.id
+      ~to_string:Fn.id ~to_json:Fn.id
 
   module AddPaymentReceipt = struct
     type t = { payment : string; added_time : string }
@@ -2132,6 +2192,7 @@ module Input = struct
                     transaction database")
           ]
         ~to_string:(fun f (t : t) -> f t.payment t.added_time)
+        ~to_json:(fun f (t : t) -> f t.payment t.added_time)
   end
 
   let set_connection_gating_config =
@@ -2158,6 +2219,68 @@ module Input = struct
           ]
       ~to_string:(fun f (t : Mina_net2.connection_gating) ->
         f t.trusted_peers t.banned_peers t.isolate)
+      ~to_json:(fun f (t : Mina_net2.connection_gating) ->
+        f t.trusted_peers t.banned_peers t.isolate)
+
+  module Encoders = struct
+    (** This module exposes the toplevel converters to be used by graphql-ppx *)
+    let json_of_NetworkPeer = peer.to_json
+    let json_of_PublicKey = public_key_arg.to_json
+    let json_of_PrivateKey = private_key_arg.to_json
+    let json_of_TokenId = token_id_arg.to_json
+    let json_of_UInt32 = uint32_arg.to_json
+    let json_of_UInt64 = uint64_arg.to_json
+    (* let json_of_Field = field.to_json *)
+    (* let json_of_Nonce = nonce.to_json *)
+    (* let json_of_SnarkedLedgerHash = snarked_ledger_hash.to_json *)
+    (* let json_of_BlockTime = block_time.to_json *)
+    (* let json_of_Length = length.to_json *)
+    (* let json_of_CurrencyAmount = currency_amount.to_json *)
+    (* let json_of_Fee = fee.to_json *)
+    let json_of_SendTestZkappInput = internal_send_zkapp.to_json
+    let json_of_PrecomputedBlock = precomputed_block.to_json
+
+    let json_of_ExtensionalBlock = extensional_block.to_json
+
+    let json_of_SignatureInput = signature_arg.to_json
+
+    let json_of_VrfMessageInput = vrf_message.to_json
+
+    let json_of_VrfThresholdInput = vrf_threshold.to_json
+
+    let  json_of_VrfEvaluationInput = vrf_evaluation.to_json
+
+    let json_of_SendPaymentInput = send_payment.to_json
+
+    let json_of_SendZkappInput = send_zkapp.to_json
+
+    let json_of_SendDelegationInput = send_delegation.to_json
+
+    let json_of_RosettaTransaction = rosetta_transaction.to_json
+
+    let json_of_AddAccountInput = create_account.to_json
+
+    let json_of_UnlockInput = unlock_account.to_json
+
+    let json_of_CreateHDAccountInput  = create_hd_account.to_json
+
+    let json_of_LockInput = lock_account.to_json
+
+    let json_of_DeleteAccountInput = delete_account.to_json
+
+    let json_of_ResetTrustStatusInput = reset_trust_status.to_json
+
+    let json_of_BlockFilterInput = block_filter_input.to_json
+
+    let json_of_UserCommandFilterType = user_command_filter_input.to_json
+
+    let json_of_SetCoinbaseReceiverInput = set_coinbase_receiver.to_json
+
+    let json_of_SetSnarkWorkFee = set_snark_work_fee.to_json
+    let json_of_SetSnarkWorkerInput = set_snark_worker.to_json
+    let json_of_AddPaymentReceiptInput = AddPaymentReceipt.typ.to_json
+    let json_of_SetConnectionGatingConfigInput = set_connection_gating_config.to_json
+  end
 end
 
 let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =

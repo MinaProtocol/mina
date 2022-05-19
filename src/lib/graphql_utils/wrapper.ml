@@ -8,7 +8,10 @@
 module Make (Schema : Graphql_intf.Schema) = struct
   module Arg = struct
     type ('obj_arg, 'a) arg_typ =
-      { typ : 'obj_arg Schema.Arg.arg_typ; to_string : 'a -> string }
+      { typ : 'obj_arg Schema.Arg.arg_typ
+      ; to_string : 'a -> string
+      ; to_json : 'a -> Yojson.Basic.t
+      }
 
     type ('obj_arg, 'a) arg =
       | Arg :
@@ -30,16 +33,21 @@ module Make (Schema : Graphql_intf.Schema) = struct
       | Arg { doc; _ } | DefaultArg { doc; _ } ->
           doc
 
-    type (_, _, _, _) args =
-      | [] : ('ctx, 'out, 'out, string) args
+    type (_, _, _, _, _) args =
+      | [] : ('ctx, 'out, 'out, string, Yojson.Basic.t) args
       | ( :: ) :
-          ('a, 'to_string_input) arg * ('ctx, 'out, 'args, 'args_string) args
-          -> ('ctx, 'out, 'a -> 'args, 'to_string_input -> 'args_string) args
+          ('a, 'input) arg * ('ctx, 'out, 'args, 'args_string, 'args_json) args
+          -> ( 'ctx
+             , 'out
+             , 'a -> 'args
+             , 'input -> 'args_string
+             , 'input -> 'args_json )
+             args
 
     let rec to_string :
-        type ctx out arg args_string.
+        type ctx out arg args_string args_json.
            string
-        -> (ctx, out, arg, args_string) args
+        -> (ctx, out, arg, args_string, args_json) args
         -> string list
         -> args_string =
      fun field_name l acc ->
@@ -59,9 +67,25 @@ module Make (Schema : Graphql_intf.Schema) = struct
             to_string field_name t
               (Format.asprintf "%s: %s" name (typ.to_string x) :: acc)
 
+    let rec to_json_arg_obj :
+        type ctx out arg args_string args_json.
+           (ctx, out, arg, args_string, args_json) args
+        -> (string * Yojson.Basic.t) list
+        -> args_json =
+     fun l acc ->
+      match l with
+      | [] ->
+          `Assoc acc
+      | Arg { name; typ; _ } :: t ->
+          fun x -> to_json_arg_obj t ((name, typ.to_json x) :: acc)
+      | DefaultArg { name; typ; _ } :: t ->
+          fun x -> to_json_arg_obj t ((name, typ.to_json x) :: acc)
+
     let rec to_string_arg_obj :
-        type ctx out arg args_string.
-        (ctx, out, arg, args_string) args -> string list -> args_string =
+        type ctx out arg args_string args_json.
+           (ctx, out, arg, args_string, args_json) args
+        -> string list
+        -> args_string =
      fun l acc ->
       match l with
       | [] -> (
@@ -81,8 +105,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     (** build the ocaml-graphql-server [Arg.arg_list]*)
     let rec args_of_myargs :
-        type ctx out args_server args_string.
-           (ctx, out, args_server, args_string) args
+        type ctx out args_server args_string args_json.
+           (ctx, out, args_server, args_string, args_json) args
         -> (out, args_server) Schema.Arg.arg_list = function
       | [] ->
           Schema.Arg.[]
@@ -94,11 +118,15 @@ module Make (Schema : Graphql_intf.Schema) = struct
           Schema.Arg.(graphql_arg :: args_of_myargs t)
 
     let int =
-      { typ = Schema.Arg.int; to_string = Json.string_of_option string_of_int }
+      { typ = Schema.Arg.int
+      ; to_string = Json.string_of_option string_of_int
+      ; to_json = Json.json_of_option (fun i -> `Int i)
+      }
 
-    let scalar ?doc name ~coerce ~to_string =
+    let scalar ?doc name ~coerce ~to_string ~to_json =
       { typ = Schema.Arg.scalar ?doc name ~coerce
       ; to_string = Json.string_of_option to_string
+      ; to_json = Json.json_of_option to_json
       }
 
     let string =
@@ -106,32 +134,44 @@ module Make (Schema : Graphql_intf.Schema) = struct
       ; to_string =
           Json.string_of_option (function s ->
               String.escaped ({|"|} ^ s ^ {|"|}))
+      ; to_json = Json.json_of_option (function s -> `String s)
       }
 
-    let float = { typ = Schema.Arg.float; to_string = string_of_float }
+    let float =
+      { typ = Schema.Arg.float
+      ; to_string = Json.string_of_option string_of_float
+      ; to_json = Json.json_of_option (function f -> `Float f)
+      }
 
     let bool =
       { typ = Schema.Arg.bool
       ; to_string = Json.string_of_option string_of_bool
+      ; to_json = Json.json_of_option (function f -> `Bool f)
       }
 
+    (* TODO: Maybe take an int as input of to_sting or (int, string) either *)
     let guid =
       { typ = Schema.Arg.guid
       ; to_string =
           Json.string_of_option (function s ->
               String.escaped ({|"|} ^ s ^ {|"|}))
-          (* TODO: Maybe take an int as input of to_sting or (int, string) either *)
+      ; to_json = Json.json_of_option (function s -> `String s)
       }
 
-    let obj ?doc name ~fields ~coerce ~to_string =
+    let obj ?doc name ~fields ~coerce ~to_string ~to_json =
       let build_obj_string = to_string_arg_obj fields [] in
+      let build_obj_json = to_json_arg_obj fields [] in
       let gql_server_fields = args_of_myargs fields in
       let typ = Schema.Arg.obj name ?doc ~fields:gql_server_fields ~coerce in
-      { typ; to_string = Json.string_of_option @@ to_string build_obj_string }
+      { typ
+      ; to_string = Json.string_of_option @@ to_string build_obj_string
+      ; to_json = Json.json_of_option @@ to_json build_obj_json
+      }
 
     let non_null (typ : _ arg_typ) =
       { typ = Schema.Arg.non_null typ.typ
       ; to_string = (function x -> typ.to_string (Some x))
+      ; to_json = (function x -> typ.to_json (Some x))
       }
 
     let list (typ : _ arg_typ) =
@@ -141,6 +181,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
             (Format.asprintf "%a"
                (Format.pp_print_list (fun fmt s ->
                     Format.fprintf fmt "%s" (typ.to_string s))))
+      ; to_json =
+          Json.json_of_option (function l -> `List (List.map typ.to_json l))
       }
 
     type 'a enum_value =
@@ -171,6 +213,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
       in
       { typ = Schema.Arg.enum ?doc name ~values:ocaml_graphql_server_values
       ; to_string = Json.string_of_option (to_string values)
+      ; to_json = Json.json_of_option (fun v -> `String (to_string values v))
       }
 
     let arg ?doc name ~typ = Arg { name; typ; doc }
@@ -202,15 +245,16 @@ module Make (Schema : Graphql_intf.Schema) = struct
       | h :: t ->
           h.field :: to_ocaml_grapql_server_fields t
 
-    let field ?doc ?deprecated name ~typ ~(args : (_, 'out, _, _) Arg.args)
+    let field ?doc ?deprecated name ~typ ~(args : (_, 'out, _, _, _) Arg.args)
         ~resolve : (_, _, _, 'out, _) field =
       let to_string = Arg.to_string name args [] in
       let args = Arg.args_of_myargs args in
       let field = Schema.field ?doc ?deprecated name ~args ~typ ~resolve in
       { name; field; to_string }
 
-    let io_field ?doc ?deprecated name ~typ ~(args : (_, 'out, _, _) Arg.args)
-        ~resolve : (_, _, _, 'out, _) field =
+    let io_field ?doc ?deprecated name ~typ
+        ~(args : (_, 'out, _, _, _) Arg.args) ~resolve :
+        (_, _, _, 'out, _) field =
       let to_string = Arg.to_string name args [] in
       let args = Arg.args_of_myargs args in
       let field = Schema.io_field ?doc ?deprecated name ~args ~typ ~resolve in
@@ -243,7 +287,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           h.field :: to_ocaml_grapql_server_fields t
 
     let subscription_field ?doc ?deprecated name ~typ
-        ~(args : (_, 'out, _, _) Arg.args) ~resolve :
+        ~(args : (_, 'out, _, _, _) Arg.args) ~resolve :
         (_, _, _, 'out, _) subscription_field =
       let to_string = Arg.to_string name args [] in
       let args = Arg.args_of_myargs args in

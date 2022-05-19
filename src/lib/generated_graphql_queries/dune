@@ -2,7 +2,7 @@
  (name generated_graphql_queries)
  (public_name generated_graphql_queries)
  (libraries
-   async cohttp core cohttp-async mina_base graphql-async graphql-cohttp yojson
+   async cohttp core cohttp-async mina_base graphql-async graphql-cohttp yojson mina_graphql
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)

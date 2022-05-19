@@ -50,6 +50,7 @@ let structure ~loc =
   end) in
   let open E in
   [%str
+    open Mina_graphql.Types.Input.Encoders
     module Pooled_zkapp_commands =
     [%graphql
     [%e party_query_expr Parties_templates.pooled_zkapp_commands ~loc]]

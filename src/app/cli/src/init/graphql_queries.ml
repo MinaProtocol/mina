@@ -59,11 +59,13 @@ mutation ($hd_index: UInt32) {
 }
 |}]
 
+let json_of_UnlockPayload x = Mina_graphql.Types.Input.unlock_account.to_json x
+
 module Unlock_account =
 [%graphql
 {|
-mutation ($password: String, $public_key: PublicKey) {
-  unlockAccount(input: {password: $password, publicKey: $public_key }) {
+mutation ($input: UnlockPayload) {
+  unlockAccount(input: $input) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
   }
 }
@@ -147,17 +149,31 @@ mutation ($fee: UInt64!) {
 }
 |}]
 
+(* module Send_payment = *)
+(* [%graphql *)
+(* {| *)
+(* mutation ($sender: PublicKey!, *)
+(*           $receiver: PublicKey!, *)
+(*           $amount: UInt64!, *)
+(*           $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!, *)
+(*           $nonce: UInt32, *)
+(*           $memo: String) { *)
+(*   sendPayment(input: *)
+(*     {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) { *)
+(*     payment { *)
+(*       id *)
+(*     } *)
+(*   } *)
+(* } *)
+(* |}] *)
+
+let json_of_SendPaymentInput = Mina_graphql.Types.Input.send_payment.to_json
+
 module Send_payment =
 [%graphql
 {|
-mutation ($sender: PublicKey!,
-          $receiver: PublicKey!,
-          $amount: UInt64!,
-          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  sendPayment(input:
-    {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+ mutation ($input:SendPaymentInput) {
+  sendPayment(input: $input){
     payment {
       id
     }
@@ -240,6 +256,8 @@ query get_peers {
   }
 }
 |}]
+
+let json_of_NetworkPeer = Mina_graphql.Types.Input.peer.to_json
 
 module Add_peers =
 [%graphql

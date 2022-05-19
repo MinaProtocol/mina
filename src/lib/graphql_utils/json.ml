@@ -28,6 +28,9 @@ let get_int = function
 let string_of_option (f : 'a -> string) (x : 'a option) : string =
   match x with None -> "null" | Some x -> f x
 
+let json_of_option (f : 'a -> Yojson.Basic.t) (x : 'a option) : Yojson.Basic.t =
+  match x with None -> `Null | Some x -> f x
+
 let non_null_list_of_json elem_of_json query json =
   match json with
   | `List l ->

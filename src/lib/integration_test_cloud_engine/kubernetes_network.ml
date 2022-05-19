@@ -95,6 +95,7 @@ module Node = struct
       let headers = String.Map.empty
     end)
 
+    open Mina_graphql.Types.Input.Encoders
     module Unlock_account =
     [%graphql
     {|
@@ -117,30 +118,25 @@ module Node = struct
         sendTestPayments(
           senders: $senders, receiver: $receiver, amount: $amount, fee: $fee,
           repeat_count: $repeat_count,
-          repeat_delay_ms: $repeat_delay_ms) 
+          repeat_delay_ms: $repeat_delay_ms)
       }
     |}]
+
+    let json_of_SendPaymentInput = Mina_graphql.Types.Input.send_payment.to_json
 
     module Send_payment =
     [%graphql
     {|
-      mutation ($sender: PublicKey!,
-      $receiver: PublicKey!,
-      $amount: UInt64!,
-      $token: UInt64,
-      $fee: UInt64!,
-      $nonce: UInt32,
-      $memo: String) {
-        sendPayment(input:
-          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-            payment {
-              id
-              nonce
-              hash
-            }
+      mutation ($input:SendPaymentInput) {
+        sendPayment(input: $input){
+          payment {
+            id
+            nonce
+            hash
           }
+        }
       }
-    |}]
+      |}]
 
     module Send_payment_with_raw_sig =
     [%graphql
@@ -247,7 +243,7 @@ module Node = struct
     module Account =
     [%graphql
     {|
-      query ($public_key: PublicKey, $token: UInt64) {
+      query ($public_key: PublicKey, $token: TokenId) {
         account (publicKey : $public_key, token : $token) {
           balance { liquid @bsDecoder(fn: "Decoders.optional_balance")
                     locked @bsDecoder(fn: "Decoders.optional_balance")
@@ -407,8 +403,8 @@ module Node = struct
         :: logger_metadata t ) ;
     let get_account_obj =
       Graphql.Account.make
-        ~public_key:(Graphql_lib.Encoders.public_key pk)
-        ~token:(Graphql_lib.Encoders.token token)
+        ~public_key:(Some pk)
+        ~token:(Some token)
         ()
     in
     exec_graphql_request ~logger ~node:t ~query_name:"get_account_graphql"
@@ -700,7 +696,7 @@ module Node = struct
     let unlock_sender_account_graphql () =
       let unlock_account_obj =
         Graphql.Unlock_account.make ~password:node_password
-          ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~public_key:(Some sender_pub_key)
           ()
       in
       exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
@@ -709,12 +705,18 @@ module Node = struct
     let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
     let send_payment_graphql () =
       let send_payment_obj =
-        Graphql.Send_payment.make
-          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-          ~amount:(Graphql_lib.Encoders.amount amount)
-          ~fee:(Graphql_lib.Encoders.fee fee)
-          ()
+        let input : Mina_graphql.Types.Input.send_payment_input option =
+          Some
+            { to_ = receiver_pub_key
+            ; from = sender_pub_key
+            ; amount
+            ; fee
+            ; memo = None
+            ; valid_until = None
+            ; nonce = None
+            }
+        in
+        Graphql.Send_payment.make ~input ()
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
         send_payment_obj
@@ -747,12 +749,12 @@ module Node = struct
         ; ("pod_id", `String (id t))
         ] ;
     let open Deferred.Or_error.Let_syntax in
-    let parties_json =
-      Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
-    in
+    (* let parties_json = *)
+    (*   Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic *)
+    (* in *)
     let send_zkapp_graphql () =
       let send_zkapp_obj =
-        Graphql.Send_test_zkapp.make ~parties:parties_json ()
+        Graphql.Send_test_zkapp.make ~parties:(Some parties) ()
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
         send_zkapp_obj
