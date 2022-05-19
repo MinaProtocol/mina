@@ -4101,11 +4101,11 @@ struct
           match snapp_proof_data ~snapp_statement ~witness with
           | None ->
               failwith "of_parties_segment: Expected exactly one proof"
-          | Some (s, p, v, tag) ->
+          | Some (_s, p, v, tag) ->
               (* TODO: We should not have to pass the statement in here. *)
               proved
                 ( Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
-                  [ (s, p) ] )
+                  [ p ] )
                 statement )
     in
     let open Async in
@@ -4170,8 +4170,7 @@ struct
     let%map proof =
       merge
         ~handler:(Merge.handle (x12.statement, x23.statement))
-        [ (x12.statement, x12.proof); (x23.statement, x23.proof) ]
-        s
+        [ x12.proof; x23.proof ] s
     in
     Ok { statement = s; proof }
 

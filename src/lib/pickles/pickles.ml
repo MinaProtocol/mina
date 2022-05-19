@@ -163,7 +163,7 @@ module Proof = P
 module Statement_with_proof = struct
   type ('s, 'max_width, _) t =
     (* TODO: use Max local max proofs verified instead of max_width *)
-    's * ('max_width, 'max_width) Proof.t
+    ('max_width, 'max_width) Proof.t
 end
 
 let pad_pass_throughs
@@ -729,7 +729,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 -> (local_widths, local_widths) H2.T(Proof).t = function
               | [] ->
                   []
-              | (_, proof) :: tl ->
+              | proof :: tl ->
                   proof :: go tl
             in
             go prevs
@@ -1159,8 +1159,7 @@ let%test_module "test no side-loaded" =
         let b0 =
           Common.time "b0" (fun () ->
               Promise.block_on_async_exn (fun () ->
-                  step ~handler:(handler s_neg_one)
-                    [ (s_neg_one, b_neg_one) ]
+                  step ~handler:(handler s_neg_one) [ b_neg_one ]
                     Field.Constant.zero ) )
         in
         (*
@@ -1173,8 +1172,7 @@ let%test_module "test no side-loaded" =
               Promise.block_on_async_exn (fun () ->
                   step
                     ~handler:(handler Field.Constant.zero)
-                    [ (Field.Constant.zero, b0) ]
-                    Field.Constant.one ) )
+                    [ b0 ] Field.Constant.one ) )
         in
         assert (
           Promise.block_on_async_exn (fun () ->
@@ -1256,7 +1254,7 @@ let%test_module "test no side-loaded" =
               Promise.block_on_async_exn (fun () ->
                   step
                     ~handler:(handler (fst No_recursion.example) s_neg_one)
-                    [ No_recursion.example; (s_neg_one, b_neg_one) ]
+                    [ snd No_recursion.example; b_neg_one ]
                     Field.Constant.zero ) )
         in
         assert (
@@ -1268,7 +1266,7 @@ let%test_module "test no side-loaded" =
                   step
                     ~handler:
                       (handler (fst No_recursion.example) Field.Constant.zero)
-                    [ No_recursion.example; (Field.Constant.zero, b0) ]
+                    [ snd No_recursion.example; b0 ]
                     Field.Constant.one ) )
         in
         [ (Field.Constant.zero, b0); (Field.Constant.one, b1) ]

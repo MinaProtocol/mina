@@ -126,10 +126,7 @@ module Worker_state = struct
                                Blockchain_snark.Blockchain.state chain
                            ; txn_snark = fst t
                            }
-                           [ ( Blockchain_snark.Blockchain.state chain
-                             , Blockchain_snark.Blockchain.proof chain )
-                           ; t
-                           ]
+                           [ Blockchain_snark.Blockchain.proof chain; snd t ]
                            next_state
                        in
                        Blockchain_snark.Blockchain.create ~state:next_state
