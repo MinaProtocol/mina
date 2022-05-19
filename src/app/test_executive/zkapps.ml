@@ -67,6 +67,52 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~receiver_pub_key ~amount:Currency.Amount.one ~fee
         >>| ignore )
 
+  let payment_receiver =
+    Signature_lib.(Public_key.compress (Keypair.create ()).public_key)
+
+  let send_payment_from_zkapp_account ?expected_failure
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
+      ~node (sender : Signature_lib.Keypair.t) nonce =
+    let sender_pk = Signature_lib.Public_key.compress sender.public_key in
+    let receiver_pk = payment_receiver in
+    let amount =
+      Currency.Amount.of_fee constraint_constants.account_creation_fee
+    in
+    let memo = "" in
+    let valid_until = Mina_numbers.Global_slot.max_value in
+    let fee = Currency.Fee.of_int 1_000_000 in
+    let payload =
+      let common =
+        { Signed_command_payload.Common.Poly.fee
+        ; fee_payer_pk = sender_pk
+        ; nonce
+        ; valid_until
+        ; memo = Signed_command_memo.empty
+        }
+      in
+      let payment_payload =
+        { Payment_payload.Poly.source_pk = sender_pk; receiver_pk; amount }
+      in
+      let body = Signed_command_payload.Body.Payment payment_payload in
+      { Signed_command_payload.Poly.common; body }
+    in
+    let raw_signature =
+      Signed_command.sign_payload sender.private_key payload
+      |> Signature.Raw.encode
+    in
+    match expected_failure with
+    | Some failure ->
+        send_invalid_payment ~logger ~sender_pub_key:sender_pk
+          ~receiver_pub_key:receiver_pk ~amount ~fee ~nonce ~memo
+          ~token:Token_id.default ~valid_until ~raw_signature
+          ~expected_failure:failure node
+    | None ->
+        incr transactions_sent ;
+        Network.Node.must_send_payment_with_raw_sig ~logger
+          ~sender_pub_key:sender_pk ~receiver_pub_key:receiver_pk ~amount ~fee
+          ~nonce ~memo ~token:Token_id.default ~valid_until ~raw_signature node
+        |> Malleable_error.ignore_m
+
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -80,9 +126,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               @ Network.snark_coordinators network ) ) )
     in
     let node = List.hd_exn block_producer_nodes in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
-    in
+    let constraint_constants = Network.constraint_constants network in
     let[@warning "-8"] [ fish1_kp; fish2_kp ] =
       Network.extra_genesis_keypairs network
     in
@@ -415,70 +459,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkApp transaction to create zkApp accounts"
         (send_zkapp ~logger node parties_create_account)
     in
-    let payment_receiver =
-      Signature_lib.(Public_key.compress (Keypair.create ()).public_key)
-    in
-    let send_payment_from_zkapp_account ?expected_failure
-        (sender : Signature_lib.Keypair.t) nonce =
-      let sender_pk = Signature_lib.Public_key.compress sender.public_key in
-      let receiver_pk = payment_receiver in
-      let amount =
-        Currency.Amount.of_fee constraint_constants.account_creation_fee
-      in
-      let memo = "" in
-      let valid_until = Mina_numbers.Global_slot.max_value in
-      let fee = Currency.Fee.of_int 1_000_000 in
-      let payload =
-        let common =
-          { Signed_command_payload.Common.Poly.fee
-          ; fee_payer_pk = sender_pk
-          ; nonce
-          ; valid_until
-          ; memo = Signed_command_memo.empty
-          }
-        in
-        let payment_payload =
-          { Payment_payload.Poly.source_pk = sender_pk; receiver_pk; amount }
-        in
-        let body = Signed_command_payload.Body.Payment payment_payload in
-        { Signed_command_payload.Poly.common; body }
-      in
-      let raw_signature =
-        Signed_command.sign_payload sender.private_key payload
-        |> Signature.Raw.encode
-      in
-      match expected_failure with
-      | Some failure ->
-          send_invalid_payment ~logger ~sender_pub_key:sender_pk
-            ~receiver_pub_key:receiver_pk ~amount ~fee ~nonce ~memo
-            ~token:Token_id.default ~valid_until ~raw_signature
-            ~expected_failure:failure node
-      | None ->
-          incr transactions_sent ;
-          Network.Node.must_send_payment_with_raw_sig ~logger
-            ~sender_pub_key:sender_pk ~receiver_pub_key:receiver_pk ~amount ~fee
-            ~nonce ~memo ~token:Token_id.default ~valid_until ~raw_signature
-            node
-          |> Malleable_error.ignore_m
+    let%bind () =
+      section_hard
+        "Wait for zkapp to create accounts to be included in transition \
+         frontier"
+        (wait_for_zkapp parties_create_account)
     in
     let%bind () =
       let sender = List.hd_exn zkapp_keypairs in
       let nonce = Account.Nonce.zero in
       section_hard "Send payment from zkApp account"
-        (send_payment_from_zkapp_account sender nonce)
+        (send_payment_from_zkapp_account ~constraint_constants ~node ~logger
+           sender nonce )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to update permissions"
         (send_zkapp ~logger node parties_update_permissions)
-    in
-    let%bind () =
-      let sender = List.hd_exn zkapp_keypairs in
-      let nonce = Account.Nonce.of_int 1 in
-      section_hard "Send invalid payment from zkApp account"
-        (send_payment_from_zkapp_account sender nonce
-           ~expected_failure:
-             Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
-               to_string_hum Fee_payer_not_permitted_to_send) )
     in
     let%bind () =
       let padding_payments =
@@ -492,15 +488,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard
-        "Wait for zkapp to create accounts to be included in transition \
-         frontier"
-        (wait_for_zkapp parties_create_account)
-    in
-    let%bind () =
-      section_hard
         "Wait for zkApp transaction to update permissions to be included in \
          transition frontier"
         (wait_for_zkapp parties_update_permissions)
+    in
+    let%bind () =
+      let sender = List.hd_exn zkapp_keypairs in
+      let nonce = Account.Nonce.of_int 1 in
+      section_hard "Send invalid payment from zkApp account"
+        (send_payment_from_zkapp_account ~constraint_constants ~logger sender
+           nonce ~node
+           ~expected_failure:
+             Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
+               to_string_name Fee_payer_not_permitted_to_send) )
     in
     let%bind () =
       section_hard "Verify that updated permissions are in ledger accounts"

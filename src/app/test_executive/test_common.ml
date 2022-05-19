@@ -47,6 +47,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
       ~expected_failure : unit Malleable_error.t =
     [%log info] "Sending payment, expected to fail" ;
+    let expected_failure = String.lowercase expected_failure in
     match%bind.Deferred
       Network.Node.send_payment_with_raw_sig ~logger node ~sender_pub_key
         ~receiver_pub_key ~amount ~fee ~nonce ~memo ~token ~valid_until
@@ -58,7 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           "Payment transaction succeeded, expected error \"%s\""
           expected_failure
     | Error err ->
-        let err_str = Error.to_string_mach err in
+        let err_str = Error.to_string_mach err |> String.lowercase in
         if String.is_substring ~substring:expected_failure err_str then (
           [%log info] "Payment failed as expected"
             ~metadata:[ ("error", `String err_str) ] ;
