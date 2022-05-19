@@ -313,8 +313,7 @@ module Node = struct
         "graphql is not enabled (hint: set `requires_graphql= true` in the \
          test config)"
     else
-      (*      let uri = Graphql.ingress_uri node in *)
-      let uri = Uri.of_string "http://localhost:4001/graphql" in
+      let uri = Graphql.ingress_uri node in
       let metadata =
         [ ("query", `String query_name)
         ; ("uri", `String (Uri.to_string uri))
