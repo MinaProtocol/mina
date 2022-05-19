@@ -1,8 +1,4 @@
-(* snapp_generators -- Quickcheck generators for Snapp transactions *)
-
-(* Ledger depends on Party, so Party generators can't refer back to Ledger
-   so we put the generators that rely on Ledger and Party here
-*)
+(* parties_generators -- Quickcheck generators for zkApp transactions *)
 
 open Core_kernel
 open Mina_base
@@ -16,20 +12,6 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
   let fee_payer_hash =
     Party.of_fee_payer parties.fee_payer |> Parties.Digest.Party.create
   in
-  let fee_payer_sk =
-    Signature_lib.Public_key.Compressed.Map.find_exn keymap
-      parties.fee_payer.body.public_key
-  in
-  let fee_payer_signature =
-    Signature_lib.Schnorr.Chunked.sign fee_payer_sk
-      (Random_oracle.Input.Chunked.field
-         ( Parties.commitment parties
-         |> Parties.Transaction_commitment.create_complete ~memo_hash
-              ~fee_payer_hash ) )
-  in
-  let fee_payer_with_valid_signature =
-    { parties.fee_payer with authorization = fee_payer_signature }
-  in
   let other_parties_hash = Parties.other_parties_hash parties in
   let tx_commitment =
     Parties.Transaction_commitment.create ~other_parties_hash
@@ -38,12 +20,34 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
     Parties.Transaction_commitment.create_complete tx_commitment ~memo_hash
       ~fee_payer_hash
   in
-  let sign_for_other_party ~use_full_commitment sk =
+  let sign_for_party ~use_full_commitment pk sk =
     let commitment =
       if use_full_commitment then full_tx_commitment else tx_commitment
     in
-    Signature_lib.Schnorr.Chunked.sign sk
-      (Random_oracle.Input.Chunked.field commitment)
+    let signature =
+      Signature_lib.Schnorr.Chunked.sign sk
+        (Random_oracle.Input.Chunked.field commitment)
+    in
+    let pk' =
+      Backend.Tick.Inner_curve.of_affine
+        (Signature_lib.Public_key.decompress_exn pk)
+    in
+    Format.eprintf "PK: %s  VERIFIES: %B@."
+      (Signature_lib.Public_key.Compressed.to_base58_check pk)
+      (Signature_lib.Schnorr.Chunked.verify signature pk'
+         (Random_oracle.Input.Chunked.field commitment) ) ;
+    signature
+  in
+  let fee_payer_sk =
+    Signature_lib.Public_key.Compressed.Map.find_exn keymap
+      parties.fee_payer.body.public_key
+  in
+  let fee_payer_signature =
+    sign_for_party ~use_full_commitment:true parties.fee_payer.body.public_key
+      fee_payer_sk
+  in
+  let fee_payer_with_valid_signature =
+    { parties.fee_payer with authorization = fee_payer_signature }
   in
   let other_parties_with_valid_signatures =
     Parties.Call_forest.mapi parties.other_parties
@@ -65,7 +69,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
                       ()
               in
               let use_full_commitment = body.use_full_commitment in
-              let signature = sign_for_other_party ~use_full_commitment sk in
+              let signature = sign_for_party ~use_full_commitment pk sk in
               Control.Signature signature
           | Proof _ -> (
               match prover with

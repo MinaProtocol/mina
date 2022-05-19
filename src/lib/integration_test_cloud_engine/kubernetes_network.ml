@@ -134,7 +134,7 @@ module Node = struct
         sendTestPayments(
           senders: $senders, receiver: $receiver, amount: $amount, fee: $fee,
           repeat_count: $repeat_count,
-          repeat_delay_ms: $repeat_delay_ms) 
+          repeat_delay_ms: $repeat_delay_ms)
       }
     |}]
 
@@ -313,7 +313,8 @@ module Node = struct
         "graphql is not enabled (hint: set `requires_graphql= true` in the \
          test config)"
     else
-      let uri = Graphql.ingress_uri node in
+      (*      let uri = Graphql.ingress_uri node in *)
+      let uri = Uri.of_string "http://localhost:4001/graphql" in
       let metadata =
         [ ("query", `String query_name)
         ; ("uri", `String (Uri.to_string uri))

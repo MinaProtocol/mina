@@ -34,66 +34,6 @@ let%test_module "Zkapp tokens tests" =
              (Public_key.compress token_owner.public_key)
              Token_id.default )
 
-    let forest ps : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
-      List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
-
-    let node party calls =
-      { Parties.Call_forest.Tree.party
-      ; party_digest = ()
-      ; calls = forest calls
-      }
-
-    let mk_party_body caller kp token_id balance_change : Party.Body.Wire.t =
-      { update = Party.Update.noop
-      ; public_key = Public_key.compress kp.Keypair.public_key
-      ; token_id
-      ; balance_change =
-          Currency.Amount.Signed.create
-            ~magnitude:(Currency.Amount.of_int (Int.abs balance_change))
-            ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
-      ; increment_nonce = false
-      ; events = []
-      ; sequence_events = []
-      ; call_data = Pickles.Impls.Step.Field.Constant.zero
-      ; call_depth = 0
-      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-      ; use_full_commitment = true
-      ; account_precondition = Accept
-      ; caller
-      }
-
-    let mk_parties_transaction ledger other_parties : Parties.t =
-      let fee_payer : Party.Fee_payer.t =
-        let pk = Public_key.compress fee_payer_keypair.public_key in
-        let _, ({ nonce; _ } : Account.t), _ =
-          Ledger.Ledger_inner.get_or_create ledger
-            (Account_id.create pk Token_id.default)
-          |> Or_error.ok_exn
-        in
-        { body =
-            { update = Party.Update.noop
-            ; public_key = pk
-            ; fee = Currency.Fee.of_int 7
-            ; events = []
-            ; sequence_events = []
-            ; protocol_state_precondition =
-                Zkapp_precondition.Protocol_state.accept
-            ; nonce
-            }
-        ; authorization = Signature.dummy
-        }
-      in
-      { fee_payer
-      ; memo = Signed_command_memo.dummy
-      ; other_parties =
-          other_parties
-          |> Parties.Call_forest.map
-               ~f:(fun (p : Party.Body.Wire.t) : Party.Wire.t ->
-                 { body = p; authorization = Signature Signature.dummy } )
-          |> Parties.Call_forest.add_callers'
-          |> Parties.Call_forest.accumulate_hashes_predicated
-      }
-
     let ledger_get_exn ledger pk token =
       match
         Ledger.Ledger_inner.get_or_create ledger (Account_id.create pk token)
@@ -134,19 +74,32 @@ let%test_module "Zkapp tokens tests" =
                           ~key:(Public_key.compress public_key)
                           ~data:private_key )
                   in
+                  let kp, _ = keypair_and_amounts.(0) in
+                  let pk = Public_key.compress kp.public_key in
+                  let nonce_from_ledger () =
+                    let _, ({ nonce; _ } : Account.t), _ =
+                      Mina_ledger.Ledger.Ledger_inner.get_or_create ledger
+                        (Account_id.create pk Token_id.default)
+                      |> Or_error.ok_exn
+                    in
+                    nonce
+                  in
                   let create_token_parties =
+                    let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
-                      forest
-                        [ node
-                            (mk_party_body Call token_funder Token_id.default
+                      Parties_builder.mk_forest
+                        [ Parties_builder.mk_node
+                            (Parties_builder.mk_party_body Call token_funder
+                               Token_id.default
                                (-(4 * account_creation_fee)) )
                             []
-                        ; node
-                            (mk_party_body Call token_owner Token_id.default
-                               (3 * account_creation_fee) )
+                        ; Parties_builder.mk_node
+                            (Parties_builder.mk_party_body Call token_owner
+                               Token_id.default (3 * account_creation_fee) )
                             []
                         ]
-                      |> mk_parties_transaction ledger
+                      |> Parties_builder.mk_parties_transaction ~fee:7
+                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
                     Mina_generators.Parties_generators.replace_authorizations
                       ~keymap with_dummy_signatures
@@ -161,18 +114,20 @@ let%test_module "Zkapp tokens tests" =
                         Token_id.default
                       : Account.t ) ;
                   let mint_token_parties =
+                    let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
-                      forest
-                        [ node
-                            (mk_party_body Call token_owner Token_id.default
-                               (-account_creation_fee) )
-                            [ node
-                                (mk_party_body Call token_account1
-                                   custom_token_id 100 )
+                      Parties_builder.mk_forest
+                        [ Parties_builder.mk_node
+                            (Parties_builder.mk_party_body Call token_owner
+                               Token_id.default (-account_creation_fee) )
+                            [ Parties_builder.mk_node
+                                (Parties_builder.mk_party_body Call
+                                   token_account1 custom_token_id 100 )
                                 []
                             ]
                         ]
-                      |> mk_parties_transaction ledger
+                      |> Parties_builder.mk_parties_transaction ~fee:7
+                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
                     Mina_generators.Parties_generators.replace_authorizations
                       ~keymap with_dummy_signatures
@@ -183,38 +138,40 @@ let%test_module "Zkapp tokens tests" =
                   in
                   check_token_balance token_account1 100 ;
                   let token_transfer_parties =
+                    let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
-                      forest
-                        [ node
-                            (mk_party_body Call token_owner Token_id.default
-                               (-account_creation_fee) )
-                            [ node
-                                (mk_party_body Call token_account1
-                                   custom_token_id (-30) )
+                      Parties_builder.mk_forest
+                        [ Parties_builder.mk_node
+                            (Parties_builder.mk_party_body Call token_owner
+                               Token_id.default (-account_creation_fee) )
+                            [ Parties_builder.mk_node
+                                (Parties_builder.mk_party_body Call
+                                   token_account1 custom_token_id (-30) )
                                 []
-                            ; node
-                                (mk_party_body Call token_account2
-                                   custom_token_id 30 )
+                            ; Parties_builder.mk_node
+                                (Parties_builder.mk_party_body Call
+                                   token_account2 custom_token_id 30 )
                                 []
-                            ; node
-                                (mk_party_body Call token_account1
-                                   custom_token_id (-10) )
+                            ; Parties_builder.mk_node
+                                (Parties_builder.mk_party_body Call
+                                   token_account1 custom_token_id (-10) )
                                 []
-                            ; node
-                                (mk_party_body Call token_account2
-                                   custom_token_id 10 )
+                            ; Parties_builder.mk_node
+                                (Parties_builder.mk_party_body Call
+                                   token_account2 custom_token_id 10 )
                                 []
-                            ; node
-                                (mk_party_body Call token_account2
-                                   custom_token_id (-5) )
+                            ; Parties_builder.mk_node
+                                (Parties_builder.mk_party_body Call
+                                   token_account2 custom_token_id (-5) )
                                 []
-                            ; node
-                                (mk_party_body Call token_account1
-                                   custom_token_id 5 )
+                            ; Parties_builder.mk_node
+                                (Parties_builder.mk_party_body Call
+                                   token_account1 custom_token_id 5 )
                                 []
                             ]
                         ]
-                      |> mk_parties_transaction ledger
+                      |> Parties_builder.mk_parties_transaction ~fee:7
+                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
                     Mina_generators.Parties_generators.replace_authorizations
                       ~keymap with_dummy_signatures

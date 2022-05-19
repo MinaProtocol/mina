@@ -3282,6 +3282,8 @@ module Mutations = struct
         Arg.[ arg "parties" ~typ:(non_null Types.Input.internal_send_zkapp) ]
       ~typ:(non_null Types.Payload.send_zkapp)
       ~resolve:(fun { ctx = mina; _ } () parties ->
+        Format.eprintf "GRAPHQL PARTIES: %s@."
+          (Parties.to_yojson parties |> Yojson.Safe.pretty_to_string) ;
         send_zkapp_command mina parties )
 
   let send_test_payments =

@@ -26,6 +26,7 @@ module Ledger_hash_intf = Ledger_hash_intf
 module Ledger_hash_intf0 = Ledger_hash_intf0
 module Ledger_intf = Ledger_intf
 module Parties = Parties
+module Parties_builder = Parties_builder
 module Party = Party
 module Payment_payload = Payment_payload
 module Pending_coinbase = Pending_coinbase
