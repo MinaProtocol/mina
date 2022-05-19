@@ -528,7 +528,7 @@ struct
       in
       go prev_proofs branch_data.rule.prevs prev_values_length
     in
-    let next_statement : _ Types.Step.Statement.t =
+    let next_statement_me_only : _ Reduced_me_only.Step.t =
       let old_bulletproof_challenges =
         extract_from_proofs
           ( module struct
@@ -540,24 +540,24 @@ struct
               t.statement.proof_state.deferred_values.bulletproof_challenges
           end )
       in
-      let me_only : _ Reduced_me_only.Step.t =
-        (* Have the sg be available in the opening proof and verify it. *)
-        { app_state = next_state
-        ; challenge_polynomial_commitments =
-            Option.value_exn !challenge_polynomial_commitments
-        ; old_bulletproof_challenges
-        }
-      in
+      (* Have the sg be available in the opening proof and verify it. *)
+      { app_state = next_state
+      ; challenge_polynomial_commitments =
+          Option.value_exn !challenge_polynomial_commitments
+      ; old_bulletproof_challenges
+      }
+    in
+    let next_statement : _ Types.Step.Statement.t =
       { proof_state =
           { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
-          ; me_only
+          ; me_only = next_statement_me_only
           }
       ; pass_through
       }
     in
     let next_me_only_prepared =
       Reduced_me_only.Step.prepare ~dlog_plonk_index:self_dlog_plonk_index
-        next_statement.proof_state.me_only
+        next_statement_me_only
     in
     let pass_through_padded =
       let rec pad :
