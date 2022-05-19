@@ -8,23 +8,22 @@ module Payload = struct
   module Common = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           ( Currency.Fee.Stable.V1.t
           , Public_key.Compressed.Stable.V1.t
-          , Token_id.Stable.V1.t
           , Account_nonce.Stable.V1.t option
           , Global_slot.Stable.V1.t
           , Signed_command_memo.Stable.V1.t )
-          Signed_command_payload.Common.Poly.Stable.V1.t
+          Signed_command_payload.Common.Poly.Stable.V2.t
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo : t =
-      { fee; fee_token; fee_payer_pk; nonce; valid_until; memo }
+    let create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo : t =
+      { fee; fee_payer_pk; nonce; valid_until; memo }
 
     let to_user_command_common (t : t) ~minimum_nonce ~inferred_nonce :
         (Signed_command_payload.Common.t, string) Result.t =
@@ -52,23 +51,22 @@ module Payload = struct
                    (Account_nonce.to_string minimum_nonce) )
       in
       { Signed_command_payload.Common.Poly.fee = t.fee
-      ; fee_token = t.fee_token
       ; fee_payer_pk = t.fee_payer_pk
       ; nonce
       ; valid_until = t.valid_until
       ; memo = t.memo
       }
 
-    let fee_payer ({ fee_token; fee_payer_pk; _ } : t) =
-      Account_id.create fee_payer_pk fee_token
+    let fee_payer ({ fee_payer_pk; _ } : t) =
+      Account_id.create fee_payer_pk Mina_base.Token_id.default
   end
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Common.Stable.V1.t
-        , Signed_command_payload.Body.Stable.V1.t )
+        ( Common.Stable.V2.t
+        , Signed_command_payload.Body.Stable.V2.t )
         Signed_command_payload.Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
@@ -76,9 +74,8 @@ module Payload = struct
     end
   end]
 
-  let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo ~body : t =
-    { common =
-        Common.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo
+  let create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo ~body : t =
+    { common = Common.create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo
     ; body
     }
 
@@ -110,9 +107,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Payload.Stable.V1.t
+      ( Payload.Stable.V2.t
       , Public_key.Compressed.Stable.V1.t
       , Sign_choice.Stable.V1.t )
       Signed_command.Poly.Stable.V1.t
@@ -126,11 +123,11 @@ end]
 
 let fee_payer ({ payload; _ } : t) = Payload.fee_payer payload
 
-let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body ~signer
+let create ?nonce ~fee ~fee_payer_pk ~valid_until ~memo ~body ~signer
     ~sign_choice () : t =
   let valid_until = Option.value valid_until ~default:Global_slot.max_value in
   let payload =
-    Payload.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo ~body
+    Payload.create ~fee ~fee_payer_pk ?nonce ~valid_until ~memo ~body
   in
   { payload; signer; signature = sign_choice }
 
