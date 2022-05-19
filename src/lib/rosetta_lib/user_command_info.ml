@@ -624,7 +624,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   let partials =
     [ payment; delegation; create_token; create_token_account; mint_tokens ]
   in
-  let oks, errs = List.partition_map partials ~f:Result.ok_fst in
+  let oks, errs = List.partition_map partials ~f:Result.to_either in
   match (oks, errs) with
   | [], errs ->
       (* no Oks *)
