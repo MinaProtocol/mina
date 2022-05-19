@@ -60,8 +60,8 @@ struct
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
       ~self_dlog_plonk_index pk self_dlog_vk
-      (prev_with_proofs :
-        (prev_values, local_widths, local_heights) H3.T(P.With_data).t ) :
+      (prev_values : prev_values H1.T(Id).t)
+      (prev_proofs : (local_widths, local_widths) H2.T(P).t) :
       ( A_value.t
       , (_, Max_proofs_verified.n) Vector.t
       , (_, prevs_length) Vector.t
@@ -82,17 +82,7 @@ struct
     in
     let lte = branch_data.lte in
     let inners_must_verify =
-      let prevs =
-        let module M =
-          H3.Map1_to_H1 (P.With_data) (Id)
-            (struct
-              let f : type a. (a, _, _) P.With_data.t -> a =
-               fun (T t) -> t.statement.pass_through.app_state
-            end)
-        in
-        M.f prev_with_proofs
-      in
-      branch_data.rule.main_value prevs next_state
+      branch_data.rule.main_value prev_values next_state
     in
     let module X_hat = struct
       type t = Tock.Field.t Double.t
@@ -119,7 +109,8 @@ struct
            max Nat.t
         -> Impls.Wrap.Verification_key.t
         -> 'a
-        -> (value, local_max_proofs_verified, m) P.With_data.t
+        -> value
+        -> (local_max_proofs_verified, local_max_proofs_verified) P.t
         -> (var, value, local_max_proofs_verified, m) Tag.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
@@ -128,7 +119,15 @@ struct
            * X_hat.t
            * (value, local_max_proofs_verified, m) Per_proof_witness.Constant.t
         =
-     fun max dlog_vk dlog_index (T t) tag ~must_verify ->
+     fun max dlog_vk dlog_index app_state (T t) tag ~must_verify ->
+      let t =
+        { t with
+          statement =
+            { t.statement with
+              pass_through = { t.statement.pass_through with app_state }
+            }
+        }
+      in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
@@ -438,7 +437,8 @@ struct
         , witnesses ) =
       let rec go :
           type vars values ns ms maxes k.
-             (values, ns, ms) H3.T(P.With_data).t
+             values H1.T(Id).t
+          -> (ns, ns) H2.T(Proof).t
           -> maxes H1.T(Nat).t
           -> (vars, values, ns, ms) H4.T(Tag).t
           -> vars H1.T(E01(Bool)).t
@@ -448,11 +448,16 @@ struct
              * (Statement_with_hashes.t, k) Vector.t
              * (X_hat.t, k) Vector.t
              * (values, ns, ms) H3.T(Per_proof_witness.Constant).t =
-       fun ps maxes ts must_verifys l ->
-        match (ps, maxes, ts, must_verifys, l) with
-        | [], _, [], [], Z ->
+       fun app_states ps maxes ts must_verifys l ->
+        match (app_states, ps, maxes, ts, must_verifys, l) with
+        | [], [], _, [], [], Z ->
             ([], [], [], [], [])
-        | p :: ps, max :: maxes, t :: ts, must_verify :: must_verifys, S l ->
+        | ( app_state :: app_states
+          , p :: ps
+          , max :: maxes
+          , t :: ts
+          , must_verify :: must_verifys
+          , S l ) ->
             let dlog_vk, dlog_index =
               if Type_equal.Id.same self.Tag.id t.id then
                 (self_dlog_vk, self_dlog_plonk_index)
@@ -461,46 +466,70 @@ struct
                 (d.wrap_vk, d.wrap_key)
             in
             let `Sg sg, u, s, x, w =
-              expand_proof max dlog_vk dlog_index p t ~must_verify
-            and sgs, us, ss, xs, ws = go ps maxes ts must_verifys l in
+              expand_proof max dlog_vk dlog_index app_state p t ~must_verify
+            and sgs, us, ss, xs, ws =
+              go app_states ps maxes ts must_verifys l
+            in
             (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
-        | _ :: _, [], _, _, _ ->
+        | _ :: _, _ :: _, [], _ :: _, _, _ ->
             assert false
+        | _ :: _, [], _, _, _, _ ->
+            .
+        | [], _ :: _, _, _, _, _ ->
+            .
       in
-      go prev_with_proofs Maxes.maxes branch_data.rule.prevs inners_must_verify
-        prev_vars_length
+      go prev_values prev_proofs Maxes.maxes branch_data.rule.prevs
+        inners_must_verify prev_vars_length
     in
     let unfinalized_proofs_extended =
       Vector.extend unfinalized_proofs lte Max_proofs_verified.n
         (Unfinalized.Constant.dummy ())
     in
     let pass_through =
-      let module M =
-        H3.Map2_to_H1 (P.With_data) (P.Base.Me_only.Wrap)
-          (struct
-            let f :
-                type a b c. (a, b, c) P.With_data.t -> b P.Base.Me_only.Wrap.t =
-             fun (T t) -> t.statement.proof_state.me_only
-          end)
+      let rec go : type a a. (a, a) H2.T(P).t -> a H1.T(P.Base.Me_only.Wrap).t =
+        function
+        | [] ->
+            []
+        | T t :: tl ->
+            t.statement.proof_state.me_only :: go tl
       in
-      M.f prev_with_proofs
+      go prev_proofs
+    in
+    let module Extract = struct
+      module type S = sig
+        type res
+
+        val f : _ P.t -> res
+      end
+    end in
+    let extract_from_proofs (type res)
+        (module Extract : Extract.S with type res = res) =
+      let rec go :
+          type vars values ns ms len.
+             (ns, ns) H2.T(P).t
+          -> (values, vars, ns, ms) H4.T(Tag).t
+          -> (vars, len) Length.t
+          -> (res, len) Vector.t =
+       fun prevs tags len ->
+        match (prevs, tags, len) with
+        | [], [], Z ->
+            []
+        | t :: prevs, _ :: tags, S len ->
+            Extract.f t :: go prevs tags len
+      in
+      go prev_proofs branch_data.rule.prevs prev_values_length
     in
     let next_statement : _ Types.Step.Statement.t =
       let old_bulletproof_challenges =
-        let module VV = struct
-          type t =
-            Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-            Step_bp_vec.t
-        end in
-        let module M =
-          H3.Map (P.With_data) (E03 (VV))
-            (struct
-              let f (T t : _ P.With_data.t) : VV.t =
-                t.statement.proof_state.deferred_values.bulletproof_challenges
-            end)
-        in
-        let module V = H3.To_vector (VV) in
-        V.f prev_values_length (M.f prev_with_proofs)
+        extract_from_proofs
+          ( module struct
+            type res =
+              Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+              Step_bp_vec.t
+
+            let f (T t : _ P.t) =
+              t.statement.proof_state.deferred_values.bulletproof_challenges
+          end )
       in
       let me_only : _ Reduced_me_only.Step.t =
         (* Have the sg be available in the opening proof and verify it. *)
@@ -569,15 +598,13 @@ struct
     in
     let prev_challenge_polynomial_commitments =
       let to_fold_in =
-        let module M =
-          H3.Map (P.With_data) (E03 (Tick.Curve.Affine))
-            (struct
-              let f (T t : _ P.With_data.t) =
-                t.statement.proof_state.me_only.challenge_polynomial_commitment
-            end)
-        in
-        let module V = H3.To_vector (Tick.Curve.Affine) in
-        V.f prev_values_length (M.f prev_with_proofs)
+        extract_from_proofs
+          ( module struct
+            type res = Tick.Curve.Affine.t
+
+            let f (T t : _ P.t) =
+              t.statement.proof_state.me_only.challenge_polynomial_commitment
+          end )
       in
       (* emphatically NOT padded with dummies *)
       Vector.(
@@ -617,15 +644,13 @@ struct
                 handler ) )
     in
     let prev_evals =
-      let module M =
-        H3.Map (P.With_data) (E03 (E))
-          (struct
-            let f (T t : _ P.With_data.t) =
-              (t.proof.openings.evals, t.proof.openings.ft_eval1)
-          end)
-      in
-      let module V = H3.To_vector (E) in
-      V.f prev_values_length (M.f prev_with_proofs)
+      extract_from_proofs
+        ( module struct
+          type res = E.t
+
+          let f (T t : _ P.t) =
+            (t.proof.openings.evals, t.proof.openings.ft_eval1)
+        end )
     in
     { P.Base.Step.proof = next_proof
     ; statement = next_statement

@@ -709,35 +709,35 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
         let _, prev_vars_length = b.proofs_verified in
-        let step handler prevs next_state =
+        let step handler prev_values prev_proofs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
-            wrap_vk.index prevs
+            wrap_vk.index prev_values prev_proofs
         in
         let step_vk = fst (Lazy.force step_vk) in
         let wrap ?handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
-          let prevs =
-            let module M =
-              H3.Map (Statement_with_proof) (P.With_data)
-                (struct
-                  let f ((app_state, T proof) : _ Statement_with_proof.t) =
-                    P.T
-                      { proof with
-                        statement =
-                          { proof.statement with
-                            pass_through =
-                              { proof.statement.pass_through with app_state }
-                          }
-                      }
-                end)
+          let app_states, prevs =
+            let rec go :
+                type prev_values local_widths local_heights.
+                   ( prev_values
+                   , local_widths
+                   , local_heights )
+                   H3.T(Statement_with_proof).t
+                -> prev_values H1.T(Id).t
+                   * (local_widths, local_widths) H2.T(Proof).t = function
+              | [] ->
+                  ([], [])
+              | (app_state, proof) :: tl ->
+                  let app_states, proofs = go tl in
+                  (app_state :: app_states, proof :: proofs)
             in
-            M.f prevs
+            go prevs
           in
           let%bind.Promise proof =
-            step handler ~maxes:(module Maxes) prevs next_state
+            step handler ~maxes:(module Maxes) app_states prevs next_state
           in
           let proof =
             { proof with
