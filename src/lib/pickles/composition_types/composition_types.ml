@@ -973,8 +973,7 @@ module Step = struct
         Vector (Per_proof.In_circuit.spec Backend.Tock.Rounds.n, proofs_verified)
       in
       spec unfinalized_proofs (B Spec.Digest)
-      |> Spec.typ impl fq ~challenge:`Constrained
-           ~scalar_challenge:`Unconstrained
+      |> Spec.typ impl fq
       |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
       |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
   end

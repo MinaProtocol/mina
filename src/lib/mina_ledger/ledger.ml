@@ -368,6 +368,34 @@ let apply_transaction ~constraint_constants ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
       apply_transaction ~constraint_constants ~txn_state_view l t )
 
+(* use mask to restore ledger after application *)
+let merkle_root_after_parties_exn ~constraint_constants ~txn_state_view ledger
+    parties =
+  let mask = Mask.create ~depth:(depth ledger) () in
+  let masked_ledger = register_mask ledger mask in
+  let _applied =
+    Or_error.ok_exn
+      (apply_parties_unchecked ~constraint_constants ~state_view:txn_state_view
+         masked_ledger parties )
+  in
+  let root = merkle_root masked_ledger in
+  ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
+  root
+
+(* use mask to restore ledger after application *)
+let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
+    ledger cmd =
+  let mask = Mask.create ~depth:(depth ledger) () in
+  let masked_ledger = register_mask ledger mask in
+  let _applied =
+    Or_error.ok_exn
+      (apply_user_command ~constraint_constants ~txn_global_slot masked_ledger
+         cmd )
+  in
+  let root = merkle_root masked_ledger in
+  ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
+  root
+
 type init_state =
   ( Signature_lib.Keypair.t
   * Currency.Amount.t

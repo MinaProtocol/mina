@@ -99,7 +99,7 @@ let%test_module "Zkapp payments tests" =
         ; memo
         }
 
-    let%test_unit "merkle_root_after_snapp_command_exn_immutable" =
+    let%test_unit "merkle_root_after_zkapp_command_exn_immutable" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = U.Wallet.random_wallets () in
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
