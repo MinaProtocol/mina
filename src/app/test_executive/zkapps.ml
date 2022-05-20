@@ -87,9 +87,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.extra_genesis_keypairs network
     in
     let token_funder = fish1_kp in
-    let token_funder_pk =
-      token_funder.public_key |> Signature_lib.Public_key.compress
-    in
     let token_owner = Signature_lib.Keypair.create () in
     let token_account1 = Signature_lib.Keypair.create () in
     let token_account2 = Signature_lib.Keypair.create () in
@@ -113,19 +110,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~key:(Signature_lib.Public_key.compress public_key)
             ~data:private_key )
     in
-    Format.eprintf "TOKEN FEE PAYER: %s@."
-      (Signature_lib.Public_key.Compressed.to_base58_check token_fee_payer_pk) ;
-    Format.eprintf "TOKEN FUNDER: %s@."
-      (Signature_lib.Public_key.Compressed.to_base58_check token_funder_pk) ;
-    Format.eprintf "TOKEN OWNER: %s@."
-      (Signature_lib.Public_key.Compressed.to_base58_check
-         (Signature_lib.Public_key.compress token_owner.public_key) ) ;
-    Format.eprintf "TOKEN ACCT 1: %s@."
-      (Signature_lib.Public_key.Compressed.to_base58_check
-         (Signature_lib.Public_key.compress token_account1.public_key) ) ;
-    Format.eprintf "TOKEN ACCT 2: %s@."
-      (Signature_lib.Public_key.Compressed.to_base58_check
-         (Signature_lib.Public_key.compress token_account2.public_key) ) ;
     let custom_token_id =
       Account_id.derive_token_id
         ~owner:
@@ -384,12 +368,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
       |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk:token_fee_payer_pk
            ~fee_payer_nonce:(Account.Nonce.of_int (* 2 *) 0)
-      |> Mina_generators.Parties_generators.replace_authorizations ~keymap
-    in
-    let __ =
-      Format.eprintf "MINT LOCAL PARTIES: %s@."
-        ( Parties.to_yojson parties_create_token_owner
-        |> Yojson.Safe.pretty_to_string )
+      |> Mina_base.Parties_builder.replace_authorizations ~keymap
     in
     let parties_token_minting =
       let open Parties_builder in
@@ -402,11 +381,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
       |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk:token_fee_payer_pk
            ~fee_payer_nonce:(Account.Nonce.of_int (* 3 *) 1)
-      |> Mina_generators.Parties_generators.replace_authorizations ~keymap
-    in
-    let __ =
-      Format.eprintf "MINT LOCAL PARTIES: %s@."
-        (Parties.to_yojson parties_token_minting |> Yojson.Safe.pretty_to_string)
+      |> Mina_base.Parties_builder.replace_authorizations ~keymap
     in
     let parties_token_transfers =
       let open Parties_builder in
@@ -430,7 +405,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
       |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk:token_fee_payer_pk
            ~fee_payer_nonce:(Account.Nonce.of_int 2 (* 3 *))
-      |> Mina_generators.Parties_generators.replace_authorizations ~keymap
+      |> Mina_base.Parties_builder.replace_authorizations ~keymap
     in
     let with_timeout =
       let soft_slots = 4 in
