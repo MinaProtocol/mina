@@ -43,7 +43,7 @@ module Digest = struct
 
   let of_field = Fn.id
 
-  let to_field = Fn.id
+  let to_field_unsafe = Fn.id
 
   [%%ifdef consensus_mechanism]
 

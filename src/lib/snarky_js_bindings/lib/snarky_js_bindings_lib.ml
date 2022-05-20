@@ -2222,7 +2222,7 @@ module Ledger = struct
     |> Mina_base.Account_id.Digest.to_string |> Js.string
 
   let field_of_base58 (field : Js.js_string Js.t) : field_class Js.t =
-    to_js_field @@ Field.constant @@ Mina_base.Account_id.Digest.to_field
+    to_js_field @@ Field.constant @@ Mina_base.Account_id.Digest.to_field_unsafe
     @@ Mina_base.Account_id.Digest.of_string @@ Js.to_string field
 
   let memo_to_base58 (memo : Js.js_string Js.t) : Js.js_string Js.t =
