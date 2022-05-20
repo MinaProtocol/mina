@@ -59,8 +59,8 @@ RUN test "$deb_codename" = "focal" \
          libffi7 \
      || exit 0
 
-# --- Install rosetta-cli
-RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/v0.7.7/scripts/install.sh | sh -s
+# --- Install the latest version of rosetta-cli
+RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
 
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
 RUN locale-gen en_US.UTF-8
