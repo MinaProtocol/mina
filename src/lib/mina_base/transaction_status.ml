@@ -27,7 +27,6 @@ module Failure = struct
         | Zkapp_account_not_present
         | Update_not_permitted_balance
         | Update_not_permitted_timing_existing_account
-        | Creation_of_timed_account_without_signature
         | Update_not_permitted_delegate
         | Update_not_permitted_app_state
         | Update_not_permitted_verification_key
@@ -129,8 +128,6 @@ module Failure = struct
         "Update_not_permitted_balance"
     | Update_not_permitted_timing_existing_account ->
         "Update_not_permitted_timing_existing_account"
-    | Creation_of_timed_account_without_signature ->
-        "Creation_of_timed_account_without_signature"
     | Update_not_permitted_delegate ->
         "update_not_permitted_delegate"
     | Update_not_permitted_app_state ->
@@ -197,8 +194,6 @@ module Failure = struct
         Ok Update_not_permitted_balance
     | "Update_not_permitted_timing_existing_account" ->
         Ok Update_not_permitted_timing_existing_account
-    | "Creation_of_timed_account_without_signature" ->
-        Ok Creation_of_timed_account_without_signature
     | "update_not_permitted_delegate" ->
         Ok Update_not_permitted_delegate
     | "Update_not_permitted_app_state" ->
@@ -279,8 +274,6 @@ module Failure = struct
          to its balance"
     | Update_not_permitted_timing_existing_account ->
         "The timing of an existing account cannot be updated"
-    | Creation_of_timed_account_without_signature ->
-        "Creation of timed account needs signature"
     | Update_not_permitted_delegate ->
         "The authentication for an account didn't allow the requested update \
          to its delegate"

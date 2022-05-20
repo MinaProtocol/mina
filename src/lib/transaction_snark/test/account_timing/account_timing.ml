@@ -1642,5 +1642,5 @@ let%test_module "account timing check" =
               in
               check_zkapp_failure
                 Transaction_status.Failure
-                .Creation_of_timed_account_without_signature result ) )
+                .Update_not_permitted_timing_existing_account result ) )
   end )
