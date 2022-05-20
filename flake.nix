@@ -225,6 +225,7 @@
           buildInputs = [
             pkgs.kimchi-rust-wasm
             pkgs.wasm-pack
+            pkgs.wasm-bindgen-cli
           ];
         };
 

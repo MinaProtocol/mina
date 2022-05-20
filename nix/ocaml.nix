@@ -130,6 +130,10 @@ let
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+
+        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+
         configurePhase = ''
           export MINA_ROOT="$PWD"
           export -f patchShebangs stopNest isScript
