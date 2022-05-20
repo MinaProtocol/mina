@@ -386,6 +386,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ~fee_payer_nonce:(Account.Nonce.of_int (* 2 *) 0)
       |> Mina_generators.Parties_generators.replace_authorizations ~keymap
     in
+    let __ =
+      Format.eprintf "MINT LOCAL PARTIES: %s@."
+        ( Parties.to_yojson parties_create_token_owner
+        |> Yojson.Safe.pretty_to_string )
+    in
     let parties_token_minting =
       let open Parties_builder in
       mk_forest
@@ -400,7 +405,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       |> Mina_generators.Parties_generators.replace_authorizations ~keymap
     in
     let __ =
-      Format.eprintf "LOCAL PARTIES: %s@."
+      Format.eprintf "MINT LOCAL PARTIES: %s@."
         (Parties.to_yojson parties_token_minting |> Yojson.Safe.pretty_to_string)
     in
     let parties_token_transfers =
