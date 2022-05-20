@@ -1,0 +1,35 @@
+(library
+ (name graphql_test)
+ (wrapped false)
+ (modules
+  echo_schema
+  schema_test
+  test_common
+  test_schema
+  variable_test
+  argument_test
+  introspection_test
+  error_test
+  custom_error_test
+  abstract_test
+  directives_test)
+ (libraries graphql alcotest yojson graphql_parser fmt graphql_utils)
+ (flags (:standard -w -9)))
+
+(executable
+ (libraries graphql_test alcotest graphql_utils)
+ (modules test)
+ (name test))
+
+; (alias
+;  (name runtest)
+;  ; (package graphql)
+;  (deps (:test test.exe))
+;  (action (run %{test} -v)))
+
+(rule
+ (alias runtest)
+ (deps
+  (:test test.exe))
+ (action
+  (run %{test} -v)))

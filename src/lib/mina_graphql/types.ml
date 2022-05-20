@@ -2236,7 +2236,7 @@ module Input = struct
     (* let json_of_BlockTime = block_time.to_json *)
     (* let json_of_Length = length.to_json *)
     (* let json_of_CurrencyAmount = currency_amount.to_json *)
-    (* let json_of_Fee = fee.to_json *)
+    let json_of_Fee = fee.to_json
     let json_of_SendTestZkappInput = internal_send_zkapp.to_json
     let json_of_PrecomputedBlock = precomputed_block.to_json
 

@@ -6,6 +6,15 @@
  *)
 
 module Make (Schema : Graphql_intf.Schema) = struct
+
+  type 'a enum_value =
+    { as_string : string; value : 'a; enum_value : 'a Schema.enum_value }
+
+  let enum_value ?doc ?deprecated as_string ~value =
+    { as_string
+    ; value
+    ; enum_value = Schema.enum_value ?doc ?deprecated as_string ~value
+    }
   module Arg = struct
     type ('obj_arg, 'a) arg_typ =
       { typ : 'obj_arg Schema.Arg.arg_typ
@@ -185,14 +194,6 @@ module Make (Schema : Graphql_intf.Schema) = struct
           Json.json_of_option (function l -> `List (List.map typ.to_json l))
       }
 
-    type 'a enum_value =
-      { as_string : string; value : 'a; enum_value : 'a Schema.enum_value }
-
-    let enum_value ?doc ?deprecated as_string ~value =
-      { as_string
-      ; value
-      ; enum_value = Schema.enum_value ?doc ?deprecated as_string ~value
-      }
 
     let enum ?doc name ~(values : _ enum_value list) =
       let rec to_string (values : _ enum_value list) v =
@@ -259,6 +260,39 @@ module Make (Schema : Graphql_intf.Schema) = struct
       let args = Arg.args_of_myargs args in
       let field = Schema.io_field ?doc ?deprecated name ~args ~typ ~resolve in
       { name; field; to_string }
+
+  end
+
+  module Abstract_fields = struct
+    type ('ctx, 'src, 'args_to_string, 'out, 'subquery) abstract_field =
+      { field : Schema.abstract_field
+      ; to_string : 'args_to_string
+      ; name : string
+      }
+
+    type ('ctx, 'src, 'acc) abstract_fields =
+      | [] : ('ctx, 'src, unit) abstract_fields
+      | ( :: ) :
+          ('ctx, 'src, 'args_to_string, 'out, 'subquery) abstract_field
+          * ('ctx, 'src, 'acc) abstract_fields
+          -> ('ctx, 'src, unit -> 'acc) abstract_fields
+
+    let rec to_ocaml_grapql_server_fields :
+        type acc.
+           ('ctx, 'src, acc) abstract_fields
+        -> Schema.abstract_field list = function
+      | [] ->
+          Stdlib.List.[]
+      | h :: t ->
+          h.field :: to_ocaml_grapql_server_fields t
+
+    let abstract_field ?doc ?deprecated name ~typ
+        ~(args : (_, 'out, _, _, _) Arg.args) :
+        (_, _, _, 'out, _) abstract_field =
+      let to_string = Arg.to_string name args [] in
+      let args = Arg.args_of_myargs args in
+      let field = Schema.abstract_field ?doc ?deprecated name ~typ ~args in
+      { name; field; to_string }
   end
 
   module Subscription_fields = struct
@@ -303,19 +337,23 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   let subscription_field = Subscription_fields.subscription_field
 
+  let abstract_field = Abstract_fields.abstract_field
+
   let obj ?doc name ~(fields : unit -> _ Fields.fields) =
     let fields = lazy (Fields.to_ocaml_grapql_server_fields (fields ())) in
     Schema.obj ?doc name ~fields:(fun _ -> Lazy.force fields)
+
+  let interface ?doc name ~(fields : unit -> _ Abstract_fields.abstract_fields) =
+    let fields = lazy (Abstract_fields.to_ocaml_grapql_server_fields (fields ())) in
+    Schema.interface ?doc name ~fields:(fun _ -> Lazy.force fields)
 
   let non_null = Schema.non_null
 
   let string = Schema.string
 
-  let enum = Schema.enum
+  let enum ?doc name ~values = Schema.enum ?doc name ~values:(List.map (function v -> v.enum_value) values)
 
   let int = Schema.int
-
-  let enum_value = Schema.enum_value
 
   type ('a, 'b) typ = ('a, 'b) Schema.typ
 end
