@@ -1,7 +1,7 @@
 open Core
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier

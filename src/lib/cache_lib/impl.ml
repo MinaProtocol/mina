@@ -164,7 +164,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
             let cache = cache t in
             Cache.remove cache `Unconsumed (original t) ;
             Inputs.handle_unconsumed_cache_item ~logger:(Cache.logger cache)
-              ~cache_name:(Cache.name cache) )) ;
+              ~cache_name:(Cache.name cache) ) ) ;
       t
 
     let create cache data final_state =
@@ -175,14 +175,14 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       if was_consumed t then
         raise
           (createf "%s: %s" msg
-             (Cache.element_to_string (cache t) (original t)))
+             (Cache.element_to_string (cache t) (original t)) )
 
     let assert_not_finalized t msg =
       let open Error in
       if was_finalized t then
         raise
           (createf "%s: %s" msg
-             (Cache.element_to_string (cache t) (original t)))
+             (Cache.element_to_string (cache t) (original t)) )
 
     let peek (type a b) (t : (a, b) t) : a =
       assert_not_finalized t "cannot peek at finalized Cached.t" ;
@@ -206,7 +206,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
            ; cache = cache t
            ; transformed = false
            ; final_state = final_state t
-           })
+           } )
 
     let invalidate_with_failure (type a b) (t : (a, b) t) : a =
       assert_not_finalized t "Cached item has already been finalized" ;
@@ -304,9 +304,9 @@ let%test_module "cache_lib test instance" =
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               let x = Cache.register_exn cache data in
-              ignore (Cached.invalidate_with_success x : string)) ;
+              ignore (Cached.invalidate_with_success x : string) ) ;
           Gc.full_major () ;
-          assert (!dropped_cache_items = 0))
+          assert (!dropped_cache_items = 0) )
 
     let%test_unit "cached objects are garbage collected independently of caches"
         =
@@ -314,18 +314,18 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              ignore (Cache.register_exn cache data : (string, string) Cached.t)) ;
+              ignore (Cache.register_exn cache data : (string, string) Cached.t) ) ;
           Gc.full_major () ;
-          assert (!dropped_cache_items = 1))
+          assert (!dropped_cache_items = 1) )
 
     let%test_unit "cached objects are garbage collected independently of data" =
       setup () ;
       let logger = Logger.null () in
       with_item ~f:(fun data ->
           with_cache ~logger ~f:(fun cache ->
-              ignore (Cache.register_exn cache data : (string, string) Cached.t)) ;
+              ignore (Cache.register_exn cache data : (string, string) Cached.t) ) ;
           Gc.full_major () ;
-          assert (!dropped_cache_items = 1))
+          assert (!dropped_cache_items = 1) )
 
     let%test_unit "cached objects are not unexpectedly garbage collected" =
       setup () ;
@@ -335,7 +335,7 @@ let%test_module "cache_lib test instance" =
               let cached = Cache.register_exn cache data in
               Gc.full_major () ;
               assert (!dropped_cache_items = 0) ;
-              ignore (Cached.invalidate_with_success cached : string))) ;
+              ignore (Cached.invalidate_with_success cached : string) ) ) ;
       Gc.full_major () ;
       assert (!dropped_cache_items = 0)
 
@@ -349,9 +349,9 @@ let%test_module "cache_lib test instance" =
                 ( Cache.register_exn cache data
                   |> Cached.transform ~f:(Fn.const 5)
                   |> Cached.transform ~f:(Fn.const ())
-                  : (unit, string) Cached.t )) ;
+                  : (unit, string) Cached.t ) ) ;
           Gc.full_major () ;
-          assert (!dropped_cache_items = 1))
+          assert (!dropped_cache_items = 1) )
 
     let%test_unit "properly invalidated derived cached objects do not trigger \
                    any unconsumption handler calls" =
@@ -362,9 +362,9 @@ let%test_module "cache_lib test instance" =
               Cache.register_exn cache data
               |> Cached.transform ~f:(Fn.const 5)
               |> Cached.transform ~f:(Fn.const ())
-              |> Cached.invalidate_with_success) ;
+              |> Cached.invalidate_with_success ) ;
           Gc.full_major () ;
-          assert (!dropped_cache_items = 0))
+          assert (!dropped_cache_items = 0) )
 
     let%test_unit "invalidate original cached object would also remove the \
                    derived cached object" =
@@ -378,9 +378,9 @@ let%test_module "cache_lib test instance" =
                 |> Cached.transform ~f:(Fn.const 5)
                 |> Cached.transform ~f:(Fn.const ())
               in
-              ignore (Cached.invalidate_with_success src : string)) ;
+              ignore (Cached.invalidate_with_success src : string) ) ;
           Gc.full_major () ;
-          assert (!dropped_cache_items = 0))
+          assert (!dropped_cache_items = 0) )
 
     let%test_unit "deriving a cached object inhabits its parent's final_state" =
       setup () ;
@@ -390,5 +390,5 @@ let%test_module "cache_lib test instance" =
               let der = Cached.transform src ~f:(Fn.const 5) in
               let src_final_state = Cached.final_state src in
               let der_final_state = Cached.final_state der in
-              assert (Ivar.equal src_final_state der_final_state)))
+              assert (Ivar.equal src_final_state der_final_state) ) )
   end )

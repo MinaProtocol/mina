@@ -20,7 +20,7 @@ end = struct
   let transfer_accounts ~src ~dest =
     let accounts =
       Source.foldi src ~init:[] ~f:(fun addr acc account ->
-          (addr, account) :: acc)
+          (addr, account) :: acc )
     in
     Dest.set_batch_accounts dest accounts ;
     let src_hash = Source.merkle_root src in
@@ -46,7 +46,7 @@ end = struct
                 let id = Account.identifier account in
                 ignore
                   ( Dest.get_or_create_account dest id account |> Or_error.ok_exn
-                    : [ `Added | `Existed ] * Dest.Location.t )))
+                    : [ `Added | `Existed ] * Dest.Location.t ) ) )
       in
       let src_hash = Sparse_ledger.merkle_root src in
       let dest_hash = Dest.merkle_root dest in

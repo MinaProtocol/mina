@@ -1,7 +1,6 @@
 open Core_kernel
 open Mina_base
 open Mina_transaction
-open Mina_transition
 open Signature_lib
 
 module Fee_transfer_type = struct
@@ -75,16 +74,16 @@ let participants
   let user_command_set =
     List.fold commands ~init:empty ~f:(fun set user_command ->
         union set
-          (of_list @@ User_command.accounts_accessed user_command.data.data))
+          (of_list @@ User_command.accounts_accessed user_command.data.data) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
-        add set (Fee_transfer.Single.receiver ft))
+        add set (Fee_transfer.Single.receiver ft) )
   in
   add
     (add
        (union user_command_set fee_transfer_participants)
-       (Account_id.create creator Token_id.default))
+       (Account_id.create creator Token_id.default) )
     (Account_id.create winner Token_id.default)
 
 let participant_pks
@@ -94,11 +93,11 @@ let participant_pks
     List.fold commands ~init:empty ~f:(fun set user_command ->
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
-        @@ User_command.accounts_accessed user_command.data.data)
+        @@ User_command.accounts_accessed user_command.data.data )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
-        add set ft.receiver_pk)
+        add set ft.receiver_pk )
   in
   add (add (union user_command_set fee_transfer_participants) creator) winner
 
@@ -154,7 +153,7 @@ let of_transition block tracked_participants
             List.exists (User_command.accounts_accessed command)
               ~f:(fun account_id ->
                 Public_key.Compressed.Set.mem participants
-                  (Account_id.public_key account_id))
+                  (Account_id.public_key account_id) )
           in
           match tracked_participants with
           | `Some interested_participants
@@ -177,7 +176,7 @@ let of_transition block tracked_participants
       | { data = Fee_transfer fee_transfer; _ } ->
           let fee_transfer_list =
             List.map (Mina_base.Fee_transfer.to_list fee_transfer) ~f:(fun f ->
-                (f, Fee_transfer_type.Fee_transfer))
+                (f, Fee_transfer_type.Fee_transfer) )
           in
           let fee_transfers =
             match tracked_participants with
@@ -186,7 +185,7 @@ let of_transition block tracked_participants
             | `Some interested_participants ->
                 List.filter
                   ~f:(fun ({ receiver_pk = pk; _ }, _) ->
-                    Public_key.Compressed.Set.mem interested_participants pk)
+                    Public_key.Compressed.Set.mem interested_participants pk )
                   fee_transfer_list
           in
           { acc_transactions with
@@ -197,7 +196,7 @@ let of_transition block tracked_participants
             Option.map
               ~f:(fun ft ->
                 ( Coinbase_fee_transfer.to_fee_transfer ft
-                , Fee_transfer_type.Fee_transfer_via_coinbase ))
+                , Fee_transfer_type.Fee_transfer_via_coinbase ) )
               fee_transfer
           in
           let fee_transfers =
@@ -211,7 +210,7 @@ let of_transition block tracked_participants
           ; coinbase =
               Currency.Amount.(
                 Option.value_exn (add amount acc_transactions.coinbase))
-          })
+          } )
   in
   let snark_jobs =
     staged_ledger_diff |> Staged_ledger_diff.completed_works

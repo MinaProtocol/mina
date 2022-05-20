@@ -120,7 +120,7 @@ let rec of_list : type a. a list -> a e = function
 let to_sequence : type a n. (a, n) t -> a Sequence.t =
  fun t ->
   Sequence.unfold ~init:(T t) ~f:(fun (T t) ->
-      match t with [] -> None | x :: xs -> Some (x, T xs))
+      match t with [] -> None | x :: xs -> Some (x, T xs) )
 
 let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
  fun xs n ->
@@ -166,7 +166,7 @@ let for_all : type a n. (a, n) t -> f:(a -> bool) -> bool =
  fun v ~f ->
   with_return (fun { return } ->
       iter v ~f:(fun x -> if not (f x) then return false) ;
-      true)
+      true )
 
 let foldi t ~f ~init =
   snd (fold t ~f:(fun (i, acc) x -> (i + 1, f i acc x)) ~init:(0, init))

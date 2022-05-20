@@ -57,7 +57,7 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
                let bit = (bits_per_row * i) + (2 * j) in
                let b0 = (Lazy.force bits_msb).(bit + 1) in
                let b1 = (Lazy.force bits_msb).(bit) in
-               Bool.to_int b0 + (2 * Bool.to_int b1))))
+               Bool.to_int b0 + (2 * Bool.to_int b1) ) ) )
   in
   let two = Field.of_int 2 in
   let a = ref two in
@@ -72,28 +72,28 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
     let xs =
       Array.init nybbles_per_row ~f:(fun j ->
           mk (fun () ->
-              Field.Constant.of_int (Lazy.force nybbles_by_row).(i).(j)))
+              Field.Constant.of_int (Lazy.force nybbles_by_row).(i).(j) ) )
     in
     let open Field.Constant in
     let double x = x + x in
     let n8 =
       mk (fun () ->
           Array.fold xs ~init:!!n0 ~f:(fun acc x ->
-              (acc |> double |> double) + !!x))
+              (acc |> double |> double) + !!x ) )
     in
     let a8 =
       mk (fun () ->
           Array.fold
             (Lazy.force nybbles_by_row).(i)
             ~init:!!a0
-            ~f:(fun acc x -> (acc |> double) + a_func x))
+            ~f:(fun acc x -> (acc |> double) + a_func x) )
     in
     let b8 =
       mk (fun () ->
           Array.fold
             (Lazy.force nybbles_by_row).(i)
             ~init:!!b0
-            ~f:(fun acc x -> (acc |> double) + b_func x))
+            ~f:(fun acc x -> (acc |> double) + b_func x) )
     in
     state :=
       { Kimchi_backend_common.Endoscale_scalar_round.a0
@@ -124,7 +124,7 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
               Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
                 T (EC_endoscalar { state = Array.of_list_rev !state }))
           }
-        ]) ;
+        ] ) ;
   (!a, !b, !n)
 
 let to_field_checked (type f) ?num_bits
@@ -170,16 +170,16 @@ let test (type f)
                 to_field_checked
                   (module Impl)
                   ~endo
-                  (SC.create (Impl.Field.pack s))))
+                  (SC.create (Impl.Field.pack s)) ) )
           (fun s ->
             to_field_constant
               (module Field.Constant)
               ~endo
-              (SC.create (Challenge.Constant.of_bits s)))
+              (SC.create (Challenge.Constant.of_bits s)) )
           xs
       with e ->
         eprintf !"Input %{sexp: bool list}\n%!" xs ;
-        raise e)
+        raise e )
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
@@ -223,7 +223,7 @@ struct
     let acc =
       with_label __LOC__ (fun () ->
           let p = G.( + ) t (seal (Field.scale xt Endo.base), yt) in
-          ref G.(p + p))
+          ref G.(p + p) )
     in
     let n_acc = ref Field.zero in
     let mk f = exists Field.typ ~compute:f in
@@ -244,7 +244,7 @@ struct
       let s1_squared = mk (fun () -> square !!s1) in
       let s2 =
         mk (fun () ->
-            (double !!yp / (double !!xp + !!xq1 - !!s1_squared)) - !!s1)
+            (double !!yp / (double !!xp + !!xq1 - !!s1_squared)) - !!s1 )
       in
 
       let xr = mk (fun () -> !!xq1 + square !!s2 - !!s1_squared) in
@@ -256,7 +256,7 @@ struct
       let s3_squared = mk (fun () -> square !!s3) in
       let s4 =
         mk (fun () ->
-            (double !!yr / (double !!xr + !!xq2 - !!s3_squared)) - !!s3)
+            (double !!yr / (double !!xr + !!xq2 - !!s3_squared)) - !!s3 )
       in
 
       let xs = mk (fun () -> !!xq2 + square !!s4 - !!s3_squared) in
@@ -265,7 +265,7 @@ struct
       n_acc :=
         mk (fun () ->
             !!n_acc_prev |> double |> ( + ) !!b1 |> double |> ( + ) !!b2
-            |> double |> ( + ) !!b3 |> double |> ( + ) !!b4) ;
+            |> double |> ( + ) !!b3 |> double |> ( + ) !!b4 ) ;
       rounds_rev :=
         { Kimchi_backend_common.Endoscale_round.xt
         ; yt
@@ -295,9 +295,9 @@ struct
                        ; ys
                        ; n_acc = !n_acc
                        ; state = Array.of_list_rev !rounds_rev
-                       }))
+                       } ))
             }
-          ]) ;
+          ] ) ;
     with_label __LOC__ (fun () -> Field.Assert.equal !n_acc scalar) ;
     !acc
 
@@ -323,16 +323,16 @@ struct
             (Typ.tuple2 G.typ (Typ.list ~length:n Boolean.typ))
             G.typ
             (fun (g, s) ->
-              make_checked (fun () -> endo g (SC.create (Field.pack s))))
+              make_checked (fun () -> endo g (SC.create (Field.pack s))) )
             (fun (g, s) ->
               let x =
                 Constant.to_field (SC.create (Challenge.Constant.of_bits s))
               in
-              G.Constant.scale g x)
+              G.Constant.scale g x )
             (random_point, xs)
         with e ->
           eprintf !"Input %{sexp: bool list}\n%!" xs ;
-          raise e)
+          raise e )
 
   let endo_inv ((gx, gy) as g) chal =
     let res =

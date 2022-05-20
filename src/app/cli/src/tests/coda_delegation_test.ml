@@ -49,7 +49,7 @@ let main () =
                 ( Public_key.Compressed.to_base58_check
                 @@ Account.public_key acct ) )
           ; ("balance", `Int (Currency.Balance.to_int acct.balance))
-          ]) ;
+          ] ) ;
   (* second account is delegator; see genesis_ledger/test_delegation_ledger.ml *)
   let ((_, delegator_account) as delegator) = List.nth_exn accounts 2 in
   let delegator_pubkey = Account.public_key delegator_account in
@@ -86,7 +86,7 @@ let main () =
            incr delegator_production_count ;
            if Int.equal !delegator_production_count delegator_production_goal
            then Ivar.fill delegator_ivar () ) ;
-         return ())) ;
+         return () ) ) ;
   [%log info] "Started delegator transition reader" ;
   let%bind delegatee_transition_reader =
     Coda_process.new_block_exn worker delegatee_pubkey
@@ -110,7 +110,7 @@ let main () =
            incr delegatee_production_count ;
            if Int.equal !delegatee_production_count delegatee_production_goal
            then Ivar.fill delegatee_ivar () ) ;
-         return ())) ;
+         return () ) ) ;
   [%log info] "Started delegatee transition reader" ;
   (* wait for delegator to produce some blocks *)
   let%bind () = Ivar.read delegator_ivar in

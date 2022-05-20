@@ -13,7 +13,7 @@ let%test_module "blake2-equality test" =
         run_and_check
           (let%bind input = exists typ1 ~compute:(As_prover.return input) in
            let%map result = checked input in
-           As_prover.read typ2 result)
+           As_prover.read typ2 result )
         |> Or_error.ok_exn
       in
       checked_result
@@ -32,7 +32,7 @@ let%test_module "blake2-equality test" =
 
     let to_bitstring bits =
       String.init (Array.length bits) ~f:(fun i ->
-          if bits.(i) then '1' else '0')
+          if bits.(i) then '1' else '0' )
 
     let%test_unit "constraint count" =
       assert (
@@ -62,5 +62,5 @@ let%test_module "blake2-equality test" =
             ~sexp_of_t:(Fn.compose [%sexp_of: string] to_bitstring)
             input_typ output_typ
             (blake2s ?personalization:None)
-            blake2_unchecked input)
+            blake2_unchecked input )
   end )

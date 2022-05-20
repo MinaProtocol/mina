@@ -183,12 +183,12 @@ module Instance = struct
                 Stop None )
           else (
             Ledger.Db.close potential_snarked_ledger ;
-            Continue None ))
+            Continue None ) )
         ~finish:(fun _ ->
           List.iter potential_snarked_ledgers ~f:File_system.rmrf ;
           File_system.rmrf
             (Locations.potential_snarked_ledgers factory.directory) ;
-          None)
+          None )
     in
     match snarked_ledger with
     | None ->
@@ -234,7 +234,7 @@ module Instance = struct
         ignore
           ( Root_identifier.Stable.Latest.bin_write_t buf ~pos:0
               new_root_identifier
-            : int ))
+            : int ) )
 
   (* defaults to genesis *)
   let load_root_identifier t =
@@ -252,7 +252,7 @@ module Instance = struct
                 [ ("root_identifier", Root_identifier.to_yojson root_identifier)
                 ]
               "Loaded persistent root identifier" ;
-            Some root_identifier)
+            Some root_identifier )
 
   let set_root_state_hash t state_hash = set_root_identifier t { state_hash }
 end
@@ -288,11 +288,11 @@ let reset_to_genesis_exn t ~precomputed_values =
         ( Ledger_transfer.transfer_accounts
             ~src:
               (Lazy.force
-                 (Precomputed_values.genesis_ledger precomputed_values))
+                 (Precomputed_values.genesis_ledger precomputed_values) )
             ~dest:(Instance.snarked_ledger instance)
           : Ledger.Db.t Or_error.t ) ;
       Instance.set_root_identifier instance
         (genesis_root_identifier
            ~genesis_state_hash:
              (Precomputed_values.genesis_state_hashes precomputed_values)
-               .state_hash))
+               .state_hash ) )

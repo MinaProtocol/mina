@@ -31,7 +31,7 @@ module Make
     ; node_initialization : bool String.Map.t
           [@to_yojson
             map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun b ->
-                `Bool b)]
+                `Bool b )]
     ; gossip_received : Gossip_state.t String.Map.t
           [@to_yojson
             map_to_yojson ~f_key_to_string:ident
@@ -43,12 +43,12 @@ module Make
     ; blocks_produced_by_node : State_hash.t list String.Map.t
           [@to_yojson
             map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun ls ->
-                `List (List.map State_hash.to_yojson ls))]
+                `List (List.map State_hash.to_yojson ls) )]
     ; blocks_seen_by_node : State_hash.Set.t String.Map.t
           [@to_yojson
             map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun set ->
                 `List
-                  (State_hash.Set.to_list set |> List.map State_hash.to_yojson))]
+                  (State_hash.Set.to_list set |> List.map State_hash.to_yojson) )]
     ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
           [@to_yojson
             map_to_yojson ~f_key_to_string:Transaction_hash.to_base58_check
@@ -99,7 +99,7 @@ module Make
                         | None ->
                             [ block_produced.state_hash ]
                         | Some ls ->
-                            List.cons block_produced.state_hash ls)
+                            List.cons block_produced.state_hash ls )
                   in
                   { state with
                     epoch = block_produced.global_slot
@@ -111,7 +111,7 @@ module Make
                       + snarked_ledgers_generated
                   ; blocks_produced_by_node = blocks_produced_by_node_map
                   }
-                else state))
+                else state ) )
         : _ Event_router.event_subscription ) ;
     (* handle_update_best_tips *)
     ignore
@@ -130,7 +130,7 @@ module Make
                       String.Map.set state.best_tips_by_node ~key:(Node.id node)
                         ~data:new_best_tip
                     in
-                    { state with best_tips_by_node = best_tips_by_node' })))
+                    { state with best_tips_by_node = best_tips_by_node' } ) ) )
         : _ Event_router.event_subscription ) ;
     let handle_gossip_received event_type =
       ignore
@@ -155,12 +155,12 @@ module Make
                               [ ( "event"
                                 , Event_type.event_to_yojson
                                     (Event_type.Event
-                                       (event_type, gossip_with_direction)) )
+                                       (event_type, gossip_with_direction) ) )
                               ] ;
                           Gossip_state.add gossip_state event_type
                             gossip_with_direction ;
-                          gossip_state)
-                  }))
+                          gossip_state )
+                  } ) )
           : _ Event_router.event_subscription )
     in
     handle_gossip_received Block_gossip ;
@@ -178,7 +178,7 @@ module Make
                   String.Map.set state.node_initialization ~key:(Node.id node)
                     ~data:true
                 in
-                { state with node_initialization = node_initialization' }))
+                { state with node_initialization = node_initialization' } ) )
         : _ Event_router.event_subscription ) ;
     (* handle_node_offline *)
     ignore
@@ -197,7 +197,7 @@ module Make
                 { state with
                   node_initialization = node_initialization'
                 ; best_tips_by_node = best_tips_by_node'
-                }))
+                } ) )
         : _ Event_router.event_subscription ) ;
     (* handle_breadcrumb_added *)
     ignore
@@ -212,13 +212,13 @@ module Make
                     ~f:(fun block_set ->
                       State_hash.Set.add
                         (Option.value block_set ~default:State_hash.Set.empty)
-                        breadcrumb.state_hash)
+                        breadcrumb.state_hash )
                 in
                 let txn_hash_list =
                   List.map breadcrumb.user_commands ~f:(fun cmd_with_status ->
                       cmd_with_status.With_status.data
                       |> User_command.forget_check
-                      |> Transaction_hash.hash_command)
+                      |> Transaction_hash.hash_command )
                 in
                 let blocks_including_txn' =
                   List.fold txn_hash_list ~init:state.blocks_including_txn
@@ -233,12 +233,12 @@ module Make
                         "adding or updating txn_hash %s to \
                          state.blocks_including_txn"
                         (Transaction_hash.to_base58_check hash) ;
-                      Transaction_hash.Map.set accum ~key:hash ~data:block_set')
+                      Transaction_hash.Map.set accum ~key:hash ~data:block_set' )
                 in
                 { state with
                   blocks_seen_by_node = blocks_seen_by_node'
                 ; blocks_including_txn = blocks_including_txn'
-                }))
+                } ) )
         : _ Event_router.event_subscription ) ;
     (r, w)
 end

@@ -41,8 +41,8 @@ let input_size ~of_int ~add ~mul w =
   let open Composition_types in
   (* This should be an affine function in [a]. *)
   let size a =
-    let (T (typ, conv)) =
-      Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
+    let (T (typ, _conv, _conv_inv)) =
+      Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Impls.Step.Data_spec.size [ typ ]
   in
@@ -112,11 +112,11 @@ end = struct
       (Vector.typ Boolean.typ Length.n)
       ~there:(fun x ->
         let x = to_int x in
-        Vector.init Length.n ~f:(fun i -> (x lsr i) land 1 = 1))
+        Vector.init Length.n ~f:(fun i -> (x lsr i) land 1 = 1) )
       ~back:(fun v ->
         Vector.foldi v ~init:0 ~f:(fun i acc b ->
-            if b then acc lor (1 lsl i) else acc)
-        |> of_int_exn)
+            if b then acc lor (1 lsl i) else acc )
+        |> of_int_exn )
 end
 
 module Domain = struct
@@ -133,7 +133,7 @@ module Domains = struct
     let dom =
       Typ.transport Typ.field
         ~there:(fun (Plonk_checks.Domain.Pow_2_roots_of_unity n) ->
-          Field.Constant.of_int n)
+          Field.Constant.of_int n )
         ~back:(fun _ -> assert false)
       |> Typ.transport_var
            ~there:(fun (Domain.Pow_2_roots_of_unity n) -> n)
@@ -150,13 +150,7 @@ let max_domains_with_x =
   let conv (Domain.Pow_2_roots_of_unity n) =
     Plonk_checks.Domain.Pow_2_roots_of_unity n
   in
-  let x =
-    Plonk_checks.Domain.Pow_2_roots_of_unity
-      (Int.ceil_log2
-         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-            (Nat.to_int Width.Max.n)))
-  in
-  { Ds.h = conv max_domains.h; x }
+  { Ds.h = conv max_domains.h }
 
 module Vk = struct
   type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
@@ -204,8 +198,10 @@ module Stable = struct
 
       let of_repr
           ({ Repr.Stable.V2.step_data; max_width; wrap_index = c } :
-            R.Stable.V2.t) : t =
-        let d = Common.wrap_domains.h in
+            R.Stable.V2.t ) : t =
+        let d =
+          (Common.wrap_domains ~proofs_verified:(Width.to_int max_width)).h
+        in
         let log2_size = Import.Domain.log2_size d in
         let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
         (* we only compute the wrap_vk if the srs can be loaded *)
@@ -237,10 +233,10 @@ module Stable = struct
                    ; complete_add_comm = g c.complete_add_comm
                    ; endomul_scalar_comm = g c.endomul_scalar_comm
                    ; chacha_comm = None
-                   })
+                   } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
-              })
+              } )
         in
         { Poly.step_data; max_width; wrap_index = c; wrap_vk }
 
@@ -258,15 +254,16 @@ module Stable = struct
 
       let compare x y = R.compare (to_repr x) (to_repr y)
 
-      include Binable.Of_binable
-                (R.Stable.V2)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (R.Stable.V2)
+          (struct
+            type nonrec t = t
 
-                  let to_binable r = to_repr r
+            let to_binable r = to_repr r
 
-                  let of_binable r = of_repr r
-                end)
+            let of_binable r = of_repr r
+          end)
     end
 
     include T
@@ -299,7 +296,7 @@ let dummy : t =
        ; mul_comm = g
        ; emul_comm = g
        ; endomul_scalar_comm = g
-       })
+       } )
   ; wrap_vk = None
   }
 
@@ -335,7 +332,7 @@ module Checked = struct
       List.reduce_exn ~f:append
         [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
               map_reduce [| h |] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
-                  packed (x, max_log2_degree)))
+                  packed (x, max_log2_degree) ) )
         ; Array.map (Vector.to_array step_widths) ~f:width |> packeds
         ; packed (width max_width)
         ; wrap_index_to_input
@@ -354,10 +351,11 @@ let%test_unit "input_size" =
       [%test_eq: int]
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Nat.of_int n in
-         let (T (typ, conv)) =
-           Impls.Step.input ~branching:a ~wrap_rounds:Backend.Tock.Rounds.n
+         let (T (typ, _conv, _conv_inv)) =
+           Impls.Step.input ~proofs_verified:a
+             ~wrap_rounds:Backend.Tock.Rounds.n
          in
-         Impls.Step.Data_spec.size [ typ ]))
+         Impls.Step.Data_spec.size [ typ ] ) )
 
 let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
@@ -371,7 +369,7 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
     ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
-      failwith "Side_loaded_verification_key: value_of_hlist")
+      failwith "Side_loaded_verification_key: value_of_hlist" )
     ~value_to_hlist:(fun { Poly.step_data; wrap_index; max_width; _ } ->
       [ At_most.extend_to_vector
           (At_most.map step_data ~f:fst)
@@ -382,5 +380,5 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
       ; max_width
       ; wrap_index
       ; (let n = At_most.length step_data in
-         Vector.init Max_branches.Log2.n ~f:(fun i -> (n lsr i) land 1 = 1))
-      ])
+         Vector.init Max_branches.Log2.n ~f:(fun i -> (n lsr i) land 1 = 1) )
+      ] )

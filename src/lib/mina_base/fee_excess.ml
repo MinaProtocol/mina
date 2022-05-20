@@ -73,16 +73,30 @@ module Poly = struct
           ]
 
       let of_yojson token_of_yojson fee_of_yojson = function
-        | `List
-            [ `Assoc [ ("token", fee_token_l); ("amount", fee_excess_l) ]
-            ; `Assoc [ ("token", fee_token_r); ("amount", fee_excess_r) ]
-            ] ->
-            let open Result.Let_syntax in
-            let%map fee_token_l = token_of_yojson fee_token_l
-            and fee_excess_l = fee_of_yojson fee_excess_l
-            and fee_token_r = token_of_yojson fee_token_r
-            and fee_excess_r = fee_of_yojson fee_excess_r in
-            { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
+        | `List [ `Assoc [ left0; left1 ]; `Assoc [ right0; right1 ] ] -> (
+            (* allow for reversed field order: "be liberal in what you accept" *)
+            let token_and_excess pair0 pair1 =
+              match (pair0, pair1) with
+              | ("token", token), ("amount", excess) ->
+                  Some (token, excess)
+              | ("amount", excess), ("token", token) ->
+                  Some (token, excess)
+              | _ ->
+                  None
+            in
+            let left = token_and_excess left0 left1 in
+            let right = token_and_excess right0 right1 in
+            match (left, right) with
+            | Some (fee_token_l, fee_excess_l), Some (fee_token_r, fee_excess_r)
+              ->
+                let open Result.Let_syntax in
+                let%map fee_token_l = token_of_yojson fee_token_l
+                and fee_excess_l = fee_of_yojson fee_excess_l
+                and fee_token_r = token_of_yojson fee_token_r
+                and fee_excess_r = fee_of_yojson fee_excess_r in
+                { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
+            | _ ->
+                Error "Fee_excess.Poly.Stable.V1.t, unexpected JSON field" )
         | _ ->
             Error "Fee_excess.Poly.Stable.V1.t"
     end
@@ -167,12 +181,12 @@ let assert_equal_checked (t1 : var) (t2 : var) =
   Checked.all_unit
     [ [%with_label "fee_token_l"]
         (make_checked (fun () ->
-             Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l))
+             Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l ) )
     ; [%with_label "fee_excess_l"]
         (Fee.Signed.Checked.assert_equal t1.fee_excess_l t2.fee_excess_l)
     ; [%with_label "fee_token_r"]
         (make_checked (fun () ->
-             Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r))
+             Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r ) )
     ; [%with_label "fee_excess_r"]
         (Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r)
     ]
@@ -246,7 +260,7 @@ let%snarkydef eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
     let%bind fee_token =
       make_checked (fun () ->
           Token_id.Checked.if_ fee_excess_zero ~then_:fee_token_m
-            ~else_:fee_token)
+            ~else_:fee_token )
     in
     let%map fee_excess_to_move =
       Field.Checked.if_ may_move ~then_:fee_excess_m
@@ -324,7 +338,7 @@ let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
     in
     make_checked (fun () ->
         Token_id.Checked.if_ excess_is_zero ~then_:fee_token_r
-          ~else_:fee_token_l)
+          ~else_:fee_token_l )
   in
   (* Rebalancing. *)
   let%bind fee_excess_l, fee_excess_r =
@@ -346,7 +360,7 @@ let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
     make_checked (fun () ->
         Token_id.Checked.if_ excess_is_zero
           ~then_:Token_id.(Checked.constant default)
-          ~else_:fee_token_l)
+          ~else_:fee_token_l )
   in
   let%map fee_token_r =
     let%bind excess_is_zero =
@@ -355,7 +369,7 @@ let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
     make_checked (fun () ->
         Token_id.Checked.if_ excess_is_zero
           ~then_:Token_id.(Checked.constant default)
-          ~else_:fee_token_r)
+          ~else_:fee_token_r )
   in
   { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
 
@@ -423,7 +437,7 @@ let%snarkydef combine_checked
       (eliminate_fee_excess_checked
          (fee_token1_l, fee_excess1_l)
          (fee_token1_r, fee_excess1_r)
-         (fee_token2_l, fee_excess2_l))
+         (fee_token2_l, fee_excess2_l) )
   in
   let%bind (fee_token1_l, fee_excess1_l), (fee_token2_r, fee_excess2_r) =
     (* [1l; 2l; 2r] -> [1l; 2r] *)
@@ -431,7 +445,7 @@ let%snarkydef combine_checked
       (eliminate_fee_excess_checked
          (fee_token1_l, fee_excess1_l)
          (fee_token2_l, fee_excess2_l)
-         (fee_token2_r, fee_excess2_r))
+         (fee_token2_r, fee_excess2_r) )
   in
   let%bind { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
     rebalance_checked
@@ -568,7 +582,7 @@ let%test_unit "Checked and unchecked behaviour is consistent" =
               Typ.(typ * typ)
               typ
               (fun (fe1, fe2) -> combine_checked fe1 fe2)
-              (fe1, fe2))
+              (fe1, fe2) )
       in
       match (fe, fe_checked) with
       | Ok fe, Ok fe_checked ->
@@ -576,7 +590,7 @@ let%test_unit "Checked and unchecked behaviour is consistent" =
       | Error _, Error _ ->
           ()
       | _ ->
-          [%test_eq: t Or_error.t] fe fe_checked)
+          [%test_eq: t Or_error.t] fe fe_checked )
 
 let%test_unit "Combine succeeds when the middle excess is zero" =
   Quickcheck.test
@@ -586,7 +600,7 @@ let%test_unit "Combine succeeds when the middle excess is zero" =
           (* The tokens before and after should be distinct. Especially in this
              scenario, we may get an overflow error otherwise.
           *)
-          not (Token_id.equal fe1.fee_token_l tid)))
+          not (Token_id.equal fe1.fee_token_l tid) ))
     ~f:(fun (fe1, tid, excess) ->
       let fe2 =
         if Fee.Signed.(equal zero) fe1.fee_excess_r then of_single (tid, excess)
@@ -595,7 +609,7 @@ let%test_unit "Combine succeeds when the middle excess is zero" =
             of_one_or_two
               (`Two
                 ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
-                , (tid, excess) ))
+                , (tid, excess) ) )
           with
           | Ok fe2 ->
               fe2
@@ -603,6 +617,6 @@ let%test_unit "Combine succeeds when the middle excess is zero" =
               (* The token is the same, and rebalancing causes an overflow. *)
               of_single (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
       in
-      ignore @@ Or_error.ok_exn (combine fe1 fe2))
+      ignore @@ Or_error.ok_exn (combine fe1 fe2) )
 
 [%%endif]

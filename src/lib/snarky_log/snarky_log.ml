@@ -30,7 +30,7 @@ module Constraints (Snarky_backendless : Snark_intf.Basic) = struct
             create_event label
               ~phase:(if start then Measure_start else Measure_end)
               ~timestamp:count
-            :: !rev_events)
+            :: !rev_events )
     in
     List.rev !rev_events
 
@@ -47,7 +47,8 @@ let () = Snarky_log.to_file "output.json" @@
     ~apply_args:(fun mul -> mul Field.one Field.one)
     }] *)
   let log_func ~(input : ('r_value, 'r_value, 'k_var, 'k_value) Data_spec.t)
-      ~(apply_args : 'k_value -> _ Checked.t) (f : 'k_var) : events =
-    let f' = conv (fun c -> c) input f in
+      ~return_typ ~(apply_args : 'k_value -> _ Checked.t) (f : 'k_var) : events
+      =
+    let f' = conv (fun c -> c) input return_typ f in
     log (apply_args f')
 end

@@ -626,7 +626,7 @@ WITH RECURSIVE chain AS (
           ; receiver= User_commands.Extras.receiver extras
           ; fee_token= `Token_id fee_token
           ; token= `Token_id token
-          ; nonce= Unsigned.UInt32.of_int uc.nonce
+          ; nonce= Unsigned.UInt32.of_int64 uc.nonce
           ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
           ; fee= Unsigned.UInt64.of_int64 uc.fee
           ; hash= uc.hash

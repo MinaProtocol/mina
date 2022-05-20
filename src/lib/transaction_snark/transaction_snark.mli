@@ -350,7 +350,7 @@ type local_state =
   ( Stack_frame.value
   , Stack_frame.value list
   , Token_id.t
-  , Currency.Amount.t
+  , Currency.Amount.Signed.t
   , Mina_ledger.Sparse_ledger.t
   , bool
   , unit

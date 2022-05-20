@@ -24,7 +24,7 @@ let check_cmd_output ~prog ~args output =
       (indent
          ( prog ^ " "
          ^ String.concat ~sep:" "
-             (List.map args ~f:(fun arg -> "\"" ^ arg ^ "\"")) )) ;
+             (List.map args ~f:(fun arg -> "\"" ^ arg ^ "\"")) ) ) ;
     print_endline "=== STDOUT ===" ;
     print_endline (indent output.stdout) ;
     print_endline "=== STDERR ===" ;
@@ -100,7 +100,7 @@ module Make (Engine : Intf.Engine.S) = struct
 
   let pub_key_of_node =
     make_get_key ~f:(fun nk ->
-        nk.keypair.public_key |> Signature_lib.Public_key.compress)
+        nk.keypair.public_key |> Signature_lib.Public_key.compress )
 
   let priv_key_of_node = make_get_key ~f:(fun nk -> nk.keypair.private_key)
 
@@ -150,13 +150,13 @@ module Make (Engine : Intf.Engine.S) = struct
         let acc = G.add_vertex acc x in
         List.fold xs ~init:acc ~f:(fun acc y ->
             let acc = G.add_vertex acc y in
-            G.add_edge acc x y))
+            G.add_edge acc x y ) )
 
   let fetch_connectivity_data ~logger nodes =
     let open Malleable_error.Let_syntax in
     Malleable_error.List.map nodes ~f:(fun node ->
         let%map response = Engine.Network.Node.must_get_peer_id ~logger node in
-        (node, response))
+        (node, response) )
 
   let assert_peers_completely_connected nodes_and_responses =
     (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
@@ -177,7 +177,7 @@ module Make (Engine : Intf.Engine.S) = struct
           in
           Malleable_error.ok_if_true
             (List.mem connected_peers p ~equal:String.equal)
-            ~error_type:`Hard ~error)
+            ~error_type:`Hard ~error )
     in
 
     let nodes_by_peer_id =
@@ -188,7 +188,7 @@ module Make (Engine : Intf.Engine.S) = struct
     Malleable_error.List.iter nodes_and_responses
       ~f:(fun (_, (peer_id, connected_peers)) ->
         check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
-          ~connected_peers)
+          ~connected_peers )
 
   let assert_peers_cant_be_partitioned ~max_disconnections nodes_and_responses =
     (* this check checks that the network does NOT become partitioned into isolated subgraphs, even if n nodes are hypothetically removed from the network.*)
@@ -196,7 +196,7 @@ module Make (Engine : Intf.Engine.S) = struct
     let open Graph_algorithms in
     let () =
       Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
-          G.output_graph c (graph_of_adjacency_list responses))
+          G.output_graph c (graph_of_adjacency_list responses) )
     in
     (* Check that the network cannot be disconnected by removing up to max_disconnections number of nodes. *)
     match

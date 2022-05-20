@@ -1,4 +1,4 @@
-open Mina_transition
+open Mina_block
 open Core_kernel
 open Mina_base
 module Breadcrumb = Transition_frontier.Breadcrumb
@@ -21,6 +21,8 @@ module Transition_frontier = struct
         ; accounts_accessed : (int * Mina_base.Account.Stable.Latest.t) list
         ; accounts_created :
             (Account_id.Stable.Latest.t * Currency.Fee.Stable.Latest.t) list
+        ; tokens_used :
+            (Token_id.Stable.Latest.t * Account_id.Stable.Latest.t option) list
         ; sender_receipt_chains_from_parent_ledger :
             (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             list
@@ -54,7 +56,7 @@ module Builder = struct
       let senders =
         commands
         |> List.map ~f:(fun { data; _ } ->
-               User_command.(fee_payer (forget_check data)))
+               User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       Set.to_list senders
@@ -67,20 +69,20 @@ module Builder = struct
                let%map { receipt_chain_hash; _ } =
                  Mina_ledger.Ledger.get ledger ledger_location
                in
-               (sender, receipt_chain_hash)))
+               (sender, receipt_chain_hash)) )
     in
     let block_with_hash = Mina_block.Validated.forget validated_block in
     let block = With_hash.data block_with_hash in
+    let account_ids_accessed = Mina_block.account_ids_accessed block in
     let accounts_accessed =
-      let account_ids_accessed = Mina_block.account_ids_accessed block in
       List.filter_map account_ids_accessed ~f:(fun acct_id ->
           (* an accessed account may not be the ledger *)
           let%bind.Option index =
             Option.try_with (fun () ->
-                Mina_ledger.Ledger.index_of_account_exn ledger acct_id)
+                Mina_ledger.Ledger.index_of_account_exn ledger acct_id )
           in
           let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
-          Some (index, account))
+          Some (index, account) )
     in
     let accounts_created =
       let account_creation_fee =
@@ -92,13 +94,23 @@ module Builder = struct
       in
       List.map
         (Staged_ledger.latest_block_accounts_created staged_ledger
-           ~previous_block_state_hash) ~f:(fun acct_id ->
-          (acct_id, account_creation_fee))
+           ~previous_block_state_hash ) ~f:(fun acct_id ->
+          (acct_id, account_creation_fee) )
+    in
+    let tokens_used =
+      let unique_tokens =
+        List.map account_ids_accessed ~f:Account_id.token_id
+        |> List.dedup_and_sort ~compare:Token_id.compare
+      in
+      List.map unique_tokens ~f:(fun token_id ->
+          let owner = Mina_ledger.Ledger.token_owner ledger token_id in
+          (token_id, owner) )
     in
     Transition_frontier.Breadcrumb_added
       { block = With_hash.map ~f:External_transition.compose block_with_hash
       ; accounts_accessed
       ; accounts_created
+      ; tokens_used
       ; sender_receipt_chains_from_parent_ledger
       }
 

@@ -84,7 +84,7 @@ let send_node_status_data ~logger ~url node_status_data =
     Async.try_with (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-          url)
+          url )
   with
   | Ok ({ status; _ }, body) ->
       let metadata =
@@ -170,7 +170,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
         | Full catchup_tree ->
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree)
+                 catchup_tree )
         | _ ->
             None
       in
@@ -339,7 +339,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                         Time.to_string (Block_time.to_time received_at)
                     ; is_valid = false
                     ; reason_for_rejection = Some reason_for_rejection
-                    })
+                    } )
                 @ List.map (Queue.to_list Transition_frontier.validated_blocks)
                     ~f:(fun (hash, sender, received_at) ->
                       { hash
@@ -348,7 +348,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                           Time.to_string (Block_time.to_time received_at)
                       ; is_valid = true
                       ; reason_for_rejection = None
-                      })
+                      } )
             }
           in
           reset_gauges () ;

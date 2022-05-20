@@ -113,8 +113,8 @@ end
 
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
-let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
-    (most_recent_width : r Nat.t) : (w, h) t =
+let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t)
+    : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -139,7 +139,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             ; sponge_digest_before_evaluations =
                 Digest.Constant.of_tock_field Tock.Field.zero
             ; me_only =
-                { sg = Lazy.force Dummy.Ipa.Step.sg
+                { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
                 ; old_bulletproof_challenges =
                     Vector.init h ~f:(fun _ -> Dummy.Ipa.Wrap.challenges)
                 }
@@ -149,11 +149,11 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             ; old_bulletproof_challenges =
                 (* Not sure if this should be w or h honestly ...*)
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Dummy.Ipa.Step.challenges)
+                    Dummy.Ipa.Step.challenges )
                 (* TODO: Should this be wrap? *)
-            ; sg =
+            ; challenge_polynomial_commitments =
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Lazy.force Dummy.Ipa.Wrap.sg)
+                    Lazy.force Dummy.Ipa.Wrap.sg )
             }
         }
     ; proof =
@@ -169,7 +169,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 ; z_1 = Ro.tock ()
                 ; z_2 = Ro.tock ()
                 ; delta = g0
-                ; sg = g0
+                ; challenge_polynomial_commitment = g0
                 }
             ; evals =
                 Tuple_lib.Double.map Dummy.evals.evals ~f:(fun e -> e.evals)
@@ -187,11 +187,11 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
            ; evals = e ()
            }
          in
-         { ft_eval1 = tick (); evals = (ex (), ex ()) })
+         { ft_eval1 = tick (); evals = (ex (), ex ()) } )
     }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
-  module Max_branching_at_most = At_most.With_length (W)
+  module Max_proofs_verified_at_most = At_most.With_length (W)
   module MLMB_vec = Nvector (MLMB)
 
   module Repr = struct
@@ -200,10 +200,10 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         , Reduced_me_only.Wrap.Challenges_vector.t MLMB_vec.t )
         Types.Wrap.Proof_state.Me_only.t
       , ( unit
-        , Tock.Curve.Affine.t Max_branching_at_most.t
+        , Tock.Curve.Affine.t Max_proofs_verified_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
-          Max_branching_at_most.t )
+          Max_proofs_verified_at_most.t )
         Base.Me_only.Step.t )
       Base.Wrap.t
     [@@deriving compare, sexp, yojson, hash, equal]
@@ -212,13 +212,19 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   type nonrec t = (W.n, MLMB.n) t
 
   let to_repr (T t) : Repr.t =
-    let lte = Nat.lte_exn (Vector.length t.statement.pass_through.sg) W.n in
+    let lte =
+      Nat.lte_exn
+        (Vector.length t.statement.pass_through.challenge_polynomial_commitments)
+        W.n
+    in
     { t with
       statement =
         { t.statement with
           pass_through =
             { t.statement.pass_through with
-              sg = At_most.of_vector t.statement.pass_through.sg lte
+              challenge_polynomial_commitments =
+                At_most.of_vector
+                  t.statement.pass_through.challenge_polynomial_commitments lte
             ; old_bulletproof_challenges =
                 At_most.of_vector
                   t.statement.pass_through.old_bulletproof_challenges lte
@@ -227,19 +233,27 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
     }
 
   let of_repr (r : Repr.t) : t =
-    let (Vector.T sg) = At_most.to_vector r.statement.pass_through.sg in
+    let (Vector.T challenge_polynomial_commitments) =
+      At_most.to_vector
+        r.statement.pass_through.challenge_polynomial_commitments
+    in
     let (Vector.T old_bulletproof_challenges) =
       At_most.to_vector r.statement.pass_through.old_bulletproof_challenges
     in
     let T =
-      Nat.eq_exn (Vector.length sg) (Vector.length old_bulletproof_challenges)
+      Nat.eq_exn
+        (Vector.length challenge_polynomial_commitments)
+        (Vector.length old_bulletproof_challenges)
     in
     T
       { r with
         statement =
           { r.statement with
             pass_through =
-              { r.statement.pass_through with sg; old_bulletproof_challenges }
+              { r.statement.pass_through with
+                challenge_polynomial_commitments
+              ; old_bulletproof_challenges
+              }
           }
       }
 
@@ -251,15 +265,16 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
 
   let hash t = Repr.hash (to_repr t)
 
-  include Sexpable.Of_sexpable
-            (Repr)
-            (struct
-              type nonrec t = t
+  include
+    Sexpable.Of_sexpable
+      (Repr)
+      (struct
+        type nonrec t = t
 
-              let to_sexpable = to_repr
+        let to_sexpable = to_repr
 
-              let of_sexpable = of_repr
-            end)
+        let of_sexpable = of_repr
+      end)
 
   let to_base64 t =
     (* assume call to Nat.lte_exn does not raise with a valid instance of t *)
@@ -286,7 +301,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         Error "Invalid json for proof. Expecting base64 encoded string"
 end
 
-module Branching_2 = struct
+module Proofs_verified_2 = struct
   module T = Make (Nat.N2) (Nat.N2)
 
   module Repr = struct
@@ -336,22 +351,23 @@ module Branching_2 = struct
 
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
-      include Binable.Of_binable
-                (Repr.Stable.V2)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Repr.Stable.V2)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_repr
+            let to_binable = to_repr
 
-                  let of_binable = of_repr
-                end)
+            let of_binable = of_repr
+          end)
     end
   end]
 
   include (T : module type of T with module Repr := T.Repr)
 end
 
-module Branching_max = struct
+module Proofs_verified_max = struct
   module T =
     Make
       (Side_loaded_verification_key.Width.Max)
@@ -405,15 +421,16 @@ module Branching_max = struct
 
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
-      include Binable.Of_binable
-                (Repr.Stable.V2)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Repr.Stable.V2)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_repr
+            let to_binable = to_repr
 
-                  let of_binable = of_repr
-                end)
+            let of_binable = of_repr
+          end)
     end
   end]
 

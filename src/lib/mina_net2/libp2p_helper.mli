@@ -11,7 +11,7 @@ val spawn :
   -> handle_push_message:
        (   t
         -> Libp2p_ipc.Reader.DaemonInterface.PushMessage.unnamed_union_t
-        -> unit Deferred.t)
+        -> unit Deferred.t )
   -> t Deferred.Or_error.t
 
 val shutdown : t -> unit Deferred.t

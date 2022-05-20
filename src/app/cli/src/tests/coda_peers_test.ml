@@ -58,8 +58,8 @@ let main () =
                ~of_:
                  (S.of_list
                     ( peers
-                    |> List.map ~f:(fun p -> p.Network_peer.Peer.libp2p_port) ))
-               (S.of_list expected_peer_ports) )))
+                    |> List.map ~f:(fun p -> p.Network_peer.Peer.libp2p_port) ) )
+               (S.of_list expected_peer_ports) ) ) )
   in
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 

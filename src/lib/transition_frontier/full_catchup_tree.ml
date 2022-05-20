@@ -2,7 +2,6 @@ open Core
 open Async
 open Cache_lib
 open Mina_base
-open Mina_transition
 open Network_peer
 open Mina_numbers
 
@@ -19,7 +18,7 @@ module Attempt_history = struct
   let to_yojson (t : t) =
     `Assoc
       (List.map (Map.to_alist t) ~f:(fun (peer, a) ->
-           (Peer.to_multiaddr_string peer, Attempt.to_yojson a)))
+           (Peer.to_multiaddr_string peer, Attempt.to_yojson a) ) )
 
   let empty : t = Peer.Map.empty
 end
@@ -119,14 +118,14 @@ let add_state states (node : Node.t) =
     | None ->
         State_hash.Set.singleton node.state_hash
     | Some hashes ->
-        State_hash.Set.add hashes node.state_hash)
+        State_hash.Set.add hashes node.state_hash )
 
 let remove_state states (node : Node.t) =
   Hashtbl.update states (Node.State.enum node.state) ~f:(function
     | None ->
         State_hash.Set.empty
     | Some hashes ->
-        State_hash.Set.remove hashes node.state_hash)
+        State_hash.Set.remove hashes node.state_hash )
 
 (* Invariant: The length of the path from each best tip to its oldest
    ancestor is at most k *)
@@ -149,7 +148,7 @@ let tear_down { nodes; states; _ } =
       | To_initial_validate _
       | To_verify _
       | To_build_breadcrumb _ ->
-          Ivar.fill_if_empty x.result (Error x.attempts)) ;
+          Ivar.fill_if_empty x.result (Error x.attempts) ) ;
   Hashtbl.clear nodes ;
   Hashtbl.clear states
 
@@ -174,7 +173,7 @@ let to_yojson =
   fun (t : t) ->
     T.to_yojson
     @@ List.map (Hashtbl.to_alist t.states) ~f:(fun (state, hashes) ->
-           (state, (State_hash.Set.length hashes, State_hash.Set.to_list hashes)))
+           (state, (State_hash.Set.length hashes, State_hash.Set.to_list hashes)) )
 
 type job_states =
   { finished : int
@@ -216,7 +215,7 @@ let to_node_status_report (t : t) =
       | To_build_breadcrumb ->
           { acc with to_build_breadcrumb = n }
       | Root ->
-          acc)
+          acc )
 
 let max_catchup_chain_length (t : t) =
   (* Find the longest directed path *)
@@ -246,7 +245,7 @@ let max_catchup_chain_length (t : t) =
         n
   in
   Hashtbl.fold t.nodes ~init:0 ~f:(fun ~key:_ ~data acc ->
-      Int.max acc (longest_starting_at data))
+      Int.max acc (longest_starting_at data) )
 
 let create_node_full t b : unit =
   let h = Breadcrumb.state_hash b in
@@ -323,11 +322,11 @@ let prune t ~root_hash =
           | None ->
               false
           | Some parent ->
-              reachable_from_root parent)
+              reachable_from_root parent )
   in
   let to_remove =
     Hashtbl.fold t.nodes ~init:[] ~f:(fun ~key:_ ~data acc ->
-        if reachable_from_root data then acc else data :: acc)
+        if reachable_from_root data then acc else data :: acc )
   in
   List.iter to_remove ~f:(remove_node' t)
 
@@ -348,7 +347,7 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
              leak" ;
           () )
     | E (Best_tip_changed _) ->
-        ())
+        () )
 
 let create ~root =
   let t =

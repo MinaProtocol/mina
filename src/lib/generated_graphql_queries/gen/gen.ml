@@ -61,6 +61,6 @@ let structure ~loc =
 let main () =
   Out_channel.with_file "generated_graphql_queries.ml" ~f:(fun ml_file ->
       let fmt = Format.formatter_of_out_channel ml_file in
-      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none)))
+      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none)) )
 
 let () = main ()

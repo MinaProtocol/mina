@@ -24,7 +24,7 @@ module Max_block_height = struct
         Mina_metrics.(
           Gauge.set
             (Archive.max_block_height metric_server)
-            (Float.of_int max_height)))
+            (Float.of_int max_height)) )
 end
 
 module Missing_blocks = struct
@@ -38,7 +38,7 @@ module Missing_blocks = struct
         LEFT JOIN blocks b 
         ON h = b.height WHERE b.height IS NULL) as v
       |sql}
-         missing_blocks_width)
+         missing_blocks_width )
 
   let update ~missing_blocks_width (module Conn : Caqti_async.CONNECTION)
       metric_server =
@@ -48,7 +48,7 @@ module Missing_blocks = struct
         Mina_metrics.(
           Gauge.set
             (Archive.missing_blocks metric_server)
-            (Float.of_int missing_blocks)))
+            (Float.of_int missing_blocks)) )
 end
 
 module Unparented_blocks = struct
@@ -68,19 +68,19 @@ module Unparented_blocks = struct
         Mina_metrics.(
           Gauge.set
             (Archive.unparented_blocks metric_server)
-            (Float.of_int unparented_block_count)))
+            (Float.of_int unparented_block_count)) )
 end
 
 let log_error ~logger pool metric_server
     (f :
          (module Caqti_async.CONNECTION)
       -> Mina_metrics.Archive.t
-      -> (unit, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t) =
+      -> (unit, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t ) =
   let open Deferred.Let_syntax in
   match%map
     Caqti_async.Pool.use
       (fun (module Conn : Caqti_async.CONNECTION) ->
-        f (module Conn) metric_server)
+        f (module Conn) metric_server )
       pool
   with
   | Ok () ->
@@ -96,4 +96,4 @@ let update ~logger ~missing_blocks_width pool metric_server =
        [ Max_block_height.update
        ; Unparented_blocks.update
        ; Missing_blocks.update ~missing_blocks_width
-       ])
+       ] )

@@ -82,14 +82,15 @@ struct
              if match query with What_contents _ -> true | _ -> false then
                Clock_ns.after
                  (Time_ns.Span.randomize (Time_ns.Span.of_ms 0.2)
-                    ~percent:(Percent.of_percentage 20.))
+                    ~percent:(Percent.of_percentage 20.) )
              else Deferred.unit
            in
-           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ))) ;
+           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ) )
+      ) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
           Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
-              true))
+              true ) )
     with
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
@@ -141,18 +142,18 @@ struct
                    (!desired_root, query, Envelope.Incoming.local answ)
              in
              ctr := !ctr + 1 ;
-             res)) ;
+             res ) ) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
           Sync_ledger.fetch lsync !desired_root ~data:() ~equal:(fun () () ->
-              true))
+              true ) )
     with
     | `Ok _ ->
         failwith "shouldn't happen"
     | `Target_changed _ -> (
         match
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Sync_ledger.wait_until_valid lsync !desired_root)
+              Sync_ledger.wait_until_valid lsync !desired_root )
         with
         | `Ok mt ->
             [%test_result: Root_hash.t] ~expect:(Ledger.merkle_root l3)
@@ -232,7 +233,7 @@ module Db = struct
             let account = Account.create aid currency_balance in
             ignore
               ( get_or_create_account ledger aid account |> Or_error.ok_exn
-                : [ `Added | `Existed ] * Location.t )) ;
+                : [ `Added | `Existed ] * Location.t ) ) ;
         (ledger, account_ids)
     end
 
@@ -338,7 +339,7 @@ module Mask = struct
               Maskable.get_or_create_account maskable account_id account
               |> Or_error.ok_exn
             in
-            assert ([%equal: [ `Added | `Existed ]] action `Added)) ;
+            assert ([%equal: [ `Added | `Existed ]] action `Added) ) ;
         let mask = Mask.create ~depth:Input.depth () in
         let attached_mask = Maskable.register_mask maskable mask in
         (* On the mask, all the children will have different values *)
@@ -366,7 +367,7 @@ module Mask = struct
                 | `Existed ->
                     Mask.Attached.set attached_mask location account
                 | `Added ->
-                    failwith "Expected to re-use an existing account") ;
+                    failwith "Expected to re-use an existing account" ) ;
             construct_layered_masks (iter - 1) (child_balance / 2) attached_mask
         in
         ( construct_layered_masks Input.mask_layers initial_balance_multiplier
