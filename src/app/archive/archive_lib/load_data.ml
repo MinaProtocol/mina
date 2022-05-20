@@ -455,7 +455,7 @@ let get_other_party_body ~pool body_id =
       match String.split balance_change ~on:'-' with
       | [ s ] ->
           (Currency.Amount.of_string s, Sgn.Pos)
-      | [ _; s ] ->
+      | [ ""; s ] ->
           (Currency.Amount.of_string s, Sgn.Neg)
       | _ ->
           failwith "Ill-formatted string for balance change"
