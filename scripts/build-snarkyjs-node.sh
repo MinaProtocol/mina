@@ -1,6 +1,10 @@
 SNARKY_JS_PATH=$1
 [ -z "$SNARKY_JS_PATH" ] && SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
+pushd "$SNARKY_JS_PATH"
+  [ -d node_modules ] || npm i
+popd
+
 dune b src/lib/crypto/kimchi_bindings/js/node_js \
 && dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js src/lib/snarky_js_bindings/snarkyjs/src/snarky/gen/js-layout.ts || exit 1
 
@@ -17,7 +21,4 @@ sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw 
 sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
 sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
 
-pushd "$SNARKY_JS_PATH"
-  [ -d node_modules ] || npm i
-  npm run build -- --bindings=./dist/server/node_bindings/
-popd
+npm run --prefix="$SNARKY_JS_PATH" build -- --bindings=./dist/server/node_bindings/
