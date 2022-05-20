@@ -1563,4 +1563,135 @@ let%test_module "account timing check" =
                   ~state_view ledger parties
               in
               check_zkapp_failure Transaction_status.Failure.Overflow result ) )
+
+    let%test_unit "zkApp command, create timed account with wrong authorization"
+        =
+      Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
+      (*
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let open Async.Deferred.Let_syntax in
+      *)
+      let ledger_init_state =
+        List.map keypairs ~f:(fun keypair ->
+            let balance = Currency.Amount.of_int 100_000_000_000_000 in
+            let nonce = Mina_numbers.Account_nonce.zero in
+            (keypair, balance, nonce, Account_timing.Untimed) )
+        |> Array.of_list
+      in
+      let sender_keypair = List.hd_exn keypairs in
+      let zkapp_keypair = Signature_lib.Keypair.create () in
+      (*
+          let (update_perm_spec : Transaction_snark.For_tests.Spec.t) =
+            { sender = (sender_keypair, Account.Nonce.zero)
+            ; fee = Currency.Fee.of_int 1_000_000
+            ; fee_payer = None
+            ; receivers = []
+            ; amount = Currency.Amount.zero
+            ; zkapp_account_keypairs = []
+            ; memo =
+                Signed_command_memo.create_from_string "zkApp update perm"
+                |> Or_error.ok_exn
+            ; new_zkapp_account = false
+            ; snapp_update =
+                { Party.Update.dummy with
+                  permissions = Zkapp_basic.Set_or_keep.Set Permissions.empty
+                }
+            ; current_auth = Permissions.Auth_required.Signature
+            ; call_data = Snark_params.Tick.Field.zero
+            ; events = []
+            ; sequence_events = []
+            ; protocol_state_precondition = None
+            ; account_precondition = None
+            }
+          in
+          let%map update_perm_parties =
+            Transaction_snark.For_tests.update_states ~constraint_constants
+              update_perm_spec
+          in
+          *)
+      let (create_timed_account_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (sender_keypair, Account.Nonce.zero)
+        ; fee = Currency.Fee.of_int 1_000_000
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.of_int 50_000_000_000_000
+        ; zkapp_account_keypairs = [ zkapp_keypair ]
+        ; memo =
+            Signed_command_memo.create_from_string_exn
+              "zkApp create timed account"
+        ; new_zkapp_account = true
+        ; snapp_update =
+            (let timing =
+               Zkapp_basic.Set_or_keep.Set
+                 ( { initial_minimum_balance =
+                       Currency.Balance.of_int 1_000_000_000
+                   ; cliff_time = Mina_numbers.Global_slot.of_int 10
+                   ; cliff_amount = Currency.Amount.of_int 1_000_000_000
+                   ; vesting_period = Mina_numbers.Global_slot.of_int 10
+                   ; vesting_increment = Currency.Amount.of_int 1_000_000_000
+                   }
+                   : Party.Update.Timing_info.value )
+             in
+             { Party.Update.dummy with timing } )
+        ; current_auth = Permissions.Auth_required.Proof
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
+        }
+      in
+      let timing_account_id =
+        Account_id.create
+          (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
+          Token_id.default
+      in
+      let create_timed_account_parties, _, _, _ =
+        ( Transaction_snark.For_tests.deploy_snapp ~no_auth:true
+            ~constraint_constants create_timed_account_spec
+        , timing_account_id
+        , create_timed_account_spec.snapp_update
+        , zkapp_keypair )
+      in
+      let gen =
+        Quickcheck.Generator.return
+          ( ledger_init_state (*, update_perm_parties*)
+          , create_timed_account_parties )
+      in
+      Quickcheck.test
+        ~seed:
+          (`Deterministic
+            "zkapp command, create timed account with wrong authorization" )
+        ~sexp_of:
+          [%sexp_of:
+            Mina_ledger.Ledger.init_state (* * Parties.t *) * Parties.t]
+        ~trials:1 gen
+        ~f:(fun
+             ( ledger_init_state (*, update_perm_parties*)
+             , create_timed_account_parties )
+           ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              let state_view =
+                Transaction_snark_tests.Util.genesis_state_view
+              in
+              (*
+                  match
+                    Mina_ledger.Ledger.apply_parties_unchecked ~state_view
+                      ~constraint_constants ledger update_perm_parties
+                  with
+                  | Error _ ->
+                      failwith "update permissions failed"
+                  | Ok _ ->
+                  *)
+              let result =
+                Mina_ledger.Ledger.apply_parties_unchecked ~state_view
+                  ~constraint_constants ledger create_timed_account_parties
+              in
+              check_zkapp_failure
+                Transaction_status.Failure
+                .Creation_of_timed_account_without_signature result ) )
   end )

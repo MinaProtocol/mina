@@ -1080,6 +1080,11 @@ module Make (Inputs : Inputs_intf) = struct
       let timing = Party.Update.timing party in
       let local_state =
         Local_state.add_check local_state
+          Creation_of_timed_account_without_signature
+          Bool.(Set_or_keep.is_keep timing ||| signature_verifies)
+      in
+      let local_state =
+        Local_state.add_check local_state
           Update_not_permitted_timing_existing_account
           Bool.(account_is_new ||| Set_or_keep.is_keep timing)
       in
