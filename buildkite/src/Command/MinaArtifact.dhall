@@ -93,20 +93,20 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         in
 
-        DockerImage.generateStep archiveSpec,
+        DockerImage.generateStep archiveSpec
 
-        -- rosetta image
-        let rosettaSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOnGitEnv,
-          service="mina-rosetta",
-          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
-        }
+        -- TODO: Re-enable when we can pin a known working install for Rosetta
+        --let rosettaSpec = DockerImage.ReleaseSpec::{
+          --deps=DebianVersions.dependsOnGitEnv,
+          --service="mina-rosetta",
+          --extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
+          --deb_codename="${DebianVersions.lowerName debVersion}",
+          --step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
+        --}
 
-        in
+        --in
 
-        DockerImage.generateStep rosettaSpec
+        --DockerImage.generateStep rosettaSpec
 
       ]
     }
