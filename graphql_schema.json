@@ -12953,52 +12953,6 @@
               "deprecationReason": null
             },
             {
-              "name": "accountMerklePath",
-              "description": "Get the merkle path for an account",
-              "args": [
-                {
-                  "name": "token",
-                  "description":
-                    "Token of account being retrieved (defaults to MINA)",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "TokenId",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "publicKey",
-                  "description": "Public key of account being retrieved",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "LIST",
-                "name": null,
-                "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "OBJECT",
-                    "name": "MerklePathElement",
-                    "ofType": null
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "tokenOwner",
               "description": "Find the account ID that owns a given token",
               "args": [

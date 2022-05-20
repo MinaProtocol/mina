@@ -3882,25 +3882,6 @@ module Queries = struct
             Types.AccountObj.Partial_account.of_full_account ~breadcrumb account
             |> Types.AccountObj.lift coda pk ) )
 
-  let account_merkle_path =
-    field "accountMerklePath" ~doc:"Get the merkle path for an account"
-      ~typ:(list (non_null Types.merkle_path_element))
-      ~args:
-        Arg.
-          [ arg "publicKey" ~doc:"Public key of account being retrieved"
-              ~typ:(non_null Types.Input.public_key_arg)
-          ; arg' "token"
-              ~doc:"Token of account being retrieved (defaults to MINA)"
-              ~typ:Types.Input.token_id_arg ~default:Token_id.default
-          ]
-      ~resolve:(fun { ctx = mina; _ } () pk token ->
-        let open Option.Let_syntax in
-        let%bind ledger, _breadcrumb = get_ledger_and_breadcrumb mina in
-        let%map location =
-          Ledger.location_of_account ledger (Account_id.create pk token)
-        in
-        Ledger.merkle_path ledger location )
-
   let accounts_for_pk =
     field "accounts" ~doc:"Find all accounts for a public key"
       ~typ:(non_null (list (non_null Types.AccountObj.account)))
@@ -4407,7 +4388,6 @@ module Queries = struct
     ; connection_gating_config
     ; account
     ; accounts_for_pk
-    ; account_merkle_path
     ; token_owner
     ; token_accounts
     ; current_snark_worker
