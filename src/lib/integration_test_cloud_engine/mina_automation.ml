@@ -187,7 +187,6 @@ module Network_config = struct
               ; set_token_symbol = None
               ; increment_nonce = None
               ; set_voting_for = None
-              ; set_timing = None
               }
           in
           let default = Runtime_config.Accounts.Single.default in

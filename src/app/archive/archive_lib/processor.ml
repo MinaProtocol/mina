@@ -402,14 +402,12 @@ module Zkapp_permissions = struct
     ; set_token_symbol : Permissions.Auth_required.t
     ; increment_nonce : Permissions.Auth_required.t
     ; set_voting_for : Permissions.Auth_required.t
-    ; set_timing : Permissions.Auth_required.t
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       [ auth_required_typ
-      ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
@@ -437,7 +435,6 @@ module Zkapp_permissions = struct
       ; set_token_symbol = perms.set_token_symbol
       ; increment_nonce = perms.increment_nonce
       ; set_voting_for = perms.set_voting_for
-      ; set_timing = perms.set_timing
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)

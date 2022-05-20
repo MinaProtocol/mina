@@ -71,7 +71,6 @@ let parties_with_ledger () =
       ; set_token_symbol = Either
       ; increment_nonce = Either
       ; set_voting_for = Either
-      ; set_timing = Either
       }
     in
     let verification_key =

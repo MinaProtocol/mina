@@ -463,8 +463,6 @@ module type Account_intf = sig
 
     val set_voting_for : t -> controller
 
-    val set_timing : t -> controller
-
     include Iffable with type bool := bool
   end
 
