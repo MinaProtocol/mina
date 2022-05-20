@@ -109,7 +109,6 @@ module Js_layout = struct
     obj
 
   let with_checked ~name (x : _ Input.t) (obj : _ Input.t) =
-    (* TODO: how to tell the type checker that obj#js_layout is of variant `Assoc? *)
     match !(obj#js_layout) with
     | `Assoc layout ->
         obj#js_layout :=

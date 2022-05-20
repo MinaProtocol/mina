@@ -39,3 +39,10 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version)))
+
+(rule
+ (targets jsLayout.json)
+ (action
+  (with-stdout-to
+   jsLayout.json
+   (run %{exe:./snarky_js_types.exe}))))
