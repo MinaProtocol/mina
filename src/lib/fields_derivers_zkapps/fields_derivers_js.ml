@@ -19,8 +19,6 @@ module Js_layout = struct
       constraint 'a t = 'a Input.t
   end
 
-  let leaftype (s : string) = `Assoc [ ("type", `String s) ]
-
   let docs (s : Fields_derivers.Annotations.Fields.T.t) : Yojson.Safe.t =
     match s.doc with Some t -> `String t | None -> `Null
 
@@ -62,21 +60,55 @@ module Js_layout = struct
         ] ;
     obj
 
+  type leaf_type =
+    | String
+    | Number
+    | Null
+    | Field
+    | Bool
+    | UInt32
+    | UInt64
+    | PublicKey
+    | Custom of string
+
+  let leaf_type_to_string = function
+    | String ->
+        "string"
+    | Number ->
+        "number"
+    | Null ->
+        "null"
+    | Field ->
+        "Field"
+    | Bool ->
+        "Bool"
+    | UInt32 ->
+        "UInt32"
+    | UInt64 ->
+        "UInt64"
+    | PublicKey ->
+        "PublicKey"
+    | Custom s ->
+        s
+
+  let leaf_type (s : leaf_type) =
+    `Assoc [ ("type", `String (leaf_type_to_string s)) ]
+
   let skip obj =
     obj#skip := true ;
-    obj#js_layout := leaftype "null" ;
+    obj#js_layout := leaf_type Null ;
     obj
 
   let int obj =
-    obj#js_layout := leaftype "number" ;
+    obj#js_layout := leaf_type Number ;
     obj
 
   let string obj =
-    obj#js_layout := leaftype "StringWithHash" ;
+    obj#js_layout := leaf_type String ;
     obj
 
   let bool obj =
-    obj#js_layout := leaftype "Bool" ;
+    obj#js_layout := leaf_type Bool ;
     obj
 
   let list x obj : _ Input.t =

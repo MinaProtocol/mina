@@ -185,13 +185,9 @@ module Numeric = struct
   module Derivers = struct
     open Fields_derivers_zkapps.Derivers
 
-    let token_id_inner obj =
-      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
-        ~of_string:Token_id.of_string
-
     let block_time_inner obj =
       let ( ^^ ) = Fn.compose in
-      iso_string ~name:"BlockTime"
+      iso_string ~name:"BlockTime" ~js_type:UInt64
         ~of_string:(Block_time.of_uint64 ^^ Unsigned_extended.UInt64.of_string)
         ~to_string:(Unsigned_extended.UInt64.to_string ^^ Block_time.to_uint64)
         obj
@@ -206,7 +202,7 @@ module Numeric = struct
 
     let global_slot obj = deriver "GlobalSlot" uint32 obj
 
-    let token_id obj = deriver "TokenId" token_id_inner obj
+    let token_id obj = deriver "TokenId" Token_id.deriver obj
 
     let block_time obj = deriver "BlockTime" block_time_inner obj
   end

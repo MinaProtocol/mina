@@ -26,7 +26,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let to_json_accumulator = ref [] in
     let of_json_creator = ref String.Map.empty in
 
-    let js_layout = ref (`String "UNALTERED") in
+    let js_layout = ref (`Assoc []) in
     let js_layout_accumulator = ref [] in
 
     let contramap = ref (fun _ -> failwith "unimplemented") in
@@ -84,7 +84,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
       constraint 'a = _ Fields_derivers_js.Js_layout.Input.t
   end
 
-  let yojson obj ?doc ~name ~map ~contramap : _ Unified_input.t =
+  let yojson obj ?doc ~name ~js_type ~map ~contramap : _ Unified_input.t =
     (obj#graphql_fields :=
        let open Schema in
        Graphql.Fields.Input.T.
@@ -114,7 +114,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     obj#map := map ;
 
-    obj#js_layout := Fields_derivers_js.Js_layout.leaftype name ;
+    obj#js_layout := Fields_derivers_js.Js_layout.leaf_type js_type ;
 
     Fields_derivers_graphql.Graphql_query.scalar obj
 
@@ -132,9 +132,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
   let except ~f v x = try f x with _ -> raise (Invalid_rich_scalar v)
 
-  let iso_string ?doc obj ~(to_string : 'a -> string)
-      ~(of_string : string -> 'a) ~name =
-    yojson obj ?doc ~name
+  let iso_string ?doc ~name ~js_type obj ~(to_string : 'a -> string)
+      ~(of_string : string -> 'a) =
+    yojson obj ?doc ~name ~js_type
       ~map:(function
         | `String x ->
             of_string x
@@ -146,22 +146,22 @@ module Make (Schema : Graphql_intf.Schema) = struct
   let uint64 obj : _ Unified_input.t =
     iso_string obj
       ~doc:"Unsigned 64-bit integer represented as a string in base10"
-      ~name:"UInt64" ~to_string:Unsigned.UInt64.to_string
+      ~name:"UInt64" ~js_type:UInt64 ~to_string:Unsigned.UInt64.to_string
       ~of_string:(except ~f:Unsigned.UInt64.of_string `Uint)
 
   let uint32 obj : _ Unified_input.t =
     iso_string obj
       ~doc:"Unsigned 32-bit integer represented as a string in base10"
-      ~name:"UInt32" ~to_string:Unsigned.UInt32.to_string
+      ~name:"UInt32" ~js_type:UInt32 ~to_string:Unsigned.UInt32.to_string
       ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
 
   let field obj : _ Unified_input.t =
-    iso_string obj ~name:"Field" ~doc:"String representing an Fp Field element"
-      ~to_string:Field.to_string
+    iso_string obj ~name:"Field" ~js_type:Field
+      ~doc:"String representing an Fp Field element" ~to_string:Field.to_string
       ~of_string:(except ~f:Field.of_string `Field)
 
   let public_key obj : _ Unified_input.t =
-    iso_string obj ~name:"PublicKey"
+    iso_string obj ~name:"PublicKey" ~js_type:PublicKey
       ~doc:"String representing a public key in base58"
       ~to_string:Signature_lib.Public_key.Compressed.to_string
       ~of_string:
@@ -201,15 +201,18 @@ module Make (Schema : Graphql_intf.Schema) = struct
     Fields_derivers_json.Of_yojson.bool obj
 
   let global_slot obj =
-    iso_string obj ~name:"GlobalSlot" ~to_string:Unsigned.UInt32.to_string
+    iso_string obj ~name:"GlobalSlot" ~js_type:UInt32
+      ~to_string:Unsigned.UInt32.to_string
       ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
 
   let amount obj =
-    iso_string obj ~name:"CurrencyAmount" ~to_string:Currency.Amount.to_string
+    iso_string obj ~name:"CurrencyAmount" ~js_type:UInt64
+      ~to_string:Currency.Amount.to_string
       ~of_string:(except ~f:Currency.Amount.of_string `Amount)
 
   let balance obj =
-    iso_string obj ~name:"Balance" ~to_string:Currency.Balance.to_string
+    iso_string obj ~name:"Balance" ~js_type:UInt64
+      ~to_string:Currency.Balance.to_string
       ~of_string:(except ~f:Currency.Balance.of_string `Balance)
 
   let option (x : _ Unified_input.t) ~js_type obj : _ Unified_input.t =
@@ -286,8 +289,10 @@ module Make (Schema : Graphql_intf.Schema) = struct
     in
     Fields_derivers_json.Of_yojson.finish ((fun x -> f (`Right x)), acc)
 
-  let with_checked ~checked ~name obj =
-    Fields_derivers_js.Js_layout.with_checked ~name (checked @@ o ()) obj
+  let with_checked ~checked ~name deriver obj =
+    Fields_derivers_js.Js_layout.with_checked ~name
+      (checked @@ o ())
+      (deriver obj)
 
   let balance_change obj =
     let sign_to_string = function
@@ -305,7 +310,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           failwith "impossible"
     in
     let sign_deriver =
-      iso_string ~name:"Sign" ~to_string:sign_to_string
+      iso_string ~name:"Sign" ~js_type:(Custom "Sign") ~to_string:sign_to_string
         ~of_string:sign_of_string
     in
     let ( !. ) = ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots in
@@ -503,13 +508,14 @@ let proof obj : _ Unified_input.t =
     | Error _err ->
         raise (Invalid_rich_scalar `Proof)
   in
-  iso_string obj ~name:"SnappProof"
+  iso_string obj ~name:"SnappProof" ~js_type:String
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
 
 let verification_key_with_hash obj =
   let verification_key obj =
     Pickles.Side_loaded.Verification_key.(
-      iso_string obj ~name:"VerificationKey" ~to_string:to_base58_check
+      iso_string obj ~name:"VerificationKey" ~js_type:String
+        ~to_string:to_base58_check
         ~of_string:(except ~f:of_base58_check_exn `Verification_key)
         ~doc:"Verification key in Base58Check format")
   in
