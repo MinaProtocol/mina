@@ -594,18 +594,6 @@ struct
         ()
 end
 
-module Staged_undos = struct
-  type applied_txn = Ledger.Transaction_applied.t
-
-  type t = applied_txn list
-
-  let apply ~constraint_constants t ledger =
-    List.fold_left t ~init:(Ok ()) ~f:(fun acc t ->
-        Or_error.bind
-          (Or_error.map acc ~f:(fun _ -> t))
-          ~f:(fun u -> Ledger.undo ~constraint_constants ledger u) )
-end
-
 let statement_of_job : job -> Transaction_snark.Statement.t option = function
   | Base { statement; _ } ->
       Some statement
@@ -668,12 +656,6 @@ let staged_transactions_with_protocol_states t
       (txn, protocol_state) )
   @@ Parallel_scan.pending_data t
   |> Or_error.all
-
-(*All the staged transactions in the reverse order of their application (Latest first)*)
-let staged_undos t : Staged_undos.t =
-  List.map
-    (Parallel_scan.pending_data t |> List.rev)
-    ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
 
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in

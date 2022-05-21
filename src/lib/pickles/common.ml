@@ -185,7 +185,7 @@ end
 
 let tock_unpadded_public_input_of_statement prev_statement =
   let input =
-    let (T (typ, _conv)) = Impls.Wrap.input () in
+    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
     Impls.Wrap.generate_public_input [ typ ] prev_statement
   in
   List.init
@@ -197,7 +197,7 @@ let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 let tick_public_input_of_statement ~max_proofs_verified
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
-    let (T (input, _conv)) =
+    let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
         ~wrap_rounds:Tock.Rounds.n
     in

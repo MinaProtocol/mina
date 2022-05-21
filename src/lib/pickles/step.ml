@@ -596,7 +596,7 @@ struct
         |> to_list)
     in
     let%map.Promise (next_proof : Tick.Proof.t) =
-      let (T (input, conv)) =
+      let (T (input, conv, _conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
       in

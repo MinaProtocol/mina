@@ -92,7 +92,7 @@ let dummy_of_tag : Tag.t -> t = function
 
 let signature_deriver obj =
   Fields_derivers_zkapps.Derivers.iso_string obj ~name:"Signature"
-    ~to_string:Signature.to_base58_check
+    ~js_type:String ~to_string:Signature.to_base58_check
     ~of_string:Signature.of_base58_check_exn
 
 module As_record = struct
@@ -106,8 +106,8 @@ module As_record = struct
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
-      ~proof:!.(option @@ proof @@ o ())
-      ~signature:!.(option @@ signature_deriver @@ o ())
+      ~proof:!.(option ~js_type:`Or_undefined @@ proof @@ o ())
+      ~signature:!.(option ~js_type:`Or_undefined @@ signature_deriver @@ o ())
     |> finish "Control" ~t_toplevel_annots
 end
 
