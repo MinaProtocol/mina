@@ -17,8 +17,7 @@ let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
   in
   let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
   let total_currency =
-    raw_epoch_data.total_currency |> Unsigned.UInt64.of_int64
-    |> Currency.Amount.of_uint64
+    Currency.Amount.of_string raw_epoch_data.total_currency
   in
   let ledger = { Mina_base.Epoch_ledger.Poly.hash; total_currency } in
   let seed = raw_epoch_data.seed |> Epoch_seed.of_base58_check_exn in
@@ -82,9 +81,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     block.min_window_density |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Length.of_uint32
   in
-  let total_currency =
-    Unsigned.UInt64.of_int64 block.total_currency |> Currency.Amount.of_uint64
-  in
+  let total_currency = Currency.Amount.of_string block.total_currency in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot_since_hard_fork =
@@ -93,7 +90,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let global_slot_since_genesis =
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
-  let timestamp = Block_time.of_int64 block.timestamp in
+  let timestamp = Block_time.of_string_exn block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
   (* commands, accounts_accessed, accounts_created, tokens_used to be filled in later *)
   return
@@ -166,9 +163,7 @@ let fill_in_accounts_created pool block_state_hash =
         Token_id.of_string value
       in
       let account_id = Account_id.create pk token_id in
-      let fee =
-        creation_fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
-      in
+      let fee = Currency.Fee.of_string creation_fee in
       return (account_id, fee) )
 
 let fill_in_tokens_used pool block_state_hash =
@@ -284,13 +279,8 @@ let fill_in_user_commands pool block_state_hash =
       let nonce =
         user_cmd.nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
       in
-      let amount =
-        Option.map user_cmd.amount ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
-      in
-      let fee =
-        user_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
-      in
+      let amount = Option.map user_cmd.amount ~f:Currency.Amount.of_string in
+      let fee = Currency.Fee.of_string user_cmd.fee in
       let valid_until =
         Option.map user_cmd.valid_until ~f:(fun valid ->
             Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32 )
@@ -347,9 +337,7 @@ let fill_in_internal_commands pool block_state_hash =
       in
       let typ = internal_cmd.typ in
       let%bind receiver = account_identifier_of_id internal_cmd.receiver_id in
-      let fee =
-        internal_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
-      in
+      let fee = Currency.Fee.of_string internal_cmd.fee in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let cmd =
         { Extensional.Internal_command.sequence_no
