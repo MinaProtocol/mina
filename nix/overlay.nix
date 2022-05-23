@@ -170,6 +170,18 @@ in {
     extensions = [ "rust-src" ];
   });
 
+  # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
+  kimchi-rust-std-deps = pkgs.rustPlatform.importCargoLock {
+    # IFD:
+    lockFileContents = import "${
+        (pkgs.runCommand "std-deps" { } ''
+          mkdir $out
+          cp ${pkgs.kimchi-rust-wasm}/lib/rustlib/src/rust/Cargo.lock $out/
+          echo builtins.readFile ./Cargo.lock > $out/std-deps.nix
+        '')
+      }/std-deps.nix";
+  };
+
   # TODO: these should be built for both web and nodejs, see the dune files
   # at ../src/lib/crypto/kimchi_bindings/js/{chrome,node_js}/dune
   plonk_wasm = let
@@ -214,21 +226,26 @@ in {
     sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
     nativeBuildInputs = [ pkgs.wasm-pack wasm-bindgen-cli ];
     cargoLock.lockFile = lock;
+
+    # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
+    # Want to run after cargoSetupPostUnpackHook
+    prePatch = ''
+      chmod +w /build/cargo-vendor-dir
+      ln -sf ${pkgs.kimchi-rust-std-deps}/*/ /build/cargo-vendor-dir
+      chmod -w /build/cargo-vendor-dir
+    '';
+
     # adapted from cargoBuildHook
-    # FIXME: wasm-pack can't find wasm-bindgen
     buildPhase = ''
       runHook preBuild
-      # TODO: remove: this file also adds -Zbuild-std
-      sed -i '/build-std/d' .cargo/config
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
       wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
       wasm-pack build --mode no-install --target web --out-dir $out/web ./.
       )
-      # runHook postBuild
+      runHook postBuild
     '';
-    # FIXME: cargo flag -Zbuild-std=panic_abort,std doesn't work
     dontCargoBuild = true;
     dontCargoCheck = true;
     installPhase = ":";
