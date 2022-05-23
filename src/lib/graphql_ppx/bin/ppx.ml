@@ -11,9 +11,9 @@ let attr_subquery =
     Ast_pattern.(single_expr_payload (pexp_constant (pconst_string __ __)))
     (fun str _ -> str)
 
-let attr_genfield =
+let attr_field =
   Ppxlib.Attribute.declare "graphql2.field"
-    Attribute.Context.value_binding
+    Attribute.Context.pattern
     Ast_pattern.(ptyp __)
     Fn.id
 
@@ -183,29 +183,88 @@ module Make (B : Ast_builder.S) = struct
     
 end
 
-let parse_field typ vb =
+(* Synthesis of a field declaration, after parsing *)
+type field_declaration = {
+  name : string;
+  typ_value : Ppxlib.expression;
+  typ_annotation : Ppxlib.core_type;
+  obj : string;
+  args : Ppxlib.expression;
+  resolve : Ppxlib.expression
+}
+
+(** Generate the actual Graphql.field expression of a field *)
+let generate_field orig field =
+  let loc = orig.pvb_loc in
+  let name = Ast_builder.Default.estring ~loc field.name in
+  let new_expr =
+    [%expr field [%e name]
+        ~typ:[%e field.typ_value]
+        ~resolve:[%e field.resolve]
+        ~args:[%e field.args]
+    ]
+  in
+  {orig with pvb_expr = new_expr}
+
+(** Rewrite the Fields module, changing every attributed field by its proper
+    generated expression *)
+let rewrite_fields_module fields modl =
+  let in_declared name =
+    List.find fields ~f:(fun x -> String.(x.name = name))
+  in
+  List.map modl ~f:(fun str_item ->
+      let pstr_desc = 
+        match str_item.pstr_desc with
+        | Pstr_value (x, vbs) ->
+          let vbs' = List.map vbs ~f:(fun vb ->
+              begin match vb.pvb_pat.ppat_desc with
+                | Ppat_var {txt; _} ->
+                  begin match in_declared txt with
+                    | Some field -> generate_field vb field
+                    | None -> vb
+                  end
+                | _ -> vb
+              end
+            )
+          in Pstr_value (x, vbs')
+        | x -> x
+      in {str_item with pstr_desc}
+    )
+  |> Result.return 
+
+(** Gather data from an expected field of the form:
+    {obj = ...; typ = ...; args = ...; resolve = ...}
+    TODO do not depend on order
+    TODO proper error reporting if not matching
+*)
+let parse_field typ_annotation vb =
   match vb.pvb_pat.ppat_desc with
   | Ppat_var {txt; _} ->
     let name = txt in
+    let loc = vb.pvb_loc in
     let expected = Ast_pattern.(
-        single_expr_payload
-          (pexp_record
-             ((loc (lident (string "typ")), __) ^::
-              (loc (lident (string "resolve")), __) ^::
-              nil) none)
+        (pexp_record
+           ((loc (lident (string "obj")) ** (estring __)) ^::
+            (loc (lident (string "typ")) ** __) ^::
+            (loc (lident (string "args")) ** __) ^::
+            (loc (lident (string "resolve")) ** __) ^::
+            nil) none)
       )
     in
-    ignore expected; None
+    let pack obj typ_value args resolve =
+      Some {name; typ_value; typ_annotation; obj; args; resolve}
+    in
+    Ast_pattern.parse expected loc vb.pvb_expr pack 
   | _ -> None (* should be a proper name *)
 
 (** Check that the Fields submodule defines a value for each field of the record *)
-let check_fields rec_fields fields =
+let get_fields fields =
   (** Return the list of the names of values defined in a module. *)
-  List.map str ~f:(fun str_item ->
+  List.map fields ~f:(fun str_item ->
       match str_item.pstr_desc with
       | Pstr_value (_, vbs) ->
         List.filter_map vbs ~f:(fun vb ->
-            match Attribute.get attr_field vb with
+            match Attribute.get attr_field vb.pvb_pat with
             | Some typ -> parse_field typ vb
             | None -> None
           )
@@ -219,11 +278,14 @@ let impl_generator ~fields type_decl =
   let loc = td.ptype_loc in
   match td.ptype_kind with
   | Ptype_record rec_fields ->
-    let* () = check_fields rec_fields fields in
+    let fields_module = fields in
+    let fields = get_fields fields_module in
     let builder = Ast_builder.make loc in
     let module B = (val builder : Ast_builder.S) in
     let module T = Make(B) in
-    T.derive_type td rec_fields ~fields
+    let* derived_types = T.derive_type td rec_fields ~fields in
+    let* rewritten_fields = rewrite_fields_module fields fields_module in
+    Result.return (derived_types @ rewritten_fields)
   | _ -> Result.fail (loc, "Type t must be a record type.")
 
 (** In a structure, find a type declaration for a type named [name] *)
@@ -246,6 +308,14 @@ let find_module structure name =
   in
   List.find_map structure ~f
 
+(** Remove a named module from a structure *)
+let remove_module structure name =
+  let f str_item = match str_item.pstr_desc with
+    | Pstr_module {pmb_name = {txt; _}; _ } when String.(txt = name) -> false
+    | _ -> true
+  in
+  List.filter structure ~f
+
 (** Check the payload is valid, and pass important parts to the generator.
     Returns the payload itself, plus the generated items *)
 let ppx_entrypoint ~ctxt payload =
@@ -259,14 +329,15 @@ let ppx_entrypoint ~ctxt payload =
     [Ast_builder.Default.pstr_extension ~loc ext []] |> B.pmod_structure ~loc
   in
   let go () =
-    let* fields = Result.of_option (find_module payload "Fields")
+    let* (_, fields) = Result.of_option (find_module payload "Fields")
         ~error:(loc, "A submodule Fields is required in the module, but was not found.")
     in
+    let payload_without_fields = remove_module payload "Fields" in
     let* type_decl = Result.of_option (find_type payload "t")
         ~error:(loc, "A base type t is required in the module, but was not found.")
     in
     let* generated_items = impl_generator type_decl ~fields in
-    let items = payload @ generated_items in
+    let items = payload_without_fields @ generated_items in
     B.pmod_structure ~loc items |> Result.return
   in match go () with
   | Ok x -> x

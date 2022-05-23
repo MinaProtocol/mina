@@ -2,7 +2,6 @@ module Address =
   struct
     type t = {
       dummy: unit }
-    module Fields = struct let dummy = () end
     module Gql =
       struct
         type 'dummy r = {
@@ -14,18 +13,14 @@ module Address =
           | Dummy: {
           siblings: unit r query } -> unit r query 
       end
+    let ((dummy)[@field :unit]) = field "dummy" ~typ:() ~resolve:() ~args:[]
   end
 module Contact =
   struct
-    type t =
-      {
+    type t = {
       id: int ;
       name: string ;
-      address: Address.t [@subquery "Address.Gql"]}
-    module Fields = struct let id = ()
-                           let name = ()
-                           let address = () end
-    module Mutations = struct let set_name = () end
+      address: Address.t }
     module Gql =
       struct
         type ('id, 'name, 'address) r =
@@ -43,10 +38,12 @@ module Contact =
           | Name: {
           siblings: ('id, unit, 'address) r query } -> ('id, string,
           'address) r query 
-          | Address:
-          {
-          siblings: ('id, 'name, unit) r query ;
-          subquery: 'a Address.Gql.query } -> ('id, 'name,
-          'a Address.Gql.modifier) r query 
+          | Address: {
+          siblings: ('id, 'name, unit) r query } -> ('id, 'name, Address.t) r
+          query 
       end
+    let ((id)[@field :int]) = field "id" ~typ:() ~resolve:() ~args:[]
+    let ((name)[@field :string]) = field "name" ~typ:() ~resolve:() ~args:[]
+    let ((address)[@field :Address.t]) =
+      field "address" ~typ:() ~resolve:() ~args:[]
   end

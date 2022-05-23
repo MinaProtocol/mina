@@ -4,7 +4,12 @@ module Address = [%derive_graphql
   }
 
   module Fields = struct
-    let dummy = ()
+    let dummy [@field: unit] = {
+      obj = "Address";
+      typ = ();
+      args = [];
+      resolve = ()
+    }
   end
 ]
 
@@ -15,8 +20,23 @@ module Contact = [%derive_graphql
     address: Address.t;
   }
   module Fields = struct
-    let id [@field int] = {typ = (); resolve = Fn.id}
-    let name [@field string] = {typ = (); resolve = Fn.id}
-    let address [@field Address.t] = {typ = (); resolve = Fn.id}
+    let id [@field: int] = {
+      obj = "Contact"; (* this should be factorized *)
+      typ = ();
+      args = [];
+      resolve = ()
+    }
+    let name [@field: string] = {
+      obj = "Contact";
+      typ = ();
+      args = [];
+      resolve = ()
+    }
+    let address [@field: Address.t] = {
+      obj = "Contact";
+      typ = ();
+      args = [];
+      resolve = ()
+    }
   end
 ]
