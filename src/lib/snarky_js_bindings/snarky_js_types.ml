@@ -5,7 +5,6 @@ let () =
   let js_layout =
     `Assoc
       [ ("Parties", layout Parties.deriver)
-      ; ("BalanceChange", layout Fields_derivers_zkapps.Derivers.balance_change)
       ; ("Party", layout Party.Graphql_repr.deriver)
       ]
   in
