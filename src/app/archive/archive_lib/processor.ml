@@ -1372,8 +1372,8 @@ module Zkapp_other_party_body = struct
 
   let table_name = "zkapp_other_party_body"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (body : Party.Body.Wire.t)
-      =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (body : Party.Body.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let account_identifier = Account_id.create body.public_key body.token_id in
     let%bind account_identifier_id =
@@ -1481,7 +1481,7 @@ module Zkapp_other_party = struct
 
   let table_name = "zkapp_other_party"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.Wire.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
       Zkapp_other_party_body.add_if_doesn't_exist (module Conn) party.body
@@ -1833,7 +1833,7 @@ module User_command = struct
 
     let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
       let open Deferred.Result.Let_syntax in
-      let parties = Parties.to_wire ps in
+      let parties = Parties.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
         Zkapp_fee_payer_body.add_if_doesn't_exist
           (module Conn)
@@ -2983,15 +2983,15 @@ module Block = struct
             let (fee_payer : Party.Fee_payer.t) =
               { body = fee_payer; authorization = Signature.dummy }
             in
-            let (other_parties : Party.Wire.t list) =
+            let (other_parties : Party.Simple.t list) =
               List.map other_parties
-                ~f:(fun (body : Party.Body.Wire.t) : Party.Wire.t ->
+                ~f:(fun (body : Party.Body.Simple.t) : Party.Simple.t ->
                   { body; authorization = None_given } )
             in
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
-                (Parties.of_wire { fee_payer; other_parties; memo })
+                (Parties.of_simple { fee_payer; other_parties; memo })
             in
             (zkapp_cmd, cmd_id) :: acc )
       in

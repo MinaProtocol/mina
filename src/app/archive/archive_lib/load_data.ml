@@ -619,7 +619,7 @@ let get_other_party_body ~pool body_id =
       ; use_full_commitment
       ; caller
       }
-      : Party.Body.Wire.t )
+      : Party.Body.Simple.t )
 
 let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =

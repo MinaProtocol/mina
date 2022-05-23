@@ -2828,7 +2828,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "PartyBodyInput",
+          "name": "PartyBodyGraphqlInput",
           "description": null,
           "fields": [
             {
@@ -3343,7 +3343,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "ZkappPartyInput",
-          "description": "A party to a zkApp transaction",
+          "description": null,
           "fields": [
             {
               "name": "body",
@@ -3354,7 +3354,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyInput",
+                  "name": "PartyBodyGraphqlInput",
                   "ofType": null
                 }
               },
@@ -3387,7 +3387,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyInput",
+                  "name": "PartyBodyGraphqlInput",
                   "ofType": null
                 }
               },
@@ -6927,7 +6927,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "PartyBody",
+          "name": "PartyBodyGraphql",
           "description": null,
           "fields": [
             {
@@ -7175,7 +7175,7 @@
         {
           "kind": "OBJECT",
           "name": "ZkappParty",
-          "description": "A party to a zkApp transaction",
+          "description": null,
           "fields": [
             {
               "name": "body",
@@ -7186,7 +7186,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "PartyBody",
+                  "name": "PartyBodyGraphql",
                   "ofType": null
                 }
               },

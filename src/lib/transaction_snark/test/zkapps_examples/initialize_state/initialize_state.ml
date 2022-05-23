@@ -46,8 +46,8 @@ let%test_module "Initialize state test" =
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
     module Deploy_party = struct
-      let party_body : Party.Body.t =
-        { Party.Body.dummy with
+      let party_body : Party.Body.Graphql_repr.t =
+        { Party.Body.Graphql_repr.dummy with
           public_key = pk_compressed
         ; update =
             { Party.Update.dummy with
@@ -79,7 +79,7 @@ let%test_module "Initialize state test" =
         ; account_precondition = Accept
         }
 
-      let party : Party.t =
+      let party : Party.Graphql_repr.t =
         (* TODO: This is a pain. *)
         { body = party_body; authorization = Signature Signature.dummy }
     end
@@ -95,8 +95,9 @@ let%test_module "Initialize state test" =
               ; at_party = Parties.Call_forest.empty
               } )
 
-      let party : Party.t =
-        { body = party_body; authorization = Proof party_proof }
+      let party : Party.Graphql_repr.t =
+        Party.to_graphql_repr ~call_depth:0
+          { body = party_body; authorization = Proof party_proof }
     end
 
     module Update_state_party = struct
@@ -115,8 +116,9 @@ let%test_module "Initialize state test" =
               ; at_party = Parties.Call_forest.empty
               } )
 
-      let party : Party.t =
-        { body = party_body; authorization = Proof party_proof }
+      let party : Party.Graphql_repr.t =
+        Party.to_graphql_repr ~call_depth:0
+          { body = party_body; authorization = Proof party_proof }
     end
 
     let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
@@ -125,8 +127,9 @@ let%test_module "Initialize state test" =
       let ps =
         (* TODO: This is a pain. *)
         Parties.Call_forest.of_parties_list
-          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+          ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
           parties
+        |> Parties.Call_forest.map ~f:Party.of_graphql_repr
         |> Parties.Call_forest.accumulate_hashes_predicated
       in
       let memo = Signed_command_memo.empty in
