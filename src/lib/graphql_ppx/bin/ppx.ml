@@ -10,7 +10,12 @@ let attr_subquery =
     Attribute.Context.label_declaration
     Ast_pattern.(single_expr_payload (pexp_constant (pconst_string __ __)))
     (fun str _ -> str)
-                                                                          
+
+let attr_genfield =
+  Ppxlib.Attribute.declare "graphql2.field"
+    Attribute.Context.value_binding
+    Ast_pattern.(ptyp __)
+    Fn.id
 
 (* The functor is used to factorize the loc parameter in all Ast_builder functions *)
 module Make (B : Ast_builder.S) = struct
@@ -160,8 +165,8 @@ module Make (B : Ast_builder.S) = struct
   (* Derive a whole module from the type declaration *)
   let derive_type 
     (td : type_declaration) (rec_fields : label_declaration list)
-    ~fields ~mutations =
-    ignore mutations; ignore fields;
+    ~fields =
+    ignore fields;
     (* Create type variables for each field of the record *)
     let params = List.map rec_fields ~f:(fun label -> B.ptyp_var label.pld_name.txt)
     in
@@ -178,46 +183,38 @@ module Make (B : Ast_builder.S) = struct
     
 end
 
-(** Return the list of the names of values defined in a module. *)
-let names_of_values_in_module str =
+let parse_field typ vb =
+  match vb.pvb_pat.ppat_desc with
+  | Ppat_var {txt; _} ->
+    let name = txt in
+    let expected = Ast_pattern.(
+        single_expr_payload
+          (pexp_record
+             ((loc (lident (string "typ")), __) ^::
+              (loc (lident (string "resolve")), __) ^::
+              nil) none)
+      )
+    in
+    ignore expected; None
+  | _ -> None (* should be a proper name *)
+
+(** Check that the Fields submodule defines a value for each field of the record *)
+let check_fields rec_fields fields =
+  (** Return the list of the names of values defined in a module. *)
   List.map str ~f:(fun str_item ->
       match str_item.pstr_desc with
       | Pstr_value (_, vbs) ->
-        List.filter_map vbs ~f:(fun {pvb_pat; _} -> match pvb_pat.ppat_desc with
-            | Ppat_var {txt; _} -> Some txt
-            | _ -> None
+        List.filter_map vbs ~f:(fun vb ->
+            match Attribute.get attr_field vb with
+            | Some typ -> parse_field typ vb
+            | None -> None
           )
       | _ -> []
     )
   |> List.concat
 
-(** Check that the Fields submodule defines a value for each field of the record *)
-let check_fields rec_fields fields =
-  (* Set of names from record definition *)
-  let rec_field_names =
-    List.map rec_fields ~f:(fun x -> x.pld_name.txt)
-    |> Set.of_list (module String)
-  in
-  let (mod_expr, fields) = fields in
-  (* Set of names of values from the Fields submodule *)
-  let fields_names = names_of_values_in_module fields
-                     |> Set.of_list (module String)
-  in
-  (* Compute difference between the two: should be empty *)
-  let missing = Set.diff rec_field_names fields_names in
-  if Set.is_empty missing then Result.return ()
-  else (
-    let loc = mod_expr.pmod_loc in
-    let missing_str = Set.sexp_of_m__t (module String) missing |>
-                      Sexp.to_string_hum in
-    let msg = Printf.sprintf "There must be one field value in the Fields
-    submodule for each field in the definition of type t. Missing: %s."
-        missing_str
-    in Result.fail (loc, msg)
-  )
-
 (* Detect deriver calls on record type declarations, and generate the derivation *)
-let impl_generator ~fields ~mutations type_decl =
+let impl_generator ~fields type_decl =
   let td = type_decl in
   let loc = td.ptype_loc in
   match td.ptype_kind with
@@ -226,7 +223,7 @@ let impl_generator ~fields ~mutations type_decl =
     let builder = Ast_builder.make loc in
     let module B = (val builder : Ast_builder.S) in
     let module T = Make(B) in
-    T.derive_type td rec_fields ~mutations ~fields
+    T.derive_type td rec_fields ~fields
   | _ -> Result.fail (loc, "Type t must be a record type.")
 
 (** In a structure, find a type declaration for a type named [name] *)
@@ -268,8 +265,7 @@ let ppx_entrypoint ~ctxt payload =
     let* type_decl = Result.of_option (find_type payload "t")
         ~error:(loc, "A base type t is required in the module, but was not found.")
     in
-    let mutations = find_module payload "Mutations" in
-    let* generated_items = impl_generator type_decl ~fields ~mutations in
+    let* generated_items = impl_generator type_decl ~fields in
     let items = payload @ generated_items in
     B.pmod_structure ~loc items |> Result.return
   in match go () with
