@@ -1,7 +1,6 @@
 (library
  (name parties_builder)
  (public_name parties_builder)
- (inline_tests)
  (library_flags -linkall)
  (libraries
    ;; opam libraries
