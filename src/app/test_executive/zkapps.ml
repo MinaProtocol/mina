@@ -86,37 +86,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let[@warning "-8"] [ fish1_kp; fish2_kp ] =
       Network.extra_genesis_keypairs network
     in
-    let token_funder = fish1_kp in
-    let token_owner = Signature_lib.Keypair.create () in
-    let token_account1 = Signature_lib.Keypair.create () in
-    let token_account2 = Signature_lib.Keypair.create () in
-    let%bind token_fee_payer_pk = Util.pub_key_of_node node in
-    let%bind token_fee_payer_sk = Util.priv_key_of_node node in
-    let token_fee_payer : Signature_lib.Keypair.t =
-      { private_key = token_fee_payer_sk
-      ; public_key = Signature_lib.Public_key.decompress_exn token_fee_payer_pk
-      }
-    in
-    let keymap =
-      List.fold
-        [ token_fee_payer
-        ; token_funder
-        ; token_owner
-        ; token_account1
-        ; token_account2
-        ] ~init:Signature_lib.Public_key.Compressed.Map.empty
-        ~f:(fun map { private_key; public_key } ->
-          Signature_lib.Public_key.Compressed.Map.add_exn map
-            ~key:(Signature_lib.Public_key.compress public_key)
-            ~data:private_key )
-    in
-    let custom_token_id =
-      Account_id.derive_token_id
-        ~owner:
-          (Account_id.create
-             (Signature_lib.Public_key.compress token_owner.public_key)
-             Token_id.default )
-    in
     let num_zkapp_accounts = 3 in
     let zkapp_keypairs =
       List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -351,62 +320,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
-    let account_creation_fee_int =
-      Currency.Fee.to_int constraint_constants.account_creation_fee
-    in
-    let parties_create_token_owner =
-      let open Parties_builder in
-      mk_forest
-        [ mk_node
-            (mk_party_body Call token_funder Token_id.default
-               (-(4 * account_creation_fee_int)) )
-            []
-        ; mk_node
-            (mk_party_body Call token_owner Token_id.default
-               (3 * account_creation_fee_int) )
-            []
-        ]
-      |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk:token_fee_payer_pk
-           ~fee_payer_nonce:(Account.Nonce.of_int (* 2 *) 0)
-      |> Mina_base.Parties_builder.replace_authorizations ~keymap
-    in
-    let parties_token_minting =
-      let open Parties_builder in
-      mk_forest
-        [ mk_node
-            (mk_party_body Call token_owner Token_id.default
-               (-account_creation_fee_int) )
-            [ mk_node (mk_party_body Call token_account1 custom_token_id 100) []
-            ]
-        ]
-      |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk:token_fee_payer_pk
-           ~fee_payer_nonce:(Account.Nonce.of_int (* 3 *) 1)
-      |> Mina_base.Parties_builder.replace_authorizations ~keymap
-    in
-    let parties_token_transfers =
-      let open Parties_builder in
-      mk_forest
-        [ mk_node
-            (mk_party_body Call token_owner Token_id.default
-               (-account_creation_fee_int) )
-            [ mk_node
-                (mk_party_body Call token_account1 custom_token_id (-30))
-                []
-            ; mk_node (mk_party_body Call token_account2 custom_token_id 30) []
-            ; mk_node
-                (mk_party_body Call token_account1 custom_token_id (-10))
-                []
-            ; mk_node (mk_party_body Call token_account2 custom_token_id 10) []
-            ; mk_node
-                (mk_party_body Call token_account2 custom_token_id (-5))
-                []
-            ; mk_node (mk_party_body Call token_account1 custom_token_id 5) []
-            ]
-        ]
-      |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk:token_fee_payer_pk
-           ~fee_payer_nonce:(Account.Nonce.of_int 2 (* 3 *))
-      |> Mina_base.Parties_builder.replace_authorizations ~keymap
-    in
     let with_timeout =
       let soft_slots = 4 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -497,33 +410,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       [%log info] "ZkApp transactions included in transition frontier"
     in
-    let%bind () =
-      section_hard "Send a zkApp to create token owner"
-        (send_zkapp ~logger node parties_create_token_owner)
-    in
-    let%bind () =
-      section_hard "Wait for zkApp to create token owner"
-        (wait_for_zkapp parties_create_token_owner)
-    in
-    let%bind () =
-      section_hard "Send a zkApp for minting a token"
-        (send_zkapp ~logger node parties_token_minting)
-    in
-    let%bind () =
-      section_hard "Wait for zkApp to mint a token"
-        (wait_for_zkapp parties_token_minting)
-    in
-    let%bind () =
-      section_hard "Send a zkApp to transfer tokens"
-        (send_zkapp ~logger node parties_token_transfers)
-    in
-    let%bind () =
-      section_hard
-        "Wait for zkApp to transfer tokens to be included in transition \
-         frontier"
-        (wait_for_zkapp parties_token_transfers)
-    in
-    ignore (Core.exit 0 : int) ;
     let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
         (send_zkapp ~logger node parties_create_account)
