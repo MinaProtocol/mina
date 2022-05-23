@@ -2,6 +2,7 @@ module Address = [%derive_graphql
   type t = {
     dummy : unit;
   }
+  type 'a final_option_modifier = 'a
 
   module Fields = struct
     let dummy [@field: unit] = {
@@ -19,6 +20,8 @@ module Contact = [%derive_graphql
     name: string;
     address: Address.t;
   }
+  type 'a final_option_modifier = 'a
+
   module Fields = struct
     let id [@field: int] = {
       obj = "Contact"; (* this should be factorized *)

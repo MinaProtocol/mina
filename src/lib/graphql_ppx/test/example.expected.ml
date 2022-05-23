@@ -2,8 +2,11 @@ module Address =
   struct
     type t = {
       dummy: unit }
+    type 'a final_option_modifier = 'a
     module Gql =
       struct
+        open (Wrapper.Make)(Graphql_lwt.Schema)
+        open (Gql_types.Make)(Graphql_lwt.Schema)
         type 'dummy r = {
           res_dummy: 'dummy }
         type 'a modifier = 'a option
@@ -21,8 +24,11 @@ module Contact =
       id: int ;
       name: string ;
       address: Address.t }
+    type 'a final_option_modifier = 'a
     module Gql =
       struct
+        open (Wrapper.Make)(Graphql_lwt.Schema)
+        open (Gql_types.Make)(Graphql_lwt.Schema)
         type ('id, 'name, 'address) r =
           {
           res_id: 'id ;

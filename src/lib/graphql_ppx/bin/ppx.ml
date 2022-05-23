@@ -162,6 +162,12 @@ module Make (B : Ast_builder.S) = struct
 
   let module_name = "Gql"
 
+  let opens =
+    [
+      [%stri open Wrapper.Make(Graphql_lwt.Schema)];
+      [%stri open Gql_types.Make(Graphql_lwt.Schema)]
+    ]
+
   (* Derive a whole module from the type declaration *)
   let derive_type 
     (td : type_declaration) (rec_fields : label_declaration list)
@@ -175,7 +181,7 @@ module Make (B : Ast_builder.S) = struct
     let res_type = Res_type.make () in
     let query_type = Query_type.make td rec_fields params in
     let out_type = Out_type.make () in
-    let all_items = [r_type; res_type; out_type; query_type] in
+    let all_items = opens @ [r_type; res_type; out_type; query_type] in
     (* Make module with created items *)
     let expr = B.pmod_structure all_items in
     let module_binding = B.module_binding ~name:(mkloc module_name) ~expr in
