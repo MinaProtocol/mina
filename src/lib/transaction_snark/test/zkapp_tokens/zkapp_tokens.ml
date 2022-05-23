@@ -101,8 +101,8 @@ let%test_module "Zkapp tokens tests" =
                       |> Parties_builder.mk_parties_transaction ~fee:7
                            ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
-                    Mina_generators.Parties_generators.replace_authorizations
-                      ~keymap with_dummy_signatures
+                    Parties_builder.replace_authorizations ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger
@@ -129,8 +129,8 @@ let%test_module "Zkapp tokens tests" =
                       |> Parties_builder.mk_parties_transaction ~fee:7
                            ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
-                    Mina_generators.Parties_generators.replace_authorizations
-                      ~keymap with_dummy_signatures
+                    Parties_builder.replace_authorizations ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger
@@ -173,8 +173,8 @@ let%test_module "Zkapp tokens tests" =
                       |> Parties_builder.mk_parties_transaction ~fee:7
                            ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
-                    Mina_generators.Parties_generators.replace_authorizations
-                      ~keymap with_dummy_signatures
+                    Parties_builder.replace_authorizations ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger

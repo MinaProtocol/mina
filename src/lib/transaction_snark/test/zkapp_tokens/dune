@@ -16,6 +16,7 @@
    currency
    pickles
    mina_numbers
+   parties_builder
    signature_lib
    genesis_constants
    sgn

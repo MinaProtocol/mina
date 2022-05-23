@@ -1,6 +1,7 @@
 (* parties_builder.ml -- combinators to build Parties.t for tests *)
 
 open Core_kernel
+open Mina_base
 
 let mk_forest ps : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
   List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
