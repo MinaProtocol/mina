@@ -1642,26 +1642,11 @@ let create_pickles_rule ((identifier, main) : pickles_rule_js) =
   ; main_value = (fun _ _ -> [])
   }
 
-let dummy_rule self =
-  { identifier = "dummy"
-  ; prevs = [ self; self ]
-  ; main_value = (fun _ _ -> [ true; true ])
-  ; main =
-      (fun _ _ ->
-        dummy_constraints () ;
-        (* unsatisfiable *)
-        let x =
-          Impl.exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-        in
-        Field.(Assert.equal x (x + one)) ;
-        Boolean.[ true_; true_ ] )
-  }
-
 let other_verification_key_constr :
     (Other_impl.Verification_key.t -> verification_key_class Js.t) Js.constr =
   Obj.magic verification_key_class
 
-type proof = (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+type proof = (Pickles_types.Nat.N0.n, Pickles_types.Nat.N0.n) Pickles.Proof.t
 
 module Statement_with_proof =
   Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
@@ -1696,10 +1681,8 @@ let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
 
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
-  let branches = List.length choices + 1 in
-  let choices ~self =
-    List.map choices ~f:create_pickles_rule @ [ dummy_rule self ]
-  in
+  let branches = List.length choices in
+  let choices ~self:_ = List.map choices ~f:create_pickles_rule in
   let (module Branches) = nat_module branches in
   (* TODO get rid of Obj.magic for choices *)
   let tag, _cache, p, provers =
@@ -1708,7 +1691,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
       (module Zkapp_statement.Constant)
       ~typ:zkapp_statement_typ
       ~branches:(module Branches)
-      ~max_proofs_verified:(module Pickles_types.Nat.N2)
+      ~max_proofs_verified:(module Pickles_types.Nat.N0)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
       ~name:"smart-contract"
       ~constraint_constants:
