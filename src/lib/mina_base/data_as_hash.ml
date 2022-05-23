@@ -35,3 +35,14 @@ let if_ b ~then_ ~else_ =
   (hash, ref)
 
 let make_unsafe hash ref : 'a t = (hash, ref)
+
+module As_record = struct
+  (* it's OK that hash is a Field.t (not a var), bc this is just annotation for the deriver *)
+  type 'a t = { data : 'a; hash : Field.t } [@@deriving annot, fields]
+end
+
+let deriver inner obj =
+  let open Fields_derivers_zkapps in
+  let ( !. ) = ( !. ) ~t_fields_annots:As_record.t_fields_annots in
+  As_record.Fields.make_creator obj ~data:!.inner ~hash:!.field
+  |> finish "Events" ~t_toplevel_annots:As_record.t_toplevel_annots
