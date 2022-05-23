@@ -18,7 +18,6 @@ let
     "sodium"
     "capnp"
     "rpc_parallel"
-    "ocaml-extlib"
     "async_kernel"
     "base58"
     "graphql_ppx"
