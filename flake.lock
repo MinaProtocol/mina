@@ -188,11 +188,11 @@
         "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1643375577,
-        "narHash": "sha256-qfpUKXqwYmRKqHneRsWe823D/XmoNOQyHu+434I28cU=",
+        "lastModified": 1653311921,
+        "narHash": "sha256-9FGwK1iS0zkvinu7RICwwClfeZ0dtQ+jxSR8B+9XSks=",
         "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "ab96c52560432f5e1d36cbb92b2dd088c3bbea4a",
+        "rev": "6091713071d226fb22e00e407e4aef741e549588",
         "type": "github"
       },
       "original": {
@@ -204,11 +204,11 @@
     "opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1640349521,
-        "narHash": "sha256-8ooQFVDFg1WOlGivMueU2HH0E1qfthJMkOMhUAAqjyA=",
+        "lastModified": 1653310919,
+        "narHash": "sha256-xnetrEmHpHMA711XNeAbJO4PPoIA47b+5/tju/BeMGY=",
         "owner": "ocaml",
         "repo": "opam-repository",
-        "rev": "c7b45b3cbcfbe22a7b3b8af1e5bb9998f3aa0e8a",
+        "rev": "103be3e9078d608d5ff5e3e80a74245195fc1e2d",
         "type": "github"
       },
       "original": {
@@ -222,11 +222,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1640804047,
-        "narHash": "sha256-YA9cIwndl3ixDYaAtSUFMvAko7nkjfwmWOqwZjzze60=",
+        "lastModified": 1651529032,
+        "narHash": "sha256-fe8bm/V/4r2iNxgbitT2sXBqDHQ0GBSnSUSBg/1aXoI=",
         "owner": "tweag",
         "repo": "opam2json",
-        "rev": "7652f94ac18ec94bc1ae697169c7f7f8b809270a",
+        "rev": "e8e9f2fa86ef124b9f7b8db41d3d19471c1d8901",
         "type": "github"
       },
       "original": {
