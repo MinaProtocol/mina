@@ -54,11 +54,18 @@ module As_field = struct
   let value (value : t) : Impl.Field.t =
     match Js.to_string (Js.typeof (Obj.magic value)) with
     | "number" ->
-        let value = Js.float_of_number (Obj.magic value) in
-        if Float.is_integer value then
-          let value = Float.to_int value in
-          if value >= 0 then Impl.Field.of_int value
-          else Impl.Field.negate (Impl.Field.of_int (-value))
+        let number : Js.number Js.t = Obj.magic value in
+        let float = Js.float_of_number number in
+        if Float.is_integer float then
+          if float >= 0. then
+            Impl.Field.(
+              constant @@ Constant.of_string @@ Js.to_string @@ number##toString)
+          else
+            let number : Js.number Js.t = Obj.magic (-.float) in
+            Impl.Field.negate
+              Impl.Field.(
+                constant @@ Constant.of_string @@ Js.to_string
+                @@ number##toString)
         else raise_error "Cannot convert a float to a field element"
     | "boolean" ->
         let value = Js.to_bool (Obj.magic value) in
