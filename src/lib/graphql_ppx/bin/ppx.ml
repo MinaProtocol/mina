@@ -102,7 +102,9 @@ module Make (B : Ast_builder.S) = struct
       in
       let type_of_module type_name mod_name =
         let var = B.ptyp_var "a" in
-        let foreign_type = mod_name ^ "." ^ type_name in
+        let foreign_type = if String.is_empty mod_name then type_name
+          else mod_name ^ "." ^ type_name
+        in
         mkconstr foreign_type ~args:[var]
       in
       let make_r_constr label typ =
