@@ -30,6 +30,7 @@ RUN sudo apt-get update -y \
     apt-utils \
     awscli \
     cmake \
+    dhall \
     jq \
     libboost-dev \
     libboost-program-options-dev \
