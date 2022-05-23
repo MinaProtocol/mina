@@ -824,7 +824,7 @@ let%test_module "account timing check" =
 
     let check_zkapp_failure expected_failure = function
       | Ok
-          ( (parties_undo :
+          ( (parties_applied :
               Mina_transaction_logic.Transaction_applied.Parties_applied.t )
           , ( (local_state :
                 _ Mina_transaction_logic.Parties_logic.Local_state.t )
@@ -835,7 +835,7 @@ let%test_module "account timing check" =
           let failure_statuses =
             local_state.failure_status_tbl |> List.concat
           in
-          match With_status.status parties_undo.command with
+          match With_status.status parties_applied.command with
           | Applied ->
               failwithf "Expected transaction failure: %s"
                 (Transaction_status.Failure.to_string expected_failure)

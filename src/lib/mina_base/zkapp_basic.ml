@@ -117,7 +117,7 @@ module Set_or_keep = struct
   let deriver inner obj =
     let open Fields_derivers_zkapps.Derivers in
     iso ~map:of_option ~contramap:to_option
-      ((option @@ inner @@ o ()) (o ()))
+      ((option ~js_type:`Flagged_option @@ inner @@ o ()) (o ()))
       obj
 
   let gen gen_a =
@@ -246,11 +246,15 @@ module Or_ignore = struct
 
   let of_option = function None -> Ignore | Some x -> Check x
 
-  let deriver inner obj =
+  let deriver_base ~js_type inner obj =
     let open Fields_derivers_zkapps.Derivers in
     iso ~map:of_option ~contramap:to_option
-      ((option @@ inner @@ o ()) (o ()))
+      ((option ~js_type @@ inner @@ o ()) (o ()))
       obj
+
+  let deriver inner obj = deriver_base ~js_type:`Flagged_option inner obj
+
+  let deriver_implicit inner obj = deriver_base ~js_type:`Implicit inner obj
 
   [%%ifdef consensus_mechanism]
 
