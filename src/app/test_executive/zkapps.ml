@@ -531,11 +531,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     "Ledger update and requested update are incompatible" ) ) )
         )
     in
-    (* let%bind () =
-       section_hard "Wait for proof to be emitted"
-         (wait_for t
-            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
-       in *)
+    let%bind () =
+      section_hard "Wait for proof to be emitted"
+        (wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+    in
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
