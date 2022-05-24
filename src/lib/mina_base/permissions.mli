@@ -1,5 +1,6 @@
 [%%import "/src/config.mlh"]
 
+open Core_kernel
 open Snark_params.Tick
 
 module Auth_required : sig
@@ -139,6 +140,9 @@ val deriver :
       ; to_json_accumulator :
           (string * (Auth_required.t Poly.t -> Yojson.Safe.t)) option list ref
       ; skip : bool ref
+      ; js_layout : Yojson.Safe.t ref
+      ; js_layout_accumulator :
+          Fields_derivers_zkapps.Js_layout.Accumulator.field option list ref
       ; .. >
       as
       'a )

@@ -498,8 +498,8 @@ let auth_required_of_string = function
 
 let auth_required =
   Fields_derivers_zkapps.Derivers.iso_string ~name:"AuthRequired"
-    ~doc:"Kind of authorization required" ~to_string:auth_required_to_string
-    ~of_string:auth_required_of_string
+    ~js_type:(Custom "AuthRequired") ~doc:"Kind of authorization required"
+    ~to_string:auth_required_to_string ~of_string:auth_required_of_string
 
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in

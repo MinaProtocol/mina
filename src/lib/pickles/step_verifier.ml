@@ -792,20 +792,13 @@ struct
           , { evals = evals2; public_input = x_hat2 } )
       } =
     let open Vector in
-    let step_domains, input_domain =
+    let step_domains =
       with_label "step_domains" (fun () ->
           match step_domains with
           | `Known domains ->
-              ( `Known domains
-              , Pseudo.Domain.to_domain ~shifts ~domain_generator
-                  (which_branch, Vector.map domains ~f:Domains.x) )
+              `Known domains
           | `Side_loaded ds ->
-              ( `Side_loaded (side_loaded_domains ds which_branch)
-              , (* This has to be the max_width of this proof system rather than actual width *)
-                side_loaded_input_domain
-                  ~width:
-                    (Side_loaded_verification_key.Width.Checked.to_field
-                       (Option.value_exn max_width) ) ) )
+              `Side_loaded (side_loaded_domains ds which_branch) )
     in
     let actual_width = Pseudo.choose (which_branch, step_widths) ~f:Fn.id in
     let T = Proofs_verified.eq in
