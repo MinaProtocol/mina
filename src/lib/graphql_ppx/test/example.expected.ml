@@ -5,8 +5,7 @@ module Address =
     type 'a final_option_modifier = 'a
     module Gql =
       struct
-        open (Wrapper.Make)(Graphql_lwt.Schema)
-        open (Gql_types.Make)(Graphql_lwt.Schema)
+        open (Graphql_utils.Wrapper.Make2)(Graphql_async.Schema)
         type 'dummy r = {
           res_dummy: 'dummy }
         type 'a modifier = 'a option
@@ -15,8 +14,9 @@ module Address =
           | Empty: unit r query 
           | Dummy: {
           siblings: unit r query } -> unit r query 
+        let ((dummy)[@field :unit]) =
+          field "dummy" ~typ:() ~resolve:() ~args:[]
       end
-    let ((dummy)[@field :unit]) = field "dummy" ~typ:() ~resolve:() ~args:[]
   end
 module Contact =
   struct
@@ -27,8 +27,7 @@ module Contact =
     type 'a final_option_modifier = 'a
     module Gql =
       struct
-        open (Wrapper.Make)(Graphql_lwt.Schema)
-        open (Gql_types.Make)(Graphql_lwt.Schema)
+        open (Graphql_utils.Wrapper.Make2)(Graphql_async.Schema)
         type ('id, 'name, 'address) r =
           {
           res_id: 'id ;
@@ -47,9 +46,10 @@ module Contact =
           | Address: {
           siblings: ('id, 'name, unit) r query } -> ('id, 'name, Address.t) r
           query 
+        let ((id)[@field :int]) = field "id" ~typ:() ~resolve:() ~args:[]
+        let ((name)[@field :string]) =
+          field "name" ~typ:() ~resolve:() ~args:[]
+        let ((address)[@field :Address.t]) =
+          field "address" ~typ:() ~resolve:() ~args:[]
       end
-    let ((id)[@field :int]) = field "id" ~typ:() ~resolve:() ~args:[]
-    let ((name)[@field :string]) = field "name" ~typ:() ~resolve:() ~args:[]
-    let ((address)[@field :Address.t]) =
-      field "address" ~typ:() ~resolve:() ~args:[]
   end

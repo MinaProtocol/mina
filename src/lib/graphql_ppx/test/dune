@@ -1,6 +1,6 @@
 (executable
   (name example)
-  (libraries graphql graphql-lwt)
+  (libraries graphql graphql-lwt graphql_utils)
   (preprocess (pps graphql2))
   (flags -w -34-37)
   (modules example))

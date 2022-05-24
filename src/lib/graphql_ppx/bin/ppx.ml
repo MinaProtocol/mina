@@ -160,12 +160,9 @@ module Make (B : Ast_builder.S) = struct
       B.pstr_type Recursive [typedecl]
   end
 
-  let module_name = "Gql"
-
   let opens =
     [
-      [%stri open Wrapper.Make(Graphql_lwt.Schema)];
-      [%stri open Gql_types.Make(Graphql_lwt.Schema)]
+      [%stri open Graphql_utils.Wrapper.Make2(Graphql_async.Schema)]
     ]
 
   (* Derive a whole module from the type declaration *)
@@ -182,11 +179,7 @@ module Make (B : Ast_builder.S) = struct
     let query_type = Query_type.make td rec_fields params in
     let out_type = Out_type.make () in
     let all_items = opens @ [r_type; res_type; out_type; query_type] in
-    (* Make module with created items *)
-    let expr = B.pmod_structure all_items in
-    let module_binding = B.module_binding ~name:(mkloc module_name) ~expr in
-    Result.return [B.pstr_module module_binding]
-    
+    all_items
 end
 
 (* Synthesis of a field declaration, after parsing *)
@@ -278,6 +271,8 @@ let get_fields fields =
     )
   |> List.concat
 
+let module_name = "Gql"
+
 (* Detect deriver calls on record type declarations, and generate the derivation *)
 let impl_generator ~fields type_decl =
   let td = type_decl in
@@ -289,9 +284,14 @@ let impl_generator ~fields type_decl =
     let builder = Ast_builder.make loc in
     let module B = (val builder : Ast_builder.S) in
     let module T = Make(B) in
-    let* derived_types = T.derive_type td rec_fields ~fields in
+    let derived_types = T.derive_type td rec_fields ~fields in
     let* rewritten_fields = rewrite_fields_module fields fields_module in
-    Result.return (derived_types @ rewritten_fields)
+    (* Make module with created items *)
+    let all_items = derived_types @ rewritten_fields in
+    let expr = B.pmod_structure all_items in
+    let mkloc txt = {txt; loc} in
+    let module_binding = B.module_binding ~name:(mkloc module_name) ~expr in
+    Result.return [B.pstr_module module_binding]
   | _ -> Result.fail (loc, "Type t must be a record type.")
 
 (** In a structure, find a type declaration for a type named [name] *)
