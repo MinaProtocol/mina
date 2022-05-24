@@ -1175,6 +1175,12 @@ module Base = struct
         let set_timing (account : t) (timing : timing) : t =
           { account with data = { account.data with timing } }
 
+        let is_timed ({ data = account; _ } : t) =
+          let open Account.Poly in
+          let open Account.Timing.As_record in
+          let { is_timed; _ } = account.timing in
+          is_timed
+
         let set_token_id (account : t) (token_id : Token_id.Checked.t) : t =
           account_with_hash { account.data with token_id }
 

@@ -474,6 +474,8 @@ module type Account_intf = sig
 
   val set_timing : t -> timing -> t
 
+  val is_timed : t -> bool
+
   val set_token_id : t -> token_id -> t
 
   type balance
@@ -1075,13 +1077,16 @@ module Make (Inputs : Inputs_intf) = struct
     let a = Account.set_token_id a (Party.token_id party) in
     let party_token = Party.token_id party in
     let party_token_is_default = Token_id.(equal default) party_token in
+    let account_is_untimed = Bool.not (Account.is_timed a) in
     (* Set account timing for new accounts, if specified. *)
     let a, local_state =
       let timing = Party.Update.timing party in
       let local_state =
         Local_state.add_check local_state
           Update_not_permitted_timing_existing_account
-          Bool.(Set_or_keep.is_keep timing ||| signature_verifies)
+          Bool.(
+            Set_or_keep.is_keep timing
+            ||| (account_is_untimed &&& signature_verifies))
       in
       let timing =
         Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)
