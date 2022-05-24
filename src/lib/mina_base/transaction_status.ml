@@ -285,17 +285,15 @@ module Failure = struct
                   for i = 0 to String.length prefix - 1 do
                     assert (Char.equal prefix.[i] str.[i])
                   done ;
-                  for
-                    i = String.length str - String.length suffix
-                    to String.length str - 1
-                  do
-                    assert (Char.equal suffix.[i] str.[i])
+                  let offset = String.length str - String.length suffix in
+                  for i = 0 to String.length suffix - 1 do
+                    assert (Char.equal suffix.[i] str.[offset + i])
                   done ;
                   parse
                     (String.sub str ~pos:(String.length prefix)
-                       ~len:(String.length str - String.length suffix) ) ) )
-            [ ( "Account_app_state"
-              , "precondition_unsatisfied"
+                       ~len:(offset - String.length prefix) ) ) )
+            [ ( "Account_app_state_"
+              , "_precondition_unsatisfied"
               , fun str ->
                   Account_app_state_precondition_unsatisfied (int_of_string str)
               )
