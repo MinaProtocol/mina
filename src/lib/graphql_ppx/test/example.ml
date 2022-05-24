@@ -34,7 +34,7 @@ module%derive_graphql Contact = struct
       args = [];
       resolve = (fun _ t -> t.name)
     }
-    let address [@field: Address.t] = {
+    let address [@field: Address.t option] = {
       typ = Address.Gql.typ ();
       args = [];
       resolve = (fun _ t -> Some t.address)

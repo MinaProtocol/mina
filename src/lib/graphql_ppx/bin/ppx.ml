@@ -166,7 +166,7 @@ module Make (B : Ast_builder.S) = struct
     ]
 
   (* Derive a whole module from the type declaration *)
-  let derive_type 
+  let derive_types
     (td : type_declaration) (rec_fields : label_declaration list)
     ~fields =
     ignore fields;
@@ -201,7 +201,14 @@ module Make (B : Ast_builder.S) = struct
           ~args:[%e field.args]
       ]
     in
-    {orig with pvb_expr = new_expr}
+    let type_annot = [%type: (_, t, _, [%t field.typ_annotation], _) Fields.field] in
+    (* Remove the field attribute *)
+    let pat_no_field =
+      Attribute.remove_seen Attribute.Context.pattern [T attr_field]
+        orig.pvb_pat
+    in
+    let pvb_pat = B.ppat_constraint pat_no_field type_annot in
+    {orig with pvb_expr = new_expr; pvb_pat}
 
   (** Rewrite the Fields module, changing every attributed field by its proper
       generated expression *)
@@ -290,7 +297,7 @@ let impl_generator name ~fields type_decl =
     let module B = (val builder : Ast_builder.S) in
     let module T = Make(B) in
     let fields = T.get_fields fields_module in
-    let derived_types = T.derive_type td rec_fields ~fields in
+    let derived_types = T.derive_types td rec_fields ~fields in
     let typ = T.gen_typ name fields in
     let* rewritten_fields = T.rewrite_fields_module fields fields_module in
     (* Make module with created items *)

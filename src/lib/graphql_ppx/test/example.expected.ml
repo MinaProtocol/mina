@@ -14,7 +14,7 @@ module Address =
           | Empty: unit r query 
           | Dummy: {
           siblings: unit r query } -> int r query 
-        let ((dummy)[@field :int]) =
+        let (dummy : (_, t, _, int, _) Fields.field) =
           field "dummy" ~typ:(non_null int)
             ~resolve:(fun _ -> fun t -> t.dummy) ~args:[]
         let typ () =
@@ -49,13 +49,13 @@ module Contact =
           | Address: {
           siblings: ('id, 'name, unit) r query } -> ('id, 'name, Address.t) r
           query 
-        let ((id)[@field :int]) =
+        let (id : (_, t, _, int, _) Fields.field) =
           field "id" ~typ:(non_null int) ~resolve:(fun _ -> fun t -> t.id)
             ~args:[]
-        let ((name)[@field :string]) =
+        let (name : (_, t, _, string, _) Fields.field) =
           field "name" ~typ:(non_null string)
             ~resolve:(fun _ -> fun t -> t.name) ~args:[]
-        let ((address)[@field :Address.t]) =
+        let (address : (_, t, _, Address.t option, _) Fields.field) =
           field "address" ~typ:(Address.Gql.typ ())
             ~resolve:(fun _ -> fun t -> Some (t.address)) ~args:[]
         let typ () =
