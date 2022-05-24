@@ -30,7 +30,7 @@ class SimpleZkapp extends SmartContract {
   deploy(args) {
     super.deploy(args);
     // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
-    this.self.update.permissions.setValue({
+    this.setPermissions({
       ...Permissions.default(),
       editState: Permissions.proofOrSignature(),
     });

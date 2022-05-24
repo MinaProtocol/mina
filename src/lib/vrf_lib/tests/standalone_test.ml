@@ -20,7 +20,7 @@ let%test_module "vrf-test" =
 
       include (Other_impl.Field : Sexpable.S with type t := t)
 
-      include Binable.Of_sexpable (Other_impl.Field)
+      include Binable.Of_sexpable_without_uuid (Other_impl.Field)
 
       let length_in_bits = size_in_bits
 
@@ -105,7 +105,7 @@ let%test_module "vrf-test" =
       end
 
       include T
-      include Binable.Of_sexpable (T)
+      include Binable.Of_sexpable_without_uuid (T)
 
       let equal = Curve.equal
 
