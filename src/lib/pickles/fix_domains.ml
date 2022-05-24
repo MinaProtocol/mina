@@ -8,13 +8,11 @@ let domains (sys : _ Kimchi_backend_common.Plonk_constraint_system.t) :
   let open Domain in
   let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
   let rows = zk_rows + public_input_size + List.length sys.rows_rev in
-  { h = Pow_2_roots_of_unity Int.(ceil_log2 rows)
-  ; x = Pow_2_roots_of_unity (Int.ceil_log2 public_input_size)
-  }
+  { h = Pow_2_roots_of_unity Int.(ceil_log2 rows) }
 
 let rough_domains : Domains.t =
   let d = Domain.Pow_2_roots_of_unity 20 in
-  { h = d; x = Pow_2_roots_of_unity 6 }
+  { h = d }
 
 let domains (type field rust_gates)
     (module Impl : Snarky_backendless.Snark_intf.Run
@@ -23,7 +21,7 @@ let domains (type field rust_gates)
                                            , rust_gates )
                                            Kimchi_backend_common
                                            .Plonk_constraint_system
-                                           .t ) (Spec.ETyp.T (typ, conv))
-    return_typ main =
+                                           .t )
+    (Spec.ETyp.T (typ, conv, _conv_inv)) return_typ main =
   let main x () : unit = main (conv x) in
   domains (Impl.constraint_system ~exposing:[ typ ] ~return_typ main)

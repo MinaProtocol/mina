@@ -24,8 +24,9 @@
  (targets librocksdb_stubs.a)
  (deps (source_tree rocksdb))
  (action (bash "
-    if [ -e /usr/local/lib/librocksdb_coda.a ]; then
-      cp /usr/local/lib/librocksdb_coda.a librocksdb_stubs.a
+    NATIVE_ROCKSDB=${MINA_ROCKSDB-/usr/local/lib/librocksdb_coda.a}
+    if [ -e $NATIVE_ROCKSDB ]; then
+      cp $NATIVE_ROCKSDB librocksdb_stubs.a
     else
       if [ ! -d rocksdb ]; then git clone https://github.com/facebook/rocksdb -b v5.17.2 --depth=1; fi
       pushd rocksdb

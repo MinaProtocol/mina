@@ -548,7 +548,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
-              let (T (typ, conv)) = etyp in
+              let (T (typ, conv, _conv_inv)) = etyp in
               let main x () : unit =
                 b.main
                   (Impls.Step.with_label "conv" (fun () -> conv x))
@@ -652,7 +652,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      let (T (typ, conv)) = input () in
+      let (T (typ, conv, _conv_inv)) = input () in
       let main x () : unit = wrap_main (conv x) in
       let () = if true then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
@@ -878,15 +878,7 @@ module Side_loaded = struct
               { commitments = vk.wrap_index
               ; step_domains =
                   Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
-                      let input_size =
-                        Side_loaded_verification_key.(
-                          input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-                            (Width.to_int vk.max_width))
-                      in
-                      { Domains.x =
-                          Pow_2_roots_of_unity (Int.ceil_log2 input_size)
-                      ; h = d.h
-                      } )
+                      { Domains.h = d.h } )
               ; index =
                   ( match vk.wrap_vk with
                   | None ->

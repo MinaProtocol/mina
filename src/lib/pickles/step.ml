@@ -599,18 +599,17 @@ struct
         |> to_list)
     in
     let%map.Promise (next_proof : Tick.Proof.t) =
-      let (T (input, conv)) =
+      let (T (input, conv, _conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
       in
-      let { Domains.h; x } =
+      let { Domains.h } =
         List.nth_exn
           (Vector.to_list step_domains)
           (Index.to_int branch_data.index)
       in
-      ksprintf Common.time "step-prover %d (%d, %d)"
-        (Index.to_int branch_data.index) (Domain.size h) (Domain.size x)
-        (fun () ->
+      ksprintf Common.time "step-prover %d (%d)"
+        (Index.to_int branch_data.index) (Domain.size h) (fun () ->
           Impls.Step.generate_witness_conv
             ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
                     () ->

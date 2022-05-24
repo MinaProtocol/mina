@@ -41,7 +41,7 @@ let input_size ~of_int ~add ~mul w =
   let open Composition_types in
   (* This should be an affine function in [a]. *)
   let size a =
-    let (T (typ, conv)) =
+    let (T (typ, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Impls.Step.Data_spec.size [ typ ]
@@ -150,13 +150,7 @@ let max_domains_with_x =
   let conv (Domain.Pow_2_roots_of_unity n) =
     Plonk_checks.Domain.Pow_2_roots_of_unity n
   in
-  let x =
-    Plonk_checks.Domain.Pow_2_roots_of_unity
-      (Int.ceil_log2
-         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-            (Nat.to_int Width.Max.n) ) )
-  in
-  { Ds.h = conv max_domains.h; x }
+  { Ds.h = conv max_domains.h }
 
 module Vk = struct
   type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
@@ -357,7 +351,7 @@ let%test_unit "input_size" =
       [%test_eq: int]
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Nat.of_int n in
-         let (T (typ, conv)) =
+         let (T (typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
              ~wrap_rounds:Backend.Tock.Rounds.n
          in

@@ -337,12 +337,12 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       let fee_transfer =
         Fee_transfer.create_single ~receiver_pk ~fee ~fee_token
       in
-      let undo_or_error =
+      let applied_or_error =
         Ledger.apply_fee_transfer ~constraint_constants ~txn_global_slot ledger
           fee_transfer
       in
-      match undo_or_error with
-      | Ok _undo ->
+      match applied_or_error with
+      | Ok _applied ->
           Deferred.unit
       | Error err ->
           fail_on_error err )
@@ -370,11 +370,11 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
             Error.tag err ~tag:"Error creating coinbase for internal command"
             |> Error.raise
       in
-      let undo_or_error =
+      let applied_or_error =
         apply_coinbase ~constraint_constants ~txn_global_slot ledger coinbase
       in
-      match undo_or_error with
-      | Ok _undo ->
+      match applied_or_error with
+      | Ok _applied ->
           Deferred.unit
       | Error err ->
           fail_on_error err )
@@ -501,7 +501,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
     Ledger.apply_user_command ~constraint_constants ~txn_global_slot ledger
       valid_signed_cmd
   with
-  | Ok _undo ->
+  | Ok _applied ->
       Deferred.unit
   | Error err ->
       Error.tag_arg err "User command failed on replay"
@@ -543,7 +543,7 @@ module Zkapp_helpers = struct
           let snarked_ledger_hash =
             Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
           in
-          let timestamp = parent_block.timestamp |> Block_time.of_int64 in
+          let timestamp = Block_time.of_string_exn parent_block.timestamp in
           let blockchain_length =
             parent_block.height |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Length.of_uint32
@@ -555,8 +555,7 @@ module Zkapp_helpers = struct
           (* TODO : this will change *)
           let last_vrf_output = () in
           let total_currency =
-            parent_block.total_currency |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
+            Currency.Amount.of_string parent_block.total_currency
           in
           let global_slot_since_hard_fork =
             parent_block.global_slot_since_hard_fork |> Unsigned.UInt32.of_int64
@@ -575,8 +574,7 @@ module Zkapp_helpers = struct
             in
             let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
             let total_currency =
-              raw_epoch_data.total_currency |> Unsigned.UInt64.of_int64
-              |> Currency.Amount.of_uint64
+              Currency.Amount.of_string raw_epoch_data.total_currency
             in
             let ledger = { Mina_base.Epoch_ledger.Poly.hash; total_currency } in
             let seed = raw_epoch_data.seed |> Epoch_seed.of_base58_check_exn in
