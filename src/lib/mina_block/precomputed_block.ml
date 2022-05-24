@@ -43,9 +43,11 @@ module Proof = struct
 end
 
 module T = struct
-  (* the accounts_accessed and accounts_created fields are used
-     for storing blocks in the archive db, they're not needed
+  (* the accounts_accessed, accounts_created, and tokens_used fields
+     are used for storing blocks in the archive db, they're not needed
      for replaying blocks
+
+     in tokens_used, the account id is the token owner
   *)
   type t =
     { scheduled_time : Block_time.t
@@ -56,7 +58,7 @@ module T = struct
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
-          (* TODO : list of token ids and owners created *)
+    ; tokens_used : (Token_id.t * Account_id.t option) list
     }
   [@@deriving sexp, yojson]
 end
@@ -79,6 +81,8 @@ module Stable = struct
       ; accounts_accessed : (int * Account.Stable.V2.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+      ; tokens_used :
+          (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
       }
 
     let to_latest = Fn.id
@@ -118,6 +122,15 @@ let of_block ~logger
          ~previous_block_state_hash ) ~f:(fun acct_id ->
         (acct_id, account_creation_fee) )
   in
+  let tokens_used =
+    let unique_tokens =
+      List.map account_ids_accessed ~f:Account_id.token_id
+      |> List.dedup_and_sort ~compare:Token_id.compare
+    in
+    List.map unique_tokens ~f:(fun token_id ->
+        let owner = Mina_ledger.Ledger.token_owner ledger token_id in
+        (token_id, owner) )
+  in
   { scheduled_time
   ; protocol_state = Header.protocol_state header
   ; protocol_state_proof = Header.protocol_state_proof header
@@ -125,6 +138,7 @@ let of_block ~logger
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; accounts_accessed
   ; accounts_created
+  ; tokens_used
   }
 
 (* NOTE: This serialization is used externally and MUST NOT change.

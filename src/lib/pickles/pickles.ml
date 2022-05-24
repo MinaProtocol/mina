@@ -868,15 +868,7 @@ module Side_loaded = struct
               { commitments = vk.wrap_index
               ; step_domains =
                   Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
-                      let input_size =
-                        Side_loaded_verification_key.(
-                          input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-                            (Width.to_int vk.max_width))
-                      in
-                      { Domains.x =
-                          Pow_2_roots_of_unity (Int.ceil_log2 input_size)
-                      ; h = d.h
-                      } )
+                      { Domains.h = d.h } )
               ; index =
                   ( match vk.wrap_vk with
                   | None ->
