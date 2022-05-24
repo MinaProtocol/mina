@@ -75,9 +75,9 @@ module Hashless_ledger = struct
   let get_or_create t id = Or_error.try_with (fun () -> get_or_create_exn t id)
 
   let remove_accounts_exn _t =
-    failwith "hashless_ledger: bug in transaction_logic, who is calling undo?"
+    failwith "hashless_ledger: bug in transaction_logic"
 
-  (* Without undo validating that the hashes match, Mina_transaction_logic doesn't really care what this is. *)
+  (* Without any validation that the hashes match, Mina_transaction_logic doesn't really care what this is. *)
   let merkle_root _t = Ledger_hash.empty_hash
 
   let create l = { base = l; overlay = Hashtbl.create (module Account_id) }

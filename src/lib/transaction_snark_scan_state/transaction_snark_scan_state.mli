@@ -73,19 +73,6 @@ end) : sig
     -> (unit, Error.t) Deferred.Result.t
 end
 
-(*All the transactions with undos*)
-module Staged_undos : sig
-  type t
-
-  val apply :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> t
-    -> Ledger.t
-    -> unit Or_error.t
-end
-
-val staged_undos : t -> Staged_undos.t
-
 val empty :
   constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
