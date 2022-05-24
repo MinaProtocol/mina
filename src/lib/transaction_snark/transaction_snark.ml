@@ -1931,7 +1931,7 @@ module Base = struct
               ( Stack_frame.t
               , Call_stack.t
               , Token_id.t
-              , Amount.t
+              , Amount.Signed.t
               , Ledger.t
               , Bool.t
               , Transaction_commitment.t
