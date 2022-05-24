@@ -1481,11 +1481,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           ( Stack_frame.t
           , Call_stack.t
           , Token_id.t
-          , Amount.t
+          , Amount.Signed.t
           , L.t
           , bool
           , Transaction_commitment.t
-          , Transaction_status.Failure.t option )
+          , Transaction_status.Failure.Collection.t )
           Parties_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
       ; transaction_commitment : unit
@@ -1500,15 +1500,22 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
-      | Check_account_precondition (_is_start, party, account, _global_state)
-        -> (
+      | Check_account_precondition (party, account, local_state) -> (
           match party.body.account_precondition with
           | Accept ->
-              true
+              local_state
           | Nonce n ->
-              Account.Nonce.equal account.nonce n
+              let nonce_matches = Account.Nonce.equal account.nonce n in
+              Inputs.Local_state.add_check local_state
+                Account_nonce_precondition_unsatisfied nonce_matches
           | Full p ->
-              Or_error.is_ok (Zkapp_precondition.Account.check p account) )
+              let local_state = ref local_state in
+              let check failure b =
+                local_state :=
+                  Inputs.Local_state.add_check !local_state failure b
+              in
+              Zkapp_precondition.Account.check ~check p account ;
+              !local_state )
       | Init_account { party = _; account = a } ->
           a
   end
