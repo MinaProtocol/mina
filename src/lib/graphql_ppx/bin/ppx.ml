@@ -187,7 +187,6 @@ module Make (B : Ast_builder.S) = struct
     name : string;
     typ_value : Ppxlib.expression;
     typ_annotation : Ppxlib.core_type;
-    obj : string;
     args : Ppxlib.expression;
     resolve : Ppxlib.expression
   }
@@ -242,15 +241,14 @@ module Make (B : Ast_builder.S) = struct
       let loc = vb.pvb_loc in
       let expected = Ast_pattern.(
           (pexp_record
-             ((loc (lident (string "obj")) ** (estring __)) ^::
-              (loc (lident (string "typ")) ** __) ^::
+             ((loc (lident (string "typ")) ** __) ^::
               (loc (lident (string "args")) ** __) ^::
               (loc (lident (string "resolve")) ** __) ^::
               nil) none)
         )
       in
-      let pack obj typ_value args resolve =
-        Some {name; typ_value; typ_annotation; obj; args; resolve}
+      let pack typ_value args resolve =
+        Some {name; typ_value; typ_annotation; args; resolve}
       in
       Ast_pattern.parse expected loc vb.pvb_expr pack 
     | _ -> None (* should be a proper name *)
@@ -269,12 +267,20 @@ module Make (B : Ast_builder.S) = struct
         | _ -> []
       )
     |> List.concat
+
+  let gen_typ name (fields : field_declaration list) =
+    let name = B.estring name in
+    let field_list =
+      List.map fields ~f:(fun f -> B.evar f.name)
+      |> B.elist
+    in
+    [%stri let typ () = obj [%e name] ~fields:(fun _ -> Fields.([%e field_list]))]
 end
 
 let module_name = "Gql"
 
 (* Detect deriver calls on record type declarations, and generate the derivation *)
-let impl_generator ~fields type_decl =
+let impl_generator name ~fields type_decl =
   let td = type_decl in
   let loc = td.ptype_loc in
   match td.ptype_kind with
@@ -285,9 +291,10 @@ let impl_generator ~fields type_decl =
     let module T = Make(B) in
     let fields = T.get_fields fields_module in
     let derived_types = T.derive_type td rec_fields ~fields in
+    let typ = T.gen_typ name fields in
     let* rewritten_fields = T.rewrite_fields_module fields fields_module in
     (* Make module with created items *)
-    let all_items = derived_types @ rewritten_fields in
+    let all_items = derived_types @ rewritten_fields @ [typ] in
     let expr = B.pmod_structure all_items in
     let mkloc txt = {txt; loc} in
     let module_binding = B.module_binding ~name:(mkloc module_name) ~expr in
@@ -342,7 +349,7 @@ let ppx_entrypoint ~ctxt name payload =
     let* type_decl = Result.of_option (find_type payload "t")
         ~error:(loc, "A base type t is required in the module, but was not found.")
     in
-    let* generated_items = impl_generator type_decl ~fields in
+    let* generated_items = impl_generator name type_decl ~fields in
     let items = payload_without_fields @ generated_items in
     let expr = B.pmod_structure ~loc items in
     let binding = B.module_binding ~name:{loc; txt=name} ~expr ~loc in

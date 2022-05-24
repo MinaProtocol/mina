@@ -17,7 +17,8 @@ module Address =
         let ((dummy)[@field :int]) =
           field "dummy" ~typ:(non_null int)
             ~resolve:(fun _ -> fun t -> t.dummy) ~args:[]
-        let typ () = obj "Address" ~fields:(fun _ -> [dummy])
+        let typ () =
+          obj "Address" ~fields:(fun _ -> let open Fields in [dummy])
       end
   end
 module Contact =
@@ -57,5 +58,8 @@ module Contact =
         let ((address)[@field :Address.t]) =
           field "address" ~typ:(Address.Gql.typ ())
             ~resolve:(fun _ -> fun t -> Some (t.address)) ~args:[]
+        let typ () =
+          obj "Contact"
+            ~fields:(fun _ -> let open Fields in [id; name; address])
       end
   end
