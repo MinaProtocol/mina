@@ -1622,40 +1622,80 @@ let dummy_constraints =
           (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t )
 
-type ('a_var, 'a_value, 'a_weird) pickles_rule =
-  { identifier : string
-  ; prevs : 'a_weird list
-  ; main : 'a_var list -> 'a_var -> Boolean.var list
-  ; main_value : 'a_value list -> 'a_value -> bool list
-  }
+type ('a_var, 'a_value) packed_pickles_rule =
+  | Packed_inductive :
+      ( 'prev_vars
+      , 'prev_values
+      , 'widths
+      , 'heights
+      , 'a_var
+      , 'a_value )
+      Pickles.Inductive_rule.t
+      -> ('a_var, 'a_value) packed_pickles_rule
+
+type ('a_var, 'a_value) packed_pickles_rules =
+  | Packed_inductive_list :
+      ( 'prev_varss
+      , 'prev_valuess
+      , 'widthss
+      , 'heightss
+      , 'a_var
+      , 'a_value )
+      Pickles_types.Hlist.H4_2.T(Pickles.Inductive_rule).t
+      -> ('a_var, 'a_value) packed_pickles_rules
+
+let rec combine_packed_rules :
+    type a_var a_value.
+       (a_var, a_value) packed_pickles_rule list
+    -> (a_var, a_value) packed_pickles_rules = function
+  | [] ->
+      Packed_inductive_list []
+  | Packed_inductive hd :: tl ->
+      let (Packed_inductive_list tl) = combine_packed_rules tl in
+      Packed_inductive_list (hd :: tl)
+
+let rec split_packed_rules :
+    type a_var a_value.
+       (a_var, a_value) packed_pickles_rules
+    -> (a_var, a_value) packed_pickles_rule list = function
+  | Packed_inductive_list [] ->
+      []
+  | Packed_inductive_list (hd :: tl) ->
+      Packed_inductive hd :: split_packed_rules (Packed_inductive_list tl)
 
 type pickles_rule_js = Js.js_string Js.t * (zkapp_statement_js -> unit)
 
 let create_pickles_rule ((identifier, main) : pickles_rule_js) =
-  { identifier = Js.to_string identifier
-  ; prevs = []
-  ; main =
-      (fun _ statement ->
-        dummy_constraints () ;
-        main (Zkapp_statement.to_js statement) ;
-        [] )
-  ; main_value = (fun _ _ -> [])
-  }
+  Packed_inductive
+    { identifier = Js.to_string identifier
+    ; prevs = []
+    ; main =
+        (fun statement ->
+          dummy_constraints () ;
+          main (Zkapp_statement.to_js statement) ;
+          [] )
+    }
 
 let dummy_rule self =
-  { identifier = "dummy"
-  ; prevs = [ self; self ]
-  ; main_value = (fun _ _ -> [ true; true ])
-  ; main =
-      (fun _ _ ->
-        dummy_constraints () ;
-        (* unsatisfiable *)
-        let x =
-          Impl.exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-        in
-        Field.(Assert.equal x (x + one)) ;
-        Boolean.[ true_; true_ ] )
-  }
+  Packed_inductive
+    { identifier = "dummy"
+    ; prevs = [ self; self ]
+    ; main =
+        (fun _ ->
+          dummy_constraints () ;
+          (* unsatisfiable *)
+          let x =
+            Impl.exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          Field.(Assert.equal x (x + one)) ;
+          let public_input =
+            Impl.exists zkapp_statement_typ ~compute:(fun () ->
+                assert false )
+          in
+          [ { public_input; proof_must_verify = Boolean.true_ }
+          ; { public_input; proof_must_verify = Boolean.true_ }
+          ] )
+    }
 
 let other_verification_key_constr :
     (Other_impl.Verification_key.t -> verification_key_class Js.t) Js.constr =
@@ -1697,13 +1737,55 @@ let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let branches = List.length choices + 1 in
+  let module Types = struct
+    type prev_varss
+
+    type prev_valuess
+
+    type widthss
+
+    type heightss
+  end in
   let choices ~self =
-    List.map choices ~f:create_pickles_rule @ [ dummy_rule self ]
+    let (Packed_inductive_list l) =
+      List.map choices ~f:create_pickles_rule @ [ dummy_rule self ]
+      |> combine_packed_rules
+    in
+    let convert_unsafe :
+        type prev_varss prev_valuess widthss heightss.
+           ( prev_varss
+           , prev_valuess
+           , widthss
+           , heightss
+           , Zkapp_statement.t
+           , Zkapp_statement.Constant.t )
+           Pickles_types.Hlist.H4_2.T(Pickles.Inductive_rule).t
+        -> ( Types.prev_varss
+           , Types.prev_valuess
+           , Types.widthss
+           , Types.heightss
+           , Zkapp_statement.t
+           , Zkapp_statement.Constant.t )
+           Pickles_types.Hlist.H4_2.T(Pickles.Inductive_rule).t =
+     fun l ->
+      (* Be very careful with this value. *)
+      let (T, T, T, T)
+            : (prev_varss, Types.prev_varss) Core_kernel.Type_equal.t
+              * (prev_valuess, Types.prev_valuess) Core_kernel.Type_equal.t
+              * (widthss, Types.widthss) Core_kernel.Type_equal.t
+              * (heightss, Types.heightss) Core_kernel.Type_equal.t =
+        ( Obj.magic Core_kernel.Type_equal.T
+        , Obj.magic Core_kernel.Type_equal.T
+        , Obj.magic Core_kernel.Type_equal.T
+        , Obj.magic Core_kernel.Type_equal.T )
+      in
+      l
+    in
+    convert_unsafe l
   in
   let (module Branches) = nat_module branches in
-  (* TODO get rid of Obj.magic for choices *)
   let tag, _cache, p, provers =
-    Pickles.compile_promise ~choices:(Obj.magic choices)
+    Pickles.compile_promise ~choices
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
       ~typ:zkapp_statement_typ
@@ -1728,8 +1810,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let module Proof = (val p) in
   let to_js_prover prover =
     let prove (statement_js : zkapp_statement_js) =
-      (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
-      let prevs = Obj.magic [] in
+      let prevs: (_, _, _) Statement_with_proof.t = Obj.magic [] in
       let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement |> Promise_js_helpers.to_js
     in
