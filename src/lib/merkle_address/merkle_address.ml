@@ -60,7 +60,7 @@ module Stable = struct
     let to_latest = Fn.id
 
     include
-      Binable.Of_binable
+      Binable.Of_binable_without_uuid
         (Binable_arg.Stable.V1)
         (struct
           type nonrec t = t
