@@ -20,6 +20,7 @@
    async_kernel
    uri
    core
+   sexplib0
    ;;local libraries
    mina_signature_kind
    graphql_lib

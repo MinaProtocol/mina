@@ -220,9 +220,10 @@ struct
       List.partition_map l ~f:(fun tok' ->
           match tok with
           | None ->
-              `Fst tok'
+              Either.first tok'
           | Some tok ->
-              if Timer.equal_tok tok tok' then `Fst tok' else `Snd tok' )
+              if Timer.equal_tok tok tok' then Either.first tok'
+              else Either.second tok' )
     in
     List.iter to_cancel ~f:(fun tok' -> Timer.cancel t.timer tok') ;
     add_back_timers t ~key:label ~data:to_put_back

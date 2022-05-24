@@ -1968,7 +1968,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       { Transaction_applied.Snapp_command_applied.accounts; command = _ } =
     let to_update, to_delete =
       List.partition_map accounts ~f:(fun (id, a) ->
-          match a with Some a -> `Fst (id, a) | None -> `Snd id )
+          match a with
+          | Some a ->
+              Either.first (id, a)
+          | None ->
+              Either.second id )
     in
     let to_update =
       List.dedup_and_sort
