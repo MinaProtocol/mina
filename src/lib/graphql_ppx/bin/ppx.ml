@@ -324,7 +324,7 @@ let remove_module structure name =
 
 (** Check the payload is valid, and pass important parts to the generator.
     Returns the payload itself, plus the generated items *)
-let ppx_entrypoint ~ctxt payload =
+let ppx_entrypoint ~ctxt name payload =
   let module B = Ast_builder.Default in
   let loc = Expansion_context.Extension.extension_point_loc ctxt in
   let make_error loc msg =
@@ -332,7 +332,7 @@ let ppx_entrypoint ~ctxt payload =
       Location.Error.createf ~loc "%s" msg
       |> Location.Error.to_extension
     in
-    [B.pstr_extension ~loc ext []] |> B.pmod_structure ~loc
+    B.pstr_extension ~loc ext []
   in
   let go () =
     let* (_, fields) = Result.of_option (find_module payload "Fields")
@@ -344,7 +344,10 @@ let ppx_entrypoint ~ctxt payload =
     in
     let* generated_items = impl_generator type_decl ~fields in
     let items = payload_without_fields @ generated_items in
-    B.pmod_structure ~loc items |> Result.return
+    let expr = B.pmod_structure ~loc items in
+    let binding = B.module_binding ~name:{loc; txt=name} ~expr ~loc in
+    let final = B.pstr_module binding ~loc in
+    Result.return final
   in match go () with
   | Ok x -> x
   | Error (loc, msg) -> make_error loc msg
@@ -352,8 +355,12 @@ let ppx_entrypoint ~ctxt payload =
 let extension =
   Extension.V3.declare
     "derive_graphql"
-    Extension.Context.module_expr
-    Ast_pattern.(pstr __)
+    Extension.Context.structure_item
+    Ast_pattern.(
+      pstr ((pstr_module
+               (module_binding ~name:__ ~expr:(pmod_structure __))
+            ^:: nil))
+    )
     ppx_entrypoint
 
 let rule = Context_free.Rule.extension extension

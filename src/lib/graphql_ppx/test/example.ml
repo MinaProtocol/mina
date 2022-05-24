@@ -1,4 +1,4 @@
-module Address = [%derive_graphql
+module%derive_graphql Address = struct
   type t = {
     dummy : int;
   }
@@ -14,9 +14,9 @@ module Address = [%derive_graphql
 
     let typ () = obj "Address" ~fields:(fun _ -> [dummy])
   end
-]
+end
 
-module Contact = [%derive_graphql
+module%derive_graphql Contact = struct
   type t = {
     id: int;
     name: string;
@@ -45,4 +45,4 @@ module Contact = [%derive_graphql
       resolve = (fun _ t -> Some t.address)
     }
   end
-]
+end
