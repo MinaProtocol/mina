@@ -10,12 +10,6 @@ data "aws_route53_zone" "selected" {
   name = "o1test.net."
 }
 
-data "kubernetes_ingress" "kibana_ingress" {
-  metadata {
-    name = "kibana-ingress"
-  }
-}
-
 resource "aws_route53_record" "seed_record" {
   count   = var.seed_count
   zone_id = data.aws_route53_zone.selected.zone_id
@@ -23,14 +17,6 @@ resource "aws_route53_record" "seed_record" {
   type    = "A"
   ttl     = "300"
   records = [google_compute_address.seed_static_ip[count.index].address]
-}
-
-resource "aws_route53_record" "kibana_ingress" {
-  zone_id = data.aws_route53_zone.selected.zone_id
-  name    = "nodestatus.${data.aws_route53_zone.selected.name}"
-  type    = "A"
-  ttl     = "300"
-  records = [data.kubernetes_ingress.kibana_ingress.status.0.load_balancer.0.ingress.0.hostname]
 }
 
 module "kubernetes_testnet" {
