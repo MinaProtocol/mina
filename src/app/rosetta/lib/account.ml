@@ -450,18 +450,17 @@ AS combo GROUP BY combo.pk_id
           UInt32.of_int (Int.of_int64_exn timing_info.cliff_time)
         in
         let cliff_amount =
-          MinaCurrency.Amount.of_int (Int.of_int64_exn timing_info.cliff_amount)
+          MinaCurrency.Amount.of_string timing_info.cliff_amount
         in
         let vesting_period =
           UInt32.of_int (Int.of_int64_exn timing_info.vesting_period)
         in
         let vesting_increment =
-          MinaCurrency.Amount.of_int
-            (Int.of_int64_exn timing_info.vesting_increment)
+          MinaCurrency.Amount.of_string
+            timing_info.vesting_increment
         in
         let initial_minimum_balance =
-          MinaCurrency.Balance.of_int
-            (Int.of_int64_exn timing_info.initial_minimum_balance)
+          MinaCurrency.Balance.of_string timing_info.initial_minimum_balance
         in
         Mina_base.Account.incremental_balance_between_slots ~start_slot ~end_slot
           ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
