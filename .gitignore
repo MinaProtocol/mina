@@ -37,6 +37,7 @@ maintenance/*.dot
 maintenance/*.png
 
 scripts/genesis_ledger.json
+scripts/annotated_ledger.json
 
 automation/*config.json
 automation/!bsconfig.json
@@ -86,3 +87,9 @@ target
 release
 Cargo.lock
 .vscode
+
+### IntelliJ IDEA ###
+**/.idea/
+*.iws
+*.iml
+*.ipr
