@@ -1,16 +1,18 @@
 module Address = [%derive_graphql
   type t = {
-    dummy : unit;
+    dummy : int;
   }
   type 'a final_option_modifier = 'a
 
   module Fields = struct
-    let dummy [@field: unit] = {
+    let dummy [@field: int] = {
       obj = "Address";
-      typ = ();
+      typ = non_null int;
       args = [];
-      resolve = ()
+      resolve = (fun _ t -> t.dummy)
     }
+
+    let typ () = obj "Address" ~fields:(fun _ -> [dummy])
   end
 ]
 
@@ -23,23 +25,24 @@ module Contact = [%derive_graphql
   type 'a final_option_modifier = 'a
 
   module Fields = struct
+
     let id [@field: int] = {
       obj = "Contact"; (* this should be factorized *)
-      typ = ();
+      typ = non_null int;
       args = [];
-      resolve = ()
+      resolve = (fun _ t -> t.id)
     }
     let name [@field: string] = {
       obj = "Contact";
-      typ = ();
+      typ = non_null string;
       args = [];
-      resolve = ()
+      resolve = (fun _ t -> t.name)
     }
     let address [@field: Address.t] = {
       obj = "Contact";
-      typ = ();
+      typ = Address.Gql.typ ();
       args = [];
-      resolve = ()
+      resolve = (fun _ t -> Some t.address)
     }
   end
 ]

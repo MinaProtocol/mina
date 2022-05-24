@@ -1,7 +1,7 @@
 module Address =
   struct
     type t = {
-      dummy: unit }
+      dummy: int }
     type 'a final_option_modifier = 'a
     module Gql =
       struct
@@ -13,9 +13,11 @@ module Address =
         type _ query =
           | Empty: unit r query 
           | Dummy: {
-          siblings: unit r query } -> unit r query 
-        let ((dummy)[@field :unit]) =
-          field "dummy" ~typ:() ~resolve:() ~args:[]
+          siblings: unit r query } -> int r query 
+        let ((dummy)[@field :int]) =
+          field "dummy" ~typ:(non_null int)
+            ~resolve:(fun _ -> fun t -> t.dummy) ~args:[]
+        let typ () = obj "Address" ~fields:(fun _ -> [dummy])
       end
   end
 module Contact =
@@ -46,10 +48,14 @@ module Contact =
           | Address: {
           siblings: ('id, 'name, unit) r query } -> ('id, 'name, Address.t) r
           query 
-        let ((id)[@field :int]) = field "id" ~typ:() ~resolve:() ~args:[]
+        let ((id)[@field :int]) =
+          field "id" ~typ:(non_null int) ~resolve:(fun _ -> fun t -> t.id)
+            ~args:[]
         let ((name)[@field :string]) =
-          field "name" ~typ:() ~resolve:() ~args:[]
+          field "name" ~typ:(non_null string)
+            ~resolve:(fun _ -> fun t -> t.name) ~args:[]
         let ((address)[@field :Address.t]) =
-          field "address" ~typ:() ~resolve:() ~args:[]
+          field "address" ~typ:(Address.Gql.typ ())
+            ~resolve:(fun _ -> fun t -> Some (t.address)) ~args:[]
       end
   end
