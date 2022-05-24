@@ -57,16 +57,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let nonce = Account.Nonce.of_int 0 in
       let memo =
         Signed_command_memo.create_from_string_exn
-          "Snapp create account with timing"
+          "zkApp create account w/ timing"
       in
-      let snapp_keypair = Signature_lib.Keypair.create () in
+      let zkapp_keypair = Signature_lib.Keypair.create () in
       let (parties_spec : Transaction_snark.For_tests.Spec.t) =
         { sender = (keypair, nonce)
         ; fee
         ; fee_payer = None
         ; receivers = []
         ; amount
-        ; zkapp_account_keypairs = [ snapp_keypair ]
+        ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo
         ; new_zkapp_account = true
         ; snapp_update =
@@ -92,7 +92,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let timing_account_id =
         Account_id.create
-          (snapp_keypair.public_key |> Signature_lib.Public_key.compress)
+          (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
           Token_id.default
       in
       return
@@ -100,7 +100,51 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             parties_spec
         , timing_account_id
         , parties_spec.snapp_update
-        , snapp_keypair )
+        , zkapp_keypair )
+    in
+    let%bind parties_create_second_account_with_timing =
+      let open Mina_base in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      let amount = Currency.Amount.of_int 10_000_000_000 in
+      let nonce = Account.Nonce.of_int 2 in
+      let memo =
+        Signed_command_memo.create_from_string_exn
+          "zkApp, 2nd account with timing"
+      in
+      let zkapp_keypair = Signature_lib.Keypair.create () in
+      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (keypair, nonce)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount
+        ; zkapp_account_keypairs = [ zkapp_keypair ]
+        ; memo
+        ; new_zkapp_account = true
+        ; snapp_update =
+            (* some maximal values to see GraphQL accepts them *)
+            (let timing =
+               Zkapp_basic.Set_or_keep.Set
+                 ( { initial_minimum_balance = Currency.Balance.max_int
+                   ; cliff_time = Mina_numbers.Global_slot.max_value
+                   ; cliff_amount = Currency.Amount.max_int
+                   ; vesting_period = Mina_numbers.Global_slot.of_int 2
+                   ; vesting_increment = Currency.Amount.of_int 1_000
+                   }
+                   : Party.Update.Timing_info.value )
+             in
+             { Party.Update.dummy with timing } )
+        ; current_auth = Permissions.Auth_required.Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        ; protocol_state_precondition = None
+        ; account_precondition = None
+        }
+      in
+      return
+      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+           parties_spec
     in
     let%bind parties_transfer_from_timed_account =
       let open Mina_base in
@@ -109,7 +153,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let nonce = Account.Nonce.zero in
       let memo =
         Signed_command_memo.create_from_string_exn
-          "Snapp transfer, timed account"
+          "zkApp transfer, timed account"
       in
       let sender_keypair = timed_account_keypair in
       let receiver_key =
@@ -172,10 +216,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_int 1_000_000 in
       let amount = Currency.Amount.zero in
-      let nonce = Account.Nonce.of_int 2 in
+      let nonce = Account.Nonce.of_int 3 in
       let memo =
         Signed_command_memo.create_from_string_exn
-          "Snapp, invalid update timing"
+          "zkApp, invalid update timing"
       in
       let snapp_update : Party.Update.t =
         { Party.Update.dummy with
@@ -216,23 +260,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
-    let wait_for_snapp ~has_failures parties =
+    let wait_for_zkapp ~has_failures parties =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
              ~parties
       in
-      [%log info] "Snapps transaction included in transition frontier"
+      [%log info] "zkApp transaction included in transition frontier"
     in
     let%bind () =
-      section "Send a snapp to create a snapp account with timing"
+      section "Send a zkApp to create a zkApp account with timing"
         (send_zkapp ~logger node parties_create_account_with_timing)
     in
     let%bind () =
       section
         "Wait for snapp to create account with timing to be included in \
          transition frontier"
-        (wait_for_snapp ~has_failures:false parties_create_account_with_timing)
+        (wait_for_zkapp ~has_failures:false parties_create_account_with_timing)
+    in
+    let%bind () =
+      section "Send zkApp to create a 2nd zkApp account with timing"
+        (send_zkapp ~logger node parties_create_second_account_with_timing)
+    in
+    let%bind () =
+      section
+        "Wait for snapp to create second account with timing to be included in \
+         transition frontier"
+        (wait_for_zkapp ~has_failures:false
+           parties_create_second_account_with_timing )
     in
     let%bind () =
       section "Verify snapp timing in ledger"
@@ -268,12 +323,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          get_account_balance ~logger node timing_account_id
        in *)
     let%bind () =
-      section "Send a snapp with transfer from timed account that succeeds"
+      section "Send a zkApp with transfer from timed account that succeeds"
         (send_zkapp ~logger node parties_transfer_from_timed_account)
     in
     let%bind () =
-      section "Waiting for snapp with transfer from timed account that succeeds"
-        (wait_for_snapp ~has_failures:false parties_transfer_from_timed_account)
+      section "Waiting for zkApp with transfer from timed account that succeeds"
+        (wait_for_zkapp ~has_failures:false parties_transfer_from_timed_account)
     in
     (* let%bind after_balance =
          get_account_balance ~logger node timing_account_id
@@ -373,7 +428,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "Waiting for snapp with transfer from timed account that fails due to \
          min balance"
-        (wait_for_snapp ~has_failures:true
+        (wait_for_zkapp ~has_failures:true
            parties_invalid_transfer_from_timed_account )
     in
     (* TODO: use transaction status to see that the transaction failed
@@ -420,7 +475,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Wait for snapp with invalid timing update"
-        (wait_for_snapp ~has_failures:true parties_update_timing)
+        (wait_for_zkapp ~has_failures:true parties_update_timing)
     in
     let%bind () =
       section "Verify timing has not changed"

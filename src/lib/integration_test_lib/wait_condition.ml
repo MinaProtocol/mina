@@ -172,7 +172,7 @@ struct
     ; hard_timeout = Slots 20
     }
 
-  let snapp_to_be_included_in_frontier ~has_failures ~parties =
+  let zkapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
       match cmd with
@@ -182,12 +182,12 @@ struct
           false
     in
     let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
-      let snapp_opt =
+      let zkapp_opt =
         List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
             cmd_with_status.With_status.data |> User_command.forget_check
             |> command_matches_parties )
       in
-      match snapp_opt with
+      match zkapp_opt with
       | Some cmd_with_status ->
           let actual_status = cmd_with_status.With_status.status in
           let successful =
@@ -209,7 +209,7 @@ struct
     let soft_timeout_in_slots = 8 in
     let is_first = ref true in
     { description =
-        sprintf "snapp with fee payer %s and other parties (%s)"
+        sprintf "zkApp with fee payer %s and other parties (%s), memo: %s"
           (Signature_lib.Public_key.Compressed.to_base58_check
              parties.fee_payer.body.public_key )
           (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
@@ -222,6 +222,7 @@ struct
                  is_first := false ;
                  str )
                else acc ^ ", " ^ str ) )
+          (Signed_command_memo.to_string_hum parties.memo)
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
