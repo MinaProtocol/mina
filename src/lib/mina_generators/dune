@@ -2,7 +2,7 @@
  (name mina_generators)
  (public_name mina_generators)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_let ppx_version))
+ (preprocess (pps ppx_let ppx_version ppx_custom_printf))
  (libraries
    ;; opam libraries
    yojson

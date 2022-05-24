@@ -2440,6 +2440,19 @@ let%test_module "staged ledger tests" =
             let%bind ledger_proof, diff =
               create_and_apply sl cmds_this_iter stmt_to_work
             in
+            List.iter (Staged_ledger_diff.commands diff) ~f:(fun c ->
+                match With_status.status c with
+                | Applied ->
+                    ()
+                | Failed ftl ->
+                    failwith
+                      (sprintf
+                         "Transaction application failed for command %s. \
+                          Failures %s"
+                         ( User_command.to_yojson (With_status.data c)
+                         |> Yojson.Safe.to_string )
+                         ( Transaction_status.Failure.Collection.to_yojson ftl
+                         |> Yojson.Safe.to_string ) ) ) ;
             let proof_count' =
               proof_count + if Option.is_some ledger_proof then 1 else 0
             in
@@ -2514,88 +2527,8 @@ let%test_module "staged ledger tests" =
       in
       let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
-          | Parties parties, fee_payer_keypair, keymap ->
-              let parties = Parties.forget parties in
-              let memo_hash = Signed_command_memo.hash parties.memo in
-              let fee_payer_hash =
-                Party.of_fee_payer parties.fee_payer
-                |> Parties.Digest.Party.create
-              in
-              let fee_payer_signature =
-                Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
-                  (Random_oracle.Input.Chunked.field
-                     ( Parties.commitment parties
-                     |> Parties.Transaction_commitment.create_complete
-                          ~memo_hash ~fee_payer_hash ) )
-              in
-              (* replace fee payer signature, because new protocol state invalidates the old *)
-              let fee_payer_with_valid_signature =
-                { parties.fee_payer with authorization = fee_payer_signature }
-              in
-              let memo_hash = Signed_command_memo.hash parties.memo in
-              let other_parties_hash = Parties.other_parties_hash parties in
-              let sign_for_other_party ~use_full_commitment sk =
-                let tx_commitment =
-                  Parties.Transaction_commitment.create ~other_parties_hash
-                in
-                let full_tx_commitment =
-                  Parties.Transaction_commitment.create_complete tx_commitment
-                    ~memo_hash ~fee_payer_hash
-                in
-                let commitment =
-                  if use_full_commitment then full_tx_commitment
-                  else tx_commitment
-                in
-                Signature_lib.Schnorr.Chunked.sign sk
-                  (Random_oracle.Input.Chunked.field commitment)
-              in
-              (* replace other party's signatures, because of new protocol state *)
-              let other_parties_with_valid_signatures =
-                Parties.Call_forest.map parties.other_parties
-                  ~f:(fun ({ body; authorization } : Party.t) ->
-                    let authorization_with_valid_signature =
-                      match authorization with
-                      | Control.Signature _dummy ->
-                          let pk = body.public_key in
-                          let sk =
-                            match
-                              Signature_lib.Public_key.Compressed.Map.find
-                                keymap pk
-                            with
-                            | Some sk ->
-                                sk
-                            | None ->
-                                failwithf
-                                  "gen_from: Could not find secret key for \
-                                   public key %s in keymap"
-                                  (Signature_lib.Public_key.Compressed
-                                   .to_base58_check pk )
-                                  ()
-                          in
-                          let use_full_commitment = body.use_full_commitment in
-                          let signature =
-                            sign_for_other_party ~use_full_commitment sk
-                          in
-                          Control.Signature signature
-                      | Proof _ | None_given ->
-                          authorization
-                    in
-                    ( { body
-                      ; authorization = authorization_with_valid_signature
-                      }
-                      : Party.t ) )
-              in
-              let parties' =
-                { parties with
-                  fee_payer = fee_payer_with_valid_signature
-                ; other_parties = other_parties_with_valid_signatures
-                }
-              in
-              let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                    parties' ) =
-                Parties.to_valid_unsafe parties'
-              in
-              User_command.Parties parties'
+          | Parties parties, _fee_payer_keypair, _keymap ->
+              User_command.Parties parties
           | Signed_command _, _, _ ->
               failwith "Expected a Parties, got a Signed command" )
       in
