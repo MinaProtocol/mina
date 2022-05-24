@@ -42,7 +42,7 @@ module Node = struct
     module V3 = struct
       type 'a t =
         | Full : Breadcrumb.t -> full t
-        | Lite : Mina_block.Validated.Stable.V1.t -> lite t
+        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
 
       include Dummy_binable1 (struct
         type nonrec 'a t = 'a t
@@ -250,7 +250,7 @@ module Lite_binable = struct
 
     module V2 = struct
       type t =
-        | New_node of Mina_block.Validated.Stable.V1.t
+        | New_node of Mina_block.Validated.Stable.V2.t
         | Root_transitioned of Root_transition.Lite.Stable.V4.t
         | Best_tip_changed of State_hash.Stable.V1.t
 

@@ -3,7 +3,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = { staged_ledger_diff : Staged_ledger_diff.Stable.V2.t }
+    type t = { staged_ledger_diff : Diff.Stable.V2.t }
     [@@deriving compare, sexp, fields]
 
     let to_latest = Fn.id
@@ -19,7 +19,7 @@ module Stable = struct
 
       let t_of_sexp = t_of_sexp
 
-      type 'a creator = Staged_ledger_diff.Stable.Latest.t -> 'a
+      type 'a creator = Diff.Stable.Latest.t -> 'a
 
       let map_creator c ~f staged_ledger_diff = f (c staged_ledger_diff)
 
@@ -47,3 +47,9 @@ type t = Stable.Latest.t
 [%%define_locally
 Stable.Latest.
   (create, to_yojson, sexp_of_t, t_of_sexp, compare, staged_ledger_diff)]
+
+let compute_reference b =
+  let sz = Stable.V1.bin_size_t b in
+  let buf = Bin_prot.Common.create_buf sz in
+  ignore (Stable.V1.bin_write_t buf ~pos:0 b : int) ;
+  snd @@ Bitswap_block.blocks_of_data ~max_block_size:1024 buf

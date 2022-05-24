@@ -109,10 +109,6 @@ module Make (Inputs : Inputs_intf) :
               "invalid protocol version"
           | `Invalid_proof ->
               "invalid proof"
-          | `Invalid_block_creator ->
-              "invalid block creator"
-          | `Invalid_reference_signature ->
-              "invalid body reference signature"
           | `Verifier_error e ->
               Printf.sprintf "verifier error: %s" (Error.to_string_hum e) )
 

@@ -1,8 +1,7 @@
 open Core_kernel
 open Mina_base
 open Mina_state
-module Body = Body
-module Body_reference = Body_reference
+module Body = Staged_ledger_diff.Body
 module Header = Header
 module Validation = Validation
 module Validated = Validated_block
@@ -23,12 +22,9 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
   in
   let protocol_state = With_hash.data genesis_state in
   let block_with_hash =
-    let body = Body.create Staged_ledger_diff.empty_diff in
-    let private_key = snd Consensus_state_hooks.genesis_winner in
-    let body_reference = Body_reference.of_body ~private_key body in
+    let body = Staged_ledger_diff.Body.create Staged_ledger_diff.empty_diff in
     let header =
-      Header.create ~body_reference ~protocol_state
-        ~protocol_state_proof:Proof.blockchain_dummy
+      Header.create ~protocol_state ~protocol_state_proof:Proof.blockchain_dummy
         ~delta_block_chain_proof:
           (Protocol_state.previous_state_hash protocol_state, [])
         ()

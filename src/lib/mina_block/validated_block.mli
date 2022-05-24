@@ -2,7 +2,7 @@ open Mina_base
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving sexp, equal]
 
     val to_yojson : t -> Yojson.Safe.t
@@ -32,4 +32,4 @@ val state_body_hash : t -> State_body_hash.t
 
 val header : t -> Header.t
 
-val body : t -> Body.t
+val body : t -> Staged_ledger_diff.Body.t

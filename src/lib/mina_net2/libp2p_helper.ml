@@ -322,3 +322,84 @@ let send_validation t ~validation_id ~validation_result =
     Libp2p_ipc.create_push_message ~validation_id ~validation_result
     |> Libp2p_ipc.push_message_to_outgoing_message
     |> Libp2p_ipc.write_outgoing_message (Child_processes.stdin t.process)
+
+let%test_module "bitswap blocks" =
+  ( module struct
+    open Staged_ledger_diff.Bitswap_block
+
+    let with_libp2p_helper f =
+      let logger = Logger.null () in
+      let pids = Pid.Table.create () in
+      let handle_push_message _ = failwith "ama istimiyorum" in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind conf_dir = Async.Unix.mkdtemp "bitswap_block_test" in
+          let%bind helper =
+            spawn ~logger ~pids ~conf_dir ~handle_push_message
+            >>| Or_error.ok_exn
+          in
+          Monitor.protect
+            (fun () -> f helper)
+            ~finally:(fun () ->
+              let%bind () = shutdown helper in
+              File_system.remove_dir conf_dir ) )
+
+    let%test_unit "forall x: libp2p_helper#decode (daemon#encode x) = x" =
+      Quickcheck.test For_tests.gen ~trials:100
+        ~f:(fun (max_block_size, data) ->
+          let blocks, root_block_hash = blocks_of_data ~max_block_size data in
+          let result =
+            with_libp2p_helper (fun helper ->
+                let open Libp2p_ipc.Rpcs in
+                let request =
+                  TestDecodeBitswapBlocks.create_request
+                    ~blocks:
+                      (blocks |> Map.map ~f:Bigstring.to_string |> Map.to_alist)
+                    ~root_block_hash
+                in
+                do_rpc helper (module TestDecodeBitswapBlocks) request )
+            |> Or_error.ok_exn
+            |> Libp2p_ipc.Reader.Libp2pHelperInterface.TestDecodeBitswapBlocks
+               .Response
+               .decoded_data_get |> Bigstring.of_string
+          in
+          [%test_eq: Bigstring.t] data result )
+
+    let%test_unit "forall x: daemon#decode (libp2p_helper#encode x) = x" =
+      Quickcheck.test For_tests.gen ~trials:100
+        ~f:(fun (max_block_size, data) ->
+          let blocks, root_block_hash =
+            let resp =
+              with_libp2p_helper (fun helper ->
+                  let open Libp2p_ipc.Rpcs in
+                  let request =
+                    TestEncodeBitswapBlocks.create_request ~max_block_size
+                      ~data:(Bigstring.to_string data)
+                  in
+                  do_rpc helper (module TestEncodeBitswapBlocks) request )
+              |> Or_error.ok_exn
+            in
+            let open Libp2p_ipc.Reader in
+            let open Libp2pHelperInterface.TestEncodeBitswapBlocks in
+            let blocks =
+              Capnp.Array.map_list (Response.blocks_get resp)
+                ~f:(fun block_with_id ->
+                  let hash =
+                    Blake2.of_raw_string
+                    @@ BlockWithId.blake2b_hash_get block_with_id
+                  in
+                  let block =
+                    Bigstring.of_string @@ BlockWithId.block_get block_with_id
+                  in
+                  (hash, block) )
+            in
+            let root_block_hash =
+              Blake2.of_raw_string @@ RootBlockId.blake2b_hash_get
+              @@ Response.root_block_id_get resp
+            in
+            (Blake2.Map.of_alist_exn blocks, root_block_hash)
+          in
+          let result =
+            Or_error.ok_exn (data_of_blocks blocks root_block_hash)
+          in
+          [%test_eq: Bigstring.t] data result )
+  end )

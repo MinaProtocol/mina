@@ -3,14 +3,14 @@ open Mina_base
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      Block.Stable.V1.t State_hash.With_state_hashes.Stable.V1.t
+      Block.Stable.V2.t State_hash.With_state_hashes.Stable.V1.t
       * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
     [@@deriving sexp, equal]
 
     let to_yojson (block_with_hashes, _) =
-      State_hash.With_state_hashes.Stable.V1.to_yojson Block.Stable.V1.to_yojson
+      State_hash.With_state_hashes.Stable.V1.to_yojson Block.Stable.V2.to_yojson
         block_with_hashes
 
     let to_latest = ident
@@ -42,8 +42,8 @@ let remember (b, delta_block_chain_proof) =
 let delta_block_chain_proof (_, d) = d
 
 let valid_commands (block, _) =
-  block |> With_hash.data |> Block.body |> Body.staged_ledger_diff
-  |> Staged_ledger_diff.commands
+  block |> With_hash.data |> Block.body
+  |> Staged_ledger_diff.Body.staged_ledger_diff |> Staged_ledger_diff.commands
   |> List.map ~f:(fun cmd ->
          (* This is safe because at this point the stage ledger diff has been
               applied successfully. *)

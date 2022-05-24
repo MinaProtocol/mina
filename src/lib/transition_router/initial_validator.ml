@@ -14,9 +14,7 @@ type validation_error =
   | `Invalid_delta_block_chain_proof
   | `Verifier_error of Error.t
   | `Mismatched_protocol_version
-  | `Invalid_protocol_version
-  | `Invalid_block_creator
-  | `Invalid_reference_signature ]
+  | `Invalid_protocol_version ]
 
 let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ~trust_system ~sender ~transition_with_hash ~delta (error : validation_error)
@@ -71,10 +69,6 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         [ ("reason", `String "protocol version mismatch") ]
     | `Invalid_protocol_version ->
         [ ("reason", `String "invalid protocol version") ]
-    | `Invalid_reference_signature ->
-        [ ("reason", `String "invalid reference signature") ]
-    | `Invalid_block_creator ->
-        [ ("reason", `String "invalid block creator") ]
   in
   let metadata =
     [ ("state_hash", State_hash.to_yojson state_hash)
@@ -105,7 +99,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
           (error_metadata @ [ ("state_hash", State_hash.to_yojson state_hash) ])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
       Deferred.unit
-  | `Invalid_proof | `Invalid_block_creator | `Invalid_reference_signature ->
+  | `Invalid_proof ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_proof) ;

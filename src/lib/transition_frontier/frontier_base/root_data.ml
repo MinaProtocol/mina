@@ -34,7 +34,7 @@ module Historical = struct
   module Stable = struct
     module V3 = struct
       type t =
-        { transition : Mina_block.Validated.Stable.V1.t
+        { transition : Mina_block.Validated.Stable.V2.t
         ; common : Common.Stable.V2.t
         ; staged_ledger_target_ledger_hash : Ledger_hash.Stable.V1.t
         }
@@ -70,7 +70,7 @@ module Limited = struct
   module Stable = struct
     module V3 = struct
       type t =
-        { transition : Mina_block.Validated.Stable.V1.t
+        { transition : Mina_block.Validated.Stable.V2.t
         ; protocol_states :
             Mina_state.Protocol_state.Value.Stable.V2.t
             Mina_base.State_hash.With_state_hashes.Stable.V1.t
@@ -80,7 +80,7 @@ module Limited = struct
 
       let to_yojson { transition; protocol_states = _; common } =
         `Assoc
-          [ ("transition", Mina_block.Validated.Stable.V1.to_yojson transition)
+          [ ("transition", Mina_block.Validated.Stable.V2.to_yojson transition)
           ; ("protocol_states", `String "<opaque>")
           ; ("common", Common.Stable.V2.to_yojson common)
           ]

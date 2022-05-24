@@ -4,8 +4,11 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
-    type t = { header : Header.Stable.V2.t; body : Body.Stable.V1.t }
+  module V2 = struct
+    type t =
+      { header : Header.Stable.V2.t
+      ; body : Staged_ledger_diff.Body.Stable.V1.t
+      }
     [@@deriving fields, sexp]
 
     let to_yojson t =
@@ -37,7 +40,7 @@ module Stable = struct
 
       let t_of_sexp = t_of_sexp
 
-      type 'a creator = header:Header.t -> body:Body.t -> 'a
+      type 'a creator = header:Header.t -> body:Staged_ledger_diff.Body.t -> 'a
 
       let map_creator c ~f ~header ~body = f (c ~header ~body)
 
@@ -85,7 +88,9 @@ let transactions ~constraint_constants block =
   let consensus_state =
     block |> header |> Header.protocol_state |> Protocol_state.consensus_state
   in
-  let staged_ledger_diff = block |> body |> Body.staged_ledger_diff in
+  let staged_ledger_diff =
+    block |> body |> Staged_ledger_diff.Body.staged_ledger_diff
+  in
   let coinbase_receiver =
     Consensus.Data.Consensus_state.coinbase_receiver consensus_state
   in
@@ -98,7 +103,8 @@ let transactions ~constraint_constants block =
   |> Or_error.ok_exn
 
 let payments block =
-  block |> body |> Body.staged_ledger_diff |> Staged_ledger_diff.commands
+  block |> body |> Staged_ledger_diff.Body.staged_ledger_diff
+  |> Staged_ledger_diff.commands
   |> List.filter_map ~f:(function
        | { data = Signed_command ({ payload = { body = Payment _; _ }; _ } as c)
          ; status

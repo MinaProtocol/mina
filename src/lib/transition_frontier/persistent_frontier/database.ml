@@ -46,7 +46,7 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V1.t t
+    | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
     | Root : Root_data.Minimal.Stable.V2.t t
     | Best_tip : State_hash.Stable.V1.t t

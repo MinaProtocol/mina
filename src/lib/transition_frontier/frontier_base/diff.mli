@@ -27,7 +27,7 @@ module Node : sig
     module V3 : sig
       type 'a t =
         | Full : Breadcrumb.t -> full t
-        | Lite : Mina_block.Validated.Stable.V1.t -> lite t
+        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
     end
   end]
 end

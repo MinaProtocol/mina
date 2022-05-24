@@ -9,6 +9,8 @@ end]
 
 type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
 
-val create : Staged_ledger_diff.t -> t
+val create : Diff.t -> t
 
-val staged_ledger_diff : t -> Staged_ledger_diff.t
+val staged_ledger_diff : t -> Diff.t
+
+val compute_reference : t -> Consensus.Body_reference.t

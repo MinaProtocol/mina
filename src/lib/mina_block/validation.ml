@@ -324,23 +324,6 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
                ~state:(Header.protocol_state header)
                ~proof:(Header.protocol_state_proof header) ) )
   in
-  let%bind.Deferred.Result () =
-    Deferred.Result.all_unit
-      (List.map tvs ~f:(fun (t, _) ->
-           let header = Block.header @@ With_hash.data t in
-           let ref = Header.body_reference header in
-           let public_key_opt =
-             Header.protocol_state header
-             |> Protocol_state.consensus_state |> Consensus_state.block_creator
-             |> Signature_lib.Public_key.decompress
-           in
-           Option.value_map public_key_opt
-             ~default:(Deferred.Result.fail `Invalid_block_creator)
-             ~f:(fun public_key ->
-               if Body_reference.verify ~public_key ref then
-                 Deferred.Result.return ()
-               else Deferred.Result.fail `Invalid_reference_signature ) ) )
-  in
   match%map.Deferred
     match to_verify with
     | [] ->
@@ -475,10 +458,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let body = Block.body block in
   let apply_start_time = Core.Time.now () in
-  let body_ref_from_header =
-    Body_reference.reference (Header.body_reference header)
-  in
-  let body_ref_computed = Body_reference.compute_reference body in
+  let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
+  let body_ref_computed = Staged_ledger_diff.Body.compute_reference body in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then
       Deferred.Result.return ()
@@ -492,7 +473,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       ~constraint_constants:
         precomputed_values.Precomputed_values.constraint_constants ~logger
       ~verifier parent_staged_ledger
-      (Body.staged_ledger_diff body)
+      (Staged_ledger_diff.Body.staged_ledger_diff body)
       ~current_state_view:
         Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
       ~state_and_body_hash:

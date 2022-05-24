@@ -360,6 +360,9 @@ module For_tests = struct
         |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
         |> Or_error.ok_exn
       in
+      let body =
+        Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
+      in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
@@ -400,6 +403,7 @@ module For_tests = struct
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~registers:next_registers ~staged_ledger_hash:next_staged_ledger_hash
           ~genesis_ledger_hash
+          ~body_reference:(Body.compute_reference body)
       in
       let previous_state_hashes =
         Protocol_state.hashes previous_protocol_state
@@ -424,18 +428,11 @@ module For_tests = struct
       in
       Protocol_version.(set_current zero) ;
       let next_block =
-        let body =
-          Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
-        in
-        let body_reference =
-          Mina_block.Body_reference.of_body body
-            ~private_key:(snd Mina_state.Consensus_state_hooks.genesis_winner)
-        in
         let header =
           Mina_block.Header.create ~protocol_state
             ~protocol_state_proof:Proof.blockchain_dummy
             ~delta_block_chain_proof:(previous_state_hashes.state_hash, [])
-            ~body_reference ()
+            ()
         in
         (* We manually created a validated an block *)
         let block =

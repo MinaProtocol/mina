@@ -295,7 +295,7 @@ module Rpcs = struct
         type query = State_hash.Stable.V1.t list
         [@@deriving bin_io, sexp, version { rpc }]
 
-        type response = Mina_block.Stable.V1.t list option
+        type response = Mina_block.Stable.V2.t list option
         [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
@@ -500,8 +500,8 @@ module Rpcs = struct
         [@@deriving bin_io, sexp, version { rpc }]
 
         type response =
-          ( Mina_block.Stable.V1.t
-          , State_body_hash.Stable.V1.t list * Mina_block.Stable.V1.t )
+          ( Mina_block.Stable.V2.t
+          , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
           option
         [@@deriving bin_io, version { rpc }]
@@ -635,8 +635,8 @@ module Rpcs = struct
         type query = unit [@@deriving bin_io, sexp, version { rpc }]
 
         type response =
-          ( Mina_block.Stable.V1.t
-          , State_body_hash.Stable.V1.t list * Mina_block.Stable.V1.t )
+          ( Mina_block.Stable.V2.t
+          , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
           option
         [@@deriving bin_io, version { rpc }]

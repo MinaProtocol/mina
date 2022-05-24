@@ -19,7 +19,6 @@ module Stable = struct
           State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
       ; current_protocol_version : Protocol_version.Stable.V1.t
       ; proposed_protocol_version_opt : Protocol_version.Stable.V1.t option
-      ; body_reference : Body_reference.Stable.V2.t
       }
     [@@deriving fields, sexp, to_yojson]
 
@@ -38,23 +37,20 @@ module Stable = struct
            protocol_state:Protocol_state.Value.t
         -> protocol_state_proof:Proof.t
         -> delta_block_chain_proof:State_hash.t * State_body_hash.t list
-        -> body_reference:Body_reference.t
         -> ?proposed_protocol_version_opt:Protocol_version.t
         -> ?current_protocol_version:Protocol_version.t
         -> unit
         -> 'a
 
       let map_creator c ~f ~protocol_state ~protocol_state_proof
-          ~delta_block_chain_proof ~body_reference
-          ?proposed_protocol_version_opt ?current_protocol_version () =
+          ~delta_block_chain_proof ?proposed_protocol_version_opt
+          ?current_protocol_version () =
         f
           (c ~protocol_state ~protocol_state_proof ~delta_block_chain_proof
-             ~body_reference ?proposed_protocol_version_opt
-             ?current_protocol_version () )
+             ?proposed_protocol_version_opt ?current_protocol_version () )
 
       let create ~protocol_state ~protocol_state_proof ~delta_block_chain_proof
-          ~body_reference ?proposed_protocol_version_opt
-          ?current_protocol_version () =
+          ?proposed_protocol_version_opt ?current_protocol_version () =
         let cur_ver_fun =
           Option.(bind current_protocol_version ~f:(Fn.compose return const))
         in
@@ -71,7 +67,6 @@ module Stable = struct
         ; current_protocol_version =
             Option.value ~default:cur_ver_fallback cur_ver_fun ()
         ; proposed_protocol_version_opt
-        ; body_reference
         }
     end
 
@@ -98,7 +93,6 @@ Stable.Latest.
   , delta_block_chain_proof
   , current_protocol_version
   , proposed_protocol_version_opt
-  , body_reference
   , create
   , sexp_of_t
   , t_of_sexp

@@ -260,6 +260,10 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   (Ledger_proof.statement proof).supply_increase )
                 ~default:Currency.Amount.zero
             in
+            let body_reference =
+              Staged_ledger_diff.Body.compute_reference
+                (Body.create @@ Staged_ledger_diff.forget diff)
+            in
             let blockchain_state =
               (* We use the time of the beginning of the slot because if things
                  are slower than expected, we may have entered the next slot and
@@ -271,7 +275,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
                 ~registers:next_registers ~genesis_ledger_hash
-                ~staged_ledger_hash:next_staged_ledger_hash
+                ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
             in
             let current_time =
               Block_time.now time_controller
@@ -321,7 +325,6 @@ module Precomputed = struct
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
-    ; body_reference : Body_reference.t
     }
 
   let sexp_of_t = Precomputed.sexp_of_t
@@ -586,8 +589,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar
-          (scheduled_time, block_data, winner_pubkey, producer_privkey) =
+      let produce ivar (scheduled_time, block_data, winner_pubkey) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -750,11 +752,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                             (let body = Body.create staged_ledger_diff in
                              Mina_block.create ~body
                                ~header:
-                                 (Header.create
-                                    ~body_reference:
-                                      (Body_reference.of_body
-                                         ~private_key:producer_privkey body )
-                                    ~protocol_state ~protocol_state_proof
+                                 (Header.create ~protocol_state
+                                    ~protocol_state_proof
                                     ~delta_block_chain_proof () ) )
                         }
                       |> Validation.skip_time_received_validation
@@ -1046,11 +1045,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                          ignore
                            ( Interruptible.finally
                                (Singleton_supervisor.dispatch
-                                  production_supervisor
-                                  ( now
-                                  , data
-                                  , winner_pk
-                                  , slot_won.producer.private_key ) )
+                                  production_supervisor (now, data, winner_pk) )
                                ~f:(check_next_block_timing new_global_slot i')
                              : (_, _) Interruptible.t ) )
                        else
@@ -1125,10 +1120,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                                    ( Interruptible.finally
                                        (Singleton_supervisor.dispatch
                                           production_supervisor
-                                          ( scheduled_time
-                                          , data
-                                          , winner_pk
-                                          , slot_won.producer.private_key ) )
+                                          (scheduled_time, data, winner_pk) )
                                        ~f:
                                          (check_next_block_timing
                                             new_global_slot i' )
@@ -1186,7 +1178,6 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       ; accounts_accessed = _
       ; accounts_created = _
       ; tokens_used = _
-      ; body_reference
       } =
     let protocol_state_hashes = Protocol_state.hashes protocol_state in
     let consensus_state_with_hashes =
@@ -1249,8 +1240,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   (let body = Body.create staged_ledger_diff in
                    Mina_block.create ~body
                      ~header:
-                       (Header.create ~body_reference ~protocol_state
-                          ~protocol_state_proof ~delta_block_chain_proof () ) )
+                       (Header.create ~protocol_state ~protocol_state_proof
+                          ~delta_block_chain_proof () ) )
               }
             |> Validation.skip_time_received_validation
                  `This_block_was_not_received_via_gossip

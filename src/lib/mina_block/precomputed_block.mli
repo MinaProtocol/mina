@@ -28,7 +28,6 @@ module Stable : sig
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
           (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
-      ; body_reference : Body_reference.Stable.V2.t
       }
   end
 end]
@@ -43,7 +42,6 @@ type t = Stable.Latest.t =
   ; accounts_accessed : (int * Account.t) list
   ; accounts_created : (Account_id.t * Currency.Fee.t) list
   ; tokens_used : (Token_id.t * Account_id.t option) list
-  ; body_reference : Body_reference.t
   }
 [@@deriving sexp, yojson]
 

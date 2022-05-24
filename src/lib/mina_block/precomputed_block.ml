@@ -59,7 +59,6 @@ module T = struct
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
-    ; body_reference : Body_reference.t
     }
   [@@deriving sexp, yojson]
 end
@@ -84,7 +83,6 @@ module Stable = struct
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
           (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
-      ; body_reference : Body_reference.Stable.V2.t
       }
 
     let to_latest = Fn.id
@@ -160,12 +158,12 @@ let of_block ~logger
   { scheduled_time
   ; protocol_state = Header.protocol_state header
   ; protocol_state_proof = Header.protocol_state_proof header
-  ; staged_ledger_diff = Body.staged_ledger_diff (Block.body block)
+  ; staged_ledger_diff =
+      Staged_ledger_diff.Body.staged_ledger_diff (Block.body block)
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; accounts_accessed
   ; accounts_created
   ; tokens_used
-  ; body_reference = Header.body_reference header
   }
 
 (* NOTE: This serialization is used externally and MUST NOT change.
