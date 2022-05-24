@@ -765,6 +765,10 @@ module Stable = struct
         end
       end]
 
+      let check (t : t) : unit =
+        List.iter t.other_parties ~f:(fun p ->
+            assert (Party.Call_type.equal p.elt.party.body.caller Call) )
+
       let of_graphql_repr (t : Graphql_repr.t) : t =
         { fee_payer = t.fee_payer
         ; memo = t.memo
@@ -875,7 +879,7 @@ module Stable = struct
         (struct
           type nonrec t = t
 
-          let of_binable = of_wire
+          let of_binable t = Wire.check t ; of_wire t
 
           let to_binable = to_wire
         end)
