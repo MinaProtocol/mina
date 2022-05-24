@@ -26,4 +26,4 @@ let%test_unit "check rust implementation of block-cipher" =
       let s () = Array.of_list s in
       [%test_eq: T.Field.t array]
         (Ocaml_permutation.block_cipher params' (s ()))
-        (block_cipher params' (s ())))
+        (block_cipher params' (s ())) )

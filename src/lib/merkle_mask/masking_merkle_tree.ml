@@ -40,7 +40,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type t =
     { uuid : Uuid.Stable.V1.t
     ; account_tbl : Account.t Location_binable.Table.t
-    ; token_owners : Account_id.Stable.Latest.t Token_id.Table.t
+    ; token_owners : Account_id.t Token_id.Table.t
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
     ; hash_tbl : Hash.t Addr.Table.t
@@ -183,9 +183,9 @@ module Make (Inputs : Inputs_intf.S) = struct
         List.partition_map locations ~f:(fun location ->
             match self_find_account t location with
             | Some account ->
-                `Fst (location, Some account)
+                Either.first (location, Some account)
             | None ->
-                `Snd location )
+                Either.second location )
       in
       found_accounts @ Base.get_batch (get_parent t) leftover_locations
 
@@ -543,9 +543,9 @@ module Make (Inputs : Inputs_intf.S) = struct
         List.partition_map account_ids ~f:(fun account_id ->
             match self_find_location t account_id with
             | Some location ->
-                `Fst (account_id, Some location)
+                Either.first (account_id, Some location)
             | None ->
-                `Snd account_id )
+                Either.second account_id )
       in
       found_locations
       @ Base.location_of_account_batch (get_parent t) leftover_account_ids
