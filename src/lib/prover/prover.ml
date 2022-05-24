@@ -159,7 +159,7 @@ module Worker_state = struct
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
                           ~constraint_constants ~pending_coinbase )
-                     (Protocol_state.hashes next_state).state_hash
+                     next_state
                    |> Or_error.map ~f:(fun () ->
                           Blockchain_snark.Blockchain.create ~state:next_state
                             ~proof:Mina_base.Proof.blockchain_dummy )

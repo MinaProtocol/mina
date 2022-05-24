@@ -92,6 +92,9 @@ let%snarkydef step ~(logger : Logger.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     new_state_hash : _ Tick.Checked.t =
+  let new_state_hash =
+    State_hash.var_of_hash_packed (Data_as_hash.hash new_state_hash)
+  in
   let%bind transition =
     with_label __LOC__
       (exists Snark_transition.typ ~request:(As_prover.return Transition))
@@ -101,15 +104,27 @@ let%snarkydef step ~(logger : Logger.t)
       (exists Transaction_snark.Statement.With_sok.typ
          ~request:(As_prover.return Txn_snark) )
   in
-  let%bind previous_state, previous_state_hash, previous_state_body_hash =
+  let%bind ( previous_state
+           , previous_state_hash
+           , previous_blockchain_proof_input
+           , previous_state_body_hash ) =
+    let%bind prev_state_ref =
+      with_label __LOC__
+        (exists (Typ.Internal.ref ()) ~request:(As_prover.return Prev_state))
+    in
     let%bind t =
       with_label __LOC__
         (exists
            (Protocol_state.typ ~constraint_constants)
-           ~request:(As_prover.return Prev_state) )
+           ~compute:(As_prover.Ref.get prev_state_ref) )
     in
     let%map previous_state_hash, body = Protocol_state.hash_checked t in
-    (t, previous_state_hash, body)
+    let previous_blockchain_proof_input =
+      Data_as_hash.make_unsafe
+        (State_hash.var_to_field previous_state_hash)
+        prev_state_ref
+    in
+    (t, previous_state_hash, previous_blockchain_proof_input, body)
   in
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__
@@ -285,21 +300,36 @@ let%snarkydef step ~(logger : Logger.t)
   in
   let%map () = Boolean.Assert.any [ is_base_case; success ] in
   ( { Pickles.Inductive_rule.Previous_proof_statement.public_input =
-        previous_state_hash
+        previous_blockchain_proof_input
     ; proof_must_verify = prev_should_verify
     }
   , { Pickles.Inductive_rule.Previous_proof_statement.public_input = txn_snark
     ; proof_must_verify = txn_snark_should_verify
     } )
 
+module Statement = struct
+  type t = Protocol_state.Value.t
+
+  let to_field_elements (t : t) : Tick.Field.t array =
+    [| (Protocol_state.hashes t).state_hash |]
+end
+
+module Statement_var = struct
+  type t = Protocol_state.Value.t Data_as_hash.t
+
+  let to_field_elements (t : t) = [| Data_as_hash.hash t |]
+end
+
+let typ = Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
+
+type tag = (Statement_var.t, Statement.t, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
+
 let check w ?handler ~proof_level ~constraint_constants new_state_hash :
     unit Or_error.t =
   let open Tick in
   check
     (Fn.flip handle (wrap_handler handler w)
-       (let%bind curr =
-          exists State_hash.typ ~compute:(As_prover.return new_state_hash)
-        in
+       (let%bind curr = exists typ ~compute:(As_prover.return new_state_hash) in
         step ~proof_level ~constraint_constants ~logger:(Logger.create ()) curr
        ) )
 
@@ -316,27 +346,6 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         in
         [ prev_blockchain_stmt; txn_snark_stmt ] )
   }
-
-module Statement = struct
-  type t = Protocol_state.Value.t
-
-  let to_field_elements (t : t) : Tick.Field.t array =
-    [| (Protocol_state.hashes t).state_hash |]
-end
-
-module Statement_var = struct
-  type t = State_hash.var
-
-  let to_field_elements (t : t) = [| State_hash.var_to_hash_packed t |]
-end
-
-let typ =
-  Typ.transport State_hash.typ
-    ~there:(fun t -> (Protocol_state.hashes t).state_hash)
-    ~back:(fun _ -> failwith "cannot unhash")
-
-type tag =
-  (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
 
 module type S = sig
   module Proof :
@@ -376,8 +385,7 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            in
            ()
          in
-         Tick.constraint_system
-           ~exposing:[ Mina_base.State_hash.typ ]
+         Tick.constraint_system ~exposing:[ typ ]
            ~return_typ:(Snarky_backendless.Typ.unit ())
            main ) )
   ]

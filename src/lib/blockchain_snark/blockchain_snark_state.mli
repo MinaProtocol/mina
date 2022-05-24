@@ -12,7 +12,11 @@ module Witness : sig
 end
 
 type tag =
-  (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
+  ( Protocol_state.value Data_as_hash.t
+  , Protocol_state.value
+  , Nat.N2.n
+  , Nat.N1.n )
+  Pickles.Tag.t
 
 val verify :
      (Protocol_state.Value.t * Proof.t) list
@@ -26,7 +30,7 @@ val check :
         -> Snarky_backendless.Request.response )
   -> proof_level:Genesis_constants.Proof_level.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
-  -> State_hash.t
+  -> Protocol_state.value
   -> unit Or_error.t
 
 module type S = sig

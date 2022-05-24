@@ -173,9 +173,13 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   let of_hash = Fn.id
 
+  let to_field = Fn.id
+
   [%%ifdef consensus_mechanism]
 
   let var_of_hash_packed digest = { digest; bits = None }
+
+  let var_to_field { digest; _ } = digest
 
   let if_ cond ~then_ ~else_ =
     let%map digest =
