@@ -168,7 +168,7 @@ CREATE TABLE public.accounts_accessed (
     block_id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     token_symbol_id integer NOT NULL,
-    balance bigint NOT NULL,
+    balance text NOT NULL,
     nonce bigint NOT NULL,
     receipt_chain_hash text NOT NULL,
     delegate_id integer,
@@ -186,7 +186,7 @@ CREATE TABLE public.accounts_accessed (
 CREATE TABLE public.accounts_created (
     block_id integer NOT NULL,
     account_identifier_id integer NOT NULL,
-    creation_fee bigint NOT NULL
+    creation_fee text NOT NULL
 );
 
 
@@ -205,12 +205,12 @@ CREATE TABLE public.blocks (
     staking_epoch_data_id integer NOT NULL,
     next_epoch_data_id integer NOT NULL,
     min_window_density bigint NOT NULL,
-    total_currency bigint NOT NULL,
+    total_currency text NOT NULL,
     ledger_hash text NOT NULL,
     height bigint NOT NULL,
     global_slot_since_hard_fork bigint NOT NULL,
     global_slot_since_genesis bigint NOT NULL,
-    "timestamp" bigint NOT NULL,
+    "timestamp" text NOT NULL,
     chain_status public.chain_status_type NOT NULL
 );
 
@@ -281,7 +281,7 @@ CREATE TABLE public.epoch_data (
     id integer NOT NULL,
     seed text NOT NULL,
     ledger_hash_id integer NOT NULL,
-    total_currency bigint NOT NULL,
+    total_currency text NOT NULL,
     start_checkpoint text NOT NULL,
     lock_checkpoint text NOT NULL,
     epoch_length bigint NOT NULL
@@ -316,7 +316,7 @@ CREATE TABLE public.internal_commands (
     id integer NOT NULL,
     typ public.internal_command_type NOT NULL,
     receiver_id integer NOT NULL,
-    fee bigint NOT NULL,
+    fee text NOT NULL,
     hash text NOT NULL
 );
 
@@ -409,11 +409,11 @@ CREATE TABLE public.timing_info (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     initial_balance bigint NOT NULL,
-    initial_minimum_balance bigint NOT NULL,
+    initial_minimum_balance text NOT NULL,
     cliff_time bigint NOT NULL,
-    cliff_amount bigint NOT NULL,
+    cliff_amount text NOT NULL,
     vesting_period bigint NOT NULL,
-    vesting_increment bigint NOT NULL
+    vesting_increment text NOT NULL
 );
 
 
@@ -510,8 +510,8 @@ CREATE TABLE public.user_commands (
     source_id integer NOT NULL,
     receiver_id integer NOT NULL,
     nonce bigint NOT NULL,
-    amount bigint,
-    fee bigint NOT NULL,
+    amount text,
+    fee text NOT NULL,
     valid_until bigint,
     memo text NOT NULL,
     hash text NOT NULL
@@ -642,8 +642,8 @@ ALTER SEQUENCE public.zkapp_accounts_id_seq OWNED BY public.zkapp_accounts.id;
 
 CREATE TABLE public.zkapp_amount_bounds (
     id integer NOT NULL,
-    amount_lower_bound bigint NOT NULL,
-    amount_upper_bound bigint NOT NULL
+    amount_lower_bound text NOT NULL,
+    amount_upper_bound text NOT NULL
 );
 
 
@@ -673,8 +673,8 @@ ALTER SEQUENCE public.zkapp_amount_bounds_id_seq OWNED BY public.zkapp_amount_bo
 
 CREATE TABLE public.zkapp_balance_bounds (
     id integer NOT NULL,
-    balance_lower_bound bigint NOT NULL,
-    balance_upper_bound bigint NOT NULL
+    balance_lower_bound text NOT NULL,
+    balance_upper_bound text NOT NULL
 );
 
 
@@ -834,7 +834,7 @@ CREATE TABLE public.zkapp_fee_payer_body (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     update_id integer NOT NULL,
-    fee bigint NOT NULL,
+    fee text NOT NULL,
     events_id integer NOT NULL,
     sequence_events_id integer NOT NULL,
     zkapp_protocol_state_precondition_id integer NOT NULL,
@@ -860,6 +860,37 @@ CREATE SEQUENCE public.zkapp_fee_payer_body_id_seq
 --
 
 ALTER SEQUENCE public.zkapp_fee_payer_body_id_seq OWNED BY public.zkapp_fee_payer_body.id;
+
+
+--
+-- Name: zkapp_fee_payers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.zkapp_fee_payers (
+    id integer NOT NULL,
+    body_id integer NOT NULL
+);
+
+
+--
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.zkapp_fee_payers_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.zkapp_fee_payers_id_seq OWNED BY public.zkapp_fee_payers.id;
+
 
 --
 -- Name: zkapp_global_slot_bounds; Type: TABLE; Schema: public; Owner: -
@@ -973,7 +1004,7 @@ CREATE TABLE public.zkapp_other_party_body (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     update_id integer NOT NULL,
-    balance_change bigint NOT NULL,
+    balance_change text NOT NULL,
     increment_nonce boolean NOT NULL,
     events_id integer NOT NULL,
     sequence_events_id integer NOT NULL,
@@ -1297,8 +1328,8 @@ ALTER SEQUENCE public.zkapp_states_id_seq OWNED BY public.zkapp_states.id;
 
 CREATE TABLE public.zkapp_timestamp_bounds (
     id integer NOT NULL,
-    timestamp_lower_bound bigint NOT NULL,
-    timestamp_upper_bound bigint NOT NULL
+    timestamp_lower_bound text NOT NULL,
+    timestamp_upper_bound text NOT NULL
 );
 
 
@@ -1328,11 +1359,11 @@ ALTER SEQUENCE public.zkapp_timestamp_bounds_id_seq OWNED BY public.zkapp_timest
 
 CREATE TABLE public.zkapp_timing_info (
     id integer NOT NULL,
-    initial_minimum_balance bigint NOT NULL,
+    initial_minimum_balance text NOT NULL,
     cliff_time bigint NOT NULL,
-    cliff_amount bigint NOT NULL,
+    cliff_amount text NOT NULL,
     vesting_period bigint NOT NULL,
-    vesting_increment bigint NOT NULL
+    vesting_increment text NOT NULL
 );
 
 
@@ -1626,6 +1657,13 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body ALTER COLUMN id SET DEFAULT nextval
 
 
 --
+-- Name: zkapp_fee_payers id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers ALTER COLUMN id SET DEFAULT nextval('public.zkapp_fee_payers_id_seq'::regclass);
+
+
+--
 -- Name: zkapp_global_slot_bounds id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1759,22 +1797,22 @@ ALTER TABLE ONLY public.zkapp_verification_keys ALTER COLUMN id SET DEFAULT next
 
 
 --
--- Data for Name: zkapp_uris; Type: TABLE DATA; Schema: public; Owner: -
---
-
-COPY public.zkapp_uris (id, value) FROM stdin;
-1	
-2	https://www.example.com
-\.
-
-
---
 -- Data for Name: token_symbols; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.token_symbols (id, value) FROM stdin;
 1	
 2	BOLSYM
+\.
+
+
+--
+-- Data for Name: zkapp_uris; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.zkapp_uris (id, value) FROM stdin;
+1	
+2	https://www.example.com
 \.
 
 
@@ -2077,6 +2115,7 @@ COPY public.timing_info (id, account_identifier_id, initial_balance, initial_min
 5	5	11000000000	0	0	0	0	0
 \.
 
+
 --
 -- Data for Name: tokens; Type: TABLE DATA; Schema: public; Owner: -
 --
@@ -2373,6 +2412,18 @@ COPY public.zkapp_fee_payer_body (id, account_identifier_id, update_id, fee, eve
 
 
 --
+-- Data for Name: zkapp_fee_payers; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.zkapp_fee_payers (id, body_id) FROM stdin;
+1	1
+2	2
+3	3
+4	4
+\.
+
+
+--
 -- Data for Name: zkapp_global_slot_bounds; Type: TABLE DATA; Schema: public; Owner: -
 --
 
@@ -2543,12 +2594,13 @@ COPY public.zkapp_updates (id, app_state_id, delegate_id, verification_key_id, p
 9	1	\N	\N	\N	\N	2	\N	\N
 \.
 
+
 --
 -- Data for Name: zkapp_verification_keys; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.zkapp_verification_keys (id, verification_key, hash) FROM stdin;
-1	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	19079293979474920563146704039152670161084248765333687110610215570697279088632
+1	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 19079293979474920563146704039152670161084248765333687110610215570697279088632
 \.
 
 
@@ -2690,6 +2742,13 @@ SELECT pg_catalog.setval('public.zkapp_events_id_seq', 1, true);
 --
 
 SELECT pg_catalog.setval('public.zkapp_fee_payer_body_id_seq', 4, true);
+
+
+--
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.zkapp_fee_payers_id_seq', 4, true);
 
 
 --
@@ -3095,6 +3154,14 @@ ALTER TABLE ONLY public.zkapp_events
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
     ADD CONSTRAINT zkapp_fee_payer_body_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: zkapp_fee_payers zkapp_fee_payers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers
+    ADD CONSTRAINT zkapp_fee_payers_pkey PRIMARY KEY (id);
 
 
 --
@@ -3725,11 +3792,11 @@ ALTER TABLE ONLY public.zkapp_accounts
 
 
 --
--- Name: zkapp_commands zkapp_commands_zkapp_fee_payer_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_commands zkapp_commands_zkapp_fee_payer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.zkapp_commands
-    ADD CONSTRAINT zkapp_commands_zkapp_fee_payer_body_id_fkey FOREIGN KEY (zkapp_fee_payer_body_id) REFERENCES public.zkapp_fee_payer_body(id);
+    ADD CONSTRAINT zkapp_commands_zkapp_fee_payer_id_fkey FOREIGN KEY (zkapp_fee_payer_body_id) REFERENCES public.zkapp_fee_payers(id);
 
 
 --
@@ -3802,6 +3869,14 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
     ADD CONSTRAINT zkapp_fee_payer_body_zkapp_protocol_state_precondition_id_fkey FOREIGN KEY (zkapp_protocol_state_precondition_id) REFERENCES public.zkapp_protocol_state_precondition(id);
+
+
+--
+-- Name: zkapp_fee_payers zkapp_fee_payers_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers
+    ADD CONSTRAINT zkapp_fee_payers_body_id_fkey FOREIGN KEY (body_id) REFERENCES public.zkapp_fee_payer_body(id);
 
 
 --
@@ -4047,3 +4122,4 @@ ALTER TABLE ONLY public.zkapp_updates
 --
 -- PostgreSQL database dump complete
 --
+
