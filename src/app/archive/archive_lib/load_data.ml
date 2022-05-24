@@ -39,14 +39,8 @@ let get_amount_bounds pool amount_id =
   let amount_opt =
     Option.map amount_db_opt
       ~f:(fun { amount_lower_bound; amount_upper_bound } ->
-        let lower =
-          amount_lower_bound |> Unsigned.UInt64.of_int64
-          |> Currency.Amount.of_uint64
-        in
-        let upper =
-          amount_upper_bound |> Unsigned.UInt64.of_int64
-          |> Currency.Amount.of_uint64
-        in
+        let lower = Currency.Amount.of_string amount_lower_bound in
+        let upper = Currency.Amount.of_string amount_upper_bound in
         ( { lower; upper }
           : Currency.Amount.t Zkapp_precondition.Closed_interval.t ) )
   in
@@ -215,25 +209,18 @@ let update_of_id pool update_id =
             query_db ~f:(fun db -> Processor.Zkapp_timing_info.load db id)
           in
           let initial_minimum_balance =
-            initial_minimum_balance |> Unsigned.UInt64.of_int64
-            |> Currency.Balance.of_uint64
+            Currency.Balance.of_string initial_minimum_balance
           in
           let cliff_time =
             cliff_time |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
           in
-          let cliff_amount =
-            cliff_amount |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
-          in
+          let cliff_amount = Currency.Amount.of_string cliff_amount in
           let vesting_period =
             vesting_period |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
           in
-          let vesting_increment =
-            vesting_increment |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
-          in
+          let vesting_increment = Currency.Amount.of_string vesting_increment in
           Some
             ( { initial_minimum_balance
               ; cliff_time
@@ -354,8 +341,8 @@ let protocol_state_precondition_of_id pool id =
     let ts_opt =
       Option.map ts_db_opt
         ~f:(fun { timestamp_lower_bound; timestamp_upper_bound } ->
-          let lower = Block_time.of_int64 timestamp_lower_bound in
-          let upper = Block_time.of_int64 timestamp_upper_bound in
+          let lower = Block_time.of_string_exn timestamp_lower_bound in
+          let upper = Block_time.of_string_exn timestamp_upper_bound in
           ({ lower; upper } : Block_time.t Zkapp_precondition.Closed_interval.t) )
     in
     Or_ignore.of_option ts_opt
@@ -420,11 +407,7 @@ let get_fee_payer_body ~pool body_id =
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
   let public_key = Account_id.public_key account_id in
   let%bind update = update_of_id pool update_id in
-  let fee =
-    (* fee payer balance change stored unsigned *)
-    assert (Int64.is_non_negative fee) ;
-    fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
-  in
+  let fee = Currency.Fee.of_string fee in
   let%bind events = load_events pool events_id in
   let%bind sequence_events = load_events pool sequence_events_id in
   let%bind protocol_state_precondition =
@@ -468,11 +451,15 @@ let get_other_party_body ~pool body_id =
   let token_id = Account_id.token_id account_id in
   let%bind update = update_of_id pool update_id in
   let balance_change =
-    let magnitude =
-      balance_change |> Int64.abs |> Unsigned.UInt64.of_int64
-      |> Currency.Amount.of_uint64
+    let magnitude, sgn =
+      match String.split balance_change ~on:'-' with
+      | [ s ] ->
+          (Currency.Amount.of_string s, Sgn.Pos)
+      | [ ""; s ] ->
+          (Currency.Amount.of_string s, Sgn.Neg)
+      | _ ->
+          failwith "Ill-formatted string for balance change"
     in
-    let sgn = if Int64.is_negative balance_change then Sgn.Neg else Sgn.Pos in
     Currency.Amount.Signed.create ~magnitude ~sgn
   in
   let%bind events = load_events pool events_id in
@@ -524,12 +511,8 @@ let get_other_party_body ~pool body_id =
                   query_db ~f:(fun db ->
                       Processor.Zkapp_balance_bounds.load db id )
                 in
-                let balance_of_int64 int64 =
-                  int64 |> Unsigned.UInt64.of_int64
-                  |> Currency.Balance.of_uint64
-                in
-                let lower = balance_of_int64 balance_lower_bound in
-                let upper = balance_of_int64 balance_upper_bound in
+                let lower = Currency.Balance.of_string balance_lower_bound in
+                let upper = Currency.Balance.of_string balance_upper_bound in
                 Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t) )
           in
           Or_ignore.of_option balance_opt
@@ -657,9 +640,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   let%bind token_symbol =
     query_db ~f:(fun db -> Processor.Token_symbols.load db token_symbol_id)
   in
-  let balance =
-    balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
-  in
+  let balance = Currency.Balance.of_string balance in
   let nonce = nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32 in
   let receipt_chain_hash =
     receipt_chain_hash |> Receipt.Chain_hash.of_base58_check_exn
@@ -696,36 +677,25 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           timing
         in
         if
-          List.for_all
-            [ initial_minimum_balance
-            ; cliff_time
-            ; cliff_amount
-            ; vesting_period
-            ; vesting_increment
-            ]
-            ~f:Int64.(equal zero)
+          List.for_all [ cliff_time; vesting_period ] ~f:Int64.(equal zero)
+          && List.for_all
+               [ initial_minimum_balance; cliff_amount; vesting_increment ]
+               ~f:String.(equal "0")
         then Untimed
         else
           let initial_minimum_balance =
-            initial_minimum_balance |> Unsigned.UInt64.of_int64
-            |> Currency.Balance.of_uint64
+            Currency.Balance.of_string initial_minimum_balance
           in
           let cliff_time =
             cliff_time |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
           in
-          let cliff_amount =
-            cliff_amount |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
-          in
+          let cliff_amount = Currency.Amount.of_string cliff_amount in
           let vesting_period =
             vesting_period |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
           in
-          let vesting_increment =
-            vesting_increment |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
-          in
+          let vesting_increment = Currency.Amount.of_string vesting_increment in
           Timed
             { initial_minimum_balance
             ; cliff_time

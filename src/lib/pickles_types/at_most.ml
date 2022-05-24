@@ -106,7 +106,7 @@ module At_most_2 = struct
       type 'a t = ('a, Nat.N2.n) at_most
 
       include
-        Binable.Of_binable1
+        Binable.Of_binable1_without_uuid
           (Core_kernel.List.Stable.V1)
           (struct
             type nonrec 'a t = 'a t
@@ -135,7 +135,7 @@ module At_most_8 = struct
       type 'a t = ('a, Nat.N8.n) at_most
 
       include
-        Binable.Of_binable1
+        Binable.Of_binable1_without_uuid
           (Core_kernel.List.Stable.V1)
           (struct
             type nonrec 'a t = 'a t

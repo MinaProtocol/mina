@@ -168,7 +168,7 @@ CREATE TABLE public.accounts_accessed (
     block_id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     token_symbol_id integer NOT NULL,
-    balance bigint NOT NULL,
+    balance text NOT NULL,
     nonce bigint NOT NULL,
     receipt_chain_hash text NOT NULL,
     delegate_id integer,
@@ -186,7 +186,7 @@ CREATE TABLE public.accounts_accessed (
 CREATE TABLE public.accounts_created (
     block_id integer NOT NULL,
     account_identifier_id integer NOT NULL,
-    creation_fee bigint NOT NULL
+    creation_fee text NOT NULL
 );
 
 
@@ -205,12 +205,12 @@ CREATE TABLE public.blocks (
     staking_epoch_data_id integer NOT NULL,
     next_epoch_data_id integer NOT NULL,
     min_window_density bigint NOT NULL,
-    total_currency bigint NOT NULL,
+    total_currency text NOT NULL,
     ledger_hash text NOT NULL,
     height bigint NOT NULL,
     global_slot_since_hard_fork bigint NOT NULL,
     global_slot_since_genesis bigint NOT NULL,
-    "timestamp" bigint NOT NULL,
+    "timestamp" text NOT NULL,
     chain_status public.chain_status_type NOT NULL
 );
 
@@ -281,7 +281,7 @@ CREATE TABLE public.epoch_data (
     id integer NOT NULL,
     seed text NOT NULL,
     ledger_hash_id integer NOT NULL,
-    total_currency bigint NOT NULL,
+    total_currency text NOT NULL,
     start_checkpoint text NOT NULL,
     lock_checkpoint text NOT NULL,
     epoch_length bigint NOT NULL
@@ -316,7 +316,7 @@ CREATE TABLE public.internal_commands (
     id integer NOT NULL,
     typ public.internal_command_type NOT NULL,
     receiver_id integer NOT NULL,
-    fee bigint NOT NULL,
+    fee text NOT NULL,
     hash text NOT NULL
 );
 
@@ -409,11 +409,11 @@ CREATE TABLE public.timing_info (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     initial_balance bigint NOT NULL,
-    initial_minimum_balance bigint NOT NULL,
+    initial_minimum_balance text NOT NULL,
     cliff_time bigint NOT NULL,
-    cliff_amount bigint NOT NULL,
+    cliff_amount text NOT NULL,
     vesting_period bigint NOT NULL,
-    vesting_increment bigint NOT NULL
+    vesting_increment text NOT NULL
 );
 
 
@@ -510,8 +510,8 @@ CREATE TABLE public.user_commands (
     source_id integer NOT NULL,
     receiver_id integer NOT NULL,
     nonce bigint NOT NULL,
-    amount bigint,
-    fee bigint NOT NULL,
+    amount text,
+    fee text NOT NULL,
     valid_until bigint,
     memo text NOT NULL,
     hash text NOT NULL
@@ -642,8 +642,8 @@ ALTER SEQUENCE public.zkapp_accounts_id_seq OWNED BY public.zkapp_accounts.id;
 
 CREATE TABLE public.zkapp_amount_bounds (
     id integer NOT NULL,
-    amount_lower_bound bigint NOT NULL,
-    amount_upper_bound bigint NOT NULL
+    amount_lower_bound text NOT NULL,
+    amount_upper_bound text NOT NULL
 );
 
 
@@ -673,8 +673,8 @@ ALTER SEQUENCE public.zkapp_amount_bounds_id_seq OWNED BY public.zkapp_amount_bo
 
 CREATE TABLE public.zkapp_balance_bounds (
     id integer NOT NULL,
-    balance_lower_bound bigint NOT NULL,
-    balance_upper_bound bigint NOT NULL
+    balance_lower_bound text NOT NULL,
+    balance_upper_bound text NOT NULL
 );
 
 
@@ -834,7 +834,7 @@ CREATE TABLE public.zkapp_fee_payer_body (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     update_id integer NOT NULL,
-    fee bigint NOT NULL,
+    fee text NOT NULL,
     events_id integer NOT NULL,
     sequence_events_id integer NOT NULL,
     zkapp_protocol_state_precondition_id integer NOT NULL,
@@ -860,6 +860,37 @@ CREATE SEQUENCE public.zkapp_fee_payer_body_id_seq
 --
 
 ALTER SEQUENCE public.zkapp_fee_payer_body_id_seq OWNED BY public.zkapp_fee_payer_body.id;
+
+
+--
+-- Name: zkapp_fee_payers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.zkapp_fee_payers (
+    id integer NOT NULL,
+    body_id integer NOT NULL
+);
+
+
+--
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.zkapp_fee_payers_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.zkapp_fee_payers_id_seq OWNED BY public.zkapp_fee_payers.id;
+
 
 --
 -- Name: zkapp_global_slot_bounds; Type: TABLE; Schema: public; Owner: -
@@ -973,7 +1004,7 @@ CREATE TABLE public.zkapp_other_party_body (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     update_id integer NOT NULL,
-    balance_change bigint NOT NULL,
+    balance_change text NOT NULL,
     increment_nonce boolean NOT NULL,
     events_id integer NOT NULL,
     sequence_events_id integer NOT NULL,
@@ -1297,8 +1328,8 @@ ALTER SEQUENCE public.zkapp_states_id_seq OWNED BY public.zkapp_states.id;
 
 CREATE TABLE public.zkapp_timestamp_bounds (
     id integer NOT NULL,
-    timestamp_lower_bound bigint NOT NULL,
-    timestamp_upper_bound bigint NOT NULL
+    timestamp_lower_bound text NOT NULL,
+    timestamp_upper_bound text NOT NULL
 );
 
 
@@ -1328,11 +1359,11 @@ ALTER SEQUENCE public.zkapp_timestamp_bounds_id_seq OWNED BY public.zkapp_timest
 
 CREATE TABLE public.zkapp_timing_info (
     id integer NOT NULL,
-    initial_minimum_balance bigint NOT NULL,
+    initial_minimum_balance text NOT NULL,
     cliff_time bigint NOT NULL,
-    cliff_amount bigint NOT NULL,
+    cliff_amount text NOT NULL,
     vesting_period bigint NOT NULL,
-    vesting_increment bigint NOT NULL
+    vesting_increment text NOT NULL
 );
 
 
@@ -1626,6 +1657,13 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body ALTER COLUMN id SET DEFAULT nextval
 
 
 --
+-- Name: zkapp_fee_payers id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers ALTER COLUMN id SET DEFAULT nextval('public.zkapp_fee_payers_id_seq'::regclass);
+
+
+--
 -- Name: zkapp_global_slot_bounds id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1759,22 +1797,22 @@ ALTER TABLE ONLY public.zkapp_verification_keys ALTER COLUMN id SET DEFAULT next
 
 
 --
--- Data for Name: zkapp_uris; Type: TABLE DATA; Schema: public; Owner: -
---
-
-COPY public.zkapp_uris (id, value) FROM stdin;
-1	
-2	https://www.example.com
-\.
-
-
---
 -- Data for Name: token_symbols; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.token_symbols (id, value) FROM stdin;
 1	
 2	BOLSYM
+\.
+
+
+--
+-- Data for Name: zkapp_uris; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.zkapp_uris (id, value) FROM stdin;
+1	
+2	https://www.example.com
 \.
 
 
@@ -2077,6 +2115,7 @@ COPY public.timing_info (id, account_identifier_id, initial_balance, initial_min
 5	5	11000000000	0	0	0	0	0
 \.
 
+
 --
 -- Data for Name: tokens; Type: TABLE DATA; Schema: public; Owner: -
 --
@@ -2373,6 +2412,18 @@ COPY public.zkapp_fee_payer_body (id, account_identifier_id, update_id, fee, eve
 
 
 --
+-- Data for Name: zkapp_fee_payers; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.zkapp_fee_payers (id, body_id) FROM stdin;
+1	1
+2	2
+3	3
+4	4
+\.
+
+
+--
 -- Data for Name: zkapp_global_slot_bounds; Type: TABLE DATA; Schema: public; Owner: -
 --
 
@@ -2543,6 +2594,7 @@ COPY public.zkapp_updates (id, app_state_id, delegate_id, verification_key_id, p
 9	1	\N	\N	\N	\N	2	\N	\N
 \.
 
+
 --
 -- Data for Name: zkapp_verification_keys; Type: TABLE DATA; Schema: public; Owner: -
 --
@@ -2690,6 +2742,13 @@ SELECT pg_catalog.setval('public.zkapp_events_id_seq', 1, true);
 --
 
 SELECT pg_catalog.setval('public.zkapp_fee_payer_body_id_seq', 4, true);
+
+
+--
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.zkapp_fee_payers_id_seq', 4, true);
 
 
 --
@@ -3095,6 +3154,14 @@ ALTER TABLE ONLY public.zkapp_events
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
     ADD CONSTRAINT zkapp_fee_payer_body_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: zkapp_fee_payers zkapp_fee_payers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers
+    ADD CONSTRAINT zkapp_fee_payers_pkey PRIMARY KEY (id);
 
 
 --
@@ -3725,11 +3792,11 @@ ALTER TABLE ONLY public.zkapp_accounts
 
 
 --
--- Name: zkapp_commands zkapp_commands_zkapp_fee_payer_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_commands zkapp_commands_zkapp_fee_payer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.zkapp_commands
-    ADD CONSTRAINT zkapp_commands_zkapp_fee_payer_body_id_fkey FOREIGN KEY (zkapp_fee_payer_body_id) REFERENCES public.zkapp_fee_payer_body(id);
+    ADD CONSTRAINT zkapp_commands_zkapp_fee_payer_id_fkey FOREIGN KEY (zkapp_fee_payer_body_id) REFERENCES public.zkapp_fee_payers(id);
 
 
 --
@@ -3802,6 +3869,14 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
     ADD CONSTRAINT zkapp_fee_payer_body_zkapp_protocol_state_precondition_id_fkey FOREIGN KEY (zkapp_protocol_state_precondition_id) REFERENCES public.zkapp_protocol_state_precondition(id);
+
+
+--
+-- Name: zkapp_fee_payers zkapp_fee_payers_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers
+    ADD CONSTRAINT zkapp_fee_payers_body_id_fkey FOREIGN KEY (body_id) REFERENCES public.zkapp_fee_payer_body(id);
 
 
 --
@@ -4047,3 +4122,4 @@ ALTER TABLE ONLY public.zkapp_updates
 --
 -- PostgreSQL database dump complete
 --
+

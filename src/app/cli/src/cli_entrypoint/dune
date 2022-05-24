@@ -20,6 +20,7 @@
    uri
    async.async_command
    result
+   sexplib0
    ;;local libraries
    verifier
    ledger_proof

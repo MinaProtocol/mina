@@ -3723,9 +3723,8 @@ let%test_module "Proof of stake tests" =
       if not (Value.equal checked_value next_consensus_state) then (
         eprintf "Different states:\n%s\n%!"
           (Sexp_diff_kernel.Display.display_with_ansi_colors
-             ~display_options:
-               (Sexp_diff_kernel.Display.Display_options.create
-                  ~collapse_threshold:1000 () )
+             (Sexp_diff_kernel.Display.Display_options.create
+                ~collapse_threshold:1000 Two_column )
              diff ) ;
         failwith "Test failed" )
 
