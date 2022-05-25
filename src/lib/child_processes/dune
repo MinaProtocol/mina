@@ -22,6 +22,7 @@
    ppx_hash.runtime-lib
    async_kernel
    base.caml
+   sexplib0
    ;; local libraries
    file_system
    error_json

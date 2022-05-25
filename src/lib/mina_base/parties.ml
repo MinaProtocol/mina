@@ -874,7 +874,7 @@ module Stable = struct
       }
 
     include
-      Binable.Of_binable
+      Binable.Of_binable_without_uuid
         (Wire.Stable.V1)
         (struct
           type nonrec t = t

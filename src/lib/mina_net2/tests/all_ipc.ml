@@ -104,7 +104,7 @@ let%test_module "all-ipc test" =
     let mk_banning_gating_config peer_id =
       let fake_peer =
         Network_peer.Peer.create
-          (UnixLabels.inet_addr_of_string "8.8.8.8")
+          (Unix.Inet_addr.of_string "8.8.8.8")
           ~libp2p_port:9999 ~peer_id
       in
       { trusted_peers = []; banned_peers = [ fake_peer ]; isolate = false }

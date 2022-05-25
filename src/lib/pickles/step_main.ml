@@ -145,11 +145,11 @@ let step_main :
        , a_var
        , a_value )
        Inductive_rule.t
-    -> (   ( (Unfinalized.t, max_proofs_verified) Vector.t
+    -> (   unit
+        -> ( (Unfinalized.t, max_proofs_verified) Vector.t
            , Field.t
            , (Field.t, max_proofs_verified) Vector.t )
-           Types.Step.Statement.t
-        -> unit )
+           Types.Step.Statement.t )
        Staged.t =
  fun (module Req) (module Max_proofs_verified) ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
@@ -212,7 +212,7 @@ let step_main :
         let f = Fn.id
       end)
   in
-  let main (stmt : _ Types.Step.Statement.t) =
+  let main () : _ Types.Step.Statement.t =
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
@@ -225,6 +225,15 @@ let step_main :
         and prevs =
           exists (Prev_typ.f prev_typs) ~request:(fun () ->
               Req.Proof_with_datas )
+        and unfinalized_proofs =
+          exists
+            (Vector.typ
+               (Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n)
+               Max_proofs_verified.n )
+            ~request:(fun () -> Req.Unfinalized_proofs)
+        and pass_through =
+          exists (Vector.typ Digest.typ Max_proofs_verified.n)
+            ~request:(fun () -> Req.Pass_through)
         in
         let prev_statements =
           let module M =
@@ -277,15 +286,14 @@ let step_main :
                 let pass_throughs =
                   with_label "pass_throughs" (fun () ->
                       let module V = H1.Of_vector (Digest) in
-                      V.f proofs_verified (Vector.trim stmt.pass_through lte) )
+                      V.f proofs_verified (Vector.trim pass_through lte) )
                 and proofs_should_verify =
                   (* Run the application logic of the rule on the predecessor statements *)
                   with_label "rule_main" (fun () ->
                       rule.main prev_statements app_state )
                 and unfinalized_proofs =
                   let module H = H1.Of_vector (Unfinalized) in
-                  H.f proofs_verified
-                    (Vector.trim stmt.proof_state.unfinalized_proofs lte)
+                  H.f proofs_verified (Vector.trim unfinalized_proofs lte)
                 and datas =
                   let self_data :
                       ( a_var
@@ -334,7 +342,7 @@ let step_main :
               in
               Boolean.Assert.all vs ; chalss )
         in
-        let () =
+        let me_only =
           let challenge_polynomial_commitments =
             let module M =
               H3.Map (Per_proof_witness) (E03 (Inner_curve))
@@ -355,16 +363,21 @@ let step_main :
                   (hash_me_only ~index:dlog_plonk_index
                      basic.var_to_field_elements )
               in
-              Field.Assert.equal stmt.proof_state.me_only
-                (hash_me_only
-                   { app_state
-                   ; dlog_plonk_index
-                   ; challenge_polynomial_commitments
-                   ; old_bulletproof_challenges =
-                       (* Note: the bulletproof_challenges here are unpadded! *)
-                       bulletproof_challenges
-                   } ) )
+              hash_me_only
+                { app_state
+                ; dlog_plonk_index
+                ; challenge_polynomial_commitments
+                ; old_bulletproof_challenges =
+                    (* Note: the bulletproof_challenges here are unpadded! *)
+                    bulletproof_challenges
+                } )
         in
-        () )
+        ( { Types.Step.Statement.proof_state = { unfinalized_proofs; me_only }
+          ; pass_through
+          }
+          : ( (Unfinalized.t, max_proofs_verified) Vector.t
+            , Field.t
+            , (Field.t, max_proofs_verified) Vector.t )
+            Types.Step.Statement.t ) )
   in
   stage main
