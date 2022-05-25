@@ -211,6 +211,31 @@
           # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
         };
 
+        packages.mina-signer = nix-npm-buildPackage.buildNpmPackage {
+          src = ./frontend/mina-signer;
+          preBuild = ''
+            cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
+            chmod 0666 src/client_sdk.bc.js
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm{.js,_bg.wasm} src
+            chmod 0666 src/plonk_wasm{.js,_bg.wasm}
+          '';
+          npmBuild = "npm run build";
+          doCheck = true;
+          checkPhase = "node node_modules/.bin/jest";
+          # HACK: work around https://github.com/serokell/nix-npm-buildpackage/issues/33
+          # our build phase requires nodejs 16, but nix-npm-buildpackage only works with nodejs 14
+          # so, we mix them :(
+          nativeBuildInputs = [ pkgs.nodejs-16_x ];
+          installPhase = ''
+            runHook preInstall
+            npm prune --production --cache=./npm-prune-cache
+            npm pack --ignore-scripts --cache=./npm-prune-cache
+            mkdir $out
+            tar xzvf ./$name.tgz -C $out --strip-components=1
+            cp -R node_modules $out
+            runHook postInstall
+          '';
+        };
 
         inherit ocamlPackages ocamlPackages_static;
         packages.mina = ocamlPackages.mina;
