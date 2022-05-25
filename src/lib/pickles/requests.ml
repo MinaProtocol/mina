@@ -119,6 +119,9 @@ module Step = struct
           t
       | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
       | App_state : statement t
+      | Unfinalized_proofs :
+          (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
+      | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
   end
 
   let create :
@@ -151,6 +154,9 @@ module Step = struct
             t
         | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
         | App_state : statement t
+        | Unfinalized_proofs :
+            (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
+        | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
     end in
     (module R)
 end
