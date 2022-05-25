@@ -410,8 +410,8 @@ module Compile = struct
 
   module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let compile :
-        type prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-           self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
+        type a_var a_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
+           self:(a_var, a_value, max_proofs_verified, branches) Tag.t
         -> cache:Key_cache.Spec.t list
         -> ?disk_keys:
              (Cache.Step.Key.Verification.t, branches) Vector.t
@@ -421,20 +421,20 @@ module Compile = struct
              (module Nat.Add.Intf with type n = max_proofs_verified)
         -> name:string
         -> constraint_constants:Snark_keys_header.Constraint_constants.t
-        -> typ:(A.t, A_value.t) Impls.Step.Typ.t
+        -> typ:(a_var, a_value) Impls.Step.Typ.t
         -> choices:
-             (   self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
+             (   self:(a_var, a_value, max_proofs_verified, branches) Tag.t
               -> ( prev_varss
                  , prev_valuess
                  , widthss
                  , heightss
-                 , A.t
-                 , A_value.t )
+                 , a_var
+                 , a_value )
                  HIR.t )
         -> ( prev_valuess
            , widthss
            , heightss
-           , A_value.t
+           , a_value
            , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
            H3_2.T(Prover).t
            * _
@@ -443,6 +443,12 @@ module Compile = struct
      fun ~self ~cache ?disk_keys ~branches:(module Branches)
          ~max_proofs_verified:(module Max_proofs_verified) ~name
          ~constraint_constants ~typ ~choices ->
+      let module A = struct
+        type t = a_var
+      end in
+      let module A_value = struct
+        type t = a_value
+      end in
       let snark_keys_header kind constraint_system_hash =
         { Snark_keys_header.header_version = Snark_keys_header.header_version
         ; kind
@@ -475,7 +481,7 @@ module Compile = struct
         let module M = Wrap_domains.Make (A) (A_value) in
         let rec f :
             type a b c d.
-            (a, b, c, d, A.t, A_value.t) HIR.t -> (a, b, c, d) H4.T(M.I).t =
+            (a, b, c, d, a_var, a_value) HIR.t -> (a, b, c, d) H4.T(M.I).t =
           function
           | [] ->
               []
@@ -489,8 +495,8 @@ module Compile = struct
       Timer.clock __LOC__ ;
       let module Branch_data = struct
         type ('vars, 'vals, 'n, 'm) t =
-          ( A.t
-          , A_value.t
+          ( a_var
+          , a_value
           , Max_proofs_verified.n
           , Branches.n
           , 'vars
@@ -520,7 +526,7 @@ module Compile = struct
         Timer.clock __LOC__ ;
         let rec go :
             type a b c d.
-               (a, b, c, d, A.t, A_value.t) HIR.t
+               (a, b, c, d, a_var, a_value) HIR.t
             -> (a, b, c, d) H4.T(Branch_data).t = function
           | [] ->
               []
@@ -629,7 +635,7 @@ module Compile = struct
         let prev_wrap_domains =
           let rec go :
               type a b c d.
-                 (a, b, c, d, A.t, A_value.t) HIR.t
+                 (a, b, c, d, a_var, a_value) HIR.t
               -> (a, b, c, d) H4.T(H4.T(E04(Domains))).t = function
             | [] ->
                 []
@@ -729,7 +735,7 @@ module Compile = struct
             -> ?handler:
                  (   Snarky_backendless.Request.request
                   -> Snarky_backendless.Request.response )
-            -> A_value.t
+            -> a_value
             -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
             =
          fun (T b as branch_data) (step_pk, step_vk) ->
@@ -760,10 +766,14 @@ module Compile = struct
               }
             in
             let%map.Promise proof =
+              let to_field_elements =
+                let (Typ typ) = typ in
+                fun x -> fst (typ.value_to_fields x)
+              in
               Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
                 full_signature.maxes wrap_requests
                 ~dlog_plonk_index:wrap_vk.commitments wrap_main
-                A_value.to_field_elements ~step_vk ~step_domains:b.domains
+                to_field_elements ~step_vk ~step_domains:b.domains
                 ~step_plonk_indices:(Lazy.force step_vks) ~wrap_domains
                 (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
                 proof
@@ -786,7 +796,7 @@ module Compile = struct
             -> ( xs2
                , xs3
                , xs4
-               , A_value.t
+               , a_value
                , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t
                )
                H3_2.T(Prover).t =

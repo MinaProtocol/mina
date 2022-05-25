@@ -16,8 +16,6 @@ open Common
 module Make
     (A : T0) (A_value : sig
       type t
-
-      val to_field_elements : t -> Tick.Field.t array
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
