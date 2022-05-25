@@ -6,8 +6,10 @@ open Pickles_types
 module Witness : sig
   type t =
     { prev_state : Protocol_state.Value.t
+    ; prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
     ; transition : Snark_transition.Value.t
     ; txn_snark : Transaction_snark.Statement.With_sok.t
+    ; txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
     }
 end
 

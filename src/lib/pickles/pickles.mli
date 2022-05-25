@@ -10,7 +10,6 @@ module Step_main_inputs = Step_main_inputs
 module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Impls = Impls
-module Inductive_rule = Inductive_rule
 module Tag = Tag
 module Step_verifier = Step_verifier
 module Common = Common
@@ -98,6 +97,30 @@ module Statement_with_proof : sig
   type ('s, 'max_width, _) t = ('max_width, 'max_width) Proof.t
 end
 
+module Inductive_rule : sig
+  module Previous_proof_statement : sig
+    type ('prev_var, 'width) t =
+      { public_input : 'prev_var
+      ; proof : ('width, 'width) Proof.t Impls.Step.As_prover.Ref.t
+      ; proof_must_verify : Impls.Step.Boolean.var
+      }
+
+    module Constant : sig
+      type ('prev_value, 'width) t =
+        { public_input : 'prev_value
+        ; proof : ('width, 'width) Proof.t
+        ; proof_must_verify : bool
+        }
+    end
+  end
+
+  type ('prev_vars, 'prev_values, 'widths, 'heights, 'a_var, 'a_value) t =
+    { identifier : string
+    ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
+    ; main : 'a_var -> ('prev_vars, 'widths) H2.T(Previous_proof_statement).t
+    }
+end
+
 val verify_promise :
      (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
@@ -117,10 +140,6 @@ module Prover : sig
        ?handler:
          (   Snarky_backendless.Request.request
           -> Snarky_backendless.Request.response )
-    -> ( 'prev_values
-       , 'local_widths
-       , 'local_heights )
-       H3.T(Statement_with_proof).t
     -> 'a_value
     -> 'proof
 end

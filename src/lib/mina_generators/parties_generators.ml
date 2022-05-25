@@ -1069,15 +1069,7 @@ let gen_parties_from ?(succeed = true)
                   in
                   let proof =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        prover ?handler:(Some handler)
-                          ( []
-                            : ( unit
-                              , unit
-                              , unit )
-                              Pickles_types.Hlist.H3.T
-                                (Pickles.Statement_with_proof)
-                              .t )
-                          txn_stmt )
+                        prover ?handler:(Some handler) txn_stmt )
                   in
                   Control.Proof proof )
           | None_given ->

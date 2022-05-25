@@ -7,11 +7,18 @@ module B = struct
 end
 
 module Previous_proof_statement = struct
-  type 'prev_var t = { public_input : 'prev_var; proof_must_verify : B.t }
+  type ('prev_var, 'width) t =
+    { public_input : 'prev_var
+    ; proof : ('width, 'width) Proof.t Impls.Step.As_prover.Ref.t
+    ; proof_must_verify : B.t
+    }
 
   module Constant = struct
-    type 'prev_value t =
-      { public_input : 'prev_value; proof_must_verify : bool }
+    type ('prev_value, 'width) t =
+      { public_input : 'prev_value
+      ; proof : ('width, 'width) Proof.t
+      ; proof_must_verify : bool
+      }
   end
 end
 
@@ -24,7 +31,7 @@ end
 type ('prev_vars, 'prev_values, 'widths, 'heights, 'a_var, 'a_value) t =
   { identifier : string
   ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
-  ; main : 'a_var -> 'prev_vars H1.T(Previous_proof_statement).t
+  ; main : 'a_var -> ('prev_vars, 'widths) H2.T(Previous_proof_statement).t
   }
 
 module T (Statement : T0) (Statement_value : T0) = struct

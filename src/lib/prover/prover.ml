@@ -124,9 +124,11 @@ module Worker_state = struct
                            { transition = block
                            ; prev_state =
                                Blockchain_snark.Blockchain.state chain
+                           ; prev_state_proof =
+                               Blockchain_snark.Blockchain.proof chain
                            ; txn_snark = fst t
+                           ; txn_snark_proof = snd t
                            }
-                           [ Blockchain_snark.Blockchain.proof chain; snd t ]
                            next_state
                        in
                        Blockchain_snark.Blockchain.create ~state:next_state
@@ -154,7 +156,9 @@ module Worker_state = struct
                      ~constraint_constants
                      { transition = block
                      ; prev_state = Blockchain_snark.Blockchain.state chain
+                     ; prev_state_proof = Mina_base.Proof.blockchain_dummy
                      ; txn_snark = t
+                     ; txn_snark_proof = Mina_base.Proof.transaction_dummy
                      }
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler

@@ -397,7 +397,7 @@ let dummy_constraints () =
          Modify snarky to do this.
 *)
 let party_circuit f ({ transaction; at_party } : Zkapp_statement.Checked.t) :
-    _ H1.T(Pickles.Inductive_rule.Previous_proof_statement).t =
+    _ H2.T(Pickles.Inductive_rule.Previous_proof_statement).t =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
