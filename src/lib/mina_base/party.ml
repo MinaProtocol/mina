@@ -752,7 +752,7 @@ module Body = struct
         ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
         ~account_precondition:!.Account_precondition.deriver
         ~use_full_commitment:!.bool ~caller:!.Token_id.deriver ~call_depth:!.int
-      |> finish "PartyBodyGraphql" ~t_toplevel_annots
+      |> finish "PartyBody" ~t_toplevel_annots
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
@@ -837,6 +837,66 @@ module Body = struct
     ; account_precondition = p.account_precondition
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    }
+
+  let of_graphql_repr
+      ({ public_key
+       ; token_id
+       ; update
+       ; balance_change
+       ; increment_nonce
+       ; events
+       ; sequence_events
+       ; call_data
+       ; protocol_state_precondition
+       ; account_precondition
+       ; use_full_commitment
+       ; caller
+       ; call_depth = _
+       } :
+        Graphql_repr.t ) : t =
+    { public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; sequence_events
+    ; call_data
+    ; protocol_state_precondition
+    ; account_precondition
+    ; use_full_commitment
+    ; caller
+    }
+
+  let to_graphql_repr
+      ({ public_key
+       ; token_id
+       ; update
+       ; balance_change
+       ; increment_nonce
+       ; events
+       ; sequence_events
+       ; call_data
+       ; protocol_state_precondition
+       ; account_precondition
+       ; use_full_commitment
+       ; caller
+       } :
+        t ) ~call_depth : Graphql_repr.t =
+    { Graphql_repr.public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; sequence_events
+    ; call_data
+    ; protocol_state_precondition
+    ; account_precondition
+    ; use_full_commitment
+    ; caller
+    ; call_depth
     }
 
   (* * Balance change for the fee payer is always going to be Neg, so represent it using
@@ -1069,23 +1129,12 @@ module Body = struct
     ; caller = Token_id.default
     }
 
-  let deriver obj =
-    let open Fields_derivers_zkapps in
-    let ( !. ) = ( !. ) ~t_fields_annots in
-    Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-      ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
-      ~increment_nonce:!.bool ~events:!.Events.deriver
-      ~sequence_events:!.Events.deriver ~call_data:!.field
-      ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
-      ~account_precondition:!.Account_precondition.deriver
-      ~use_full_commitment:!.bool ~caller:!.Token_id.deriver
-    |> finish "PartyBody" ~t_toplevel_annots
-
   let%test_unit "json roundtrip" =
     let open Fields_derivers_zkapps.Derivers in
     let full = o () in
-    let _a = deriver full in
-    [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
+    let _a = Graphql_repr.deriver full in
+    [%test_eq: Graphql_repr.t] Graphql_repr.dummy
+      (Graphql_repr.dummy |> to_json full |> of_json full)
 
   let to_input
       ({ public_key
@@ -1235,77 +1284,12 @@ module T = struct
     end
   end]
 
-  let of_graphql_repr
-      ({ body =
-           { public_key
-           ; token_id
-           ; update
-           ; balance_change
-           ; increment_nonce
-           ; events
-           ; sequence_events
-           ; call_data
-           ; protocol_state_precondition
-           ; account_precondition
-           ; use_full_commitment
-           ; caller
-           ; call_depth = _
-           }
-       ; authorization
-       } :
-        Graphql_repr.t ) : t =
-    { authorization
-    ; body =
-        { Body.public_key
-        ; token_id
-        ; update
-        ; balance_change
-        ; increment_nonce
-        ; events
-        ; sequence_events
-        ; call_data
-        ; protocol_state_precondition
-        ; account_precondition
-        ; use_full_commitment
-        ; caller
-        }
-    }
+  let of_graphql_repr ({ body; authorization } : Graphql_repr.t) : t =
+    { authorization; body = Body.of_graphql_repr body }
 
-  let to_graphql_repr
-      ({ body =
-           { public_key
-           ; token_id
-           ; update
-           ; balance_change
-           ; increment_nonce
-           ; events
-           ; sequence_events
-           ; call_data
-           ; protocol_state_precondition
-           ; account_precondition
-           ; use_full_commitment
-           ; caller
-           }
-       ; authorization
-       } :
-        t ) ~call_depth : Graphql_repr.t =
-    { authorization
-    ; body =
-        { Body.Graphql_repr.public_key
-        ; token_id
-        ; update
-        ; balance_change
-        ; increment_nonce
-        ; events
-        ; sequence_events
-        ; call_data
-        ; protocol_state_precondition
-        ; account_precondition
-        ; use_full_commitment
-        ; caller
-        ; call_depth
-        }
-    }
+  let to_graphql_repr ({ body; authorization } : t) ~call_depth : Graphql_repr.t
+      =
+    { authorization; body = Body.to_graphql_repr ~call_depth body }
 
   let gen caller : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -1324,20 +1308,15 @@ module T = struct
     let digest (t : t) = Body.Checked.digest t
   end
 
-  let deriver obj =
-    let open Fields_derivers_zkapps.Derivers in
-    let ( !. ) = ( !. ) ~t_fields_annots in
-    Fields.make_creator obj ~body:!.Body.deriver
-      ~authorization:!.Control.deriver
-    |> finish "ZkappParty" ~t_toplevel_annots
-
   let%test_unit "json roundtrip dummy" =
-    let dummy : t =
-      { body = Body.dummy; authorization = Control.dummy_of_tag Signature }
+    let dummy : Graphql_repr.t =
+      to_graphql_repr ~call_depth:0
+        { body = Body.dummy; authorization = Control.dummy_of_tag Signature }
     in
     let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver @@ Fd.o () in
-    [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+    let full = Graphql_repr.deriver @@ Fd.o () in
+    [%test_eq: Graphql_repr.t] dummy
+      (dummy |> Fd.to_json full |> Fd.of_json full)
 end
 
 module Fee_payer = struct

@@ -2828,7 +2828,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "PartyBodyGraphqlInput",
+          "name": "PartyBodyInput",
           "description": null,
           "fields": [
             {
@@ -3354,7 +3354,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyGraphqlInput",
+                  "name": "PartyBodyInput",
                   "ofType": null
                 }
               },
@@ -3387,7 +3387,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyGraphqlInput",
+                  "name": "PartyBodyInput",
                   "ofType": null
                 }
               },
@@ -6927,7 +6927,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "PartyBodyGraphql",
+          "name": "PartyBody",
           "description": null,
           "fields": [
             {
@@ -7186,7 +7186,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "PartyBodyGraphql",
+                  "name": "PartyBody",
                   "ofType": null
                 }
               },
