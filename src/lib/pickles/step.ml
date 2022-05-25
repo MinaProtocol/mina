@@ -470,23 +470,22 @@ struct
       go prev_with_proofs Maxes.maxes branch_data.rule.prevs inners_must_verify
         prev_vars_length
     in
+    let unfinalized_proofs_extended =
+      Vector.extend unfinalized_proofs lte Max_proofs_verified.n
+        (Unfinalized.Constant.dummy ())
+    in
+    let pass_through =
+      let module M =
+        H3.Map2_to_H1 (P.With_data) (P.Base.Me_only.Wrap)
+          (struct
+            let f :
+                type a b c. (a, b, c) P.With_data.t -> b P.Base.Me_only.Wrap.t =
+             fun (T t) -> t.statement.proof_state.me_only
+          end)
+      in
+      M.f prev_with_proofs
+    in
     let next_statement : _ Types.Step.Statement.t =
-      let unfinalized_proofs_extended =
-        Vector.extend unfinalized_proofs lte Max_proofs_verified.n
-          (Unfinalized.Constant.dummy ())
-      in
-      let pass_through =
-        let module M =
-          H3.Map2_to_H1 (P.With_data) (P.Base.Me_only.Wrap)
-            (struct
-              let f :
-                  type a b c. (a, b, c) P.With_data.t -> b P.Base.Me_only.Wrap.t
-                  =
-               fun (T t) -> t.statement.proof_state.me_only
-            end)
-        in
-        M.f prev_with_proofs
-      in
       let old_bulletproof_challenges =
         let module VV = struct
           type t =
@@ -519,23 +518,7 @@ struct
       Reduced_me_only.Step.prepare ~dlog_plonk_index:self_dlog_plonk_index
         next_statement.proof_state.me_only
     in
-    let handler (Snarky_backendless.Request.With { request; respond } as r) =
-      let k x = respond (Provide x) in
-      match request with
-      | Req.Proof_with_datas ->
-          k witnesses
-      | Req.Wrap_index ->
-          k self_dlog_plonk_index
-      | Req.App_state ->
-          k next_me_only_prepared.app_state
-      | _ -> (
-          match handler with
-          | Some f ->
-              f r
-          | None ->
-              Snarky_backendless.Request.unhandled )
-    in
-    let next_statement_hashed : _ Types.Step.Statement.t =
+    let pass_through_padded =
       let rec pad :
           type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
@@ -560,19 +543,29 @@ struct
             in
             Common.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
       in
-      { proof_state =
-          { next_statement.proof_state with
-            me_only =
-              Common.hash_step_me_only ~app_state:A_value.to_field_elements
-                next_me_only_prepared
-          }
-      ; pass_through =
-          (* TODO: Use the same pad_pass_through function as in wrap *)
-          pad
-            (Vector.map statements_with_hashes ~f:(fun s ->
-                 s.proof_state.me_only ) )
-            Maxes.maxes Maxes.length
-      }
+      pad
+        (Vector.map statements_with_hashes ~f:(fun s -> s.proof_state.me_only))
+        Maxes.maxes Maxes.length
+    in
+    let handler (Snarky_backendless.Request.With { request; respond } as r) =
+      let k x = respond (Provide x) in
+      match request with
+      | Req.Proof_with_datas ->
+          k witnesses
+      | Req.Wrap_index ->
+          k self_dlog_plonk_index
+      | Req.App_state ->
+          k next_me_only_prepared.app_state
+      | Req.Unfinalized_proofs ->
+          k unfinalized_proofs_extended
+      | Req.Pass_through ->
+          k pass_through_padded
+      | _ -> (
+          match handler with
+          | Some f ->
+              f r
+          | None ->
+              Snarky_backendless.Request.unhandled )
     in
     let prev_challenge_polynomial_commitments =
       let to_fold_in =
@@ -595,8 +588,8 @@ struct
             } )
         |> to_list)
     in
-    let%map.Promise (next_proof : Tick.Proof.t) =
-      let (T (input, conv, _conv_inv)) =
+    let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
+      let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
       in
@@ -607,17 +600,18 @@ struct
         (Domain.size h) (fun () ->
           Impls.Step.generate_witness_conv
             ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
-                    () ->
-              Backend.Tick.Proof.create_async ~primary:public_inputs
-                ~auxiliary:auxiliary_inputs
-                ~message:prev_challenge_polynomial_commitments pk )
-            [ input ]
-            ~return_typ:(Snarky_backendless.Typ.unit ())
-            (fun x () : unit ->
+                    next_statement_hashed ->
+              let%map.Promise proof =
+                Backend.Tick.Proof.create_async ~primary:public_inputs
+                  ~auxiliary:auxiliary_inputs
+                  ~message:prev_challenge_polynomial_commitments pk
+              in
+              (proof, next_statement_hashed) )
+            [] ~return_typ:input
+            (fun () ->
               Impls.Step.handle
-                (fun () : unit -> branch_data.main ~step_domains (conv x))
-                handler )
-            next_statement_hashed )
+                (fun () -> conv_inv (branch_data.main ~step_domains ()))
+                handler ) )
     in
     let prev_evals =
       let module M =
