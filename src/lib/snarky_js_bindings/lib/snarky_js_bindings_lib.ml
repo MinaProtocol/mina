@@ -254,6 +254,11 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
+let to_js_bigint =
+  let bigint_constr = Js.Unsafe.eval_string {js|BigInt|js} in
+  fun (s : Js.js_string Js.t) ->
+    Js.Unsafe.fun_call bigint_constr [| Js.Unsafe.inject s |]
+
 let to_js_field x : field_class Js.t = new%js field_constr (As_field.of_field x)
 
 let of_js_field (x : field_class Js.t) : Field.t = x##.value
@@ -304,6 +309,7 @@ let () =
   method_ "sizeInFields" (fun _this : int -> 1) ;
   method_ "toFields" (fun this : field_class Js.t Js.js_array Js.t ->
       singleton_array this ) ;
+  method_ "toBigInt" (fun this -> to_string this##.value |> to_js_bigint) ;
   ((* TODO: Make this work with arbitrary bit length *)
    let bit_length = Field.size_in_bits - 2 in
    let cmp_method (name, f) =
@@ -384,6 +390,10 @@ let () =
   in
   field_class##.one := mk Field.one ;
   field_class##.zero := mk Field.zero ;
+  field_class##.minusOne := mk @@ Field.negate Field.one ;
+  Js.Unsafe.set field_class (Js.string "ORDER")
+    ( to_js_bigint @@ Js.string @@ Pasta_bindings.BigInt256.to_string
+    @@ Pasta_bindings.Fp.size () ) ;
   field_class##.random :=
     Js.wrap_callback (fun () : field_class Js.t ->
         mk (Field.constant (Field.Constant.random ())) ) ;
