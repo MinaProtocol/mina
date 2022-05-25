@@ -297,105 +297,118 @@ module Proof_system = struct
 end
 
 module Compile = struct
-  module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
-    module IR = Inductive_rule.T (A) (A_value)
-    module HIR = H4.T (IR)
+  module IR = Inductive_rule
+  module HIR = H4_2.T (Inductive_rule)
 
-    let max_local_max_proofs_verifieds ~self (type n)
-        (module Max_proofs_verified : Nat.Intf with type n = n) branches choices
-        =
-      let module Local_max_proofs_verifieds = struct
-        type t = (int, Max_proofs_verified.n) Vector.t
-      end in
-      let module M =
-        H4.Map (IR) (E04 (Local_max_proofs_verifieds))
-          (struct
-            module V = H4.To_vector (Int)
-            module HT = H4.T (Tag)
+  let max_local_max_proofs_verifieds ~self (type n)
+      (module Max_proofs_verified : Nat.Intf with type n = n) branches choices =
+    let rec go :
+        type prev_varss prev_valuess widthss heightss a_var a_value length.
+           ( prev_varss
+           , prev_valuess
+           , widthss
+           , heightss
+           , a_var
+           , a_value )
+           H4_2.T(Inductive_rule).t
+        -> (prev_varss, length) Length.t
+        -> ((int, n) Vector.t, length) Vector.t =
+     fun rules len ->
+      match (rules, len) with
+      | [], Z ->
+          []
+      | rule :: rules, S len ->
+          let rec go_inner :
+              type prev_vars prev_values widths heights target_len.
+                 (prev_vars, prev_values, widths, heights) H4.T(Tag).t
+              -> target_len Nat.t
+              -> (int, target_len) Vector.t =
+           fun tags len ->
+            match (tags, len) with
+            | [], Z ->
+                []
+            | [], S len ->
+                0 :: go_inner [] len
+            | _ :: _, Z ->
+                failwith
+                  "Max_proofs_verified.n is less than the number of previous \
+                   rules"
+            | tag :: tags, S len ->
+                let max_proofs_verified =
+                  if Type_equal.Id.same tag.id self then
+                    Nat.to_int Max_proofs_verified.n
+                  else
+                    let (module M) = Types_map.max_proofs_verified tag in
+                    Nat.to_int M.n
+                in
+                max_proofs_verified :: go_inner tags len
+          in
+          go_inner rule.prevs Max_proofs_verified.n :: go rules len
+    in
+    let padded = go choices branches |> Vector.transpose in
+    (padded, Maxes.m padded)
 
-            module M =
-              H4.Map (Tag) (E04 (Int))
-                (struct
-                  let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
-                    if Type_equal.Id.same t.id self then
-                      Nat.to_int Max_proofs_verified.n
-                    else
-                      let (module M) = Types_map.max_proofs_verified t in
-                      Nat.to_int M.n
-                end)
+  module Lazy_ (A : T0) = struct
+    type t = A.t Lazy.t
+  end
 
-            let f :
-                type a b c d. (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t
-                =
-             fun rule ->
-              let (T (_, l)) = HT.length rule.prevs in
-              Vector.extend_exn (V.f l (M.f rule.prevs)) Max_proofs_verified.n 0
-          end)
-      in
-      let module V = H4.To_vector (Local_max_proofs_verifieds) in
-      let padded = V.f branches (M.f choices) |> Vector.transpose in
-      (padded, Maxes.m padded)
+  module Lazy_keys = struct
+    type t =
+      (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+      * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
 
-    module Lazy_ (A : T0) = struct
-      type t = A.t Lazy.t
-    end
+    (* TODO Think this is right.. *)
+  end
 
-    module Lazy_keys = struct
-      type t =
-        (Impls.Step.Keypair.t * Dirty.t) Lazy.t
-        * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
-
-      (* TODO Think this is right.. *)
-    end
-
-    let log_step main typ name index =
-      let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
-      let log =
-        let weight =
-          let sys = Backend.Tick.R1CS_constraint_system.create () in
-          fun (c : Impls.Step.Constraint.t) ->
-            let prev = sys.next_row in
-            List.iter c ~f:(fun { annotation; basic } ->
-                Backend.Tick.R1CS_constraint_system.add_constraint sys
-                  ?label:annotation basic ) ;
-            let next = sys.next_row in
-            next - prev
-        in
-        Constraints.log ~weight (Impls.Step.make_checked main)
-      in
-      if profile_constraints then
-        Snarky_log.to_file
-          (sprintf "step-snark-%s-%d.json" name (Index.to_int index))
-          log
-
-    let log_wrap main typ name id =
-      let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
-      let log =
-        let sys = Backend.Tock.R1CS_constraint_system.create () in
-        let weight (c : Impls.Wrap.Constraint.t) =
+  let log_step main typ name index =
+    let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
+    let log =
+      let weight =
+        let sys = Backend.Tick.R1CS_constraint_system.create () in
+        fun (c : Impls.Step.Constraint.t) ->
           let prev = sys.next_row in
           List.iter c ~f:(fun { annotation; basic } ->
-              Backend.Tock.R1CS_constraint_system.add_constraint sys
+              Backend.Tick.R1CS_constraint_system.add_constraint sys
                 ?label:annotation basic ) ;
           let next = sys.next_row in
           next - prev
-        in
-        let log =
-          Constraints.log ~weight
-            Impls.Wrap.(
-              make_checked (fun () : unit ->
-                  let x = with_label __LOC__ (fun () -> exists typ) in
-                  main x () ))
-        in
-        log
       in
-      if profile_constraints then
-        Snarky_log.to_file
-          (sprintf
-             !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
-             name (Type_equal.Id.uid id) )
-          log
+      Constraints.log ~weight (Impls.Step.make_checked main)
+    in
+    if profile_constraints then
+      Snarky_log.to_file
+        (sprintf "step-snark-%s-%d.json" name (Index.to_int index))
+        log
 
+  let log_wrap main typ name id =
+    let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
+    let log =
+      let sys = Backend.Tock.R1CS_constraint_system.create () in
+      let weight (c : Impls.Wrap.Constraint.t) =
+        let prev = sys.next_row in
+        List.iter c ~f:(fun { annotation; basic } ->
+            Backend.Tock.R1CS_constraint_system.add_constraint sys
+              ?label:annotation basic ) ;
+        let next = sys.next_row in
+        next - prev
+      in
+      let log =
+        Constraints.log ~weight
+          Impls.Wrap.(
+            make_checked (fun () : unit ->
+                let x = with_label __LOC__ (fun () -> exists typ) in
+                main x () ))
+      in
+      log
+    in
+    if profile_constraints then
+      Snarky_log.to_file
+        (sprintf
+           !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
+           name (Type_equal.Id.uid id) )
+        log
+
+  module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let compile :
         type prev_varss prev_valuess widthss heightss max_proofs_verified branches.
            self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
@@ -411,7 +424,13 @@ module Compile = struct
         -> typ:(A.t, A_value.t) Impls.Step.Typ.t
         -> choices:
              (   self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
-              -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+              -> ( prev_varss
+                 , prev_valuess
+                 , widthss
+                 , heightss
+                 , A.t
+                 , A_value.t )
+                 HIR.t )
         -> ( prev_valuess
            , widthss
            , heightss
@@ -455,7 +474,8 @@ module Compile = struct
       let wrap_domains =
         let module M = Wrap_domains.Make (A) (A_value) in
         let rec f :
-            type a b c d. (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t =
+            type a b c d.
+            (a, b, c, d, A.t, A_value.t) HIR.t -> (a, b, c, d) H4.T(M.I).t =
           function
           | [] ->
               []
@@ -480,43 +500,43 @@ module Compile = struct
           Step_branch_data.t
       end in
       let proofs_verifieds =
-        let module M =
-          H4.Map (IR) (E04 (Int))
-            (struct
-              module M = H4.T (Tag)
-
-              let f : type a b c d. (a, b, c, d) IR.t -> int =
-               fun r ->
-                let (T (n, _)) = M.length r.prevs in
-                Nat.to_int n
-            end)
+        let rec go :
+            type a b c d e f l.
+            (a, b, c, d, e, f) HIR.t -> (a, l) Length.t -> (int, l) Vector.t =
+         fun rules length ->
+          match (rules, length) with
+          | [], Z ->
+              []
+          | rule :: rules, S length ->
+              let rec go_inner : type w x y z. (w, x, y, z) H4.T(Tag).t -> int =
+               fun l -> match l with [] -> 0 | _ :: tl -> 1 + go_inner tl
+              in
+              go_inner rule.prevs :: go rules length
         in
-        let module V = H4.To_vector (Int) in
-        V.f prev_varss_length (M.f choices)
+        go choices prev_varss_length
       in
       let step_data =
         let i = ref 0 in
         Timer.clock __LOC__ ;
-        let module M =
-          H4.Map (IR) (Branch_data)
-            (struct
-              let f :
-                  type a b c d. (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t
-                  =
-               fun rule ->
-                Timer.clock __LOC__ ;
-                let res =
-                  Common.time "make step data" (fun () ->
-                      Step_branch_data.create ~index:(Index.of_int_exn !i)
-                        ~max_proofs_verified:Max_proofs_verified.n
-                        ~branches:Branches.n ~self ~typ A.to_field_elements
-                        A_value.to_field_elements rule ~wrap_domains
-                        ~proofs_verifieds )
-                in
-                Timer.clock __LOC__ ; incr i ; res
-            end)
+        let rec go :
+            type a b c d.
+               (a, b, c, d, A.t, A_value.t) HIR.t
+            -> (a, b, c, d) H4.T(Branch_data).t = function
+          | [] ->
+              []
+          | rule :: rules ->
+              Timer.clock __LOC__ ;
+              let res =
+                Common.time "make step data" (fun () ->
+                    Step_branch_data.create ~index:(Index.of_int_exn !i)
+                      ~max_proofs_verified:Max_proofs_verified.n
+                      ~branches:Branches.n ~self ~typ A.to_field_elements
+                      A_value.to_field_elements rule ~wrap_domains
+                      ~proofs_verifieds )
+              in
+              Timer.clock __LOC__ ; incr i ; res :: go rules
         in
-        M.f choices
+        go choices
       in
       Timer.clock __LOC__ ;
       let step_domains =
@@ -608,19 +628,23 @@ module Compile = struct
       let wrap_requests, wrap_main =
         Timer.clock __LOC__ ;
         let prev_wrap_domains =
-          let module M =
-            H4.Map (IR) (H4.T (E04 (Domains)))
-              (struct
-                let f :
-                    type a b c d.
-                    (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
-                 fun rule ->
-                  let module M =
-                    H4.Map (Tag) (E04 (Domains))
-                      (struct
-                        let f (type a b c d) (t : (a, b, c, d) Tag.t) :
-                            Domains.t =
-                          Types_map.lookup_map t ~self:self.id
+          let rec go :
+              type a b c d.
+                 (a, b, c, d, A.t, A_value.t) HIR.t
+              -> (a, b, c, d) H4.T(H4.T(E04(Domains))).t = function
+            | [] ->
+                []
+            | rule :: rules ->
+                let domains =
+                  let rec go :
+                      type a b c d.
+                         (a, b, c, d) H4.T(Tag).t
+                      -> (a, b, c, d) H4.T(E04(Domains)).t = function
+                    | [] ->
+                        []
+                    | tag :: tags ->
+                        let domain =
+                          Types_map.lookup_map tag ~self:self.id
                             ~default:wrap_domains ~f:(function
                             | `Compiled d ->
                                 d.wrap_domains
@@ -629,12 +653,14 @@ module Compile = struct
                                   ~proofs_verified:
                                     ( d.permanent.max_proofs_verified
                                     |> Nat.Add.n |> Nat.to_int ) )
-                      end)
+                        in
+                        domain :: go tags
                   in
-                  M.f rule.Inductive_rule.prevs
-              end)
+                  go rule.prevs
+                in
+                domains :: go rules
           in
-          M.f choices
+          go choices
         in
         Timer.clock __LOC__ ;
         Wrap_main.wrap_main full_signature prev_varss_length step_vks
@@ -920,18 +946,9 @@ let compile_promise :
         self
   in
   let module M = Compile.Make (A_var) (A_value) in
-  let rec conv_irs :
-      type v1ss v2ss wss hss.
-         (v1ss, v2ss, wss, hss, a_var, a_value) H4_2.T(Inductive_rule).t
-      -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
-    | [] ->
-        []
-    | r :: rs ->
-        r :: conv_irs rs
-  in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~cache ?disk_keys ~branches ~max_proofs_verified ~name ~typ
-      ~constraint_constants ~choices:(fun ~self -> conv_irs (choices ~self))
+      ~constraint_constants ~choices:(fun ~self -> choices ~self)
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
