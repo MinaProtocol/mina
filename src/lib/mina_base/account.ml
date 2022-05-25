@@ -114,7 +114,7 @@ module Token_symbol = struct
       include T
 
       include
-        Binable.Of_binable
+        Binable.Of_binable_without_uuid
           (Core_kernel.String.Stable.V1)
           (struct
             type t = string
@@ -365,7 +365,7 @@ module Stable = struct
     [@@deriving sexp, equal, hash, compare, yojson]
 
     include
-      Binable.Of_binable
+      Binable.Of_binable_without_uuid
         (Binable_arg.Stable.V2)
         (struct
           type nonrec t = t

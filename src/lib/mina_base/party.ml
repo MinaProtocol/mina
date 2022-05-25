@@ -20,12 +20,6 @@ module type Type = sig
   type t
 end
 
-let token_id_deriver obj =
-  let open Fields_derivers_zkapps in
-  iso_string obj ~name:"TokenId" ~doc:"String representing a token ID"
-    ~to_string:Token_id.to_string
-    ~of_string:(except ~f:Token_id.of_string `Token_id)
-
 module Call_type = struct
   [%%versioned
   module Stable = struct
@@ -449,14 +443,19 @@ module Update = struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
+    let string_with_hash =
+      with_checked
+        ~checked:(Data_as_hash.deriver string)
+        ~name:"StringWithHash" string
+    in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
-         ~zkapp_uri:!.(Set_or_keep.deriver string)
-         ~token_symbol:!.(Set_or_keep.deriver string)
+         ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
+         ~token_symbol:!.(Set_or_keep.deriver string_with_hash)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
@@ -754,14 +753,12 @@ module Body = struct
     let deriver obj =
       let open Fields_derivers_zkapps in
       let fee obj =
-        iso_string obj ~name:"Fee" ~to_string:Fee.to_string
+        iso_string obj ~name:"Fee" ~js_type:UInt64 ~to_string:Fee.to_string
           ~of_string:Fee.of_string
       in
       let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-        ~fee:!.fee
-        ~events:!.(list @@ array field @@ o ())
-        ~sequence_events:!.(list @@ array field @@ o ())
+        ~fee:!.fee ~events:!.Events.deriver ~sequence_events:!.Events.deriver
         ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
         ~nonce:!.uint32
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
@@ -935,47 +932,14 @@ module Body = struct
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    let token_id_deriver obj =
-      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
-        ~of_string:Token_id.of_string
-    in
-    let balance_change_deriver obj =
-      let sign_to_string = function
-        | Sgn.Pos ->
-            "Positive"
-        | Sgn.Neg ->
-            "Negative"
-      in
-      let sign_of_string = function
-        | "Positive" ->
-            Sgn.Pos
-        | "Negative" ->
-            Sgn.Neg
-        | _ ->
-            failwith "impossible"
-      in
-      let sign_deriver =
-        iso_string ~name:"Sign" ~to_string:sign_to_string
-          ~of_string:sign_of_string
-      in
-      let ( !. ) =
-        ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots
-      in
-      Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
-        ~sgn:!.sign_deriver
-      |> finish "BalanceChange"
-           ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
-    in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-      ~token_id:!.token_id_deriver ~balance_change:!.balance_change_deriver
-      ~increment_nonce:!.bool
-      ~events:!.(list @@ array field @@ o ())
-      ~sequence_events:!.(list @@ array field @@ o ())
-      ~call_data:!.field ~call_depth:!.int
+      ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
+      ~increment_nonce:!.bool ~events:!.Events.deriver
+      ~sequence_events:!.Events.deriver ~call_data:!.field ~call_depth:!.int
       ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
       ~account_precondition:!.Account_precondition.deriver
-      ~use_full_commitment:!.bool ~caller:!.token_id_deriver
+      ~use_full_commitment:!.bool ~caller:!.Token_id.deriver
     |> finish "PartyBody" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =

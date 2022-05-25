@@ -216,6 +216,7 @@ module Internal_command_info = struct
 end
 
 module Block_info = struct
+  (* TODO: should timestamp be string?; Block_time.t is an unsigned 64-bit int *)
   type t =
     { block_identifier: Block_identifier.t
     ; parent_block_identifier: Block_identifier.t
@@ -557,7 +558,7 @@ WITH RECURSIVE chain AS (
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
           ; receiver_account_creation_fee_paid= Option.map (Internal_commands.Extras.receiver_account_creation_fee_paid extras) ~f:Unsigned.UInt64.of_int64
-          ; fee= Unsigned.UInt64.of_int64 ic.fee
+          ; fee= Unsigned.UInt64.of_string ic.fee
           ; token= `Token_id token_id
           ; sequence_no=Internal_commands.Extras.sequence_no extras
           ; secondary_sequence_no=Internal_commands.Extras.secondary_sequence_no extras
@@ -627,8 +628,8 @@ WITH RECURSIVE chain AS (
           ; fee_token= `Token_id fee_token
           ; token= `Token_id token
           ; nonce= Unsigned.UInt32.of_int64 uc.nonce
-          ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
-          ; fee= Unsigned.UInt64.of_int64 uc.fee
+          ; amount= Option.map ~f:Unsigned.UInt64.of_string uc.amount
+          ; fee= Unsigned.UInt64.of_string uc.fee
           ; hash= uc.hash
           ; failure_status= Some failure_status
           ; valid_until= Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
@@ -642,7 +643,7 @@ WITH RECURSIVE chain AS (
     ; parent_block_identifier=
         { Block_identifier.index= raw_parent_block.height
         ; hash= raw_parent_block.state_hash }
-    ; timestamp= raw_block.timestamp
+    ; timestamp= Int64.of_string raw_block.timestamp
     ; internal_info= internal_commands
     ; user_commands }
 end

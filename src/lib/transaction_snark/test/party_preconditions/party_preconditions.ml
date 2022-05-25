@@ -609,7 +609,7 @@ let%test_module "Account precondition tests" =
                   U.check_parties_with_merges_exn
                     ~expected_failure:
                       Transaction_status.Failure
-                      .Account_precondition_unsatisfied ~state_body ledger
+                      .Account_nonce_precondition_unsatisfied ~state_body ledger
                     [ parties ] ) ) )
 
     let%test_unit "invalid account predicate in fee payer" =
@@ -753,7 +753,7 @@ let%test_module "Account precondition tests" =
                       (Str.regexp
                          (sprintf {|.*\(%s\).*|}
                             Transaction_status.Failure.(
-                              to_string Account_precondition_unsatisfied) ) )
+                              to_string Account_nonce_precondition_unsatisfied) ) )
                       (Error.to_string_hum e) 0 )
               | Ok _ ->
                   failwith

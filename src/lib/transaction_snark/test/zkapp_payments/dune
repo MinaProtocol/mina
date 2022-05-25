@@ -10,6 +10,7 @@
    base
    core_kernel
    yojson
+   sexplib0
    ;; local libraries
    logger
    mina_base.import
