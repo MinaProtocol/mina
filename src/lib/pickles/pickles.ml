@@ -901,8 +901,6 @@ let compile_promise :
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> (module Statement_var_intf with type t = a_var)
-    -> (module Statement_value_intf with type t = a_value)
     -> typ:(a_var, a_value) Impls.Step.Typ.t
     -> branches:(module Nat.Intf with type n = branches)
     -> max_proofs_verified:
@@ -918,6 +916,7 @@ let compile_promise :
              , a_var
              , a_value )
              H4_2.T(Inductive_rule).t )
+    -> unit
     -> (a_var, a_value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
        * (module Proof_intf
@@ -929,8 +928,8 @@ let compile_promise :
          , a_value
          , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
          H3_2.T(Prover).t =
- fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices ->
+ fun ?self ?(cache = []) ?disk_keys ~typ ~branches ~max_proofs_verified ~name
+     ~constraint_constants ~choices () ->
   let self =
     match self with
     | None ->
@@ -944,8 +943,15 @@ let compile_promise :
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
+  let module A_value = struct
+    type t = a_value
+
+    let to_field_elements =
+      let (Typ typ) = typ in
+      fun x -> fst (typ.value_to_fields x)
+  end in
   let module P = struct
-    type statement = A_value.t
+    type statement = a_value
 
     module Max_local_max_proofs_verified = Max_proofs_verified
     module Max_proofs_verified_vec = Nvector (Max_proofs_verified)
@@ -968,11 +974,11 @@ let compile_promise :
   end in
   (self, cache_handle, (module P), provers)
 
-let compile ?self ?cache ?disk_keys a_var a_value ~typ ~branches
-    ~max_proofs_verified ~name ~constraint_constants ~choices =
+let compile ?self ?cache ?disk_keys ~typ ~branches ~max_proofs_verified ~name
+    ~constraint_constants ~choices () =
   let self, cache_handle, proof_module, provers =
-    compile_promise ?self ?cache ?disk_keys a_var a_value ~typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices
+    compile_promise ?self ?cache ?disk_keys ~typ ~branches ~max_proofs_verified
+      ~name ~constraint_constants ~choices ()
   in
   let rec adjust_provers :
       type a1 a2 a3 s1 s2_inner.
@@ -1042,10 +1048,7 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
-              ~typ:Field.typ
+            compile_promise ~typ:Field.typ
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
               ~name:"blockchain-snark"
@@ -1071,7 +1074,8 @@ let%test_module "test no side-loaded" =
                         Field.Assert.equal self Field.zero ;
                         [] )
                   }
-                ] ) )
+                ] )
+              () )
 
       module Proof = (val p)
 
@@ -1105,10 +1109,7 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
-              ~typ:Field.typ
+            compile_promise ~typ:Field.typ
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N1)
               ~name:"blockchain-snark"
@@ -1143,7 +1144,8 @@ let%test_module "test no side-loaded" =
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
                         [ { public_input = prev; proof; proof_must_verify } ] )
                   }
-                ] ) )
+                ] )
+              () )
 
       module Proof = (val p)
 
@@ -1205,10 +1207,7 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
-              ~typ:Field.typ
+            compile_promise ~typ:Field.typ
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"blockchain-snark"
@@ -1259,7 +1258,8 @@ let%test_module "test no side-loaded" =
                           }
                         ] )
                   }
-                ] ) )
+                ] )
+              () )
 
       module Proof = (val p)
 

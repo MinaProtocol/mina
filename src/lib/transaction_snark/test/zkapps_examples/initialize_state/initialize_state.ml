@@ -26,8 +26,6 @@ let%test_module "Initialize state test" =
         , p_module
         , Pickles.Provers.[ initialize_prover; update_state_prover; _ ] ) =
       Pickles.compile ~cache:Cache_dir.cache
-        (module Zkapp_statement.Checked)
-        (module Zkapp_statement)
         ~typ:Zkapp_statement.typ
         ~branches:(module Nat.N3)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
@@ -40,6 +38,7 @@ let%test_module "Initialize state test" =
           ; Zkapps_initialize_state.update_state_rule pk_compressed
           ; dummy_rule self
           ] )
+        ()
 
     module P = (val p_module)
 

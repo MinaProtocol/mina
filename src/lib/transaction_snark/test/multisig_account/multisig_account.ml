@@ -210,8 +210,6 @@ let%test_module "multisig_account" =
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
-                  (module Zkapp_statement.Checked)
-                  (module Zkapp_statement)
                   ~typ:Zkapp_statement.typ
                   ~branches:(module Nat.N2)
                   ~max_proofs_verified:(module Nat.N2)
@@ -253,6 +251,7 @@ let%test_module "multisig_account" =
                             ] )
                       }
                     ] )
+                  ()
               in
               let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
               let { Mina_transaction_logic.For_tests.Transaction_spec.fee

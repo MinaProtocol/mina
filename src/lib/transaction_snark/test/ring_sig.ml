@@ -119,8 +119,6 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let spec = List.hd_exn specs in
           let tag, _, (module P), Pickles.Provers.[ ringsig_prover; _ ] =
             Pickles.compile ~cache:Cache_dir.cache
-              (module Zkapp_statement.Checked)
-              (module Zkapp_statement)
               ~typ:Zkapp_statement.typ
               ~branches:(module Nat.N2)
               ~max_proofs_verified:(module Nat.N2)
@@ -131,6 +129,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                    constraint_constants )
               ~choices:(fun ~self ->
                 [ ring_sig_rule ring_member_pks; dummy_rule self ] )
+              ()
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           ( if debug_mode then

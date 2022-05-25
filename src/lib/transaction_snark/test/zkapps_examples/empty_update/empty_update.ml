@@ -19,8 +19,6 @@ let account_id = Account_id.create pk_compressed Token_id.default
 
 let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
   Pickles.compile ~cache:Cache_dir.cache
-    (module Zkapp_statement.Checked)
-    (module Zkapp_statement)
     ~typ:Zkapp_statement.typ
     ~branches:(module Nat.N2)
     ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
@@ -30,6 +28,7 @@ let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
          constraint_constants )
     ~choices:(fun ~self ->
       [ Zkapps_empty_update.rule pk_compressed; dummy_rule self ] )
+    ()
 
 module P = (val p_module)
 

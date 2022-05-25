@@ -1788,10 +1788,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   in
   let (module Branches) = nat_module branches in
   let tag, _cache, p, provers =
-    Pickles.compile_promise ~choices
-      (module Zkapp_statement)
-      (module Zkapp_statement.Constant)
-      ~typ:zkapp_statement_typ
+    Pickles.compile_promise ~choices ~typ:zkapp_statement_typ
       ~branches:(module Branches)
       ~max_proofs_verified:(module Pickles_types.Nat.N2)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
@@ -1809,6 +1806,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
         ; account_creation_fee = Unsigned.UInt64.of_int 0
         ; fork = None
         }
+      ()
   in
   let module Proof = (val p) in
   let to_js_prover prover =

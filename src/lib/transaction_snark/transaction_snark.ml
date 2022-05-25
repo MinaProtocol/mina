@@ -3221,10 +3221,7 @@ let time lab f =
 
 let system ~proof_level ~constraint_constants =
   time "Transaction_snark.system" (fun () ->
-      Pickles.compile ~cache:Cache_dir.cache
-        (module Statement.With_sok.Checked)
-        (module Statement.With_sok)
-        ~typ:Statement.With_sok.typ
+      Pickles.compile ~cache:Cache_dir.cache ~typ:Statement.With_sok.typ
         ~branches:(module Nat.N5)
         ~max_proofs_verified:(module Nat.N2)
         ~name:"transaction-snark"
@@ -3240,7 +3237,8 @@ let system ~proof_level ~constraint_constants =
           ; parties Opt_signed_opt_signed
           ; parties Opt_signed
           ; parties Proved
-          ] ) )
+          ] )
+        () )
 
 module Verification = struct
   module type S = sig
@@ -4248,10 +4246,7 @@ module For_tests = struct
               [] )
         }
       in
-      Pickles.compile ~cache:Cache_dir.cache
-        (module Zkapp_statement.Checked)
-        (module Zkapp_statement)
-        ~typ:Zkapp_statement.typ
+      Pickles.compile ~cache:Cache_dir.cache ~typ:Zkapp_statement.typ
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"trivial"
@@ -4284,6 +4279,7 @@ module For_tests = struct
                   ] )
             }
           ] )
+        ()
     in
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
     ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
