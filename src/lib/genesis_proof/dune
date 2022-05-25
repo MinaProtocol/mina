@@ -8,6 +8,7 @@
    base.md5
    core
    async
+   async_kernel
    ;; local libraries
    snarky.backendless
    pickles_types
