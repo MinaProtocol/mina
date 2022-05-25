@@ -20,7 +20,7 @@ resource "aws_route53_record" "seed_record" {
 }
 
 module "kubernetes_testnet" {
-  providers = { google = google.gke }
+  providers = { google = google.google-us-central1 }
   source    = "../kubernetes/testnet"
 
   cluster_name   = var.cluster_name

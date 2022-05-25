@@ -1,9 +1,23 @@
 terraform {
   experiments = [module_variable_optional_attrs]
+
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">=4.3.0" # version required to run Terraform on Mac with M1
+    }
+  }
 }
 
+#provider "google" {
+#  alias = "gke"
+#}
+
 provider "google" {
-  alias = "gke"
+  alias   = "google-us-central1"
+  project = "o1labs-192920"
+  region  = "us-central1"
+  zone    = "us-central1-c"
 }
 
 # K8s Cluster Vars
@@ -32,12 +46,12 @@ variable "artifact_path" {
 
 variable "mina_image" {
   type    = string
-  default = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet"
+  default = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-0975867-mainnet-6a9354a"
 }
 
 variable "mina_archive_image" {
   type    = string
-  default = ""
+  default = "gcr.io/o1labs-192920/coda-archive:1.1.2-0975867"
 }
 
 variable "mina_archive_schema" {

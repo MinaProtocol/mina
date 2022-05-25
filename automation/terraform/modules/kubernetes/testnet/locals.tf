@@ -1,7 +1,7 @@
 provider "helm" {
   alias = "testnet_deploy"
   kubernetes {
-    config_context = var.k8s_context
+    config_path = "~/.kube/config"
   }
 }
 

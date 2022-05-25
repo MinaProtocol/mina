@@ -1,8 +1,7 @@
 data "google_client_config" "current" {}
 
 provider "kubernetes" {
-  alias          = "testnet_deploy"
-  config_context = var.k8s_context
+  config_path = "~/.kube/config"
 }
 
 resource "kubernetes_namespace" "testnet_namespace" {

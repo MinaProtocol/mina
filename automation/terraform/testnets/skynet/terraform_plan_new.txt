@@ -1,0 +1,466 @@
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  [32m+[0m create
+ [36m<=[0m read (data resources)
+[0m
+Terraform will perform the following actions:
+
+[1m  # module.skynet.data.local_file.genesis_ledger[0m will be read during apply
+  # (config refers to values not yet known)[0m[0m
+[0m [36m<=[0m[0m data "local_file" "genesis_ledger"  {
+      [32m+[0m [0m[1m[0mcontent[0m[0m        = (known after apply)
+      [32m+[0m [0m[1m[0mcontent_base64[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfilename[0m[0m       = "/home/telecomsteve/Documents/Github/mina/automation/terraform/testnets/skynet/genesis_ledger.json"
+      [32m+[0m [0m[1m[0mid[0m[0m             = (known after apply)
+    }
+
+[1m  # module.skynet.data.local_file.libp2p_peers["fish-block-producer-1"][0m will be read during apply
+  # (config refers to values not yet known)[0m[0m
+[0m [36m<=[0m[0m data "local_file" "libp2p_peers"  {
+      [32m+[0m [0m[1m[0mcontent[0m[0m        = (known after apply)
+      [32m+[0m [0m[1m[0mcontent_base64[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfilename[0m[0m       = "../../modules/o1-testnet/../../../keys/libp2p/skynet/fish-block-producer-1"
+      [32m+[0m [0m[1m[0mid[0m[0m             = (known after apply)
+    }
+
+[1m  # module.skynet.data.local_file.libp2p_peers["fish-block-producer-2"][0m will be read during apply
+  # (config refers to values not yet known)[0m[0m
+[0m [36m<=[0m[0m data "local_file" "libp2p_peers"  {
+      [32m+[0m [0m[1m[0mcontent[0m[0m        = (known after apply)
+      [32m+[0m [0m[1m[0mcontent_base64[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfilename[0m[0m       = "../../modules/o1-testnet/../../../keys/libp2p/skynet/fish-block-producer-2"
+      [32m+[0m [0m[1m[0mid[0m[0m             = (known after apply)
+    }
+
+[1m  # module.skynet.data.local_file.libp2p_peers["whale-block-producer-1"][0m will be read during apply
+  # (config refers to values not yet known)[0m[0m
+[0m [36m<=[0m[0m data "local_file" "libp2p_peers"  {
+      [32m+[0m [0m[1m[0mcontent[0m[0m        = (known after apply)
+      [32m+[0m [0m[1m[0mcontent_base64[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfilename[0m[0m       = "../../modules/o1-testnet/../../../keys/libp2p/skynet/whale-block-producer-1"
+      [32m+[0m [0m[1m[0mid[0m[0m             = (known after apply)
+    }
+
+[1m  # module.skynet.data.local_file.libp2p_peers["whale-block-producer-2"][0m will be read during apply
+  # (config refers to values not yet known)[0m[0m
+[0m [36m<=[0m[0m data "local_file" "libp2p_peers"  {
+      [32m+[0m [0m[1m[0mcontent[0m[0m        = (known after apply)
+      [32m+[0m [0m[1m[0mcontent_base64[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfilename[0m[0m       = "../../modules/o1-testnet/../../../keys/libp2p/skynet/whale-block-producer-2"
+      [32m+[0m [0m[1m[0mid[0m[0m             = (known after apply)
+    }
+
+[1m  # module.skynet.data.local_file.libp2p_seed_peers["seed-1"][0m will be read during apply
+  # (config refers to values not yet known)[0m[0m
+[0m [36m<=[0m[0m data "local_file" "libp2p_seed_peers"  {
+      [32m+[0m [0m[1m[0mcontent[0m[0m        = (known after apply)
+      [32m+[0m [0m[1m[0mcontent_base64[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfilename[0m[0m       = "../../modules/o1-testnet/../../../keys/libp2p/skynet/seed-1"
+      [32m+[0m [0m[1m[0mid[0m[0m             = (known after apply)
+    }
+
+[1m  # module.skynet.data.local_file.libp2p_seed_peers["seed-2"][0m will be read during apply
+  # (config refers to values not yet known)[0m[0m
+[0m [36m<=[0m[0m data "local_file" "libp2p_seed_peers"  {
+      [32m+[0m [0m[1m[0mcontent[0m[0m        = (known after apply)
+      [32m+[0m [0m[1m[0mcontent_base64[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfilename[0m[0m       = "../../modules/o1-testnet/../../../keys/libp2p/skynet/seed-2"
+      [32m+[0m [0m[1m[0mid[0m[0m             = (known after apply)
+    }
+
+[1m  # module.skynet.aws_route53_record.seed_record[0][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "aws_route53_record" "seed_record" {
+      [32m+[0m [0m[1m[0mallow_overwrite[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfqdn[0m[0m            = (known after apply)
+      [32m+[0m [0m[1m[0mid[0m[0m              = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m            = "seed-1.skynet.o1test.net"
+      [32m+[0m [0m[1m[0mrecords[0m[0m         = (known after apply)
+      [32m+[0m [0m[1m[0mttl[0m[0m             = 300
+      [32m+[0m [0m[1m[0mtype[0m[0m            = "A"
+      [32m+[0m [0m[1m[0mzone_id[0m[0m         = "ZJPR9NA6W9M7F"
+    }
+
+[1m  # module.skynet.aws_route53_record.seed_record[1][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "aws_route53_record" "seed_record" {
+      [32m+[0m [0m[1m[0mallow_overwrite[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mfqdn[0m[0m            = (known after apply)
+      [32m+[0m [0m[1m[0mid[0m[0m              = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m            = "seed-2.skynet.o1test.net"
+      [32m+[0m [0m[1m[0mrecords[0m[0m         = (known after apply)
+      [32m+[0m [0m[1m[0mttl[0m[0m             = 300
+      [32m+[0m [0m[1m[0mtype[0m[0m            = "A"
+      [32m+[0m [0m[1m[0mzone_id[0m[0m         = "ZJPR9NA6W9M7F"
+    }
+
+[1m  # module.skynet.google_compute_address.seed_static_ip[0][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "google_compute_address" "seed_static_ip" {
+      [32m+[0m [0m[1m[0maddress[0m[0m            = (known after apply)
+      [32m+[0m [0m[1m[0maddress_type[0m[0m       = "EXTERNAL"
+      [32m+[0m [0m[1m[0mcreation_timestamp[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mid[0m[0m                 = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m               = "skynet-seed-static-ip-1"
+      [32m+[0m [0m[1m[0mnetwork_tier[0m[0m       = (known after apply)
+      [32m+[0m [0m[1m[0mproject[0m[0m            = "o1labs-192920"
+      [32m+[0m [0m[1m[0mpurpose[0m[0m            = (known after apply)
+      [32m+[0m [0m[1m[0mregion[0m[0m             = "us-central1"
+      [32m+[0m [0m[1m[0mself_link[0m[0m          = (known after apply)
+      [32m+[0m [0m[1m[0msubnetwork[0m[0m         = (known after apply)
+      [32m+[0m [0m[1m[0musers[0m[0m              = (known after apply)
+    }
+
+[1m  # module.skynet.google_compute_address.seed_static_ip[1][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "google_compute_address" "seed_static_ip" {
+      [32m+[0m [0m[1m[0maddress[0m[0m            = (known after apply)
+      [32m+[0m [0m[1m[0maddress_type[0m[0m       = "EXTERNAL"
+      [32m+[0m [0m[1m[0mcreation_timestamp[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mid[0m[0m                 = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m               = "skynet-seed-static-ip-2"
+      [32m+[0m [0m[1m[0mnetwork_tier[0m[0m       = (known after apply)
+      [32m+[0m [0m[1m[0mproject[0m[0m            = "o1labs-192920"
+      [32m+[0m [0m[1m[0mpurpose[0m[0m            = (known after apply)
+      [32m+[0m [0m[1m[0mregion[0m[0m             = "us-central1"
+      [32m+[0m [0m[1m[0mself_link[0m[0m          = (known after apply)
+      [32m+[0m [0m[1m[0msubnetwork[0m[0m         = (known after apply)
+      [32m+[0m [0m[1m[0musers[0m[0m              = (known after apply)
+    }
+
+[1m  # module.skynet.null_resource.block_producer_key_generation[0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "null_resource" "block_producer_key_generation" {
+      [32m+[0m [0m[1m[0mid[0m[0m = (known after apply)
+    }
+
+[1m  # module.skynet.null_resource.block_producer_uploads[0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "null_resource" "block_producer_uploads" {
+      [32m+[0m [0m[1m[0mid[0m[0m = (known after apply)
+    }
+
+[1m  # module.skynet.null_resource.seed_list[0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "null_resource" "seed_list" {
+      [32m+[0m [0m[1m[0mid[0m[0m = (known after apply)
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.helm_release.archive_node[0][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "helm_release" "archive_node" {
+      [32m+[0m [0m[1m[0matomic[0m[0m                     = false
+      [32m+[0m [0m[1m[0mchart[0m[0m                      = "archive-node"
+      [32m+[0m [0m[1m[0mcleanup_on_fail[0m[0m            = false
+      [32m+[0m [0m[1m[0mcreate_namespace[0m[0m           = false
+      [32m+[0m [0m[1m[0mdependency_update[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_crd_hooks[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_openapi_validation[0m[0m = false
+      [32m+[0m [0m[1m[0mdisable_webhooks[0m[0m           = false
+      [32m+[0m [0m[1m[0mforce_update[0m[0m               = false
+      [32m+[0m [0m[1m[0mid[0m[0m                         = (known after apply)
+      [32m+[0m [0m[1m[0mlint[0m[0m                       = false
+      [32m+[0m [0m[1m[0mmanifest[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mmax_history[0m[0m                = 0
+      [32m+[0m [0m[1m[0mmetadata[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m                       = "archive-1"
+      [32m+[0m [0m[1m[0mnamespace[0m[0m                  = "skynet"
+      [32m+[0m [0m[1m[0mrecreate_pods[0m[0m              = false
+      [32m+[0m [0m[1m[0mrender_subchart_notes[0m[0m      = true
+      [32m+[0m [0m[1m[0mreplace[0m[0m                    = false
+      [32m+[0m [0m[1m[0mrepository[0m[0m                 = "https://coda-charts.storage.googleapis.com"
+      [32m+[0m [0m[1m[0mreset_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mreuse_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mskip_crds[0m[0m                  = false
+      [32m+[0m [0m[1m[0mstatus[0m[0m                     = "deployed"
+      [32m+[0m [0m[1m[0mtimeout[0m[0m                    = 600
+      [32m+[0m [0m[1m[0mvalues[0m[0m                     = (known after apply)
+      [32m+[0m [0m[1m[0mverify[0m[0m                     = false
+      [32m+[0m [0m[1m[0mversion[0m[0m                    = "1.0.5"
+      [32m+[0m [0m[1m[0mwait[0m[0m                       = false
+      [32m+[0m [0m[1m[0mwait_for_jobs[0m[0m              = false
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.helm_release.archive_node[1][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "helm_release" "archive_node" {
+      [32m+[0m [0m[1m[0matomic[0m[0m                     = false
+      [32m+[0m [0m[1m[0mchart[0m[0m                      = "archive-node"
+      [32m+[0m [0m[1m[0mcleanup_on_fail[0m[0m            = false
+      [32m+[0m [0m[1m[0mcreate_namespace[0m[0m           = false
+      [32m+[0m [0m[1m[0mdependency_update[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_crd_hooks[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_openapi_validation[0m[0m = false
+      [32m+[0m [0m[1m[0mdisable_webhooks[0m[0m           = false
+      [32m+[0m [0m[1m[0mforce_update[0m[0m               = false
+      [32m+[0m [0m[1m[0mid[0m[0m                         = (known after apply)
+      [32m+[0m [0m[1m[0mlint[0m[0m                       = false
+      [32m+[0m [0m[1m[0mmanifest[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mmax_history[0m[0m                = 0
+      [32m+[0m [0m[1m[0mmetadata[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m                       = "archive-2"
+      [32m+[0m [0m[1m[0mnamespace[0m[0m                  = "skynet"
+      [32m+[0m [0m[1m[0mrecreate_pods[0m[0m              = false
+      [32m+[0m [0m[1m[0mrender_subchart_notes[0m[0m      = true
+      [32m+[0m [0m[1m[0mreplace[0m[0m                    = false
+      [32m+[0m [0m[1m[0mrepository[0m[0m                 = "https://coda-charts.storage.googleapis.com"
+      [32m+[0m [0m[1m[0mreset_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mreuse_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mskip_crds[0m[0m                  = false
+      [32m+[0m [0m[1m[0mstatus[0m[0m                     = "deployed"
+      [32m+[0m [0m[1m[0mtimeout[0m[0m                    = 600
+      [32m+[0m [0m[1m[0mvalues[0m[0m                     = (known after apply)
+      [32m+[0m [0m[1m[0mverify[0m[0m                     = false
+      [32m+[0m [0m[1m[0mversion[0m[0m                    = "1.0.5"
+      [32m+[0m [0m[1m[0mwait[0m[0m                       = false
+      [32m+[0m [0m[1m[0mwait_for_jobs[0m[0m              = false
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.helm_release.block_producers[0][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "helm_release" "block_producers" {
+      [32m+[0m [0m[1m[0matomic[0m[0m                     = false
+      [32m+[0m [0m[1m[0mchart[0m[0m                      = "block-producer"
+      [32m+[0m [0m[1m[0mcleanup_on_fail[0m[0m            = false
+      [32m+[0m [0m[1m[0mcreate_namespace[0m[0m           = false
+      [32m+[0m [0m[1m[0mdependency_update[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_crd_hooks[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_openapi_validation[0m[0m = false
+      [32m+[0m [0m[1m[0mdisable_webhooks[0m[0m           = false
+      [32m+[0m [0m[1m[0mforce_update[0m[0m               = false
+      [32m+[0m [0m[1m[0mid[0m[0m                         = (known after apply)
+      [32m+[0m [0m[1m[0mlint[0m[0m                       = false
+      [32m+[0m [0m[1m[0mmanifest[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mmax_history[0m[0m                = 0
+      [32m+[0m [0m[1m[0mmetadata[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m                       = "skynet-block-producers"
+      [32m+[0m [0m[1m[0mnamespace[0m[0m                  = "skynet"
+      [32m+[0m [0m[1m[0mrecreate_pods[0m[0m              = false
+      [32m+[0m [0m[1m[0mrender_subchart_notes[0m[0m      = true
+      [32m+[0m [0m[1m[0mreplace[0m[0m                    = false
+      [32m+[0m [0m[1m[0mrepository[0m[0m                 = "https://coda-charts.storage.googleapis.com"
+      [32m+[0m [0m[1m[0mreset_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mreuse_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mskip_crds[0m[0m                  = false
+      [32m+[0m [0m[1m[0mstatus[0m[0m                     = "deployed"
+      [32m+[0m [0m[1m[0mtimeout[0m[0m                    = 600
+      [32m+[0m [0m[1m[0mvalues[0m[0m                     = (known after apply)
+      [32m+[0m [0m[1m[0mverify[0m[0m                     = false
+      [32m+[0m [0m[1m[0mversion[0m[0m                    = "1.0.5"
+      [32m+[0m [0m[1m[0mwait[0m[0m                       = false
+      [32m+[0m [0m[1m[0mwait_for_jobs[0m[0m              = false
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.helm_release.plain_nodes[0][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "helm_release" "plain_nodes" {
+      [32m+[0m [0m[1m[0matomic[0m[0m                     = false
+      [32m+[0m [0m[1m[0mchart[0m[0m                      = "plain-node"
+      [32m+[0m [0m[1m[0mcleanup_on_fail[0m[0m            = false
+      [32m+[0m [0m[1m[0mcreate_namespace[0m[0m           = false
+      [32m+[0m [0m[1m[0mdependency_update[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_crd_hooks[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_openapi_validation[0m[0m = false
+      [32m+[0m [0m[1m[0mdisable_webhooks[0m[0m           = false
+      [32m+[0m [0m[1m[0mforce_update[0m[0m               = false
+      [32m+[0m [0m[1m[0mid[0m[0m                         = (known after apply)
+      [32m+[0m [0m[1m[0mlint[0m[0m                       = false
+      [32m+[0m [0m[1m[0mmanifest[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mmax_history[0m[0m                = 0
+      [32m+[0m [0m[1m[0mmetadata[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m                       = "skynet-plain-node-1"
+      [32m+[0m [0m[1m[0mnamespace[0m[0m                  = "skynet"
+      [32m+[0m [0m[1m[0mrecreate_pods[0m[0m              = false
+      [32m+[0m [0m[1m[0mrender_subchart_notes[0m[0m      = true
+      [32m+[0m [0m[1m[0mreplace[0m[0m                    = false
+      [32m+[0m [0m[1m[0mrepository[0m[0m                 = "https://coda-charts.storage.googleapis.com"
+      [32m+[0m [0m[1m[0mreset_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mreuse_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mskip_crds[0m[0m                  = false
+      [32m+[0m [0m[1m[0mstatus[0m[0m                     = "deployed"
+      [32m+[0m [0m[1m[0mtimeout[0m[0m                    = 600
+      [32m+[0m [0m[1m[0mvalues[0m[0m                     = (known after apply)
+      [32m+[0m [0m[1m[0mverify[0m[0m                     = false
+      [32m+[0m [0m[1m[0mversion[0m[0m                    = "1.0.1"
+      [32m+[0m [0m[1m[0mwait[0m[0m                       = false
+      [32m+[0m [0m[1m[0mwait_for_jobs[0m[0m              = false
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.helm_release.plain_nodes[1][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "helm_release" "plain_nodes" {
+      [32m+[0m [0m[1m[0matomic[0m[0m                     = false
+      [32m+[0m [0m[1m[0mchart[0m[0m                      = "plain-node"
+      [32m+[0m [0m[1m[0mcleanup_on_fail[0m[0m            = false
+      [32m+[0m [0m[1m[0mcreate_namespace[0m[0m           = false
+      [32m+[0m [0m[1m[0mdependency_update[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_crd_hooks[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_openapi_validation[0m[0m = false
+      [32m+[0m [0m[1m[0mdisable_webhooks[0m[0m           = false
+      [32m+[0m [0m[1m[0mforce_update[0m[0m               = false
+      [32m+[0m [0m[1m[0mid[0m[0m                         = (known after apply)
+      [32m+[0m [0m[1m[0mlint[0m[0m                       = false
+      [32m+[0m [0m[1m[0mmanifest[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mmax_history[0m[0m                = 0
+      [32m+[0m [0m[1m[0mmetadata[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m                       = "skynet-plain-node-2"
+      [32m+[0m [0m[1m[0mnamespace[0m[0m                  = "skynet"
+      [32m+[0m [0m[1m[0mrecreate_pods[0m[0m              = false
+      [32m+[0m [0m[1m[0mrender_subchart_notes[0m[0m      = true
+      [32m+[0m [0m[1m[0mreplace[0m[0m                    = false
+      [32m+[0m [0m[1m[0mrepository[0m[0m                 = "https://coda-charts.storage.googleapis.com"
+      [32m+[0m [0m[1m[0mreset_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mreuse_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mskip_crds[0m[0m                  = false
+      [32m+[0m [0m[1m[0mstatus[0m[0m                     = "deployed"
+      [32m+[0m [0m[1m[0mtimeout[0m[0m                    = 600
+      [32m+[0m [0m[1m[0mvalues[0m[0m                     = (known after apply)
+      [32m+[0m [0m[1m[0mverify[0m[0m                     = false
+      [32m+[0m [0m[1m[0mversion[0m[0m                    = "1.0.1"
+      [32m+[0m [0m[1m[0mwait[0m[0m                       = false
+      [32m+[0m [0m[1m[0mwait_for_jobs[0m[0m              = false
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.helm_release.seeds[0][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "helm_release" "seeds" {
+      [32m+[0m [0m[1m[0matomic[0m[0m                     = false
+      [32m+[0m [0m[1m[0mchart[0m[0m                      = "seed-node"
+      [32m+[0m [0m[1m[0mcleanup_on_fail[0m[0m            = false
+      [32m+[0m [0m[1m[0mcreate_namespace[0m[0m           = false
+      [32m+[0m [0m[1m[0mdependency_update[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_crd_hooks[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_openapi_validation[0m[0m = false
+      [32m+[0m [0m[1m[0mdisable_webhooks[0m[0m           = false
+      [32m+[0m [0m[1m[0mforce_update[0m[0m               = false
+      [32m+[0m [0m[1m[0mid[0m[0m                         = (known after apply)
+      [32m+[0m [0m[1m[0mlint[0m[0m                       = false
+      [32m+[0m [0m[1m[0mmanifest[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mmax_history[0m[0m                = 0
+      [32m+[0m [0m[1m[0mmetadata[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m                       = "skynet-seeds"
+      [32m+[0m [0m[1m[0mnamespace[0m[0m                  = "skynet"
+      [32m+[0m [0m[1m[0mrecreate_pods[0m[0m              = false
+      [32m+[0m [0m[1m[0mrender_subchart_notes[0m[0m      = true
+      [32m+[0m [0m[1m[0mreplace[0m[0m                    = false
+      [32m+[0m [0m[1m[0mrepository[0m[0m                 = "https://coda-charts.storage.googleapis.com"
+      [32m+[0m [0m[1m[0mreset_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mreuse_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mskip_crds[0m[0m                  = false
+      [32m+[0m [0m[1m[0mstatus[0m[0m                     = "deployed"
+      [32m+[0m [0m[1m[0mtimeout[0m[0m                    = 600
+      [32m+[0m [0m[1m[0mvalues[0m[0m                     = (known after apply)
+      [32m+[0m [0m[1m[0mverify[0m[0m                     = false
+      [32m+[0m [0m[1m[0mversion[0m[0m                    = "1.0.6"
+      [32m+[0m [0m[1m[0mwait[0m[0m                       = false
+      [32m+[0m [0m[1m[0mwait_for_jobs[0m[0m              = false
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.helm_release.watchdog[0][0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "helm_release" "watchdog" {
+      [32m+[0m [0m[1m[0matomic[0m[0m                     = false
+      [32m+[0m [0m[1m[0mchart[0m[0m                      = "watchdog"
+      [32m+[0m [0m[1m[0mcleanup_on_fail[0m[0m            = false
+      [32m+[0m [0m[1m[0mcreate_namespace[0m[0m           = false
+      [32m+[0m [0m[1m[0mdependency_update[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_crd_hooks[0m[0m          = false
+      [32m+[0m [0m[1m[0mdisable_openapi_validation[0m[0m = false
+      [32m+[0m [0m[1m[0mdisable_webhooks[0m[0m           = false
+      [32m+[0m [0m[1m[0mforce_update[0m[0m               = false
+      [32m+[0m [0m[1m[0mid[0m[0m                         = (known after apply)
+      [32m+[0m [0m[1m[0mlint[0m[0m                       = false
+      [32m+[0m [0m[1m[0mmanifest[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mmax_history[0m[0m                = 0
+      [32m+[0m [0m[1m[0mmetadata[0m[0m                   = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m                       = "skynet-watchdog"
+      [32m+[0m [0m[1m[0mnamespace[0m[0m                  = "skynet"
+      [32m+[0m [0m[1m[0mrecreate_pods[0m[0m              = false
+      [32m+[0m [0m[1m[0mrender_subchart_notes[0m[0m      = true
+      [32m+[0m [0m[1m[0mreplace[0m[0m                    = false
+      [32m+[0m [0m[1m[0mrepository[0m[0m                 = "https://coda-charts.storage.googleapis.com"
+      [32m+[0m [0m[1m[0mreset_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mreuse_values[0m[0m               = false
+      [32m+[0m [0m[1m[0mskip_crds[0m[0m                  = false
+      [32m+[0m [0m[1m[0mstatus[0m[0m                     = "deployed"
+      [32m+[0m [0m[1m[0mtimeout[0m[0m                    = 600
+      [32m+[0m [0m[1m[0mvalues[0m[0m                     = [
+          [32m+[0m [0m<<-EOT
+                "image": "gcr.io/o1labs-192920/watchdog:0.4.5"
+                "makeReportAccounts": ""
+                "makeReportDiscordWebhookUrl": ""
+                "makeReportEveryMins": "5"
+                "makeReports": true
+                "mina":
+                  "image": "gcr.io/o1labs-192920/mina-daemon:1.2.0beta5-feature-gossip-qa-ledger-8e15537-buster-devnet"
+                  "ports":
+                    "metrics": 8000
+                  "uploadBlocksToGCloud": false
+                "restartEveryMins": "60"
+                "restartNodes": false
+                "seedPeersURL": ""
+                "testnetName": "skynet"
+            EOT,
+        ]
+      [32m+[0m [0m[1m[0mverify[0m[0m                     = false
+      [32m+[0m [0m[1m[0mversion[0m[0m                    = "0.1.0"
+      [32m+[0m [0m[1m[0mwait[0m[0m                       = false
+      [32m+[0m [0m[1m[0mwait_for_jobs[0m[0m              = false
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.kubernetes_namespace.testnet_namespace[0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "kubernetes_namespace" "testnet_namespace" {
+      [32m+[0m [0m[1m[0mid[0m[0m = (known after apply)
+
+      [32m+[0m [0mmetadata {
+          [32m+[0m [0m[1m[0mgeneration[0m[0m       = (known after apply)
+          [32m+[0m [0m[1m[0mname[0m[0m             = "skynet"
+          [32m+[0m [0m[1m[0mresource_version[0m[0m = (known after apply)
+          [32m+[0m [0m[1m[0muid[0m[0m              = (known after apply)
+        }
+
+      [32m+[0m [0mtimeouts {
+          [32m+[0m [0m[1m[0mdelete[0m[0m = "15m"
+        }
+    }
+
+[1m  # module.skynet.module.kubernetes_testnet.kubernetes_role_binding.helm_release[0m will be created[0m[0m
+[0m  [32m+[0m[0m resource "kubernetes_role_binding" "helm_release" {
+      [32m+[0m [0m[1m[0mid[0m[0m = (known after apply)
+
+      [32m+[0m [0mmetadata {
+          [32m+[0m [0m[1m[0mgeneration[0m[0m       = (known after apply)
+          [32m+[0m [0m[1m[0mname[0m[0m             = "admin-role"
+          [32m+[0m [0m[1m[0mnamespace[0m[0m        = "skynet"
+          [32m+[0m [0m[1m[0mresource_version[0m[0m = (known after apply)
+          [32m+[0m [0m[1m[0muid[0m[0m              = (known after apply)
+        }
+
+      [32m+[0m [0mrole_ref {
+          [32m+[0m [0m[1m[0mapi_group[0m[0m = "rbac.authorization.k8s.io"
+          [32m+[0m [0m[1m[0mkind[0m[0m      = "ClusterRole"
+          [32m+[0m [0m[1m[0mname[0m[0m      = "admin"
+        }
+
+      [32m+[0m [0msubject {
+          [32m+[0m [0m[1m[0mapi_group[0m[0m = (known after apply)
+          [32m+[0m [0m[1m[0mkind[0m[0m      = "ServiceAccount"
+          [32m+[0m [0m[1m[0mname[0m[0m      = "default"
+          [32m+[0m [0m[1m[0mnamespace[0m[0m = "skynet"
+        }
+    }
+
+[0m[1mPlan:[0m 16 to add, 0 to change, 0 to destroy.
+[0m[33m╷[0m[0m
+[33m│[0m [0m[1m[33mWarning: [0m[0m[1mExperimental feature "module_variable_optional_attrs" is active[0m
+[33m│[0m [0m
+[33m│[0m [0m[0m  on ../../modules/o1-testnet/inputs.tf line 2, in terraform:
+[33m│[0m [0m   2:   experiments = [[4mmodule_variable_optional_attrs[0m][0m
+[33m│[0m [0m
+[33m│[0m [0mExperimental features are subject to breaking changes in future minor or patch releases, based on feedback.
+[33m│[0m [0m
+[33m│[0m [0mIf you have feedback on the design of this feature, please open a GitHub issue to discuss it.
+[33m│[0m [0m
+[33m│[0m [0m(and one more similar warning elsewhere)
+[33m╵[0m[0m
+[33m╷[0m[0m
+[33m│[0m [0m[1m[33mWarning: [0m[0m[1mProvider google is undefined[0m
+[33m│[0m [0m
+[33m│[0m [0m[0m  on ../../modules/o1-testnet/testnet.tf line 23, in module "kubernetes_testnet":
+[33m│[0m [0m  23:   providers = { [4mgoogle[0m = google.google-us-central1 }[0m
+[33m│[0m [0m
+[33m│[0m [0mModule module.skynet.module.kubernetes_testnet does not declare a provider named google.
+[33m│[0m [0mIf you wish to specify a provider configuration for the module, add an entry for google in the required_providers block within the module.
+[33m╵[0m[0m
+[90m
+─────────────────────────────────────────────────────────────────────────────[0m
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.

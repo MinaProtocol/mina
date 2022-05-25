@@ -16,7 +16,7 @@ variable "k8s_context" {
   type = string
 
   description = "K8s resource provider context"
-  default     = "gke_o1labs-192920_us-east1_coda-infra-east"
+  default     = "gke_o1labs-192920_us-central1_coda-infra-central1"
 }
 
 # Global Vars
@@ -43,7 +43,7 @@ variable "deploy_watchdog" {
 
 variable "mina_image" {
   type    = string
-  default = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet"
+  default = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-0975867-mainnet-6a9354a"
 }
 
 variable "use_custom_entrypoint" {
@@ -58,7 +58,7 @@ variable "custom_entrypoint" {
 
 variable "mina_archive_image" {
   type    = string
-  default = ""
+  default = "gcr.io/o1labs-192920/coda-archive:1.1.2-0975867"
 }
 
 variable "mina_archive_schema" {
@@ -111,7 +111,7 @@ variable "mina_faucet_fee" {
 
 variable "testnet_name" {
   type    = string
-  default = "mina-testnet"
+  default = "skynet"
 }
 
 variable "additional_peers" {

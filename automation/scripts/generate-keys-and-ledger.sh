@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # Set defaults before parsing args
-TESTNET=new-net
+TESTNET=skynet
 COMMUNITY_KEYFILE=""
 RESET=false
 
