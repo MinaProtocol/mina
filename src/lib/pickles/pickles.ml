@@ -296,491 +296,502 @@ module Proof_system = struct
            t
 end
 
-module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
-  module IR = Inductive_rule.T (A) (A_value)
-  module HIR = H4.T (IR)
+module Compile = struct
+  module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
+    module IR = Inductive_rule.T (A) (A_value)
+    module HIR = H4.T (IR)
 
-  let max_local_max_proofs_verifieds ~self (type n)
-      (module Max_proofs_verified : Nat.Intf with type n = n) branches choices =
-    let module Local_max_proofs_verifieds = struct
-      type t = (int, Max_proofs_verified.n) Vector.t
-    end in
-    let module M =
-      H4.Map (IR) (E04 (Local_max_proofs_verifieds))
-        (struct
-          module V = H4.To_vector (Int)
-          module HT = H4.T (Tag)
+    let max_local_max_proofs_verifieds ~self (type n)
+        (module Max_proofs_verified : Nat.Intf with type n = n) branches choices
+        =
+      let module Local_max_proofs_verifieds = struct
+        type t = (int, Max_proofs_verified.n) Vector.t
+      end in
+      let module M =
+        H4.Map (IR) (E04 (Local_max_proofs_verifieds))
+          (struct
+            module V = H4.To_vector (Int)
+            module HT = H4.T (Tag)
 
-          module M =
-            H4.Map (Tag) (E04 (Int))
-              (struct
-                let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
-                  if Type_equal.Id.same t.id self then
-                    Nat.to_int Max_proofs_verified.n
-                  else
-                    let (module M) = Types_map.max_proofs_verified t in
-                    Nat.to_int M.n
-              end)
+            module M =
+              H4.Map (Tag) (E04 (Int))
+                (struct
+                  let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
+                    if Type_equal.Id.same t.id self then
+                      Nat.to_int Max_proofs_verified.n
+                    else
+                      let (module M) = Types_map.max_proofs_verified t in
+                      Nat.to_int M.n
+                end)
 
-          let f :
-              type a b c d. (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
-           fun rule ->
-            let (T (_, l)) = HT.length rule.prevs in
-            Vector.extend_exn (V.f l (M.f rule.prevs)) Max_proofs_verified.n 0
-        end)
-    in
-    let module V = H4.To_vector (Local_max_proofs_verifieds) in
-    let padded = V.f branches (M.f choices) |> Vector.transpose in
-    (padded, Maxes.m padded)
+            let f :
+                type a b c d. (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t
+                =
+             fun rule ->
+              let (T (_, l)) = HT.length rule.prevs in
+              Vector.extend_exn (V.f l (M.f rule.prevs)) Max_proofs_verified.n 0
+          end)
+      in
+      let module V = H4.To_vector (Local_max_proofs_verifieds) in
+      let padded = V.f branches (M.f choices) |> Vector.transpose in
+      (padded, Maxes.m padded)
 
-  module Lazy_ (A : T0) = struct
-    type t = A.t Lazy.t
-  end
+    module Lazy_ (A : T0) = struct
+      type t = A.t Lazy.t
+    end
 
-  module Lazy_keys = struct
-    type t =
-      (Impls.Step.Keypair.t * Dirty.t) Lazy.t
-      * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
+    module Lazy_keys = struct
+      type t =
+        (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+        * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
 
-    (* TODO Think this is right.. *)
-  end
+      (* TODO Think this is right.. *)
+    end
 
-  let log_step main typ name index =
-    let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
-    let log =
-      let weight =
-        let sys = Backend.Tick.R1CS_constraint_system.create () in
-        fun (c : Impls.Step.Constraint.t) ->
+    let log_step main typ name index =
+      let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
+      let log =
+        let weight =
+          let sys = Backend.Tick.R1CS_constraint_system.create () in
+          fun (c : Impls.Step.Constraint.t) ->
+            let prev = sys.next_row in
+            List.iter c ~f:(fun { annotation; basic } ->
+                Backend.Tick.R1CS_constraint_system.add_constraint sys
+                  ?label:annotation basic ) ;
+            let next = sys.next_row in
+            next - prev
+        in
+        Constraints.log ~weight (Impls.Step.make_checked main)
+      in
+      if profile_constraints then
+        Snarky_log.to_file
+          (sprintf "step-snark-%s-%d.json" name (Index.to_int index))
+          log
+
+    let log_wrap main typ name id =
+      let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
+      let log =
+        let sys = Backend.Tock.R1CS_constraint_system.create () in
+        let weight (c : Impls.Wrap.Constraint.t) =
           let prev = sys.next_row in
           List.iter c ~f:(fun { annotation; basic } ->
-              Backend.Tick.R1CS_constraint_system.add_constraint sys
+              Backend.Tock.R1CS_constraint_system.add_constraint sys
                 ?label:annotation basic ) ;
           let next = sys.next_row in
           next - prev
-      in
-      Constraints.log ~weight (Impls.Step.make_checked main)
-    in
-    if profile_constraints then
-      Snarky_log.to_file
-        (sprintf "step-snark-%s-%d.json" name (Index.to_int index))
+        in
+        let log =
+          Constraints.log ~weight
+            Impls.Wrap.(
+              make_checked (fun () : unit ->
+                  let x = with_label __LOC__ (fun () -> exists typ) in
+                  main x () ))
+        in
         log
+      in
+      if profile_constraints then
+        Snarky_log.to_file
+          (sprintf
+             !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
+             name (Type_equal.Id.uid id) )
+          log
 
-  let log_wrap main typ name id =
-    let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
-    let log =
-      let sys = Backend.Tock.R1CS_constraint_system.create () in
-      let weight (c : Impls.Wrap.Constraint.t) =
-        let prev = sys.next_row in
-        List.iter c ~f:(fun { annotation; basic } ->
-            Backend.Tock.R1CS_constraint_system.add_constraint sys
-              ?label:annotation basic ) ;
-        let next = sys.next_row in
-        next - prev
+    let compile :
+        type prev_varss prev_valuess widthss heightss max_proofs_verified branches.
+           self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
+        -> cache:Key_cache.Spec.t list
+        -> ?disk_keys:
+             (Cache.Step.Key.Verification.t, branches) Vector.t
+             * Cache.Wrap.Key.Verification.t
+        -> branches:(module Nat.Intf with type n = branches)
+        -> max_proofs_verified:
+             (module Nat.Add.Intf with type n = max_proofs_verified)
+        -> name:string
+        -> constraint_constants:Snark_keys_header.Constraint_constants.t
+        -> typ:(A.t, A_value.t) Impls.Step.Typ.t
+        -> choices:
+             (   self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
+              -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+        -> ( prev_valuess
+           , widthss
+           , heightss
+           , A_value.t
+           , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
+           H3_2.T(Prover).t
+           * _
+           * _
+           * _ =
+     fun ~self ~cache ?disk_keys ~branches:(module Branches)
+         ~max_proofs_verified:(module Max_proofs_verified) ~name
+         ~constraint_constants ~typ ~choices ->
+      let snark_keys_header kind constraint_system_hash =
+        { Snark_keys_header.header_version = Snark_keys_header.header_version
+        ; kind
+        ; constraint_constants
+        ; commits =
+            { mina = Mina_version.commit_id
+            ; marlin = Mina_version.marlin_commit_id
+            }
+        ; length = (* This is a dummy, it gets filled in on read/write. *) 0
+        ; commit_date = Mina_version.commit_date
+        ; constraint_system_hash
+        ; identifying_hash =
+            (* TODO: Proper identifying hash. *)
+            constraint_system_hash
+        }
       in
-      let log =
-        Constraints.log ~weight
-          Impls.Wrap.(
-            make_checked (fun () : unit ->
-                let x = with_label __LOC__ (fun () -> exists typ) in
-                main x () ))
+      Timer.start __LOC__ ;
+      let T = Max_proofs_verified.eq in
+      let choices = choices ~self in
+      let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
+      let T = Nat.eq_exn prev_varss_n Branches.n in
+      let padded, (module Maxes) =
+        max_local_max_proofs_verifieds
+          (module Max_proofs_verified)
+          prev_varss_length choices ~self:self.id
       in
-      log
-    in
-    if profile_constraints then
-      Snarky_log.to_file
-        (sprintf
-           !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
-           name (Type_equal.Id.uid id) )
-        log
-
-  let compile :
-      type prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-         self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
-      -> cache:Key_cache.Spec.t list
-      -> ?disk_keys:
-           (Cache.Step.Key.Verification.t, branches) Vector.t
-           * Cache.Wrap.Key.Verification.t
-      -> branches:(module Nat.Intf with type n = branches)
-      -> max_proofs_verified:
-           (module Nat.Add.Intf with type n = max_proofs_verified)
-      -> name:string
-      -> constraint_constants:Snark_keys_header.Constraint_constants.t
-      -> typ:(A.t, A_value.t) Impls.Step.Typ.t
-      -> choices:
-           (   self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
-            -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
-      -> ( prev_valuess
-         , widthss
-         , heightss
-         , A_value.t
-         , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
-         H3_2.T(Prover).t
-         * _
-         * _
-         * _ =
-   fun ~self ~cache ?disk_keys ~branches:(module Branches)
-       ~max_proofs_verified:(module Max_proofs_verified) ~name
-       ~constraint_constants ~typ ~choices ->
-    let snark_keys_header kind constraint_system_hash =
-      { Snark_keys_header.header_version = Snark_keys_header.header_version
-      ; kind
-      ; constraint_constants
-      ; commits =
-          { mina = Mina_version.commit_id
-          ; marlin = Mina_version.marlin_commit_id
-          }
-      ; length = (* This is a dummy, it gets filled in on read/write. *) 0
-      ; commit_date = Mina_version.commit_date
-      ; constraint_system_hash
-      ; identifying_hash =
-          (* TODO: Proper identifying hash. *)
-          constraint_system_hash
-      }
-    in
-    Timer.start __LOC__ ;
-    let T = Max_proofs_verified.eq in
-    let choices = choices ~self in
-    let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
-    let T = Nat.eq_exn prev_varss_n Branches.n in
-    let padded, (module Maxes) =
-      max_local_max_proofs_verifieds
-        (module Max_proofs_verified)
-        prev_varss_length choices ~self:self.id
-    in
-    let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
-    Timer.clock __LOC__ ;
-    let wrap_domains =
-      let module M = Wrap_domains.Make (A) (A_value) in
-      let rec f :
-          type a b c d. (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t =
-        function
-        | [] ->
-            []
-        | x :: xs ->
-            x :: f xs
-      in
-      M.f full_signature prev_varss_n prev_varss_length ~self
-        ~choices:(f choices)
-        ~max_proofs_verified:(module Max_proofs_verified)
-    in
-    Timer.clock __LOC__ ;
-    let module Branch_data = struct
-      type ('vars, 'vals, 'n, 'm) t =
-        ( A.t
-        , A_value.t
-        , Max_proofs_verified.n
-        , Branches.n
-        , 'vars
-        , 'vals
-        , 'n
-        , 'm )
-        Step_branch_data.t
-    end in
-    let proofs_verifieds =
-      let module M =
-        H4.Map (IR) (E04 (Int))
-          (struct
-            module M = H4.T (Tag)
-
-            let f : type a b c d. (a, b, c, d) IR.t -> int =
-             fun r ->
-              let (T (n, _)) = M.length r.prevs in
-              Nat.to_int n
-          end)
-      in
-      let module V = H4.To_vector (Int) in
-      V.f prev_varss_length (M.f choices)
-    in
-    let step_data =
-      let i = ref 0 in
+      let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
       Timer.clock __LOC__ ;
-      let module M =
-        H4.Map (IR) (Branch_data)
-          (struct
-            let f :
-                type a b c d. (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t =
-             fun rule ->
-              Timer.clock __LOC__ ;
-              let res =
-                Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:(Index.of_int_exn !i)
-                      ~max_proofs_verified:Max_proofs_verified.n
-                      ~branches:Branches.n ~self ~typ A.to_field_elements
-                      A_value.to_field_elements rule ~wrap_domains
-                      ~proofs_verifieds )
-              in
-              Timer.clock __LOC__ ; incr i ; res
-          end)
+      let wrap_domains =
+        let module M = Wrap_domains.Make (A) (A_value) in
+        let rec f :
+            type a b c d. (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t =
+          function
+          | [] ->
+              []
+          | x :: xs ->
+              x :: f xs
+        in
+        M.f full_signature prev_varss_n prev_varss_length ~self
+          ~choices:(f choices)
+          ~max_proofs_verified:(module Max_proofs_verified)
       in
-      M.f choices
-    in
-    Timer.clock __LOC__ ;
-    let step_domains =
-      let module M =
-        H4.Map (Branch_data) (E04 (Domains))
-          (struct
-            let f (T b : _ Branch_data.t) = b.domains
-          end)
-      in
-      let module V = H4.To_vector (Domains) in
-      V.f prev_varss_length (M.f step_data)
-    in
-    let cache_handle = ref (Lazy.return `Cache_hit) in
-    let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
-    Timer.clock __LOC__ ;
-    let step_keypairs =
-      let disk_keys =
-        Option.map disk_keys ~f:(fun (xs, _) -> Vector.to_array xs)
-      in
-      let module M =
-        H4.Map (Branch_data) (E04 (Lazy_keys))
-          (struct
-            let etyp =
-              Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n
-
-            let f (T b : _ Branch_data.t) =
-              let (T (typ, _conv, conv_inv)) = etyp in
-              let main () =
-                let res = b.main ~step_domains () in
-                Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-              in
-              let () = if true then log_step main typ name b.index in
-              let open Impls.Step in
-              let k_p =
-                lazy
-                  (let cs =
-                     constraint_system ~exposing:[] ~return_typ:typ main
-                   in
-                   let cs_hash =
-                     Md5.to_hex (R1CS_constraint_system.digest cs)
-                   in
-                   ( Type_equal.Id.uid self.id
-                   , snark_keys_header
-                       { type_ = "step-proving-key"
-                       ; identifier = name ^ "-" ^ b.rule.identifier
-                       }
-                       cs_hash
-                   , Index.to_int b.index
-                   , cs ) )
-              in
-              let k_v =
-                match disk_keys with
-                | Some ks ->
-                    Lazy.return ks.(Index.to_int b.index)
-                | None ->
-                    lazy
-                      (let id, _header, index, cs = Lazy.force k_p in
-                       let digest = R1CS_constraint_system.digest cs in
-                       ( id
-                       , snark_keys_header
-                           { type_ = "step-verification-key"
-                           ; identifier = name ^ "-" ^ b.rule.identifier
-                           }
-                           (Md5.to_hex digest)
-                       , index
-                       , digest ) )
-              in
-              let ((pk, vk) as res) =
-                Common.time "step read or generate" (fun () ->
-                    Cache.Step.read_or_generate cache k_p k_v
-                      (Snarky_backendless.Typ.unit ()) typ (fun () -> main) )
-              in
-              accum_dirty (Lazy.map pk ~f:snd) ;
-              accum_dirty (Lazy.map vk ~f:snd) ;
-              res
-          end)
-      in
-      M.f step_data
-    in
-    Timer.clock __LOC__ ;
-    let step_vks =
-      let module V = H4.To_vector (Lazy_keys) in
-      lazy
-        (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
-    in
-    Timer.clock __LOC__ ;
-    let wrap_requests, wrap_main =
       Timer.clock __LOC__ ;
-      let prev_wrap_domains =
+      let module Branch_data = struct
+        type ('vars, 'vals, 'n, 'm) t =
+          ( A.t
+          , A_value.t
+          , Max_proofs_verified.n
+          , Branches.n
+          , 'vars
+          , 'vals
+          , 'n
+          , 'm )
+          Step_branch_data.t
+      end in
+      let proofs_verifieds =
         let module M =
-          H4.Map (IR) (H4.T (E04 (Domains)))
+          H4.Map (IR) (E04 (Int))
+            (struct
+              module M = H4.T (Tag)
+
+              let f : type a b c d. (a, b, c, d) IR.t -> int =
+               fun r ->
+                let (T (n, _)) = M.length r.prevs in
+                Nat.to_int n
+            end)
+        in
+        let module V = H4.To_vector (Int) in
+        V.f prev_varss_length (M.f choices)
+      in
+      let step_data =
+        let i = ref 0 in
+        Timer.clock __LOC__ ;
+        let module M =
+          H4.Map (IR) (Branch_data)
             (struct
               let f :
-                  type a b c d.
-                  (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
+                  type a b c d. (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t
+                  =
                fun rule ->
-                let module M =
-                  H4.Map (Tag) (E04 (Domains))
-                    (struct
-                      let f (type a b c d) (t : (a, b, c, d) Tag.t) : Domains.t
-                          =
-                        Types_map.lookup_map t ~self:self.id
-                          ~default:wrap_domains ~f:(function
-                          | `Compiled d ->
-                              d.wrap_domains
-                          | `Side_loaded d ->
-                              Common.wrap_domains
-                                ~proofs_verified:
-                                  ( d.permanent.max_proofs_verified |> Nat.Add.n
-                                  |> Nat.to_int ) )
-                    end)
+                Timer.clock __LOC__ ;
+                let res =
+                  Common.time "make step data" (fun () ->
+                      Step_branch_data.create ~index:(Index.of_int_exn !i)
+                        ~max_proofs_verified:Max_proofs_verified.n
+                        ~branches:Branches.n ~self ~typ A.to_field_elements
+                        A_value.to_field_elements rule ~wrap_domains
+                        ~proofs_verifieds )
                 in
-                M.f rule.Inductive_rule.prevs
+                Timer.clock __LOC__ ; incr i ; res
             end)
         in
         M.f choices
       in
       Timer.clock __LOC__ ;
-      Wrap_main.wrap_main full_signature prev_varss_length step_vks
-        proofs_verifieds step_domains prev_wrap_domains
-        (module Max_proofs_verified)
-    in
-    Timer.clock __LOC__ ;
-    let (wrap_pk, wrap_vk), disk_key =
-      let open Impls.Wrap in
-      let (T (typ, conv, _conv_inv)) = input () in
-      let main x () : unit = wrap_main (conv x) in
-      let () = if true then log_wrap main typ name self.id in
-      let self_id = Type_equal.Id.uid self.id in
-      let disk_key_prover =
+      let step_domains =
+        let module M =
+          H4.Map (Branch_data) (E04 (Domains))
+            (struct
+              let f (T b : _ Branch_data.t) = b.domains
+            end)
+        in
+        let module V = H4.To_vector (Domains) in
+        V.f prev_varss_length (M.f step_data)
+      in
+      let cache_handle = ref (Lazy.return `Cache_hit) in
+      let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
+      Timer.clock __LOC__ ;
+      let step_keypairs =
+        let disk_keys =
+          Option.map disk_keys ~f:(fun (xs, _) -> Vector.to_array xs)
+        in
+        let module M =
+          H4.Map (Branch_data) (E04 (Lazy_keys))
+            (struct
+              let etyp =
+                Impls.Step.input ~proofs_verified:Max_proofs_verified.n
+                  ~wrap_rounds:Tock.Rounds.n
+
+              let f (T b : _ Branch_data.t) =
+                let (T (typ, _conv, conv_inv)) = etyp in
+                let main () =
+                  let res = b.main ~step_domains () in
+                  Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+                in
+                let () = if true then log_step main typ name b.index in
+                let open Impls.Step in
+                let k_p =
+                  lazy
+                    (let cs =
+                       constraint_system ~exposing:[] ~return_typ:typ main
+                     in
+                     let cs_hash =
+                       Md5.to_hex (R1CS_constraint_system.digest cs)
+                     in
+                     ( Type_equal.Id.uid self.id
+                     , snark_keys_header
+                         { type_ = "step-proving-key"
+                         ; identifier = name ^ "-" ^ b.rule.identifier
+                         }
+                         cs_hash
+                     , Index.to_int b.index
+                     , cs ) )
+                in
+                let k_v =
+                  match disk_keys with
+                  | Some ks ->
+                      Lazy.return ks.(Index.to_int b.index)
+                  | None ->
+                      lazy
+                        (let id, _header, index, cs = Lazy.force k_p in
+                         let digest = R1CS_constraint_system.digest cs in
+                         ( id
+                         , snark_keys_header
+                             { type_ = "step-verification-key"
+                             ; identifier = name ^ "-" ^ b.rule.identifier
+                             }
+                             (Md5.to_hex digest)
+                         , index
+                         , digest ) )
+                in
+                let ((pk, vk) as res) =
+                  Common.time "step read or generate" (fun () ->
+                      Cache.Step.read_or_generate cache k_p k_v
+                        (Snarky_backendless.Typ.unit ()) typ (fun () -> main) )
+                in
+                accum_dirty (Lazy.map pk ~f:snd) ;
+                accum_dirty (Lazy.map vk ~f:snd) ;
+                res
+            end)
+        in
+        M.f step_data
+      in
+      Timer.clock __LOC__ ;
+      let step_vks =
+        let module V = H4.To_vector (Lazy_keys) in
         lazy
-          (let cs =
-             constraint_system ~exposing:[ typ ]
-               ~return_typ:(Snarky_backendless.Typ.unit ())
-               main
-           in
-           let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-           ( self_id
-           , snark_keys_header
-               { type_ = "wrap-proving-key"; identifier = name }
-               cs_hash
-           , cs ) )
+          (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
+               Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
       in
-      let disk_key_verifier =
-        match disk_keys with
-        | None ->
-            lazy
-              (let id, _header, cs = Lazy.force disk_key_prover in
-               let digest = R1CS_constraint_system.digest cs in
-               ( id
-               , snark_keys_header
-                   { type_ = "wrap-verification-key"; identifier = name }
-                   (Md5.to_hex digest)
-               , digest ) )
-        | Some (_, (_id, header, digest)) ->
-            Lazy.return (self_id, header, digest)
-      in
-      let r =
-        Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate
-              (Vector.to_array step_domains)
-              cache disk_key_prover disk_key_verifier typ
-              (Snarky_backendless.Typ.unit ())
-              main )
-      in
-      (r, disk_key_verifier)
-    in
-    Timer.clock __LOC__ ;
-    accum_dirty (Lazy.map wrap_pk ~f:snd) ;
-    accum_dirty (Lazy.map wrap_vk ~f:snd) ;
-    let wrap_vk = Lazy.map wrap_vk ~f:fst in
-    let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
-    let provers =
-      let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
-      let f :
-          type prev_vars prev_values local_widths local_heights.
-             (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
-          -> Lazy_keys.t
-          -> ?handler:
-               (   Snarky_backendless.Request.request
-                -> Snarky_backendless.Request.response )
-          -> A_value.t
-          -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t =
-       fun (T b as branch_data) (step_pk, step_vk) ->
-        let (module Requests) = b.requests in
-        let _, prev_vars_length = b.proofs_verified in
-        let step handler next_state =
-          let wrap_vk = Lazy.force wrap_vk in
-          S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
-            (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
-            wrap_vk.index
+      Timer.clock __LOC__ ;
+      let wrap_requests, wrap_main =
+        Timer.clock __LOC__ ;
+        let prev_wrap_domains =
+          let module M =
+            H4.Map (IR) (H4.T (E04 (Domains)))
+              (struct
+                let f :
+                    type a b c d.
+                    (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
+                 fun rule ->
+                  let module M =
+                    H4.Map (Tag) (E04 (Domains))
+                      (struct
+                        let f (type a b c d) (t : (a, b, c, d) Tag.t) :
+                            Domains.t =
+                          Types_map.lookup_map t ~self:self.id
+                            ~default:wrap_domains ~f:(function
+                            | `Compiled d ->
+                                d.wrap_domains
+                            | `Side_loaded d ->
+                                Common.wrap_domains
+                                  ~proofs_verified:
+                                    ( d.permanent.max_proofs_verified
+                                    |> Nat.Add.n |> Nat.to_int ) )
+                      end)
+                  in
+                  M.f rule.Inductive_rule.prevs
+              end)
+          in
+          M.f choices
         in
-        let step_vk = fst (Lazy.force step_vk) in
-        let wrap ?handler next_state =
-          let wrap_vk = Lazy.force wrap_vk in
-          let%bind.Promise proof =
-            step handler ~maxes:(module Maxes) next_state
-          in
-          let proof =
-            { proof with
-              statement =
-                { proof.statement with
-                  pass_through =
-                    pad_pass_throughs
-                      (module Maxes)
-                      proof.statement.pass_through
-                }
-            }
-          in
-          let%map.Promise proof =
-            Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
-              full_signature.maxes wrap_requests
-              ~dlog_plonk_index:wrap_vk.commitments wrap_main
-              A_value.to_field_elements ~step_vk ~step_domains:b.domains
-              ~step_plonk_indices:(Lazy.force step_vks) ~wrap_domains
-              (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
-              proof
-          in
-          Proof.T
-            { proof with
-              statement =
-                { proof.statement with
-                  pass_through =
-                    { proof.statement.pass_through with app_state = () }
-                }
-            }
+        Timer.clock __LOC__ ;
+        Wrap_main.wrap_main full_signature prev_varss_length step_vks
+          proofs_verifieds step_domains prev_wrap_domains
+          (module Max_proofs_verified)
+      in
+      Timer.clock __LOC__ ;
+      let (wrap_pk, wrap_vk), disk_key =
+        let open Impls.Wrap in
+        let (T (typ, conv, _conv_inv)) = input () in
+        let main x () : unit = wrap_main (conv x) in
+        let () = if true then log_wrap main typ name self.id in
+        let self_id = Type_equal.Id.uid self.id in
+        let disk_key_prover =
+          lazy
+            (let cs =
+               constraint_system ~exposing:[ typ ]
+                 ~return_typ:(Snarky_backendless.Typ.unit ())
+                 main
+             in
+             let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+             ( self_id
+             , snark_keys_header
+                 { type_ = "wrap-proving-key"; identifier = name }
+                 cs_hash
+             , cs ) )
         in
-        wrap
+        let disk_key_verifier =
+          match disk_keys with
+          | None ->
+              lazy
+                (let id, _header, cs = Lazy.force disk_key_prover in
+                 let digest = R1CS_constraint_system.digest cs in
+                 ( id
+                 , snark_keys_header
+                     { type_ = "wrap-verification-key"; identifier = name }
+                     (Md5.to_hex digest)
+                 , digest ) )
+          | Some (_, (_id, header, digest)) ->
+              Lazy.return (self_id, header, digest)
+        in
+        let r =
+          Common.time "wrap read or generate " (fun () ->
+              Cache.Wrap.read_or_generate
+                (Vector.to_array step_domains)
+                cache disk_key_prover disk_key_verifier typ
+                (Snarky_backendless.Typ.unit ())
+                main )
+        in
+        (r, disk_key_verifier)
       in
-      let rec go :
-          type xs1 xs2 xs3 xs4.
-             (xs1, xs2, xs3, xs4) H4.T(Branch_data).t
-          -> (xs1, xs2, xs3, xs4) H4.T(E04(Lazy_keys)).t
-          -> ( xs2
-             , xs3
-             , xs4
-             , A_value.t
-             , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
-             H3_2.T(Prover).t =
-       fun bs ks ->
-        match (bs, ks) with
-        | [], [] ->
-            []
-        | b :: bs, k :: ks ->
-            f b k :: go bs ks
+      Timer.clock __LOC__ ;
+      accum_dirty (Lazy.map wrap_pk ~f:snd) ;
+      accum_dirty (Lazy.map wrap_vk ~f:snd) ;
+      let wrap_vk = Lazy.map wrap_vk ~f:fst in
+      let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
+      let provers =
+        let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
+        let f :
+            type prev_vars prev_values local_widths local_heights.
+               ( prev_vars
+               , prev_values
+               , local_widths
+               , local_heights )
+               Branch_data.t
+            -> Lazy_keys.t
+            -> ?handler:
+                 (   Snarky_backendless.Request.request
+                  -> Snarky_backendless.Request.response )
+            -> A_value.t
+            -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
+            =
+         fun (T b as branch_data) (step_pk, step_vk) ->
+          let (module Requests) = b.requests in
+          let _, prev_vars_length = b.proofs_verified in
+          let step handler next_state =
+            let wrap_vk = Lazy.force wrap_vk in
+            S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
+              ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
+              (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
+              wrap_vk.index
+          in
+          let step_vk = fst (Lazy.force step_vk) in
+          let wrap ?handler next_state =
+            let wrap_vk = Lazy.force wrap_vk in
+            let%bind.Promise proof =
+              step handler ~maxes:(module Maxes) next_state
+            in
+            let proof =
+              { proof with
+                statement =
+                  { proof.statement with
+                    pass_through =
+                      pad_pass_throughs
+                        (module Maxes)
+                        proof.statement.pass_through
+                  }
+              }
+            in
+            let%map.Promise proof =
+              Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
+                full_signature.maxes wrap_requests
+                ~dlog_plonk_index:wrap_vk.commitments wrap_main
+                A_value.to_field_elements ~step_vk ~step_domains:b.domains
+                ~step_plonk_indices:(Lazy.force step_vks) ~wrap_domains
+                (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
+                proof
+            in
+            Proof.T
+              { proof with
+                statement =
+                  { proof.statement with
+                    pass_through =
+                      { proof.statement.pass_through with app_state = () }
+                  }
+              }
+          in
+          wrap
+        in
+        let rec go :
+            type xs1 xs2 xs3 xs4.
+               (xs1, xs2, xs3, xs4) H4.T(Branch_data).t
+            -> (xs1, xs2, xs3, xs4) H4.T(E04(Lazy_keys)).t
+            -> ( xs2
+               , xs3
+               , xs4
+               , A_value.t
+               , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t
+               )
+               H3_2.T(Prover).t =
+         fun bs ks ->
+          match (bs, ks) with
+          | [], [] ->
+              []
+          | b :: bs, k :: ks ->
+              f b k :: go bs ks
+        in
+        go step_data step_keypairs
       in
-      go step_data step_keypairs
-    in
-    Timer.clock __LOC__ ;
-    let data : _ Types_map.Compiled.t =
-      { branches = Branches.n
-      ; proofs_verifieds
-      ; max_proofs_verified = (module Max_proofs_verified)
-      ; typ
-      ; value_to_field_elements = A_value.to_field_elements
-      ; var_to_field_elements = A.to_field_elements
-      ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
-      ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
-      ; wrap_domains
-      ; step_domains
-      }
-    in
-    Timer.clock __LOC__ ;
-    Types_map.add_exn self data ;
-    (provers, wrap_vk, disk_key, !cache_handle)
+      Timer.clock __LOC__ ;
+      let data : _ Types_map.Compiled.t =
+        { branches = Branches.n
+        ; proofs_verifieds
+        ; max_proofs_verified = (module Max_proofs_verified)
+        ; typ
+        ; value_to_field_elements = A_value.to_field_elements
+        ; var_to_field_elements = A.to_field_elements
+        ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
+        ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
+        ; wrap_domains
+        ; step_domains
+        }
+      in
+      Timer.clock __LOC__ ;
+      Types_map.add_exn self data ;
+      (provers, wrap_vk, disk_key, !cache_handle)
+  end
 end
 
 module Side_loaded = struct
@@ -908,7 +919,7 @@ let compile_promise :
     | Some self ->
         self
   in
-  let module M = Make (A_var) (A_value) in
+  let module M = Compile.Make (A_var) (A_value) in
   let rec conv_irs :
       type v1ss v2ss wss hss.
          (v1ss, v2ss, wss, hss, a_var, a_value) H4_2.T(Inductive_rule).t
