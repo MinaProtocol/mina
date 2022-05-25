@@ -38,13 +38,6 @@ let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state )
 
-let hash_dlog_me_only (type n) (_max_proofs_verified : n Nat.t)
-    (t : (Tick.Curve.Affine.t, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t)
-    =
-  Tock_field_sponge.digest Tock_field_sponge.params
-    (Types.Wrap.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]) )
-
 let dlog_pcs_batch (type proofs_verified total)
     ((without_degree_bound, _pi) :
       total Nat.t * (proofs_verified, Nat.N26.n, total) Nat.Adds.t ) =

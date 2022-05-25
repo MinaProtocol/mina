@@ -190,6 +190,8 @@ module Side_loaded : sig
       end
     end]
 
+    val of_proof : _ Proof.t -> t
+
     val to_base64 : t -> string
 
     val of_base64 : string -> (t, string) Result.t

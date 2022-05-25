@@ -372,10 +372,14 @@ let wrap_main
                           , old_bulletproof_challenges ) ) =
                       old_bulletproof_challenges
                     in
+                    let old_bulletproof_challenges =
+                      Wrap_hack.Checked.pad_challenges
+                        old_bulletproof_challenges
+                    in
                     let finalized, chals =
                       with_label __LOC__ (fun () ->
                           finalize_other_proof
-                            (Nat.Add.create max_local_max_proofs_verified)
+                            (module Wrap_hack.Padded_length)
                             ~max_quot_size ~actual_proofs_verified
                             ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
                             ~sponge ~old_bulletproof_challenges deferred_values
@@ -390,7 +394,7 @@ let wrap_main
           let prev_me_onlys =
             Vector.map2 prev_step_accs old_bp_chals
               ~f:(fun sacc (T (max_local_max_proofs_verified, chals)) ->
-                hash_me_only max_local_max_proofs_verified
+                Wrap_hack.Checked.hash_me_only max_local_max_proofs_verified
                   { challenge_polynomial_commitment = sacc
                   ; old_bulletproof_challenges = chals
                   } )
@@ -459,7 +463,7 @@ let wrap_main
             Boolean.Assert.is_true bulletproof_success ) ;
         with_label __LOC__ (fun () ->
             Field.Assert.equal me_only_digest
-              (hash_me_only Max_proofs_verified.n
+              (Wrap_hack.Checked.hash_me_only Max_proofs_verified.n
                  { Types.Wrap.Proof_state.Me_only
                    .challenge_polynomial_commitment =
                      openings_proof.challenge_polynomial_commitment
