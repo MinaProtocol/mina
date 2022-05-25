@@ -1377,12 +1377,12 @@ module Zkapp_other_party_body = struct
     let%bind zkapp_protocol_state_precondition_id =
       Zkapp_protocol_state_precondition.add_if_doesn't_exist
         (module Conn)
-        body.protocol_state_precondition
+        body.preconditions.network
     in
     let%bind zkapp_account_precondition_id =
       Zkapp_account_precondition.add_if_doesn't_exist
         (module Conn)
-        body.account_precondition
+        body.preconditions.account
     in
     let balance_change =
       let magnitude = Currency.Amount.to_string body.balance_change.magnitude in

@@ -626,6 +626,74 @@ module Account_precondition = struct
         Ignore
 end
 
+module Preconditions = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { network : Zkapp_precondition.Protocol_state.Stable.V1.t
+        ; account : Account_precondition.Stable.V1.t
+        }
+      [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let deriver obj =
+    let open Fields_derivers_zkapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj
+      ~network:!.Zkapp_precondition.Protocol_state.deriver
+      ~account:!.Account_precondition.deriver
+    |> finish "Preconditions" ~t_toplevel_annots
+
+  let to_input ({ network; account } : t) =
+    List.reduce_exn ~f:Random_oracle_input.Chunked.append
+      [ Zkapp_precondition.Protocol_state.to_input network
+      ; Random_oracle_input.Chunked.field (Account_precondition.digest account)
+      ]
+
+  module Checked = struct
+    module Type_of_var (V : sig
+      type var
+    end) =
+    struct
+      type t = V.var
+    end
+
+    module Int_as_prover_ref = struct
+      type t = int As_prover.Ref.t
+    end
+
+    type t =
+      { network : Zkapp_precondition.Protocol_state.Checked.t
+      ; account : Account_precondition.Checked.t
+      }
+    [@@deriving annot, hlist, fields]
+
+    let to_input ({ network; account } : t) =
+      List.reduce_exn ~f:Random_oracle_input.Chunked.append
+        [ Zkapp_precondition.Protocol_state.Checked.to_input network
+        ; Random_oracle_input.Chunked.field
+            (Account_precondition.Checked.digest account)
+        ]
+  end
+
+  let x = Zkapp_precondition.Protocol_state.to_input
+
+  let typ () : (Checked.t, t) Typ.t =
+    Typ.of_hlistable
+      [ Zkapp_precondition.Protocol_state.typ; Account_precondition.typ () ]
+      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let accept =
+    { network = Zkapp_precondition.Protocol_state.accept
+    ; account = Account_precondition.Accept
+    }
+end
+
 module Body = struct
   (* Why isn't this derived automatically? *)
   let hash_fold_array f init x = Array.fold ~init ~f x
@@ -657,9 +725,7 @@ module Body = struct
           ; sequence_events : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
-          ; protocol_state_precondition :
-              Zkapp_precondition.Protocol_state.Stable.V1.t
-          ; account_precondition : Account_precondition.Stable.V1.t
+          ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; caller : Call_type.Stable.V1.t
           }
@@ -684,9 +750,7 @@ module Body = struct
         ; sequence_events : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; call_depth : int
-        ; protocol_state_precondition :
-            Zkapp_precondition.Protocol_state.Stable.V1.t
-        ; account_precondition : Account_precondition.Stable.V1.t
+        ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
         ; caller : Token_id.Stable.V1.t
         }
@@ -706,8 +770,7 @@ module Body = struct
     ; sequence_events = p.sequence_events
     ; call_data = p.call_data
     ; call_depth = p.call_depth
-    ; protocol_state_precondition = p.protocol_state_precondition
-    ; account_precondition = p.account_precondition
+    ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
     }
@@ -732,6 +795,7 @@ module Body = struct
           ; sequence_events : Events'.Stable.V1.t
           ; protocol_state_precondition :
               Zkapp_precondition.Protocol_state.Stable.V1.t
+                [@name "network"]
           ; nonce : Account_nonce.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
@@ -781,8 +845,10 @@ module Body = struct
     ; sequence_events = t.sequence_events
     ; call_data = Field.zero
     ; call_depth = 0
-    ; protocol_state_precondition = t.protocol_state_precondition
-    ; account_precondition = Account_precondition.Nonce t.nonce
+    ; preconditions =
+        { Preconditions.network = t.protocol_state_precondition
+        ; account = Account_precondition.Nonce t.nonce
+        }
     ; use_full_commitment = true
     ; caller = Token_id.default
     }
@@ -797,8 +863,7 @@ module Body = struct
         ; sequence_events
         ; call_data = _
         ; call_depth = _
-        ; protocol_state_precondition
-        ; account_precondition
+        ; preconditions
         ; use_full_commitment = _
         ; caller = _
         } =
@@ -809,7 +874,7 @@ module Body = struct
         (balance_change.magnitude |> Currency.Amount.to_uint64)
     in
     let nonce =
-      match account_precondition with
+      match preconditions.account with
       | Nonce nonce ->
           Mina_numbers.Account_nonce.of_uint32 nonce
       | Full _ | Accept ->
@@ -820,7 +885,7 @@ module Body = struct
     ; fee
     ; events
     ; sequence_events
-    ; protocol_state_precondition
+    ; protocol_state_precondition = preconditions.network
     ; nonce
     }
 
@@ -846,9 +911,7 @@ module Body = struct
       ; sequence_events : Events.var
       ; call_data : Field.Var.t
       ; call_depth : int As_prover.Ref.t
-      ; protocol_state_precondition :
-          Zkapp_precondition.Protocol_state.Checked.t
-      ; account_precondition : Account_precondition.Checked.t
+      ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
       ; caller : Token_id.Checked.t
       }
@@ -864,8 +927,7 @@ module Body = struct
          ; sequence_events
          ; call_data
          ; call_depth = _depth (* ignored *)
-         ; protocol_state_precondition
-         ; account_precondition
+         ; preconditions
          ; use_full_commitment
          ; caller
          } :
@@ -881,10 +943,7 @@ module Body = struct
         ; Events.var_to_input events
         ; Events.var_to_input sequence_events
         ; Random_oracle_input.Chunked.field call_data
-        ; Zkapp_precondition.Protocol_state.Checked.to_input
-            protocol_state_precondition
-        ; Random_oracle_input.Chunked.field
-            (Account_precondition.Checked.digest account_precondition)
+        ; Preconditions.Checked.to_input preconditions
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
         ; Token_id.Checked.to_input caller
@@ -906,8 +965,7 @@ module Body = struct
       ; Events.typ
       ; Field.typ
       ; Typ.Internal.ref ()
-      ; Zkapp_precondition.Protocol_state.typ
-      ; Account_precondition.typ ()
+      ; Preconditions.typ ()
       ; Impl.Boolean.typ
       ; Token_id.typ
       ]
@@ -924,8 +982,7 @@ module Body = struct
     ; sequence_events = []
     ; call_data = Field.zero
     ; call_depth = 0
-    ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-    ; account_precondition = Account_precondition.Accept
+    ; preconditions = Preconditions.accept
     ; use_full_commitment = false
     ; caller = Token_id.default
     }
@@ -937,9 +994,8 @@ module Body = struct
       ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
       ~increment_nonce:!.bool ~events:!.Events.deriver
       ~sequence_events:!.Events.deriver ~call_data:!.field ~call_depth:!.int
-      ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
-      ~account_precondition:!.Account_precondition.deriver
-      ~use_full_commitment:!.bool ~caller:!.Token_id.deriver
+      ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
+      ~caller:!.Token_id.deriver
     |> finish "PartyBody" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
@@ -958,8 +1014,7 @@ module Body = struct
        ; sequence_events
        ; call_data
        ; call_depth = _ (* ignored *)
-       ; protocol_state_precondition
-       ; account_precondition
+       ; preconditions
        ; use_full_commitment
        ; caller
        } :
@@ -973,9 +1028,7 @@ module Body = struct
       ; Events.to_input events
       ; Events.to_input sequence_events
       ; Random_oracle_input.Chunked.field call_data
-      ; Zkapp_precondition.Protocol_state.to_input protocol_state_precondition
-      ; Random_oracle_input.Chunked.field
-          (Account_precondition.digest account_precondition)
+      ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
       ; Token_id.to_input caller
       ]
@@ -1100,7 +1153,7 @@ let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
 let balance_change (t : t) : Amount.Signed.t = t.body.balance_change
 
 let protocol_state_precondition (t : t) : Zkapp_precondition.Protocol_state.t =
-  t.body.protocol_state_precondition
+  t.body.preconditions.network
 
 let public_key (t : t) : Public_key.Compressed.t = t.body.public_key
 

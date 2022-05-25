@@ -10,8 +10,7 @@ let add_caller' (p : Party.Body.Wire.t) caller : Party.Body.t =
   ; sequence_events = p.sequence_events
   ; call_data = p.call_data
   ; call_depth = p.call_depth
-  ; protocol_state_precondition = p.protocol_state_precondition
-  ; account_precondition = p.account_precondition
+  ; preconditions = p.preconditions
   ; use_full_commitment = p.use_full_commitment
   ; caller
   }

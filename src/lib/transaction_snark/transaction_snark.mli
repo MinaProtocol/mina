@@ -514,8 +514,7 @@ module For_tests : sig
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
-      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t option
-      ; account_precondition : Party.Account_precondition.t option
+      ; preconditions : Party.Preconditions.t option
       }
     [@@deriving sexp]
   end
