@@ -43,6 +43,12 @@ module Proof = struct
 end
 
 module T = struct
+  (* the accounts_accessed, accounts_created, and tokens_used fields
+     are used for storing blocks in the archive db, they're not needed
+     for replaying blocks
+
+     in tokens_used, the account id is the token owner
+  *)
   type t =
     { scheduled_time : Block_time.t
     ; protocol_state : Protocol_state.value
@@ -50,6 +56,9 @@ module T = struct
     ; staged_ledger_diff : Staged_ledger_diff.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+    ; accounts_accessed : (int * Account.t) list
+    ; accounts_created : (Account_id.t * Currency.Fee.t) list
+    ; tokens_used : (Token_id.t * Account_id.t option) list
     }
   [@@deriving sexp, yojson]
 end
@@ -60,27 +69,100 @@ include T
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V2 = struct
     type t = T.t =
       { scheduled_time : Block_time.Stable.V1.t
-      ; protocol_state : Protocol_state.Value.Stable.V1.t
-      ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
-      ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+      ; protocol_state : Protocol_state.Value.Stable.V2.t
+      ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
+      ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
+            (* TODO: Delete this or find out why it is here. *)
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+      ; accounts_accessed : (int * Account.Stable.V2.t) list
+      ; accounts_created :
+          (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+      ; tokens_used :
+          (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
       }
 
     let to_latest = Fn.id
   end
 end]
 
-let of_block ~scheduled_time (t : Block.t) =
+let of_block ~logger
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~scheduled_time ~staged_ledger block_with_hash =
+  let ledger = Staged_ledger.ledger staged_ledger in
+  let block = With_hash.data block_with_hash in
+  let state_hash =
+    (With_hash.hash block_with_hash).State_hash.State_hashes.state_hash
+  in
+  let account_ids_accessed = Block.account_ids_accessed block in
+  let start = Time.now () in
+  let accounts_accessed =
+    List.filter_map account_ids_accessed ~f:(fun acct_id ->
+        try
+          let index = Mina_ledger.Ledger.index_of_account_exn ledger acct_id in
+          let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
+          Some (index, account)
+        with exn ->
+          [%log error]
+            "When computing accounts accessed for precomputed block, exception \
+             when finding account id in staged ledger"
+            ~metadata:
+              [ ("account_id", Account_id.to_yojson acct_id)
+              ; ("exception", `String (Exn.to_string exn))
+              ] ;
+          None )
+  in
+  let header = Block.header block in
+  let accounts_accessed_time = Time.now () in
+  [%log debug]
+    "Precomputed block for $state_hash: accounts-accessed took $time ms"
+    ~metadata:
+      [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+      ; ( "time"
+        , `Float (Time.Span.to_ms (Time.diff accounts_accessed_time start)) )
+      ] ;
+  let accounts_created =
+    let account_creation_fee = constraint_constants.account_creation_fee in
+    let previous_block_state_hash =
+      Mina_state.Protocol_state.previous_state_hash
+        (Header.protocol_state header)
+    in
+    List.map
+      (Staged_ledger.latest_block_accounts_created staged_ledger
+         ~previous_block_state_hash ) ~f:(fun acct_id ->
+        (acct_id, account_creation_fee) )
+  in
+  let tokens_used =
+    let unique_tokens =
+      List.map account_ids_accessed ~f:Account_id.token_id
+      |> List.dedup_and_sort ~compare:Token_id.compare
+    in
+    List.map unique_tokens ~f:(fun token_id ->
+        let owner = Mina_ledger.Ledger.token_owner ledger token_id in
+        (token_id, owner) )
+  in
+  let account_created_time = Time.now () in
+  [%log debug]
+    "Precomputed block for $state_hash: accounts-created took $time ms"
+    ~metadata:
+      [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+      ; ( "time"
+        , `Float
+            (Time.Span.to_ms
+               (Time.diff account_created_time accounts_accessed_time) ) )
+      ] ;
+
   { scheduled_time
-  ; protocol_state = Header.protocol_state (Block.header t)
-  ; protocol_state_proof = Header.protocol_state_proof (Block.header t)
-  ; staged_ledger_diff = Body.staged_ledger_diff (Block.body t)
-  ; delta_transition_chain_proof =
-      Header.delta_block_chain_proof (Block.header t)
+  ; protocol_state = Header.protocol_state header
+  ; protocol_state_proof = Header.protocol_state_proof header
+  ; staged_ledger_diff = Body.staged_ledger_diff (Block.body block)
+  ; delta_transition_chain_proof = Header.delta_block_chain_proof header
+  ; accounts_accessed
+  ; accounts_created
+  ; tokens_used
   }
 
 (* NOTE: This serialization is used externally and MUST NOT change.

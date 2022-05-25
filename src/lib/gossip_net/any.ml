@@ -1,7 +1,7 @@
 open Async_kernel
 
 module type S = sig
-  module Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf
+  module Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf
 
   module type Implementation_intf =
     Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf
@@ -19,7 +19,7 @@ module type S = sig
   val create : creatable -> t creator
 end
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 

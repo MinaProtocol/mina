@@ -7,20 +7,24 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
   type ('a, 'n) t = 'n One_hot_vector.T(Impl).t * ('a, 'n) Vector.t
 
-  (* TODO: Put this in a common module. *)
-  let seal x =
-    match Field.to_constant x with
-    | Some x ->
-        Field.constant x
-    | None ->
+  (* TODO: Use version in common. *)
+  let seal (x : Impl.Field.t) : Impl.Field.t =
+    let open Impl in
+    match Field.to_constant_and_terms x with
+    | None, [ (x, i) ] when Field.Constant.(equal x one) ->
+        Snarky_backendless.Cvar.Var (Impl.Var.index i)
+    | Some c, [] ->
+        Field.constant c
+    | _ ->
         let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
         Field.Assert.equal x y ; y
 
   let mask (type n) (bits : n One_hot_vector.T(Impl).t) xs =
-    Vector.map
-      (Vector.zip (bits :> (Boolean.var, n) Vector.t) xs)
-      ~f:(fun (b, x) -> Field.((b :> t) * x))
-    |> Vector.fold ~init:Field.zero ~f:Field.( + )
+    with_label __LOC__ (fun () ->
+        Vector.map
+          (Vector.zip (bits :> (Boolean.var, n) Vector.t) xs)
+          ~f:(fun (b, x) -> Field.((b :> t) * x))
+        |> Vector.fold ~init:Field.zero ~f:Field.( + ) )
 
   let choose : type a n. (a, n) t -> f:(a -> Field.t) -> Field.t =
    fun (bits, xs) ~f -> mask bits (Vector.map xs ~f)
@@ -36,11 +40,15 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   end
 
   module Domain = struct
-    let shifts (type n) ((which, log2s) : (int, n) t) ~shifts =
+    let num_shifts = Nat.to_int Pickles_types.Plonk_types.Permuts.n
+
+    let shifts (type n) ((which, log2s) : (int, n) t)
+        ~(shifts : log2_size:int -> Field.t array) :
+        Field.t Pickles_types.Plonk_types.Shifts.t =
       let shifts = Vector.map log2s ~f:(fun d -> shifts ~log2_size:d) in
-      let open Marlin_plonk_bindings.Types.Plonk_verification_shifts in
+      let open Pickles_types.Plonk_types.Shifts in
       let mk f = mask which (Vector.map shifts ~f) in
-      { r = mk (fun { r; _ } -> r); o = mk (fun { o; _ } -> o) }
+      Array.init num_shifts ~f:(fun i -> mk (fun a -> a.(i)))
 
     let generator (type n) ((which, log2s) : (int, n) t) ~domain_generator =
       mask which (Vector.map log2s ~f:(fun d -> domain_generator ~log2_size:d))

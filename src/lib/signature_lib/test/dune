@@ -1,15 +1,14 @@
 (library
  (name signature_lib_tests)
  (libraries
-   ;;opam libraries
+   ;; opam libraries
    ppx_inline_test.config
-   ;;local libraries
+   ;; local libraries
    pickles
-   signature_lib
-   random_oracle_input
-   snark_params
    random_oracle
- )
+   random_oracle_input
+   signature_lib
+   snark_params)
  (instrumentation (backend bisect_ppx))
  (inline_tests)
  (preprocess

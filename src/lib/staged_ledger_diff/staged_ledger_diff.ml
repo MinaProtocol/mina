@@ -78,13 +78,11 @@ module Pre_diff_two = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type ('a, 'b) t =
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_two.Stable.V1.t
-        ; internal_command_balances :
-            Transaction_status.Internal_command_balance_data.Stable.V1.t list
         }
       [@@deriving compare, sexp, yojson]
     end
@@ -94,10 +92,14 @@ module Pre_diff_two = struct
     { completed_works : 'a list
     ; commands : 'b list
     ; coinbase : Ft.t At_most_two.t
-    ; internal_command_balances :
-        Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
+
+  let map t ~f1 ~f2 =
+    { completed_works = List.map t.completed_works ~f:f1
+    ; commands = List.map t.commands ~f:f2
+    ; coinbase = t.coinbase
+    }
 end
 
 module Pre_diff_one = struct
@@ -105,13 +107,11 @@ module Pre_diff_one = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type ('a, 'b) t =
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
-        ; internal_command_balances :
-            Transaction_status.Internal_command_balance_data.Stable.V1.t list
         }
       [@@deriving compare, sexp, yojson]
     end
@@ -121,10 +121,14 @@ module Pre_diff_one = struct
     { completed_works : 'a list
     ; commands : 'b list
     ; coinbase : Ft.t At_most_one.t
-    ; internal_command_balances :
-        Transaction_status.Internal_command_balance_data.t list
     }
   [@@deriving compare, sexp, yojson]
+
+  let map t ~f1 ~f2 =
+    { completed_works = List.map t.completed_works ~f:f1
+    ; commands = List.map t.commands ~f:f2
+    ; coinbase = t.coinbase
+    }
 end
 
 module Pre_diff_with_at_most_two_coinbase = struct
@@ -132,11 +136,11 @@ module Pre_diff_with_at_most_two_coinbase = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Transaction_snark_work.Stable.V1.t
-        , User_command.Stable.V1.t With_status.Stable.V1.t )
-        Pre_diff_two.Stable.V1.t
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V2.t With_status.Stable.V2.t )
+        Pre_diff_two.Stable.V2.t
       [@@deriving compare, sexp, yojson]
 
       let to_latest = Fn.id
@@ -151,11 +155,11 @@ module Pre_diff_with_at_most_one_coinbase = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Transaction_snark_work.Stable.V1.t
-        , User_command.Stable.V1.t With_status.Stable.V1.t )
-        Pre_diff_one.Stable.V1.t
+        ( Transaction_snark_work.Stable.V2.t
+        , User_command.Stable.V2.t With_status.Stable.V2.t )
+        Pre_diff_one.Stable.V2.t
       [@@deriving compare, sexp, yojson]
 
       let to_latest = Fn.id
@@ -170,10 +174,10 @@ module Diff = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        Pre_diff_with_at_most_two_coinbase.Stable.V1.t
-        * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
+        Pre_diff_with_at_most_two_coinbase.Stable.V2.t
+        * Pre_diff_with_at_most_one_coinbase.Stable.V2.t option
       [@@deriving compare, sexp, yojson]
 
       let to_latest = Fn.id
@@ -187,8 +191,8 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
-    type t = { diff : Diff.Stable.V1.t } [@@deriving compare, sexp, yojson]
+  module V2 = struct
+    type t = { diff : Diff.Stable.V2.t } [@@deriving compare, sexp, yojson]
 
     let to_latest = Fn.id
   end
@@ -219,11 +223,7 @@ module With_valid_signatures_and_proofs = struct
 
   let empty_diff : t =
     { diff =
-        ( { completed_works = []
-          ; commands = []
-          ; coinbase = At_most_two.Zero
-          ; internal_command_balances = []
-          }
+        ( { completed_works = []; commands = []; coinbase = At_most_two.Zero }
         , None )
     }
 
@@ -321,7 +321,6 @@ let validate_commands (t : t)
         { completed_works = d1.completed_works
         ; commands = commands1
         ; coinbase = d1.coinbase
-        ; internal_command_balances = d1.internal_command_balances
         }
       in
       let p2 =
@@ -330,7 +329,6 @@ let validate_commands (t : t)
               { Pre_diff_one.completed_works = d2.completed_works
               ; commands = commands2
               ; coinbase = d2.coinbase
-              ; internal_command_balances = d2.internal_command_balances
               } )
       in
       ({ diff = (p1, p2) } : With_valid_signatures.t) )
@@ -342,7 +340,6 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
     { completed_works = forget_cw d1.completed_works
     ; commands = d1.commands
     ; coinbase = d1.coinbase
-    ; internal_command_balances = d1.internal_command_balances
     }
   in
   let p2 =
@@ -351,7 +348,6 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
         { completed_works = forget_cw d2.completed_works
         ; commands = d2.commands
         ; coinbase = d2.coinbase
-        ; internal_command_balances = d2.internal_command_balances
         } )
   in
   { diff = (p1, p2) }
@@ -363,7 +359,6 @@ let forget_pre_diff_with_at_most_two
   { completed_works = forget_cw pre_diff.completed_works
   ; commands = (pre_diff.commands :> User_command.t With_status.t list)
   ; coinbase = pre_diff.coinbase
-  ; internal_command_balances = pre_diff.internal_command_balances
   }
 
 let forget_pre_diff_with_at_most_one
@@ -372,7 +367,6 @@ let forget_pre_diff_with_at_most_one
   { Pre_diff_one.completed_works = forget_cw pre_diff.completed_works
   ; commands = (pre_diff.commands :> User_command.t With_status.t list)
   ; coinbase = pre_diff.coinbase
-  ; internal_command_balances = pre_diff.internal_command_balances
   }
 
 let forget (t : With_valid_signatures_and_proofs.t) =
@@ -401,7 +395,7 @@ let net_return
       (commands t)
       ~f:(fun sum cmd ->
         let%bind sum = sum in
-        Fee.( + ) sum (User_command.fee_exn (With_status.data cmd)) )
+        Fee.( + ) sum (User_command.fee (With_status.data cmd)) )
   in
   let%bind completed_works_fees =
     List.fold ~init:(Some Fee.zero) (completed_works t) ~f:(fun sum work ->
@@ -412,10 +406,6 @@ let net_return
 
 let empty_diff : t =
   { diff =
-      ( { completed_works = []
-        ; commands = []
-        ; coinbase = At_most_two.Zero
-        ; internal_command_balances = []
-        }
+      ( { completed_works = []; commands = []; coinbase = At_most_two.Zero }
       , None )
   }

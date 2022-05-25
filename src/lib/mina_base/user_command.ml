@@ -3,45 +3,52 @@ open Core_kernel
 module Poly = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type ('u, 's) t = Signed_command of 'u | Parties of 's
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type ('u, 's) t = Signed_command of 'u | Snapp_command of 's
       [@@deriving sexp, compare, equal, hash, yojson]
 
-      let to_latest = Fn.id
+      let to_latest : _ t -> _ V2.t = function
+        | Signed_command x ->
+            Signed_command x
+        | Snapp_command _ ->
+            failwith "Snapp_command"
     end
   end]
 end
 
 type ('u, 's) t_ = ('u, 's) Poly.Stable.Latest.t =
   | Signed_command of 'u
-  | Snapp_command of 's
+  | Parties of 's
 
-(* TODO: For now, we don't generate snapp transactions. *)
 module Gen_make (C : Signed_command_intf.Gen_intf) = struct
-  let f g = Quickcheck.Generator.map g ~f:(fun c -> Signed_command c)
+  let to_signed_command f =
+    Quickcheck.Generator.map f ~f:(fun c -> Signed_command c)
 
   open C.Gen
 
-  let payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-      ~fee_range () =
-    f
-      (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-         ~fee_range () )
+  let payment ?sign_type ~key_gen ?nonce ~max_amount ~fee_range () =
+    to_signed_command
+      (payment ?sign_type ~key_gen ?nonce ~max_amount ~fee_range ())
 
   let payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-      ?fee_token ?payment_token ~fee_range () =
-    f
-      (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-         ?fee_token ?payment_token ~fee_range () )
-
-  let stake_delegation ~key_gen ?nonce ?fee_token ~fee_range () =
-    f (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
-
-  let stake_delegation_with_random_participants ~keys ?nonce ?fee_token
       ~fee_range () =
-    f
-      (stake_delegation_with_random_participants ~keys ?nonce ?fee_token
+    to_signed_command
+      (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
          ~fee_range () )
+
+  let stake_delegation ~key_gen ?nonce ~fee_range () =
+    to_signed_command (stake_delegation ~key_gen ?nonce ~fee_range ())
+
+  let stake_delegation_with_random_participants ~keys ?nonce ~fee_range () =
+    to_signed_command
+      (stake_delegation_with_random_participants ~keys ?nonce ~fee_range ())
 
   let sequence ?length ?sign_type a =
     Quickcheck.Generator.map
@@ -54,11 +61,11 @@ module Gen = Gen_make (Signed_command)
 module Valid = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Signed_command.With_valid_signature.Stable.V1.t
-        , Snapp_command.Valid.Stable.V1.t )
-        Poly.Stable.V1.t
+        ( Signed_command.With_valid_signature.Stable.V2.t
+        , Parties.Valid.Stable.V1.t )
+        Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -70,9 +77,8 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
-    type t =
-      (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
+  module V2 = struct
+    type t = (Signed_command.Stable.V2.t, Parties.Stable.V1.t) Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
@@ -113,124 +119,112 @@ end
 module Verifiable = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
-        ( Signed_command.Stable.V1.t
-        , Snapp_command.Stable.V1.t
-          * (* TODO: Should be Mina_base.Side_loaded_verification_key *)
-          Pickles.Side_loaded.Verification_key.Stable.V1.t
-          Zero_one_or_two.Stable.V1.t )
-        Poly.Stable.V1.t
+        ( Signed_command.Stable.V2.t
+        , Parties.Verifiable.Stable.V1.t )
+        Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
+
+  let fee_payer (t : t) =
+    match t with
+    | Signed_command x ->
+        Signed_command.fee_payer x
+    | Parties p ->
+        Party.Fee_payer.account_id p.fee_payer
 end
 
-let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
-  let find_vk c pk =
+let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
+  let find_vk (p : Party.t) =
     let ( ! ) x = Option.value_exn x in
-    let id = Account_id.create pk (Snapp_command.token_id c) in
-    let account : Account.t = !(get ledger !(location_of_account ledger id)) in
-    !(!(account.snapp).verification_key).data
-  in
-  let of_list = function
-    | [] ->
-        `Zero
-    | [ x ] ->
-        `One x
-    | [ x; y ] ->
-        `Two (x, y)
-    | _ ->
-        failwith "of_list"
+    let id = Party.account_id p in
+    Option.try_with (fun () ->
+        let account : Account.t =
+          !(get ledger !(location_of_account ledger id))
+        in
+        !(!(account.zkapp).verification_key).data )
   in
   match t with
   | Signed_command c ->
       Signed_command c
-  | Snapp_command c ->
-      let pks =
-        match c with
-        | Proved_proved r ->
-            [ r.one.data.body.pk; r.two.data.body.pk ]
-        | Proved_empty r ->
-            [ r.one.data.body.pk ]
-        | Proved_signed r ->
-            [ r.one.data.body.pk ]
-        | Signed_signed _ | Signed_empty _ ->
-            []
-      in
-      Snapp_command (c, of_list (List.map ~f:(find_vk c) pks))
+  | Parties { fee_payer; other_parties; memo } ->
+      Parties
+        { fee_payer
+        ; other_parties =
+            other_parties
+            |> Parties.Call_forest.map ~f:(fun party -> (party, find_vk party))
+        ; memo
+        }
 
-let to_verifiable t ~ledger ~get ~location_of_account =
-  Option.try_with (fun () ->
-      to_verifiable_exn t ~ledger ~get ~location_of_account )
+let of_verifiable (t : Verifiable.t) : t =
+  match t with
+  | Signed_command x ->
+      Signed_command x
+  | Parties p ->
+      Parties (Parties.of_verifiable p)
 
-let fee_exn : t -> Currency.Fee.t = function
+let fee : t -> Currency.Fee.t = function
   | Signed_command x ->
       Signed_command.fee x
-  | Snapp_command x ->
-      Snapp_command.fee_exn x
+  | Parties p ->
+      Parties.fee p
 
 (* for filtering *)
 let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
-let has_insufficient_fee t = Currency.Fee.(fee_exn t < minimum_fee)
+let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let accounts_accessed (t : t) ~next_available_token =
+let accounts_accessed (t : t) =
   match t with
   | Signed_command x ->
-      Signed_command.accounts_accessed x ~next_available_token
-  | Snapp_command x ->
-      Snapp_command.accounts_accessed x
-
-let next_available_token (t : t) tok =
-  match t with
-  | Signed_command x ->
-      Signed_command.next_available_token x tok
-  | Snapp_command x ->
-      Snapp_command.next_available_token x tok
+      Signed_command.accounts_accessed x
+  | Parties ps ->
+      Parties.accounts_accessed ps
 
 let to_base58_check (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.to_base58_check x
-  | Snapp_command x ->
-      Snapp_command.to_base58_check x
+  | Parties ps ->
+      Parties.to_base58_check ps
 
 let fee_payer (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.fee_payer x
-  | Snapp_command x ->
-      Snapp_command.fee_payer x
+  | Parties p ->
+      Parties.fee_payer p
 
 let nonce_exn (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.nonce x
-  | Snapp_command x ->
-      Option.value_exn (Snapp_command.nonce x)
+  | Parties p ->
+      Parties.nonce p
 
-let check_tokens (t : t) =
+let check (t : t) : Valid.t option =
   match t with
   | Signed_command x ->
-      Signed_command.check_tokens x
-  | Snapp_command x ->
-      Snapp_command.check_tokens x
+      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
+  | Parties p ->
+      Some (Parties (p :> Parties.Valid.t))
 
 let fee_token (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.fee_token x
-  | Snapp_command x ->
-      Snapp_command.fee_token x
+  | Parties x ->
+      Parties.fee_token x
 
 let valid_until (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
-  | Snapp_command _ ->
+  | Parties _ ->
       Mina_numbers.Global_slot.max_value
 
 let forget_check (t : Valid.t) : t = (t :> t)
@@ -238,8 +232,8 @@ let forget_check (t : Valid.t) : t = (t :> t)
 let to_valid_unsafe (t : t) =
   `If_this_is_used_it_should_have_a_comment_justifying_it
     ( match t with
-    | Snapp_command x ->
-        Snapp_command x
+    | Parties x ->
+        Parties x
     | Signed_command x ->
         (* This is safe due to being immediately wrapped again. *)
         let (`If_this_is_used_it_should_have_a_comment_justifying_it x) =
@@ -250,8 +244,21 @@ let to_valid_unsafe (t : t) =
 let filter_by_participant (commands : t list) public_key =
   List.filter commands ~f:(fun user_command ->
       Core_kernel.List.exists
-        (accounts_accessed ~next_available_token:Token_id.invalid user_command)
+        (accounts_accessed user_command)
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)
              Account_id.public_key ) )
+
+(* A metric on user commands that should correspond roughly to resource costs
+   for validation/application *)
+let weight : Stable.Latest.t -> int = function
+  | Signed_command signed_command ->
+      Signed_command.payload signed_command |> Signed_command_payload.weight
+  | Parties parties ->
+      Parties.weight parties
+
+(* Fee per weight unit *)
+let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
+  (*TODO: return Or_error*)
+  Currency.Fee_rate.make_exn (fee user_command) (weight user_command)
