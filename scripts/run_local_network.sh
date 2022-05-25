@@ -32,6 +32,7 @@ whales=1
 fish=1
 nodes=1
 log_level="Trace"
+file_log_level=$log_level
 transactions=false
 reset=false
 
@@ -59,6 +60,7 @@ help() {
   echo "-fp|--fish-start-port #"
   echo "-np|--node-start-port #"
   echo "-ll|--log-level <Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal>"
+  echo "-fll|--file-log-level <Same as above values>"
   echo "-t|--transactions"
   echo "-r|--reset"
   echo "-h|--help"
@@ -94,6 +96,7 @@ exec-daemon() {
     -generate-genesis-proof true \
     -log-json \
     -log-level $log_level \
+    -file-log-level $file_log_level \
     $@
   exec $MINA daemon \
     -client-port $client_port \
@@ -105,6 +108,7 @@ exec-daemon() {
     -generate-genesis-proof true \
     -log-json \
     -log-level $log_level \
+    -file-log-level $file_log_level \
     $@
 }
 
@@ -129,6 +133,7 @@ while [[ "$#" -gt 0 ]]; do
         -fp|--fish-start-port) FISH_START_PORT="$2"; shift ;;
         -np|--node-start-port) NODE_START_PORT="$2"; shift ;;
         -ll|--log-level) log_level="$2"; shift ;;
+        -fll|--file-log-level) file_log_level="$2"; shift ;;
         -t|--transactions) transactions=true ;;
         -r|--reset) reset=true ;;
         -h|--help) help ;;
