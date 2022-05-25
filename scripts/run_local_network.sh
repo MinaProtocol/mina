@@ -132,7 +132,7 @@ while [[ "$#" -gt 0 ]]; do
         -wp|--whale-start-port) WHALE_START_PORT="$2"; shift ;;
         -fp|--fish-start-port) FISH_START_PORT="$2"; shift ;;
         -np|--node-start-port) NODE_START_PORT="$2"; shift ;;
-        -ll|--log-level) log_level="$2"; shift ;;
+        -ll|--log-level) log_level="$2"; file_log_level=$log_level; shift ;;
         -fll|--file-log-level) file_log_level="$2"; shift ;;
         -t|--transactions) transactions=true ;;
         -r|--reset) reset=true ;;
