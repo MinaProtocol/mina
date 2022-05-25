@@ -72,6 +72,12 @@ let
       ocaml-libs =
         builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
 
+      # This is needed because
+      # - lld package is not wrapped to pick up the correct linker flags
+      # - bintools package also includes as which is incompatible with gcc
+      lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
+        ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
+
       runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
         check:
         self.mina-dev.overrideAttrs (oa:
@@ -110,9 +116,13 @@ let
         MINA_BRANCH = "<unknown>";
 
         buildInputs = ocaml-libs ++ external-libs;
-        nativeBuildInputs =
-          [ self.dune self.ocamlfind pkgs.capnproto pkgs.removeReferencesTo ]
-          ++ ocaml-libs;
+        nativeBuildInputs = [
+          self.dune
+          self.ocamlfind
+          lld_wrapped
+          pkgs.capnproto
+          pkgs.removeReferencesTo
+        ] ++ ocaml-libs;
 
         # todo: slimmed rocksdb
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
@@ -139,7 +149,8 @@ let
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
         '';
 
-        outputs = [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" ];
+        outputs =
+          [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" ];
 
         installPhase = ''
           mkdir -p $out/bin $sample/share/mina $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
