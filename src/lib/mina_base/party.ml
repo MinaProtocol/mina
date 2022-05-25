@@ -795,7 +795,7 @@ module Body = struct
           ; sequence_events : Events'.Stable.V1.t
           ; protocol_state_precondition :
               Zkapp_precondition.Protocol_state.Stable.V1.t
-                [@name "network"]
+                [@name "networkPrecondition"]
           ; nonce : Account_nonce.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]

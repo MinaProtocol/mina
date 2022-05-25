@@ -792,7 +792,7 @@
               "deprecationReason": null
             },
             {
-              "name": "network",
+              "name": "networkPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -924,7 +924,7 @@
               "defaultValue": null
             },
             {
-              "name": "network",
+              "name": "networkPrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -8311,7 +8311,7 @@
               "deprecationReason": null
             },
             {
-              "name": "network",
+              "name": "networkPrecondition",
               "description": null,
               "args": [],
               "type": {
