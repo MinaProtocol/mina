@@ -67,15 +67,6 @@ let time lab f =
       x )
     f ()
 
-let bits_random_oracle =
-  let h = Digestif.blake2s 32 in
-  fun ~length s ->
-    Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
-    |> List.concat_map ~f:(fun c ->
-           let c = Char.to_int c in
-           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1) )
-    |> fun a -> List.take a length
-
 let bits_to_bytes bits =
   let byte_of_bits bs =
     List.foldi bs ~init:0 ~f:(fun i acc b ->
