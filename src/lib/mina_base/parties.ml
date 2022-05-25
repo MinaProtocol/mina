@@ -1186,7 +1186,7 @@ let of_json x = Fields_derivers_zkapps.(of_json (deriver @@ Derivers.o ())) x
 
 let other_parties_of_json x =
   Fields_derivers_zkapps.(
-    of_json ((list @@ Party.deriver @@ o ()) @@ derivers ()))
+    of_json ((list @@ Party.Graphql_repr.deriver @@ o ()) @@ derivers ()))
     x
 
 let parties_to_json x =

@@ -2039,10 +2039,13 @@ module Ledger = struct
   module Parties = Mina_base.Parties
 
   let party_of_json =
-    let deriver = Party.deriver @@ Fields_derivers_zkapps.Derivers.o () in
+    let deriver =
+      Party.Graphql_repr.deriver @@ Fields_derivers_zkapps.Derivers.o ()
+    in
     let party_of_json (party : Js.js_string Js.t) : Party.t =
       Fields_derivers_zkapps.of_json deriver
         (party |> Js.to_string |> Yojson.Safe.from_string)
+      |> Party.of_graphql_repr
     in
     party_of_json
 
