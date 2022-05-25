@@ -231,7 +231,9 @@ let
         buildPhase = ''
           dune build --display=short \
             src/lib/crypto/kimchi_bindings/js/node_js \
-            src/app/client_sdk/client_sdk.bc.js
+            src/app/client_sdk/client_sdk.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_node.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
         '';
 
         doCheck = true;
@@ -248,8 +250,9 @@ let
         '';
 
         installPhase = ''
-          mkdir -p $out/share/client_sdk
+          mkdir -p $out/share/client_sdk $out/share/snarkyjs_bindings
           mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
+          mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
         '';
       });
 

@@ -174,6 +174,44 @@
           '';
         };
 
+        # snarkyjs
+        packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
+          src = ./src/lib/snarky_js_bindings/snarkyjs;
+          preBuild = ''
+            BINDINGS_PATH=./dist/server/node_bindings
+            mkdir -p "$BINDINGS_PATH"
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/server/node_bindings
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/server/node_bindings
+            chmod -R 777 "$BINDINGS_PATH"
+
+            # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
+            # better error messages
+            # TODO: find a less hacky way to make adjustments to jsoo compiler output
+            # `s` is the jsoo representation of the error message string, and `s.c` is the actual JS string
+            sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+            sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+            sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+          '';
+          npmBuild = "npm run build -- --bindings=./dist/server/node_bindings";
+          # HACK: work around https://github.com/serokell/nix-npm-buildpackage/issues/33
+          # our build phase requires nodejs 16, but nix-npm-buildpackage only works with nodejs 14
+          # so, we mix them :(
+          # TODO: add snarky-run
+          nativeBuildInputs = [ pkgs.nodejs-16_x ];
+          installPhase = ''
+            runHook preInstall
+            npm prune --production --cache=./npm-prune-cache
+            npm pack --ignore-scripts --cache=./npm-prune-cache
+            mkdir $out
+            tar xzvf ./$name.tgz -C $out --strip-components=1
+            cp -R node_modules $out
+            runHook postInstall
+          '';
+          # TODO
+          # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
+        };
+
+
         inherit ocamlPackages ocamlPackages_static;
         packages.mina = ocamlPackages.mina;
         packages.mina_tests = ocamlPackages.mina_tests;
