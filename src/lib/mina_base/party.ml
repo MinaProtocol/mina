@@ -1162,6 +1162,7 @@ module T = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
+        (** A party to a zkApp transaction *)
         type t =
           { body : Body.Graphql_repr.Stable.V1.t
           ; authorization : Control.Stable.V2.t

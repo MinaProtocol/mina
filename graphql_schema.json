@@ -3343,7 +3343,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "ZkappPartyInput",
-          "description": null,
+          "description": "A party to a zkApp transaction",
           "fields": [
             {
               "name": "body",
@@ -7175,7 +7175,7 @@
         {
           "kind": "OBJECT",
           "name": "ZkappParty",
-          "description": null,
+          "description": "A party to a zkApp transaction",
           "fields": [
             {
               "name": "body",
