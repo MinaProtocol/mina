@@ -207,7 +207,7 @@ let
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
         psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
-        dune runtest src/app/archive src/lib --display=short
+        dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
 
       mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''
