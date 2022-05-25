@@ -12,6 +12,7 @@
    async
    async_unix
    base
+   sexplib0
    ;; local libraries
    sgn
    pickles_types

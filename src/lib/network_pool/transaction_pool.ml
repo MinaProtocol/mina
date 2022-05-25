@@ -1727,7 +1727,7 @@ let%test_module _ =
               let account_id = Account_id.create compressed Token_id.default in
               ( account_id
               , Account.create account_id
-                @@ Currency.Balance.of_int 1_000_000_000_000 ) )
+                @@ Currency.Balance.of_formatted_string "900000000.0" ) )
         in
         let ledger = Account_id.Table.of_alist_exn accounts in
         ((pipe_r, ref ledger), pipe_w)
@@ -1838,7 +1838,7 @@ let%test_module _ =
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
                    (Quickcheck_lib.of_array test_keys) )
-              ~max_amount:100_000_000_000 ~fee_range:10_000_000_000 ()
+              ~max_amount:1_000_000_000 ~fee_range:1_000_000_000 ()
           in
           go (n + 1) (cmd :: cmds)
         else Quickcheck.Generator.return @@ List.rev cmds

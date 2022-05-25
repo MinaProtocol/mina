@@ -8,19 +8,23 @@ open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
-let gen_account_precondition_from_account ?(succeed = true)
-    ~(account : Account.t) ~account_state_tbl =
+let gen_account_precondition_from_account ?(succeed = true) ?account_state_tbl
+    (account : Account.t) =
   let open Quickcheck.Let_syntax in
   let%bind b = Quickcheck.Generator.bool in
   let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
-    match
-      Signature_lib.Public_key.Compressed.Table.find account_state_tbl
-        account.public_key
-    with
+    match account_state_tbl with
     | None ->
         account
-    | Some updated_account ->
-        updated_account
+    | Some account_state_tbl -> (
+        match
+          Signature_lib.Public_key.Compressed.Table.find account_state_tbl
+            account.public_key
+        with
+        | None ->
+            account
+        | Some updated_account ->
+            updated_account )
   in
   (* choose constructor *)
   if b then
@@ -234,7 +238,7 @@ let gen_account_precondition_from ?(succeed = true) ~account_id ~ledger
             "gen_account_precondition_from: could not find account with known \
              location"
       | Some account ->
-          gen_account_precondition_from_account ~succeed ~account
+          gen_account_precondition_from_account ~succeed account
             ~account_state_tbl )
 
 let gen_fee ~account_state_tbl (account : Account.t) =
@@ -1089,10 +1093,9 @@ let gen_parties_from ?(succeed = true)
     in
     let required_balance =
       match required_balance_change with
-      | { magnitude; sgn = Sgn.Neg } ->
-          (* put in enough balance so we can subtract it all *)
-          Some
-            (Currency.Amount.to_uint64 magnitude |> Currency.Balance.of_uint64)
+      | { sgn = Sgn.Neg; _ } ->
+          (* Large balance to allow more updates to this account*)
+          Some (Currency.Balance.of_formatted_string "10000000.0")
       | { sgn = Sgn.Pos; _ } ->
           (* we're adding to the account, so no required balance *)
           None
