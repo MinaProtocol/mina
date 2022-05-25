@@ -13,6 +13,7 @@
    async_kernel
    core.uuid
    base.caml
+   sexplib0
    ;; local libraries
    with_hash
    blockchain_snark

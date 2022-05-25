@@ -831,7 +831,7 @@ module T = struct
         { t with trees }
 
       include
-        Binable.Of_binable2
+        Binable.Of_binable2_without_uuid
           (Binable_arg.Stable.V1)
           (struct
             type nonrec ('merge, 'base) t = ('merge, 'base) t
