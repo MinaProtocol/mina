@@ -12,7 +12,7 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 let ledger_depth = 20
 
-let parties_with_ledger ?account_state_tbl () =
+let parties_with_ledger ?account_state_tbl ?vk ?succeed () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -35,6 +35,16 @@ let parties_with_ledger ?account_state_tbl () =
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
         Account_id.create (Public_key.compress public_key) Token_id.default )
+  in
+  let verification_key =
+    match vk with
+    | None ->
+        With_hash.
+          { data = Side_loaded_verification_key.dummy
+          ; hash = Zkapp_account.dummy_vk_hash ()
+          }
+    | Some vk ->
+        vk
   in
   let%bind balances =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
@@ -75,13 +85,7 @@ let parties_with_ledger ?account_state_tbl () =
       ; set_voting_for = Either
       }
     in
-    let verification_key =
-      Some
-        With_hash.
-          { data = Side_loaded_verification_key.dummy
-          ; hash = Zkapp_account.dummy_vk_hash ()
-          }
-    in
+    let verification_key = Some verification_key in
     let zkapp = Some { Zkapp_account.default with verification_key } in
     { account with permissions; zkapp }
   in
@@ -112,16 +116,28 @@ let parties_with_ledger ?account_state_tbl () =
       ~default:(Signature_lib.Public_key.Compressed.Table.create ())
   in
   let%bind parties =
-    Parties_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
-      ~account_state_tbl ()
+    Parties_generators.gen_parties_from ?succeed ~fee_payer_keypair ~keymap
+      ~ledger ~account_state_tbl ?vk ()
   in
-  let (`If_this_is_used_it_should_have_a_comment_justifying_it parties) =
-    Parties.to_valid_unsafe parties
+  let parties =
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it p) =
+      Parties.to_valid_unsafe parties
+    in
+    let proof_parties =
+      Parties.Call_forest.fold ~init:[] p.parties.other_parties ~f:(fun acc p ->
+          if Control.(Tag.equal Proof (tag (Party.authorization p))) then
+            Party.account_id p :: acc
+          else acc )
+    in
+    let verification_keys =
+      List.map proof_parties ~f:(fun a -> (a, With_hash.hash verification_key))
+    in
+    { p with verification_keys }
   in
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
 
-let sequence_parties_with_ledger ?length () =
+let sequence_parties_with_ledger ?length ?vk ?succeed () =
   let open Quickcheck.Let_syntax in
   let%bind length =
     match length with
@@ -150,7 +166,7 @@ let sequence_parties_with_ledger ?length () =
     if n <= 0 then return (List.rev parties_and_fee_payer_keypairs, init_ledger)
     else
       let%bind parties, fee_payer_keypair, keymap, ledger =
-        parties_with_ledger ~account_state_tbl ()
+        parties_with_ledger ~account_state_tbl ?vk ?succeed ()
       in
       let parties_and_fee_payer_keypairs' =
         (parties, fee_payer_keypair, keymap) :: parties_and_fee_payer_keypairs
