@@ -1623,29 +1623,30 @@ let%test_module "account timing check" =
         Quickcheck.Generator.return
           (ledger_init_state, create_timed_account_parties)
       in
-      Quickcheck.test
-        ~seed:
-          (`Deterministic
-            "zkapp command, create timed account with wrong authorization" )
-        ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        gen ~f:(fun (ledger_init_state, create_timed_account_parties) ->
-          Mina_ledger.Ledger.with_ephemeral_ledger
-            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Async.Quickcheck.async_test
+            ~seed:
+              (`Deterministic
+                "zkapp command, create timed account with wrong authorization"
+                )
+            ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t]
+            ~trials:1 gen
+            ~f:(fun (ledger_init_state, create_timed_account_parties) ->
+              let ledger =
+                Mina_ledger.Ledger.create
+                  ~depth:constraint_constants.ledger_depth ()
+              in
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              let state_view =
-                Transaction_snark_tests.Util.genesis_state_view
-              in
-              let result =
-                Mina_ledger.Ledger.apply_parties_unchecked ~state_view
-                  ~constraint_constants ledger create_timed_account_parties
-              in
-              check_zkapp_failure
-                Transaction_status.Failure
-                .Update_not_permitted_timing_existing_account result ) )
+              Transaction_snark_tests.Util.check_parties_with_merges_exn
+                ~expected_failure:
+                  Transaction_status.Failure
+                  .Update_not_permitted_timing_existing_account ledger
+                [ create_timed_account_parties ] ) )
 
     let%test_unit "zkApp command, change untimed account to timed" =
       Async.Thread_safe.block_on_async_exn (fun () ->
+          Backtrace.elide := false ;
           let ledger_init_state =
             List.map keypairs ~f:(fun keypair ->
                 let balance = Currency.Amount.of_int 100_000_000_000_000 in
@@ -1688,7 +1689,7 @@ let%test_module "account timing check" =
             }
           in
           let open Async.Deferred.Let_syntax in
-          let%map update_timing_parties =
+          let%bind update_timing_parties =
             Transaction_snark.For_tests.update_states ~constraint_constants
               update_timing_spec
           in
@@ -1696,27 +1697,20 @@ let%test_module "account timing check" =
             Quickcheck.Generator.return
               (ledger_init_state, update_timing_parties)
           in
-          Quickcheck.test
+          Async.Quickcheck.async_test
             ~seed:
               (`Deterministic
                 "zkapp command, change untimed account to timed account" )
             ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t]
             ~trials:1 gen ~f:(fun (ledger_init_state, update_timing_parties) ->
-              Mina_ledger.Ledger.with_ephemeral_ledger
-                ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
-                  Mina_ledger.Ledger.apply_initial_ledger_state ledger
-                    ledger_init_state ;
-                  let state_view =
-                    Transaction_snark_tests.Util.genesis_state_view
-                  in
-                  match
-                    Mina_ledger.Ledger.apply_parties_unchecked ~state_view
-                      ~constraint_constants ledger update_timing_parties
-                  with
-                  | Ok _ ->
-                      ()
-                  | Error e ->
-                      failwith (Error.to_string_hum e) ) ) )
+              let ledger =
+                Mina_ledger.Ledger.create
+                  ~depth:constraint_constants.ledger_depth ()
+              in
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              Transaction_snark_tests.Util.check_parties_with_merges_exn ledger
+                [ update_timing_parties ] ) )
 
     let%test_unit "zkApp command, invalid update for timed account" =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1782,23 +1776,24 @@ let%test_module "account timing check" =
             Quickcheck.Generator.return
               (ledger_init_state, update_timing_parties)
           in
-          Quickcheck.test
-            ~seed:
-              (`Deterministic "zkapp command, invalid update for timed account")
-            ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t]
-            ~trials:1 gen ~f:(fun (ledger_init_state, update_timing_parties) ->
-              Mina_ledger.Ledger.with_ephemeral_ledger
-                ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Async.Quickcheck.async_test
+                ~seed:
+                  (`Deterministic
+                    "zkapp command, invalid update for timed account" )
+                ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t]
+                ~trials:1 gen
+                ~f:(fun (ledger_init_state, update_timing_parties) ->
+                  let ledger =
+                    Mina_ledger.Ledger.create
+                      ~depth:constraint_constants.ledger_depth ()
+                  in
                   Mina_ledger.Ledger.apply_initial_ledger_state ledger
                     ledger_init_state ;
-                  let state_view =
-                    Transaction_snark_tests.Util.genesis_state_view
-                  in
-                  let result =
-                    Mina_ledger.Ledger.apply_parties_unchecked ~state_view
-                      ~constraint_constants ledger update_timing_parties
-                  in
-                  check_zkapp_failure
-                    Transaction_status.Failure
-                    .Update_not_permitted_timing_existing_account result ) ) )
+
+                  Transaction_snark_tests.Util.check_parties_with_merges_exn
+                    ~expected_failure:
+                      Transaction_status.Failure
+                      .Update_not_permitted_timing_existing_account ledger
+                    [ update_timing_parties ] ) ) )
   end )
