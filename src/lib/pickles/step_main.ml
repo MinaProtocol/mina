@@ -69,8 +69,12 @@ let verify_one
     let prev_me_only =
       with_label __LOC__ (fun () ->
           let hash =
+            let var_to_field_elements =
+              let (Typ typ) = d.typ in
+              fun x -> fst (typ.var_to_fields x)
+            in
             (* TODO: Don't rehash when it's not necessary *)
-            unstage (hash_me_only_opt ~index:d.wrap_key d.var_to_field_elements)
+            unstage (hash_me_only_opt ~index:d.wrap_key var_to_field_elements)
           in
           hash ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
@@ -341,8 +345,6 @@ let step_main :
                     ; max_proofs_verified = (module Max_proofs_verified)
                     ; max_width = None
                     ; typ = basic.typ
-                    ; var_to_field_elements = basic.var_to_field_elements
-                    ; value_to_field_elements = basic.value_to_field_elements
                     ; wrap_domains = basic.wrap_domains
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
@@ -393,9 +395,12 @@ let step_main :
           in
           with_label "hash_me_only" (fun () ->
               let hash_me_only =
+                let var_to_field_elements =
+                  let (Typ typ) = basic.typ in
+                  fun x -> fst (typ.var_to_fields x)
+                in
                 unstage
-                  (hash_me_only ~index:dlog_plonk_index
-                     basic.var_to_field_elements )
+                  (hash_me_only ~index:dlog_plonk_index var_to_field_elements)
               in
               hash_me_only
                 { app_state

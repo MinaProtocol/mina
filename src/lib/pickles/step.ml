@@ -199,11 +199,15 @@ struct
           , _ )
           Wrap.Statement.In_circuit.t =
         { pass_through =
-            (* TODO: Only do this hashing when necessary *)
-            Common.hash_step_me_only
-              (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
-                 statement.pass_through )
-              ~app_state:data.value_to_field_elements
+            (let value_to_field_elements =
+               let (Typ typ) = data.typ in
+               fun x -> fst (typ.value_to_fields x)
+             in
+             (* TODO: Only do this hashing when necessary *)
+             Common.hash_step_me_only
+               (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
+                  statement.pass_through )
+               ~app_state:value_to_field_elements )
         ; proof_state =
             { statement.proof_state with
               deferred_values =

@@ -60,8 +60,7 @@ let create
     ~(self : (a_var, a_value, max_proofs_verified, branches) Tag.t)
     ~wrap_domains ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
-    ~typ var_to_field_elements value_to_field_elements
-    (rule : _ Inductive_rule.t) =
+    ~typ (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in
@@ -103,14 +102,7 @@ let create
     Step_main.step_main requests
       (Nat.Add.create max_proofs_verified)
       rule
-      ~basic:
-        { typ
-        ; proofs_verifieds
-        ; var_to_field_elements
-        ; value_to_field_elements
-        ; wrap_domains
-        ; step_domains
-        }
+      ~basic:{ typ; proofs_verifieds; wrap_domains; step_domains }
       ~self_branches:branches ~proofs_verified ~local_signature:widths
       ~local_signature_length ~local_branches:heights ~local_branches_length
       ~lte ~self

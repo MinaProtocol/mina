@@ -217,8 +217,6 @@ module Side_loaded : sig
   val create :
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
-    -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
-    -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 

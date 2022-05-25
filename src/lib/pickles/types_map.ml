@@ -13,8 +13,6 @@ type inner_curve_var =
 module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
     { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
-    ; value_to_field_elements : 'value -> Impls.Step.Field.Constant.t array
-    ; var_to_field_elements : 'var -> Impls.Step.Field.t array
     ; typ : ('var, 'value) Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
@@ -38,8 +36,6 @@ module Side_loaded = struct
   module Permanent = struct
     type ('var, 'value, 'n1, 'n2) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
-      ; value_to_field_elements : 'value -> Impls.Step.Field.Constant.t array
-      ; var_to_field_elements : 'var -> Impls.Step.Field.t array
       ; typ : ('var, 'value) Impls.Step.Typ.t
       ; branches : 'n2 Nat.t
       }
@@ -55,16 +51,8 @@ module Side_loaded = struct
         ('var, 'value, 'n1, 'n2) Tag.tag * ('var, 'value, 'n1, 'n2) t
         -> packed
 
-  let to_basic
-      { permanent =
-          { max_proofs_verified
-          ; value_to_field_elements
-          ; var_to_field_elements
-          ; typ
-          ; branches
-          }
-      ; ephemeral
-      } =
+  let to_basic { permanent = { max_proofs_verified; typ; branches }; ephemeral }
+      =
     let wrap_key, wrap_vk =
       match ephemeral with
       | Some { index = `In_prover i | `In_both (i, _) } ->
@@ -76,8 +64,6 @@ module Side_loaded = struct
     let wrap_vk = Option.value_exn ~here:[%here] wrap_vk in
     { Basic.max_proofs_verified
     ; wrap_vk
-    ; value_to_field_elements
-    ; var_to_field_elements
     ; typ
     ; branches
     ; wrap_domains = Common.wrap_domains ~proofs_verified
@@ -92,8 +78,6 @@ module Compiled = struct
     { typ : ('a_var, 'a_value) Impls.Step.Typ.t
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
-    ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     }
@@ -108,8 +92,6 @@ module Compiled = struct
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; value_to_field_elements : 'a_value -> Tick.Field.t array
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
     ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
@@ -126,8 +108,6 @@ module Compiled = struct
       ; max_proofs_verified
       ; proofs_verifieds
       ; typ
-      ; value_to_field_elements
-      ; var_to_field_elements
       ; wrap_vk
       ; wrap_domains
       ; step_domains
@@ -135,8 +115,6 @@ module Compiled = struct
       } =
     { Basic.max_proofs_verified
     ; wrap_domains
-    ; value_to_field_elements
-    ; var_to_field_elements
     ; typ
     ; branches = Vector.length step_domains
     ; wrap_key = Lazy.force wrap_key
@@ -151,8 +129,6 @@ module For_step = struct
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds : (Impls.Step.Field.t, 'branches) Vector.t
     ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; value_to_field_elements : 'a_value -> Tick.Field.t array
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
     ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
     ; wrap_domains : Domains.t
     ; step_domains :
@@ -166,15 +142,7 @@ module For_step = struct
     }
 
   let of_side_loaded (type a b c d)
-      ({ ephemeral
-       ; permanent =
-           { branches
-           ; max_proofs_verified
-           ; typ
-           ; value_to_field_elements
-           ; var_to_field_elements
-           }
-       } :
+      ({ ephemeral; permanent = { branches; max_proofs_verified; typ } } :
         (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
     let index =
       match ephemeral with
@@ -190,8 +158,6 @@ module For_step = struct
         Vector.map index.step_widths
           ~f:Side_loaded_verification_key.Width.Checked.to_field
     ; typ
-    ; value_to_field_elements
-    ; var_to_field_elements
     ; wrap_key = index.wrap_index
     ; wrap_domains =
         Common.wrap_domains
@@ -205,8 +171,6 @@ module For_step = struct
        ; max_proofs_verified
        ; proofs_verifieds
        ; typ
-       ; value_to_field_elements
-       ; var_to_field_elements
        ; wrap_key
        ; wrap_domains
        ; step_domains
@@ -217,8 +181,6 @@ module For_step = struct
     ; max_proofs_verified
     ; proofs_verifieds = Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int
     ; typ
-    ; value_to_field_elements
-    ; var_to_field_elements
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
           ~f:Step_main_inputs.Inner_curve.constant
@@ -304,9 +266,11 @@ let value_to_field_elements :
  fun t ->
   match t.kind with
   | Compiled ->
-      (lookup_compiled t.id).value_to_field_elements
+      let (Typ typ) = (lookup_compiled t.id).typ in
+      fun x -> fst (typ.value_to_fields x)
   | Side_loaded ->
-      (lookup_side_loaded t.id).permanent.value_to_field_elements
+      let (Typ typ) = (lookup_side_loaded t.id).permanent.typ in
+      fun x -> fst (typ.value_to_fields x)
 
 let lookup_map (type a b c d) (t : (a, b, c, d) Tag.t) ~self ~default
     ~(f :

@@ -530,8 +530,7 @@ module Compile = struct
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:(Index.of_int_exn !i)
                       ~max_proofs_verified:Max_proofs_verified.n
-                      ~branches:Branches.n ~self ~typ A.to_field_elements
-                      A_value.to_field_elements rule ~wrap_domains
+                      ~branches:Branches.n ~self ~typ rule ~wrap_domains
                       ~proofs_verifieds )
               in
               Timer.clock __LOC__ ; incr i ; res :: go rules
@@ -806,8 +805,6 @@ module Compile = struct
         ; proofs_verifieds
         ; max_proofs_verified = (module Max_proofs_verified)
         ; typ
-        ; value_to_field_elements = A_value.to_field_elements
-        ; var_to_field_elements = A.to_field_elements
         ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
         ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
         ; wrap_domains
@@ -849,15 +846,9 @@ module Side_loaded = struct
 
   let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
-  let create ~name ~max_proofs_verified ~value_to_field_elements
-      ~var_to_field_elements ~typ =
+  let create ~name ~max_proofs_verified ~typ =
     Types_map.add_side_loaded ~name
-      { max_proofs_verified
-      ; value_to_field_elements
-      ; var_to_field_elements
-      ; typ
-      ; branches = Verification_key.Max_branches.n
-      }
+      { max_proofs_verified; typ; branches = Verification_key.Max_branches.n }
 
   module Proof = Proof.Proofs_verified_max
 
