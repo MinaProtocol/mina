@@ -1175,6 +1175,12 @@ module Base = struct
         let set_timing (account : t) (timing : timing) : t =
           { account with data = { account.data with timing } }
 
+        let is_timed ({ data = account; _ } : t) =
+          let open Account.Poly in
+          let open Account.Timing.As_record in
+          let { is_timed; _ } = account.timing in
+          is_timed
+
         let set_token_id (account : t) (token_id : Token_id.Checked.t) : t =
           account_with_hash { account.data with token_id }
 
@@ -1931,7 +1937,7 @@ module Base = struct
               ( Stack_frame.t
               , Call_stack.t
               , Token_id.t
-              , Amount.t
+              , Amount.Signed.t
               , Ledger.t
               , Bool.t
               , Transaction_commitment.t
@@ -1954,10 +1960,14 @@ module Base = struct
             (protocol_state_predicate, global_state) ->
             Zkapp_precondition.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
-        | Check_account_precondition (_is_start, { party; _ }, account, _global)
-          ->
-            Zkapp_precondition.Account.Checked.check
-              party.data.account_precondition account.data
+        | Check_account_precondition ({ party; _ }, account, local_state) ->
+            let local_state = ref local_state in
+            let check failure b =
+              local_state := Inputs.Local_state.add_check !local_state failure b
+            in
+            Zkapp_precondition.Account.Checked.check ~check
+              party.data.account_precondition account.data ;
+            !local_state
         | Init_account { party = { party; _ }; account } ->
             let account' : Account.Checked.Unhashed.t =
               { account.data with
@@ -4451,7 +4461,7 @@ module For_tests = struct
     , `Txn_commitment commitment
     , `Full_txn_commitment full_commitment )
 
-  let deploy_snapp ~constraint_constants (spec : Spec.t) =
+  let deploy_snapp ?(no_auth = false) ~constraint_constants (spec : Spec.t) =
     let `VK vk, `Prover _trivial_prover =
       create_trivial_snapp ~constraint_constants ()
     in
@@ -4463,15 +4473,17 @@ module For_tests = struct
       || (spec.new_zkapp_account && List.length spec.zkapp_account_keypairs = 1) ) ;
     let update_vk =
       let update = spec.snapp_update in
-      { update with
-        verification_key = Zkapp_basic.Set_or_keep.Set vk
-      ; permissions =
-          Zkapp_basic.Set_or_keep.Set
-            { Permissions.user_default with
-              edit_state = Permissions.Auth_required.Proof
-            ; edit_sequence_state = Proof
-            }
-      }
+      if no_auth then update
+      else
+        { update with
+          verification_key = Zkapp_basic.Set_or_keep.Set vk
+        ; permissions =
+            Zkapp_basic.Set_or_keep.Set
+              { Permissions.user_default with
+                edit_state = Permissions.Auth_required.Proof
+              ; edit_sequence_state = Proof
+              }
+        }
     in
     let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
@@ -4487,16 +4499,20 @@ module For_tests = struct
     in
     let snapp_parties =
       List.map snapp_parties_keypairs ~f:(fun (snapp_party, keypair) ->
-          let commitment =
-            if snapp_party.body.use_full_commitment then full_commitment
-            else commitment
-          in
-          let signature =
-            Signature_lib.Schnorr.Chunked.sign keypair.private_key
-              (Random_oracle.Input.Chunked.field commitment)
-          in
-          ( { body = snapp_party.body; authorization = Signature signature }
-            : Party.Wire.t ) )
+          if no_auth then
+            ( { body = snapp_party.body; authorization = None_given }
+              : Party.Wire.t )
+          else
+            let commitment =
+              if snapp_party.body.use_full_commitment then full_commitment
+              else commitment
+            in
+            let signature =
+              Signature_lib.Schnorr.Chunked.sign keypair.private_key
+                (Random_oracle.Input.Chunked.field commitment)
+            in
+            ( { body = snapp_party.body; authorization = Signature signature }
+              : Party.Wire.t ) )
     in
     let other_parties = Option.to_list sender_party @ snapp_parties in
     let parties : Parties.t =
