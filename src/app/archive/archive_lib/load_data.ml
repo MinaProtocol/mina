@@ -824,8 +824,6 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   let account =
     ( { public_key
       ; token_id
-      ; token_permissions =
-          Token_permissions.Not_owned { account_disabled = false }
       ; token_symbol
       ; balance
       ; nonce
