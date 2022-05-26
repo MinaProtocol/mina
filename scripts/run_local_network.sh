@@ -14,7 +14,6 @@ LOGPROC=_build/default/src/app/logproc/logproc.exe
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
 SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
-SEED_PEER_ID="/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
 
 SNARK_WORKER_FEE=0.01
 
@@ -93,7 +92,6 @@ exec-daemon() {
     -metrics-port $daemon_metrics_port \
     -libp2p-metrics-port $libp2p_metrics_port \
     -config-file $config \
-    -generate-genesis-proof true \
     -log-json \
     -log-level $log_level \
     -file-log-level $file_log_level \
@@ -105,7 +103,6 @@ exec-daemon() {
     -metrics-port $daemon_metrics_port \
     -libp2p-metrics-port $libp2p_metrics_port \
     -config-file $config \
-    -generate-genesis-proof true \
     -log-json \
     -log-level $log_level \
     -file-log-level $file_log_level \
@@ -142,6 +139,8 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+SEED_PEER_ID="/ip4/127.0.0.1/tcp/$(($SEED_START_PORT+2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+
 if $transactions; then
   if [ "$fish" -eq "0" ]; then
     echo "Sending transactions require at least one fish"
@@ -168,7 +167,8 @@ fi
 if [ ! -d "$ledgerfolder" ]; then
   printf "\n"
   echo "Making ledger"
-  
+  printf "\n"
+
   mkdir -p $ledgerfolder
 
   clean-dir $ledgerfolder/offline_whale_keys
@@ -221,19 +221,24 @@ snark_worker_pubkey=$(cat $ledgerfolder/snark_worker_keys/snark_worker_account.p
 # Update Timestamp
 
 config=$ledgerfolder/daemon.json
-jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
-  < $ledgerfolder/genesis_ledger.json \
-  > $config
+
+if $reset; then
+  jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
+    < $ledgerfolder/genesis_ledger.json \
+    > $config
+fi
 
 # ================================================
 # Launch nodes
 
 nodesfolder=$ledgerfolder/nodes
-clean-dir $nodesfolder
+
+if $reset; then
+  clean-dir $nodesfolder
+  mkdir -p $nodesfolder/seed
+fi
 
 # ----------
-
-mkdir -p $nodesfolder/seed
 
 spawn-node $nodesfolder/seed ${SEED_START_PORT} -seed -discovery-keypair $SEED_PEER_KEY
 seed_pid=$!
@@ -253,7 +258,7 @@ snark_worker_flags="-snark-worker-fee $SNARK_WORKER_FEE -run-snark-worker $snark
 for ((i = 0; i < $whales; i++)); do
   folder=$nodesfolder/whale_$i
   keyfile=$ledgerfolder/online_whale_keys/online_whale_account_$i
-  mkdir $folder
+  mkdir -p $folder
   spawn-node $folder $(($WHALE_START_PORT+($i * 5))) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
   whale_pids[${i}]=$!
 done
@@ -263,7 +268,7 @@ done
 for ((i = 0; i < $fish; i++)); do
   folder=$nodesfolder/fish_$i
   keyfile=$ledgerfolder/online_fish_keys/online_fish_account_$i
-  mkdir $folder
+  mkdir -p $folder
   spawn-node $folder $(($FISH_START_PORT+($i * 5))) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
   fish_pids[${i}]=$!
 done
@@ -272,7 +277,7 @@ done
 
 for ((i = 0; i < $nodes; i++)); do
   folder=$nodesfolder/node_$i
-  mkdir $folder
+  mkdir -p $folder
   spawn-node $folder $(($NODE_START_PORT+($i * 5))) -peer $SEED_PEER_ID
   node_pids[${i}]=$!
 done
@@ -325,12 +330,11 @@ if $transactions; then
   folder=$nodesfolder/fish_1
   keyfile=$ledgerfolder/online_fish_keys/online_fish_account_1
   pubkey=$(cat $ledgerfolder/online_fish_keys/online_fish_account_1.pub)
-  rest_server="http://127.0.0.1:5001/graphql"
-
+  rest_server="http://127.0.0.1:$(($FISH_START_PORT+1))/graphql"
   printf "\n"
   echo "Waiting for node to be up to start sending transactions..."
 
-  until $MINA client status -daemon-port 5000 &> /dev/null
+  until $MINA client status -daemon-port $FISH_START_PORT &> /dev/null
   do
     sleep 1
   done
