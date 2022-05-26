@@ -61,7 +61,7 @@ variable "plain_node_count" {
 locals {
   testnet_name = "skynet"
   mina_image = "minaprotocol/mina-daemon:1.3.1beta1-compatible-8a582fd-focal-devnet"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.1beta1-compatible-8a582fd-focal-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.1beta1-compatible-8a582fd-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
