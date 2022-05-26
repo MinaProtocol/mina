@@ -356,6 +356,14 @@ module Make (Inputs : Inputs_intf) :
           (Bigstring.of_string
              (Format.sprintf !"$tid!%{sexp: Token_id.t}" token_id) )
 
+      let serialize_kv ~ledger_depth ((tid : Token_id.t), (aid : Account_id.t))
+          =
+        let aid_buf =
+          Bin_prot.Common.create_buf (Account_id.Stable.Latest.bin_size_t aid)
+        in
+        ignore (Account_id.Stable.Latest.bin_write_t aid_buf ~pos:0 aid : int) ;
+        (Location.serialize ~ledger_depth (build_location tid), aid_buf)
+
       let get (mdb : t) (token_id : Token_id.t) : Account_id.t option =
         get_bin mdb (build_location token_id)
           Account_id.Stable.Latest.bin_read_t
@@ -547,19 +555,12 @@ module Make (Inputs : Inputs_intf) :
         (addresses_and_accounts : (location * Account.t) list) =
       set_bin_batch mdb Account.bin_size_t Account.bin_write_t
         addresses_and_accounts ;
-<<<<<<< HEAD
-      let token_owner_changes = [] in
-=======
       let token_owner_changes =
-        List.filter_map addresses_and_accounts ~f:(fun (_, account) ->
-            if Account.token_owner account then
-              let aid = Account.identifier account in
-              Some
-                (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
-                   (Account_id.token_id aid, aid) )
-            else None )
+        List.map addresses_and_accounts ~f:(fun (_, account) ->
+            let aid = Account.identifier account in
+            Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
+              (Account_id.derive_token_id ~owner:aid, aid) )
       in
->>>>>>> upstream/develop
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
         ~key_data_pairs:token_owner_changes
   end)

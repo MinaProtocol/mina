@@ -2747,7 +2747,7 @@ module Base = struct
              and token_id =
                make_checked (fun () ->
                    Token_id.Checked.if_ is_empty_and_writeable ~then_:token
-                     ~else_:account.token_id)
+                     ~else_:account.token_id )
              in
              { Account.Poly.balance
              ; public_key
