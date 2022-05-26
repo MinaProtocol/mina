@@ -41,12 +41,22 @@
   (pps ppx_version ppx_inline_test)))
 
 (library
+ (public_name pasta_bindings.rust)
+ (name pasta_bindings_rust)
+ (modules)
+ (foreign_archives wires_15_stubs)
+ (c_library_flags :standard "-lpthread")
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests)
+ (preprocess
+  (pps ppx_version ppx_inline_test)))
+
+(library
  (public_name pasta_bindings)
  (name pasta_bindings)
  (modules pasta_bindings)
  (libraries kimchi_types)
- (foreign_archives wires_15_stubs)
- (c_library_flags :standard "-lpthread")
  (instrumentation
   (backend bisect_ppx))
  (inline_tests)
