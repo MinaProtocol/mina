@@ -563,12 +563,12 @@ end
 module Eff = struct
   type (_, _) t =
     | Check_account_precondition :
-        'bool * 'party * 'account * 'global_state
-        -> ( 'bool
+        'party * 'account * 'local_state
+        -> ( 'local_state
            , < bool : 'bool
              ; party : 'party
              ; account : 'account
-             ; global_state : 'global_state
+             ; local_state : 'local_state
              ; .. > )
            t
     | Check_protocol_state_precondition :
@@ -1013,12 +1013,8 @@ module Make (Inputs : Inputs_intf) = struct
        verify a snapp proof.
     *)
     Account.register_verification_key a ;
-    let account_precondition_satisfied =
-      h.perform (Check_account_precondition (is_start', party, a, global_state))
-    in
     let local_state =
-      Local_state.add_check local_state Account_precondition_unsatisfied
-        account_precondition_satisfied
+      h.perform (Check_account_precondition (party, a, local_state))
     in
     let protocol_state_predicate_satisfied =
       h.perform
