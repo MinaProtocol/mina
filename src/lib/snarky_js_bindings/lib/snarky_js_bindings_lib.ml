@@ -1570,7 +1570,7 @@ module Zkapp_statement = struct
       val atParty = to_js_field at_party
     end
 
-  let of_js (statement : zkapp_statement_js) =
+  let of_js (statement : zkapp_statement_js) : t =
     { transaction = of_js_field statement##.transaction
     ; at_party = of_js_field statement##.atParty
     }
@@ -1585,6 +1585,11 @@ module Zkapp_statement = struct
         { transaction = Field.constant transaction
         ; at_party = Field.constant at_party
         }
+
+    let of_js (statement : zkapp_statement_js) : t =
+      { transaction = of_js_field statement##.transaction |> to_unchecked
+      ; at_party = of_js_field statement##.atParty |> to_unchecked
+      }
   end
 end
 
@@ -2187,6 +2192,21 @@ module Ledger = struct
         | Proof _ | None_given ->
             () )
 
+  let verify_party_proof (statement : zkapp_statement_js)
+      (proof : Js.js_string Js.t) (vk : Js.js_string Js.t) =
+    let statement = Zkapp_statement.Constant.of_js statement in
+    let proof =
+      Result.ok_or_failwith
+        (Pickles.Side_loaded.Proof.of_base64 (Js.to_string proof))
+    in
+    let vk =
+      Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
+    in
+    Pickles.Side_loaded.verify_promise
+      [ (vk, statement, proof) ]
+      ~value_to_field_elements:Zkapp_statement.Constant.to_field_elements
+    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
     |> Js.string
@@ -2325,6 +2345,8 @@ module Ledger = struct
     static_method "signFieldElement" sign_field_element ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
+    static_method "verifyPartyProof" verify_party_proof ;
+
     static_method "publicKeyToString" public_key_to_string ;
     static_method "publicKeyOfString" public_key_of_string ;
     static_method "privateKeyToString" private_key_to_string ;
