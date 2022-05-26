@@ -1,3 +1,8 @@
+(env
+ (_
+  (js_of_ocaml
+   (compilation_mode whole_program))))
+
 (executable
  (name client_sdk)
  (modes js)
@@ -46,9 +51,6 @@
   mina_metrics.none
   js_backend
   mina_transaction)
- (link_deps
-  ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.js
-  ../../lib/crypto/kimchi_bindings/js/node_js/plonk_wasm.wasm)
  (preprocessor_deps ../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
