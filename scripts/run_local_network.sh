@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# set -x
 
 # exit script when commands fail
 set -e
@@ -19,6 +20,7 @@ SNARK_WORKER_FEE=0.01
 
 TRANSACTION_FREQUENCY=5
 
+SEED_START_PORT=3000
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
@@ -29,6 +31,7 @@ NODE_START_PORT=6000
 whales=1
 fish=1
 nodes=1
+log_level="Trace"
 transactions=false
 reset=false
 
@@ -51,6 +54,11 @@ help() {
   echo "-w|--whales #"
   echo "-f|--fish #"
   echo "-n|--nodes #"
+  echo "-sp|--seed-start-port #"
+  echo "-wp|--whale-start-port #"
+  echo "-fp|--fish-start-port #"
+  echo "-np|--node-start-port #"
+  echo "-ll|--log-level <Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal>"
   echo "-t|--transactions"
   echo "-r|--reset"
   echo "-h|--help"
@@ -85,7 +93,7 @@ exec-daemon() {
     -config-file $config \
     -generate-genesis-proof true \
     -log-json \
-    -log-level Trace \
+    -log-level $log_level \
     $@
   exec $MINA daemon \
     -client-port $client_port \
@@ -96,7 +104,7 @@ exec-daemon() {
     -config-file $config \
     -generate-genesis-proof true \
     -log-json \
-    -log-level Trace \
+    -log-level $log_level \
     $@
 }
 
@@ -116,6 +124,11 @@ while [[ "$#" -gt 0 ]]; do
         -w|--whales) whales="$2"; shift ;;
         -f|--fish) fish="$2"; shift ;;
         -n|--nodes) nodes="$2"; shift ;;
+        -sp|--seed-start-port) SEED_START_PORT="$2"; shift ;;
+        -wp|--whale-start-port) WHALE_START_PORT="$2"; shift ;;
+        -fp|--fish-start-port) FISH_START_PORT="$2"; shift ;;
+        -np|--node-start-port) NODE_START_PORT="$2"; shift ;;
+        -ll|--log-level) log_level="$2"; shift ;;
         -t|--transactions) transactions=true ;;
         -r|--reset) reset=true ;;
         -h|--help) help ;;
@@ -126,7 +139,7 @@ done
 
 if $transactions; then
   if [ "$fish" -eq "0" ]; then
-    echo "sending transactions require at least one fish"
+    echo "Sending transactions require at least one fish"
     exit
   fi
 fi
@@ -136,21 +149,22 @@ echo -e "\t1 seed"
 echo -e "\t$whales whales"
 echo -e "\t$fish fish"
 echo -e "\t$nodes non block-producing nodes"
-echo -e "\tsending transactions: $transactions"
+echo -e "\tSending transactions: $transactions"
 
 # ================================================
 # Create genesis ledger
 
-ledgerfolder="/tmp/mina-local-network-$whales-$fish-$nodes"
+ledgerfolder="${HOME}/.mina-network/mina-local-network-$whales-$fish-$nodes"
 
 if $reset; then
   rm -rf "$ledgerfolder"
 fi
 
 if [ ! -d "$ledgerfolder" ]; then
-  echo "making ledger"
+  printf "\n"
+  echo "Making ledger"
   
-  mkdir $ledgerfolder
+  mkdir -p $ledgerfolder
 
   clean-dir $ledgerfolder/offline_whale_keys
   clean-dir $ledgerfolder/offline_fish_keys
@@ -159,11 +173,11 @@ if [ ! -d "$ledgerfolder" ]; then
   clean-dir $ledgerfolder/service-keys
 
   generate-keypair $ledgerfolder/snark_worker_keys/snark_worker_account
-  for i in $(seq 1 $fish); do
+  for ((i = 0; i < $fish; i++)); do
     generate-keypair $ledgerfolder/offline_fish_keys/offline_fish_account_$i
     generate-keypair $ledgerfolder/online_fish_keys/online_fish_account_$i
   done
-  for i in $(seq 1 $whales); do
+  for ((i = 0; i < $whales; i++)); do
     generate-keypair $ledgerfolder/offline_whale_keys/offline_whale_account_$i
     generate-keypair $ledgerfolder/online_whale_keys/online_whale_account_$i
   done
@@ -202,7 +216,7 @@ snark_worker_pubkey=$(cat $ledgerfolder/snark_worker_keys/snark_worker_account.p
 # Update Timestamp
 
 config=$ledgerfolder/daemon.json
-jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S.%6NZ")\"}, ledger:.}" \
+jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
   < $ledgerfolder/genesis_ledger.json \
   > $config
 
@@ -214,14 +228,15 @@ clean-dir $nodesfolder
 
 # ----------
 
-mkdir $nodesfolder/seed
+mkdir -p $nodesfolder/seed
 
-spawn-node $nodesfolder/seed 3000 -seed -discovery-keypair $SEED_PEER_KEY
+spawn-node $nodesfolder/seed ${SEED_START_PORT} -seed -discovery-keypair $SEED_PEER_KEY
 seed_pid=$!
 
-echo 'waiting for seed to go up...'
+printf "\n"
+echo 'Waiting for seed to go up...'
 
-until $MINA client status -daemon-port 3000 &> /dev/null
+until $MINA client status -daemon-port ${SEED_START_PORT} &> /dev/null
 do
   sleep 1
 done
@@ -230,66 +245,73 @@ done
 
 snark_worker_flags="-snark-worker-fee $SNARK_WORKER_FEE -run-snark-worker $snark_worker_pubkey -work-selection seq"
 
-for i in $(seq 1 $whales); do
+for ((i = 0; i < $whales; i++)); do
   folder=$nodesfolder/whale_$i
   keyfile=$ledgerfolder/online_whale_keys/online_whale_account_$i
   mkdir $folder
-  spawn-node $folder $(($WHALE_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
+  spawn-node $folder $(($WHALE_START_PORT+($i * 5))) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
   whale_pids[${i}]=$!
 done
 
 # ----------
 
-for i in $(seq 1 $fish); do
+for ((i = 0; i < $fish; i++)); do
   folder=$nodesfolder/fish_$i
   keyfile=$ledgerfolder/online_fish_keys/online_fish_account_$i
   mkdir $folder
-  spawn-node $folder $(($FISH_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
+  spawn-node $folder $(($FISH_START_PORT+($i * 5))) -peer $SEED_PEER_ID -block-producer-key $keyfile $snark_worker_flags
   fish_pids[${i}]=$!
 done
 
 # ----------
 
-for i in $(seq 1 $nodes); do
+for ((i = 0; i < $nodes; i++)); do
   folder=$nodesfolder/node_$i
   mkdir $folder
-  spawn-node $folder $(($NODE_START_PORT+($i-1)*5)) -peer $SEED_PEER_ID
+  spawn-node $folder $(($NODE_START_PORT+($i * 5))) -peer $SEED_PEER_ID
   node_pids[${i}]=$!
 done
 
 # ================================================
 
-echo "Node information:"
+printf "\n"
+echo "Network participants information:"
 
-echo -e "\tseed"
-echo -e "\t\t1"
+echo -e "\tSeed"
+echo -e "\t\tInstance #0"
 echo -e "\t\t  pid $seed_pid"
-echo -e "\t\t  status: $MINA client status -daemon-port 3000"
+echo -e "\t\t  status: $MINA client status -daemon-port ${SEED_START_PORT}"
 echo -e "\t\t  logs: cat $nodesfolder/seed/log.txt | $LOGPROC"
 
-echo -e "\twhales"
-for i in $(seq 1 $whales); do
-  echo -e "\t\t$i"
-  echo -e "\t\t  pid ${whale_pids[${i}]}"
-  echo -e "\t\t  status: $MINA client status -daemon-port $(($WHALE_START_PORT+($i-1)*5))"
-  echo -e "\t\t  logs: cat $nodesfolder/whale_$i/log.txt | $LOGPROC"
-done
+if [ "$whales" -gt "0" ]; then
+  echo -e "\tWhales"
+  for ((i = 0; i < $whales; i++)); do
+    echo -e "\t\tInstance #$i"
+    echo -e "\t\t  pid ${whale_pids[${i}]}"
+    echo -e "\t\t  status: $MINA client status -daemon-port $(($WHALE_START_PORT+($i * 5)))"
+    echo -e "\t\t  logs: cat $nodesfolder/whale_$i/log.txt | $LOGPROC"
+  done
+fi
 
-echo -e "\tfish"
-for i in $(seq 1 $fish); do
-  echo -e "\t\t$i"
-  echo -e "\t\t  pid ${fish_pids[${i}]}"
-  echo -e "\t\t  status: $MINA client status -daemon-port $(($FISH_START_PORT+($i-1)*5))"
-  echo -e "\t\t  logs: cat $nodesfolder/fish_$i/log.txt | $LOGPROC"
-done
+if [ "$fish" -gt "0" ]; then
+  echo -e "\tFish"
+  for ((i = 0; i < $fish; i++)); do
+    echo -e "\t\tInstance #$i"
+    echo -e "\t\t  pid ${fish_pids[${i}]}"
+    echo -e "\t\t  status: $MINA client status -daemon-port $(($FISH_START_PORT+($i * 5)))"
+    echo -e "\t\t  logs: cat $nodesfolder/fish_$i/log.txt | $LOGPROC"
+  done
+fi
 
-echo -e "\tnodes"
-for i in $(seq 1 $nodes); do
-  echo -e "\t\t$i"
-  echo -e "\t\t  pid ${node_pids[${i}]}"
-  echo -e "\t\t  status: $MINA client status -daemon-port $(($NODE_START_PORT+($i-1)*5))"
-  echo -e "\t\t  logs: cat $nodesfolder/node_$i/log.txt | $LOGPROC"
-done
+if [ "$nodes" -gt "0" ]; then
+  echo -e "\tNon block-producing nodes"
+  for ((i = 0; i < $nodes; i++)); do
+    echo -e "\t\tInstance #$i"
+    echo -e "\t\t  pid ${node_pids[${i}]}"
+    echo -e "\t\t  status: $MINA client status -daemon-port $(($NODE_START_PORT+($i * 5)))"
+    echo -e "\t\t  logs: cat $nodesfolder/node_$i/log.txt | $LOGPROC"
+  done
+fi
 
 # ================================================
 # Start sending transactions
@@ -300,14 +322,15 @@ if $transactions; then
   pubkey=$(cat $ledgerfolder/online_fish_keys/online_fish_account_1.pub)
   rest_server="http://127.0.0.1:5001/graphql"
 
-  echo "waiting for node to be up to start sending transactions..."
+  printf "\n"
+  echo "Waiting for node to be up to start sending transactions..."
 
   until $MINA client status -daemon-port 5000 &> /dev/null
   do
     sleep 1
   done
 
-  echo "starting to send transactions every $transaction_frequency seconds"
+  echo "Starting to send transactions every $transaction_frequency seconds"
 
   set +e
 

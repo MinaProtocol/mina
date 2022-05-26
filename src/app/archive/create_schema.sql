@@ -1,14 +1,10 @@
 /* the Postgresql schema used by the Mina archive database */
 
-/* there are a number of values represented by a Postgresql bigint here, which is a 64-bit signed value,
-   while in OCaml, the value is represented by a 64-bit unsigned value, so that overflow is
-   possible
+/* Unsigned 64-bit values in OCaml are represented by text values in the database,
+   and string values in the type `t`s in the modules below
 
-   while overflow is unlikely, because a bigint can be very large, it's possible in theory
-
-   that describes almost all the bigint values below, except for those representing
-   nonces and slots, which are unsigned 32-bit values in OCaml
-
+   Unsigned 32-bit values are represented by bigint values in the database, and
+   int64 values in the `t`s
 */
 
 /* the tables below named `blocks_xxx_commands`, where xxx is `user`, `internal`, or `zkapps`,
@@ -54,11 +50,11 @@ CREATE TABLE account_identifiers
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
 , account_identifier_id   int       NOT NULL UNIQUE REFERENCES account_identifiers(id)
-, initial_minimum_balance bigint    NOT NULL
+, initial_minimum_balance text      NOT NULL
 , cliff_time              bigint    NOT NULL
-, cliff_amount            bigint    NOT NULL
+, cliff_amount            text      NOT NULL
 , vesting_period          bigint    NOT NULL
-, vesting_increment       bigint    NOT NULL
+, vesting_increment       text      NOT NULL
 );
 
 CREATE TABLE snarked_ledger_hashes
@@ -77,8 +73,8 @@ CREATE TABLE user_commands
 , source_id      int                 NOT NULL REFERENCES account_identifiers(id)
 , receiver_id    int                 NOT NULL REFERENCES account_identifiers(id)
 , nonce          bigint              NOT NULL
-, amount         bigint
-, fee            bigint              NOT NULL
+, amount         text
+, fee            text                NOT NULL
 , valid_until    bigint
 , memo           text                NOT NULL
 , hash           text                NOT NULL UNIQUE
@@ -90,7 +86,7 @@ CREATE TABLE internal_commands
 ( id          serial                PRIMARY KEY
 , typ         internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES account_identifiers(id)
-, fee         bigint                NOT NULL
+, fee         text                  NOT NULL
 , hash        text                  NOT NULL
 , UNIQUE (hash,typ)
 );
@@ -127,7 +123,7 @@ CREATE TABLE epoch_data
 ( id               serial PRIMARY KEY
 , seed             text   NOT NULL
 , ledger_hash_id   int    NOT NULL REFERENCES snarked_ledger_hashes(id)
-, total_currency   bigint NOT NULL
+, total_currency   text   NOT NULL
 , start_checkpoint text   NOT NULL
 , lock_checkpoint  text   NOT NULL
 , epoch_length     bigint NOT NULL
@@ -146,12 +142,12 @@ CREATE TABLE blocks
 , staking_epoch_data_id        int    NOT NULL        REFERENCES epoch_data(id)
 , next_epoch_data_id           int    NOT NULL        REFERENCES epoch_data(id)
 , min_window_density           bigint NOT NULL
-, total_currency               bigint NOT NULL
+, total_currency               text   NOT NULL
 , ledger_hash                  text   NOT NULL
 , height                       bigint NOT NULL
 , global_slot_since_hard_fork  bigint NOT NULL
 , global_slot_since_genesis    bigint NOT NULL
-, timestamp                    bigint NOT NULL
+, timestamp                    text   NOT NULL
 , chain_status                 chain_status_type NOT NULL
 );
 
@@ -168,7 +164,7 @@ CREATE TABLE accounts_accessed
 , block_id                int     NOT NULL  REFERENCES blocks(id)
 , account_identifier_id   int     NOT NULL  REFERENCES account_identifiers(id)
 , token_symbol_id         int     NOT NULL  REFERENCES token_symbols(id)
-, balance                 bigint  NOT NULL
+, balance                 text    NOT NULL
 , nonce                   bigint  NOT NULL
 , receipt_chain_hash      text    NOT NULL
 , delegate_id             int               REFERENCES public_keys(id)
@@ -186,7 +182,7 @@ CREATE INDEX idx_accounts_accessed_block_account_identifier_id ON accounts_acces
 CREATE TABLE accounts_created
 ( block_id                int     NOT NULL  REFERENCES blocks(id)
 , account_identifier_id   int     NOT NULL  REFERENCES account_identifiers(id)
-, creation_fee            bigint  NOT NULL
+, creation_fee            text    NOT NULL
 , PRIMARY KEY (block_id,account_identifier_id)
 );
 
