@@ -562,8 +562,9 @@ let%test_module "Account precondition tests" =
           Transaction_snark.For_tests.trivial_zkapp_account ~vk snapp_pk
         in
         let%map account_precondition =
-          Mina_generators.Parties_generators
-          .gen_account_precondition_from_account ~succeed:false snapp_account
+          Mina_generators.Parties_generators.(
+            gen_account_precondition_from_account
+              ~failure:Invalid_account_precondition snapp_account)
         in
         (l, account_precondition)
       in
