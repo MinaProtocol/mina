@@ -330,10 +330,11 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
-                    ; account_precondition =
-                        Nonce (Account.Nonce.succ sender_nonce)
+                    ; preconditions =
+                        { Party.Preconditions.network =
+                            Zkapp_precondition.Protocol_state.accept
+                        ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        }
                     ; use_full_commitment = false
                     ; caller = Call
                     }
@@ -352,10 +353,11 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
-                    ; account_precondition =
-                        Full Zkapp_precondition.Account.accept
+                    ; preconditions =
+                        { Party.Preconditions.network =
+                            Zkapp_precondition.Protocol_state.accept
+                        ; account = Full Zkapp_precondition.Account.accept
+                        }
                     ; use_full_commitment = false
                     ; caller = Call
                     }

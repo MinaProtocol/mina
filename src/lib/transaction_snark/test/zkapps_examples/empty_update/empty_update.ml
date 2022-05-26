@@ -63,7 +63,10 @@ let deploy_party_body : Party.Body.t =
                 Zkapp_account.digest_vk vk
             }
       }
-  ; account_precondition = Accept
+  ; preconditions =
+      { Party.Preconditions.network = Zkapp_precondition.Protocol_state.accept
+      ; account = Accept
+      }
   ; caller = Token_id.default
   ; use_full_commitment = true
   }
