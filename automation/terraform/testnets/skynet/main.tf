@@ -63,7 +63,7 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "skynet"
-  mina_image = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta5-feature-gossip-qa-ledger-8e15537-buster-devnet"
+  mina_image = "minaprotocol/mina-daemon:latest"
   mina_archive_image = "minaprotocol/mina-archive:1.2.0beta5-feature-gossip-qa-ledger-8e15537-buster-devnet"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"

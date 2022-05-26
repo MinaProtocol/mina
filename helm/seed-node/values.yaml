@@ -1,11 +1,10 @@
 testnetName: "testnet"
 mina:
-  runtimeConfig:
   generateGenesisProof: true
   logPrecomputedBlocks: true
   logTxnPoolGossip: false
   maxConnections: 200
-  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  image: minaprotocol/mina-daemon:latest
   useCustomEntrypoint: false
   customEntrypoint: ""
   seedPeers:
@@ -17,6 +16,9 @@ mina:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+
+coda:
+  image: minaprotocol/mina-daemon:latest
 
 seed:
   active: true

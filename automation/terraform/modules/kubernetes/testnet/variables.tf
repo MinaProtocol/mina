@@ -43,7 +43,7 @@ variable "deploy_watchdog" {
 
 variable "mina_image" {
   type    = string
-  default = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-0975867-mainnet-6a9354a"
+  default = "minaprotocol/mina-daemon:latest"
 }
 
 variable "use_custom_entrypoint" {

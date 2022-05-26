@@ -46,12 +46,10 @@ variable "artifact_path" {
 
 variable "mina_image" {
   type    = string
-  default = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-0975867-mainnet-6a9354a"
 }
 
 variable "mina_archive_image" {
   type    = string
-  default = "gcr.io/o1labs-192920/coda-archive:1.1.2-0975867"
 }
 
 variable "mina_archive_schema" {
@@ -61,7 +59,6 @@ variable "mina_archive_schema" {
 
 variable "mina_agent_image" {
   type    = string
-  default = "codaprotocol/coda-user-agent:0.1.4"
 }
 
 variable "mina_agent_active" {
@@ -86,7 +83,6 @@ variable "use_embedded_runtime_config" {
 
 variable "watchdog_image" {
   type    = string
-  default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
 # this must be a string to avoid scientific notation truncation
