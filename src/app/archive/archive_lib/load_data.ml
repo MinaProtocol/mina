@@ -597,8 +597,10 @@ let get_other_party_body ~pool body_id =
       ; sequence_events
       ; call_data
       ; call_depth
-      ; protocol_state_precondition
-      ; account_precondition
+      ; preconditions =
+          { Party.Preconditions.network = protocol_state_precondition
+          ; account = account_precondition
+          }
       ; use_full_commitment
       ; caller
       }
