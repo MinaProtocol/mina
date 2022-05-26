@@ -34,7 +34,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
+    let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
     let%bind _ =
