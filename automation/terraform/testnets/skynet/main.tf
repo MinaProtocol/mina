@@ -63,8 +63,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "skynet"
-  mina_image = "minaprotocol/mina-daemon:latest"
-  mina_archive_image = "minaprotocol/mina-archive:1.2.0beta5-feature-gossip-qa-ledger-8e15537-buster-devnet"
+  mina_image = "minaprotocol/mina-daemon:1.3.1beta1-compatible-8a582fd-focal-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.1beta1-compatible-8a582fd-focal-devnet"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -101,7 +101,7 @@ module "skynet" {
   mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.5"
-  use_embedded_runtime_config = true
+  use_embedded_runtime_config = false
 
   archive_node_count  = 2
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql"
@@ -154,7 +154,7 @@ module "skynet" {
   ]
 
   seed_count            = var.seed_count
-  plain_node_count      = var.seed_count
+  plain_node_count      = var.plain_node_count
 
   upload_blocks_to_gcloud         = false
   restart_nodes                   = false
