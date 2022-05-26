@@ -1136,6 +1136,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               ~f:Party.Update.Timing_info.to_account_timing timing
         }
 
+      let is_timed (a : t) =
+        match a.timing with Account_timing.Untimed -> false | _ -> true
+
       let set_token_id (a : t) (id : Token_id.t) : t = { a with token_id = id }
 
       let balance (a : t) : Balance.t = a.balance
