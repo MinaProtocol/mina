@@ -53,11 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Node.id node_c) ;
          let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
          wait_for t
-           ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
-           |> Wait_condition.with_timeouts
-                ~hard_timeout:
-                  (Network_time_span.Literal
-                     (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
+           (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
     in
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
