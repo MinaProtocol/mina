@@ -67,7 +67,7 @@ module Transition_frontier = struct
           | None ->
               Some 1
           | Some count ->
-              Some (count + 1)))
+              Some (count + 1) ) )
 
   (*Create tf with some statements referenced to be able to add snark work for those statements to the pool*)
   let create _stmts : t =

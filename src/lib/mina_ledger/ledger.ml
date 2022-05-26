@@ -292,7 +292,7 @@ module Ledger_inner = struct
         (sprintf
            !"Could not create a new account with pk \
              %{sexp:Public_key.Compressed.t}: Account already exists"
-           (Account_id.public_key account_id))
+           (Account_id.public_key account_id) )
 
   let create_new_account t account_id account =
     Or_error.try_with (fun () -> create_new_account_exn t account_id account)
@@ -310,7 +310,7 @@ module Ledger_inner = struct
       Result.of_option (get ledger loc)
         ~error:
           (Error.of_string
-             "get_or_create: Account was not found in the ledger after creation")
+             "get_or_create: Account was not found in the ledger after creation" )
     in
     (action, account, loc)
 
@@ -323,7 +323,7 @@ module Ledger_inner = struct
         failwith "create_empty for a key already present"
     | `Added, new_loc ->
         Debug_assert.debug_assert (fun () ->
-            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger)) ;
+            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
         (merkle_path ledger new_loc, Account.empty)
 
   let _handler t =
@@ -333,7 +333,7 @@ module Ledger_inner = struct
         | `Left h ->
             h
         | `Right h ->
-            h)
+            h )
     in
     stage (fun (With { request; respond }) ->
         match request with
@@ -351,7 +351,7 @@ module Ledger_inner = struct
             let index = index_of_account_exn t pk in
             respond (Provide index)
         | _ ->
-            unhandled)
+            unhandled )
 end
 
 include Ledger_inner
@@ -359,7 +359,35 @@ include Mina_transaction_logic.Make (Ledger_inner)
 
 let apply_transaction ~constraint_constants ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
-      apply_transaction ~constraint_constants ~txn_state_view l t)
+      apply_transaction ~constraint_constants ~txn_state_view l t )
+
+(* use mask to restore ledger after application *)
+let merkle_root_after_parties_exn ~constraint_constants ~txn_state_view ledger
+    parties =
+  let mask = Mask.create ~depth:(depth ledger) () in
+  let masked_ledger = register_mask ledger mask in
+  let _applied =
+    Or_error.ok_exn
+      (apply_parties_unchecked ~constraint_constants ~state_view:txn_state_view
+         masked_ledger parties )
+  in
+  let root = merkle_root masked_ledger in
+  ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
+  root
+
+(* use mask to restore ledger after application *)
+let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
+    ledger cmd =
+  let mask = Mask.create ~depth:(depth ledger) () in
+  let masked_ledger = register_mask ledger mask in
+  let _applied =
+    Or_error.ok_exn
+      (apply_user_command ~constraint_constants ~txn_global_slot masked_ledger
+         cmd )
+  in
+  let root = merkle_root masked_ledger in
+  ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
+  root
 
 type init_state =
   ( Signature_lib.Keypair.t
@@ -410,7 +438,7 @@ let apply_initial_ledger_state : t -> init_state -> unit =
         ; timing
         }
       in
-      create_new_account_exn t account_id account')
+      create_new_account_exn t account_id account' )
 
 let%test_unit "tokens test" =
   let open Mina_transaction_logic.For_tests in
@@ -456,7 +484,7 @@ let%test_unit "tokens test" =
         other_parties
         |> Parties.Call_forest.map
              ~f:(fun (p : Party.Body.Wire.t) : Party.Wire.t ->
-               { body = p; authorization = Signature Signature.dummy })
+               { body = p; authorization = Signature Signature.dummy } )
         |> Parties.Call_forest.add_callers'
         |> Parties.Call_forest.accumulate_hashes_predicated
     }
@@ -511,7 +539,7 @@ let%test_unit "tokens test" =
       forest
         [ node
             (party Call token_funder Token_id.default
-               (-(4 * account_creation_fee)))
+               (-(4 * account_creation_fee)) )
             []
         ; node
             (party Call token_owner Token_id.default (3 * account_creation_fee))
@@ -523,7 +551,7 @@ let%test_unit "tokens test" =
         ~owner:
           (Account_id.create
              (Public_key.compress token_owner.public_key)
-             Token_id.default)
+             Token_id.default )
     in
     let token_minting =
       forest
@@ -562,7 +590,7 @@ let%test_unit "tokens test" =
         (module Ledger_inner)
         [| keypairs.(0); keypairs.(1) |]
         ledger ;
-      main ledger)
+      main ledger )
 
 let%test_unit "parties payment test" =
   let open Mina_transaction_logic.For_tests in
@@ -579,7 +607,7 @@ let%test_unit "parties payment test" =
             let use_full_commitment =
               Quickcheck.random_value Bool.quickcheck_generator
             in
-            party_send ~constraint_constants ~use_full_commitment s)
+            party_send ~constraint_constants ~use_full_commitment s )
       in
       L.with_ledger ~depth ~f:(fun l1 ->
           L.with_ledger ~depth ~f:(fun l2 ->
@@ -589,12 +617,12 @@ let%test_unit "parties payment test" =
               let%bind () =
                 iter_err ts1 ~f:(fun t ->
                     apply_user_command_unchecked l1 t ~constraint_constants
-                      ~txn_global_slot)
+                      ~txn_global_slot )
               in
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
                     apply_parties_unchecked l2 t ~constraint_constants
-                      ~state_view:view)
+                      ~state_view:view )
               in
               let accounts = List.concat_map ~f:Parties.accounts_accessed ts2 in
               (* TODO: Hack. The nonces are inconsistent between the 2
@@ -608,6 +636,6 @@ let%test_unit "parties payment test" =
                         account.nonce |> Mina_numbers.Account_nonce.to_uint32
                         |> Unsigned.UInt32.(mul (of_int 2))
                         |> Mina_numbers.Account_nonce.to_uint32
-                    }) ;
-              test_eq (module L) accounts l1 l2))
-      |> Or_error.ok_exn)
+                    } ) ;
+              test_eq (module L) accounts l1 l2 ) )
+      |> Or_error.ok_exn )

@@ -35,7 +35,7 @@ let%test_module "test functor on in memory databases" =
         Test.with_instance (fun mdb ->
             Quickcheck.test
               (MT.For_tests.gen_account_location ~ledger_depth:(MT.depth mdb))
-              ~f:(fun location -> assert (Option.is_none (MT.get mdb location))))
+              ~f:(fun location -> assert (Option.is_none (MT.get mdb location))) )
 
       let create_new_account_exn mdb account =
         let public_key = Account.identifier account in
@@ -52,7 +52,7 @@ let%test_module "test functor on in memory databases" =
         Test.with_instance (fun mdb ->
             let account = Quickcheck.random_value Account.gen in
             let location = create_new_account_exn mdb account in
-            Account.equal (Option.value_exn (MT.get mdb location)) account)
+            Account.equal (Option.value_exn (MT.get mdb location)) account )
 
       let%test "accounts are atomic" =
         Test.with_instance (fun mdb ->
@@ -69,13 +69,13 @@ let%test_module "test functor on in memory databases" =
             | Some acct, Some acct' ->
                 Account.equal acct acct'
             | _, _ ->
-                false)
+                false )
 
       let dedup_accounts accounts =
         List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
             Account_id.compare
               (Account.identifier account1)
-              (Account.identifier account2))
+              (Account.identifier account2) )
 
       let%test_unit "length" =
         Test.with_instance (fun mdb ->
@@ -95,9 +95,9 @@ let%test_module "test functor on in memory databases" =
             in
             let num_initial_accounts = List.length accounts in
             List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account) ;
+                ignore @@ create_new_account_exn mdb account ) ;
             let result = MT.num_accounts mdb in
-            [%test_eq: int] result num_initial_accounts)
+            [%test_eq: int] result num_initial_accounts )
 
       let%test "get_or_create_acount does not update an account if key already \
                 exists" =
@@ -123,7 +123,7 @@ let%test_module "test functor on in memory databases" =
             && not
                  (Mina_base.Account.equal
                     (Option.value_exn (MT.get mdb location))
-                    account'))
+                    account' ) )
 
       let%test_unit "get_or_create_account t account = location_of_account \
                      account.key" =
@@ -145,7 +145,7 @@ let%test_module "test functor on in memory databases" =
                    let location' =
                      MT.location_of_account mdb account_id |> Option.value_exn
                    in
-                   assert ([%equal: Test.Location.t] location location')))
+                   assert ([%equal: Test.Location.t] location location') ) )
 
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =
@@ -160,7 +160,7 @@ let%test_module "test functor on in memory databases" =
                 let address = MT.Addr.of_directions direction in
                 MT.set_inner_hash_at_addr_exn mdb address random_hash ;
                 let result = MT.get_inner_hash_at_addr_exn mdb address in
-                assert (Hash.equal result random_hash)))
+                assert (Hash.equal result random_hash) ) )
 
       let random_accounts max_height =
         let num_accounts = 1 lsl max_height in
@@ -180,7 +180,7 @@ let%test_module "test functor on in memory databases" =
                | `Added ->
                    ()
                | `Existed ->
-                   MT.set mdb location account)
+                   MT.set mdb location account )
 
       let%test_unit "If the entire database is full, let \
                      addresses_and_accounts = \
@@ -204,7 +204,7 @@ let%test_module "test functor on in memory databases" =
                 in
                 MT.set_batch_accounts mdb addresses_and_accounts ;
                 let new_merkle_root = MT.merkle_root mdb in
-                assert (Hash.equal old_merkle_root new_merkle_root)))
+                assert (Hash.equal old_merkle_root new_merkle_root) ) )
 
       let%test_unit "set_batch_accounts would change the merkle root" =
         Test.with_instance (fun mdb ->
@@ -223,15 +223,15 @@ let%test_module "test functor on in memory databases" =
                 let accounts =
                   Quickcheck.random_value
                     (Quickcheck.Generator.list_with_length num_accounts
-                       Account.gen)
+                       Account.gen )
                 in
                 if not @@ List.is_empty accounts then
                   let addresses =
                     List.rev
                     @@ MT.Addr.Range.fold
                          (MT.Addr.Range.subtree_range ~ledger_depth:depth
-                            address) ~init:[] ~f:(fun address addresses ->
-                           address :: addresses)
+                            address ) ~init:[] ~f:(fun address addresses ->
+                           address :: addresses )
                   in
                   let new_addresses_and_accounts =
                     List.zip_exn addresses accounts
@@ -246,13 +246,13 @@ let%test_module "test functor on in memory databases" =
                     @@ List.equal
                          (fun (addr1, account1) (addr2, account2) ->
                            MT.Addr.equal addr1 addr2
-                           && Account.equal account1 account2)
+                           && Account.equal account1 account2 )
                          old_addresses_and_accounts new_addresses_and_accounts
                   then (
                     let old_merkle_root = MT.merkle_root mdb in
                     MT.set_batch_accounts mdb new_addresses_and_accounts ;
                     let new_merkle_root = MT.merkle_root mdb in
-                    assert (not @@ Hash.equal old_merkle_root new_merkle_root) )))
+                    assert (not @@ Hash.equal old_merkle_root new_merkle_root) ) ) )
 
       let%test_unit "We can retrieve accounts by their by key after using \
                      set_batch_accounts" =
@@ -270,7 +270,7 @@ let%test_module "test functor on in memory databases" =
                   let location =
                     Test.Location.next prev_location |> Option.value_exn
                   in
-                  (location, (location |> Test.Location.to_path_exn, account)))
+                  (location, (location |> Test.Location.to_path_exn, account)) )
             in
             MT.set_batch_accounts mdb accounts_with_addresses ;
             List.iter accounts ~f:(fun account ->
@@ -279,7 +279,7 @@ let%test_module "test functor on in memory databases" =
                   MT.location_of_account mdb aid |> Option.value_exn
                 in
                 let queried_account = MT.get mdb location |> Option.value_exn in
-                assert (Account.equal queried_account account)) ;
+                assert (Account.equal queried_account account) ) ;
             let to_int =
               Fn.compose MT.Location.Addr.to_int MT.Location.to_path_exn
             in
@@ -294,7 +294,7 @@ let%test_module "test functor on in memory databases" =
               actual_last_location
               ~message:
                 (sprintf "(expected_location: %i) (actual_location: %i)"
-                   expected_last_location actual_last_location))
+                   expected_last_location actual_last_location ) )
 
       let%test_unit "If the entire database is full, \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
@@ -316,14 +316,14 @@ let%test_module "test functor on in memory databases" =
                 let accounts =
                   Quickcheck.random_value
                     (Quickcheck.Generator.list_with_length num_accounts
-                       Account.gen)
+                       Account.gen )
                 in
                 MT.set_all_accounts_rooted_at_exn mdb address accounts ;
                 let result =
                   List.map ~f:snd
                   @@ MT.get_all_accounts_rooted_at_exn mdb address
                 in
-                assert (List.equal Account.equal accounts result)))
+                assert (List.equal Account.equal accounts result) ) )
 
       let%test_unit "create_empty doesn't modify the hash" =
         Test.with_instance (fun ledger ->
@@ -337,7 +337,7 @@ let%test_module "test functor on in memory databases" =
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
             | `Added, _ ->
-                [%test_eq: Hash.t] start_hash (merkle_root ledger))
+                [%test_eq: Hash.t] start_hash (merkle_root ledger) )
 
       let%test "get_at_index_exn t (index_of_account_exn t public_key) = \
                 account" =
@@ -345,14 +345,14 @@ let%test_module "test functor on in memory databases" =
             let max_height = Int.min (MT.depth mdb) 5 in
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account) ;
+                ignore @@ create_new_account_exn mdb account ) ;
             Sequence.of_list accounts
             |> Sequence.for_all ~f:(fun account ->
                    let indexed_account =
                      MT.index_of_account_exn mdb (Account.identifier account)
                      |> MT.get_at_index_exn mdb
                    in
-                   Account.equal account indexed_account))
+                   Account.equal account indexed_account ) )
 
       let test_subtree_range mdb ~f max_height =
         populate_db mdb max_height ;
@@ -366,7 +366,7 @@ let%test_module "test functor on in memory databases" =
                 let account = Quickcheck.random_value Account.gen in
                 MT.set_at_index_exn mdb index account ;
                 let result = MT.get_at_index_exn mdb index in
-                assert (Account.equal account result)))
+                assert (Account.equal account result) ) )
 
       let%test_unit "implied_root(account) = root_hash" =
         Test.with_instance (fun mdb ->
@@ -383,7 +383,7 @@ let%test_module "test functor on in memory databases" =
                 let path = MT.merkle_path_at_addr_exn mdb address in
                 let leaf_hash = MT.get_inner_hash_at_addr_exn mdb address in
                 let root_hash = MT.merkle_root mdb in
-                assert (MT.Path.check_path path leaf_hash root_hash)))
+                assert (MT.Path.check_path path leaf_hash root_hash) ) )
 
       let%test_unit "implied_root(index) = root_hash" =
         Test.with_instance (fun mdb ->
@@ -396,15 +396,15 @@ let%test_module "test functor on in memory databases" =
                     (MT.Addr.of_int_exn ~ledger_depth:depth index)
                 in
                 let root_hash = MT.merkle_root mdb in
-                assert (MT.Path.check_path path leaf_hash root_hash)))
+                assert (MT.Path.check_path path leaf_hash root_hash) ) )
 
       let%test_unit "iter" =
         Test.with_instance (fun mdb ->
             let max_height = Int.min (MT.depth mdb) 5 in
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
-                ignore (create_new_account_exn mdb account : Test.Location.t)) ;
-            [%test_result: Account.t list] accounts ~expect:(MT.to_list mdb))
+                ignore (create_new_account_exn mdb account : Test.Location.t) ) ;
+            [%test_result: Account.t list] accounts ~expect:(MT.to_list mdb) )
 
       let%test_unit "Add 2^d accounts (for testing, d is small)" =
         if Test.depth <= 8 then
@@ -414,19 +414,19 @@ let%test_module "test functor on in memory databases" =
               let balances =
                 Quickcheck.random_value
                   (Quickcheck.Generator.list_with_length num_accounts
-                     Balance.gen)
+                     Balance.gen )
               in
               let accounts =
                 List.map2_exn account_ids balances ~f:Account.create
               in
               List.iter accounts ~f:(fun account ->
-                  ignore @@ create_new_account_exn mdb account) ;
+                  ignore @@ create_new_account_exn mdb account ) ;
               let retrieved_accounts =
                 List.map ~f:snd
                 @@ MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
               assert (List.length accounts = List.length retrieved_accounts) ;
-              assert (List.equal Account.equal accounts retrieved_accounts))
+              assert (List.equal Account.equal accounts retrieved_accounts) )
 
       let%test_unit "removing accounts restores Merkle root" =
         Test.with_instance (fun mdb ->
@@ -441,14 +441,14 @@ let%test_module "test functor on in memory databases" =
             in
             let merkle_root0 = MT.merkle_root mdb in
             List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account) ;
+                ignore @@ create_new_account_exn mdb account ) ;
             let merkle_root1 = MT.merkle_root mdb in
             (* adding accounts should change the Merkle root *)
             assert (not (Hash.equal merkle_root0 merkle_root1)) ;
             MT.remove_accounts_exn mdb account_ids ;
             (* should see original Merkle root after removing the accounts *)
             let merkle_root2 = MT.merkle_root mdb in
-            assert (Hash.equal merkle_root2 merkle_root0))
+            assert (Hash.equal merkle_root2 merkle_root0) )
 
       let%test_unit "fold over account balances" =
         Test.with_instance (fun mdb ->
@@ -460,18 +460,18 @@ let%test_module "test functor on in memory databases" =
             in
             let total =
               List.fold balances ~init:0 ~f:(fun accum balance ->
-                  Balance.to_int balance + accum)
+                  Balance.to_int balance + accum )
             in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
             List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account) ;
+                ignore @@ create_new_account_exn mdb account ) ;
             let retrieved_total =
               MT.foldi mdb ~init:0 ~f:(fun _addr total account ->
-                  Balance.to_int (Account.balance account) + total)
+                  Balance.to_int (Account.balance account) + total )
             in
-            assert (Int.equal retrieved_total total))
+            assert (Int.equal retrieved_total total) )
 
       let%test_unit "fold_until over account balances" =
         Test.with_instance (fun mdb ->
@@ -487,13 +487,13 @@ let%test_module "test functor on in memory databases" =
             let some_balances = List.take balances some_num in
             let total =
               List.fold some_balances ~init:0 ~f:(fun accum balance ->
-                  Balance.to_int balance + accum)
+                  Balance.to_int balance + accum )
             in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
             List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account) ;
+                ignore @@ create_new_account_exn mdb account ) ;
             (* stop folding on last_account_id, sum of balances in accounts should be same as some_balances *)
             let retrieved_total =
               MT.fold_until mdb ~init:0
@@ -503,10 +503,10 @@ let%test_module "test functor on in memory databases" =
                   let new_total = Balance.to_int current_balance + total in
                   if Account_id.equal current_account_id last_account_id then
                     Stop new_total
-                  else Continue new_total)
+                  else Continue new_total )
                 ~finish:(fun total -> total)
             in
-            assert (Int.equal retrieved_total total))
+            assert (Int.equal retrieved_total total) )
     end
 
     module Make_db (Depth : sig

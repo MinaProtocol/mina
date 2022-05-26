@@ -300,7 +300,7 @@ module Make
 
     let%snarkydef verifier (type s) ~equal ~final_check
         ((module Shifted) as shifted :
-          (module Curve.Checked.Shifted.S with type t = s))
+          (module Curve.Checked.Shifted.S with type t = s) )
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
         =
       let%bind e = Message.hash_checked m ~public_key ~r in
@@ -335,7 +335,7 @@ end
 
 (* nonconsensus version of the functor; yes, there's some repeated code,
    but seems difficult to abstract over the functors and signatures
- *)
+*)
 
 module type S = sig
   open Snark_params.Tick
@@ -563,7 +563,7 @@ module Message = struct
           let open Random_oracle.Legacy.Checked in
           hash ~init:Hash_prefix_states.signature_legacy (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
-          |> Bitstring_lib.Bitstring.Lsb_first.of_list)
+          |> Bitstring_lib.Bitstring.Lsb_first.of_list )
 
     [%%endif]
   end
@@ -631,7 +631,7 @@ module Message = struct
           let open Random_oracle.Checked in
           hash ~init:Hash_prefix_states.signature (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
-          |> Bitstring_lib.Bitstring.Lsb_first.of_list)
+          |> Bitstring_lib.Bitstring.Lsb_first.of_list )
 
     [%%endif]
   end
@@ -681,8 +681,7 @@ let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
       ; value_of_fields = (fun (_, t) -> t)
       ; size_in_field_elements = 0
       ; constraint_system_auxiliary =
-          (fun () ->
-            failwith "Cannot create constant in constraint-system mode")
+          (fun () -> failwith "Cannot create constant in constraint-system mode")
       }
   in
   let to_hlist { Random_oracle.Input.Chunked.field_elements; packeds } =
@@ -713,9 +712,9 @@ let%test_unit "schnorr checked + unchecked" =
            let%bind (module Shifted) =
              Tick.Inner_curve.Checked.Shifted.create ()
            in
-           Legacy.Checked.verifies (module Shifted) s public_key msg)
-         (fun _ -> true))
-        (pubkey, msg, s))
+           Legacy.Checked.verifies (module Shifted) s public_key msg )
+         (fun _ -> true) )
+        (pubkey, msg, s) )
 
 let%test_unit "schnorr checked + unchecked" =
   Quickcheck.test ~trials:5 gen_chunked ~f:(fun (pk, msg) ->
@@ -732,8 +731,8 @@ let%test_unit "schnorr checked + unchecked" =
            let%bind (module Shifted) =
              Tick.Inner_curve.Checked.Shifted.create ()
            in
-           Chunked.Checked.verifies (module Shifted) s public_key msg)
-         (fun _ -> true))
-        (pubkey, msg, s))
+           Chunked.Checked.verifies (module Shifted) s public_key msg )
+         (fun _ -> true) )
+        (pubkey, msg, s) )
 
 [%%endif]

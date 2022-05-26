@@ -4,7 +4,7 @@ open Frontier_base
 
 (* WARNING: don't use this code until @nholland has landed a PR that
    synchronize the read/write of transition frontier
- *)
+*)
 
 module T = struct
   (* a pair of hash tables
@@ -42,7 +42,7 @@ module T = struct
     List.iter breadcrumbs ~f:(fun bc ->
         let ledger = Staged_ledger.ledger @@ Breadcrumb.staged_ledger bc in
         let ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
-        add_entry t ~ledger_hash ~ledger) ;
+        add_entry t ~ledger_hash ~ledger ) ;
     (t, ())
 
   let lookup t ledger_hash = Ledger_hash.Table.find t.ledgers ledger_hash
@@ -66,8 +66,8 @@ module T = struct
                   in
                   let blockchain_state =
                     Protocol_state.blockchain_state
-                    @@ Mina_transition.External_transition.protocol_state
-                         external_transition
+                    @@ Mina_block.(
+                         Header.protocol_state @@ header external_transition)
                   in
                   let staged_ledger =
                     Blockchain_state.staged_ledger_hash blockchain_state
@@ -75,9 +75,9 @@ module T = struct
                   let ledger_hash =
                     Staged_ledger_hash.ledger_hash staged_ledger
                   in
-                  remove_entry t ~ledger_hash) )
+                  remove_entry t ~ledger_hash ) )
       | E (Best_tip_changed _, _) ->
-          ()) ;
+          () ) ;
     None
 end
 

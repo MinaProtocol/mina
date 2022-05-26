@@ -38,7 +38,7 @@ let hashes =
        Blockchain_snark.Blockchain_snark_state.constraint_system_digests
          ~proof_level ~constraint_constants ()
      in
-     ts @ bs)
+     ts @ bs )
 
 let hashes_to_expr ~loc hashes =
   let open Ppxlib.Ast_builder.Default in
@@ -46,7 +46,7 @@ let hashes_to_expr ~loc hashes =
   @@ List.map hashes ~f:(fun (x, y) ->
          [%expr
            [%e estring ~loc x]
-           , Core.Md5.of_hex_exn [%e estring ~loc (Core.Md5.to_hex y)]])
+           , Core.Md5.of_hex_exn [%e estring ~loc (Core.Md5.to_hex y)]] )
 
 let vk_id_to_expr ~loc vk_id =
   let open Ppxlib.Ast_builder.Default in
@@ -57,8 +57,8 @@ let vk_id_to_expr ~loc vk_id =
            [%e
              estring ~loc
                (Core.Sexp.to_string
-                  (Pickles.Verification_key.Id.sexp_of_t vk_id))]
-           Pickles.Verification_key.Id.t_of_sexp)
+                  (Pickles.Verification_key.Id.sexp_of_t vk_id) )]
+           Pickles.Verification_key.Id.t_of_sexp )
     in
     fun () -> Lazy.force t]
 
@@ -103,7 +103,7 @@ module Dummy = struct
            ; protocol_state_with_hashes
            ; constraint_system_digests = hashes
            ; proof_data = None
-           })
+           } )
     else None
 end
 
@@ -137,7 +137,7 @@ module Make_real () = struct
              ; blockchain_proof_system_id = None
              }
          in
-         values)
+         values )
     else None
 end
 
@@ -185,7 +185,7 @@ let main () =
            ; constraint_system_digests =
                lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
            ; proof_data = None
-           })
+           } )
 
       let compiled_inputs =
         lazy
@@ -228,7 +228,7 @@ let main () =
                      [%expr Some [%e vk_id_to_expr ~loc id]]
                  | _ ->
                      [%expr None]]
-           })
+           } )
 
       let compiled =
         [%e
@@ -267,11 +267,11 @@ let main () =
                                              (Binable.to_string
                                                 ( module Mina_base.Proof.Stable
                                                          .Latest )
-                                                proof_data.genesis_proof)]
+                                                proof_data.genesis_proof )]
                                    }]
                            | None ->
                                [%expr None]]
-                     }) )]
+                     } ) )]
           | None ->
               [%expr None]]]
   in

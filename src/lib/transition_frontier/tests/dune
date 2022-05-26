@@ -10,6 +10,7 @@
    ppx_inline_test.config
    async_unix
    core_kernel.uuid
+   sexplib0
    ;;local libraries
    mina_state
    staged_ledger
@@ -18,7 +19,7 @@
    child_processes
    genesis_constants
    logger
-   mina_transition
+   mina_block
    signature_lib
    transition_frontier_persistent_root
    inline_test_quiet_logs
@@ -33,6 +34,7 @@
    full_frontier
    frontier_base
    transition_frontier
+   protocol_version
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

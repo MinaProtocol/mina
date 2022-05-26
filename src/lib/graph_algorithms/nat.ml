@@ -40,7 +40,7 @@ let rec min (xs : t list) : tt =
     with_return (fun { return } ->
         `S
           (List.map xs ~f:(fun x ->
-               match Lazy.force x with Z -> return `Z | S n -> n)))
+               match Lazy.force x with Z -> return `Z | S n -> n ) ) )
   with
   | `Z ->
       Z

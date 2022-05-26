@@ -391,17 +391,21 @@ AS combo GROUP BY combo.pk_id
           Option.map result ~f:(fun (_pk,slot,balance,nonce) -> (slot,balance,Option.map ~f:Int64.((+) one) nonce)))
   end
 
+  (* TODO: either address will have to include a token id, or we pass the
+     token id separately, make it optional and use the default token if omitted
+  *)
   let run (module Conn : Caqti_async.CONNECTION) block_query address =
     let open Deferred.Result.Let_syntax in
     let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn address in
-    match%bind Archive_lib.Processor.Public_key.find_opt (module Conn) pk |>
-                     Errors.Lift.sql ~context:"Finding public key" with
+    let account_id = Mina_base.Account_id.create pk Mina_base.Token_id.default in
+    match%bind Archive_lib.Processor.Account_identifiers.find_opt (module Conn) account_id |>
+                     Errors.Lift.sql ~context:"Finding account identifier" with
     | None -> Deferred.Result.fail (Errors.create @@ `Account_not_found address)
-    | Some _ ->
+    | Some account_identifier_id ->
       let%bind timing_info_opt =
-        Archive_lib.Processor.Timing_info.find_by_pk_opt
+        Archive_lib.Processor.Timing_info.find_by_account_identifier_id_opt
           (module Conn)
-          pk
+          account_identifier_id
         |> Errors.Lift.sql ~context:"Finding timing info"
       in
       (* First find the block referenced by the block identifier. Then find the latest block no later than it that has a
@@ -446,18 +450,17 @@ AS combo GROUP BY combo.pk_id
           UInt32.of_int (Int.of_int64_exn timing_info.cliff_time)
         in
         let cliff_amount =
-          MinaCurrency.Amount.of_int (Int.of_int64_exn timing_info.cliff_amount)
+          MinaCurrency.Amount.of_string timing_info.cliff_amount
         in
         let vesting_period =
           UInt32.of_int (Int.of_int64_exn timing_info.vesting_period)
         in
         let vesting_increment =
-          MinaCurrency.Amount.of_int
-            (Int.of_int64_exn timing_info.vesting_increment)
+          MinaCurrency.Amount.of_string
+            timing_info.vesting_increment
         in
         let initial_minimum_balance =
-          MinaCurrency.Balance.of_int
-            (Int.of_int64_exn timing_info.initial_minimum_balance)
+          MinaCurrency.Balance.of_string timing_info.initial_minimum_balance
         in
         Mina_base.Account.incremental_balance_between_slots ~start_slot ~end_slot
           ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
@@ -479,10 +482,11 @@ AS combo GROUP BY combo.pk_id
           (* Could not get a nonce, return 0 *)
           Deferred.Result.return (last_relevant_command_balance, UInt64.zero)
         | None, Some timing_info ->
-          (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block *)
-          let balance_at_genesis : int64 =
-            Int64.(
-              timing_info.initial_balance - timing_info.initial_minimum_balance)
+          (* This account hasn't seen any transactions but was in the genesis ledger, so compute its balance at the start block
+             TODO: this is probably wrong now, because we have timing info for all accounts, in every block
+          *)
+          let balance_at_genesis : int64 = failwith "TODO: LOOK UP BALANCE"
+              (* WAS : timing_info.initial_balance - timing_info.initial_minimum_balance) *)
           in
           let incremental_balance_since_genesis : UInt64.t =
             compute_incremental_balance timing_info
@@ -542,7 +546,8 @@ AS combo GROUP BY combo.pk_id
           Deferred.Result.return last_relevant_command_balance
         | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
-          Deferred.Result.return timing_info.initial_balance
+          failwith "LOOKUP BALANCE, NONCE IN ACCOUNTS_ACCESSED; timing_info isn't just genesis ledger any longer"
+          (* WAS:    Deferred.Result.return timing_info.initial_balance *)
       in
       let balance_info : Balance_info.t = {liquid_balance; total_balance} in
       Deferred.Result.return (requested_block_identifier, balance_info, nonce)

@@ -59,7 +59,7 @@ module L = struct
     Option.try_with (fun () ->
         let account = M.get_exn !t loc in
         if Public_key.Compressed.(equal empty account.public_key) then None
-        else Some account)
+        else Some account )
     |> Option.bind ~f:Fn.id
 
   let location_of_account : t -> Account_id.t -> location option =
@@ -97,7 +97,7 @@ module L = struct
         if Public_key.Compressed.(equal empty a.public_key) then (
           set t loc to_set ;
           (`Added, loc) )
-        else (`Existed, loc))
+        else (`Existed, loc) )
 
   let create_new_account t id to_set =
     get_or_create_account t id to_set |> Or_error.map ~f:ignore
@@ -197,4 +197,4 @@ let handler t =
           let index = find_index_exn !ledger pk in
           respond (Provide index)
       | _ ->
-          unhandled)
+          unhandled )

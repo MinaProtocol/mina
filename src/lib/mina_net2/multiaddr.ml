@@ -40,4 +40,4 @@ let of_file_contents contents : t list =
            [%log' error (Logger.create ())]
              "Invalid peer $peer found in peers list"
              ~metadata:[ ("peer", `String s) ] ;
-           false ))
+           false ) )

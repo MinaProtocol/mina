@@ -43,7 +43,7 @@
    trust_system
    protocol_version
    child_processes
-   mina_transition
+   mina_block
    mina_state
    mina_graphql
    mina_base

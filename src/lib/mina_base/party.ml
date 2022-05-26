@@ -20,12 +20,6 @@ module type Type = sig
   type t
 end
 
-let token_id_deriver obj =
-  let open Fields_derivers_zkapps in
-  iso_string obj ~name:"TokenId" ~doc:"String representing a token ID"
-    ~to_string:Token_id.to_string
-    ~of_string:(except ~f:Token_id.of_string `Token_id)
-
 module Call_type = struct
   [%%versioned
   module Stable = struct
@@ -37,12 +31,22 @@ module Call_type = struct
     end
   end]
 
+  let to_string = function Call -> "call" | Delegate_call -> "delegate_call"
+
+  let of_string = function
+    | "call" ->
+        Call
+    | "delegate_call" ->
+        Delegate_call
+    | s ->
+        failwithf "Invalid call type: %s" s ()
+
   let quickcheck_generator =
     Quickcheck.Generator.map Bool.quickcheck_generator ~f:(function
       | false ->
           Call
       | true ->
-          Delegate_call)
+          Delegate_call )
 end
 
 module Update = struct
@@ -152,7 +156,7 @@ module Update = struct
            ; vesting_period
            ; vesting_increment
            } :
-            t) =
+            t ) =
         List.reduce_exn ~f:Random_oracle_input.Chunked.append
           [ Balance.var_to_input initial_minimum_balance
           ; Global_slot.Checked.to_input cliff_time
@@ -227,7 +231,7 @@ module Update = struct
     end
   end]
 
-  let gen ?(zkapp_account = false) ?permissions_auth () :
+  let gen ?(zkapp_account = false) ?vk ?permissions_auth () :
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind app_state =
@@ -243,9 +247,13 @@ module Update = struct
       if zkapp_account then
         Set_or_keep.gen
           (Quickcheck.Generator.return
-             (let data = Pickles.Side_loaded.Verification_key.dummy in
-              let hash = Zkapp_account.digest_vk data in
-              { With_hash.data; hash }))
+             ( match vk with
+             | None ->
+                 let data = Pickles.Side_loaded.Verification_key.dummy in
+                 let hash = Zkapp_account.digest_vk data in
+                 { With_hash.data; hash }
+             | Some vk ->
+                 vk ) )
       else return Set_or_keep.Keep
     in
     let%bind permissions =
@@ -323,7 +331,7 @@ module Update = struct
          ; timing
          ; voting_for
          } :
-          t) =
+          t ) =
       let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Zkapp_state.to_input app_state
@@ -331,7 +339,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input delegate
             ~f:Public_key.Compressed.Checked.to_input
         ; Set_or_keep.Checked.to_input verification_key ~f:(fun x ->
-              field (Data_as_hash.hash x.data))
+              field (Data_as_hash.hash x.data) )
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
         ; Set_or_keep.Checked.to_input zkapp_uri ~f:Data_as_hash.to_input
@@ -366,7 +374,7 @@ module Update = struct
        ; timing
        ; voting_for
        } :
-        t) =
+        t ) =
     let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Zkapp_state.to_input app_state
@@ -403,26 +411,26 @@ module Update = struct
             | { With_hash.data = Some data; hash } ->
                 Some { With_hash.data; hash }
             | { With_hash.data = None; _ } ->
-                None)
+                None )
           ~of_option:(function
             | Some { With_hash.data; hash } ->
                 { With_hash.data = Some data; hash }
             | None ->
-                { With_hash.data = None; hash = Field.Constant.zero })
+                { With_hash.data = None; hash = Field.Constant.zero } )
         |> Typ.transport_var
              ~there:
                (Set_or_keep.Checked.map
-                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data))
+                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data) )
              ~back:(fun x ->
                Set_or_keep.Checked.map x ~f:(fun data ->
                    { Zkapp_basic.Flagged_option.data
                    ; is_some = Set_or_keep.Checked.is_set x
-                   }))
+                   } ) )
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
       ; Set_or_keep.optional_typ
           (Data_as_hash.optional_typ ~hash:Account.hash_zkapp_uri
              ~non_preimage:(Account.hash_zkapp_uri_opt None)
-             ~dummy_value:"")
+             ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
           Account.Token_symbol.typ
@@ -435,14 +443,19 @@ module Update = struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
+    let string_with_hash =
+      with_checked
+        ~checked:(Data_as_hash.deriver string)
+        ~name:"StringWithHash" string
+    in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
-         ~zkapp_uri:!.(Set_or_keep.deriver string)
-         ~token_symbol:!.(Set_or_keep.deriver string)
+         ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
+         ~token_symbol:!.(Set_or_keep.deriver string_with_hash)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
@@ -460,7 +473,7 @@ module Update = struct
              dummy |> to_base58_check |> of_base58_check_exn)
          in
          let hash = Zkapp_account.digest_vk data in
-         { With_hash.data; hash })
+         { With_hash.data; hash } )
     in
     let update : t =
       { app_state
@@ -740,14 +753,12 @@ module Body = struct
     let deriver obj =
       let open Fields_derivers_zkapps in
       let fee obj =
-        iso_string obj ~name:"Fee" ~to_string:Fee.to_string
+        iso_string obj ~name:"Fee" ~js_type:UInt64 ~to_string:Fee.to_string
           ~of_string:Fee.of_string
       in
       let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-        ~fee:!.fee
-        ~events:!.(list @@ array field @@ o ())
-        ~sequence_events:!.(list @@ array field @@ o ())
+        ~fee:!.fee ~events:!.Events.deriver ~sequence_events:!.Events.deriver
         ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
         ~nonce:!.uint32
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
@@ -774,6 +785,43 @@ module Body = struct
     ; account_precondition = Account_precondition.Nonce t.nonce
     ; use_full_commitment = true
     ; caller = Token_id.default
+    }
+
+  let to_fee_payer_exn (t : t) : Fee_payer.t =
+    let { public_key
+        ; token_id = _
+        ; update
+        ; balance_change
+        ; increment_nonce = _
+        ; events
+        ; sequence_events
+        ; call_data = _
+        ; call_depth = _
+        ; protocol_state_precondition
+        ; account_precondition
+        ; use_full_commitment = _
+        ; caller = _
+        } =
+      t
+    in
+    let fee =
+      Currency.Fee.of_uint64
+        (balance_change.magnitude |> Currency.Amount.to_uint64)
+    in
+    let nonce =
+      match account_precondition with
+      | Nonce nonce ->
+          Mina_numbers.Account_nonce.of_uint32 nonce
+      | Full _ | Accept ->
+          failwith "Expected a nonce for fee payer account precondition"
+    in
+    { public_key
+    ; update
+    ; fee
+    ; events
+    ; sequence_events
+    ; protocol_state_precondition
+    ; nonce
     }
 
   module Checked = struct
@@ -821,7 +869,7 @@ module Body = struct
          ; use_full_commitment
          ; caller
          } :
-          t) =
+          t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input public_key
         ; Update.Checked.to_input update
@@ -884,47 +932,14 @@ module Body = struct
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    let token_id_deriver obj =
-      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
-        ~of_string:Token_id.of_string
-    in
-    let balance_change_deriver obj =
-      let sign_to_string = function
-        | Sgn.Pos ->
-            "Positive"
-        | Sgn.Neg ->
-            "Negative"
-      in
-      let sign_of_string = function
-        | "Positive" ->
-            Sgn.Pos
-        | "Negative" ->
-            Sgn.Neg
-        | _ ->
-            failwith "impossible"
-      in
-      let sign_deriver =
-        iso_string ~name:"Sign" ~to_string:sign_to_string
-          ~of_string:sign_of_string
-      in
-      let ( !. ) =
-        ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots
-      in
-      Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
-        ~sgn:!.sign_deriver
-      |> finish "BalanceChange"
-           ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
-    in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-      ~token_id:!.token_id_deriver ~balance_change:!.balance_change_deriver
-      ~increment_nonce:!.bool
-      ~events:!.(list @@ array field @@ o ())
-      ~sequence_events:!.(list @@ array field @@ o ())
-      ~call_data:!.field ~call_depth:!.int
+      ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
+      ~increment_nonce:!.bool ~events:!.Events.deriver
+      ~sequence_events:!.Events.deriver ~call_data:!.field ~call_depth:!.int
       ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
       ~account_precondition:!.Account_precondition.deriver
-      ~use_full_commitment:!.bool ~caller:!.token_id_deriver
+      ~use_full_commitment:!.bool ~caller:!.Token_id.deriver
     |> finish "PartyBody" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
@@ -948,7 +963,7 @@ module Body = struct
        ; use_full_commitment
        ; caller
        } :
-        t) =
+        t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input public_key
       ; Update.to_input update

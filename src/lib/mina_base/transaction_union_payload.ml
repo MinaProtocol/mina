@@ -119,7 +119,7 @@ module Body = struct
       and () =
         make_checked (fun () ->
             Token_id.Checked.Assert.equal token_id
-              (Token_id.Checked.constant Token_id.default))
+              (Token_id.Checked.constant Token_id.default) )
       in
       let token_id = Signed_command_payload.Legacy_token_id.default_checked in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
@@ -227,7 +227,7 @@ type payload = t [@@deriving sexp]
 
 let of_user_command_payload
     ({ common = { memo; fee; fee_payer_pk; nonce; valid_until }; body } :
-      Signed_command_payload.t) : t =
+      Signed_command_payload.t ) : t =
   { common =
       { fee
       ; fee_token = Token_id.default
@@ -280,7 +280,7 @@ end
 let to_input_legacy ({ common; body } : t) =
   Random_oracle.Input.Legacy.append
     (Signed_command_payload.Common.to_input_legacy
-       (Payload_common.to_signed_command_payload_common common))
+       (Payload_common.to_signed_command_payload_common common) )
     (Body.to_input_legacy body)
 
 let excess (payload : t) : Amount.Signed.t =

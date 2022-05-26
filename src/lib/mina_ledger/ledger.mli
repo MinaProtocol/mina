@@ -110,8 +110,6 @@ module Transaction_applied : sig
       type t = Transaction_applied.Signed_command_applied.Common.t =
         { user_command : Signed_command.t With_status.t
         ; previous_receipt_chain_hash : Receipt.Chain_hash.t
-        ; fee_payer_timing : Account.Timing.t
-        ; source_timing : Account.Timing.t option
         }
       [@@deriving sexp]
     end
@@ -134,6 +132,7 @@ module Transaction_applied : sig
     type t = Transaction_applied.Parties_applied.t =
       { accounts : (Account_id.t * Account.t option) list
       ; command : Parties.t With_status.t
+      ; previous_empty_accounts : Account_id.t list
       }
     [@@deriving sexp]
   end
@@ -149,19 +148,13 @@ module Transaction_applied : sig
     type t = Transaction_applied.Fee_transfer_applied.t =
       { fee_transfer : Fee_transfer.t
       ; previous_empty_accounts : Account_id.t list
-      ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Fee_transfer_balance_data.t
       }
     [@@deriving sexp]
   end
 
   module Coinbase_applied : sig
     type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase : Coinbase.t
-      ; previous_empty_accounts : Account_id.t list
-      ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Coinbase_balance_data.t
-      }
+      { coinbase : Coinbase.t; previous_empty_accounts : Account_id.t list }
     [@@deriving sexp]
   end
 
@@ -224,7 +217,7 @@ val apply_parties_unchecked :
      * ( ( Stack_frame.value
          , Stack_frame.value list
          , Token_id.t
-         , Currency.Amount.t
+         , Currency.Amount.Signed.t
          , t
          , bool
          , unit
@@ -232,12 +225,6 @@ val apply_parties_unchecked :
          Mina_transaction_logic.Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )
      Or_error.t
-
-val undo :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> t
-  -> Transaction_applied.t
-  -> unit Or_error.t
 
 val has_locked_tokens :
      global_slot:Mina_numbers.Global_slot.t

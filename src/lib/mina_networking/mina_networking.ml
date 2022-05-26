@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 module Sync_ledger = Mina_ledger.Sync_ledger
-open Mina_transition
+open Mina_block
 open Network_peer
 open Network_pool
 open Pipe_lib
@@ -262,7 +262,7 @@ module Rpcs = struct
       module T = struct
         type query = State_hash.t list [@@deriving sexp, to_yojson]
 
-        type response = External_transition.t list option
+        type response = Mina_block.t list option
       end
 
       module Caller = T
@@ -454,7 +454,7 @@ module Rpcs = struct
 
   let map_proof_caryying_data_option ~f =
     Option.map ~f:(fun { Proof_carrying_data.data; proof = hashes, block } ->
-        { Proof_carrying_data.data = f data; proof = (hashes, f block) })
+        { Proof_carrying_data.data = f data; proof = (hashes, f block) } )
 
   module Get_ancestry = struct
     module Master = struct
@@ -467,8 +467,8 @@ module Rpcs = struct
         [@@deriving sexp, to_yojson]
 
         type response =
-          ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
+          ( Mina_block.t
+          , State_body_hash.t list * Mina_block.t )
           Proof_carrying_data.t
           option
       end
@@ -609,8 +609,8 @@ module Rpcs = struct
         type query = unit [@@deriving sexp, to_yojson]
 
         type response =
-          ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
+          ( Mina_block.t
+          , State_body_hash.t list * Mina_block.t )
           Proof_carrying_data.t
           option
       end
@@ -1031,36 +1031,55 @@ type t =
 let wrap_rpc_data_in_envelope conn data =
   Envelope.Incoming.wrap_peer ~data ~sender:conn
 
+type protocol_version_status =
+  { valid_current : bool; valid_next : bool; matches_daemon : bool }
+
+let protocol_version_status t =
+  let header = Mina_block.header t in
+  let valid_current =
+    Protocol_version.is_valid (Header.current_protocol_version header)
+  in
+  let valid_next =
+    Option.for_all
+      (Header.proposed_protocol_version_opt header)
+      ~f:Protocol_version.is_valid
+  in
+  let matches_daemon =
+    Protocol_version.compatible_with_daemon
+      (Header.current_protocol_version header)
+  in
+  { valid_current; valid_next; matches_daemon }
+
 let create (config : Config.t) ~sinks
     ~(get_some_initial_peers :
           Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
-       -> Rpcs.Get_some_initial_peers.response Deferred.t)
+       -> Rpcs.Get_some_initial_peers.response Deferred.t )
     ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
           Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
           Envelope.Incoming.t
        -> Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response
-          Deferred.t)
+          Deferred.t )
     ~(answer_sync_ledger_query :
           Rpcs.Answer_sync_ledger_query.query Envelope.Incoming.t
-       -> Rpcs.Answer_sync_ledger_query.response Deferred.t)
+       -> Rpcs.Answer_sync_ledger_query.response Deferred.t )
     ~(get_ancestry :
           Rpcs.Get_ancestry.query Envelope.Incoming.t
-       -> Rpcs.Get_ancestry.response Deferred.t)
+       -> Rpcs.Get_ancestry.response Deferred.t )
     ~(get_best_tip :
           Rpcs.Get_best_tip.query Envelope.Incoming.t
-       -> Rpcs.Get_best_tip.response Deferred.t)
+       -> Rpcs.Get_best_tip.response Deferred.t )
     ~(get_node_status :
           Rpcs.Get_node_status.query Envelope.Incoming.t
-       -> Rpcs.Get_node_status.response Deferred.t)
+       -> Rpcs.Get_node_status.response Deferred.t )
     ~(get_transition_chain_proof :
           Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
-       -> Rpcs.Get_transition_chain_proof.response Deferred.t)
+       -> Rpcs.Get_transition_chain_proof.response Deferred.t )
     ~(get_transition_chain :
           Rpcs.Get_transition_chain.query Envelope.Incoming.t
-       -> Rpcs.Get_transition_chain.response Deferred.t)
+       -> Rpcs.Get_transition_chain.response Deferred.t )
     ~(get_transition_knowledge :
           Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
-       -> Rpcs.Get_transition_knowledge.response Deferred.t) =
+       -> Rpcs.Get_transition_knowledge.response Deferred.t ) =
   let logger = config.logger in
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
@@ -1088,8 +1107,8 @@ let create (config : Config.t) ~sinks
   in
   let validate_protocol_versions ~rpc_name sender external_transition =
     let open Trust_system.Actions in
-    let External_transition.{ valid_current; valid_next; matches_daemon } =
-      External_transition.protocol_version_status external_transition
+    let { valid_current; valid_next; matches_daemon } =
+      protocol_version_status external_transition
     in
     let%bind () =
       if valid_current then return ()
@@ -1103,8 +1122,8 @@ let create (config : Config.t) ~sinks
                 ; ( "current_protocol_version"
                   , `String
                       (Protocol_version.to_string
-                         (External_transition.current_protocol_version
-                            external_transition)) )
+                         (Header.current_protocol_version
+                            (Mina_block.header external_transition) ) ) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1123,8 +1142,8 @@ let create (config : Config.t) ~sinks
                   , `String
                       (Protocol_version.to_string
                          (Option.value_exn
-                            (External_transition.proposed_protocol_version_opt
-                               external_transition))) )
+                            (Header.proposed_protocol_version_opt
+                               (Mina_block.header external_transition) ) ) ) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1142,8 +1161,8 @@ let create (config : Config.t) ~sinks
                 ; ( "current_protocol_version"
                   , `String
                       (Protocol_version.to_string
-                         (External_transition.current_protocol_version
-                            external_transition)) )
+                         (Header.current_protocol_version
+                            (Mina_block.header external_transition) ) ) )
                 ; ( "daemon_current_protocol_version"
                   , `String Protocol_version.(to_string @@ get_current ()) )
                 ] ) )
@@ -1301,7 +1320,7 @@ let create (config : Config.t) ~sinks
           Deferred.List.map ext_trans
             ~f:
               (validate_protocol_versions ~rpc_name:"Get_transition_chain"
-                 sender)
+                 sender )
         in
         if List.for_all valid_protocol_versions ~f:(Bool.equal true) then result
         else None
@@ -1382,14 +1401,14 @@ let create (config : Config.t) ~sinks
           (rpc_handlers ~logger:config.logger
              ~local_state:config.consensus_local_state
              ~genesis_ledger_hash:
-               (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash))
+               (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash) )
           ~f:(fun (Rpc_handler { rpc; f; cost; budget }) ->
-            Rpcs.(Rpc_handler { rpc = Consensus_rpc rpc; f; cost; budget })))
+            Rpcs.(Rpc_handler { rpc = Consensus_rpc rpc; f; cost; budget }) ))
   in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
         Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
-          (Gossip_net.Message.Any_sinks ((module Sinks), sinks)))
+          (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
@@ -1407,7 +1426,7 @@ let create (config : Config.t) ~sinks
               Gossip_net.Any.set_node_status gossip_net
                 ( Rpcs.Get_node_status.Node_status.to_yojson data
                 |> Yojson.Safe.to_string )
-              >>| ignore)) ;
+              >>| ignore ) ) ;
   don't_wait_for
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
@@ -1417,7 +1436,7 @@ let create (config : Config.t) ~sinks
               [%log fatal]
                 "Failed to connect to any initial peers, possible chain id \
                  mismatch" ;
-              raise No_initial_peers )))) ;
+              raise No_initial_peers ) ) ) ) ;
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
@@ -1445,7 +1464,7 @@ include struct
         | Ok x ->
             x
         | Error e ->
-            failwith e)
+            failwith e )
     |> Deferred.return
 
   let add_peer = lift add_peer
@@ -1486,7 +1505,7 @@ let broadcast_state t state =
   log_gossip t.logger (Gossip_net.Message.New_state msg)
     ~log_msg:
       (Gossip_new_state
-         { state_hash = State_hash.With_state_hashes.state_hash state }) ;
+         { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
   Gossip_net.Any.broadcast_state t.gossip_net msg
 
@@ -1503,7 +1522,7 @@ let broadcast_snark_pool_diff t diff =
       (Gossip_snark_pool_diff
          { work =
              Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
-         }) ;
+         } ) ;
   Gossip_net.Any.broadcast_snark_pool_diff t.gossip_net diff
 
 (* TODO: Don't copy and paste *)
@@ -1518,7 +1537,7 @@ let find_map' xs ~f =
         (* TODO: Validation applicative here *)
         if List.for_all ds ~f:Or_error.is_error then
           return (Or_error.error_string "all none")
-        else Deferred.never ())
+        else Deferred.never () )
   in
   Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
@@ -1561,7 +1580,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
     if num_peers > max_current_peers then
       return
         (Or_error.error_string
-           "None of randomly-chosen peers can handle the request")
+           "None of randomly-chosen peers can handle the request" )
     else
       let current_peers, remaining_peers = List.split_n peers num_peers in
       find_map' current_peers ~f:(fun peer ->
@@ -1582,7 +1601,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
           | Connected { data = Ok None; _ } ->
               loop remaining_peers (2 * num_peers)
           | _ ->
-              loop remaining_peers (2 * num_peers))
+              loop remaining_peers (2 * num_peers) )
   in
   loop peers 1
 
@@ -1660,24 +1679,24 @@ module Sl_downloader = struct
     include Hashable.Make (T)
   end
 
-  include Downloader.Make
-            (Key)
-            (struct
-              type t = unit [@@deriving to_yojson]
+  include
+    Downloader.Make
+      (Key)
+      (struct
+        type t = unit [@@deriving to_yojson]
 
-              let download : t = ()
+        let download : t = ()
 
-              let worth_retrying () = true
-            end)
-            (struct
-              type t =
-                (Mina_base.Ledger_hash.t * Sync_ledger.Query.t)
-                * Sync_ledger.Answer.t
-              [@@deriving to_yojson]
+        let worth_retrying () = true
+      end)
+      (struct
+        type t =
+          (Mina_base.Ledger_hash.t * Sync_ledger.Query.t) * Sync_ledger.Answer.t
+        [@@deriving to_yojson]
 
-              let key = fst
-            end)
-            (Ledger_hash)
+        let key = fst
+      end)
+      (Ledger_hash)
 end
 
 let glue_sync_ledger :
@@ -1717,7 +1736,7 @@ let glue_sync_ledger :
         List.iter qs ~f:(fun (h, _) ->
             if
               not (Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r))
-            then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h)) ;
+            then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) ) ;
         let%map rs =
           query_peer' ~how:`Parallel ~heartbeat_timeout
             ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
@@ -1737,8 +1756,8 @@ let glue_sync_ledger :
                 | Ok ps ->
                     Ok
                       (List.filter_map ps ~f:(fun (q, r) ->
-                           match r with Ok r -> Some (q, r) | Error _ -> None))
-                ) ))
+                           match r with Ok r -> Some (q, r) | Error _ -> None )
+                      ) ) ) )
   in
   don't_wait_for
     (let%bind downloader = downloader in
@@ -1751,4 +1770,4 @@ let glue_sync_ledger :
              Deferred.unit
          | Ok (a, _) ->
              Linear_pipe.write_if_open response_writer
-               (fst q, snd q, { a with data = snd a.data })))
+               (fst q, snd q, { a with data = snd a.data }) ) )

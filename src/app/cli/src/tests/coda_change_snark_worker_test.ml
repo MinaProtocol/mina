@@ -1,5 +1,5 @@
 open Core
-open Mina_transition
+open Mina_block
 open Signature_lib
 open Async
 
@@ -42,22 +42,23 @@ let main () =
     let found_snark_prover_ivar = Ivar.create () in
     Pipe.iter new_block_pipe ~f:(fun transition ->
         let completed_works =
-          Staged_ledger_diff.completed_works
-          @@ External_transition.Validated.staged_ledger_diff transition
+          Staged_ledger_diff.completed_works @@ Body.staged_ledger_diff
+          @@ Mina_block.Validated.body
+          @@ External_transition.Validated.lower transition
         in
         if
           List.exists completed_works
             ~f:(fun { Transaction_snark_work.prover; _ } ->
               [%log trace] "Prover of completed work"
                 ~metadata:[ ("Prover", Public_key.Compressed.to_yojson prover) ] ;
-              Public_key.Compressed.equal prover public_key)
+              Public_key.Compressed.equal prover public_key )
         then (
           [%log trace] "Found snark prover ivar filled"
             ~metadata:
               [ ("public key", Public_key.Compressed.to_yojson public_key) ] ;
           Ivar.fill_if_empty found_snark_prover_ivar () )
         else () ;
-        Deferred.unit)
+        Deferred.unit )
     |> don't_wait_for ;
     Ivar.read found_snark_prover_ivar
   in

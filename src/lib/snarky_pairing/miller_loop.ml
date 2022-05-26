@@ -64,7 +64,7 @@ module Make (Inputs : Inputs_intf) = struct
          let%map t = Fqe.mul_field gamma_twist px in
          Fqe.(c.gamma_x - c.ry - t)
        in
-       (p.py_twist_squared, c1))
+       (p.py_twist_squared, c1) )
 
   (* result = c.gamma_x + qy * (invert_q ? -1 : 1) - gamma_twist * px *)
   let add_line_eval ~invert_q (p : G1_precomputation.t)
@@ -78,7 +78,7 @@ module Make (Inputs : Inputs_intf) = struct
          let%map t = mul_field gamma_twist px in
          c.gamma_x + (if invert_q then qy else Fqe.negate qy) - t
        in
-       (p.py_twist_squared, c1))
+       (p.py_twist_squared, c1) )
 
   let uncons_exn = function [] -> failwith "uncons_exn" | x :: xs -> (x, xs)
 
@@ -123,7 +123,7 @@ module Make (Inputs : Inputs_intf) = struct
                times a constant.
             *)
           in
-          (acc, (sgn, p, { q with G2_precomputation.coeffs })))
+          (acc, (sgn, p, { q with G2_precomputation.coeffs })) )
     in
     let rec go i found_nonzero pairs f =
       if i < 0 then return f

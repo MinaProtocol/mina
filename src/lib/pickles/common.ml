@@ -17,20 +17,18 @@ let tick_shifts, tock_shifts =
   let mk g =
     let f =
       Memo.general ~cache_size_bound:20 ~hashable:Int.hashable (fun log2_size ->
-          g log2_size)
+          g log2_size )
     in
     fun ~log2_size -> f log2_size
   in
   ( mk Kimchi_bindings.Protocol.VerifierIndex.Fp.shifts
   , mk Kimchi_bindings.Protocol.VerifierIndex.Fq.shifts )
 
-let wrap_domains =
-  { Domains.h = Pow_2_roots_of_unity 15
-  ; x =
-      Pow_2_roots_of_unity
-        (let (T (typ, _)) = Impls.Wrap.input () in
-         Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]))
-  }
+let wrap_domains ~proofs_verified =
+  let h =
+    match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
+  in
+  { Domains.h = Pow_2_roots_of_unity h }
 
 let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
   let g (x, y) = [ x; y ] in
@@ -38,18 +36,18 @@ let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
   Tick_field_sponge.digest Tick_field_sponge.params
     (Types.Step.Proof_state.Me_only.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
-       ~app_state)
+       ~app_state )
 
-let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
-    (t :
-      (Tick.Curve.Affine.t, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
+let hash_dlog_me_only (type n) (_max_proofs_verified : n Nat.t)
+    (t : (Tick.Curve.Affine.t, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t)
+    =
   Tock_field_sponge.digest Tock_field_sponge.params
     (Types.Wrap.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]))
+       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]) )
 
-let dlog_pcs_batch (type n_branching total)
+let dlog_pcs_batch (type proofs_verified total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (n_branching, Nat.N26.n, total) Nat.Adds.t) =
+      total Nat.t * (proofs_verified, Nat.N26.n, total) Nat.Adds.t ) =
   Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 let when_profiling profiling default =
@@ -66,7 +64,7 @@ let time lab f =
       let x = f () in
       let stop = Time.now () in
       printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
-      x)
+      x )
     f ()
 
 let bits_random_oracle =
@@ -75,13 +73,13 @@ let bits_random_oracle =
     Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
     |> List.concat_map ~f:(fun c ->
            let c = Char.to_int c in
-           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1))
+           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1) )
     |> fun a -> List.take a length
 
 let bits_to_bytes bits =
   let byte_of_bits bs =
     List.foldi bs ~init:0 ~f:(fun i acc b ->
-        if b then acc lor (1 lsl i) else acc)
+        if b then acc lor (1 lsl i) else acc )
     |> Char.of_int_exn
   in
   List.map (List.groupi bits ~break:(fun i _ _ -> i mod 8 = 0)) ~f:byte_of_bits
@@ -129,7 +127,7 @@ module Ipa = struct
 
   let compute_challenges ~endo_to_field field chals =
     Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
-        compute_challenge field ~endo_to_field prechallenge)
+        compute_challenge field ~endo_to_field prechallenge )
 
   module Wrap = struct
     let field =
@@ -175,19 +173,19 @@ module Ipa = struct
       in
       let comms =
         Array.of_list_map comm_chals ~f:(fun (comm, _) ->
-            Or_infinity.Finite comm)
+            Or_infinity.Finite comm )
       in
       let urs = Backend.Tick.Keypair.load_urs () in
       Promise.run_in_thread (fun () ->
           Kimchi_bindings.Protocol.SRS.Fp.batch_accumulator_check urs
             (Array.map comms ~f:or_infinite_conv)
-            chals)
+            chals )
   end
 end
 
 let tock_unpadded_public_input_of_statement prev_statement =
   let input =
-    let (T (typ, _conv)) = Impls.Wrap.input () in
+    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
     Impls.Wrap.generate_public_input [ typ ] prev_statement
   in
   List.init
@@ -196,11 +194,12 @@ let tock_unpadded_public_input_of_statement prev_statement =
 
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_branching
+let tick_public_input_of_statement ~max_proofs_verified
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
-    let (T (input, _conv)) =
-      Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n
+    let (T (input, _conv, _conv_inv)) =
+      Impls.Step.input ~proofs_verified:max_proofs_verified
+        ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input [ input ] prev_statement
   in
@@ -243,8 +242,8 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
     *)
     let generic =
       let coeffs = Vector.to_array m.coefficients_comm in
-      let (generic_selector
-          :: l1 :: r1 :: o1 :: m1 :: l2 :: r2 :: o2 :: m2 :: _) =
+      let (generic_selector :: l1 :: r1 :: o1 :: m1 :: l2 :: r2 :: o2 :: m2 :: _)
+          =
         plonk.generic
       in
       (* Second gate first, to multiply with a power of alpha. *)

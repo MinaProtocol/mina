@@ -93,7 +93,7 @@ module Make (Inputs : Inputs.S) = struct
       let%bind init = G1_shifted.(add zero vk.query_base) in
       Checked.List.fold (List.zip_exn vk.query inputs) ~init
         ~f:(fun acc (g, input) ->
-          G1.scale (module G1_shifted) g input ~init:acc)
+          G1.scale (module G1_shifted) g input ~init:acc )
       >>= G1_shifted.unshift_nonzero
     in
     let%bind test1 =

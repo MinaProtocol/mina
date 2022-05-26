@@ -283,7 +283,7 @@ module Make_weierstrass_checked
           As_prover.(
             map2 (read typ x_squared) (read typ ay) ~f:(fun x_squared ay ->
                 let open F.Unchecked in
-                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay)))
+                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay) ))
     in
     let%bind bx =
       exists typ
@@ -291,7 +291,7 @@ module Make_weierstrass_checked
           As_prover.(
             map2 (read typ lambda) (read typ ax) ~f:(fun lambda ax ->
                 let open F.Unchecked in
-                square lambda - (ax + ax)))
+                square lambda - (ax + ax) ))
     in
     let%bind by =
       exists typ
@@ -319,7 +319,7 @@ module Make_weierstrass_checked
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)))
+          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)) )
     in
     (choose x1 x2, choose y1 y2)
 
@@ -338,7 +338,7 @@ module Make_weierstrass_checked
             with_label (sprintf "acc_%d" i)
               (let%bind add_pt = Shifted.add acc pt in
                let don't_add_pt = acc in
-               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
+               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt )
           and pt' = double pt in
           go (i + 1) bs acc' pt'
     in

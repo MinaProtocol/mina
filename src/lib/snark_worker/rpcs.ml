@@ -6,7 +6,6 @@ open Signature_lib
    RFC 0012, and
 
    https://ocaml.janestreet.com/ocaml-core/latest/doc/async_rpc_kernel/Async_rpc_kernel/Versioned_rpc/
-
 *)
 
 (* for each RPC, return the Master module only, and not the versioned modules, because the functor should not
