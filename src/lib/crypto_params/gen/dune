@@ -17,6 +17,7 @@
    bin_prot.shape
    ocaml-compiler-libs.common
    ;; local libraries
+   pasta_bindings.rust
    kimchi_backend.pasta
    group_map
    tuple_lib

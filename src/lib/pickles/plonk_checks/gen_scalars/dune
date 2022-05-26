@@ -9,6 +9,7 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
+   pasta_bindings.rust
 )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

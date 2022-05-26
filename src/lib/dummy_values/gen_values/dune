@@ -15,6 +15,7 @@
    async_kernel
    ocaml-compiler-libs.common
    ;; local libraries
+   pasta_bindings.rust
    pickles_types
    pickles
    crypto_params
