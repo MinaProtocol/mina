@@ -89,6 +89,16 @@ serializations of outermost type instances. The constituent types need
 not have the annotation: the type `t` will be identical to the type
 `t` in the containing `Vn` module.
 
+The existing versioning system generates a function in `Stable` modules:
+```ocaml
+ val bin_read_to_latest_opt : Bin_prot.Common.buf -> pos_ref:(int ref) -> Stable.Latest.t option
+```
+That function deserializes data by dispatching on version tags.
+Because the default serialization does not contain version tags, it no
+longer makes sense to generate such a function in `Stable`. Instead,
+generate it inside `With_all_version_tags` and `With_top_version_tag`,
+if they're created.
+
 ### Version linting changes
 
 The CI version linter looks for changes to versioned types in a PR
