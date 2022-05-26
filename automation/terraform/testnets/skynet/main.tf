@@ -7,10 +7,7 @@ terraform {
       version = ">=4.3.0" # version required to run Terraform on Mac with M1
     }
   }
-  backend "gcs" {
-    bucket = "o1labs-terraform"
-    prefix = "skynet-testnet"
-  }
+
 }
 
 provider "aws" {
