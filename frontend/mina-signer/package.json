@@ -3,9 +3,9 @@
   "description": "Node/Browser API for signing transactions on various networks for Mina Protocol",
   "version": "1.0.0",
   "scripts": {
-    "build": "tsc && cp src/client_sdk.bc.js dist/src",
+    "build": "tsc && cp src/client_sdk.min.js dist/src/client_sdk.bc.js",
     "clean": "rm -rf dist",
-    "copy-jsoo": "cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js",
+    "copy-jsoo": "cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js && esbuild --minify --log-level=silent src/client_sdk.bc.js > src/client_sdk.min.js",
     "make-jsoo": "make -C ../.. client_sdk && npm run copy-jsoo",
     "test": "jest",
     "prepublishOnly": "npm run make-jsoo && npm run build && npm run test"
@@ -31,6 +31,7 @@
     "@babel/preset-typescript": "^7.16.0",
     "@types/jest": "^27.0.3",
     "babel-jest": "^27.3.1",
+    "esbuild": "^0.14.39",
     "ts-jest": "^27.0.7",
     "ts-node": "^10.4.0",
     "typescript": "^4.5.2"
