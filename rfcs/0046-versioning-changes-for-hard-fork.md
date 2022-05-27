@@ -33,7 +33,7 @@ mechanism.
 The CI version linter currently compares changes to versioned types
 against the PR base branch. That's more fine-grained than needed, if
 the goal of preventing version changes is to allow interoperability
-with deployed software. Instead, compare the types against the branch 
+with deployed software. Instead, compare the types against the branch
 of the latest released software. That strategy will reduce the amount
 of noise produced by the linter, and provide more useful results.
 
@@ -54,12 +54,12 @@ For backwards-compatibility, we can add the annotation
 ```
  [@@@with_all_version_tags]
 ```
-to a `Stable` module. For each versioned type module `Vn`, generate a
-module:
+to the legacy `Stable.Vn` modules. For each such module, generate a module
+within it:
 ```ocaml
  module With_all_version_tags = struct
    type t = ...
-   
+
    let bin_read_t = ... bin_read_t ...
    let bin_write_t = ... bin_write_t ...
    ...
@@ -70,7 +70,7 @@ this case, the constituent types must also have the same annotation,
 which is enforced by the construction of the type `t`: the constituent
 types of `t` are of the form `M.Stable.Vn.With_all_version_tags.t`.
 
-Another available annotation can be
+Within `Stable` modules, we can have the annotation
 ```
  [@@@with_top_version_tag]
 ```
@@ -78,7 +78,7 @@ to generate:
 ```ocaml
  module With_top_version_tag = struct
    type t = ...
-   
+
    let bin_read_t = ... bin_read_t ...
    let bin_write_t = ... bin_write_t ...
    ...
@@ -93,11 +93,28 @@ The existing versioning system generates a function in `Stable` modules:
 ```ocaml
  val bin_read_to_latest_opt : Bin_prot.Common.buf -> pos_ref:(int ref) -> Stable.Latest.t option
 ```
-That function deserializes data by dispatching on version tags.
+That function deserializes data by dispatching on version tags. Serializations
+may or may not have version tags. If there are neither all-tagged or top-tagged
+serializations, generate nothing. If there are all-tagged serializations,
+generate:
+```ocaml
+ val bin_read_all_tagged_to_latest : Bin_prot.Common.buf -> pos_ref:(int ref) -> Stable.Latest.t Or_error.t
+```
+This function will know only about the version in the legacy `Vn` modules
+where we've maintained all-tagging.
+
+If there are top-tagged serializations, generate:
+```ocaml
+ val bin_read_top_tagged_to_latest : Bin_prot.Common.buf -> pos_ref:(int ref) -> Stable.Latest.t Or_error.t
+```
+This function will know about all the versions within a `Stable` module.
+
 Because the default serialization does not contain version tags, it no
 longer makes sense to generate such a function in `Stable`. Instead,
 generate it inside `With_all_version_tags` and `With_top_version_tag`,
-if they're created.
+if they're created. The return type should be changed to an
+`Or_error.t` type, to describe errors, instead of using an option
+type.
 
 ### Version linting changes
 
@@ -134,7 +151,7 @@ some purpose. Then again, adding that feature now while working on
 other code changes may be easier than deferring it.
 
 We could phase out the all-tagged mechanism, by allowing two syntaxes
-for public keys and other affected types, and eventually disallowing 
+for public keys and other affected types, and eventually disallowing
 the old syntax. That strategy may be too drastic to impose upon users.
 
 ## Prior art
@@ -147,6 +164,6 @@ The relevant prior art is the existing versioning mechanism.
 
 - Do we need top-tagging?
 - What types will require all-tagging? Any user-visible Base58Check-encoded data created from
-   `Bin_prot`-serializations will need that. One way to enforce this would be to have 
+   `Bin_prot`-serializations will need that. One way to enforce this would be to have
    `Codable.Make_base58_check` take a module containing a value `all_tagged`, which
 	would be contained in the generated `With_all_version_tags` modules.
