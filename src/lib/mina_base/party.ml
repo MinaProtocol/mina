@@ -680,8 +680,6 @@ module Preconditions = struct
         ]
   end
 
-  let x = Zkapp_precondition.Protocol_state.to_input
-
   let typ () : (Checked.t, t) Typ.t =
     Typ.of_hlistable
       [ Zkapp_precondition.Protocol_state.typ; Account_precondition.typ () ]

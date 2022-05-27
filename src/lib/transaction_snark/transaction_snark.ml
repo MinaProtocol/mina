@@ -4305,7 +4305,7 @@ module For_tests = struct
       ; authorization = Signature.dummy
       }
     in
-    let preconditions =
+    let preconditions' =
       Option.value preconditions
         ~default:
           { Party.Preconditions.network =
@@ -4328,7 +4328,7 @@ module For_tests = struct
         ; sequence_events = []
         ; call_data = Field.zero
         ; call_depth = 0
-        ; preconditions
+        ; preconditions = preconditions'
         ; use_full_commitment = false
         ; caller = Call
         }
@@ -4387,7 +4387,13 @@ module For_tests = struct
                 ; sequence_events
                 ; call_data
                 ; call_depth = 0
-                ; preconditions
+                ; preconditions =
+                    { preconditions' with
+                      account =
+                        Option.map preconditions ~f:(fun { account; _ } ->
+                            account )
+                        |> Option.value ~default:Accept
+                    }
                 ; use_full_commitment = true
                 ; caller = Call
                 }
@@ -4408,7 +4414,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; preconditions = { preconditions with account = Accept }
+              ; preconditions = { preconditions' with account = Accept }
               ; use_full_commitment = false
               ; caller = Call
               }
