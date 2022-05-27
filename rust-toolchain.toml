@@ -1,0 +1,14 @@
+# ================================================
+# READ THIS IF YOU'RE PLANNING TO UPDATE THIS FILE
+# ================================================
+#
+# To update the version of Rust used in Mina (to pass CI),
+# you will have to follow these steps:
+#
+# 1. grep for the current version of Rust in the codebase (e.g. "1.58.1") and update all instances
+# 2. get CI to build your PR
+# 3. check the "docker" rules in CI to see what the hashes of the (newly) built docker files are
+# 4. figure out the hashes of the (now obsolete) docker images used in CI rules that are failing, grep for these hashes and replace them with the new hashes
+
+[toolchain]
+channel = "1.58.1"
