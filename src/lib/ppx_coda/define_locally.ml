@@ -1,7 +1,5 @@
 open Core_kernel
 open Ppxlib
-open Asttypes
-open Ast_helper
 
 (* define_locally mirrors local definitions from some other module
 
@@ -26,19 +24,20 @@ let expr_to_id loc expr =
       Location.raise_errorf ~loc "Expected identifier"
 
 let expand ~loc ~path:_ open_decl defs =
+  let (module Ast_builder) = Ast_builder.make loc in
+  let open Ast_builder in
   match defs.pexp_desc with
   | Pexp_tuple exps ->
-      let (module Ast_builder) = Ast_builder.make loc in
-      let open Ast_builder in
       let names = List.map exps ~f:(expr_to_id loc) in
       let vars = List.map names ~f:pvar in
-      Str.value ~loc Nonrecursive
-        [ Vb.mk ~loc (Pat.tuple ~loc vars) (Exp.open_ ~loc open_decl defs) ]
+      pstr_value Nonrecursive
+        [ value_binding ~pat:(ppat_tuple vars)
+            ~expr:(pexp_open open_decl defs)
+        ]
   | Pexp_ident { txt = Lident id; _ } ->
-      Str.value ~loc Nonrecursive
-        [ Vb.mk ~loc
-            (Pat.var ~loc { txt = id; loc })
-            (Exp.open_ ~loc open_decl defs)
+      pstr_value Nonrecursive
+        [ value_binding ~pat:(ppat_var {txt = id; loc})
+            ~expr:(pexp_open open_decl defs)
         ]
   | _ ->
       raise_errorf ~loc "Must provide an identifier or tuple of identifiers"
