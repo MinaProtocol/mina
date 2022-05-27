@@ -66,6 +66,11 @@ variable "mina_archive_schema" {
   default = ""
 }
 
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
+}
+
 variable "archive_node_count" {
   type    = number
   default = 0
@@ -308,6 +313,7 @@ variable "archive_configs" {
       postgresqlPassword      = string
       postgresDB              = string
       remoteSchemaFile        = string
+      remoteSchemaAuxFiles        = list(string)
 
       persistenceEnabled      = bool
       persistenceSize         = string

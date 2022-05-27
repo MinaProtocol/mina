@@ -450,7 +450,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     (t, validation) =
   let open Deferred.Result.Let_syntax in
   let target_hash_of_ledger_proof =
-    Fn.compose Ledger_proof.statement_target Ledger_proof.statement
+    Fn.compose Registers.ledger
+    @@ Fn.compose Ledger_proof.statement_target Ledger_proof.statement
   in
   let block = With_hash.data t in
   let protocol_state = block |> Block.header |> Header.protocol_state in
@@ -495,7 +496,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
           ~f:target_hash_of_ledger_proof
           ~default:
             ( Precomputed_values.genesis_ledger precomputed_values
-            |> Lazy.force |> Ledger.merkle_root
+            |> Lazy.force |> Mina_ledger.Ledger.merkle_root
             |> Frozen_ledger_hash.of_ledger_hash )
     | Some (proof, _) ->
         target_hash_of_ledger_proof proof

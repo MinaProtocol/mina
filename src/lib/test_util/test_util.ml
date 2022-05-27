@@ -10,19 +10,18 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
 
   let checked_to_unchecked typ1 typ2 checked input =
     let open Impl in
-    let (), checked_result =
+    let checked_result =
       run_and_check
         (let%bind input = exists typ1 ~compute:(As_prover.return input) in
          let%map result = checked input in
          As_prover.read typ2 result )
-        ()
       |> Or_error.ok_exn
     in
     checked_result
 
   let test_to_triples typ fold var_to_triples input =
     let open Impl in
-    let (), checked =
+    let checked =
       run_and_check
         (let%bind input = exists typ ~compute:(As_prover.return input) in
          let%map result = var_to_triples input in
@@ -31,7 +30,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
               ~f:
                 (As_prover.read
                    (Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ) ) ) )
-        ()
       |> Or_error.ok_exn
     in
     let unchecked = Fold.to_list (fold input) in
