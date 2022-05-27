@@ -151,15 +151,21 @@ let%test_module "Full_frontier tests" =
               in
               let precomputed =
                 Mina_block.Precomputed.of_block ~logger ~constraint_constants
-                  ~staged_ledger ~scheduled_time (Breadcrumb.block_with_hash breadcrumb)
+                  ~staged_ledger ~scheduled_time
+                  (Breadcrumb.block_with_hash breadcrumb)
               in
-              eprintf
-                !"Randomly generated block, sexp:\n\
-                  %{sexp:Mina_block.Precomputed.t}\n"
-                precomputed ;
-              eprintf
-                !"Randomly generated block, json:\n%{Yojson.Safe}\n"
-                (Mina_block.Precomputed.to_yojson precomputed) ;
+              if
+                Option.value_map ~default:0 ~f:String.length
+                  (Sys.getenv_opt "PRINT_BLOCKS")
+                > 0
+              then (
+                eprintf
+                  !"Randomly generated block, sexp:\n\
+                    %{sexp:Mina_block.Precomputed.t}\n"
+                  precomputed ;
+                eprintf
+                  !"Randomly generated block, json:\n%{Yojson.Safe}\n"
+                  (Mina_block.Precomputed.to_yojson precomputed) ) ;
               clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Constructing a better branch should change the best tip" =
