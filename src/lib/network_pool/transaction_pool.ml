@@ -1897,9 +1897,11 @@ let%test_module _ =
               Mina_generators.Parties_generators.gen_parties_from ~succeed:true
                 ~keymap ~fee_payer_keypair ~ledger ()
             in
-            let (`If_this_is_used_it_should_have_a_comment_justifying_it parties)
-                =
-              Parties.to_valid_unsafe parties
+            let parties =
+              Option.value_exn
+                (Parties.Valid.to_valid ~ledger ~get:Mina_ledger.Ledger.get
+                   ~location_of_account:Mina_ledger.Ledger.location_of_account
+                   parties )
             in
             User_command.Parties parties
           in
@@ -2169,7 +2171,7 @@ let%test_module _ =
       in
       let parties = Transaction_snark.For_tests.multiple_transfers test_spec in
       let (`If_this_is_used_it_should_have_a_comment_justifying_it parties) =
-        Parties.to_valid_unsafe parties
+        Parties.Valid.to_valid_unsafe parties
       in
       User_command.Parties parties
 

@@ -40,7 +40,7 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Parties { fee_payer; other_parties; memo } ->
+  | Parties ({ fee_payer; other_parties; memo } as parties_with_vk) ->
       with_return (fun { return } ->
           let other_parties_hash = Parties.Call_forest.hash other_parties in
           let tx_commitment =
@@ -101,24 +101,11 @@ let check :
                         Some (vk.data, stmt, pi) ) )
           in
           let v : User_command.Valid.t =
-            let verification_keys =
-              List.fold parties_with_hashes_list ~init:Account_id.Map.empty
-                ~f:(fun acc ((p, vk_opt), _) ->
-                  Option.value_map vk_opt ~default:acc ~f:(fun vk ->
-                      Account_id.Map.update acc (Party.account_id p)
-                        ~f:(fun _ -> With_hash.hash vk) ) )
-            in
+            (*Verification keys should be present if it reaches here*)
             let parties =
-              { Parties.fee_payer
-              ; other_parties =
-                  Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
-              ; memo
-              }
+              Option.value_exn (Parties.Valid.of_verifiable parties_with_vk)
             in
-            User_command.Poly.Parties
-              { Parties.Valid.parties
-              ; verification_keys = Account_id.Map.to_alist verification_keys
-              }
+            User_command.Poly.Parties parties
           in
           match valid_assuming with
           | [] ->

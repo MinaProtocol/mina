@@ -11,7 +11,6 @@ module Ledger = Mina_ledger.Ledger
 let gen_account_precondition_from_account ?(succeed = true) ?account_state_tbl
     (account : Account.t) =
   let open Quickcheck.Let_syntax in
-  let%bind b = Quickcheck.Generator.bool in
   let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
     match account_state_tbl with
     | None ->
@@ -27,9 +26,10 @@ let gen_account_precondition_from_account ?(succeed = true) ?account_state_tbl
             updated_account )
   in
   (* choose constructor *)
+  let%bind b = Quickcheck.Generator.bool in
   if b then
-    let (* Full *)
-    open Zkapp_basic in
+    (* Full *)
+    let open Zkapp_basic in
     let%bind (predicate_account : Zkapp_precondition.Account.t) =
       let%bind balance =
         let%bind balance_change_int = Int.gen_uniform_incl 1 10_000_000 in
@@ -1003,7 +1003,7 @@ let gen_parties_from ?(succeed = true)
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:() ) ;
     tbl
   in
-  (* table of public keys to balances, updated when generating each party
+  (* table of public keys to accounts, updated when generating each party
 
      a Map would be more principled, but threading that map through the code
      adds complexity

@@ -3846,14 +3846,9 @@ let%test_module "staged ledger tests" =
                       ~constraint_constants test_spec
                   in
                   let parties =
-                    let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                          p ) =
-                      Parties.to_valid_unsafe parties
-                    in
-                    let verification_keys =
-                      [ (snapp_account_id, With_hash.hash vk) ]
-                    in
-                    { p with Parties.Valid.verification_keys }
+                    Option.value_exn
+                      (Parties.Valid.to_valid ~ledger ~get:Ledger.get
+                         ~location_of_account:Ledger.location_of_account parties )
                   in
                   let%bind _proof, diff =
                     create_and_apply sl

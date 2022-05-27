@@ -220,17 +220,18 @@ module Valid = struct
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
 
-let check (t : t) : Valid.t option =
+let check ~ledger ~get ~location_of_account (t : t) : Valid.t option =
   match t with
   | Signed_command x ->
       Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
   | Parties p ->
-      Some (Parties { Parties.Valid.parties = p; verification_keys = [] })
+      Option.map (Parties.Valid.to_valid ~ledger ~get ~location_of_account p)
+        ~f:(fun p -> Parties p)
 
 let forget_check (t : Valid.t) : t =
   match t with
   | Parties x ->
-      Parties (Parties.forget x)
+      Parties (Parties.Valid.forget x)
   | Signed_command c ->
       Signed_command (c :> Signed_command.t)
 
@@ -239,7 +240,7 @@ let to_valid_unsafe (t : t) =
     ( match t with
     | Parties x ->
         let (`If_this_is_used_it_should_have_a_comment_justifying_it x) =
-          Parties.to_valid_unsafe x
+          Parties.Valid.to_valid_unsafe x
         in
         Parties x
     | Signed_command x ->

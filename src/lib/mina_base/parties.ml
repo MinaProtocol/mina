@@ -653,67 +653,71 @@ end
 
 module Digest = Call_forest.Digest
 
-[%%versioned_binable
-module Stable = struct
-  module V1 = struct
-    type t =
-      { fee_payer : Party.Fee_payer.Stable.V1.t
-      ; other_parties :
-          ( Party.Stable.V1.t
-          , Digest.Party.Stable.V1.t
-          , Digest.Forest.Stable.V1.t )
-          Call_forest.Stable.V1.t
-      ; memo : Signed_command_memo.Stable.V1.t
-      }
-    [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
+module T = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { fee_payer : Party.Fee_payer.Stable.V1.t
+        ; other_parties :
+            ( Party.Stable.V1.t
+            , Digest.Party.Stable.V1.t
+            , Digest.Forest.Stable.V1.t )
+            Call_forest.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 
-    let to_latest = Fn.id
+      let to_latest = Fn.id
 
-    let version_byte = Base58_check.Version_bytes.snapp_command
+      let version_byte = Base58_check.Version_bytes.snapp_command
 
-    let description = "Parties"
+      let description = "Parties"
 
-    let of_wire (w : Wire.t) : t =
-      { fee_payer = w.fee_payer
-      ; memo = w.memo
-      ; other_parties =
-          w.other_parties
-          |> Call_forest.of_parties_list ~party_depth:(fun (p : Party.Wire.t) ->
-                 p.body.call_depth )
-          |> Call_forest.add_callers
-               ~call_type:(fun (p : Party.Wire.t) -> p.body.caller)
-               ~add_caller ~null_id:Token_id.default
-               ~party_id:(fun (p : Party.Wire.t) ->
-                 Account_id.(
-                   derive_token_id
-                     ~owner:(create p.body.public_key p.body.token_id)) )
-          |> Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
-                 Digest.Party.create p )
-      }
+      let of_wire (w : Wire.t) : t =
+        { fee_payer = w.fee_payer
+        ; memo = w.memo
+        ; other_parties =
+            w.other_parties
+            |> Call_forest.of_parties_list
+                 ~party_depth:(fun (p : Party.Wire.t) -> p.body.call_depth)
+            |> Call_forest.add_callers
+                 ~call_type:(fun (p : Party.Wire.t) -> p.body.caller)
+                 ~add_caller ~null_id:Token_id.default
+                 ~party_id:(fun (p : Party.Wire.t) ->
+                   Account_id.(
+                     derive_token_id
+                       ~owner:(create p.body.public_key p.body.token_id)) )
+            |> Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
+                   Digest.Party.create p )
+        }
 
-    let to_wire (t : t) : Wire.t =
-      { fee_payer = t.fee_payer
-      ; memo = t.memo
-      ; other_parties =
-          Call_forest.to_parties_list
-            (Call_forest.remove_callers ~equal_id:Token_id.equal
-               ~add_call_type:Party.to_wire ~null_id:Token_id.default
-               ~party_caller:(fun p -> p.body.caller)
-               t.other_parties )
-      }
+      let to_wire (t : t) : Wire.t =
+        { fee_payer = t.fee_payer
+        ; memo = t.memo
+        ; other_parties =
+            Call_forest.to_parties_list
+              (Call_forest.remove_callers ~equal_id:Token_id.equal
+                 ~add_call_type:Party.to_wire ~null_id:Token_id.default
+                 ~party_caller:(fun p -> p.body.caller)
+                 t.other_parties )
+        }
 
-    include
-      Binable.Of_binable_without_uuid
-        (Wire.Stable.V1)
-        (struct
-          type nonrec t = t
+      include
+        Binable.Of_binable_without_uuid
+          (Wire.Stable.V1)
+          (struct
+            type nonrec t = t
 
-          let of_binable = of_wire
+            let of_binable = of_wire
 
-          let to_binable = to_wire
-        end)
-  end
-end]
+            let to_binable = to_wire
+          end)
+    end
+  end]
+end
+
+include T
 
 [%%define_locally Stable.Latest.(of_wire, to_wire)]
 
@@ -914,7 +918,45 @@ let weight (parties : t) : int =
     ; Weight.memo memo
     ]
 
-module Valid = struct
+module type Valid_intf = sig
+  module Verification_key_hash : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t = Zkapp_basic.F.Stable.V1.t
+        [@@deriving sexp, compare, equal, hash, yojson]
+      end
+    end]
+  end
+
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = private
+        { parties : T.Stable.V1.t
+        ; verification_keys :
+            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+    end
+  end]
+
+  val to_valid_unsafe :
+    T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
+
+  val to_valid :
+       T.t
+    -> ledger:'a
+    -> get:('a -> 'b -> Account.t option)
+    -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> t option
+
+  val of_verifiable : Verifiable.t -> t option
+
+  val forget : t -> T.t
+end
+
+module Valid : Valid_intf = struct
   module S = Stable
 
   module Verification_key_hash = struct
@@ -927,8 +969,6 @@ module Valid = struct
         let to_latest = Fn.id
       end
     end]
-
-    [%%define_locally Stable.Latest.(equal)]
   end
 
   [%%versioned
@@ -944,14 +984,54 @@ module Valid = struct
       let to_latest = Fn.id
     end
   end]
+
+  let create ~verification_keys parties : t = { parties; verification_keys }
+
+  let of_verifiable (t : Verifiable.t) : t option =
+    let open Option.Let_syntax in
+    let tbl = Account_id.Table.create () in
+    let%map () =
+      Call_forest.fold t.other_parties ~init:(Some ())
+        ~f:(fun acc (p, vk_opt) ->
+          let%bind _ok = acc in
+          let account_id = Party.account_id p in
+          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
+            let%map { With_hash.hash; _ } = vk_opt in
+            Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
+          else acc )
+    in
+    { parties = of_verifiable t
+    ; verification_keys = Account_id.Table.to_alist tbl
+    }
+
+  let to_valid_unsafe (t : T.t) :
+      [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ] =
+    `If_this_is_used_it_should_have_a_comment_justifying_it
+      (create t ~verification_keys:[])
+
+  let forget (t : t) : T.t = t.parties
+
+  let to_valid (t : T.t) ~ledger ~get ~location_of_account : t option =
+    let open Option.Let_syntax in
+    let find_vk account_id =
+      let%bind location = location_of_account ledger account_id in
+      let%bind (account : Account.t) = get ledger location in
+      let%bind zkapp = account.zkapp in
+      zkapp.verification_key
+    in
+    let tbl = Account_id.Table.create () in
+    let%map () =
+      Call_forest.fold t.other_parties ~init:(Some ()) ~f:(fun acc p ->
+          let%bind _ok = acc in
+          let account_id = Party.account_id p in
+          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
+            Option.map (find_vk account_id) ~f:(fun vk ->
+                Account_id.Table.update tbl account_id ~f:(fun _ ->
+                    With_hash.hash vk ) )
+          else acc )
+    in
+    create ~verification_keys:(Account_id.Table.to_alist tbl) t
 end
-
-let forget (t : Valid.t) : t = t.parties
-
-let to_valid_unsafe (t : t) :
-    [> `If_this_is_used_it_should_have_a_comment_justifying_it of Valid.t ] =
-  `If_this_is_used_it_should_have_a_comment_justifying_it
-    { Valid.parties = t; verification_keys = [] }
 
 include Codable.Make_base58_check (Stable.Latest)
 

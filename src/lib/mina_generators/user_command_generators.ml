@@ -120,19 +120,9 @@ let parties_with_ledger ?account_state_tbl ?vk ?succeed () =
       ~ledger ~account_state_tbl ?vk ()
   in
   let parties =
-    let (`If_this_is_used_it_should_have_a_comment_justifying_it p) =
-      Parties.to_valid_unsafe parties
-    in
-    let proof_parties =
-      Parties.Call_forest.fold ~init:[] p.parties.other_parties ~f:(fun acc p ->
-          if Control.(Tag.equal Proof (tag (Party.authorization p))) then
-            Party.account_id p :: acc
-          else acc )
-    in
-    let verification_keys =
-      List.map proof_parties ~f:(fun a -> (a, With_hash.hash verification_key))
-    in
-    { p with verification_keys }
+    Option.value_exn
+      (Parties.Valid.to_valid ~ledger ~get:Ledger.get
+         ~location_of_account:Ledger.location_of_account parties )
   in
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
