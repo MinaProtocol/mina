@@ -1,0 +1,120 @@
+---
+{{- if .Values.rosetta.enabled}}
+apiVersion: apps/v1
+{{- if .Values.features.persistence.enabled}}
+kind: StatefulSet
+{{- else}}
+kind: Deployment
+{{- end}}
+metadata:
+  name: {{.Values.name}}-rosetta
+  labels:
+    app: {{.Values.name}}-rosetta
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{.Values.name}}-rosetta
+  template:
+    metadata:
+      labels:
+        app: {{.Values.name}}-rosetta
+        testnet: {{.Values.testnetName}}
+        role: rosetta-node
+        class: "rosetta-node"
+        version: {{.Values.rosetta.image.tag | quote}}
+        syncStatus: INIT
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{.Values.ports.metrics | quote}}
+        prometheus.io/path: '/metrics'
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: "cloud.google.com/gke-preemptible"
+                  operator: In
+                  values: ["true"]
+      containers:
+      - name: mina-rosetta
+        image:  "{{.Values.rosetta.image.repository }}:{{.Values.rosetta.image.tag}}"
+        imagePullPolicy: {{.Values.rosetta.image.pullPolicy}}
+        {{- if .Values.features.customEntrypoint.enabled}}
+        command: "mina-rosetta"
+        {{- end }}
+        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        resources:
+          limits:
+          requests:
+            memory: {{.Values.resources.requests.memory}}
+            cpu: {{.Values.resources.requests.cpu}}
+        args:
+        {{- if .Values.archive.enabled}}
+        - "--archive-uri"
+        - "$(DAEMON_PG_CONN_PORT)"
+        {{- end}}
+        - "--graphql-uri"
+        - "$(DAEMON_GRAPHQL_URI)"
+        - "--port"
+        - "$(DAEMON_ROSETTA_PORT)"
+        - "--log-json"
+        - "--metrics-port"
+        - "$(DAEMON_METRICS_PORT)"
+        {{- range .Values.rosetta.args}}
+        - {{ .| quote }}
+        {{- end }}
+        env:
+        - name: DAEMON_GRAPHQL_URI
+          value: {{ $.Values.name }}:{{ .Values.ports.graphql }}/graphql
+        - name: DAEMON_ROSETTA_PORT
+          value: {{.Values.ports.rosetta | quote}}
+        - name: DAEMON_METRICS_PORT
+          value: {{.Values.ports.metrics | quote}}
+        - name: MINA_ROSETTA_PG_DATA_INTERVAL
+          value: "30"
+        - name: MINA_ROSETTA_MAX_DB_POOL_SIZE
+          value: "80"
+        - name: MINA_ROSETTA_NETWORK
+          value: "mainnet"
+        - name: MINA_NETWORK
+          value: "mainnet"
+        - name: MINA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CONNECT_PRIVATE_IPS
+          value: "true"
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ .Values.testnetName}}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
+          value: "features_network_block_data"
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{.Values.ports.p2p | quote}}
+        ports:
+        - name: rosetta-port
+          protocol: TCP
+          containerPort: {{.Values.ports.rosetta}}
+        - name: metrics-port
+          protocol: TCP
+          containerPort: {{.Values.ports.metrics}}
+        - name: external-port
+          protocol: TCP
+          containerPort: {{.Values.ports.p2p}}
+          hostPort: {{.Values.ports.external}}
+      volumes:
+      - name: destination-libp2p
+        emptyDir: {}
+      - name: config-dir
+        emptyDir: {}
+      - name: actual-libp2p
+        emptyDir: {}
+      - name: wallet-keys
+        emptyDir: {}
+{{- end }}

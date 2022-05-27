@@ -1,0 +1,127 @@
+---
+name: "generic-node"
+
+testnetName: "mainnet"
+
+image:
+  repository: minaprotocol/mina-daemon
+  pullPolicy: IfNotPresent
+  tag: focal-latest
+
+features:
+  logsnarkworkgossip:
+    enabled: false
+  enablepeerexchange:
+    enabled: true
+  runtimeConfig:
+    enabled: false
+  maxConnections: 200
+  logTxnPoolGossip:
+    enabled: false
+  exposeGraphql:
+    enabled: false
+  # requires a secret but not pulicly available - it is available in the test namespace
+  uploadBlocksToGCloud:
+    enabled: false
+  seedPeersLists:
+    enabled: true
+  customEntrypoint:
+    enabled: false
+    command: ""
+  prometheus:
+    enabled: true
+  snarkcoordinator:
+    enabled: false
+  logging:
+    enabled: true
+  persistence:
+    # for every deploy the name must be unique
+    enabled: false
+    name: "generic-node-volume"
+    storageClass: standard
+    mountPath: /data/
+    size: 100Gi
+  privateKeySecret:
+    enabled: false
+    secretName: "generic-node-devnet-bp-key"
+
+daemon:
+  enabled: true
+  args:
+    - "--libp2p-metrics-port"
+    - "9000"
+  seedPeers: []
+
+persistence:
+  enabled: true
+
+coordinator:
+  enablesd: false
+  publicKey: "" #"4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
+  snarkFee: "0.025"
+  workSelectionAlgorithm: seq #seq OR rand
+
+archive:
+  enabled: true
+  image:
+    repository: minaprotocol/mina-archive
+    pullPolicy: IfNotPresent
+    tag: focal-latest
+  pg_conn: 'postgres://postgresql:5432'
+
+rosetta:
+  enabled: true
+  image:
+    repository: minaprotocol/mina-rosetta
+    pullPolicy: IfNotPresent
+    tag: latest
+  pg_conn: 'postgres://postgresql:5432'
+  graphql_host: 'http://127.0.0.1'
+
+watchdog:
+  enabled: true
+  image: gcr.io/o1labs-192920/watchdog:latest
+  memory: 512m
+  cpu: 1.0
+restartEveryMins: ""
+restartNodes: ""
+seedPeersURL: ""
+
+libp2p:
+  seed:
+    enabled: true
+  staticKeypair:
+    enabled: false
+    secretName: "generic-node-devnet-libp2p-key"
+  loadBalancer:
+    enabled: true
+
+ports:
+  client: "8301"
+  graphql: "3085"
+  metrics: "10001"
+  p2p: "10909"
+  nodePort: "30011"
+  postgres: "5432"
+  archive: "3086"
+  rosetta: "3087"
+
+resources:
+  limits:
+  requests:
+    memory: "8Gi"
+    cpu: "12"
+    rayonThreads: "6"
+
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  periodSeconds: 10
+  initialDelaySeconds: 30
+  seed:
+    healthcheck.seed.allChecks:
+  daemon:
+    healthcheck.daemon.allChecks:
+
+nodeSelector:
+  preemptible: true

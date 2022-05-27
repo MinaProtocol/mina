@@ -1,0 +1,72 @@
+---
+{{if .Values.archive.enabled}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{.Values.name}}-archive
+  labels:
+    app: {{.Values.name}}-archive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{.Values.name}}-archive
+  template:
+    metadata:
+      labels:
+        app: {{.Values.name}}-archive
+        testnet: {{.Values.testnetName}}
+        role: archive-node
+        class: "archive-node"
+        version: {{.Values.archive.image.tag | quote}}
+        syncStatus: INIT
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{.Values.ports.metrics | quote}}
+        prometheus.io/path: '/metrics'
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: "cloud.google.com/gke-preemptible"
+                  operator: In
+                  values: ["true"]
+      containers:
+      - name: mina-archive
+        image: "{{.Values.archive.image.repository }}:{{.Values.archive.image.tag}}"
+        imagePullPolicy: {{.Values.archive.image.pullPolicy}}
+        {{- if .Values.features.customEntrypoint.enabled}}
+        command: [ {{ .Values.features.customEntrypoint.command}} ]
+        {{- end }}
+        resources:
+          limits:
+          requests:
+            memory: {{.Values.resources.requests.memory}}
+            cpu: {{.Values.resources.requests.cpu}}
+        args:
+        - "mina-archive"
+        - "run"
+        - "--postgres-uri"
+        - "$(DAEMON_ARCHIVE_PG_CONN_PORT)"
+        - "--metrics-port"
+        - "$(DAEMON_METRICS_PORT)"
+        {{- range .Values.archive.args}}
+        - {{ .| quote }}
+        {{- end }}
+        env:
+        - name: DAEMON_METRICS_PORT
+          value: {{.Values.ports.metrics | quote}}
+        - name: DAEMON_ARCHIVE_PG_CONN_PORT
+          value: {{.Values.archive.pg_conn | quote}}
+        - name: NETWORK_NAME
+          value: {{ .Values.testnetName}}
+        ports:
+        - name: archive-port
+          protocol: TCP
+          containerPort: {{.Values.ports.archive}}
+        - name: metrics-port
+          protocol: TCP
+          containerPort: {{.Values.ports.metrics}}
+{{- end}}

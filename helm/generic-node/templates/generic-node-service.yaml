@@ -1,0 +1,32 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{.Values.name}}
+spec:
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  {{- if .Values.libp2p.loadBalancer.enabled}}
+  type: LoadBalancer
+  {{- else}}
+  type: ClusterIP
+  {{- end }}
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $.Values.name }}
+  ports:
+  - name: tcp-p2p
+    port: {{ .Values.ports.p2p }}
+    targetPort: external-port
+    nodePort: {{ .Values.ports.nodePort }}
+  {{- if .Values.features.exposeGraphql.enabled }}
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{.Values.ports.graphql}}
+  {{- end }}
+  - name: tcp-archive
+    port: {{ .Values.ports.archive }}
+    targetPort: archive-port
+---

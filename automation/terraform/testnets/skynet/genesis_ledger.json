@@ -1,11 +1,10 @@
 {
-    "genesis": {
-      "genesis_state_timestamp": "2022-05-23T20:06:02Z"
-    },
-    "ledger": {
-      "name": "skynet",
-      "num_accounts": 0,
-      "accounts": []
-    }
+  "genesis": {
+    "genesis_state_timestamp": "2022-05-27T22:19:35Z"
+  },
+  "ledger": {
+    "name": "skynet",
+    "num_accounts": 0,
+    "accounts": []
   }
-  
+}

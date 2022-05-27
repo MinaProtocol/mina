@@ -1,0 +1,284 @@
+---
+{{if .Values.daemon.enabled}}
+apiVersion: apps/v1
+{{- if .Values.features.persistence.enabled}}
+kind: StatefulSet
+{{- else}}
+kind: Deployment
+{{- end}}
+metadata:
+  name: {{.Values.name}}
+  labels:
+    app: {{.Values.name}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{.Values.name}}
+  template:
+    metadata:
+      labels:
+        app: {{.Values.name}}
+        testnet: {{.Values.testnetName}}
+        role: generic-node
+        class: "generic-node"
+        version: {{.Values.image.tag | quote}}
+        syncStatus: INIT
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{.Values.ports.metrics | quote}}
+        prometheus.io/path: '/metrics'
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: "cloud.google.com/gke-preemptible"
+                  operator: In
+                  values: ["true"]
+      initContainers:
+      {{- if .Values.libp2p.staticKeypair.enabled}}
+      - name: libp2p-init-my-service
+        image: busybox:latest
+        command: ['sh', '-c', '/bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/']
+        volumeMounts:
+        - mountPath: /libp2p-keys
+          name: source-libp2p-keys
+        - mountPath: /root/libp2p-keys
+          name: destination-libp2p
+      {{- end }}
+      {{- if .Values.features.privateKeySecret.enabled}}
+      - name: fix-perms
+        image: busybox:latest
+        command: [ 'sh', '-c', 'for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys']
+        volumeMounts:
+        - mountPath: "/keys/"
+          name: private-keys
+          readOnly: true
+        - mountPath: /wallet-keys
+          name: wallet-keys
+      {{- end }}
+      containers:
+      - name: daemon
+        image: "{{.Values.image.repository }}:{{.Values.image.tag}}"
+        imagePullPolicy: {{.Values.image.pullPolicy}}
+        {{- if .Values.features.customEntrypoint.enabled}}
+        command: [ {{ .Values.features.customEntrypoint.command}} ]
+        {{- end }}
+        volumeMounts:
+        - name: destination-libp2p
+          mountPath: /root/libp2p-keys
+          readOnly: true
+        {{- if .Values.persistence.enabled}}
+        - name: config-dir
+          mountPath: "/root/.mina-config"
+        {{- end }}
+        {{- end }}
+        {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        {{- if .Values.features.runtimeConfig.enabled}}
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
+        {{- if .Values.libp2p.staticKeypair.enabled}}
+        - name: destination-libp2p
+          mountPath: "/root/libp2p-keys"
+        {{- end }}
+        {{-  if .Values.features.persistence.enabled}}
+        - name: {{.Values.features.persistence.name}}
+          mountPath: "{{.Values.features.persistence.mountPath}}"
+        {{- end }}
+        resources:
+          limits:
+          requests:
+            memory: {{.Values.resources.requests.memory}}
+            cpu: {{.Values.resources.requests.cpu}}
+        args:
+        - "daemon"
+        - "--log-level"
+        - "Debug"
+        - "--client-port"
+        - "$(DAEMON_CLIENT_PORT)"
+        - "--rest-port"
+        - "$(DAEMON_REST_PORT)"
+        - "--external-port"
+        - "$(DAEMON_EXTERNAL_PORT)"
+        - "--metrics-port"
+        - "$(DAEMON_METRICS_PORT)"
+        {{- if .Values.features.logging.enabled}}
+        - "--log-json"
+        {{- end }}
+        {{- if .Values.features.snarkcoordinator.enabled}}
+        - "-run-snark-coordinator"
+        - {{ $.Values.publicKey | quote }}
+        - "-snark-worker-fee"
+        - {{ $.Values.snarkFee | quote }}
+        - "-work-selection"
+        - {{$.Values.workSelectionAlgorithm | quote }}
+        {{- end }}
+        {{- if .Values.libp2p.staticKeypair.enabled}}
+        - "--discovery-keypair"
+        - "/root/libp2p-keys/key"
+        {{- end }}
+        {{- if .Values.libp2p.seed.enabled}}
+        - "--seed"
+        {{- end }}
+        {{- if .Values.features.runtimeConfig.enabled}}
+        - "--config-file"
+        - "/config/daemon.json"
+        {{- end }}
+        {{- if .Values.features.maxConnections}}
+        - "--max-connections"
+        - {{.Values.features.maxConnections | quote}}
+        {{- end }}
+        {{- if .Values.features.privateKeySecret.enabled}}
+        - "--block-producer-key"
+        - "/root/wallet-keys/key"
+        {{- end }}
+        {{-  if .Values.features.uploadBlocksToGCloud.enabled}}
+        - "-upload-blocks-to-gcloud"
+        - "true"
+        {{- end }}
+        {{-  if .Values.features.persistence.enabled}}
+        - "--config-directory"
+        - "{{.Values.features.persistence.mountPath}}/.mina-config"
+        {{- end }}
+        {{-  if .Values.features.seedPeersLists.enabled}}
+        - "--peer-list-url"
+        - "https://storage.googleapis.com/seed-lists/{{.Values.testnetName}}_seeds.txt"
+        {{- end }}
+        {{- range .Values.daemon.args}}
+        - {{ .| quote }}
+        {{- end }}
+        env:
+        - name: DAEMON_REST_PORT
+          value: {{.Values.ports.graphql | quote}}
+        - name: DAEMON_CLIENT_PORT
+          value: {{.Values.ports.client  | quote}}
+        - name: DAEMON_METRICS_PORT
+          value: {{.Values.ports.metrics | quote}}
+        - name: MINA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CONNECT_PRIVATE_IPS
+          value: "true"
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ .Values.testnetName}}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
+          value: "features_network_block_data"
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{.Values.ports.p2p | quote}}
+        - name: "RESTART_EVERY_MINS"
+          value: {{ .Values.restartEveryMins | quote }}
+        - name: "RESTART_NODES"
+          value: {{ .Values.restartNodes | quote }}
+        - name: "SEED_PEERS"
+          value: {{ $.Values.daemon.seedPeers | quote }}
+        - name: "SEED_PEERS_URL"
+          value: {{ $.Values.seedPeersURL | quote }}
+        {{- if .Values.libp2p.staticKeypair.enabled}}
+        - name: CODA_LIBP2P_PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.libp2p.staticKeypair.secretName | quote}}
+              key: password
+        - name: MINA_LIBP2P_PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.libp2p.staticKeypair.secretName | quote}}
+              key: password
+        {{- end }}
+        {{- if .Values.features.privateKeySecret.enabled}}
+        - name: CODA_PRIVKEY_PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.features.privateKeySecret.secretName | quote}}
+              key: password
+        - name: MINA_PRIVKEY_PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.features.privateKeySecret.secretName | quote}}
+              key: password
+        {{- end }}
+        ports:
+        - name: client-port
+          protocol: TCP
+          containerPort: {{.Values.ports.client}}
+        - name: graphql-port
+          protocol: TCP
+          containerPort: {{.Values.ports.graphql}}
+        - name: metrics-port
+          protocol: TCP
+          containerPort: {{.Values.ports.metrics}}
+        - name: external-port
+          protocol: TCP
+          containerPort: {{.Values.ports.p2p}}
+          hostPort: {{.Values.ports.external}}
+      volumes:
+      - name: destination-libp2p
+        emptyDir: {}
+      {{- if .Values.persistence.enabled}}
+      - name: config-dir
+        emptyDir: {}
+      {{- else}}
+      {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}
+      - name: wallet-keys
+        emptyDir: {}
+      {{- if .Values.features.runtimeConfig.enabled}}
+      - name: daemon-config
+        configMap:
+          name: seed-daemon-config
+      {{- end }}
+      {{- if .Values.features.uploadBlocksToGCloud.enabled}}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
+      {{- if .Values.libp2p.staticKeypair.enabled}}
+      - name: source-libp2p-keys
+        secret:
+          secretName: {{ .Values.libp2p.staticKeypair.secretName }}
+          defaultMode: 448
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- end }}
+      {{- if .Values.features.privateKeySecret.enabled}}
+      - name: private-keys
+        secret:
+          secretName: {{ .Values.features.privateKeySecret.secretName }}
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- end }}
+  {{- if .Values.features.persistence.enabled}}
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: {{.Values.features.persistence.name}}
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{.Values.features.persistence.storageClass}}
+      resources:
+        requests:
+          storage: {{.Values.features.persistence.size}}
+  {{- end}}
+---

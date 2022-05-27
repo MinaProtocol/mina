@@ -1,0 +1,12 @@
+dependencies:
+- name: common-utilities
+  repository: https://coda-charts.storage.googleapis.com
+  version: 0.0.9
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 10.12.9
+- name: common-utilities
+  repository: https://coda-charts.storage.googleapis.com
+  version: 0.0.9
+digest: sha256:90a62f4968b13b6e0fa0fb0c403063815617ae4ad367b56ecbd77eaaca1393c7
+generated: "2021-10-28T23:41:58.512076+01:00"

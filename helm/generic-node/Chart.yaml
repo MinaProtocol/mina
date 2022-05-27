@@ -1,0 +1,37 @@
+---
+apiVersion: v2
+name: generic-node
+description: A Helm chart for Mina Protocol's Generic nodes
+type: application
+version: 1.0.4
+appVersion: 1.16.0
+kubeVersion: ">=v1.11.0-0"
+annotations:
+  artifacthub.io/changes: |
+    - initial
+dependencies:
+  - name: common-utilities
+    version: 0.0.9
+    repository: "https://coda-charts.storage.googleapis.com"
+  - name: postgresql
+    version: "*"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: archive.enablePostgresDB
+  - name: common-utilities
+    version: 0.0.9
+    repository: "https://coda-charts.storage.googleapis.com"
+maintainers:
+  - name: O(1) Labs
+
+icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.png
+keywords:
+  - mina
+  - testnet
+  - generic-node
+  - archive-node
+  - block-producer
+  - stake
+  - delegate
+home: https://minaprotocol.com/
+sources:
+  - https://github.com/MinaProtocol/mina/tree/compatib;e/helm/generic-node

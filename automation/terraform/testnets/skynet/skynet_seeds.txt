@@ -1,3 +1,3 @@
-/dns4/seed-1.skynet.o1test.net/tcp/10000/p2p/12D3KooWSfvWri84zGB1umEU1m3L81ppz4ftdrjz1yDu9FqJZWuw
-/dns4/seed-2.skynet.o1test.net/tcp/10001/p2p/12D3KooWRKZcQsCPEZUWmdKfVwtBi9RCTXVtBWd1jbkesUB5eFRS
+/dns4/seed-1.skynet.o1test.net/tcp/10000/p2p/12D3KooWAdJ2xG1r63wnDcPbqyxMoMs8n559piAm9sMKyia4obTE
+/dns4/seed-2.skynet.o1test.net/tcp/10001/p2p/12D3KooWG95PDuhXDdzsi2AtP5vqu4BGpEmBmDfevzQCa2UF3jN2
 
