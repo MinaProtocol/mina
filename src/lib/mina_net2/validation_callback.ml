@@ -6,18 +6,24 @@ type validation_result = [ `Accept | `Reject | `Ignore ] [@@deriving equal]
 
 type t =
   { expiration : Time_ns.t option
+  ; created_at : Time_ns.t
   ; signal : validation_result Ivar.t
   ; mutable message_type : [ `Unknown | `Block | `Snark_work | `Transaction ]
   }
 
 let create expiration =
   { expiration = Some expiration
+  ; created_at = Time_ns.now ()
   ; signal = Ivar.create ()
   ; message_type = `Unknown
   }
 
 let create_without_expiration () =
-  { expiration = None; signal = Ivar.create (); message_type = `Unknown }
+  { expiration = None
+  ; created_at = Time_ns.now ()
+  ; signal = Ivar.create ()
+  ; message_type = `Unknown
+  }
 
 let is_expired cb =
   match cb.expiration with
@@ -34,6 +40,10 @@ module type Metric_intf = sig
   val ignored : Mina_metrics.Counter.t
 
   module Validation_time : sig
+    val update : Time.Span.t -> unit
+  end
+
+  module Processing_time : sig
     val update : Time.Span.t -> unit
   end
 end
@@ -58,7 +68,7 @@ let record_timeout_metrics cb =
       Mina_metrics.Counter.inc_one M.validations_timed_out
 
 let record_validation_metrics message_type (result : validation_result)
-    validation_time =
+    validation_time processing_time =
   match metrics_of_message_type message_type with
   | None ->
       ()
@@ -67,9 +77,11 @@ let record_validation_metrics message_type (result : validation_result)
       | `Ignore ->
           Mina_metrics.Counter.inc_one M.ignored
       | `Accept ->
-          M.Validation_time.update validation_time
+          M.Validation_time.update validation_time ;
+          M.Processing_time.update processing_time
       | `Reject ->
-          Mina_metrics.Counter.inc_one M.rejected )
+          Mina_metrics.Counter.inc_one M.rejected ;
+          M.Processing_time.update processing_time )
 
 let await_timeout cb =
   if is_expired cb then Deferred.return ()
@@ -99,7 +111,12 @@ let await cb =
               Time_ns.abs_diff expires_at (Time_ns.now ())
               |> Time_ns.Span.to_ms |> Time.Span.of_ms
             in
-            record_validation_metrics cb.message_type result validation_time ;
+            let processing_time =
+              Time_ns.abs_diff (Time_ns.now ()) cb.created_at
+              |> Time_ns.Span.to_ms |> Time.Span.of_ms
+            in
+            record_validation_metrics cb.message_type result validation_time
+              processing_time ;
             Some result
         | `Timeout ->
             record_timeout_metrics cb ; None )
