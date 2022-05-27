@@ -2040,7 +2040,7 @@ module For_tests = struct
       |> Unsigned.UInt32.(mul (of_int 2))
       |> Account.Nonce.to_uint32
     in
-    let parties : Parties.Wire.t =
+    let parties : Parties.Simple.t =
       { fee_payer =
           { Party.Fee_payer.body =
               { public_key = sender_pk
@@ -2103,7 +2103,7 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let parties = Parties.of_wire parties in
+    let parties = Parties.of_simple parties in
     let commitment = Parties.commitment parties in
     let full_commitment =
       Parties.Transaction_commitment.create_complete commitment

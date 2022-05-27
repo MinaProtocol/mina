@@ -647,7 +647,7 @@ module Party_body_components = struct
     ; nonce = t.account_precondition
     }
 
-  let to_typical_party t : Party.Body.Wire.t =
+  let to_typical_party t : Party.Body.Simple.t =
     { public_key = t.public_key
     ; update = t.update
     ; token_id = t.token_id
@@ -945,7 +945,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
       ~gen_use_full_commitment:(gen_use_full_commitment ~increment_nonce ())
   in
   let body = Party_body_components.to_typical_party body_components in
-  return { Party.Wire.body; authorization }
+  return { Party.Simple.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
 let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
@@ -1292,7 +1292,7 @@ let gen_parties_from ?(failure = None)
   let%bind memo = Signed_command_memo.gen in
   let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
-    Parties.of_wire { fee_payer; other_parties; memo }
+    Parties.of_simple { fee_payer; other_parties; memo }
   in
   (* replace dummy signature in fee payer *)
   let fee_payer_hash =
