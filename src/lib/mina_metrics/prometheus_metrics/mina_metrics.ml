@@ -431,6 +431,20 @@ module Network = struct
             "average time, in ms, for blocks to be validated and rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average time, in ms, for blocks to be accepted or rejected"
+        end)
+        ()
   end
 
   module Snark_work = struct
@@ -466,6 +480,20 @@ module Network = struct
              rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for snark work to be accepted or rejected"
+        end)
+        ()
   end
 
   module Transaction = struct
@@ -499,6 +527,20 @@ module Network = struct
           let help =
             "average delay, in ms, for transactions to be validated and \
              rebroadcasted"
+        end)
+        ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for transactions to be accepted or rejected"
         end)
         ()
   end
