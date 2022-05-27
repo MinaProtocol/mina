@@ -96,6 +96,10 @@ module Network : sig
     module Validation_time : sig
       val update : Time.Span.t -> unit
     end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
   end
 
   module Snark_work : sig
@@ -110,6 +114,10 @@ module Network : sig
     module Validation_time : sig
       val update : Time.Span.t -> unit
     end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
   end
 
   module Transaction : sig
@@ -122,6 +130,10 @@ module Network : sig
     val received : Counter.t
 
     module Validation_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Processing_time : sig
       val update : Time.Span.t -> unit
     end
   end
