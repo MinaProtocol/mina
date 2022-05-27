@@ -28,6 +28,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 0
     }
 
+  (*
+     There are 3 cases of bootstrap that we need to test:
+
+     1: short bootstrap-- bootstrap where node has been down for less than 2k+1 blocks
+     2: medium bootstrap-- bootstrap where node has been down for more than 2k+1 blocks, OR equivalently when the blockchain is longer than 2k+1 blocks and a node goes down and resets to a fresh state, thereby resetting at the genesis block, before reconnecting to the network
+     3: long bootstrap-- bootstrap where node has been down for more than 42k slots (2 epochs) where each epoch emitted at least 1 parallel scan state proof
+  *)
+
+  (* this test is the medium bootstrap test *)
+
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
@@ -37,7 +47,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
-    let%bind _ =
+    let%bind () =
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
@@ -46,7 +56,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
            (Node.id node_c) ;
-         let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 5) in
+         let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 5) in
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
