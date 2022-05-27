@@ -1,9 +1,6 @@
 [submodule "src/lib/snarky"]
 	path = src/lib/snarky
 	url = https://github.com/o1-labs/snarky
-[submodule "src/external/ppx_optcomp"]
-	path = src/external/ppx_optcomp
-	url = https://github.com/MinaProtocol/ppx_optcomp
 [submodule "src/external/async_kernel"]
 	path = src/external/async_kernel
 	url = https://github.com/MinaProtocol/async_kernel
