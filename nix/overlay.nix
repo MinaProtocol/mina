@@ -4,7 +4,7 @@ in {
   # nixpkgs + musl problems
   postgresql =
     (prev.postgresql.override { enableSystemd = false; }).overrideAttrs
-    (o: { doCheck = !prev.stdenv.hostPlatform.isMusl; });
+    (o: { doCheck = false; });
 
   openssh = (if prev.stdenv.hostPlatform.isMusl then
     (prev.openssh.override {
