@@ -20,21 +20,10 @@ type failure =
       | `Token_symbol
       | `Balance ]
 
-let gen_account_precondition_from_account ?failure ?account_state_tbl account =
+let gen_account_precondition_from_account ?failure account =
   let open Quickcheck.Let_syntax in
   let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
-    match account_state_tbl with
-    | None ->
-        account
-    | Some account_state_tbl -> (
-        match
-          Signature_lib.Public_key.Compressed.Table.find account_state_tbl
-            account.public_key
-        with
-        | None ->
-            account
-        | Some updated_account ->
-            updated_account )
+    account
   in
   (* choose constructor *)
   let%bind b = Quickcheck.Generator.bool in
@@ -228,48 +217,8 @@ let gen_account_precondition_from_account ?failure ?account_state_tbl account =
     | _ ->
         return (Party.Account_precondition.Nonce nonce)
 
-let gen_account_precondition_from ?failure ~account_id ~ledger
-    ~account_state_tbl () =
-  (* construct account_precondition using pk and ledger
-     don't return Accept, which would ignore those inputs
-  *)
-  let open Quickcheck.Let_syntax in
-  match Ledger.location_of_account ledger account_id with
-  | None -> (
-      (* account not in the ledger, can't create meaningful Full or Nonce *)
-      match failure with
-      | Some Invalid_account_precondition ->
-          let%map nonce = Account.Nonce.gen in
-          Party.Account_precondition.Nonce nonce
-      | _ ->
-          failwithf
-            "gen_account_precondition_from: account id with public key %s and \
-             token id %s not in ledger"
-            (Signature_lib.Public_key.Compressed.to_base58_check
-               (Account_id.public_key account_id) )
-            (Account_id.token_id account_id |> Token_id.to_string)
-            () )
-  | Some loc -> (
-      match Ledger.get ledger loc with
-      | None ->
-          failwith
-            "gen_account_precondition_from: could not find account with known \
-             location"
-      | Some account ->
-          gen_account_precondition_from_account ?failure account
-            ~account_state_tbl )
-
-let gen_fee ~account_state_tbl (account : Account.t) =
-  let balance =
-    match
-      Signature_lib.Public_key.Compressed.Table.find account_state_tbl
-        account.public_key
-    with
-    | None ->
-        account.balance
-    | Some (updated_account : Account.t) ->
-        updated_account.balance
-  in
+let gen_fee (account : Account.t) =
+  let balance = account.balance in
   let lo_fee = Mina_compile_config.minimum_user_command_fee in
   let hi_fee =
     Option.value_exn
@@ -284,10 +233,8 @@ let gen_fee ~account_state_tbl (account : Account.t) =
 let fee_to_amt fee =
   Currency.Amount.(Signed.of_unsigned (of_fee fee) |> Signed.negate)
 
-let gen_balance_change ?account_state_tbl ?permissions_auth (account : Account.t)
-    =
+let gen_balance_change ?permissions_auth (account : Account.t) =
   let open Quickcheck.Let_syntax in
-  let pk = account.public_key in
   let%bind sgn =
     match permissions_auth with
     | Some auth -> (
@@ -303,17 +250,7 @@ let gen_balance_change ?account_state_tbl ?permissions_auth (account : Account.t
          the effective balance is either what's in the account state table,
          if provided, or what's in the ledger
   *)
-  let effective_balance =
-    match account_state_tbl with
-    | Some tbl -> (
-        match Signature_lib.Public_key.Compressed.Table.find tbl pk with
-        | None ->
-            account.balance
-        | Some (updated_account : Account.t) ->
-            updated_account.balance )
-    | None ->
-        account.balance
-  in
+  let effective_balance = account.balance in
   let small_balance_change =
     (*make small transfers to allow generating large number of parties without an overflow*)
     let open Currency in
@@ -835,6 +772,11 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
             Int.gen_uniform_incl 0 (Ledger.num_accounts ledger - 1)
           in
           let account = Ledger.get_at_index_exn ledger index in
+          (*get the latest state of this account*)
+          let (account : Account.t) =
+            Account_id.Table.find_exn account_state_tbl
+              (Account.identifier account)
+          in
           if zkapp_account && Option.is_none account.zkapp then
             failwith "gen_party_body: chosen account has no snapp field" ;
           account
@@ -860,7 +802,11 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
                        (Account_id.public_key account_id) )
                     (Account_id.token_id account_id |> Token_id.to_string)
                     ()
-              | Some acct ->
+              | Some _acct ->
+                  (*get the latest state of the account*)
+                  let acct =
+                    Account_id.Table.find_exn account_state_tbl account_id
+                  in
                   if zkapp_account && Option.is_none acct.zkapp then
                     failwith
                       "gen_party_body: provided account has no snapp field" ;
@@ -893,9 +839,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     field_array_list_gen ~max_array_len:4 ~max_list_len:6
   in
   let%bind call_data = Snark_params.Tick.Field.gen in
-  let%bind account_precondition =
-    f_account_predcondition (Account.identifier account) ledger ()
-  in
+  let%bind account_precondition = f_account_predcondition account in
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
   let%bind use_full_commitment =
@@ -1006,7 +950,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
          in
          Some { zk with app_state; sequence_state; proved_state }
    in
-   Signature_lib.Public_key.Compressed.Table.change account_state_tbl public_key
+   Account_id.Table.change account_state_tbl (Account.identifier account)
      ~f:(function
      | None ->
          (* new entry in table *)
@@ -1068,12 +1012,9 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?vk ~available_public_keys
       ?required_balance_change ?required_balance ~ledger ~account_state_tbl
-      ~gen_balance_change:
-        (gen_balance_change ?permissions_auth ~account_state_tbl)
+      ~gen_balance_change:(gen_balance_change ?permissions_auth)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
-      ~f_account_predcondition:(fun account_id ledger ->
-        gen_account_precondition_from ?failure ~account_id ~ledger
-          ~account_state_tbl )
+      ~f_account_predcondition:(gen_account_precondition_from_account ?failure)
       ~f_party_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
         gen_use_full_commitment ~increment_nonce ~account_precondition
@@ -1088,26 +1029,13 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
     ?protocol_state_view ~account_state_tbl () :
     Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  let account_precondition_gen account_id ledger () =
-    let account =
-      match Ledger.location_of_account ledger account_id with
-      | None ->
-          failwith
-            "gen_party_predicated_fee_payer: expected account to be in ledger"
-      | Some loc -> (
-          match Ledger.get ledger loc with
-          | None ->
-              failwith "gen_party_predicated_fee_payer: no account at location"
-          | Some account ->
-              account )
-    in
+  let account_precondition_gen (account : Account.t) =
     Quickcheck.Generator.return account.nonce
   in
   let%map body_components =
     gen_party_body_components ?failure ?permissions_auth ~account_id
       ~account_state_tbl ?vk ~is_fee_payer:true ~increment_nonce:((), true)
-      ~gen_balance_change:(gen_fee ~account_state_tbl)
-      ~f_balance_change:fee_to_amt
+      ~gen_balance_change:gen_fee ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
         (* make sure the fee payer's token id is the default,
            which is represented by the unit value in the body
@@ -1154,10 +1082,21 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
   let fee_payer_account_id = Account_id.create fee_payer_pk Token_id.default in
-  let ledger_accounts = Ledger.accounts ledger in
+  let ledger_accounts = Ledger.to_list ledger in
+  (* table of public keys to accounts, updated when generating each party
+
+     a Map would be more principled, but threading that map through the code
+     adds complexity
+  *)
+  let account_state_tbl =
+    Option.value account_state_tbl ~default:(Account_id.Table.create ())
+  in
   (* make sure all ledger keys are in the keymap *)
-  Account_id.Set.iter ledger_accounts ~f:(fun acct_id ->
+  List.iter ledger_accounts ~f:(fun acct ->
+      let acct_id = Account.identifier acct in
       let pk = Account_id.public_key acct_id in
+      (*Initialize account states*)
+      Account_id.Table.update account_state_tbl acct_id ~f:(fun _ -> acct) ;
       if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
       then
         failwithf "gen_parties_from: public key %s is in ledger, but not keymap"
@@ -1166,22 +1105,14 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   (* table of public keys not in the ledger, to be used for new parties
      we have the corresponding private keys, so we can create signatures for those new parties
   *)
+  let ledger_account_set = Ledger.accounts ledger in
   let available_public_keys =
     let tbl = Signature_lib.Public_key.Compressed.Table.create () in
     Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
         let account_id = Account_id.create pk Token_id.default in
-        if not (Account_id.Set.mem ledger_accounts account_id) then
+        if not (Account_id.Set.mem ledger_account_set account_id) then
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:() ) ;
     tbl
-  in
-  (* table of public keys to accounts, updated when generating each party
-
-     a Map would be more principled, but threading that map through the code
-     adds complexity
-  *)
-  let account_state_tbl =
-    Option.value account_state_tbl
-      ~default:(Signature_lib.Public_key.Compressed.Table.create ())
   in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature

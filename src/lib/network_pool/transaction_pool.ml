@@ -2124,8 +2124,8 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_int amount
                 } ) )
 
-    let mk_parties ?valid_period ?fee_payer_idx ~sender_idx ~receiver_idx ~fee
-        ~nonce ~amount () =
+    let mk_transfer_parties ?valid_period ?fee_payer_idx ~sender_idx
+        ~receiver_idx ~fee ~nonce ~amount () =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
@@ -2170,8 +2170,13 @@ let%test_module _ =
         }
       in
       let parties = Transaction_snark.For_tests.multiple_transfers test_spec in
-      let (`If_this_is_used_it_should_have_a_comment_justifying_it parties) =
-        Parties.Valid.to_valid_unsafe parties
+      let parties =
+        Option.value_exn
+          (Parties.Valid.to_valid ~ledger:()
+             ~get:(fun _ _ -> failwith "Not expecting proof parties")
+             ~location_of_account:(fun _ _ ->
+               failwith "Not expecting proof parties" )
+             parties )
       in
       User_command.Parties parties
 
@@ -2469,13 +2474,13 @@ let%test_module _ =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
-            mk_parties
+            mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
               ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
               ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ()
           in
           let expires_later2 =
-            mk_parties
+            mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~fee_payer_idx:(0, 2) ~sender_idx:1 ~receiver_idx:9
               ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ()
@@ -2511,13 +2516,13 @@ let%test_module _ =
           assert_pool_txs cmds_wo_check ;
           (* Add new commands, remove old commands some of which are now expired *)
           let expired_zkapp =
-            mk_parties
+            mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time }
               ~fee_payer_idx:(9, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:3
               ~receiver_idx:5 ~amount:1_000_000_000 ()
           in
           let unexpired_zkapp =
-            mk_parties
+            mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~fee_payer_idx:(8, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:4
               ~receiver_idx:9 ~amount:1_000_000_000 ()
@@ -2581,8 +2586,9 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let party_transfer =
-            mk_parties ~fee_payer_idx:(0, 0) ~sender_idx:1 ~receiver_idx:9
-              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:0 ()
+            mk_transfer_parties ~fee_payer_idx:(0, 0) ~sender_idx:1
+              ~receiver_idx:9 ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:0
+              ()
           in
           let valid_commands = [ party_transfer ] in
           let cmds_wo_check =

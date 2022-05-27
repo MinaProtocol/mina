@@ -112,8 +112,7 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
           () ) ;
   (*to keep track of account states across transactions*)
   let account_state_tbl =
-    Option.value account_state_tbl
-      ~default:(Signature_lib.Public_key.Compressed.Table.create ())
+    Option.value account_state_tbl ~default:(Account_id.Table.create ())
   in
   let%bind parties =
     Parties_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
@@ -137,7 +136,7 @@ let sequence_parties_with_ledger ?length ?vk ?failure () =
         Quickcheck.Generator.small_non_negative_int
   in
   (*Keep track of account states across multiple parties transaction*)
-  let account_state_tbl = Signature_lib.Public_key.Compressed.Table.create () in
+  let account_state_tbl = Account_id.Table.create () in
   let merge_ledger source_ledger target_ledger =
     (* add all accounts in source to target *)
     Ledger.iteri source_ledger ~f:(fun _ndx acct ->
