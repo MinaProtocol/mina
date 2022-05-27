@@ -1594,8 +1594,7 @@ let%test_module "account timing check" =
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       let timing_account_id =
@@ -1675,8 +1674,7 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
-            ; protocol_state_precondition = None
-            ; account_precondition = None
+            ; preconditions = None
             }
           in
           let open Async.Deferred.Let_syntax in
@@ -1754,8 +1752,7 @@ let%test_module "account timing check" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
-            ; protocol_state_precondition = None
-            ; account_precondition = None
+            ; preconditions = None
             }
           in
           let open Async.Deferred.Let_syntax in
