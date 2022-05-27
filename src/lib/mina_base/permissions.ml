@@ -65,6 +65,15 @@ module Auth_required = struct
     end
   end]
 
+  let from ~auth_tag : t =
+    match auth_tag with
+    | Control.Tag.Proof ->
+        Proof
+    | Signature ->
+        Signature
+    | None_given ->
+        None
+
   (* permissions such that [check permission (Proof _)] is true *)
   let gen_for_proof_authorization : t Quickcheck.Generator.t =
     Quickcheck.Generator.of_list [ None; Either; Proof ]

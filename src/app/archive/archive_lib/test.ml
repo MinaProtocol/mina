@@ -237,8 +237,8 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added ~precomputed_values breadcrumb)
-                )
+                  (Diff.Builder.breadcrumb_added ~precomputed_values ~logger
+                     breadcrumb ) )
               breadcrumbs
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
@@ -312,7 +312,7 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added breadcrumb) )
+                  (Diff.Builder.breadcrumb_added ~logger breadcrumb) )
               breadcrumbs
           in
           let max_height =

@@ -2532,13 +2532,13 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_zkapps ?succeed ~num_zkapps iters :
+    let gen_zkapps ?failure ~num_zkapps iters :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind parties_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators.sequence_parties_with_ledger
-          ~length:num_zkapps ~vk ?succeed ()
+          ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
@@ -2556,7 +2556,9 @@ let%test_module "staged ledger tests" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
       let num_zkapps = transaction_capacity * iters in
-      gen_zkapps ~succeed:false ~num_zkapps iters
+      gen_zkapps
+        ~failure:Mina_generators.Parties_generators.Invalid_account_precondition
+        ~num_zkapps iters
 
     let gen_zkapps_at_capacity :
         (Ledger.t * User_command.Valid.t list * int option list)
