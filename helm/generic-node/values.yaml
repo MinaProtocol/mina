@@ -74,7 +74,7 @@ rosetta:
   image:
     repository: minaprotocol/mina-rosetta
     pullPolicy: IfNotPresent
-    tag: 1.3.1beta1-529bf17-berkeley-mainnet
+    tag: latest
   pg_conn: 'postgres://postgresql:5432'
   graphql_host: 'http://127.0.0.1'
 
