@@ -1266,7 +1266,7 @@ module T = struct
 
     let quickcheck_generator : t Quickcheck.Generator.t = gen
 
-    let quickcheck_obserber : t Quickcheck.Observer.t =
+    let quickcheck_observer : t Quickcheck.Observer.t =
       Quickcheck.Observer.of_hash (module Stable.Latest)
 
     let quickcheck_shrinker : t Quickcheck.Shrinker.t =
