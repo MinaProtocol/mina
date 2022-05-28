@@ -58,6 +58,7 @@ module Env = struct
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
+    ; unnormalized_lagrange_basis : int -> 'a
     }
 end
 
@@ -90,6 +91,7 @@ module Tick : S = struct
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
+       ; unnormalized_lagrange_basis = _
        } :
         a Env.t) =
 |ocaml}
@@ -126,6 +128,7 @@ let () =
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
+       ; unnormalized_lagrange_basis = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn
@@ -173,6 +176,7 @@ module Tock : S = struct
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
+       ; unnormalized_lagrange_basis = _
        } :
         a Env.t) =
 |ocaml}
@@ -209,6 +213,7 @@ let () =
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
+       ; unnormalized_lagrange_basis = _
        } :
         a Env.t) =
     Column.Table.of_alist_exn

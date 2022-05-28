@@ -154,6 +154,20 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
     (zeta - w1) * (zeta - w2) * (zeta - w3)
   in
   let vanishes_on_last_4_rows = zk_polynomial * (zeta - w4) in
+  let zeta_to_n_minus_1 = domain#vanishing_polynomial zeta in
+  let unnormalized_lagrange_basis i =
+    let w_to_i =
+      match i with
+      | 0 -> one
+      | 1 -> domain#generator
+      | -1 -> w1
+      | -2 -> w2
+      | -3 -> w3
+      | -4 -> w4
+      | _ -> failwith "TODO"
+    in
+    zeta_to_n_minus_1 / (zeta - w_to_i)
+  in
   { Scalars.Env.add = ( + )
   ; sub = ( - )
   ; mul = ( * )
@@ -166,7 +180,7 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
   ; double = (fun x -> of_int 2 * x)
   ; zk_polynomial
   ; omega_to_minus_3 = w3
-  ; zeta_to_n_minus_1 = domain#vanishing_polynomial zeta
+  ; zeta_to_n_minus_1
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
   ; srs_length_log2
@@ -174,6 +188,7 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
   ; gamma
   ; joint_combiner
   ; vanishes_on_last_4_rows
+  ; unnormalized_lagrange_basis
   }
 
 (* TODO: not true anymore if lookup is used *)

@@ -49,6 +49,7 @@ module Env = struct
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
+    ; unnormalized_lagrange_basis : int -> 'a
     }
 end
 
@@ -81,6 +82,7 @@ module Tick : S = struct
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
+       ; unnormalized_lagrange_basis = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -166,6 +168,7 @@ module Tick : S = struct
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
+       ; unnormalized_lagrange_basis = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -1072,6 +1075,7 @@ module Tock : S = struct
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
+       ; unnormalized_lagrange_basis = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -1157,6 +1161,7 @@ module Tock : S = struct
        ; joint_combiner = _
        ; beta = _
        ; gamma = _
+       ; unnormalized_lagrange_basis = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
