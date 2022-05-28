@@ -91,9 +91,9 @@ let evals_of_split_evals field ~zeta ~zetaw
 
 open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
-let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
+let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
     ~field_of_hex ~domain ~srs_length_log2
-    ({ alpha; beta = _; gamma = _; zeta; joint_combiner = _ } : (c, _) Minimal.t)
+    ({ alpha; beta; gamma; zeta; joint_combiner } : (t, _) Minimal.t)
     ((e0, e1) : _ Plonk_types.Evals.t Double.t) =
   let w0 = Vector.to_array e0.w in
   let w1 = Vector.to_array e1.w in
@@ -168,6 +168,9 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
   ; srs_length_log2
+  ; beta
+  ; gamma
+  ; joint_combiner
   }
 
 (* TODO: not true anymore if lookup is used *)

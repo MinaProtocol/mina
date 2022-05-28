@@ -45,6 +45,9 @@ module Env = struct
     ; endo_coefficient : 'a
     ; mds : int * int -> 'a
     ; srs_length_log2 : int
+    ; joint_combiner : 'a
+    ; beta : 'a
+    ; gamma : 'a
     }
 end
 
@@ -73,6 +76,9 @@ module Tick : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
+       ; joint_combiner = _
+       ; beta = _
+       ; gamma = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -154,6 +160,9 @@ module Tick : S = struct
        ; mds = _
        ; endo_coefficient
        ; srs_length_log2 = _
+       ; joint_combiner = _
+       ; beta = _
+       ; gamma = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -1056,6 +1065,9 @@ module Tock : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
+       ; joint_combiner = _
+       ; beta = _
+       ; gamma = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -1137,6 +1149,9 @@ module Tock : S = struct
        ; mds = _
        ; endo_coefficient
        ; srs_length_log2 = _
+       ; joint_combiner = _
+       ; beta = _
+       ; gamma = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
