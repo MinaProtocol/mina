@@ -137,14 +137,15 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
     done ;
     arr
   in
-  let w3, w2, w1 =
+  let w4, w3, w2, w1 =
     (* generator^{n - 3} *)
     let gen = domain#generator in
     (* gen_inv = gen^{n - 1} = gen^{-1} *)
-    let gen_inv = one / gen in
-    let w3 = square gen_inv * gen_inv in
-    let w2 = gen * w3 in
-    (w3, w2, gen * w2)
+    let w1 = one / gen in
+    let w2 = w1 * w1 in
+    let w3 = w2 * w1 in
+    let w4 = w3 * w1 in
+    (w4, w3, w2, w1)
   in
   let zk_polynomial =
     (* Vanishing polynomial of [w1, w2, w3]
@@ -152,6 +153,7 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
     *)
     (zeta - w1) * (zeta - w2) * (zeta - w3)
   in
+  let vanishes_on_last_4_rows = zk_polynomial * (zeta - w4) in
   { Scalars.Env.add = ( + )
   ; sub = ( - )
   ; mul = ( * )
@@ -171,6 +173,7 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
   ; beta
   ; gamma
   ; joint_combiner
+  ; vanishes_on_last_4_rows
   }
 
 (* TODO: not true anymore if lookup is used *)
