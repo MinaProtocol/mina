@@ -233,6 +233,7 @@ module Stable = struct
                    ; complete_add_comm = g c.complete_add_comm
                    ; endomul_scalar_comm = g c.endomul_scalar_comm
                    ; chacha_comm = None
+                   ; range_check_comm = None
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None

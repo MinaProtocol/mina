@@ -20,6 +20,7 @@ pub struct CamlPlonkVerificationEvals<PolyComm> {
     pub emul_comm: PolyComm,
     pub endomul_scalar_comm: PolyComm,
     pub chacha_comm: Option<Vec<PolyComm>>,
+    pub range_check_comm: Option<Vec<PolyComm>>,
 }
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Enum)]
@@ -35,6 +36,7 @@ pub struct CamlLookupVerifierIndex<PolyComm> {
     pub lookup_selectors: Vec<PolyComm>,
     pub table_ids: Option<PolyComm>,
     pub max_joint_size: ocaml::Int,
+    pub runtime_tables_selector: Option<PolyComm>,
 }
 
 impl<G, CamlPolyComm> From<LookupVerifierIndex<G>> for CamlLookupVerifierIndex<CamlPolyComm>
@@ -49,6 +51,7 @@ where
             lookup_selectors,
             table_ids,
             max_joint_size,
+            runtime_tables_selector,
         } = li;
         CamlLookupVerifierIndex {
             lookup_used: {
@@ -62,6 +65,7 @@ where
             lookup_selectors: lookup_selectors.into_iter().map(From::from).collect(),
             table_ids: table_ids.map(From::from),
             max_joint_size: max_joint_size.try_into().unwrap(),
+            runtime_tables_selector: runtime_tables_selector.map(From::from),
         }
     }
 }
@@ -78,6 +82,7 @@ where
             lookup_selectors,
             table_ids,
             max_joint_size,
+            runtime_tables_selector,
         } = li;
         LookupVerifierIndex {
             lookup_used: {
@@ -90,6 +95,7 @@ where
             lookup_selectors: lookup_selectors.into_iter().map(From::from).collect(),
             table_ids: table_ids.map(From::from),
             max_joint_size: max_joint_size.try_into().unwrap(),
+            runtime_tables_selector: runtime_tables_selector.map(From::from),
         }
     }
 }

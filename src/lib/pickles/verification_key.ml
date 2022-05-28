@@ -16,6 +16,7 @@ module Verifier_index_json = struct
       ; lookup_selectors : 'polyComm array
       ; table_ids : 'polyComm option
       ; max_joint_size : int
+      ; runtime_tables_selector : 'polyComm option
       }
     [@@deriving yojson]
   end
@@ -35,6 +36,7 @@ module Verifier_index_json = struct
     ; emul_comm : 'polyComm
     ; endomul_scalar_comm : 'polyComm
     ; chacha_comm : 'polyComm array option
+    ; range_check_comm : 'polyComm array option
     }
   [@@deriving yojson]
 
@@ -139,6 +141,7 @@ module Stable = struct
              ; complete_add_comm = g c.complete_add_comm
              ; endomul_scalar_comm = g c.endomul_scalar_comm
              ; chacha_comm = None
+             ; range_check_comm = None
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None

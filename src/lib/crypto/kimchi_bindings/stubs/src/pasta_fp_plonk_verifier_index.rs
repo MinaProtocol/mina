@@ -47,6 +47,16 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
                 chacha_comm: vi
                     .chacha_comm
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
+                range_check_comm: {
+                    if vi.range_check_comm.len() == 0 { None }
+                    else {
+                    Some (vi
+                    .range_check_comm
+                    .iter()
+                    .map(Into::into)
+                    .collect())
+                    }
+                },
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
@@ -82,7 +92,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
         // TODO chacha, dummy_lookup_value ?
-        let (linearization, powers_of_alpha) = expr_linearization(domain, false, None);
+        let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
 
         VerifierIndex::<GAffine> {
             domain,
@@ -103,6 +113,15 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             endomul_scalar_comm: evals.endomul_scalar_comm.into(),
 
             chacha_comm,
+
+            range_check_comm: {
+                match evals.range_check_comm {
+                    None => vec![],
+                    Some(range_check_comm) => {
+                        range_check_comm.iter().map(Into::into).collect()
+                    },
+                }
+            },
 
             shift,
             zkpm: zk_polynomial(domain),
@@ -128,7 +147,7 @@ pub fn read_raw(
     let fq_sponge_params = oracle::pasta::fq_kimchi::params();
     let fr_sponge_params = oracle::pasta::fp_kimchi::params();
     VerifierIndex::<GAffine>::from_file(
-        srs.0,
+        Some(srs.0),
         path,
         offset.map(|x| x as u64),
         endo_q,
@@ -227,6 +246,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             emul_comm: comm(),
             endomul_scalar_comm: comm(),
             chacha_comm: None,
+            range_check_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
         lookup_index: None,

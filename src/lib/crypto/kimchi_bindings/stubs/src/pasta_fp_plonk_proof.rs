@@ -81,7 +81,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fq>::setup();
         let proof =
-            ProverProof::create_recursive::<EFqSponge, EFrSponge>(&group_map, witness, index, prev)
+            ProverProof::create_recursive::<EFqSponge, EFrSponge>(&group_map, witness, &[], index, prev)
                 .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok(proof.into())
     })

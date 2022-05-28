@@ -55,6 +55,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     let cs = match ConstraintSystem::<Fp>::create(
         gates,
         vec![],
+        None,
         oracle::pasta::fp_kimchi::params(),
         public as usize,
     ) {
@@ -145,7 +146,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     t.srs = srs.clone();
     t.fq_sponge_params = oracle::pasta::fq_kimchi::params();
 
-    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, None);
+    let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 
