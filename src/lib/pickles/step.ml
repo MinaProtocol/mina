@@ -152,6 +152,7 @@ struct
           in
           let alpha = to_field plonk0.alpha in
           let zeta = to_field plonk0.zeta in
+          let joint_combiner = to_field plonk0.joint_combiner in
           let zetaw =
             Tick.Field.(
               zeta * domain_generator ~log2_size:(Domain.log2_size domain))
@@ -168,6 +169,7 @@ struct
             ; alpha
             ; beta = Challenge.Constant.to_tick_field plonk0.beta
             ; gamma = Challenge.Constant.to_tick_field plonk0.gamma
+            ; joint_combiner
             }
           in
           let env =
@@ -226,6 +228,7 @@ struct
                       ; alpha = plonk0.alpha
                       ; beta = plonk0.beta
                       ; gamma = plonk0.gamma
+                      ; joint_combiner = plonk0.joint_combiner
                       }
                   }
               ; me_only =
@@ -269,6 +272,7 @@ struct
           ; beta = O.beta o
           ; gamma = O.gamma o
           ; zeta = scalar_chal O.zeta
+          ; joint_combiner = scalar_chal O.joint_combiner
           }
         in
         let xi = scalar_chal O.v in
@@ -287,6 +291,8 @@ struct
           let zeta = to_field plonk0.zeta
 
           let alpha = to_field plonk0.alpha
+
+          let joint_combiner = to_field plonk0.joint_combiner
         end in
         let w =
           Tock.Field.domain_generator
@@ -358,7 +364,11 @@ struct
             ~zeta:As_field.zeta ~zetaw
         in
         let tock_plonk_minimal =
-          { plonk0 with zeta = As_field.zeta; alpha = As_field.alpha }
+          { plonk0 with
+            zeta = As_field.zeta
+          ; alpha = As_field.alpha
+          ; joint_combiner = As_field.joint_combiner
+          }
         in
         let tock_env =
           Plonk_checks.scalars_env
@@ -426,6 +436,7 @@ struct
                   ; alpha = plonk0.alpha
                   ; beta = chal plonk0.beta
                   ; gamma = chal plonk0.gamma
+                  ; joint_combiner = plonk0.joint_combiner
                   }
               ; combined_inner_product = shifted_value combined_inner_product
               ; xi

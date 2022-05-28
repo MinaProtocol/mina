@@ -37,6 +37,7 @@ module Wrap = struct
                 ; beta : 'challenge
                 ; gamma : 'challenge
                 ; zeta : 'scalar_challenge
+                ; joint_combiner : 'scalar_challenge
                 }
               [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
@@ -79,6 +80,8 @@ module Wrap = struct
                   (** scalar used on one of the permutation polynomial commitments. *)
             ; generic : 'fp Generic_coeffs_vec.t
                   (** scalars used on the coefficient column commitments. *)
+            ; joint_combiner : 'scalar_challenge
+                  (** joint combiner for lookups. *)
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
@@ -88,6 +91,7 @@ module Wrap = struct
             ; beta = f t.beta
             ; gamma = f t.gamma
             ; zeta = scalar t.zeta
+            ; joint_combiner = scalar t.joint_combiner
             }
 
           let map_fields t ~f =
@@ -119,13 +123,19 @@ module Wrap = struct
               ; fp
               ; fp
               ; Vector.typ fp Nat.N9.n
+              ; Scalar_challenge.typ scalar_challenge
               ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         end
 
         let to_minimal (t : _ In_circuit.t) : _ Minimal.t =
-          { alpha = t.alpha; beta = t.beta; zeta = t.zeta; gamma = t.gamma }
+          { alpha = t.alpha
+          ; beta = t.beta
+          ; zeta = t.zeta
+          ; gamma = t.gamma
+          ; joint_combiner = t.joint_combiner
+          }
       end
 
       [%%versioned
@@ -565,7 +575,7 @@ module Wrap = struct
         Struct
           [ Vector (B Field, Nat.N19.n)
           ; Vector (B Challenge, Nat.N2.n)
-          ; Vector (Scalar Challenge, Nat.N3.n)
+          ; Vector (Scalar Challenge, Nat.N4.n)
           ; Vector (B Digest, Nat.N3.n)
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Index, Nat.N1.n)
@@ -594,6 +604,7 @@ module Wrap = struct
                        ; endomul_scalar
                        ; perm
                        ; generic
+                       ; joint_combiner
                        }
                    }
                ; sponge_digest_before_evaluations
@@ -611,7 +622,7 @@ module Wrap = struct
           :: endomul :: endomul_scalar :: perm :: generic
         in
         let challenge = [ beta; gamma ] in
-        let scalar_challenge = [ alpha; zeta; xi ] in
+        let scalar_challenge = [ alpha; zeta; xi; joint_combiner ] in
         let digest =
           [ sponge_digest_before_evaluations; me_only; pass_through ]
         in
@@ -648,7 +659,7 @@ module Wrap = struct
           fp
         in
         let [ beta; gamma ] = challenge in
-        let [ alpha; zeta; xi ] = scalar_challenge in
+        let [ alpha; zeta; xi; joint_combiner ] = scalar_challenge in
         let [ sponge_digest_before_evaluations; me_only; pass_through ] =
           digest
         in
@@ -674,6 +685,7 @@ module Wrap = struct
                     ; endomul_scalar
                     ; perm
                     ; generic
+                    ; joint_combiner
                     }
                 }
             ; sponge_digest_before_evaluations
@@ -839,7 +851,7 @@ module Step = struct
             [ Vector (B Field, Nat.N19.n)
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
-            ; Vector (Scalar Challenge, Nat.N3.n)
+            ; Vector (Scalar Challenge, Nat.N4.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
             ]
@@ -864,6 +876,7 @@ module Step = struct
                      ; endomul_scalar
                      ; perm
                      ; generic
+                     ; joint_combiner
                      }
                  }
              ; should_finalize
@@ -877,7 +890,7 @@ module Step = struct
             :: endomul :: endomul_scalar :: perm :: generic
           in
           let challenge = [ beta; gamma ] in
-          let scalar_challenge = [ alpha; zeta; xi ] in
+          let scalar_challenge = [ alpha; zeta; xi; joint_combiner ] in
           let digest = [ sponge_digest_before_evaluations ] in
           let bool = [ should_finalize ] in
           let open Hlist.HlistId in
@@ -903,7 +916,7 @@ module Step = struct
                                        :: endomul_scalar :: perm :: generic)
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
-              ; Vector.[ alpha; zeta; xi ]
+              ; Vector.[ alpha; zeta; xi; joint_combiner ]
               ; bulletproof_challenges
               ; Vector.[ should_finalize ]
               ] : _ t =
@@ -926,6 +939,7 @@ module Step = struct
                   ; endomul_scalar
                   ; perm
                   ; generic
+                  ; joint_combiner
                   }
               }
           ; should_finalize

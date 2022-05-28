@@ -46,12 +46,14 @@ module Constant = struct
     let beta = chal () in
     let gamma = chal () in
     let zeta = scalar_chal () in
+    let joint_combiner = scalar_chal () in
     let chals :
         _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
       { alpha = Common.Ipa.Wrap.endo_to_field alpha
       ; beta = Challenge.Constant.to_tock_field beta
       ; gamma = Challenge.Constant.to_tock_field gamma
       ; zeta = Common.Ipa.Wrap.endo_to_field zeta
+      ; joint_combiner = Common.Ipa.Wrap.endo_to_field joint_combiner
       }
     in
     let evals =
@@ -82,6 +84,7 @@ module Constant = struct
             ; beta
             ; gamma
             ; zeta
+            ; joint_combiner
             }
         ; combined_inner_product = Shifted_value (tock ())
         ; xi = Scalar_challenge.create one_chal

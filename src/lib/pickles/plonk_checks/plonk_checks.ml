@@ -93,7 +93,7 @@ open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
 let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
     ~field_of_hex ~domain ~srs_length_log2
-    ({ alpha; beta = _; gamma = _; zeta } : (c, _) Minimal.t)
+    ({ alpha; beta = _; gamma = _; zeta; joint_combiner = _ } : (c, _) Minimal.t)
     ((e0, e1) : _ Plonk_types.Evals.t Double.t) =
   let w0 = Vector.to_array e0.w in
   let w1 = Vector.to_array e1.w in
@@ -181,7 +181,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
-      ~(env : t Scalars.Env.t) ({ alpha = _; beta; gamma; zeta } : _ Minimal.t)
+      ~(env : t Scalars.Env.t)
+      ({ alpha = _; beta; gamma; zeta; joint_combiner = _ } : _ Minimal.t)
       ((e0, e1) : _ Plonk_types.Evals.t Double.t) p_eval0 =
     let zkp = env.zk_polynomial in
     let alpha_pow = env.alpha_pow in
@@ -222,7 +223,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift =
     let _ = with_label in
     let open F in
-    fun ({ alpha; beta; gamma; zeta } : _ Minimal.t)
+    fun ({ alpha; beta; gamma; zeta; joint_combiner } : _ Minimal.t)
         ((e0, e1) : _ Plonk_types.Evals.t Double.t) ->
       let zkp = env.zk_polynomial in
       let index_terms = Sc.index_terms env in
@@ -259,6 +260,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             Lazy.force (Hashtbl.find_exn index_terms (Index EndoMulScalar))
         ; perm
         ; generic
+        ; joint_combiner
         }
 
   (** Check that computed proof scalars match the expected ones,
@@ -280,6 +282,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; beta = plonk.beta
         ; gamma = plonk.gamma
         ; zeta = plonk.zeta
+        ; joint_combiner = plonk.joint_combiner
         }
         evals
     in

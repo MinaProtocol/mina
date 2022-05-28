@@ -82,6 +82,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
+        let joint_combiner = sc plonk0.joint_combiner in
         let step_domains = key.step_domains.(Index.to_int which_branch) in
         let w =
           Tick.Field.domain_generator
@@ -92,7 +93,12 @@ let verify_heterogenous (ts : Instance.t list) =
             _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
             =
           let chal = Challenge.Constant.to_tick_field in
-          { zeta; alpha; beta = chal plonk0.beta; gamma = chal plonk0.gamma }
+          { zeta
+          ; alpha
+          ; beta = chal plonk0.beta
+          ; gamma = chal plonk0.gamma
+          ; joint_combiner
+          }
         in
         let tick_combined_evals =
           Plonk_checks.evals_of_split_evals
@@ -128,6 +134,7 @@ let verify_heterogenous (ts : Instance.t list) =
           ; alpha = plonk0.alpha
           ; beta = plonk0.beta
           ; gamma = plonk0.gamma
+          ; joint_combiner = plonk0.joint_combiner
           }
         in
         Timer.clock __LOC__ ;

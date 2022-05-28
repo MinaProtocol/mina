@@ -6,6 +6,8 @@ module type Inputs_intf = sig
 
   module Field : sig
     type t
+
+    val zero : t
   end
 
   module Proof : sig
@@ -46,6 +48,13 @@ module Make (Inputs : Inputs_intf) = struct
   let gamma (t : t) = t.o.gamma
 
   let zeta (t : t) = t.o.zeta_chal
+
+  let joint_combiner (t : t) =
+    match t.o.joint_combiner with
+    | Some (joint_combiner, _) ->
+        joint_combiner
+    | None ->
+        scalar_challenge Inputs.Field.zero
 
   let digest_before_evaluations (t : t) = t.digest_before_evaluations
 

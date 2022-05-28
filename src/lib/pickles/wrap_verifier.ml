@@ -540,6 +540,10 @@ struct
         absorb sponge PC (Boolean.true_, x_hat) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        let joint_combiner =
+          (* TODO *)
+          if true then SC.SC.create Field.zero else sample_scalar ()
+        in
         let beta = sample () in
         let gamma = sample () in
         let z_comm = messages.z_comm in
@@ -632,8 +636,9 @@ struct
           ; beta = plonk.beta
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
+          ; joint_combiner = plonk.joint_combiner
           }
-          { alpha; beta; gamma; zeta } ;
+          { alpha; beta; gamma; zeta; joint_combiner } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   module Split_evaluations = struct
