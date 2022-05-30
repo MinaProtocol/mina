@@ -20,8 +20,6 @@ let
     "rpc_parallel"
     "async_kernel"
     "base58"
-    "graphql_ppx"
-    "ppx_deriving_yojson"
   ] (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   implicit-deps = export // external-packages;
