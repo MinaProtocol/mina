@@ -188,11 +188,11 @@
         "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1653311921,
-        "narHash": "sha256-9FGwK1iS0zkvinu7RICwwClfeZ0dtQ+jxSR8B+9XSks=",
+        "lastModified": 1653914403,
+        "narHash": "sha256-NWlMm/4HnoraJRISj6e7IVAx5hAEnN1P/VAZSD/u+hQ=",
         "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "6091713071d226fb22e00e407e4aef741e549588",
+        "rev": "6f68c995519b71682cb811bae2b4c91c95f86ab0",
         "type": "github"
       },
       "original": {

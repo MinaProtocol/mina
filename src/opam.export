@@ -259,6 +259,7 @@ package "graphql_ppx" {
     "dune" {>= "2.5"}
     "ocaml" {>= "4.06"}
     "ppxlib" {>= "0.21.0"}
+    "result" {>= "1.5"}
   ]
   build: [
     ["dune" "build" "-p" name "-j" jobs]
@@ -266,6 +267,7 @@ package "graphql_ppx" {
   ]
   dev-repo: "git+https://github.com/reasonml-community/graphql-ppx.git"
   url {
-    src: "git+https://github.com/reasonml-community/graphql-ppx.git#master"
+    src: "https://github.com/reasonml-community/graphql-ppx/archive/eb8648d1552fbc11989b9197ef41a7a958b2545f.tar.gz"
+    checksum: "sha256=f2aa35f1de4a9c7ef6fac9766a72e2d8bd112036fcf23c3e0906e74d5eb4be7b"
   }
 }
