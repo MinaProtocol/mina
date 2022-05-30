@@ -1845,8 +1845,10 @@ module T = struct
           get_verification_keys (Account_id.Set.to_list proof_parties)
         in
         if
-          Account_id.Map.equal Parties.Valid.Verification_key_hash.equal
-            checked_verification_keys current_verification_keys
+          Account_id.Set.length proof_parties
+          = Account_id.Map.length checked_verification_keys
+          && Account_id.Map.equal Parties.Valid.Verification_key_hash.equal
+               checked_verification_keys current_verification_keys
         then true
         else (
           [%log error]
@@ -3826,22 +3828,36 @@ let%test_module "staged ledger tests" =
                     let hash = Zkapp_account.digest_vk data in
                     ({ data; hash } : _ With_hash.t)
                   in
-                  Transaction_snark.For_tests.create_trivial_zkapp_account
-                    ~permissions:snapp_permissions ~vk:dummy_vk ~ledger snapp_pk ;
-                  let open Async.Deferred.Let_syntax in
-                  let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
+                  let valid_against_ledger =
+                    let new_mask =
+                      Ledger.Mask.create ~depth:(Ledger.depth ledger) ()
+                    in
+                    let l = Ledger.register_mask ledger new_mask in
+                    Transaction_snark.For_tests.create_trivial_zkapp_account
+                      ~permissions:snapp_permissions ~vk ~ledger:l snapp_pk ;
+                    l
+                  in
                   let%bind parties =
                     Transaction_snark.For_tests.update_states ~snapp_prover
                       ~constraint_constants test_spec
                   in
-                  let parties =
+                  let valid_parties =
                     Option.value_exn
-                      (Parties.Valid.to_valid ~ledger ~get:Ledger.get
+                      (Parties.Valid.to_valid ~ledger:valid_against_ledger
+                         ~get:Ledger.get
                          ~location_of_account:Ledger.location_of_account parties )
                   in
+                  ignore
+                    (Ledger.unregister_mask_exn valid_against_ledger
+                       ~loc:__LOC__ ) ;
+                  (*Different key in the staged ledger*)
+                  Transaction_snark.For_tests.create_trivial_zkapp_account
+                    ~permissions:snapp_permissions ~vk:dummy_vk ~ledger snapp_pk ;
+                  let open Async.Deferred.Let_syntax in
+                  let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let%bind _proof, diff =
                     create_and_apply sl
-                      (Sequence.singleton (User_command.Parties parties))
+                      (Sequence.singleton (User_command.Parties valid_parties))
                       stmt_to_work_one_prover
                   in
                   let commands = Staged_ledger_diff.commands diff in
@@ -3864,7 +3880,7 @@ let%test_module "staged ledger tests" =
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let%bind _proof, diff =
                     create_and_apply sl
-                      (Sequence.singleton (User_command.Parties parties))
+                      (Sequence.singleton (User_command.Parties valid_parties))
                       stmt_to_work_one_prover
                   in
                   let commands = Staged_ledger_diff.commands diff in
