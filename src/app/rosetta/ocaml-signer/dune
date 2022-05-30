@@ -28,7 +28,8 @@
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -47,7 +48,8 @@
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -66,7 +68,8 @@
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -85,7 +88,8 @@
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))

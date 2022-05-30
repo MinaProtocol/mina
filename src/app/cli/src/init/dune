@@ -94,4 +94,4 @@
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh ../../../../../graphql_schema.json)
- (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
+ (preprocess (pps graphql_ppx ppx_deriving_yojson ppx_coda ppx_version ppx_let)))

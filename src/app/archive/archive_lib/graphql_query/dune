@@ -15,5 +15,5 @@
  )
  (preprocessor_deps ../../archive_graphql_schema.json)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json))
+ (preprocess (pps ppx_base ppx_let ppx_version graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json))
 )
