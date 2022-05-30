@@ -255,7 +255,7 @@ let%test_module "Protocol state precondition tests" =
                     ; authorization = Signature.dummy
                     }
                   in
-                  let sender_party : Party.Wire.t =
+                  let sender_party : Party.Simple.t =
                     { body =
                         { public_key = sender_pk
                         ; update = Party.Update.noop
@@ -278,7 +278,7 @@ let%test_module "Protocol state precondition tests" =
                     ; authorization = Control.Signature Signature.dummy
                     }
                   in
-                  let snapp_party : Party.Wire.t =
+                  let snapp_party : Party.Simple.t =
                     { body =
                         { public_key = snapp_pk
                         ; update = snapp_update
@@ -309,7 +309,7 @@ let%test_module "Protocol state precondition tests" =
                     }
                   in
                   let ps =
-                    Parties.Call_forest.With_hashes.of_parties_list
+                    Parties.Call_forest.With_hashes.of_parties_simple_list
                       (List.map
                          ~f:(fun p -> (p, ()))
                          [ sender_party; snapp_party ] )
@@ -333,7 +333,7 @@ let%test_module "Protocol state precondition tests" =
                     in
                     { fee_payer with authorization = fee_payer_signature_auth }
                   in
-                  let sender_party : Party.Wire.t =
+                  let sender_party : Party.Simple.t =
                     let signature_auth : Signature.t =
                       Signature_lib.Schnorr.Chunked.sign sender.private_key
                         (Random_oracle.Input.Chunked.field commitment)
@@ -356,7 +356,7 @@ let%test_module "Protocol state precondition tests" =
                     ; memo
                     ; other_parties = [ sender_party; snapp_party ]
                     }
-                    |> Parties.of_wire
+                    |> Parties.of_simple
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
@@ -644,7 +644,7 @@ let%test_module "Account precondition tests" =
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party : Party.Wire.t =
+              let sender_party : Party.Simple.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -667,7 +667,7 @@ let%test_module "Account precondition tests" =
                 ; authorization = Control.Signature Signature.dummy
                 }
               in
-              let snapp_party : Party.Wire.t =
+              let snapp_party : Party.Simple.t =
                 { body =
                     { public_key = snapp_pk
                     ; update = snapp_update
@@ -694,7 +694,7 @@ let%test_module "Account precondition tests" =
                 }
               in
               let ps =
-                Parties.Call_forest.With_hashes.of_parties_list
+                Parties.Call_forest.With_hashes.of_parties_simple_list
                   (List.map ~f:(fun p -> (p, ())) [ sender_party; snapp_party ])
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
@@ -735,7 +735,7 @@ let%test_module "Account precondition tests" =
                 }
               in
               let parties_with_invalid_fee_payer =
-                Parties.of_wire
+                Parties.of_simple
                   { fee_payer
                   ; memo
                   ; other_parties = [ sender_party; snapp_party ]
