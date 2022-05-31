@@ -114,7 +114,6 @@ module Party_under_construction = struct
     ; events = []
     ; sequence_events = []
     ; call_data = Field.Constant.zero
-    ; call_depth = 0
     ; preconditions =
         { Party.Preconditions.network =
             { snarked_ledger_hash = Ignore
@@ -322,7 +321,6 @@ module Party_under_construction = struct
       ; events = var_of_t Zkapp_account.Events.typ []
       ; sequence_events = var_of_t Zkapp_account.Events.typ []
       ; call_data = Field.zero
-      ; call_depth = As_prover.Ref.create (fun () -> 0)
       ; preconditions =
           { Party.Preconditions.Checked.network =
               var_of_t Zkapp_precondition.Protocol_state.typ

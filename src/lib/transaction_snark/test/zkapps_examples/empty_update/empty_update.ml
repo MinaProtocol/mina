@@ -45,11 +45,13 @@ let party_proof =
         ; at_party = Parties.Call_forest.empty
         } )
 
-let party : Party.t = { body = party_body; authorization = Proof party_proof }
+let party : Party.Graphql_repr.t =
+  Party.to_graphql_repr ~call_depth:0
+    { body = party_body; authorization = Proof party_proof }
 
-let deploy_party_body : Party.Body.t =
+let deploy_party_body : Party.Body.Graphql_repr.t =
   (* TODO: This is a pain. *)
-  { Party.Body.dummy with
+  { Party.Body.Graphql_repr.dummy with
     public_key = pk_compressed
   ; update =
       { Party.Update.dummy with
@@ -71,7 +73,7 @@ let deploy_party_body : Party.Body.t =
   ; use_full_commitment = true
   }
 
-let deploy_party : Party.t =
+let deploy_party : Party.Graphql_repr.t =
   (* TODO: This is a pain. *)
   { body = deploy_party_body; authorization = Signature Signature.dummy }
 
@@ -80,8 +82,9 @@ let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
 let ps =
   (* TODO: This is a pain. *)
   Parties.Call_forest.of_parties_list
-    ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+    ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
     [ deploy_party; party ]
+  |> Parties.Call_forest.map ~f:Party.of_graphql_repr
   |> Parties.Call_forest.accumulate_hashes_predicated
 
 let memo = Signed_command_memo.empty
@@ -149,7 +152,8 @@ let parties : Parties.t =
     { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
     ; other_parties =
         Parties.Call_forest.of_parties_list [ deploy_party; party ]
-          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+          ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
+        |> Parties.Call_forest.map ~f:Party.of_graphql_repr
         |> Parties.Call_forest.accumulate_hashes'
     ; memo
     }
