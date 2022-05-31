@@ -130,7 +130,7 @@ let
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
-        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}/lib";
+        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
         configurePhase = ''
           export MINA_ROOT="$PWD"
           export -f patchShebangs stopNest isScript
