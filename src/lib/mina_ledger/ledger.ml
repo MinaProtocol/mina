@@ -470,8 +470,8 @@ let%test_unit "tokens test" =
   in
   let main (ledger : t) =
     let execute_parties_transaction
-        (parties : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t) : unit
-        =
+        (parties : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t) :
+        unit =
       let _, ({ nonce; _ } : Account.t), _ =
         Ledger_inner.get_or_create ledger
           (Account_id.create pk Token_id.default)
@@ -510,7 +510,7 @@ let%test_unit "tokens test" =
     let account_creation_fee =
       Currency.Fee.to_int constraint_constants.account_creation_fee
     in
-    let create_token : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
+    let create_token : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
       mk_forest
         [ mk_node
             (mk_party_body Call token_funder Token_id.default

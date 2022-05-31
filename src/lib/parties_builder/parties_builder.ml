@@ -3,13 +3,13 @@
 open Core_kernel
 open Mina_base
 
-let mk_forest ps : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
+let mk_forest ps : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
   List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
 
 let mk_node party calls =
   { Parties.Call_forest.Tree.party; party_digest = (); calls = mk_forest calls }
 
-let mk_party_body caller kp token_id balance_change : Party.Body.Wire.t =
+let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
   let open Signature_lib in
   { update = Party.Update.noop
   ; public_key = Public_key.compress kp.Keypair.public_key
@@ -49,9 +49,9 @@ let mk_parties_transaction ~fee ~fee_payer_pk ~fee_payer_nonce other_parties :
   ; other_parties =
       other_parties
       |> Parties.Call_forest.map
-           ~f:(fun (p : Party.Body.Wire.t) : Party.Wire.t ->
+           ~f:(fun (p : Party.Body.Simple.t) : Party.Simple.t ->
              { body = p; authorization = Signature Signature.dummy } )
-      |> Parties.Call_forest.add_callers'
+      |> Parties.Call_forest.add_callers_simple
       |> Parties.Call_forest.accumulate_hashes_predicated
   }
 
