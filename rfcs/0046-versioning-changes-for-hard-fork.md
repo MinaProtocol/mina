@@ -161,6 +161,10 @@ no longer need unit tests for version-asserted types. `ppx_version`
 was checking for a `For_tests` module in that case, to remind that
 such tests were needed; that check can be removed.
 
+Shape digests will also allow detecting changes to serializations
+provided by hand-written `bin_io` code. We may wish to add a module
+annotation like `%versioned_custom` for that use case.
+
 ## Drawbacks
 [drawbacks]: #drawbacks
 
