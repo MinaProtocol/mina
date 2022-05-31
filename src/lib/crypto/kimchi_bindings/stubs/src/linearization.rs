@@ -2,7 +2,7 @@ use kimchi::{
     circuits::{
         expr::Linearization,
         lookup::constraints::LookupConfiguration,
-        lookup::lookups::{JointLookup, LookupsUsed},
+        lookup::lookups::{JointLookup, LookupInfo, LookupPattern, LookupsUsed},
     },
     linearization::{constraints_expr, linearization_columns},
 };
@@ -37,16 +37,12 @@ pub fn lookup_gate_config<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     LookupConfiguration {
         lookup_used: LookupsUsed::Joint,
 
-        max_lookups_per_row: 4,
-        max_joint_size: 2,
+        lookup_info: LookupInfo::create([LookupPattern::LookupGate].into_iter().collect(), true),
 
         dummy_lookup: JointLookup {
             table_id: F::zero(),
             entry: vec![],
         },
-
-        runtime_tables: None,
-        runtime_table_offset: None,
     }
 }
 

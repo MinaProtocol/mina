@@ -1,6 +1,6 @@
 use ark_ec::AffineCurve;
 use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
-use kimchi::circuits::lookup::lookups::LookupsUsed;
+use kimchi::circuits::lookup::{index::LookupSelectors, lookups::LookupsUsed};
 use kimchi::verifier_index::LookupVerifierIndex;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
@@ -30,10 +30,47 @@ pub enum CamlLookupsUsed {
 }
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
+pub struct CamlLookupSelectors<T> {
+    pub chacha: Option<T>,
+    pub chacha_final: Option<T>,
+    pub lookup_gate: Option<T>,
+}
+
+impl<U, T: From<U>> From<LookupSelectors<U>> for CamlLookupSelectors<T> {
+    fn from(selectors: LookupSelectors<U>) -> Self {
+        let LookupSelectors {
+            chacha,
+            chacha_final,
+            lookup_gate,
+        } = selectors;
+        CamlLookupSelectors {
+            chacha: chacha.map(Into::into),
+            chacha_final: chacha_final.map(Into::into),
+            lookup_gate: lookup_gate.map(Into::into),
+        }
+    }
+}
+
+impl<U, T: From<U>> From<CamlLookupSelectors<U>> for LookupSelectors<T> {
+    fn from(selectors: CamlLookupSelectors<U>) -> Self {
+        let CamlLookupSelectors {
+            chacha,
+            chacha_final,
+            lookup_gate,
+        } = selectors;
+        LookupSelectors {
+            chacha: chacha.map(Into::into),
+            chacha_final: chacha_final.map(Into::into),
+            lookup_gate: lookup_gate.map(Into::into),
+        }
+    }
+}
+
+#[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupVerifierIndex<PolyComm> {
     pub lookup_used: CamlLookupsUsed,
     pub lookup_table: Vec<PolyComm>,
-    pub lookup_selectors: Vec<PolyComm>,
+    pub lookup_selectors: CamlLookupSelectors<PolyComm>,
     pub table_ids: Option<PolyComm>,
     pub max_joint_size: ocaml::Int,
     pub runtime_tables_selector: Option<PolyComm>,
@@ -62,7 +99,7 @@ where
             },
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
 
-            lookup_selectors: lookup_selectors.into_iter().map(From::from).collect(),
+            lookup_selectors: lookup_selectors.into(),
             table_ids: table_ids.map(From::from),
             max_joint_size: max_joint_size.try_into().unwrap(),
             runtime_tables_selector: runtime_tables_selector.map(From::from),
@@ -92,7 +129,7 @@ where
                 }
             },
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
-            lookup_selectors: lookup_selectors.into_iter().map(From::from).collect(),
+            lookup_selectors: lookup_selectors.into(),
             table_ids: table_ids.map(From::from),
             max_joint_size: max_joint_size.try_into().unwrap(),
             runtime_tables_selector: runtime_tables_selector.map(From::from),

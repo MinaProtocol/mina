@@ -129,12 +129,20 @@ type nonrec 'f oracles =
 
 module VerifierIndex = struct
   module Lookup = struct
+    module Selectors = struct
+      type nonrec 't t =
+        { chacha : 't option
+        ; chacha_final : 't option
+        ; lookup_gate : 't option
+        }
+    end
+
     type nonrec lookups_used = Single | Joint
 
     type nonrec 'poly_comm t =
       { lookup_used : lookups_used
       ; lookup_table : 'poly_comm array
-      ; lookup_selectors : 'poly_comm array
+      ; lookup_selectors : 'poly_comm Selectors.t
       ; table_ids : 'poly_comm option
       ; max_joint_size : int
       ; runtime_tables_selector : 'poly_comm option

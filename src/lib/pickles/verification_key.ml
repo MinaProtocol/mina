@@ -5,6 +5,15 @@ open Kimchi_pasta.Pasta
 
 module Verifier_index_json = struct
   module Lookup = struct
+    module Selectors = struct
+      type 't t = 't Kimchi_types.VerifierIndex.Lookup.Selectors.t =
+        { chacha : 't option
+        ; chacha_final : 't option
+        ; lookup_gate : 't option
+        }
+      [@@deriving yojson]
+    end
+
     type lookups_used = Kimchi_types.VerifierIndex.Lookup.lookups_used =
       | Single
       | Joint
@@ -13,7 +22,7 @@ module Verifier_index_json = struct
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
       { lookup_used : lookups_used
       ; lookup_table : 'polyComm array
-      ; lookup_selectors : 'polyComm array
+      ; lookup_selectors : 'polyComm Selectors.t
       ; table_ids : 'polyComm option
       ; max_joint_size : int
       ; runtime_tables_selector : 'polyComm option

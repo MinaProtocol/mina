@@ -48,13 +48,10 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
                     .chacha_comm
                     .map(|x| x.to_vec().iter().map(Into::into).collect()),
                 range_check_comm: {
-                    if vi.range_check_comm.len() == 0 { None }
-                    else {
-                    Some (vi
-                    .range_check_comm
-                    .iter()
-                    .map(Into::into)
-                    .collect())
+                    if vi.range_check_comm.len() == 0 {
+                        None
+                    } else {
+                        Some(vi.range_check_comm.iter().map(Into::into).collect())
                     }
                 },
             },
@@ -117,9 +114,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             range_check_comm: {
                 match evals.range_check_comm {
                     None => vec![],
-                    Some(range_check_comm) => {
-                        range_check_comm.iter().map(Into::into).collect()
-                    },
+                    Some(range_check_comm) => range_check_comm.iter().map(Into::into).collect(),
                 }
             },
 
