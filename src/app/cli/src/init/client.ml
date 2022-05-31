@@ -586,9 +586,7 @@ let cancel_transaction_graphql =
          let open Deferred.Let_syntax in
          let cancel_fee =
            let fee = Currency.Fee.to_uint64 (Signed_command.fee user_command) in
-           let replace_fee =
-             Currency.Fee.to_uint64 Network_pool.Indexed_pool.replace_fee
-           in
+           let replace_fee = Unsigned.UInt64.of_int 1 in
            let open Unsigned.UInt64.Infix in
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
            Currency.Fee.of_uint64 (fee + replace_fee)

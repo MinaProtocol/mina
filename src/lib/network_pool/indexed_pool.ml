@@ -5,15 +5,6 @@ open Mina_transaction
 open Mina_numbers
 open Signature_lib
 
-(* Fee increase required to replace a transaction. This represents the cost to
-   the network as a whole of checking, gossiping, and storing a transaction
-   until it is included in a block. I did some napkin math and came up with
-   $0.00007. Ideally we'd fetch an exchange rate and convert that into an amount
-   of currency, but a made up number will do for the testnets at least. See
-   issue #2385.
-*)
-let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5_000_000_000
-
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
    * Iff a command is in all_by_fee it is also in all_by_hash.
@@ -919,8 +910,7 @@ let get_highest_fee :
    2. The sum of the currency consumed by all queued commands for the sender
       must be <= the sender's balance.
    3. If a command is replaced, the new command must have a fee greater than the
-      replaced command by at least replace fee * (number of commands after the
-      the replaced command + 1)
+      replaced command
    4. No integer overflows are allowed.
    5. protocol state predicate must be satisfiable before txs would expire
       from the pool based on age
@@ -1134,7 +1124,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             let%bind () =
               let replace_fee = User_command.fee to_drop in
               Result.ok_if_true
-                Currency.Fee.(fee >= replace_fee)
+                Currency.Fee.(fee > replace_fee)
                 ~error:(Insufficient_replace_fee (`Replace_fee replace_fee, fee))
               |> M.of_result
               (* C3 *)
@@ -1215,9 +1205,9 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             in
             let%map () =
               Result.ok_if_true
-                Currency.Fee.(increment >= replace_fee)
+                Currency.Fee.(increment > zero)
                 ~error:
-                  (Insufficient_replace_fee (`Replace_fee replace_fee, increment)
+                  (Insufficient_replace_fee (`Replace_fee Currency.Fee.zero, increment)
                   )
               |> M.of_result
               (* C3 *)

@@ -34,8 +34,6 @@ module Command_error : sig
   val grounds_for_diff_rejection : t -> bool
 end
 
-val replace_fee : Currency.Fee.t
-
 module Config : sig
   type t
 end
