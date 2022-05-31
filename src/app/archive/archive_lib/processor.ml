@@ -1203,7 +1203,7 @@ module Zkapp_epoch_data = struct
       id
 end
 
-module Zkapp_protocol_state_precondition = struct
+module Zkapp_network_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
     ; timestamp_id : int option
@@ -1231,7 +1231,7 @@ module Zkapp_protocol_state_precondition = struct
         ; int
         ]
 
-  let table_name = "zkapp_protocol_state_precondition"
+  let table_name = "zkapp_network_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
@@ -1340,7 +1340,7 @@ module Zkapp_other_party_body = struct
     ; sequence_events_id : int
     ; call_data_id : int
     ; call_depth : int
-    ; zkapp_protocol_state_precondition_id : int
+    ; zkapp_network_precondition_id : int
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
     ; caller : string
@@ -1374,15 +1374,15 @@ module Zkapp_other_party_body = struct
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
-    let%bind zkapp_protocol_state_precondition_id =
-      Zkapp_protocol_state_precondition.add_if_doesn't_exist
+    let%bind zkapp_network_precondition_id =
+      Zkapp_network_precondition.add_if_doesn't_exist
         (module Conn)
-        body.protocol_state_precondition
+        body.preconditions.network
     in
     let%bind zkapp_account_precondition_id =
       Zkapp_account_precondition.add_if_doesn't_exist
         (module Conn)
-        body.account_precondition
+        body.preconditions.account
     in
     let balance_change =
       let magnitude = Currency.Amount.to_string body.balance_change.magnitude in
@@ -1404,7 +1404,7 @@ module Zkapp_other_party_body = struct
       ; sequence_events_id
       ; call_data_id
       ; call_depth
-      ; zkapp_protocol_state_precondition_id
+      ; zkapp_network_precondition_id
       ; zkapp_account_precondition_id
       ; use_full_commitment
       ; caller
@@ -1486,7 +1486,7 @@ module Zkapp_fee_payer_body = struct
     ; fee : string
     ; events_id : int
     ; sequence_events_id : int
-    ; zkapp_protocol_state_precondition_id : int
+    ; zkapp_network_precondition_id : int
     ; nonce : int64
     }
   [@@deriving fields, hlist]
@@ -1515,8 +1515,8 @@ module Zkapp_fee_payer_body = struct
     let%bind sequence_events_id =
       Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
     in
-    let%bind zkapp_protocol_state_precondition_id =
-      Zkapp_protocol_state_precondition.add_if_doesn't_exist
+    let%bind zkapp_network_precondition_id =
+      Zkapp_network_precondition.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
     in
@@ -1531,7 +1531,7 @@ module Zkapp_fee_payer_body = struct
       ; fee
       ; events_id
       ; sequence_events_id
-      ; zkapp_protocol_state_precondition_id
+      ; zkapp_network_precondition_id
       ; nonce
       }
     in
