@@ -12,6 +12,7 @@
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
+  inputs.nix-npm-buildPackage.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.url = "github:tweag/opam-nix";
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
@@ -82,7 +83,9 @@
           ]);
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
-        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage { };
+        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage {
+          nodejs = pkgs.nodejs-16_x;
+        };
 
         submodules = map builtins.head (builtins.filter lib.isList
           (map (builtins.match "	path = (.*)")
@@ -193,20 +196,7 @@
             sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
           '';
           npmBuild = "npm run build -- --bindings=./dist/server/node_bindings";
-          # HACK: work around https://github.com/serokell/nix-npm-buildpackage/issues/33
-          # our build phase requires nodejs 16, but nix-npm-buildpackage only works with nodejs 14
-          # so, we mix them :(
           # TODO: add snarky-run
-          nativeBuildInputs = [ pkgs.nodejs-16_x ];
-          installPhase = ''
-            runHook preInstall
-            npm prune --production --cache=./npm-prune-cache
-            npm pack --ignore-scripts --cache=./npm-prune-cache
-            mkdir $out
-            tar xzvf ./$name.tgz -C $out --strip-components=1
-            cp -R node_modules $out
-            runHook postInstall
-          '';
           # TODO
           # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
         };
@@ -221,20 +211,7 @@
           '';
           npmBuild = "npm run build";
           doCheck = true;
-          checkPhase = "node node_modules/.bin/jest";
-          # HACK: work around https://github.com/serokell/nix-npm-buildpackage/issues/33
-          # our build phase requires nodejs 16, but nix-npm-buildpackage only works with nodejs 14
-          # so, we mix them :(
-          nativeBuildInputs = [ pkgs.nodejs-16_x ];
-          installPhase = ''
-            runHook preInstall
-            npm prune --production --cache=./npm-prune-cache
-            npm pack --ignore-scripts --cache=./npm-prune-cache
-            mkdir $out
-            tar xzvf ./$name.tgz -C $out --strip-components=1
-            cp -R node_modules $out
-            runHook postInstall
-          '';
+          checkPhase = "npm test";
         };
 
         inherit ocamlPackages ocamlPackages_static;
