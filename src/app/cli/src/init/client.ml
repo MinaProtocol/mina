@@ -68,10 +68,11 @@ let get_balance_graphql =
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Get_tracked_account.(
-                 make @@ makeVariables
-                   ~public_key:(Graphql_lib.Encoders.public_key public_key)
-                   ~token:(Graphql_lib.Encoders.token token)
-                   ())
+               make
+               @@ makeVariables
+                    ~public_key:(Graphql_lib.Encoders.public_key public_key)
+                    ~token:(Graphql_lib.Encoders.token token)
+                    ())
              graphql_endpoint
          in
          match response.account with
@@ -97,9 +98,11 @@ let get_tokens_graphql =
        ~f:(fun graphql_endpoint public_key ->
          let%map response =
            Graphql_client.query_exn
-             Graphql_queries.Get_all_accounts.(make @@ makeVariables
-                ~public_key:(Graphql_lib.Encoders.public_key public_key)
-                ())
+             Graphql_queries.Get_all_accounts.(
+               make
+               @@ makeVariables
+                    ~public_key:(Graphql_lib.Encoders.public_key public_key)
+                    ())
              graphql_endpoint
          in
          printf "Accounts are held for token IDs:\n" ;
@@ -535,17 +538,19 @@ let send_payment_graphql =
           ->
          let%map response =
            Graphql_client.query_exn
-             Graphql_queries.Send_payment.(make @@ makeVariables
-                ~receiver:(Encoders.public_key receiver)
-                ~sender:(Encoders.public_key sender)
-                ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
-                ?token:(Option.map ~f:Encoders.token token)
-                ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                ?memo () )
+             Graphql_queries.Send_payment.(
+               make
+               @@ makeVariables
+                    ~receiver:(Encoders.public_key receiver)
+                    ~sender:(Encoders.public_key sender)
+                    ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                    ?token:(Option.map ~f:Encoders.token token)
+                    ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                    ?memo ())
              graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
-           response.sendPayment.payment.id))
+           response.sendPayment.payment.id ) )
 
 let delegate_stake_graphql =
   let open Command.Param in
@@ -565,12 +570,14 @@ let delegate_stake_graphql =
           ->
          let%map response =
            Graphql_client.query_exn
-             Graphql_queries.Send_delegation.(make @@ makeVariables
-                ~receiver:(Encoders.public_key receiver)
-                ~sender:(Encoders.public_key sender)
-                ~fee:(Encoders.fee fee)
-                ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                ?memo () )
+             Graphql_queries.Send_delegation.(
+               make
+               @@ makeVariables
+                    ~receiver:(Encoders.public_key receiver)
+                    ~sender:(Encoders.public_key sender)
+                    ~fee:(Encoders.fee fee)
+                    ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                    ?memo ())
              graphql_endpoint
          in
          printf "Dispatched stake delegation with ID %s\n"
@@ -595,12 +602,14 @@ let create_new_token_graphql =
          let receiver = Option.value ~default:sender receiver in
          let%map response =
            Graphql_client.query_exn
-             Graphql_queries.Send_create_token.(make @@ makeVariables
-                ~sender:(Encoders.public_key sender)
-                ~receiver:(Encoders.public_key receiver)
-                ~fee:(Encoders.fee fee)
-                ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                ?memo () )
+             Graphql_queries.Send_create_token.(
+               make
+               @@ makeVariables
+                    ~sender:(Encoders.public_key sender)
+                    ~receiver:(Encoders.public_key receiver)
+                    ~fee:(Encoders.fee fee)
+                    ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                    ?memo ())
              graphql_endpoint
          in
          printf "Dispatched create new token command with TRANSACTION_ID %s\n"
@@ -651,8 +660,8 @@ let create_new_account_graphql =
                let%map token_owner =
                  Graphql_client.(
                    query_exn
-                     Graphql_queries.Get_token_owner.(make @@ makeVariables
-                        ~token:(Encoders.token token) () ))
+                     Graphql_queries.Get_token_owner.(
+                       make @@ makeVariables ~token:(Encoders.token token) ()))
                    graphql_endpoint
                in
                match token_owner.tokenOwner with
@@ -665,13 +674,15 @@ let create_new_account_graphql =
          in
          let%map response =
            Graphql_client.query_exn
-             Graphql_queries.Send_create_token_account.(make @@ makeVariables
-                ~sender:(Encoders.public_key sender)
-                ~receiver:(Encoders.public_key receiver)
-                ~tokenOwner:(Encoders.public_key token_owner)
-                ~token:(Encoders.token token) ~fee:(Encoders.fee fee)
-                ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                ?memo () )
+             Graphql_queries.Send_create_token_account.(
+               make
+               @@ makeVariables
+                    ~sender:(Encoders.public_key sender)
+                    ~receiver:(Encoders.public_key receiver)
+                    ~tokenOwner:(Encoders.public_key token_owner)
+                    ~token:(Encoders.token token) ~fee:(Encoders.fee fee)
+                    ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                    ?memo ())
              graphql_endpoint
          in
          printf
@@ -709,13 +720,15 @@ let mint_tokens_graphql =
           ->
          let%map response =
            Graphql_client.query_exn
-             Graphql_queries.Send_mint_tokens.(make @@ makeVariables
-                ~sender:(Encoders.public_key sender)
-                ?receiver:(Option.map ~f:Encoders.public_key receiver)
-                ~token:(Encoders.token token) ~amount:(Encoders.amount amount)
-                ~fee:(Encoders.fee fee)
-                ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                ?memo () )
+             Graphql_queries.Send_mint_tokens.(
+               make
+               @@ makeVariables
+                    ~sender:(Encoders.public_key sender)
+                    ?receiver:(Option.map ~f:Encoders.public_key receiver)
+                    ~token:(Encoders.token token)
+                    ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                    ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                    ?memo ())
              graphql_endpoint
          in
          printf "Dispatched mint token command with TRANSACTION_ID %s\n"
@@ -749,15 +762,17 @@ let cancel_transaction_graphql =
            (Currency.Fee.to_formatted_string cancel_fee) ;
          let cancel_query =
            let open Graphql_lib.Encoders in
-           Graphql_queries.Send_payment.(make @@ makeVariables
-             ~sender:(public_key cancel_sender_pk)
-             ~receiver:(public_key receiver_pk) ~fee:(fee cancel_fee)
-             ~amount:(amount Currency.Amount.zero)
-             ~nonce:
-               (uint32
-                  (Mina_numbers.Account_nonce.to_uint32
-                     (Signed_command.nonce user_command) ) )
-             ())
+           Graphql_queries.Send_payment.(
+             make
+             @@ makeVariables
+                  ~sender:(public_key cancel_sender_pk)
+                  ~receiver:(public_key receiver_pk) ~fee:(fee cancel_fee)
+                  ~amount:(amount Currency.Amount.zero)
+                  ~nonce:
+                    (uint32
+                       (Mina_numbers.Account_nonce.to_uint32
+                          (Signed_command.nonce user_command) ) )
+                  ())
          in
          let%map cancel_response =
            Graphql_client.query_exn cancel_query graphql_endpoint
@@ -782,8 +797,9 @@ let send_rosetta_transactions_graphql =
                      in
                      let%map response =
                        Graphql_client.query_exn
-                         Graphql_queries.Send_rosetta_transaction.(make @@ makeVariables
-                            ~transaction:transaction_json () )
+                         Graphql_queries.Send_rosetta_transaction.(
+                           make
+                           @@ makeVariables ~transaction:transaction_json ())
                          graphql_endpoint
                      in
                      printf "Dispatched command with TRANSACTION_ID %s\n"
@@ -1160,8 +1176,7 @@ let pooled_user_commands =
            @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
          in
          let module Q = Graphql_queries.Pooled_user_commands in
-         let graphql = Q.( make @@ makeVariables ~public_key ())
-         in
+         let graphql = Q.(make @@ makeVariables ~public_key ()) in
          let%map response = Graphql_client.query_exn graphql graphql_endpoint in
          let json_response = Q.serialize response |> Q.toJson in
          print_string (Yojson.Basic.to_string json_response) ) )
@@ -1261,11 +1276,13 @@ let set_coinbase_receiver_graphql =
          in
          let%map result =
            Graphql_client.query_exn
-             Graphql_queries.Set_coinbase_receiver.(make @@ makeVariables
-                ~public_key:
-                  (Option.value_map ~f:Encoders.public_key public_key_opt
-                     ~default:`Null )
-                () )
+             Graphql_queries.Set_coinbase_receiver.(
+               make
+               @@ makeVariables
+                    ~public_key:
+                      (Option.value_map ~f:Encoders.public_key public_key_opt
+                         ~default:`Null )
+                    ())
              graphql_endpoint
          in
          printf
@@ -1287,10 +1304,13 @@ let set_snark_worker =
     (Cli_lib.Background_daemon.graphql_init public_key_flag
        ~f:(fun graphql_endpoint optional_public_key ->
          let graphql =
-           Graphql_queries.Set_snark_worker.(make @@ makeVariables
-             ~public_key:
-               Graphql_lib.Encoders.(optional optional_public_key ~f:public_key)
-             ())
+           Graphql_queries.Set_snark_worker.(
+             make
+             @@ makeVariables
+                  ~public_key:
+                    Graphql_lib.Encoders.(
+                      optional optional_public_key ~f:public_key)
+                  ())
          in
          Deferred.map (Graphql_client.query_exn graphql graphql_endpoint)
            ~f:(fun response ->
@@ -1312,9 +1332,12 @@ let set_snark_work_fee =
        Command.Param.(anon @@ ("fee" %: Cli_lib.Arg_type.txn_fee))
        ~f:(fun graphql_endpoint fee ->
          let graphql =
-           Graphql_queries.Set_snark_work_fee.(make @@ makeVariables
-             ~fee:(Graphql_lib.Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
-             ())
+           Graphql_queries.Set_snark_work_fee.(
+             make
+             @@ makeVariables
+                  ~fee:
+                    (Graphql_lib.Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
+                  ())
          in
          Deferred.map (Graphql_client.query_exn graphql graphql_endpoint)
            ~f:(fun response ->
@@ -1355,8 +1378,10 @@ let import_key =
                password
          in
          let graphql =
-           Graphql_queries.Import_account.(make @@ makeVariables ~path:privkey_path
-             ~password:(Bytes.to_string password) ())
+           Graphql_queries.Import_account.(
+             make
+             @@ makeVariables ~path:privkey_path
+                  ~password:(Bytes.to_string password) ())
          in
          match%map Graphql_client.query graphql graphql_endpoint with
          | Ok res ->
@@ -1630,8 +1655,8 @@ let create_account =
          in
          let%map response =
            Graphql_client.query_exn
-             Graphql_queries.Create_account.(make @@ makeVariables
-                ~password:(Bytes.to_string password) () )
+             Graphql_queries.Create_account.(
+               make @@ makeVariables ~password:(Bytes.to_string password) ())
              graphql_endpoint
          in
          let pk_string =
@@ -1647,9 +1672,11 @@ let create_hd_account =
          let%map response =
            Graphql_client.(
              query_exn
-               Graphql_queries.Create_hd_account.(make @@ makeVariables
-                  ~hd_index:(Graphql_lib.Encoders.uint32 hd_index)
-                  () ))
+               Graphql_queries.Create_hd_account.(
+                 make
+                 @@ makeVariables
+                      ~hd_index:(Graphql_lib.Encoders.uint32 hd_index)
+                      ()))
              graphql_endpoint
          in
          let pk_string =
@@ -1679,10 +1706,12 @@ let unlock_account =
          | Ok password_bytes ->
              let%map response =
                Graphql_client.query_exn
-                 Graphql_queries.Unlock_account.(make @@ makeVariables
-                    ~public_key:(Graphql_lib.Encoders.public_key pk_str)
-                    ~password:(Bytes.to_string password_bytes)
-                    () )
+                 Graphql_queries.Unlock_account.(
+                   make
+                   @@ makeVariables
+                        ~public_key:(Graphql_lib.Encoders.public_key pk_str)
+                        ~password:(Bytes.to_string password_bytes)
+                        ())
                  graphql_endpoint
              in
              let pk_string =
@@ -1707,9 +1736,11 @@ let lock_account =
        ~f:(fun graphql_endpoint pk ->
          let%map response =
            Graphql_client.query_exn
-             Graphql_queries.Lock_account.(make @@ makeVariables
-                ~public_key:(Graphql_lib.Encoders.public_key pk)
-                () )
+             Graphql_queries.Lock_account.(
+               make
+               @@ makeVariables
+                    ~public_key:(Graphql_lib.Encoders.public_key pk)
+                    ())
              graphql_endpoint
          in
          let pk_string =
@@ -1848,11 +1879,11 @@ let add_peers_graphql =
                  |> Mina_net2.Multiaddr.to_peer
                  |> Option.map ~f:Network_peer.Peer.to_display
                with
-               | Some peer -> {
-                   Graphql_queries.Add_peers.host = peer.host;
-                   libp2p_port = peer.libp2p_port;
-                   peer_id = peer.peer_id
-                 }
+               | Some peer ->
+                   { Graphql_queries.Add_peers.host = peer.host
+                   ; libp2p_port = peer.libp2p_port
+                   ; peer_id = peer.peer_id
+                   }
                | None ->
                    eprintf
                      "Could not parse %s as a peer address. It should use the \
@@ -2131,9 +2162,8 @@ let archive_blocks =
          let send_precomputed_block =
            make_send_block
              ~graphql_make:(fun block ->
-                 Graphql_queries.Archive_precomputed_block.(
-                   make @@ makeVariables ~block ()
-                 ))
+               Graphql_queries.Archive_precomputed_block.(
+                 make @@ makeVariables ~block ()) )
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_precomputed_block
              ~block_to_yojson:Mina_block.Precomputed.to_yojson
@@ -2141,9 +2171,8 @@ let archive_blocks =
          let send_extensional_block =
            make_send_block
              ~graphql_make:(fun block ->
-                 Graphql_queries.Archive_extensional_block.(
-                   make @@ makeVariables ~block ()
-                 ))
+               Graphql_queries.Archive_extensional_block.(
+                 make @@ makeVariables ~block ()) )
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_extensional_block
              ~block_to_yojson:Archive_lib.Extensional.Block.to_yojson

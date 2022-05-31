@@ -103,10 +103,8 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   let event_name = String.lowercase ctor in
   let event_path = path ^ "." ^ ctor in
   let split_path = String.split path ~on:'.' in
-  let to_yojson = Ppx_deriving_yojson.ser_expr_of_typ
-  in
-  let of_yojson = Ppx_deriving_yojson.desu_expr_of_typ
-  in
+  let to_yojson = Ppx_deriving_yojson.ser_expr_of_typ in
+  let of_yojson = Ppx_deriving_yojson.desu_expr_of_typ in
   let elist ~f l = elist (List.map ~f l) in
   let record_pattern =
     let arg =

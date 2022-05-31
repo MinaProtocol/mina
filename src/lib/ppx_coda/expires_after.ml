@@ -36,7 +36,8 @@ let expand ~loc ~path:_ str =
 
 let ext =
   Extension.declare name Extension.Context.structure_item
-    Ast_pattern.(single_expr_payload (pexp_constant (pconst_string __' drop drop)))
+    Ast_pattern.(
+      single_expr_payload (pexp_constant (pconst_string __' drop drop)))
     expand
 
 let () =

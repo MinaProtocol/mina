@@ -31,12 +31,12 @@ let expand ~loc ~path:_ open_decl defs =
       let names = List.map exps ~f:(expr_to_id loc) in
       let vars = List.map names ~f:pvar in
       pstr_value Nonrecursive
-        [ value_binding ~pat:(ppat_tuple vars)
-            ~expr:(pexp_open open_decl defs)
+        [ value_binding ~pat:(ppat_tuple vars) ~expr:(pexp_open open_decl defs)
         ]
   | Pexp_ident { txt = Lident id; _ } ->
       pstr_value Nonrecursive
-        [ value_binding ~pat:(ppat_var {txt = id; loc})
+        [ value_binding
+            ~pat:(ppat_var { txt = id; loc })
             ~expr:(pexp_open open_decl defs)
         ]
   | _ ->
