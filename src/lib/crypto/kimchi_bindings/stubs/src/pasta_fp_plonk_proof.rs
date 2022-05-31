@@ -10,7 +10,8 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
 use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof};
+use kimchi::proof::caml::CamlRecursionChallenge;
+use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
@@ -33,7 +34,7 @@ type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 pub fn caml_pasta_fp_plonk_proof_create(
     index: CamlPastaFpPlonkIndexPtr<'static>,
     witness: Vec<CamlFpVector>,
-    prev_challenges: Vec<CamlFp>,
+    prev_challenges: Vec<CamlRecursionChallenge<CamlGVesta, CamlFp>>,
     prev_sgs: Vec<CamlGVesta>,
 ) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
     {
@@ -41,7 +42,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
-    let prev: Vec<(Vec<Fp>, PolyComm<GAffine>)> = {
+    let prev: Vec<RecursionChallenge<GAffine>> = {
         if prev_challenges.is_empty() {
             Vec::new()
         } else {
@@ -51,8 +52,9 @@ pub fn caml_pasta_fp_plonk_proof_create(
                 .map(Into::<GAffine>::into)
                 .enumerate()
                 .map(|(i, sg)| {
-                    (
-                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                    RecursionChallenge::new(
+                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg][0]
+                            .chals
                             .iter()
                             .map(Into::<Fp>::into)
                             .collect(),
@@ -137,9 +139,9 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
     }
 
     let prev_challenges = vec![
-        (vec![Fp::one(), Fp::one()], comm()),
-        (vec![Fp::one(), Fp::one()], comm()),
-        (vec![Fp::one(), Fp::one()], comm()),
+        RecursionChallenge::new(vec![Fp::one(), Fp::one()], comm()),
+        RecursionChallenge::new(vec![Fp::one(), Fp::one()], comm()),
+        RecursionChallenge::new(vec![Fp::one(), Fp::one()], comm()),
     ];
 
     let g = GAffine::prime_subgroup_generator();

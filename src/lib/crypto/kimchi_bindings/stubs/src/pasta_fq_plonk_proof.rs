@@ -10,7 +10,8 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
 use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof};
+use kimchi::proof::caml::CamlRecursionChallenge;
+use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
@@ -30,7 +31,7 @@ use std::convert::TryInto;
 pub fn caml_pasta_fq_plonk_proof_create(
     index: CamlPastaFqPlonkIndexPtr<'static>,
     witness: Vec<CamlFqVector>,
-    prev_challenges: Vec<CamlFq>,
+    prev_challenges: Vec<CamlRecursionChallenge<CamlGPallas, CamlFq>>,
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
     {
@@ -38,7 +39,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
-    let prev: Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
+    let prev: Vec<RecursionChallenge<GAffine>> = {
         if prev_challenges.is_empty() {
             Vec::new()
         } else {
@@ -48,8 +49,9 @@ pub fn caml_pasta_fq_plonk_proof_create(
                 .map(Into::<GAffine>::into)
                 .enumerate()
                 .map(|(i, sg)| {
-                    (
-                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                    RecursionChallenge::new(
+                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg][0]
+                            .chals
                             .iter()
                             .map(Into::<Fq>::into)
                             .collect(),
@@ -136,9 +138,9 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
     }
 
     let prev_challenges = vec![
-        (vec![Fq::one(), Fq::one()], comm()),
-        (vec![Fq::one(), Fq::one()], comm()),
-        (vec![Fq::one(), Fq::one()], comm()),
+        RecursionChallenge::new(vec![Fq::one(), Fq::one()], comm()),
+        RecursionChallenge::new(vec![Fq::one(), Fq::one()], comm()),
+        RecursionChallenge::new(vec![Fq::one(), Fq::one()], comm()),
     ];
 
     let g = GAffine::prime_subgroup_generator();
