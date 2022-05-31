@@ -31,7 +31,8 @@
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, ... }:
+    , opam-nix, opam-repository, nixpkgs-mozilla, ...
+    }:
     {
       overlay = import ./nix/overlay.nix;
     } // utils.lib.eachDefaultSystem (system:
@@ -169,12 +170,10 @@
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-        packages.mina_static = ocamlPackages_static.mina;
-        packages.marlin_plonk_bindings_stubs = pkgs.marlin_plonk_bindings_stubs;
+        # packages.mina_static = ocamlPackages_static.mina;
+        packages.kimchi_bindings_stubs = pkgs.kimchi_bindings_stubs;
         packages.go-capnproto2 = pkgs.go-capnproto2;
         packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.marlin_plonk_bindings_stubs_static =
-          pkgs.pkgsMusl.marlin_plonk_bindings_stubs;
         packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
@@ -185,8 +184,9 @@
 
         devShell = ocamlPackages.mina-dev;
         devShells.default = ocamlPackages.mina-dev;
-
-        packages.impure-shell = import ./nix/impure-shell.nix pkgs;
+        # TODO: think about rust toolchain in the dev shell
+        packages.impure-shell =
+          (import ./nix/impure-shell.nix pkgs).inputDerivation;
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 
         inherit checks;
