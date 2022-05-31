@@ -32,7 +32,7 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      Parties.of_wire
+      Parties.of_simple
         { fee_payer =
             { body =
                 { public_key = acct1.account.public_key

@@ -1175,6 +1175,12 @@ module Base = struct
         let set_timing (account : t) (timing : timing) : t =
           { account with data = { account.data with timing } }
 
+        let is_timed ({ data = account; _ } : t) =
+          let open Account.Poly in
+          let open Account.Timing.As_record in
+          let { is_timed; _ } = account.timing in
+          is_timed
+
         let set_token_id (account : t) (token_id : Token_id.Checked.t) : t =
           account_with_hash { account.data with token_id }
 
@@ -1931,7 +1937,7 @@ module Base = struct
               ( Stack_frame.t
               , Call_stack.t
               , Token_id.t
-              , Amount.t
+              , Amount.Signed.t
               , Ledger.t
               , Bool.t
               , Transaction_commitment.t
@@ -1954,10 +1960,14 @@ module Base = struct
             (protocol_state_predicate, global_state) ->
             Zkapp_precondition.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
-        | Check_account_precondition (_is_start, { party; _ }, account, _global)
-          ->
-            Zkapp_precondition.Account.Checked.check
-              party.data.account_precondition account.data
+        | Check_account_precondition ({ party; _ }, account, local_state) ->
+            let local_state = ref local_state in
+            let check failure b =
+              local_state := Inputs.Local_state.add_check !local_state failure b
+            in
+            Zkapp_precondition.Account.Checked.check ~check
+              party.data.account_precondition account.data ;
+            !local_state
         | Init_account { party = { party; _ }; account } ->
             let account' : Account.Checked.Unhashed.t =
               { account.data with
@@ -4297,8 +4307,8 @@ module For_tests = struct
       ; authorization = Signature.dummy
       }
     in
-    let sender_party : Party.Wire.t option =
-      let sender_party_body : Party.Body.Wire.t =
+    let sender_party : Party.Simple.t option =
+      let sender_party_body : Party.Body.Simple.t =
         { public_key = sender_pk
         ; update = Party.Update.noop
         ; token_id = Token_id.default
@@ -4323,9 +4333,9 @@ module For_tests = struct
           ; authorization =
               Control.Signature Signature.dummy (*To be updated later*)
           }
-          : Party.Wire.t )
+          : Party.Simple.t )
     in
-    let snapp_parties : Party.Wire.t list =
+    let snapp_parties : Party.Simple.t list =
       let num_keypairs = List.length zkapp_account_keypairs in
       let account_creation_fee =
         Amount.of_fee constraint_constants.account_creation_fee
@@ -4380,10 +4390,10 @@ module For_tests = struct
             ; authorization =
                 Control.Signature Signature.dummy (*To be updated later*)
             }
-            : Party.Wire.t ) )
+            : Party.Simple.t ) )
     in
     let other_receivers =
-      List.map receivers ~f:(fun (receiver, amt) : Party.Wire.t ->
+      List.map receivers ~f:(fun (receiver, amt) : Party.Simple.t ->
           { body =
               { public_key = receiver
               ; update
@@ -4407,7 +4417,7 @@ module For_tests = struct
       @ snapp_parties @ other_receivers
     in
     let ps =
-      Parties.Call_forest.With_hashes.of_parties_list
+      Parties.Call_forest.With_hashes.of_parties_simple_list
         (List.map ~f:(fun p -> (p, ())) other_parties_data)
     in
     let other_parties_hash = Parties.Call_forest.hash ps in
@@ -4433,7 +4443,7 @@ module For_tests = struct
       { fee_payer with authorization = fee_payer_signature_auth }
     in
     let sender_party =
-      Option.map sender_party ~f:(fun s : Party.Wire.t ->
+      Option.map sender_party ~f:(fun s : Party.Simple.t ->
           let commitment =
             if s.body.use_full_commitment then full_commitment else commitment
           in
@@ -4444,13 +4454,13 @@ module For_tests = struct
           { body = s.body; authorization = Signature sender_signature_auth } )
     in
     ( `Parties
-        (Parties.of_wire { fee_payer; other_parties = other_receivers; memo })
+        (Parties.of_simple { fee_payer; other_parties = other_receivers; memo })
     , `Sender_party sender_party
     , `Proof_parties snapp_parties
     , `Txn_commitment commitment
     , `Full_txn_commitment full_commitment )
 
-  let deploy_snapp ~constraint_constants (spec : Spec.t) =
+  let deploy_snapp ?(no_auth = false) ~constraint_constants (spec : Spec.t) =
     let `VK vk, `Prover _trivial_prover =
       create_trivial_snapp ~constraint_constants ()
     in
@@ -4462,15 +4472,17 @@ module For_tests = struct
       || (spec.new_zkapp_account && List.length spec.zkapp_account_keypairs = 1) ) ;
     let update_vk =
       let update = spec.snapp_update in
-      { update with
-        verification_key = Zkapp_basic.Set_or_keep.Set vk
-      ; permissions =
-          Zkapp_basic.Set_or_keep.Set
-            { Permissions.user_default with
-              edit_state = Permissions.Auth_required.Proof
-            ; edit_sequence_state = Proof
-            }
-      }
+      if no_auth then update
+      else
+        { update with
+          verification_key = Zkapp_basic.Set_or_keep.Set vk
+        ; permissions =
+            Zkapp_basic.Set_or_keep.Set
+              { Permissions.user_default with
+                edit_state = Permissions.Auth_required.Proof
+              ; edit_sequence_state = Proof
+              }
+        }
     in
     let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
@@ -4486,20 +4498,24 @@ module For_tests = struct
     in
     let snapp_parties =
       List.map snapp_parties_keypairs ~f:(fun (snapp_party, keypair) ->
-          let commitment =
-            if snapp_party.body.use_full_commitment then full_commitment
-            else commitment
-          in
-          let signature =
-            Signature_lib.Schnorr.Chunked.sign keypair.private_key
-              (Random_oracle.Input.Chunked.field commitment)
-          in
-          ( { body = snapp_party.body; authorization = Signature signature }
-            : Party.Wire.t ) )
+          if no_auth then
+            ( { body = snapp_party.body; authorization = None_given }
+              : Party.Simple.t )
+          else
+            let commitment =
+              if snapp_party.body.use_full_commitment then full_commitment
+              else commitment
+            in
+            let signature =
+              Signature_lib.Schnorr.Chunked.sign keypair.private_key
+                (Random_oracle.Input.Chunked.field commitment)
+            in
+            ( { body = snapp_party.body; authorization = Signature signature }
+              : Party.Simple.t ) )
     in
     let other_parties = Option.to_list sender_party @ snapp_parties in
     let parties : Parties.t =
-      Parties.of_wire { fee_payer; other_parties; memo }
+      Parties.of_simple { fee_payer; other_parties; memo }
     in
     parties
 
@@ -4524,7 +4540,7 @@ module For_tests = struct
           | Permissions.Auth_required.Proof ->
               let proof_party =
                 let ps =
-                  Parties.Call_forest.With_hashes.of_parties_list
+                  Parties.Call_forest.With_hashes.of_parties_simple_list
                     (List.map
                        ~f:(fun p -> (p, ()))
                        (List.drop snapp_parties ndx) )
@@ -4558,7 +4574,7 @@ module For_tests = struct
                 prover ~handler [] tx_statement
               in
               ( { body = snapp_party.body; authorization = Proof pi }
-                : Party.Wire.t )
+                : Party.Simple.t )
           | Signature ->
               let commitment =
                 if snapp_party.body.use_full_commitment then full_commitment
@@ -4572,18 +4588,18 @@ module For_tests = struct
                 ( { body = snapp_party.body
                   ; authorization = Signature signature
                   }
-                  : Party.Wire.t )
+                  : Party.Simple.t )
           | None ->
               Async.Deferred.return
                 ( { body = snapp_party.body; authorization = None_given }
-                  : Party.Wire.t )
+                  : Party.Simple.t )
           | _ ->
               failwith
                 "Current authorization not Proof or Signature or None_given" )
     in
     let other_parties = snapp_parties in
     let parties : Parties.t =
-      Parties.of_wire { fee_payer; other_parties; memo }
+      Parties.of_simple { fee_payer; other_parties; memo }
     in
     parties
 
@@ -4602,7 +4618,7 @@ module For_tests = struct
     let other_parties =
       let sender_party = Option.value_exn sender_party in
       Parties.Call_forest.cons
-        (Parties.add_caller sender_party Token_id.default)
+        (Parties.add_caller_simple sender_party Token_id.default)
         parties.other_parties
     in
     { parties with other_parties }
@@ -4682,7 +4698,7 @@ module For_tests = struct
       ; authorization = Signature.dummy
       }
     in
-    let sender_party_data : Party.Wire.t =
+    let sender_party_data : Party.Simple.t =
       { body =
           { public_key = sender_pk
           ; update = Party.Update.noop
@@ -4701,7 +4717,7 @@ module For_tests = struct
       ; authorization = Signature Signature.dummy
       }
     in
-    let snapp_party_data : Party.Wire.t =
+    let snapp_party_data : Party.Simple.t =
       { body =
           { public_key = trivial_account_pk
           ; update = update_empty_permissions
@@ -4722,7 +4738,7 @@ module For_tests = struct
     in
     let memo = Signed_command_memo.empty in
     let ps =
-      Parties.Call_forest.With_hashes.of_parties_list
+      Parties.Call_forest.With_hashes.of_parties_simple_list
         [ (sender_party_data, ()); (snapp_party_data, ()) ]
     in
     let other_parties_hash = Parties.Call_forest.hash ps in
@@ -4732,7 +4748,7 @@ module For_tests = struct
     in
     let proof_party =
       let ps =
-        Parties.Call_forest.With_hashes.of_parties_list
+        Parties.Call_forest.With_hashes.of_parties_simple_list
           [ (snapp_party_data, ()) ]
       in
       Parties.Call_forest.hash ps
@@ -4763,14 +4779,14 @@ module For_tests = struct
       Signature_lib.Schnorr.Chunked.sign sender.private_key
         (Random_oracle.Input.Chunked.field transaction)
     in
-    let sender : Party.Wire.t =
+    let sender : Party.Simple.t =
       { sender_party_data with authorization = Signature sender_signature_auth }
     in
     let other_parties =
       [ sender; { body = snapp_party_data.body; authorization = Proof pi } ]
     in
     let parties : Parties.t =
-      Parties.of_wire { fee_payer; other_parties; memo }
+      Parties.of_simple { fee_payer; other_parties; memo }
     in
     parties
 end

@@ -470,7 +470,7 @@ let%test_unit "tokens test" =
   in
   let main (ledger : t) =
     let execute_parties_transaction
-        (parties : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t) : unit
+        (parties : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t) : unit
         =
       let _, ({ nonce; _ } : Account.t), _ =
         Ledger_inner.get_or_create ledger

@@ -1136,6 +1136,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               ~f:Party.Update.Timing_info.to_account_timing timing
         }
 
+      let is_timed (a : t) =
+        match a.timing with Account_timing.Untimed -> false | _ -> true
+
       let set_token_id (a : t) (id : Token_id.t) : t = { a with token_id = id }
 
       let balance (a : t) : Balance.t = a.balance
@@ -1481,11 +1484,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           ( Stack_frame.t
           , Call_stack.t
           , Token_id.t
-          , Amount.t
+          , Amount.Signed.t
           , L.t
           , bool
           , Transaction_commitment.t
-          , Transaction_status.Failure.t option )
+          , Transaction_status.Failure.Collection.t )
           Parties_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
       ; transaction_commitment : unit
@@ -1500,15 +1503,22 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
-      | Check_account_precondition (_is_start, party, account, _global_state)
-        -> (
+      | Check_account_precondition (party, account, local_state) -> (
           match party.body.account_precondition with
           | Accept ->
-              true
+              local_state
           | Nonce n ->
-              Account.Nonce.equal account.nonce n
+              let nonce_matches = Account.Nonce.equal account.nonce n in
+              Inputs.Local_state.add_check local_state
+                Account_nonce_precondition_unsatisfied nonce_matches
           | Full p ->
-              Or_error.is_ok (Zkapp_precondition.Account.check p account) )
+              let local_state = ref local_state in
+              let check failure b =
+                local_state :=
+                  Inputs.Local_state.add_check !local_state failure b
+              in
+              Zkapp_precondition.Account.check ~check p account ;
+              !local_state )
       | Init_account { party = _; account = a } ->
           a
   end
@@ -1569,6 +1579,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             { parties; memo_hash = Signed_command_memo.hash c.memo }
             { perform } initial_state )
     in
+    let account_states_after_fee_payer =
+      List.map (Parties.accounts_accessed c) ~f:(fun id ->
+          ( id
+          , Option.Let_syntax.(
+              let%bind loc = L.location_of_account ledger id in
+              let%map a = L.get ledger loc in
+              (loc, a)) ) )
+    in
     let accounts () =
       List.map original_account_states
         ~f:(Tuple2.map_snd ~f:(Option.map ~f:snd))
@@ -1582,28 +1600,61 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ~f:(fun (acct_id, loc_and_acct) ->
               if Option.is_none loc_and_acct then Some acct_id else None )
         in
+        let successfully_applied =
+          Transaction_status.Failure.Collection.is_empty failure_status_tbl
+        in
         (* accounts not originally in ledger, now present in ledger *)
         let previous_empty_accounts =
           List.filter_map account_ids_originally_not_in_ledger
             ~f:(fun acct_id ->
-              Option.map (L.location_of_account ledger acct_id) ~f:(fun _ ->
-                  acct_id ) )
+              let open Option.Let_syntax in
+              let%bind loc = L.location_of_account ledger acct_id in
+              let%bind acc = L.get ledger loc in
+              (*Check account ids because sparse ledger stores empty
+                accounts at new account locations*)
+              Option.some_if
+                (Account_id.equal (Account.identifier acc) acct_id)
+                acct_id )
         in
-        Ok
-          ( { Transaction_applied.Parties_applied.accounts = accounts ()
-            ; command =
-                { With_status.data = c
-                ; status =
-                    (* TODO *)
-                    ( if
-                      Transaction_status.Failure.Collection.is_empty
-                        failure_status_tbl
-                    then Applied
-                    else Failed failure_status_tbl )
-                }
-            ; previous_empty_accounts
-            }
-          , s )
+        let valid_result =
+          Ok
+            ( { Transaction_applied.Parties_applied.accounts = accounts ()
+              ; command =
+                  { With_status.data = c
+                  ; status =
+                      ( if successfully_applied then Applied
+                      else Failed failure_status_tbl )
+                  }
+              ; previous_empty_accounts
+              }
+            , s )
+        in
+        if successfully_applied then valid_result
+        else
+          let other_party_accounts_unchanged =
+            List.fold_until account_states_after_fee_payer ~init:true
+              ~f:(fun acc (_, loc_opt) ->
+                match
+                  let open Option.Let_syntax in
+                  let%bind loc, a = loc_opt in
+                  let%bind a' = L.get ledger loc in
+                  Option.some_if (not (Account.equal a a')) ()
+                with
+                | None ->
+                    Continue acc
+                | Some _ ->
+                    Stop false )
+              ~finish:Fn.id
+          in
+          (*Other parties failed, therefore, updates in those should not get applied*)
+          if
+            List.is_empty previous_empty_accounts
+            && other_party_accounts_unchanged
+          then valid_result
+          else
+            Or_error.error_string
+              "Parties application failed but new accounts created or some of \
+               the other party updates applied"
 
   let apply_parties_unchecked ~constraint_constants ~state_view ledger c =
     apply_parties_unchecked_aux ~constraint_constants ~state_view ledger c
@@ -1989,7 +2040,7 @@ module For_tests = struct
       |> Unsigned.UInt32.(mul (of_int 2))
       |> Account.Nonce.to_uint32
     in
-    let parties : Parties.Wire.t =
+    let parties : Parties.Simple.t =
       { fee_payer =
           { Party.Fee_payer.body =
               { public_key = sender_pk
@@ -2052,7 +2103,7 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let parties = Parties.of_wire parties in
+    let parties = Parties.of_simple parties in
     let commitment = Parties.commitment parties in
     let full_commitment =
       Parties.Transaction_commitment.create_complete commitment

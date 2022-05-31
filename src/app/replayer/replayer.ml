@@ -543,7 +543,7 @@ module Zkapp_helpers = struct
           let snarked_ledger_hash =
             Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
           in
-          let timestamp = parent_block.timestamp |> Block_time.of_int64 in
+          let timestamp = Block_time.of_string_exn parent_block.timestamp in
           let blockchain_length =
             parent_block.height |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Length.of_uint32
@@ -555,8 +555,7 @@ module Zkapp_helpers = struct
           (* TODO : this will change *)
           let last_vrf_output = () in
           let total_currency =
-            parent_block.total_currency |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
+            Currency.Amount.of_string parent_block.total_currency
           in
           let global_slot_since_hard_fork =
             parent_block.global_slot_since_hard_fork |> Unsigned.UInt32.of_int64
@@ -575,8 +574,7 @@ module Zkapp_helpers = struct
             in
             let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
             let total_currency =
-              raw_epoch_data.total_currency |> Unsigned.UInt64.of_int64
-              |> Currency.Amount.of_uint64
+              Currency.Amount.of_string raw_epoch_data.total_currency
             in
             let ledger = { Mina_base.Epoch_ledger.Poly.hash; total_currency } in
             let seed = raw_epoch_data.seed |> Epoch_seed.of_base58_check_exn in
@@ -639,7 +637,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     in
     ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
   in
-  let%bind (other_parties : Party.Wire.t list) =
+  let%bind (other_parties : Party.Simple.t list) =
     Deferred.List.map (Array.to_list cmd.zkapp_other_parties_ids) ~f:(fun id ->
         let%bind { body_id; authorization_kind } =
           query_db ~f:(fun db -> Processor.Zkapp_other_party.load db id)
@@ -656,10 +654,10 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
           | None_given ->
               None_given
         in
-        ({ body; authorization } : Party.Wire.t) )
+        ({ body; authorization } : Party.Simple.t) )
   in
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
-  let parties = Parties.of_wire { fee_payer; other_parties; memo } in
+  let parties = Parties.of_simple { fee_payer; other_parties; memo } in
   return (parties : Parties.t)
 
 let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
