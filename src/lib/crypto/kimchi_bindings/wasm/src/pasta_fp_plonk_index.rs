@@ -54,12 +54,12 @@ pub fn caml_pasta_fp_plonk_index_create(
         oracle::pasta::fp_kimchi::params(),
         public_ as usize,
     ) {
-        None => {
+        Err(_) => {
             return Err(JsValue::from_str(
                 "caml_pasta_fp_plonk_index_create: could not create constraint system",
             ));
         }
-        Some(cs) => cs,
+        Ok(cs) => cs,
     };
 
     // endo

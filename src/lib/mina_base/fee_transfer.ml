@@ -98,7 +98,7 @@ include Comparable.Make (Stable.Latest)
 let fee_excess ft =
   ft
   |> One_or_two.map ~f:(fun { fee_token; fee; _ } ->
-         (fee_token, Currency.Fee.Signed.(negate (of_unsigned fee))))
+         (fee_token, Currency.Fee.Signed.(negate (of_unsigned fee))) )
   |> Fee_excess.of_one_or_two
 
 let receiver_pks t = One_or_two.to_list (One_or_two.map ~f:Single.receiver_pk t)

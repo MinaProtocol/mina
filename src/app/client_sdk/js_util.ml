@@ -46,17 +46,11 @@ let payload_of_fee_payer_party_js
   { Party.Fee_payer.body =
       { public_key = fee_payer_pk
       ; update = Party.Update.noop
-      ; token_id = ()
-      ; balance_change = fee
-      ; increment_nonce = ()
+      ; fee
       ; events = []
       ; sequence_events = []
-      ; call_data = Field.zero
-      ; call_depth = 0
       ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-      ; account_precondition = nonce
-      ; use_full_commitment = ()
-      ; caller = ()
+      ; nonce
       }
   ; authorization = Signature.dummy
   }
@@ -178,4 +172,4 @@ let signature_kind_of_string_js network_js fname : Mina_signature_kind.t =
   | s ->
       raise_js_error
         (Core_kernel.sprintf
-           "%s: expected network to be mainnet or testnet, got: %s" fname s)
+           "%s: expected network to be mainnet or testnet, got: %s" fname s )

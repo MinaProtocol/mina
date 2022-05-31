@@ -2,14 +2,16 @@
 
 module Stable : sig
   module V1 : sig
-    type 'a t [@@deriving sexp, compare, equal, hash, bin_io, version]
+    type 'a t
+    [@@deriving sexp, compare, equal, hash, bin_io, version, to_yojson]
   end
 
   module Latest = V1
 end
 
 (* no bin_io on purpose *)
-type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, equal, hash]
+type 'a t = 'a Stable.Latest.t
+[@@deriving sexp, compare, equal, hash, to_yojson]
 
 (** Create a non-empty list by proving you have a head element *)
 val init : 'a -> 'a list -> 'a t

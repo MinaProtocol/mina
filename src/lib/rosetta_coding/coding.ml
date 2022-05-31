@@ -183,4 +183,4 @@ let unit_tests =
 let run_unit_tests () =
   List.iter unit_tests ~f:(fun (name, test) ->
       printf "Running %s test\n%!" name ;
-      assert (test ()))
+      assert (test ()) )

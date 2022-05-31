@@ -82,7 +82,6 @@ module Network_config = struct
         ; delta
         ; slots_per_epoch
         ; slots_per_sub_window
-        ; proof_level
         ; txpool_max_size
         ; requires_graphql
         ; block_producers
@@ -92,8 +91,7 @@ module Network_config = struct
         ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key
-        ; work_delay
-        ; transaction_capacity
+        ; proof_config
         } =
       test_config
     in
@@ -113,7 +111,7 @@ module Network_config = struct
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
         (List.drop
            (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
-           1)
+           1 )
         num_block_producers
     in
     if List.length bp_keypairs < num_block_producers then
@@ -153,7 +151,7 @@ module Network_config = struct
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
-          })
+          } )
     in
     let bp_accounts =
       List.map (List.zip_exn block_producers bp_keypairs)
@@ -175,8 +173,8 @@ module Network_config = struct
           (* an account may be used for snapp transactions, so add
              permissions
           *)
-          let (permissions
-                : Runtime_config.Accounts.Single.Permissions.t option) =
+          let (permissions : Runtime_config.Accounts.Single.Permissions.t option)
+              =
             Some
               { edit_state = None
               ; send = None
@@ -201,23 +199,9 @@ module Network_config = struct
           ; delegate = None
           ; timing
           ; permissions
-          })
+          } )
     in
     (* DAEMON CONFIG *)
-    let proof_config =
-      (* TODO: lift configuration of these up Test_config.t *)
-      { Runtime_config.Proof_keys.level = Some proof_level
-      ; sub_windows_per_window = None
-      ; ledger_depth = None
-      ; work_delay
-      ; block_window_duration_ms = Some 120000
-      ; transaction_capacity
-      ; coinbase_amount = None
-      ; supercharged_coinbase_factor = None
-      ; account_creation_fee = None
-      ; fork = None
-      }
-    in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
         ~default:Genesis_constants.Constraint_constants.compiled proof_config
@@ -254,7 +238,7 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants.compiled runtime_config)
+           ~default:Genesis_constants.compiled runtime_config )
     in
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }
@@ -421,7 +405,7 @@ module Network_manager = struct
             Deferred.return
               ([%log info]
                  "Existing namespace of same name detected; removing to start \
-                  clean")
+                  clean" )
         in
         Util.run_cmd_exn "/" "kubectl"
           [ "delete"; "namespace"; network_config.terraform.testnet_name ]
@@ -451,7 +435,7 @@ module Network_manager = struct
       ~f:(fun ch ->
         Network_config.to_terraform network_config
         |> Terraform.to_string
-        |> Out_channel.output_string ch) ;
+        |> Out_channel.output_string ch ) ;
     let testnet_log_filter = Network_config.testnet_log_filter network_config in
     let cons_workload workload_id node_info : Kubernetes_network.Workload.t =
       { workload_id; node_info }
@@ -467,7 +451,7 @@ module Network_manager = struct
         (String.sub network_config.terraform.snark_worker_public_key
            ~pos:
              (String.length network_config.terraform.snark_worker_public_key - 6)
-           ~len:6)
+           ~len:6 )
     in
     let snark_coordinator_workloads =
       if network_config.terraform.snark_worker_replicas > 0 then
@@ -482,7 +466,7 @@ module Network_manager = struct
         [ cons_workload
             ("snark-worker-" ^ snark_coordinator_id)
             (List.init network_config.terraform.snark_worker_replicas
-               ~f:(fun _i -> cons_node_info "worker"))
+               ~f:(fun _i -> cons_node_info "worker") )
         ]
       else []
     in
@@ -490,13 +474,13 @@ module Network_manager = struct
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config ->
           cons_workload bp_config.name
-            [ cons_node_info ~network_keypair:bp_config.keypair "mina" ])
+            [ cons_node_info ~network_keypair:bp_config.keypair "mina" ] )
     in
     let archive_workloads =
       List.init network_config.terraform.archive_node_count ~f:(fun i ->
           cons_workload
             (sprintf "archive-%d" (i + 1))
-            [ cons_node_info ~has_archive_container:true "mina" ])
+            [ cons_node_info ~has_archive_container:true "mina" ] )
     in
     let workloads_by_id =
       let all_workloads =

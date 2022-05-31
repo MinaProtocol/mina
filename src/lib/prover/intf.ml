@@ -1,7 +1,7 @@
 open Async_kernel
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Blockchain_snark
 
 module type S = sig

@@ -45,7 +45,7 @@ module Ledger_hash = Ledger_hash0
 
      "Making sense" can be captured by the idea that these are the *increasing*
      boolean functions on the type { has_valid_signature: bool; has_valid_proof: bool }.
-  *)
+*)
 module Auth_required = struct
   [%%versioned
   module Stable = struct
@@ -64,6 +64,15 @@ module Auth_required = struct
       let to_latest = Fn.id
     end
   end]
+
+  let from ~auth_tag : t =
+    match auth_tag with
+    | Control.Tag.Proof ->
+        Proof
+    | Signature ->
+        Signature
+    | None_given ->
+        None
 
   (* permissions such that [check permission (Proof _)] is true *)
   let gen_for_proof_authorization : t Quickcheck.Generator.t =
@@ -209,7 +218,7 @@ module Auth_required = struct
 
   let%test_unit "decode encode" =
     List.iter [ Impossible; Proof; Signature; Either ] ~f:(fun t ->
-        [%test_eq: t] t (decode (encode t)))
+        [%test_eq: t] t (decode (encode t)) )
 
   [%%ifdef consensus_mechanism]
 
@@ -220,7 +229,7 @@ module Auth_required = struct
 
     let to_input : t -> _ =
       Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
-          (b :> Field.Var.t))
+          (b :> Field.Var.t) )
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 
@@ -489,8 +498,8 @@ let auth_required_of_string = function
 
 let auth_required =
   Fields_derivers_zkapps.Derivers.iso_string ~name:"AuthRequired"
-    ~doc:"Kind of authorization required" ~to_string:auth_required_to_string
-    ~of_string:auth_required_of_string
+    ~js_type:(Custom "AuthRequired") ~doc:"Kind of authorization required"
+    ~to_string:auth_required_to_string ~of_string:auth_required_of_string
 
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in

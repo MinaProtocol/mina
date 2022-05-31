@@ -88,7 +88,7 @@ module Step = struct
       in
       let str_list =
         List.map forbidden_shifted_values ~f:(fun (a, b) ->
-            (Tick.Field.to_string a, b))
+            (Tick.Field.to_string a, b) )
       in
       assert ([%equal: (string * bool) list] str_list expected_list)
 
@@ -100,10 +100,10 @@ module Step = struct
           | [] ->
               assert false
           | low :: high ->
-              (Field.Constant.project high, low))
+              (Field.Constant.project high, low) )
         ~back:(fun (high, low) ->
           let high = Field.Constant.unpack high in
-          Tock.Field.of_bits (low :: high))
+          Tock.Field.of_bits (low :: high) )
 
     let check t =
       let open Internal_Basic in
@@ -128,21 +128,22 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~branching ~wrap_rounds =
+  let input ~proofs_verified ~wrap_rounds =
     let open Types.Step.Statement in
-    let spec = spec branching wrap_rounds in
-    let (T (typ, f)) =
+    let spec = spec proofs_verified wrap_rounds in
+    let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
-           , fun (Shifted_value.Type2.Shifted_value x as t) ->
+           , (fun (Shifted_value.Type2.Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
-               t ))
+               t )
+           , Fn.id ) )
         spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.ETyp.T (typ, fun x -> of_data (f x))
+    Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
 end
 
 module Wrap = struct
@@ -227,18 +228,22 @@ module Wrap = struct
   let input () =
     let fp : ('a, Other_field.Constant.t) Typ.t = Other_field.typ_unchecked in
     let open Types.Wrap.Statement in
-    let (T (typ, f)) =
+    let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
         (T
            ( Shifted_value.Type1.typ fp
-           , fun (Shifted_value x as t) ->
+           , (fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
-               t ))
+               t )
+           , Fn.id ) )
         In_circuit.spec
     in
     let typ =
       Typ.transport typ ~there:In_circuit.to_data ~back:In_circuit.of_data
     in
-    Spec.ETyp.T (typ, fun x -> In_circuit.of_data (f x))
+    Spec.ETyp.T
+      ( typ
+      , (fun x -> In_circuit.of_data (f x))
+      , fun x -> f_inv (In_circuit.to_data x) )
 end

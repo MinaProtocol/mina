@@ -25,7 +25,7 @@ module Make (Input : Inputs_intf) : Make_intf(Input).S = struct
     let hashes =
       List.fold merkle_list ~init:(Non_empty_list.singleton init)
         ~f:(fun acc proof_elem ->
-          Non_empty_list.cons (hash (Non_empty_list.head acc) proof_elem) acc)
+          Non_empty_list.cons (hash (Non_empty_list.head acc) proof_elem) acc )
     in
     if equal_hash target_hash (Non_empty_list.head hashes) then Some hashes
     else None

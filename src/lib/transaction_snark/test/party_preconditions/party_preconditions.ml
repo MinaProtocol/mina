@@ -7,7 +7,7 @@ open Mina_base
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -18,7 +18,7 @@ let%test_module "Protocol state precondition tests" =
       { Party.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
-              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i))
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
       }
 
     let precondition_exact
@@ -80,13 +80,13 @@ let%test_module "Protocol state precondition tests" =
             ; protocol_state_precondition =
                 Some
                   (precondition_exact
-                     (Mina_state.Protocol_state.Body.view state_body))
+                     (Mina_state.Protocol_state.Body.view state_body) )
             ; account_precondition = None
             }
           in
           U.test_snapp_update test_spec ~state_body ~init_ledger ~vk
             ~snapp_prover
-            ~snapp_pk:(Public_key.compress new_kp.public_key))
+            ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "generated protocol state predicate" =
       let state_body = U.genesis_state_body in
@@ -125,7 +125,7 @@ let%test_module "Protocol state precondition tests" =
           in
           U.test_snapp_update test_spec ~state_body ~init_ledger ~vk
             ~snapp_prover
-            ~snapp_pk:(Public_key.compress new_kp.public_key))
+            ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "invalid protocol state predicate in fee payer" =
       let state_body = U.genesis_state_body in
@@ -196,12 +196,12 @@ let%test_module "Protocol state precondition tests" =
                              (sprintf {|.*\(%s\).*|}
                                 Transaction_status.Failure.(
                                   to_string
-                                    Protocol_state_precondition_unsatisfied)))
+                                    Protocol_state_precondition_unsatisfied) ) )
                           (Error.to_string_hum e) 0 )
                   | Ok _ ->
                       failwith
                         "Expected transaction to fail due to invalid protocol \
-                         state precondition in the fee payer")))
+                         state precondition in the fee payer" ) ) )
 
     let%test_unit "invalid protocol state predicate in other parties" =
       let state_body = U.genesis_state_body in
@@ -245,23 +245,17 @@ let%test_module "Protocol state precondition tests" =
                     { Party.Fee_payer.body =
                         { public_key = sender_pk
                         ; update = Party.Update.noop
-                        ; token_id = ()
-                        ; balance_change = fee
-                        ; increment_nonce = ()
+                        ; fee
                         ; events = []
                         ; sequence_events = []
-                        ; call_data = Snark_params.Tick.Field.zero
-                        ; call_depth = 0
                         ; protocol_state_precondition
-                        ; account_precondition = sender_nonce
-                        ; use_full_commitment = ()
-                        ; caller = ()
+                        ; nonce = sender_nonce
                         }
                         (*To be updated later*)
                     ; authorization = Signature.dummy
                     }
                   in
-                  let sender_party : Party.Wire.t =
+                  let sender_party : Party.Simple.t =
                     { body =
                         { public_key = sender_pk
                         ; update = Party.Update.noop
@@ -284,7 +278,7 @@ let%test_module "Protocol state precondition tests" =
                     ; authorization = Control.Signature Signature.dummy
                     }
                   in
-                  let snapp_party : Party.Wire.t =
+                  let snapp_party : Party.Simple.t =
                     { body =
                         { public_key = snapp_pk
                         ; update = snapp_update
@@ -296,7 +290,7 @@ let%test_module "Protocol state precondition tests" =
                                    (sub amount
                                       (of_fee
                                          constraint_constants
-                                           .account_creation_fee))))
+                                           .account_creation_fee ) ) ))
                         ; increment_nonce = false
                         ; events = []
                         ; sequence_events = []
@@ -315,10 +309,10 @@ let%test_module "Protocol state precondition tests" =
                     }
                   in
                   let ps =
-                    Parties.Call_forest.With_hashes.of_parties_list
+                    Parties.Call_forest.With_hashes.of_parties_simple_list
                       (List.map
                          ~f:(fun p -> (p, ()))
-                         [ sender_party; snapp_party ])
+                         [ sender_party; snapp_party ] )
                   in
                   let other_parties_hash = Parties.Call_forest.hash ps in
                   let commitment =
@@ -339,7 +333,7 @@ let%test_module "Protocol state precondition tests" =
                     in
                     { fee_payer with authorization = fee_payer_signature_auth }
                   in
-                  let sender_party : Party.Wire.t =
+                  let sender_party : Party.Simple.t =
                     let signature_auth : Signature.t =
                       Signature_lib.Schnorr.Chunked.sign sender.private_key
                         (Random_oracle.Input.Chunked.field commitment)
@@ -362,7 +356,7 @@ let%test_module "Protocol state precondition tests" =
                     ; memo
                     ; other_parties = [ sender_party; snapp_party ]
                     }
-                    |> Parties.of_wire
+                    |> Parties.of_simple
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
@@ -372,12 +366,12 @@ let%test_module "Protocol state precondition tests" =
                       Transaction_status.Failure
                       .Protocol_state_precondition_unsatisfied ~state_body
                     ledger
-                    [ parties_with_valid_fee_payer ])))
+                    [ parties_with_valid_fee_payer ] ) ) )
   end )
 
 let%test_module "Account precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -387,7 +381,7 @@ let%test_module "Account precondition tests" =
       { Party.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
-              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i))
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
       }
 
     let precondition_exact (account : Account.t) =
@@ -396,8 +390,7 @@ let%test_module "Account precondition tests" =
       let interval v =
         { Closed_interval.lower = v; Closed_interval.upper = v }
       in
-      let { Mina_base.Account.Poly.public_key
-          ; balance
+      let { Mina_base.Account.Poly.balance
           ; nonce
           ; receipt_chain_hash
           ; delegate
@@ -410,7 +403,6 @@ let%test_module "Account precondition tests" =
         let balance = Or_ignore.Check (interval balance) in
         let nonce = Or_ignore.Check (interval nonce) in
         let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
-        let public_key = Or_ignore.Check public_key in
         let delegate =
           match delegate with
           | None ->
@@ -433,7 +425,7 @@ let%test_module "Account precondition tests" =
           | Some { app_state; sequence_state; proved_state; _ } ->
               let state =
                 Zkapp_state.V.map app_state ~f:(fun field ->
-                    Or_ignore.Check field)
+                    Or_ignore.Check field )
               in
               let sequence_state =
                 (* choose a value from account sequence state *)
@@ -445,10 +437,9 @@ let%test_module "Account precondition tests" =
               let proved_state = Or_ignore.Check proved_state in
               (state, sequence_state, proved_state)
         in
-        { Zkapp_precondition.Account.Poly.balance
+        { Zkapp_precondition.Account.balance
         ; nonce
         ; receipt_chain_hash
-        ; public_key
         ; delegate
         ; state
         ; sequence_state
@@ -503,7 +494,7 @@ let%test_module "Account precondition tests" =
                     Transaction_snark.For_tests.update_states ~snapp_prover
                       ~constraint_constants test_spec
                   in
-                  U.check_parties_with_merges_exn ~state_body ledger [ parties ])))
+                  U.check_parties_with_merges_exn ~state_body ledger [ parties ] ) ) )
 
     let%test_unit "generated account precondition" =
       let gen =
@@ -559,7 +550,7 @@ let%test_module "Account precondition tests" =
                     Transaction_snark.For_tests.update_states ~snapp_prover
                       ~constraint_constants test_spec
                   in
-                  U.check_parties_with_merges_exn ~state_body ledger [ parties ])))
+                  U.check_parties_with_merges_exn ~state_body ledger [ parties ] ) ) )
 
     let%test_unit "invalid account predicate in other parties" =
       let state_body = U.genesis_state_body in
@@ -571,8 +562,9 @@ let%test_module "Account precondition tests" =
           Transaction_snark.For_tests.trivial_zkapp_account ~vk snapp_pk
         in
         let%map account_precondition =
-          Mina_generators.Parties_generators
-          .gen_account_precondition_from_account ~succeed:false snapp_account
+          Mina_generators.Parties_generators.(
+            gen_account_precondition_from_account
+              ~failure:Invalid_account_precondition snapp_account)
         in
         (l, account_precondition)
       in
@@ -618,8 +610,8 @@ let%test_module "Account precondition tests" =
                   U.check_parties_with_merges_exn
                     ~expected_failure:
                       Transaction_status.Failure
-                      .Account_precondition_unsatisfied ~state_body ledger
-                    [ parties ])))
+                      .Account_nonce_precondition_unsatisfied ~state_body ledger
+                    [ parties ] ) ) )
 
     let%test_unit "invalid account predicate in fee payer" =
       let state_body = U.genesis_state_body in
@@ -641,25 +633,18 @@ let%test_module "Account precondition tests" =
                 { Party.Fee_payer.body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
-                    ; token_id = ()
-                    ; balance_change = fee
-                    ; increment_nonce = ()
+                    ; fee
                     ; events = []
                     ; sequence_events = []
-                    ; call_data = Snark_params.Tick.Field.zero
-                    ; call_depth = 0
                     ; protocol_state_precondition =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account_precondition =
-                        Account.Nonce.succ sender_nonce (*Invalid nonce*)
-                    ; use_full_commitment = ()
-                    ; caller = ()
+                    ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
                     }
                     (*To be updated later*)
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party : Party.Wire.t =
+              let sender_party : Party.Simple.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -682,7 +667,7 @@ let%test_module "Account precondition tests" =
                 ; authorization = Control.Signature Signature.dummy
                 }
               in
-              let snapp_party : Party.Wire.t =
+              let snapp_party : Party.Simple.t =
                 { body =
                     { public_key = snapp_pk
                     ; update = snapp_update
@@ -691,7 +676,7 @@ let%test_module "Account precondition tests" =
                         Option.value_exn
                           (Currency.Amount.sub amount
                              (Amount.of_fee
-                                constraint_constants.account_creation_fee))
+                                constraint_constants.account_creation_fee ) )
                         |> Amount.Signed.of_unsigned
                     ; increment_nonce = false
                     ; events = []
@@ -709,7 +694,7 @@ let%test_module "Account precondition tests" =
                 }
               in
               let ps =
-                Parties.Call_forest.With_hashes.of_parties_list
+                Parties.Call_forest.With_hashes.of_parties_simple_list
                   (List.map ~f:(fun p -> (p, ())) [ sender_party; snapp_party ])
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
@@ -750,7 +735,7 @@ let%test_module "Account precondition tests" =
                 }
               in
               let parties_with_invalid_fee_payer =
-                Parties.of_wire
+                Parties.of_simple
                   { fee_payer
                   ; memo
                   ; other_parties = [ sender_party; snapp_party ]
@@ -769,10 +754,10 @@ let%test_module "Account precondition tests" =
                       (Str.regexp
                          (sprintf {|.*\(%s\).*|}
                             Transaction_status.Failure.(
-                              to_string Account_precondition_unsatisfied)))
+                              to_string Account_nonce_precondition_unsatisfied) ) )
                       (Error.to_string_hum e) 0 )
               | Ok _ ->
                   failwith
                     "Expected transaction to fail due to invalid account \
-                     precondition in the fee payer"))
+                     precondition in the fee payer" ) )
   end )

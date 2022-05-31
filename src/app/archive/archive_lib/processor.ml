@@ -7,30 +7,34 @@ open Caqti_async
 open Mina_base
 open Mina_transaction
 open Mina_state
-open Mina_transition
+open Mina_block
 open Pipe_lib
 open Signature_lib
 open Pickles_types
+
+let applied_str = "applied"
+
+let failed_str = "failed"
 
 module Public_key = struct
   let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
-         "SELECT id FROM public_keys WHERE value = ?")
+         "SELECT id FROM public_keys WHERE value = ?" )
       public_key
 
   let find_opt (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-         "SELECT id FROM public_keys WHERE value = ?")
+         "SELECT id FROM public_keys WHERE value = ?" )
       public_key
 
   let find_by_id (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int Caqti_type.string
-         "SELECT value FROM public_keys WHERE id = ?")
+         "SELECT value FROM public_keys WHERE id = ?" )
       id
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -43,8 +47,187 @@ module Public_key = struct
         let public_key = Public_key.Compressed.to_base58_check t in
         Conn.find
           (Caqti_request.find Caqti_type.string Caqti_type.int
-             "INSERT INTO public_keys (value) VALUES (?) RETURNING id")
+             "INSERT INTO public_keys (value) VALUES (?) RETURNING id" )
           public_key
+end
+
+module Token_owners = struct
+  (* hash table of token owners, updated for each block *)
+  let owner_tbl : Account_id.t Token_id.Table.t = Token_id.Table.create ()
+
+  let add_if_doesn't_exist token_id owner =
+    match Token_id.Table.add owner_tbl ~key:token_id ~data:owner with
+    | `Ok | `Duplicate ->
+        ()
+
+  let find_owner token_id = Token_id.Table.find owner_tbl token_id
+end
+
+module Token = struct
+  type t =
+    { value : string
+    ; owner_public_key_id : int option
+    ; owner_token_id : int option
+    }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; option int; option int ]
+
+  let table_name = "tokens"
+
+  let find_by_id (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+
+  let make_finder conn_finder req_finder token_id =
+    conn_finder
+      (req_finder Caqti_type.string Caqti_type.int
+         (Mina_caqti.select_cols ~table_name ~select:"id" ~cols:[ "value" ] ()) )
+      (Token_id.to_string token_id)
+
+  let find (module Conn : CONNECTION) = make_finder Conn.find Caqti_request.find
+
+  let find_opt (module Conn : CONNECTION) =
+    make_finder Conn.find_opt Caqti_request.find_opt
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) token_id =
+    let open Deferred.Result.Let_syntax in
+    let value = Token_id.(to_string token_id) in
+    match Token_owners.find_owner token_id with
+    | None ->
+        assert (Token_id.(equal default) token_id) ;
+        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+          ~table_name ~cols:(Fields.names, typ)
+          (module Conn)
+          { value; owner_public_key_id = None; owner_token_id = None }
+    | Some acct_id ->
+        assert (not @@ Token_id.(equal default) token_id) ;
+        (* we can only add this token if its owner exists
+           that means if we add several tokens in a block,
+           we must add them in topologically sorted order
+        *)
+        let%bind owner_public_key_id =
+          let owner_pk = Account_id.public_key acct_id in
+          let%map id = Public_key.add_if_doesn't_exist (module Conn) owner_pk in
+          Some id
+        in
+        let%bind owner_token_id =
+          let owner_tid = Account_id.token_id acct_id in
+          let%map id = find (module Conn) owner_tid in
+          Some id
+        in
+        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+          ~table_name ~cols:(Fields.names, typ)
+          (module Conn)
+          { value; owner_public_key_id; owner_token_id }
+end
+
+module Voting_for = struct
+  type t = string
+
+  let typ = Caqti_type.string
+
+  let table_name = "voting_for"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) voting_for =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "value" ], typ)
+      (module Conn)
+      (State_hash.to_base58_check voting_for)
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
+      id
+end
+
+module Token_symbols = struct
+  type t = string
+
+  let typ = Caqti_type.string
+
+  let table_name = "token_symbols"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) token_symbol =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "value" ], typ)
+      (module Conn)
+      token_symbol
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
+      id
+end
+
+module Account_identifiers = struct
+  type t = { public_key_id : int; token_id : int } [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int; int ]
+
+  let table_name = "account_identifiers"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) account_id =
+    let open Deferred.Result.Let_syntax in
+    let pk = Account_id.public_key account_id in
+    (* this token_id is Token_id.t *)
+    let token_id = Account_id.token_id account_id in
+    let%bind public_key_id = Public_key.add_if_doesn't_exist (module Conn) pk in
+    (* this token_id is a Postgresql table id *)
+    let%bind token_id = Token.add_if_doesn't_exist (module Conn) token_id in
+    let t = { public_key_id; token_id } in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      t
+
+  let find_opt (module Conn : CONNECTION) account_id =
+    let open Deferred.Result.Let_syntax in
+    let pk = Account_id.public_key account_id in
+    match%bind Public_key.find_opt (module Conn) pk with
+    | None ->
+        return None
+    | Some pk_id -> (
+        let token = Account_id.token_id account_id in
+        match%bind Token.find_opt (module Conn) token with
+        | None ->
+            return None
+        | Some tok_id ->
+            Conn.find_opt
+              (Caqti_request.find_opt
+                 Caqti_type.(tup2 int int)
+                 Caqti_type.int
+                 (Mina_caqti.select_cols ~select:"id" ~table_name
+                    ~cols:Fields.names () ) )
+              (pk_id, tok_id) )
+
+  let find (module Conn : CONNECTION) account_id =
+    let open Deferred.Result.Let_syntax in
+    let pk = Account_id.public_key account_id in
+    let%bind public_key_id = Public_key.find (module Conn) pk in
+    let token = Account_id.token_id account_id in
+    let%bind token_id = Token.find (module Conn) token in
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup2 int int)
+         Caqti_type.int
+         (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
+      (public_key_id, token_id)
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
 end
 
 module Zkapp_state_data = struct
@@ -61,7 +244,7 @@ module Zkapp_state_data = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int Caqti_type.string
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "field" ]))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "field" ]) )
       id
 end
 
@@ -86,7 +269,7 @@ module Zkapp_state_data_array = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
       id
 end
 
@@ -113,7 +296,32 @@ module Zkapp_states = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int Mina_caqti.array_nullable_int_typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
+      id
+end
+
+module Zkapp_sequence_states = struct
+  let table_name = "zkapp_sequence_states"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (fps : (Pickles.Backend.Tick.Field.t, 'n) Vector.vec) =
+    let open Deferred.Result.Let_syntax in
+    let%bind (element_ids : int array) =
+      Mina_caqti.deferred_result_list_map (Vector.to_list fps) ~f:(fun field ->
+          Zkapp_state_data.add_if_doesn't_exist (module Conn) field )
+      >>| Array.of_list
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
+      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+      (module Conn)
+      element_ids
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
       id
 end
 
@@ -131,7 +339,7 @@ module Zkapp_verification_keys = struct
       (vk :
         ( Pickles.Side_loaded.Verification_key.t
         , Pickles.Backend.Tick.Field.t )
-        With_hash.Stable.Latest.t) =
+        With_hash.t ) =
     let verification_key =
       Binable.to_string
         (module Pickles.Side_loaded.Verification_key.Stable.Latest)
@@ -148,7 +356,7 @@ module Zkapp_verification_keys = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -237,43 +445,38 @@ module Zkapp_permissions = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
 module Zkapp_timing_info = struct
   type t =
-    { initial_minimum_balance : int64
+    { initial_minimum_balance : string
     ; cliff_time : int64
-    ; cliff_amount : int64
+    ; cliff_amount : string
     ; vesting_period : int64
-    ; vesting_increment : int64
+    ; vesting_increment : string
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int64; int64; int64; int64; int64 ]
+      Caqti_type.[ string; int64; string; int64; string ]
 
   let table_name = "zkapp_timing_info"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (timing_info : Party.Update.Timing_info.t) =
     let initial_minimum_balance =
-      timing_info.initial_minimum_balance |> Currency.Balance.to_uint64
-      |> Unsigned.UInt64.to_int64
+      Currency.Balance.to_string timing_info.initial_minimum_balance
     in
     let cliff_time = timing_info.cliff_time |> Unsigned.UInt32.to_int64 in
-    let cliff_amount =
-      timing_info.cliff_amount |> Currency.Amount.to_uint64
-      |> Unsigned.UInt64.to_int64
-    in
+    let cliff_amount = Currency.Amount.to_string timing_info.cliff_amount in
     let vesting_period =
       timing_info.vesting_period |> Unsigned.UInt32.to_int64
     in
     let vesting_increment =
-      timing_info.vesting_increment |> Currency.Amount.to_uint64
-      |> Unsigned.UInt64.to_int64
+      Currency.Amount.to_string timing_info.vesting_increment
     in
     let value =
       { initial_minimum_balance
@@ -291,7 +494,28 @@ module Zkapp_timing_info = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+end
+
+module Zkapp_uri = struct
+  type t = string
+
+  let typ = Caqti_type.string
+
+  let table_name = "zkapp_uris"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "value" ], typ)
+      (module Conn)
+      zkapp_uri
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
       id
 end
 
@@ -301,10 +525,10 @@ module Zkapp_updates = struct
     ; delegate_id : int option
     ; verification_key_id : int option
     ; permissions_id : int option
-    ; zkapp_uri : string option
-    ; token_symbol : string option
+    ; zkapp_uri_id : int option
+    ; token_symbol_id : int option
     ; timing_id : int option
-    ; voting_for : string option
+    ; voting_for_id : int option
     }
   [@@deriving fields, hlist]
 
@@ -315,10 +539,10 @@ module Zkapp_updates = struct
         ; option int
         ; option int
         ; option int
-        ; option string
-        ; option string
         ; option int
-        ; option string
+        ; option int
+        ; option int
+        ; option int
         ]
 
   let table_name = "zkapp_updates"
@@ -350,21 +574,30 @@ module Zkapp_updates = struct
         (Zkapp_timing_info.add_if_doesn't_exist (module Conn))
         update.timing
     in
-    let zkapp_uri = Zkapp_basic.Set_or_keep.to_option update.zkapp_uri in
-    let token_symbol = Zkapp_basic.Set_or_keep.to_option update.token_symbol in
-    let voting_for =
-      Option.map ~f:State_hash.to_base58_check
-        (Zkapp_basic.Set_or_keep.to_option update.voting_for)
+    let%bind zkapp_uri_id =
+      Mina_caqti.add_if_zkapp_set
+        (Zkapp_uri.add_if_doesn't_exist (module Conn))
+        update.zkapp_uri
+    in
+    let%bind token_symbol_id =
+      Mina_caqti.add_if_zkapp_set
+        (Token_symbols.add_if_doesn't_exist (module Conn))
+        update.token_symbol
+    in
+    let%bind voting_for_id =
+      Mina_caqti.add_if_zkapp_set
+        (Voting_for.add_if_doesn't_exist (module Conn))
+        update.voting_for
     in
     let value =
       { app_state_id
       ; delegate_id
       ; verification_key_id
       ; permissions_id
-      ; zkapp_uri
-      ; token_symbol
+      ; zkapp_uri_id
+      ; token_symbol_id
       ; timing_id
-      ; voting_for
+      ; voting_for_id
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -375,31 +608,25 @@ module Zkapp_updates = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
 module Zkapp_balance_bounds = struct
-  type t = { balance_lower_bound : int64; balance_upper_bound : int64 }
+  type t = { balance_lower_bound : string; balance_upper_bound : string }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int64; int64 ]
+      Caqti_type.[ string; string ]
 
   let table_name = "zkapp_balance_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (balance_bounds :
-        Currency.Balance.t Mina_base.Zkapp_precondition.Closed_interval.t) =
-    let balance_lower_bound =
-      balance_bounds.lower |> Currency.Balance.to_uint64
-      |> Unsigned.UInt64.to_int64
-    in
-    let balance_upper_bound =
-      balance_bounds.upper |> Currency.Balance.to_uint64
-      |> Unsigned.UInt64.to_int64
-    in
+        Currency.Balance.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
+    let balance_lower_bound = Currency.Balance.to_string balance_bounds.lower in
+    let balance_upper_bound = Currency.Balance.to_string balance_bounds.upper in
     let value = { balance_lower_bound; balance_upper_bound } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -409,7 +636,7 @@ module Zkapp_balance_bounds = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -426,7 +653,7 @@ module Zkapp_nonce_bounds = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (nonce_bounds :
         Mina_numbers.Account_nonce.t
-        Mina_base.Zkapp_precondition.Closed_interval.t) =
+        Mina_base.Zkapp_precondition.Closed_interval.t ) =
     let nonce_lower_bound = Unsigned.UInt32.to_int64 nonce_bounds.lower in
     let nonce_upper_bound = Unsigned.UInt32.to_int64 nonce_bounds.upper in
     let value = { nonce_lower_bound; nonce_upper_bound } in
@@ -438,16 +665,15 @@ module Zkapp_nonce_bounds = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
-module Zkapp_account = struct
+module Zkapp_precondition_account = struct
   type t =
     { balance_id : int option
     ; nonce_id : int option
     ; receipt_chain_hash : string option
-    ; public_key_id : int option
     ; delegate_id : int option
     ; state_id : int
     ; sequence_state_id : int option
@@ -462,13 +688,12 @@ module Zkapp_account = struct
         ; option int
         ; option string
         ; option int
-        ; option int
         ; int
         ; option int
         ; option bool
         ]
 
-  let table_name = "zkapp_account"
+  let table_name = "zkapp_precondition_accounts"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (acct : Zkapp_precondition.Account.t) =
@@ -482,11 +707,6 @@ module Zkapp_account = struct
       Mina_caqti.add_if_zkapp_check
         (Zkapp_nonce_bounds.add_if_doesn't_exist (module Conn))
         acct.nonce
-    in
-    let%bind public_key_id =
-      Mina_caqti.add_if_zkapp_check
-        (Public_key.add_if_doesn't_exist (module Conn))
-        acct.public_key
     in
     let%bind delegate_id =
       Mina_caqti.add_if_zkapp_check
@@ -511,7 +731,6 @@ module Zkapp_account = struct
       { balance_id
       ; nonce_id
       ; receipt_chain_hash
-      ; public_key_id
       ; delegate_id
       ; state_id
       ; sequence_state_id
@@ -526,14 +745,14 @@ module Zkapp_account = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
 module Zkapp_account_precondition = struct
   type t =
     { kind : Party.Account_precondition.Tag.t
-    ; account_id : int option
+    ; precondition_account_id : int option
     ; nonce : int64 option
     }
   [@@deriving fields, hlist]
@@ -542,9 +761,9 @@ module Zkapp_account_precondition = struct
     let encode = function
       | Party.Account_precondition.Tag.Full ->
           "full"
-      | Party.Account_precondition.Tag.Nonce ->
+      | Nonce ->
           "nonce"
-      | Party.Account_precondition.Tag.Accept ->
+      | Accept ->
           "accept"
     in
     let decode = function
@@ -557,7 +776,7 @@ module Zkapp_account_precondition = struct
       | _ ->
           Result.failf "Failed to decode zkapp_account_precondition_kind_typ"
     in
-    Caqti_type.enum "zkapp_account_precondition_type" ~encode ~decode
+    Caqti_type.enum "zkapp_precondition_type" ~encode ~decode
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -569,10 +788,11 @@ module Zkapp_account_precondition = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (account_precondition : Party.Account_precondition.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind account_id =
+    let%bind precondition_account_id =
       match account_precondition with
       | Party.Account_precondition.Full acct ->
-          Zkapp_account.add_if_doesn't_exist (module Conn) acct >>| Option.some
+          Zkapp_precondition_account.add_if_doesn't_exist (module Conn) acct
+          >>| Option.some
       | _ ->
           return None
     in
@@ -584,16 +804,15 @@ module Zkapp_account_precondition = struct
       | _ ->
           None
     in
-    let value = { kind; account_id; nonce } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
-      value
+      { kind; precondition_account_id; nonce }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -609,7 +828,7 @@ module Zkapp_token_id_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (token_id_bounds :
-        Token_id.t Mina_base.Zkapp_precondition.Closed_interval.t) =
+        Token_id.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
     let token_id_lower_bound = token_id_bounds.lower |> Token_id.to_string in
     let token_id_upper_bound = token_id_bounds.upper |> Token_id.to_string in
     let value = { token_id_lower_bound; token_id_upper_bound } in
@@ -621,25 +840,25 @@ module Zkapp_token_id_bounds = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
 module Zkapp_timestamp_bounds = struct
-  type t = { timestamp_lower_bound : int64; timestamp_upper_bound : int64 }
+  type t = { timestamp_lower_bound : string; timestamp_upper_bound : string }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int64; int64 ]
+      Caqti_type.[ string; string ]
 
   let table_name = "zkapp_timestamp_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (timestamp_bounds :
-        Block_time.t Mina_base.Zkapp_precondition.Closed_interval.t) =
-    let timestamp_lower_bound = Block_time.to_int64 timestamp_bounds.lower in
-    let timestamp_upper_bound = Block_time.to_int64 timestamp_bounds.upper in
+        Block_time.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
+    let timestamp_lower_bound = Block_time.to_string timestamp_bounds.lower in
+    let timestamp_upper_bound = Block_time.to_string timestamp_bounds.upper in
     let value = { timestamp_lower_bound; timestamp_upper_bound } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -649,7 +868,7 @@ module Zkapp_timestamp_bounds = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -665,7 +884,7 @@ module Zkapp_length_bounds = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (length_bounds :
-        Unsigned.uint32 Mina_base.Zkapp_precondition.Closed_interval.t) =
+        Unsigned.uint32 Mina_base.Zkapp_precondition.Closed_interval.t ) =
     let length_lower_bound = Unsigned.UInt32.to_int64 length_bounds.lower in
     let length_upper_bound = Unsigned.UInt32.to_int64 length_bounds.upper in
     let value = { length_lower_bound; length_upper_bound } in
@@ -677,29 +896,25 @@ module Zkapp_length_bounds = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
 module Zkapp_amount_bounds = struct
-  type t = { amount_lower_bound : int64; amount_upper_bound : int64 }
+  type t = { amount_lower_bound : string; amount_upper_bound : string }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int64; int64 ]
+      Caqti_type.[ string; string ]
 
   let table_name = "zkapp_amount_bounds"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (amount_bounds :
-        Currency.Amount.t Mina_base.Zkapp_precondition.Closed_interval.t) =
-    let amount_lower_bound =
-      Currency.Amount.to_uint64 amount_bounds.lower |> Unsigned.UInt64.to_int64
-    in
-    let amount_upper_bound =
-      Currency.Amount.to_uint64 amount_bounds.upper |> Unsigned.UInt64.to_int64
-    in
+        Currency.Amount.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
+    let amount_lower_bound = Currency.Amount.to_string amount_bounds.lower in
+    let amount_upper_bound = Currency.Amount.to_string amount_bounds.upper in
     let value = { amount_lower_bound; amount_upper_bound } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -709,7 +924,7 @@ module Zkapp_amount_bounds = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -726,7 +941,7 @@ module Zkapp_global_slot_bounds = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (global_slot_bounds :
         Mina_numbers.Global_slot.t
-        Mina_base.Zkapp_precondition.Closed_interval.t) =
+        Mina_base.Zkapp_precondition.Closed_interval.t ) =
     let global_slot_lower_bound =
       Mina_numbers.Global_slot.to_uint32 global_slot_bounds.lower
       |> Unsigned.UInt32.to_int64
@@ -744,109 +959,113 @@ module Zkapp_global_slot_bounds = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
 module Timing_info = struct
   type t =
-    { public_key_id : int
-    ; token : string
-    ; initial_balance : int64
-    ; initial_minimum_balance : int64
+    { account_identifier_id : int
+    ; initial_minimum_balance : string
     ; cliff_time : int64
-    ; cliff_amount : int64
+    ; cliff_amount : string
     ; vesting_period : int64
-    ; vesting_increment : int64
+    ; vesting_increment : string
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; string; int64; int64; int64; int64; int64; int64 ]
+      Caqti_type.[ int; string; int64; string; int64; string ]
+
+  let table_name = "timing_info"
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind pk_id = Public_key.find (module Conn) acc.public_key in
+    let%bind account_identifier_id =
+      let account_id = Account_id.create acc.public_key acc.token_id in
+      Account_identifiers.find (module Conn) account_id
+    in
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT public_key_id, token, initial_balance,
-                      initial_minimum_balance, cliff_time, cliff_amount,
+         {sql| SELECT account_identifier_id, initial_minimum_balance,
+                      cliff_time, cliff_amount,
                       vesting_period, vesting_increment
                FROM timing_info
-               WHERE public_key_id = ?
-         |sql})
-      pk_id
+               WHERE account_identifier_id = ?
+         |sql} )
+      account_identifier_id
 
-  let find_by_pk_opt (module Conn : CONNECTION) public_key =
-    let open Deferred.Result.Let_syntax in
-    let%bind pk_id = Public_key.find (module Conn) public_key in
+  let find_by_account_identifier_id_opt (module Conn : CONNECTION)
+      account_identifier_id =
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.int typ
-         {sql| SELECT public_key_id, token, initial_balance,
-                     initial_minimum_balance, cliff_time, cliff_amount,
-                     vesting_period, vesting_increment
+         {sql| SELECT account_identifier_id, initial_minimum_balance,
+                      cliff_time, cliff_amount,
+                      vesting_period, vesting_increment
                FROM timing_info
-               WHERE public_key_id = ?
-         |sql})
-      pk_id
+               WHERE account_identifier_id = ?
+         |sql} )
+      account_identifier_id
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) account_identifier_id
+      (timing : Account_timing.t) =
     let open Deferred.Result.Let_syntax in
-    let amount_to_int64 x =
-      Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
-    in
-    let balance_to_int64 x = amount_to_int64 (Currency.Balance.to_amount x) in
     let slot_to_int64 x =
       Mina_numbers.Global_slot.to_uint32 x |> Unsigned.UInt32.to_int64
-    in
-    let%bind public_key_id =
-      Public_key.add_if_doesn't_exist (module Conn) acc.public_key
     in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.int Caqti_type.int
-           "SELECT id FROM timing_info WHERE public_key_id = ?")
-        public_key_id
+           "SELECT id FROM timing_info WHERE account_identifier_id = ?" )
+        account_identifier_id
     with
     | Some id ->
         return id
     | None ->
         let values =
-          let token = Token_id.to_string (Account.token acc) in
-          match acc.timing with
+          match timing with
           | Timed timing ->
-              { public_key_id
-              ; token
-              ; initial_balance = balance_to_int64 acc.balance
+              { account_identifier_id
               ; initial_minimum_balance =
-                  balance_to_int64 timing.initial_minimum_balance
+                  Currency.Balance.to_string timing.initial_minimum_balance
               ; cliff_time = slot_to_int64 timing.cliff_time
-              ; cliff_amount = amount_to_int64 timing.cliff_amount
+              ; cliff_amount = Currency.Amount.to_string timing.cliff_amount
               ; vesting_period = slot_to_int64 timing.vesting_period
-              ; vesting_increment = amount_to_int64 timing.vesting_increment
+              ; vesting_increment =
+                  Currency.Amount.to_string timing.vesting_increment
               }
           | Untimed ->
-              let zero = Int64.zero in
-              { public_key_id
-              ; token
-              ; initial_balance = balance_to_int64 acc.balance
+              let zero = "0" in
+              { account_identifier_id
               ; initial_minimum_balance = zero
-              ; cliff_time = zero
+              ; cliff_time = 0L
               ; cliff_amount = zero
-              ; vesting_period = zero
+              ; vesting_period = 0L
               ; vesting_increment = zero
               }
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO timing_info
-                    (public_key_id,token,initial_balance,initial_minimum_balance,
+                    (account_identifier_id,initial_minimum_balance,
                      cliff_time, cliff_amount, vesting_period, vesting_increment)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, ?)
                    RETURNING id
-             |sql})
+             |sql} )
           values
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+
+  let load_opt (module Conn : CONNECTION) id =
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
 end
 
 module Snarked_ledger_hash = struct
@@ -854,8 +1073,14 @@ module Snarked_ledger_hash = struct
     let hash = Frozen_ledger_hash.to_base58_check t in
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
-         "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
+         "SELECT id FROM snarked_ledger_hashes WHERE value = ?" )
       hash
+
+  let find_by_id (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         "SELECT value FROM snarked_ledger_hashes WHERE id = ?" )
+      id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Frozen_ledger_hash.t)
       =
@@ -864,7 +1089,7 @@ module Snarked_ledger_hash = struct
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-           "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
+           "SELECT id FROM snarked_ledger_hashes WHERE value = ?" )
         hash
     with
     | Some id ->
@@ -872,13 +1097,13 @@ module Snarked_ledger_hash = struct
     | None ->
         Conn.find
           (Caqti_request.find Caqti_type.string Caqti_type.int
-             "INSERT INTO snarked_ledger_hashes (value) VALUES (?) RETURNING id")
+             "INSERT INTO snarked_ledger_hashes (value) VALUES (?) RETURNING id" )
           hash
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int Caqti_type.string
-         "SELECT value FROM snarked_ledger_hashes WHERE id = ?")
+         "SELECT value FROM snarked_ledger_hashes WHERE id = ?" )
       id
 end
 
@@ -914,7 +1139,7 @@ module Zkapp_epoch_ledger = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -974,7 +1199,7 @@ module Zkapp_epoch_data = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -1072,19 +1297,47 @@ module Zkapp_protocol_state_precondition = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
-module Zkapp_party_body = struct
+module Zkapp_events = struct
+  type t = int array
+
+  let typ = Mina_caqti.array_int_typ
+
+  let table_name = "zkapp_events"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (events : Party.Body.Events'.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind (element_ids : int array) =
+      Mina_caqti.deferred_result_list_map events
+        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
+      >>| Array.of_list
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
+      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+      (module Conn)
+      element_ids
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
+      id
+end
+
+module Zkapp_other_party_body = struct
   type t =
-    { public_key_id : int
+    { account_identifier_id : int
     ; update_id : int
-    ; token_id : string
-    ; balance_change : int64
+    ; balance_change : string
     ; increment_nonce : bool
-    ; events_ids : int array
-    ; sequence_events_ids : int array
+    ; events_id : int
+    ; sequence_events_id : int
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_protocol_state_precondition_id : int
@@ -1097,41 +1350,26 @@ module Zkapp_party_body = struct
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ int
-        ; int
-        ; string
-        ; int64
-        ; bool
-        ; Mina_caqti.array_int_typ
-        ; Mina_caqti.array_int_typ
-        ; int
-        ; int
-        ; int
-        ; int
-        ; bool
-        ; string
-        ]
+        [ int; int; string; bool; int; int; int; int; int; int; bool; string ]
 
-  let table_name = "zkapp_party_body"
+  let table_name = "zkapp_other_party_body"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (body : Party.Body.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (body : Party.Body.Simple.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind public_key_id =
-      Public_key.add_if_doesn't_exist (module Conn) body.public_key
+    let account_identifier = Account_id.create body.public_key body.token_id in
+    let%bind account_identifier_id =
+      Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
     let%bind update_id =
       Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
     let increment_nonce = body.increment_nonce in
-    let%bind events_ids =
-      Mina_caqti.deferred_result_list_map body.events
-        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
+    let%bind events_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
-    let%bind sequence_events_ids =
-      Mina_caqti.deferred_result_list_map body.sequence_events
-        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
+    let%bind sequence_events_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
     in
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
@@ -1146,29 +1384,24 @@ module Zkapp_party_body = struct
         (module Conn)
         body.account_precondition
     in
-    let token_id = Token_id.to_string body.token_id in
     let balance_change =
-      let magnitude =
-        Currency.Amount.to_uint64 body.balance_change.magnitude
-        |> Unsigned.UInt64.to_int64
-      in
+      let magnitude = Currency.Amount.to_string body.balance_change.magnitude in
       match body.balance_change.sgn with
       | Sgn.Pos ->
           magnitude
       | Sgn.Neg ->
-          Int64.neg magnitude
+          "-" ^ magnitude
     in
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
-    let caller = Token_id.to_string body.caller in
+    let caller = Party.Call_type.to_string body.caller in
     let value =
-      { public_key_id
+      { account_identifier_id
       ; update_id
-      ; token_id
       ; balance_change
       ; increment_nonce
-      ; events_ids
-      ; sequence_events_ids
+      ; events_id
+      ; sequence_events_id
       ; call_data_id
       ; call_depth
       ; zkapp_protocol_state_precondition_id
@@ -1180,18 +1413,23 @@ module Zkapp_party_body = struct
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       ~tannot:(function
-        | "events_ids" | "sequence_events_ids" -> Some "int[]" | _ -> None)
+        | "events_ids" | "sequence_events_ids" ->
+            Some "int[]"
+        | "caller" ->
+            Some "call_type_type"
+        | _ ->
+            None )
       (module Conn)
       value
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
-module Zkapp_party = struct
+module Zkapp_other_party = struct
   type t = { body_id : int; authorization_kind : Control.Tag.t }
   [@@deriving fields, hlist]
 
@@ -1220,12 +1458,12 @@ module Zkapp_party = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; authorization_kind_typ ]
 
-  let table_name = "zkapp_party"
+  let table_name = "zkapp_other_party"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
-      Zkapp_party_body.add_if_doesn't_exist (module Conn) party.body
+      Zkapp_other_party_body.add_if_doesn't_exist (module Conn) party.body
     in
     let authorization_kind = Control.tag party.authorization in
     let value = { body_id; authorization_kind } in
@@ -1237,35 +1475,77 @@ module Zkapp_party = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
-module Zkapp_fee_payers = struct
-  type t = { body_id : int } [@@deriving fields, hlist]
+module Zkapp_fee_payer_body = struct
+  type t =
+    { account_identifier_id : int
+    ; update_id : int
+    ; fee : string
+    ; events_id : int
+    ; sequence_events_id : int
+    ; zkapp_protocol_state_precondition_id : int
+    ; nonce : int64
+    }
+  [@@deriving fields, hlist]
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist Caqti_type.[ int ]
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; string; int; int; int; int64 ]
 
-  let table_name = "zkapp_fee_payers"
+  let table_name = "zkapp_fee_payer_body"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (fp : Party.Fee_payer.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (body : Party.Body.Fee_payer.t) =
     let open Deferred.Result.Let_syntax in
-    let%bind body_id =
-      Zkapp_party_body.add_if_doesn't_exist
-        (module Conn)
-        (Party.Body.of_fee_payer fp.body)
+    let account_identifier =
+      Account_id.create body.public_key Token_id.default
     in
-    let value = { body_id } in
+    let%bind account_identifier_id =
+      Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
+    in
+    let%bind update_id =
+      Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
+    in
+    let%bind events_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.events
+    in
+    let%bind sequence_events_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
+    in
+    let%bind zkapp_protocol_state_precondition_id =
+      Zkapp_protocol_state_precondition.add_if_doesn't_exist
+        (module Conn)
+        body.protocol_state_precondition
+    in
+    let nonce =
+      body.nonce |> Mina_numbers.Account_nonce.to_uint32
+      |> Unsigned.UInt32.to_int64
+    in
+    let fee = Currency.Fee.to_string body.fee in
+    let value =
+      { account_identifier_id
+      ; update_id
+      ; fee
+      ; events_id
+      ; sequence_events_id
+      ; zkapp_protocol_state_precondition_id
+      ; nonce
+      }
+    in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
+      ~tannot:(function
+        | "events_ids" | "sequence_events_ids" -> Some "int[]" | _ -> None )
       (module Conn)
       value
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -1273,7 +1553,7 @@ module Epoch_data = struct
   type t =
     { seed : string
     ; ledger_hash_id : int
-    ; total_currency : int64
+    ; total_currency : string
     ; start_checkpoint : string
     ; lock_checkpoint : string
     ; epoch_length : int64
@@ -1282,7 +1562,9 @@ module Epoch_data = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ string; int; int64; string; string; int64 ]
+      Caqti_type.[ string; int; string; string; string; int64 ]
+
+  let table_name = "epoch_data"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Mina_base.Epoch_data.Value.t) =
@@ -1294,53 +1576,28 @@ module Epoch_data = struct
       Snarked_ledger_hash.add_if_doesn't_exist (module Conn) hash
     in
     let seed = t.seed |> Epoch_seed.to_base58_check in
-    let total_currency =
-      total_currency |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
-    in
+    let total_currency = Currency.Amount.to_string total_currency in
     let start_checkpoint = t.start_checkpoint |> State_hash.to_base58_check in
     let lock_checkpoint = t.lock_checkpoint |> State_hash.to_base58_check in
     let epoch_length =
       t.epoch_length |> Mina_numbers.Length.to_uint32
       |> Unsigned.UInt32.to_int64
     in
-    match%bind
-      Conn.find_opt
-        (Caqti_request.find_opt typ Caqti_type.int
-           {sql| SELECT id FROM epoch_data
-                 WHERE seed = $1
-                 AND ledger_hash_id = $2
-                 AND total_currency = $3
-                 AND start_checkpoint = $4
-                 AND lock_checkpoint = $5
-                 AND epoch_length = $6
-           |sql})
-        { seed
-        ; ledger_hash_id
-        ; total_currency
-        ; start_checkpoint
-        ; lock_checkpoint
-        ; epoch_length
-        }
-    with
-    | Some id ->
-        return id
-    | None ->
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name:"epoch_data" ~cols:(Fields.names, typ)
-          (module Conn)
-          { seed
-          ; ledger_hash_id
-          ; total_currency
-          ; start_checkpoint
-          ; lock_checkpoint
-          ; epoch_length
-          }
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      { seed
+      ; ledger_hash_id
+      ; total_currency
+      ; start_checkpoint
+      ; lock_checkpoint
+      ; epoch_length
+      }
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name:"epoch_data"
-            ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -1351,16 +1608,14 @@ module User_command = struct
       ; fee_payer_id : int
       ; source_id : int
       ; receiver_id : int
-      ; fee_token : string
-      ; token : string
-      ; nonce : int
-      ; amount : int64 option
-      ; fee : int64
+      ; nonce : int64
+      ; amount : string option
+      ; fee : string
       ; valid_until : int64 option
       ; memo : string
       ; hash : string
       }
-    [@@deriving hlist]
+    [@@deriving hlist, fields]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -1369,54 +1624,55 @@ module User_command = struct
           ; int
           ; int
           ; int
-          ; string
-          ; string
-          ; int
-          ; option int64
           ; int64
+          ; option string
+          ; string
           ; option int64
           ; string
           ; string
           ]
 
+    let table_name = "user_commands"
+
     let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
         =
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-           "SELECT id FROM user_commands WHERE hash = ?")
+           (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()) )
         (Transaction_hash.to_base58_check transaction_hash)
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
         (Caqti_request.find Caqti_type.int typ
-           {sql| SELECT type,fee_payer_id,source_id,receiver_id,
-                 fee_token,token,
-                 nonce,amount,fee,valid_until,memo,hash
-                 FROM user_commands
-                 WHERE id = ?
-           |sql})
+           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
         id
 
     type balance_public_key_ids =
       { fee_payer_id : int; source_id : int; receiver_id : int }
 
-    let add_balance_public_keys_if_don't_exist (module Conn : CONNECTION)
+    let add_account_ids_if_don't_exist (module Conn : CONNECTION)
         (t : Signed_command.t) =
       let open Deferred.Result.Let_syntax in
       let%bind fee_payer_id =
-        Public_key.add_if_doesn't_exist
-          (module Conn)
-          (Signed_command.fee_payer_pk t)
+        let pk = Signed_command.fee_payer_pk t in
+        let token_id = Signed_command.fee_token t in
+        assert (Token_id.(equal default) token_id) ;
+        let acct_id = Account_id.create pk token_id in
+        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
       in
       let%bind source_id =
-        Public_key.add_if_doesn't_exist
-          (module Conn)
-          (Signed_command.source_pk t)
+        let pk = Signed_command.source_pk t in
+        let token_id = Signed_command.token t in
+        assert (Token_id.(equal default) token_id) ;
+        let acct_id = Account_id.create pk token_id in
+        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
       in
       let%map receiver_id =
-        Public_key.add_if_doesn't_exist
-          (module Conn)
-          (Signed_command.receiver_pk t)
+        let pk = Signed_command.receiver_pk t in
+        let token_id = Signed_command.token t in
+        assert (Token_id.(equal default) token_id) ;
+        let acct_id = Account_id.create pk token_id in
+        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
       in
       { fee_payer_id; source_id; receiver_id }
 
@@ -1429,7 +1685,7 @@ module User_command = struct
           return user_command_id
       | None ->
           let%bind { fee_payer_id; source_id; receiver_id } =
-            add_balance_public_keys_if_don't_exist (module Conn) t
+            add_account_ids_if_don't_exist (module Conn) t
           in
           let valid_until =
             let open Mina_numbers in
@@ -1443,11 +1699,10 @@ module User_command = struct
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
-                      receiver_id, fee_token, token, nonce, amount, fee,
-                      valid_until, memo, hash)
-                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    RETURNING id |sql})
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "typ" -> Some "user_command_type" | _ -> None )
+                  ~cols:Fields.names () ) )
             { typ =
                 ( match via with
                 | `Ident ->
@@ -1457,77 +1712,117 @@ module User_command = struct
             ; fee_payer_id
             ; source_id
             ; receiver_id
-            ; fee_token = Signed_command.fee_token t |> Token_id.to_string
-            ; token = Signed_command.token t |> Token_id.to_string
-            ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int
+            ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int64
             ; amount =
-                Signed_command.amount t
-                |> Core.Option.map ~f:(fun amt ->
-                       Currency.Amount.to_uint64 amt |> Unsigned.UInt64.to_int64)
-            ; fee =
-                ( Signed_command.fee t
-                |> fun amt ->
-                Currency.Fee.to_uint64 amt |> Unsigned.UInt64.to_int64 )
+                Option.map (Signed_command.amount t)
+                  ~f:Currency.Amount.to_string
+            ; fee = Currency.Fee.to_string (Signed_command.fee t)
             ; valid_until
             ; memo =
                 Signed_command.memo t |> Signed_command_memo.to_base58_check
             ; hash = transaction_hash |> Transaction_hash.to_base58_check
             }
+
+    let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
+        (user_cmd : Extensional.User_command.t) =
+      let open Deferred.Result.Let_syntax in
+      match%bind find (module Conn) ~transaction_hash:user_cmd.hash with
+      | Some id ->
+          return id
+      | None ->
+          let open Deferred.Result.Let_syntax in
+          let%bind fee_payer_id =
+            Account_identifiers.add_if_doesn't_exist
+              (module Conn)
+              user_cmd.fee_payer
+          in
+          let%bind source_id =
+            Account_identifiers.add_if_doesn't_exist
+              (module Conn)
+              user_cmd.source
+          in
+          let%bind receiver_id =
+            Account_identifiers.add_if_doesn't_exist
+              (module Conn)
+              user_cmd.receiver
+          in
+          Conn.find
+            (Caqti_request.find typ Caqti_type.int
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "typ" -> Some "user_command_type" | _ -> None )
+                  ~cols:Fields.names () ) )
+            { typ = user_cmd.typ
+            ; fee_payer_id
+            ; source_id
+            ; receiver_id
+            ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int64
+            ; amount = Option.map user_cmd.amount ~f:Currency.Amount.to_string
+            ; fee = Currency.Fee.to_string user_cmd.fee
+            ; valid_until =
+                Option.map user_cmd.valid_until
+                  ~f:
+                    (Fn.compose Unsigned.UInt32.to_int64
+                       Mina_numbers.Global_slot.to_uint32 )
+            ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
+            ; hash = user_cmd.hash |> Transaction_hash.to_base58_check
+            }
   end
 
   module Zkapp_command = struct
     type t =
-      { zkapp_fee_payer_id : int
+      { zkapp_fee_payer_body_id : int
       ; zkapp_other_parties_ids : int array
+      ; memo : string
       ; hash : string
       }
     [@@deriving fields, hlist]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.[ int; Mina_caqti.array_int_typ; string ]
+        Caqti_type.[ int; Mina_caqti.array_int_typ; string; string ]
+
+    let table_name = "zkapp_commands"
 
     let find_opt (module Conn : CONNECTION)
         ~(transaction_hash : Transaction_hash.t) =
       Conn.find_opt
         ( Caqti_request.find_opt Caqti_type.string Caqti_type.int
-        @@ Mina_caqti.select_cols ~select:"id" ~table_name:"zkapp_commands"
-             [ "hash" ] )
+        @@ Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()
+        )
         (Transaction_hash.to_base58_check transaction_hash)
+
+    let load (module Conn : CONNECTION) id =
+      Conn.find
+        ( Caqti_request.find Caqti_type.int typ
+        @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
+        id
 
     let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
       let open Deferred.Result.Let_syntax in
-      let%bind zkapp_fee_payer_id =
-        Zkapp_fee_payers.add_if_doesn't_exist (module Conn) ps.fee_payer
+      let parties = Parties.to_simple ps in
+      let%bind zkapp_fee_payer_body_id =
+        Zkapp_fee_payer_body.add_if_doesn't_exist
+          (module Conn)
+          parties.fee_payer.body
       in
       let%bind zkapp_other_parties_ids =
-        Mina_caqti.deferred_result_list_map
-          (Parties.other_parties_list ps)
-          ~f:(Zkapp_party.add_if_doesn't_exist (module Conn))
+        Mina_caqti.deferred_result_list_map parties.other_parties
+          ~f:(Zkapp_other_party.add_if_doesn't_exist (module Conn))
         >>| Array.of_list
       in
+      let memo = ps.memo |> Signed_command_memo.to_base58_check in
       let hash =
         Transaction_hash.hash_command (Parties ps)
         |> Transaction_hash.to_base58_check
       in
-      let value = { zkapp_fee_payer_id; zkapp_other_parties_ids; hash } in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
         ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
         ~tannot:(function
-          | "zkapp_other_parties_ids" -> Some "int[]" | _ -> None)
+          | "zkapp_other_parties_ids" -> Some "int[]" | _ -> None )
         (module Conn)
-        value
+        { zkapp_fee_payer_body_id; zkapp_other_parties_ids; memo; hash }
   end
-
-  let as_signed_command (t : User_command.t) : Mina_base.Signed_command.t =
-    match t with
-    | Signed_command c ->
-        c
-    | Parties _ ->
-        let `Needs_some_work_for_zkapps_on_mainnet =
-          Mina_base.Util.todo_zkapps
-        in
-        failwith "TODO"
 
   let via (t : User_command.t) : [ `Parties | `Ident ] =
     match t with Signed_command _ -> `Ident | Parties _ -> `Parties
@@ -1550,105 +1845,41 @@ module User_command = struct
       >>| Option.map ~f:(fun id -> `Zkapp_command_id id)
     in
     Option.first_some signed_command_id zkapp_command_id
-
-  (* meant to work with either a signed command, or a zkapp *)
-  let add_extensional (module Conn : CONNECTION)
-      (user_cmd : Extensional.User_command.t) =
-    let amount_opt_to_int64_opt amt_opt =
-      Option.map amt_opt
-        ~f:(Fn.compose Unsigned.UInt64.to_int64 Currency.Amount.to_uint64)
-    in
-    let open Deferred.Result.Let_syntax in
-    let%bind fee_payer_id =
-      Public_key.add_if_doesn't_exist (module Conn) user_cmd.fee_payer
-    in
-    let%bind source_id =
-      Public_key.add_if_doesn't_exist (module Conn) user_cmd.source
-    in
-    let%bind receiver_id =
-      Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
-    in
-    Conn.find
-      (Caqti_request.find Signed_command.typ Caqti_type.int
-         {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
-                      receiver_id, fee_token, token, nonce, amount, fee,
-                      valid_until, memo, hash)
-                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    RETURNING id
-         |sql})
-      { typ = user_cmd.typ
-      ; fee_payer_id
-      ; source_id
-      ; receiver_id
-      ; fee_token = user_cmd.fee_token |> Token_id.to_string
-      ; token = user_cmd.token |> Token_id.to_string
-      ; nonce = user_cmd.nonce |> Unsigned.UInt32.to_int
-      ; amount = user_cmd.amount |> amount_opt_to_int64_opt
-      ; fee =
-          user_cmd.fee
-          |> Fn.compose Unsigned.UInt64.to_int64 Currency.Fee.to_uint64
-      ; valid_until =
-          Option.map user_cmd.valid_until
-            ~f:
-              (Fn.compose Unsigned.UInt32.to_int64
-                 Mina_numbers.Global_slot.to_uint32)
-      ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
-      ; hash = user_cmd.hash |> Transaction_hash.to_base58_check
-      }
-
-  let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
-      (user_cmd : Extensional.User_command.t) =
-    let open Deferred.Result.Let_syntax in
-    match%bind find (module Conn) ~transaction_hash:user_cmd.hash with
-    | None ->
-        add_extensional (module Conn) user_cmd
-    | Some (`Signed_command_id user_cmd_id) ->
-        return user_cmd_id
-    | Some (`Zkapp_command_id _user_cmd_id) ->
-        failwith "Unexpected zkapp command"
 end
 
 module Internal_command = struct
-  type t =
-    { typ : string
-    ; receiver_id : int
-    ; fee : int64
-    ; token : string
-    ; hash : string
-    }
+  type t = { typ : string; receiver_id : int; fee : string; hash : string }
+  [@@deriving hlist, fields]
 
   let typ =
-    let encode t = Ok ((t.typ, t.receiver_id, t.fee, t.token), t.hash) in
-    let decode ((typ, receiver_id, fee, token), hash) =
-      Ok { typ; receiver_id; fee; token; hash }
-    in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
-    Caqti_type.custom ~encode ~decode rep
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; int; string; string ]
 
-  let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
-      ~(typ : string) =
+  let table_name = "internal_commands"
+
+  let find_opt (module Conn : CONNECTION)
+      ~(transaction_hash : Transaction_hash.t) ~(typ : string) =
     Conn.find_opt
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
-         "SELECT id FROM internal_commands WHERE hash = $1 AND type = \
-          $2::internal_command_type")
+         (Mina_caqti.select_cols ~select:"id" ~table_name
+            ~tannot:(function
+              | "typ" -> Some "internal_command_type" | _ -> None )
+            ~cols:[ "hash"; "typ" ] () ) )
       (Transaction_hash.to_base58_check transaction_hash, typ)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT type,receiver_id,fee,token,hash
-               FROM internal_commands
-               WHERE id = ?
-         |sql})
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 
   let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
       (internal_cmd : Extensional.Internal_command.t) =
     let open Deferred.Result.Let_syntax in
     match%bind
-      find
+      find_opt
         (module Conn)
         ~transaction_hash:internal_cmd.hash ~typ:internal_cmd.typ
     with
@@ -1656,21 +1887,19 @@ module Internal_command = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
+          Account_identifiers.add_if_doesn't_exist
+            (module Conn)
+            internal_cmd.receiver
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, token,hash)
-                   VALUES (?::internal_command_type, ?, ?, ?, ?)
-                   RETURNING id
-             |sql})
+             (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                ~tannot:(function
+                  | "typ" -> Some "internal_command_type" | _ -> None )
+                ~cols:Fields.names () ) )
           { typ = internal_cmd.typ
           ; receiver_id
-          ; fee =
-              internal_cmd.fee |> Currency.Fee.to_uint64
-              |> Unsigned.UInt64.to_int64
-          ; token = internal_cmd.token |> Token_id.to_string
+          ; fee = Currency.Fee.to_string internal_cmd.fee
           ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
           }
 end
@@ -1686,20 +1915,14 @@ module Fee_transfer = struct
           "fee_transfer_via_coinbase"
   end
 
-  type t =
-    { kind : Kind.t
-    ; receiver_id : int
-    ; fee : int64
-    ; token : string
-    ; hash : string
-    }
+  type t = { kind : Kind.t; receiver_id : int; fee : int64; hash : string }
 
   let typ =
     let encode t =
       let kind = Kind.to_string t.kind in
-      Ok ((kind, t.receiver_id, t.fee, t.token), t.hash)
+      Ok (kind, t.receiver_id, t.fee, t.hash)
     in
-    let decode ((kind, receiver_id, fee, token), hash) =
+    let decode (kind, receiver_id, fee, hash) =
       let open Result.Let_syntax in
       let%bind kind =
         match kind with
@@ -1710,9 +1933,9 @@ module Fee_transfer = struct
         | s ->
             Result.fail (sprintf "Bad kind %s in decode attempt" s)
       in
-      Ok { kind; receiver_id; fee; token; hash }
+      Ok { kind; receiver_id; fee; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
+    let rep = Caqti_type.(tup4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -1720,7 +1943,7 @@ module Fee_transfer = struct
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_fee_transfer t in
     match%bind
-      Internal_command.find
+      Internal_command.find_opt
         (module Conn)
         ~transaction_hash ~typ:(Kind.to_string kind)
     with
@@ -1728,23 +1951,25 @@ module Fee_transfer = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist
-            (module Conn)
-            (Fee_transfer.Single.receiver_pk t)
+          let account_id =
+            Account_id.create
+              (Fee_transfer.Single.receiver_pk t)
+              Token_id.default
+          in
+          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, token, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?, ?)
+                    (typ, receiver_id, fee, hash)
+                   VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
-             |sql})
+             |sql} )
           { kind
           ; receiver_id
           ; fee =
               Fee_transfer.Single.fee t |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; token = Token_id.to_string t.fee_token
           ; hash = transaction_hash |> Transaction_hash.to_base58_check
           }
 end
@@ -1755,36 +1980,37 @@ module Coinbase = struct
   let coinbase_typ = "coinbase"
 
   let typ =
-    let encode t =
-      Ok
-        ( (coinbase_typ, t.receiver_id, t.amount, Token_id.(to_string default))
-        , t.hash )
-    in
-    let decode ((_, receiver_id, amount, _), hash) =
+    let encode t = Ok (coinbase_typ, t.receiver_id, t.amount, t.hash) in
+    let decode (_, receiver_id, amount, hash) =
       Ok { receiver_id; amount; hash }
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int64 string) string) in
+    let rep = Caqti_type.(tup4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_coinbase t in
     match%bind
-      Internal_command.find (module Conn) ~transaction_hash ~typ:coinbase_typ
+      Internal_command.find_opt
+        (module Conn)
+        ~transaction_hash ~typ:coinbase_typ
     with
     | Some internal_command_id ->
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist (module Conn) (Coinbase.receiver_pk t)
+          let account_id =
+            Account_id.create (Coinbase.receiver_pk t) Token_id.default
+          in
+          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
-                    (type, receiver_id, fee, token, hash)
-                   VALUES (?::internal_command_type, ?, ?, ?, ?)
+                    (typ, receiver_id, fee, hash)
+                   VALUES (?::internal_command_type, ?, ?, ?)
                    RETURNING id
-             |sql})
+             |sql} )
           { receiver_id
           ; amount =
               Coinbase.amount t |> Currency.Amount.to_uint64
@@ -1793,234 +2019,28 @@ module Coinbase = struct
           }
 end
 
-module Find_nonce = struct
-  let sql_template public_keys_sql_list =
-    (* using a string containing the comma-delimited public keys list as an SQL parameter results
-       in syntax errors, so we inline that list into the query
-    *)
-    sprintf
-      {sql|
-SELECT t.pk_id, MAX(pk), MAX(t.height) as height, MAX(t.nonce) AS nonce FROM
-(
-WITH RECURSIVE pending_chain_nonce AS (
-
-               (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-
-                FROM blocks b
-                WHERE id = $1
-                LIMIT 1)
-
-                UNION ALL
-
-                SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
-
-                FROM blocks b
-                INNER JOIN pending_chain_nonce
-                ON b.id = pending_chain_nonce.parent_id AND pending_chain_nonce.id <> pending_chain_nonce.parent_id
-                AND pending_chain_nonce.chain_status <> 'canonical'
-
-               )
-
-              /* Slot and balance are NULL here */
-              SELECT pks.id AS pk_id,pks.value AS pk,full_chain.height,cmds.nonce
-
-              FROM (SELECT
-                    id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-                    FROM pending_chain_nonce
-
-                    UNION ALL
-
-                    SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-
-                    FROM blocks b
-                    WHERE chain_status = 'canonical') AS full_chain
-
-              INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
-              INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
-              INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
-
-              WHERE pks.value IN (%s)
-              AND busc.user_command_id = cmds.id
-
-              ORDER BY (full_chain.height, busc.sequence_no) DESC
-            ) t
-            GROUP BY t.pk_id LIMIT $2
-    |sql}
-      public_keys_sql_list
-
-  type t =
-    { public_key_id : int; public_key : string; height : int; nonce : int64 }
-  [@@deriving hlist]
-
-  let typ =
-    let open Mina_caqti.Type_spec in
-    let spec = Caqti_type.[ int; string; int; int64 ] in
-    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-    Caqti_type.custom ~encode ~decode (to_rep spec)
-
-  let collect (module Conn : CONNECTION) ~public_keys ~parent_id =
-    if List.is_empty public_keys then
-      (* SQL query would fail, because `IN ()` is invalid syntax *)
-      return @@ Ok []
-    else
-      let public_keys_sql_list =
-        public_keys
-        |> List.map ~f:(fun pk ->
-               sprintf "'%s'"
-                 (Signature_lib.Public_key.Compressed.to_base58_check pk))
-        |> String.concat ~sep:","
-      in
-      Conn.collect_list
-        (Caqti_request.collect
-           Caqti_type.(tup2 int int)
-           typ
-           (sql_template public_keys_sql_list))
-        (parent_id, List.length public_keys)
-
-  (* INVARIANT: The map is populated with all the public_keys present *)
-  let initialize_nonce_map (module Conn : CONNECTION) ~public_keys ~parent_id =
-    let open Deferred.Result.Let_syntax in
-    let%map ts = collect (module Conn) ~public_keys ~parent_id in
-    let alist =
-      List.map ts ~f:(fun t ->
-          ( Signature_lib.Public_key.Compressed.of_base58_check_exn t.public_key
-          , Account.Nonce.of_uint32 Unsigned.UInt32.(of_int64 t.nonce |> succ)
-          ))
-    in
-    let map = Signature_lib.Public_key.Compressed.Map.of_alist_exn alist in
-    List.fold public_keys ~init:map ~f:(fun map key ->
-        match
-          Signature_lib.Public_key.Compressed.Map.add map ~key
-            ~data:Account.Nonce.zero
-        with
-        | `Ok map' ->
-            map'
-        | `Duplicate ->
-            map)
-end
-
-module Balance = struct
-  type t =
-    { id : int
-    ; public_key_id : int
-    ; balance : int64
-    ; block_id : int
-    ; block_height : int64
-    ; block_sequence_no : int
-    ; block_secondary_sequence_no : int
-    ; nonce : int64 option
-    }
-  [@@deriving hlist]
-
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int64; int; int64; int; int; option int64 ]
-
-  let balance_to_int64 (balance : Currency.Balance.t) : int64 =
-    balance |> Currency.Balance.to_amount |> Currency.Amount.to_uint64
-    |> Unsigned.UInt64.to_int64
-
-  let find (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
-      ~block_secondary_sequence_no =
-    (* TODO: Do we need to query with the nonce here? *)
-    Conn.find_opt
-      (Caqti_request.find_opt
-         Caqti_type.(tup2 (tup2 int int64) (tup4 int int64 int int))
-         Caqti_type.int
-         {sql| SELECT id FROM balances
-               WHERE public_key_id = $1
-               AND balance = $2
-               AND block_id = $3
-               AND block_height = $4
-               AND block_sequence_no = $5
-               AND block_secondary_sequence_no = $6
-         |sql})
-      ( (public_key_id, balance_to_int64 balance)
-      , (block_id, block_height, block_sequence_no, block_secondary_sequence_no)
-      )
-
-  let load (module Conn : CONNECTION) ~(id : int) =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         {sql| SELECT id, public_key_id, balance,
-                      block_id, block_height,
-                      block_sequence_no, block_secondary_sequence_no, nonce
-               FROM balances
-               WHERE id = $1
-         |sql})
-      id
-
-  let add (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
-      ~block_secondary_sequence_no ~nonce =
-    Conn.find
-      (Caqti_request.find
-         Caqti_type.(
-           tup2 (tup2 int int64) (tup4 int int64 (tup2 int int) (option int64)))
-         Caqti_type.int
-         {sql| INSERT INTO balances (public_key_id, balance,
-                                     block_id, block_height, block_sequence_no, block_secondary_sequence_no, nonce)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
-               RETURNING id |sql})
-      ( (public_key_id, balance_to_int64 balance)
-      , ( block_id
-        , block_height
-        , (block_sequence_no, block_secondary_sequence_no)
-        , nonce ) )
-
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~(public_key_id : int)
-      ~(balance : Currency.Balance.t) ~block_id ~block_height ~block_sequence_no
-      ~block_secondary_sequence_no ~nonce =
-    let open Deferred.Result.Let_syntax in
-    match%bind
-      find
-        (module Conn)
-        ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no
-        ~block_secondary_sequence_no
-    with
-    | Some balance_id ->
-        return balance_id
-    | None ->
-        add
-          (module Conn)
-          ~public_key_id ~balance ~block_id ~block_height ~block_sequence_no
-          ~block_secondary_sequence_no ~nonce
-end
-
 module Block_and_internal_command = struct
   type t =
     { block_id : int
     ; internal_command_id : int
     ; sequence_no : int
     ; secondary_sequence_no : int
-    ; receiver_account_creation_fee_paid : int64 option
-    ; receiver_balance_id : int
     }
   [@@deriving hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; option int64; int ]
+      Caqti_type.[ int; int; int; int ]
 
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id ~sequence_no
-      ~secondary_sequence_no ~receiver_account_creation_fee_paid
-      ~receiver_balance_id =
+      ~secondary_sequence_no =
     Conn.exec
       (Caqti_request.exec typ
          {sql| INSERT INTO blocks_internal_commands
-                (block_id, internal_command_id, sequence_no, secondary_sequence_no,
-                 receiver_account_creation_fee_paid,receiver_balance)
-                VALUES (?, ?, ?, ?, ?, ?)
-         |sql})
-      { block_id
-      ; internal_command_id
-      ; sequence_no
-      ; secondary_sequence_no
-      ; receiver_account_creation_fee_paid
-      ; receiver_balance_id
-      }
+                (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+                VALUES (?, ?, ?, ?)
+         |sql} )
+      { block_id; internal_command_id; sequence_no; secondary_sequence_no }
 
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
@@ -2033,12 +2053,11 @@ module Block_and_internal_command = struct
                AND internal_command_id = $2
                AND sequence_no = $3
                AND secondary_sequence_no = $4
-         |sql})
+         |sql} )
       (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
-      ~internal_command_id ~sequence_no ~secondary_sequence_no
-      ~receiver_account_creation_fee_paid ~receiver_balance_id =
+      ~internal_command_id ~sequence_no ~secondary_sequence_no =
     let open Deferred.Result.Let_syntax in
     match%bind
       find
@@ -2051,7 +2070,6 @@ module Block_and_internal_command = struct
         add
           (module Conn)
           ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-          ~receiver_account_creation_fee_paid ~receiver_balance_id
 end
 
 module Block_and_signed_command = struct
@@ -2061,49 +2079,17 @@ module Block_and_signed_command = struct
     ; sequence_no : int
     ; status : string
     ; failure_reason : string option
-    ; fee_payer_account_creation_fee_paid : int64 option
-    ; receiver_account_creation_fee_paid : int64 option
-    ; created_token : string option
-    ; fee_payer_balance_id : int
-    ; source_balance_id : int option
-    ; receiver_balance_id : int option
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ int
-        ; int
-        ; int
-        ; string
-        ; option string
-        ; option int64
-        ; option int64
-        ; option string
-        ; int
-        ; option int
-        ; option int
-        ]
+      Caqti_type.[ int; int; int; string; option string ]
 
   let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no
-      ~status ~failure_reason ~fee_payer_account_creation_fee_paid
-      ~receiver_account_creation_fee_paid ~created_token ~fee_payer_balance_id
-      ~source_balance_id ~receiver_balance_id =
+      ~status ~failure_reason =
     let failure_reason =
       Option.map ~f:Transaction_status.Failure.to_string failure_reason
-    in
-    let amount_to_int64 x =
-      Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
-    in
-    let fee_payer_account_creation_fee_paid =
-      Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
-    in
-    let receiver_account_creation_fee_paid =
-      Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
-    in
-    let created_token =
-      Option.map created_token ~f:(fun tid -> Token_id.to_string tid)
     in
     Conn.exec
       (Caqti_request.exec typ
@@ -2112,124 +2098,27 @@ module Block_and_signed_command = struct
                  user_command_id,
                  sequence_no,
                  status,
-                 failure_reason,
-                 fee_payer_account_creation_fee_paid,
-                 receiver_account_creation_fee_paid,
-                 created_token,
-                 fee_payer_balance,
-                 source_balance,
-                 receiver_balance)
-               VALUES (?, ?, ?, ?::user_command_status, ?, ?, ?, ?, ?, ?, ?)
-         |sql})
-      { block_id
-      ; user_command_id
-      ; sequence_no
-      ; status
-      ; failure_reason
-      ; fee_payer_account_creation_fee_paid
-      ; receiver_account_creation_fee_paid
-      ; created_token
-      ; fee_payer_balance_id
-      ; source_balance_id
-      ; receiver_balance_id
-      }
+                 failure_reason)
+               VALUES (?, ?, ?, ?::user_command_status, ?)
+         |sql} )
+      { block_id; user_command_id; sequence_no; status; failure_reason }
 
-  let add_with_status (module Conn : CONNECTION) ~block_id ~block_height
-      ~user_command_id ~sequence_no ~(status : Transaction_status.t)
-      ~fee_payer_id ~source_id ~receiver_id ~nonce_map =
-    let open Deferred.Result.Let_syntax in
-    let ( status_str
-        , failure_reason
-        , fee_payer_account_creation_fee_paid
-        , receiver_account_creation_fee_paid
-        , created_token
-        , { Transaction_status.Balance_data.fee_payer_balance
-          ; source_balance
-          ; receiver_balance
-          } ) =
+  let add_with_status (module Conn : CONNECTION) ~block_id ~user_command_id
+      ~sequence_no ~(status : Transaction_status.t) =
+    let status_str, failure_reason =
       match status with
-      | Applied
-          ( { fee_payer_account_creation_fee_paid
-            ; receiver_account_creation_fee_paid
-            }
-          , balances ) ->
-          ( "applied"
-          , None
-          , fee_payer_account_creation_fee_paid
-          , receiver_account_creation_fee_paid
-          , None
-          , balances )
-      | Failed (failures, balances) ->
-          (*TODO: change schema to include list of failures when/after refactoring for balance changes*)
-          ( "failed"
-          , Some (List.concat failures |> List.hd_exn)
-          , None
-          , None
-          , None
-          , balances )
-    in
-    let pk_of_id id =
-      let%map pk_str = Public_key.find_by_id (module Conn) id in
-      Signature_lib.Public_key.Compressed.of_base58_check pk_str
-      |> Or_error.ok_exn
-      (* Note: This is safe because the database will already have the
-       * correctly formatted public key by this point. *)
-    in
-    let nonce_int64_of_pk pk =
-      Signature_lib.Public_key.Compressed.Map.find nonce_map pk
-      |> Option.map ~f:(fun nonce ->
-             Account.Nonce.to_uint32 nonce |> Unsigned.UInt32.to_int64)
-    in
-    let add_optional_balance id balance ~block_id ~block_height
-        ~block_sequence_no ~block_secondary_sequence_no ~nonce =
-      match balance with
-      | None ->
-          Deferred.Result.return None
-      | Some balance ->
-          let%map balance_id =
-            Balance.add_if_doesn't_exist
-              (module Conn)
-              ~public_key_id:id ~balance ~block_id ~block_height
-              ~block_sequence_no ~block_secondary_sequence_no ~nonce
-          in
-          Some balance_id
-    in
-    (* Any transaction included in a block will have had its fee paid, so we can
-     * assume the fee payer balance will be Some here *)
-    let fee_payer_balance = Option.value_exn fee_payer_balance in
-    let%bind fee_payer_balance_id =
-      let%bind fee_payer_pk = pk_of_id fee_payer_id in
-      let nonce = nonce_int64_of_pk fee_payer_pk in
-      Balance.add_if_doesn't_exist
-        (module Conn)
-        ~public_key_id:fee_payer_id ~balance:fee_payer_balance ~block_id
-        ~block_height ~block_sequence_no:sequence_no
-        ~block_secondary_sequence_no:0 ~nonce
-    in
-    let%bind source_balance_id =
-      let%bind source_pk = pk_of_id source_id in
-      let nonce = nonce_int64_of_pk source_pk in
-      add_optional_balance source_id source_balance ~block_id ~block_height
-        ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce
-    in
-    let%bind receiver_balance_id =
-      let%bind receiver_pk = pk_of_id receiver_id in
-      let nonce = nonce_int64_of_pk receiver_pk in
-      add_optional_balance receiver_id receiver_balance ~block_id ~block_height
-        ~block_sequence_no:sequence_no ~block_secondary_sequence_no:0 ~nonce
+      | Applied ->
+          (applied_str, None)
+      | Failed failures ->
+          (* for signed commands, there's exactly one failure *)
+          (failed_str, Some (List.concat failures |> List.hd_exn))
     in
     add
       (module Conn)
       ~block_id ~user_command_id ~sequence_no ~status:status_str ~failure_reason
-      ~fee_payer_account_creation_fee_paid ~receiver_account_creation_fee_paid
-      ~created_token ~fee_payer_balance_id ~source_balance_id
-      ~receiver_balance_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id ~user_command_id
-      ~sequence_no ~(status : string) ~failure_reason
-      ~fee_payer_account_creation_fee_paid ~receiver_account_creation_fee_paid
-      ~created_token ~fee_payer_balance_id ~source_balance_id
-      ~receiver_balance_id =
+      ~sequence_no ~(status : string) ~failure_reason =
     let open Deferred.Result.Let_syntax in
     match%bind
       Conn.find_opt
@@ -2240,7 +2129,7 @@ module Block_and_signed_command = struct
                  WHERE block_id = $1
                  AND user_command_id = $2
                  AND sequence_no = $3
-           |sql})
+           |sql} )
         (block_id, user_command_id, sequence_no)
     with
     | Some _ ->
@@ -2249,29 +2138,375 @@ module Block_and_signed_command = struct
         add
           (module Conn)
           ~block_id ~user_command_id ~sequence_no ~status ~failure_reason
-          ~fee_payer_account_creation_fee_paid
-          ~receiver_account_creation_fee_paid ~created_token
-          ~fee_payer_balance_id ~source_balance_id ~receiver_balance_id
 
-  let load (module Conn : CONNECTION) ~block_id ~user_command_id =
+  let load (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
+    let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
       (Caqti_request.find
-         Caqti_type.(tup2 int int)
+         Caqti_type.(tup3 int int int)
          typ
-         {sql| SELECT block_id, user_command_id,
-               sequence_no,
-               status,failure_reason,
-               fee_payer_account_creation_fee_paid,
-               receiver_account_creation_fee_paid,
-               created_token,
-               fee_payer_balance,
-               source_balance,
-               receiver_balance
-               FROM blocks_user_commands
+         (sprintf
+            {sql| SELECT %s FROM blocks_user_commands
                WHERE block_id = $1
                AND user_command_id = $2
-           |sql})
-      (block_id, user_command_id)
+               AND sequence_no = $3
+           |sql}
+            comma_cols ) )
+      (block_id, user_command_id, sequence_no)
+end
+
+module Zkapp_party_failures = struct
+  type t = { index : int; failures : string array } [@@deriving fields, hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; Mina_caqti.array_string_typ ]
+
+  let table_name = "zkapp_party_failures"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) index failures =
+    let failures =
+      List.map failures ~f:Transaction_status.Failure.to_string |> Array.of_list
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~tannot:(function "failures" -> Some "text[]" | _ -> None)
+      ~cols:([ "index"; "failures" ], typ)
+      (module Conn)
+      { index; failures }
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name
+            ~cols:[ "index"; "failures" ] ) )
+      id
+end
+
+module Block_and_zkapp_command = struct
+  type t =
+    { block_id : int
+    ; zkapp_command_id : int
+    ; sequence_no : int
+    ; status : string
+    ; failure_reasons_ids : int array option
+    }
+  [@@deriving hlist, fields]
+
+  let table_name = "blocks_zkapp_commands"
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int; string; option Mina_caqti.array_int_typ ]
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
+      ~zkapp_command_id ~sequence_no ~status
+      ~(failure_reasons : Transaction_status.Failure.Collection.display option)
+      =
+    let open Deferred.Result.Let_syntax in
+    let%bind failure_reasons_ids =
+      match failure_reasons with
+      | None ->
+          return None
+      | Some reasons ->
+          let%map failure_reasons_ids_list =
+            Mina_caqti.deferred_result_list_map reasons
+              ~f:(fun (ndx, failure_reasons) ->
+                Zkapp_party_failures.add_if_doesn't_exist
+                  (module Conn)
+                  ndx failure_reasons )
+          in
+          Some (Array.of_list failure_reasons_ids_list)
+    in
+    Mina_caqti.select_insert_into_cols
+      ~select:
+        ( "block_id, zkapp_command_id, sequence_no"
+        , Caqti_type.(tup3 int int int) )
+      ~table_name
+      ~cols:
+        ( [ "block_id"
+          ; "zkapp_command_id"
+          ; "sequence_no"
+          ; "status"
+          ; "failure_reasons_ids"
+          ]
+        , typ )
+      ~tannot:(function
+        | "status" ->
+            Some "user_command_status"
+        | "failure_reasons_ids" ->
+            Some "int[]"
+        | _ ->
+            None )
+      (module Conn)
+      { block_id; zkapp_command_id; sequence_no; status; failure_reasons_ids }
+
+  let load (module Conn : CONNECTION) ~block_id ~zkapp_command_id ~sequence_no =
+    let comma_cols = String.concat Fields.names ~sep:"," in
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup3 int int int)
+         typ
+         (Mina_caqti.select_cols ~table_name ~select:comma_cols
+            ~cols:[ "block_id"; "zkapp_command_id"; "sequence_no" ]
+            () ) )
+      (block_id, zkapp_command_id, sequence_no)
+
+  let all_from_block (module Conn : CONNECTION) ~block_id =
+    let comma_cols = String.concat Fields.names ~sep:"," in
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.int typ
+         (Mina_caqti.select_cols ~table_name ~select:comma_cols
+            ~cols:[ "block_id" ] () ) )
+      block_id
+end
+
+module Zkapp_account = struct
+  type t =
+    { app_state_id : int
+    ; verification_key_id : int option
+    ; zkapp_version : int64
+    ; sequence_state_id : int
+    ; last_sequence_slot : int64
+    ; proved_state : bool
+    ; zkapp_uri_id : int
+    }
+  [@@deriving fields, hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; option int; int64; int; int64; bool; int ]
+
+  let table_name = "zkapp_accounts"
+
+  (* TODO: when zkapp_uri moved to Zkapp.Account in OCaml, no need to pass it in separately *)
+  let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri zkapp_account =
+    let open Deferred.Result.Let_syntax in
+    let ({ app_state
+         ; verification_key
+         ; zkapp_version
+         ; sequence_state
+         ; last_sequence_slot
+         ; proved_state
+         }
+          : Mina_base.Zkapp_account.t ) =
+      zkapp_account
+    in
+    let app_state = Vector.map app_state ~f:(fun field -> Some field) in
+    let%bind app_state_id =
+      Zkapp_states.add_if_doesn't_exist (module Conn) app_state
+    in
+    let%bind verification_key_id =
+      Option.value_map verification_key ~default:(return None) ~f:(fun vk ->
+          let%map id =
+            Zkapp_verification_keys.add_if_doesn't_exist (module Conn) vk
+          in
+          Some id )
+    in
+    let zkapp_version = zkapp_version |> Unsigned.UInt32.to_int64 in
+    let%bind sequence_state_id =
+      Zkapp_sequence_states.add_if_doesn't_exist (module Conn) sequence_state
+    in
+    let last_sequence_slot =
+      Mina_numbers.Global_slot.to_uint32 last_sequence_slot
+      |> Unsigned.UInt32.to_int64
+    in
+    let%bind zkapp_uri_id =
+      Zkapp_uri.add_if_doesn't_exist (module Conn) zkapp_uri
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      { app_state_id
+      ; verification_key_id
+      ; zkapp_version
+      ; sequence_state_id
+      ; last_sequence_slot
+      ; proved_state
+      ; zkapp_uri_id
+      }
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+end
+
+module Accounts_accessed = struct
+  type t =
+    { ledger_index : int
+    ; block_id : int
+    ; account_identifier_id : int
+    ; token_symbol_id : int
+    ; balance : string
+    ; nonce : int64
+    ; receipt_chain_hash : string
+    ; delegate_id : int option
+    ; voting_for_id : int
+    ; timing_id : int
+    ; permissions_id : int
+    ; zkapp_id : int option
+    }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.
+        [ int
+        ; int
+        ; int
+        ; int
+        ; string
+        ; int64
+        ; string
+        ; option int
+        ; int
+        ; int
+        ; int
+        ; option int
+        ]
+
+  let table_name = "accounts_accessed"
+
+  let find_opt (module Conn : CONNECTION) ~block_id ~account_identifier_id =
+    let comma_cols = String.concat Fields.names ~sep:"," in
+    Conn.find_opt
+      (Caqti_request.find_opt
+         Caqti_type.(tup2 int int)
+         typ
+         (sprintf
+            {sql| SELECT %s
+                  FROM %s
+                  WHERE block_id = $1
+                  AND   account_identifier_id = $2
+            |sql}
+            comma_cols table_name ) )
+      (block_id, account_identifier_id)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) block_id
+      (ledger_index, (account : Account.t)) =
+    let open Deferred.Result.Let_syntax in
+    let account_id = Account_id.create account.public_key account.token_id in
+    let%bind account_identifier_id =
+      Account_identifiers.add_if_doesn't_exist (module Conn) account_id
+    in
+    match%bind find_opt (module Conn) ~block_id ~account_identifier_id with
+    | Some result ->
+        return (result.block_id, result.account_identifier_id)
+    | None ->
+        let%bind token_symbol_id =
+          Token_symbols.add_if_doesn't_exist (module Conn) account.token_symbol
+        in
+        let balance = Currency.Balance.to_string account.balance in
+        let nonce =
+          account.nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
+        in
+        let receipt_chain_hash =
+          account.receipt_chain_hash |> Receipt.Chain_hash.to_base58_check
+        in
+        let%bind delegate_id =
+          Mina_caqti.add_if_some
+            (Public_key.add_if_doesn't_exist (module Conn))
+            account.delegate
+        in
+        let%bind voting_for_id =
+          Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
+        in
+        let%bind timing_id =
+          Timing_info.add_if_doesn't_exist
+            (module Conn)
+            account_identifier_id account.timing
+        in
+        let%bind permissions_id =
+          Zkapp_permissions.add_if_doesn't_exist
+            (module Conn)
+            account.permissions
+        in
+        let%bind zkapp_id =
+          (* TODO: when zkapp_uri part of Zkapp.Account.t, don't pass it separately here *)
+          Mina_caqti.add_if_some
+            (Zkapp_account.add_if_doesn't_exist (module Conn) account.zkapp_uri)
+            account.zkapp
+        in
+        let account_accessed : t =
+          { ledger_index
+          ; block_id
+          ; account_identifier_id
+          ; token_symbol_id
+          ; balance
+          ; nonce
+          ; receipt_chain_hash
+          ; delegate_id
+          ; voting_for_id
+          ; timing_id
+          ; permissions_id
+          ; zkapp_id
+          }
+        in
+        Mina_caqti.select_insert_into_cols
+          ~select:("block_id,account_identifier_id", Caqti_type.(tup2 int int))
+          ~table_name ~cols:(Fields.names, typ)
+          (module Conn)
+          account_accessed
+
+  let add_accounts_if_don't_exist (module Conn : CONNECTION) block_id
+      (accounts : (int * Account.t) list) =
+    let%map results =
+      Deferred.List.map accounts ~f:(fun account ->
+          add_if_doesn't_exist (module Conn) block_id account )
+    in
+    Result.all results
+
+  let all_from_block (module Conn : CONNECTION) block_id =
+    let comma_cols = String.concat Fields.names ~sep:"," in
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.int typ
+         (Mina_caqti.select_cols ~select:comma_cols ~table_name
+            ~cols:[ "block_id" ] () ) )
+      block_id
+end
+
+module Accounts_created = struct
+  type t =
+    { block_id : int; account_identifier_id : int; creation_fee : string }
+  [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; string ]
+
+  let table_name = "accounts_created"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) block_id account_id
+      creation_fee =
+    let open Deferred.Result.Let_syntax in
+    let%bind account_identifier_id =
+      Account_identifiers.add_if_doesn't_exist (module Conn) account_id
+    in
+    let creation_fee = Currency.Fee.to_string creation_fee in
+    Mina_caqti.select_insert_into_cols
+      ~select:("block_id,account_identifier_id", Caqti_type.(tup2 int int))
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      { block_id; account_identifier_id; creation_fee }
+
+  let add_accounts_created_if_don't_exist (module Conn : CONNECTION) block_id
+      accounts_created =
+    let%map results =
+      Deferred.List.map accounts_created ~f:(fun (pk, creation_fee) ->
+          add_if_doesn't_exist (module Conn) block_id pk creation_fee )
+    in
+    Result.all results
+
+  let all_from_block (module Conn : CONNECTION) block_id =
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.int typ
+         {sql| SELECT block_id, account_identifier_id, creation_fee
+               FROM accounts_created
+               WHERE block_id = ?
+         |sql} )
+      block_id
 end
 
 module Block = struct
@@ -2285,12 +2520,12 @@ module Block = struct
     ; staking_epoch_data_id : int
     ; next_epoch_data_id : int
     ; min_window_density : int64
-    ; total_currency : int64
+    ; total_currency : string
     ; ledger_hash : string
     ; height : int64
     ; global_slot_since_hard_fork : int64
     ; global_slot_since_genesis : int64
-    ; timestamp : int64
+    ; timestamp : string
     ; chain_status : string
     }
   [@@deriving hlist, fields]
@@ -2307,32 +2542,32 @@ module Block = struct
         ; int
         ; int
         ; int64
-        ; int64
+        ; string
         ; string
         ; int64
         ; int64
         ; int64
-        ; int64
+        ; string
         ; string
         ]
 
-  let find (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
-    Conn.find
-      (Caqti_request.find Caqti_type.string Caqti_type.int
-         "SELECT id FROM blocks WHERE state_hash = ?")
+  let table_name = "blocks"
+
+  let make_finder conn_finder req_finder ~state_hash =
+    conn_finder
+      (req_finder Caqti_type.string Caqti_type.int
+         "SELECT id FROM blocks WHERE state_hash = ?" )
       (State_hash.to_base58_check state_hash)
 
-  let find_opt (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
-    Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-         "SELECT id FROM blocks WHERE state_hash = ?")
-      (State_hash.to_base58_check state_hash)
+  let find (module Conn : CONNECTION) = make_finder Conn.find Caqti_request.find
+
+  let find_opt (module Conn : CONNECTION) =
+    make_finder Conn.find_opt Caqti_request.find_opt
 
   let load (module Conn : CONNECTION) ~id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name:"blocks"
-            ~cols:Fields.names))
+         (Mina_caqti.select_cols_from_id ~table_name:"blocks" ~cols:Fields.names) )
       id
 
   let add_parts_if_doesn't_exist (module Conn : CONNECTION)
@@ -2394,38 +2629,23 @@ module Block = struct
           | Error e ->
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
-        (* grab all the nonces associated with every public key in all of these
-         * transactions for blocks earlier than this one. *)
-        let%bind initial_nonce_map :
-            ( Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t
-            , _ )
-            Deferred.Result.t =
-          let public_keys =
-            transactions
-            |> List.map ~f:(fun x -> Transaction.public_keys x.data)
-            |> List.concat
-          in
-          (* if this block is disconnected and doesn't have a parent, the nonce map will need to start empty *)
-          match parent_id with
-          | None ->
-              Deferred.Result.return
-                Signature_lib.Public_key.Compressed.Map.empty
-          | Some parent_id ->
-              Find_nonce.initialize_nonce_map
-                (module Conn)
-                ~public_keys ~parent_id
+        let global_slot_since_hard_fork =
+          Consensus.Data.Consensus_state.curr_global_slot consensus_state
+          |> Unsigned.UInt32.to_int64
+        in
+        let chain_status =
+          if Int64.equal global_slot_since_hard_fork 0L then
+            (* at-launch genesis block, or genesis block at hard fork *)
+            Chain_status.(to_string Canonical)
+          else Chain_status.(to_string Pending)
         in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {sql| INSERT INTO blocks (state_hash, parent_id, parent_hash,
-                      creator_id, block_winner_id,
-                      snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id,
-                      min_window_density, total_currency,
-                      ledger_hash, height, global_slot_since_hard_fork,
-                      global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type) RETURNING id
-               |sql})
+               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
+                  ~tannot:(function
+                    | "chain_status" -> Some "chain_status_type" | _ -> None )
+                  ~cols:Fields.names () ) )
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash =
@@ -2443,88 +2663,31 @@ module Block = struct
             ; total_currency =
                 Protocol_state.consensus_state protocol_state
                 |> Consensus.Data.Consensus_state.total_currency
-                |> Currency.Amount.to_uint64 |> Unsigned.UInt64.to_int64
+                |> Currency.Amount.to_string
             ; ledger_hash =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height
-            ; global_slot_since_hard_fork =
-                Consensus.Data.Consensus_state.curr_global_slot consensus_state
-                |> Unsigned.UInt32.to_int64
+            ; global_slot_since_hard_fork
             ; global_slot_since_genesis =
                 consensus_state
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
                 |> Unsigned.UInt32.to_int64
             ; timestamp =
                 Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.timestamp |> Block_time.to_int64
-                (* we don't yet know the chain status for a block we're adding *)
-            ; chain_status = Chain_status.(to_string Pending)
+                |> Blockchain_state.timestamp |> Block_time.to_string
+            ; chain_status
             }
         in
-        let account_creation_fee_of_fees_and_balance ?additional_fee fee balance
-            =
-          (* TODO: add transaction statuses to internal commands
-             the archive lib should not know the details of
-             account creation fees; the calculation below is
-             a temporizing hack
-          *)
-          let fee_uint64 = Currency.Fee.to_uint64 fee in
-          let balance_uint64 = Currency.Balance.to_uint64 balance in
-          let account_creation_fee_uint64 =
-            Currency.Fee.to_uint64 constraint_constants.account_creation_fee
-          in
-          (* for coinbases, an associated fee transfer may reduce
-             the amount given to the coinbase receiver beyond
-             the account creation fee
-          *)
-          let creation_deduction_uint64 =
-            match additional_fee with
-            | None ->
-                account_creation_fee_uint64
-            | Some fee' ->
-                Unsigned.UInt64.add
-                  (Currency.Fee.to_uint64 fee')
-                  account_creation_fee_uint64
-          in
-          (* first compare guards against underflow in subtraction *)
-          if
-            Unsigned.UInt64.compare fee_uint64 creation_deduction_uint64 >= 0
-            && Unsigned.UInt64.equal balance_uint64
-                 (Unsigned.UInt64.sub fee_uint64 creation_deduction_uint64)
-          then Some (Unsigned.UInt64.to_int64 account_creation_fee_uint64)
-          else None
-        in
-        let nonce_int64_of_pk nonce_map pk =
-          Signature_lib.Public_key.Compressed.Map.find nonce_map pk
-          |> Option.map ~f:(fun nonce ->
-                 Account.Nonce.to_uint32 nonce |> Unsigned.UInt32.to_int64)
-        in
-        let%bind (_
-                   : int
-                     * Account.Nonce.t Signature_lib.Public_key.Compressed.Map.t)
-            =
-          Mina_caqti.deferred_result_list_fold transactions
-            ~init:(0, initial_nonce_map) ~f:(fun (sequence_no, nonce_map) ->
-            function
+        let%bind _seq_no =
+          Mina_caqti.deferred_result_list_fold transactions ~init:0
+            ~f:(fun sequence_no -> function
             | { Mina_base.With_status.status
               ; data = Transaction.Command command
               } ->
                 let user_command =
                   { Mina_base.With_status.status; data = command }
-                in
-                (* This is the only place we adjust the nonce_map -- we want to modify the public key associated with the fee_payer for this user-command to increment its nonce.
-                   Note: Intentionally shadowing `nonce_map` here as we want to pass the updated map. *)
-                let nonce_map =
-                  Signature_lib.Public_key.Compressed.Map.change
-                    initial_nonce_map
-                    ( Mina_base.User_command.fee_payer command
-                    |> Account_id.public_key )
-                    ~f:(fun _ ->
-                      Some
-                        ( Mina_base.User_command.nonce_exn command
-                        |> Unsigned.UInt32.succ ))
                 in
                 let%bind id =
                   User_command.add_if_doesn't_exist
@@ -2533,29 +2696,32 @@ module Block = struct
                 in
                 let%map () =
                   match command with
-                  | Signed_command c ->
-                      let%bind { fee_payer_id; source_id; receiver_id } =
-                        User_command.Signed_command
-                        .add_balance_public_keys_if_don't_exist
-                          (module Conn)
-                          c
-                      in
+                  | Signed_command _ ->
                       Block_and_signed_command.add_with_status
                         (module Conn)
-                        ~block_id ~block_height:height ~user_command_id:id
-                        ~sequence_no ~status:user_command.status ~fee_payer_id
-                        ~source_id ~receiver_id ~nonce_map
+                        ~block_id ~user_command_id:id ~sequence_no
+                        ~status:user_command.status
                       >>| ignore
                   | Parties _ ->
-                      Deferred.Result.return ()
+                      let status, failure_reasons =
+                        match user_command.status with
+                        | Applied ->
+                            (applied_str, None)
+                        | Failed failures ->
+                            let display =
+                              Transaction_status.Failure.Collection.to_display
+                                failures
+                            in
+                            (failed_str, Some display)
+                      in
+                      Block_and_zkapp_command.add_if_doesn't_exist
+                        (module Conn)
+                        ~block_id ~zkapp_command_id:id ~sequence_no ~status
+                        ~failure_reasons
+                      >>| ignore
                 in
-                (sequence_no + 1, nonce_map)
-            | { data = Fee_transfer fee_transfer_bundled; status } ->
-                let balances =
-                  Transaction_status.Fee_transfer_balance_data
-                  .of_balance_data_exn
-                    (Transaction_status.balance_data status)
-                in
+                sequence_no + 1
+            | { data = Fee_transfer fee_transfer_bundled; _ } ->
                 let fee_transfers =
                   Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
@@ -2575,17 +2741,15 @@ module Block = struct
                       , secondary_sequence_no
                       , fee_transfer.fee
                       , fee_transfer.receiver_pk )
-                      :: acc)
+                      :: acc )
                 in
                 let fee_transfer_infos_with_balances =
                   match fee_transfer_infos with
                   | [ id ] ->
-                      [ (id, balances.receiver1_balance) ]
+                      [ id ]
                   | [ id2; id1 ] ->
                       (* the fold reverses the order of the infos from the fee transfers *)
-                      [ (id1, balances.receiver1_balance)
-                      ; (id2, Option.value_exn balances.receiver2_balance)
-                      ]
+                      [ id1; id2 ]
                   | _ ->
                       failwith
                         "Unexpected number of single fee transfers in a fee \
@@ -2594,48 +2758,19 @@ module Block = struct
                 let%map () =
                   Mina_caqti.deferred_result_list_fold
                     fee_transfer_infos_with_balances ~init:()
-                    ~f:(fun
-                         ()
-                         ( ( fee_transfer_id
-                           , secondary_sequence_no
-                           , fee
-                           , receiver_pk )
-                         , balance )
-                       ->
-                      let%bind receiver_id =
-                        Public_key.add_if_doesn't_exist
-                          (module Conn)
-                          receiver_pk
-                      in
-                      let nonce = nonce_int64_of_pk nonce_map receiver_pk in
-                      let%bind receiver_balance_id =
-                        Balance.add_if_doesn't_exist
-                          (module Conn)
-                          ~public_key_id:receiver_id ~balance ~block_id
-                          ~block_height:height ~block_sequence_no:sequence_no
-                          ~block_secondary_sequence_no:secondary_sequence_no
-                          ~nonce
-                      in
-                      let receiver_account_creation_fee_paid =
-                        account_creation_fee_of_fees_and_balance fee balance
-                      in
+                    ~f:(fun () (fee_transfer_id, secondary_sequence_no, _, _) ->
                       Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
                         ~sequence_no ~secondary_sequence_no
-                        ~receiver_account_creation_fee_paid ~receiver_balance_id
-                      >>| ignore)
+                      >>| ignore )
                 in
-                (sequence_no + 1, nonce_map)
-            | { data = Coinbase coinbase; status } ->
-                let balances =
-                  Transaction_status.Coinbase_balance_data.of_balance_data_exn
-                    (Transaction_status.balance_data status)
-                in
-                let%bind additional_fee =
+                sequence_no + 1
+            | { data = Coinbase coinbase; _ } ->
+                let%bind () =
                   match Mina_base.Coinbase.fee_transfer coinbase with
                   | None ->
-                      return None
+                      return ()
                   | Some { receiver_pk; fee } ->
                       let fee_transfer =
                         Mina_base.Fee_transfer.Single.create ~receiver_pk ~fee
@@ -2646,153 +2781,40 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Via_coinbase
                       in
-                      let%bind fee_transfer_receiver_id =
-                        Public_key.add_if_doesn't_exist
-                          (module Conn)
-                          receiver_pk
-                      in
-                      let nonce = nonce_int64_of_pk nonce_map receiver_pk in
-                      let balance =
-                        Option.value_exn balances.fee_transfer_receiver_balance
-                      in
-                      let%bind receiver_balance_id =
-                        Balance.add_if_doesn't_exist
-                          (module Conn)
-                          ~public_key_id:fee_transfer_receiver_id ~balance
-                          ~block_id ~block_height:height
-                          ~block_sequence_no:sequence_no
-                          ~block_secondary_sequence_no:0 ~nonce
-                      in
-                      let receiver_account_creation_fee_paid =
-                        account_creation_fee_of_fees_and_balance fee balance
-                      in
-                      let%bind () =
-                        Block_and_internal_command.add
-                          (module Conn)
-                          ~block_id ~internal_command_id:id ~sequence_no
-                          ~secondary_sequence_no:0
-                          ~receiver_account_creation_fee_paid
-                          ~receiver_balance_id
-                      in
-                      return (Some fee)
+                      Block_and_internal_command.add
+                        (module Conn)
+                        ~block_id ~internal_command_id:id ~sequence_no
+                        ~secondary_sequence_no:0
                 in
                 let%bind id =
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
-                in
-                let%bind coinbase_receiver_id =
-                  Public_key.add_if_doesn't_exist
-                    (module Conn)
-                    coinbase.receiver
-                in
-                let nonce = nonce_int64_of_pk nonce_map coinbase.receiver in
-                let%bind receiver_balance_id =
-                  Balance.add_if_doesn't_exist
-                    (module Conn)
-                    ~public_key_id:coinbase_receiver_id
-                    ~balance:balances.coinbase_receiver_balance ~block_id
-                    ~block_height:height ~block_sequence_no:sequence_no
-                    ~block_secondary_sequence_no:0 ~nonce
-                in
-                let receiver_account_creation_fee_paid =
-                  account_creation_fee_of_fees_and_balance ?additional_fee
-                    (Currency.Amount.to_fee coinbase.amount)
-                    balances.coinbase_receiver_balance
                 in
                 let%map () =
                   Block_and_internal_command.add
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0 ~receiver_account_creation_fee_paid
-                    ~receiver_balance_id
+                    ~secondary_sequence_no:0
                   >>| ignore
                 in
-                (sequence_no + 1, nonce_map))
+                sequence_no + 1 )
         in
         return block_id
 
   let add_if_doesn't_exist conn ~constraint_constants
       ({ data = t; hash = { state_hash = hash; _ } } :
-        External_transition.t State_hash.With_state_hashes.t) =
+        Mina_block.t State_hash.With_state_hashes.t ) =
     add_parts_if_doesn't_exist conn ~constraint_constants
-      ~protocol_state:(External_transition.protocol_state t)
-      ~staged_ledger_diff:(External_transition.staged_ledger_diff t)
+      ~protocol_state:(Header.protocol_state @@ Mina_block.header t)
+      ~staged_ledger_diff:(Body.staged_ledger_diff @@ Mina_block.body t)
       ~hash
 
-  let add_from_precomputed conn ~constraint_constants
-      (t : External_transition.Precomputed_block.t) =
+  let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
 
   let add_from_extensional (module Conn : CONNECTION)
       (block : Extensional.Block.t) =
-    (* modelled on query in Rosetta.Lib.Account.query_pending
-       except that all we need is the nonce, not the balance
-
-       see the comment explaining the design there
-    *)
-    let nonce_query =
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
-        Caqti_type.int64
-        {sql| SELECT nonce
-              FROM (WITH RECURSIVE chain AS (
-
-                     (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-
-                      FROM blocks b
-                      WHERE height = (select MAX(height) from blocks)
-                      ORDER BY timestamp ASC, state_hash ASC
-                      LIMIT 1)
-
-                      UNION ALL
-
-                      SELECT b.id, b.state_hash, b.parent_id, b.height, b.global_slot_since_genesis, b.timestamp, b.chain_status
-                      FROM blocks b
-                      INNER JOIN chain
-
-                      ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
-
-                     )
-
-                    SELECT nonce
-
-                    FROM (SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-
-                          FROM chain
-
-                          UNION ALL
-
-                          SELECT id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
-
-                          FROM blocks b
-
-                          WHERE chain_status = 'canonical') AS full_chain
-
-                    INNER JOIN blocks_user_commands busc ON busc.block_id = full_chain.id
-                    INNER JOIN user_commands        cmds ON cmds.id = busc.user_command_id
-                    INNER JOIN public_keys          pks  ON pks.id = cmds.source_id
-
-                    WHERE pks.value = $1
-                    AND full_chain.height <= $2
-
-                    ORDER BY (full_chain.height,busc.sequence_no) DESC
-                    LIMIT 1
-                )
-                AS result
-        |sql}
-    in
-    let run_nonce_query pk =
-      let pk_str = Signature_lib.Public_key.Compressed.to_base58_check pk in
-      let%map last_nonce =
-        Conn.find_opt nonce_query
-          (pk_str, block.height |> Unsigned.UInt32.to_int64)
-      in
-      (* last nonce was in the last user_command for the public key, add 1 to get current nonce
-         if no nonce found, leave as None (it could be 0, but could also be missing data)
-      *)
-      Result.map last_nonce ~f:(Option.map ~f:Int64.succ)
-    in
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
       match%bind find_opt (module Conn) ~state_hash:block.state_hash with
@@ -2833,7 +2855,7 @@ module Block = struct
                       global_slot_since_genesis, timestamp, chain_status)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
-               |sql})
+               |sql} )
             { state_hash = block.state_hash |> State_hash.to_base58_check
             ; parent_id
             ; parent_hash = block.parent_hash |> State_hash.to_base58_check
@@ -2845,16 +2867,14 @@ module Block = struct
             ; min_window_density =
                 block.min_window_density |> Mina_numbers.Length.to_uint32
                 |> Unsigned.UInt32.to_int64
-            ; total_currency =
-                block.total_currency |> Currency.Amount.to_uint64
-                |> Unsigned.UInt64.to_int64
+            ; total_currency = Currency.Amount.to_string block.total_currency
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork =
                 block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
                 block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
-            ; timestamp = block.timestamp |> Block_time.to_int64
+            ; timestamp = Block_time.to_string block.timestamp
             ; chain_status = Chain_status.to_string block.chain_status
             }
     in
@@ -2864,72 +2884,23 @@ module Block = struct
         Mina_caqti.deferred_result_list_fold block.user_cmds ~init:[]
           ~f:(fun acc user_cmd ->
             let%map cmd_id =
-              User_command.add_extensional_if_doesn't_exist
+              User_command.Signed_command.add_extensional_if_doesn't_exist
                 (module Conn)
                 user_cmd
             in
-            cmd_id :: acc)
+            cmd_id :: acc )
       in
       List.zip_exn block.user_cmds (List.rev user_cmd_ids_rev)
-    in
-    let balance_id_of_info pk balance ~block_sequence_no
-        ~block_secondary_sequence_no ~nonce =
-      let%bind public_key_id =
-        Public_key.add_if_doesn't_exist (module Conn) pk
-      in
-      Balance.add_if_doesn't_exist
-        (module Conn)
-        ~public_key_id ~balance ~block_id
-        ~block_height:(block.height |> Unsigned.UInt32.to_int64)
-        ~block_sequence_no ~block_secondary_sequence_no ~nonce
-    in
-    let balance_id_of_info_balance_opt pk balance_opt ~block_sequence_no
-        ~block_secondary_sequence_no ~nonce =
-      Option.value_map balance_opt ~default:(Deferred.Result.return None)
-        ~f:(fun balance ->
-          let%map id =
-            balance_id_of_info pk balance ~block_sequence_no
-              ~block_secondary_sequence_no ~nonce
-          in
-          Some id)
     in
     (* add user commands to join table *)
     let%bind () =
       Mina_caqti.deferred_result_list_fold user_cmds_with_ids ~init:()
         ~f:(fun () (user_command, user_command_id) ->
-          let fee_payer_nonce =
-            user_command.nonce |> Unsigned.UInt32.to_int64
-          in
-          let%bind fee_payer_balance_id =
-            balance_id_of_info user_command.fee_payer
-              user_command.fee_payer_balance
-              ~block_sequence_no:user_command.sequence_no
-              ~block_secondary_sequence_no:0 ~nonce:(Some fee_payer_nonce)
-          in
-          let%bind source_balance_id =
-            balance_id_of_info_balance_opt user_command.source
-              user_command.source_balance
-              ~block_sequence_no:user_command.sequence_no
-              ~block_secondary_sequence_no:0 ~nonce:(Some fee_payer_nonce)
-          in
-          let%bind receiver_balance_id =
-            let%bind nonce = run_nonce_query user_command.receiver in
-            balance_id_of_info_balance_opt user_command.receiver
-              user_command.receiver_balance
-              ~block_sequence_no:user_command.sequence_no
-              ~block_secondary_sequence_no:0 ~nonce
-          in
           Block_and_signed_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~user_command_id ~sequence_no:user_command.sequence_no
             ~status:user_command.status
-            ~failure_reason:user_command.failure_reason
-            ~fee_payer_account_creation_fee_paid:
-              user_command.fee_payer_account_creation_fee_paid
-            ~receiver_account_creation_fee_paid:
-              user_command.receiver_account_creation_fee_paid
-            ~created_token:user_command.created_token ~fee_payer_balance_id
-            ~source_balance_id ~receiver_balance_id)
+            ~failure_reason:user_command.failure_reason )
     in
     (* add internal commands *)
     let%bind internal_cmds_ids_and_seq_nos =
@@ -2941,11 +2912,11 @@ module Block = struct
                 (module Conn)
                 internal_cmd
             in
-            (internal_cmd, cmd_id) :: acc)
+            (internal_cmd, cmd_id) :: acc )
       in
       let sequence_nos =
         List.map block.internal_cmds ~f:(fun internal_cmd ->
-            (internal_cmd.sequence_no, internal_cmd.secondary_sequence_no))
+            (internal_cmd.sequence_no, internal_cmd.secondary_sequence_no) )
       in
       List.zip_exn (List.rev internal_cmds_and_ids_rev) sequence_nos
     in
@@ -2955,26 +2926,63 @@ module Block = struct
         ~init:()
         ~f:(fun
              ()
-             ( (internal_command, internal_command_id)
+             ( (_internal_command, internal_command_id)
              , (sequence_no, secondary_sequence_no) )
            ->
-          let%bind receiver_balance_id =
-            let%bind nonce = run_nonce_query internal_command.receiver in
-            balance_id_of_info internal_command.receiver
-              internal_command.receiver_balance
-              ~block_sequence_no:internal_command.sequence_no
-              ~block_secondary_sequence_no:
-                internal_command.secondary_sequence_no ~nonce
-          in
-          let receiver_account_creation_fee_paid =
-            internal_command.receiver_account_creation_fee_paid
-            |> Option.map ~f:(fun amount ->
-                   Currency.Amount.to_uint64 amount |> Unsigned.UInt64.to_int64)
-          in
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
-            ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-            ~receiver_account_creation_fee_paid ~receiver_balance_id)
+            ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no )
+    in
+    (* add zkApp commands *)
+    let%bind zkapp_cmds_ids_and_seq_nos =
+      let%map zkapp_cmds_and_ids_rev =
+        Mina_caqti.deferred_result_list_fold block.zkapp_cmds ~init:[]
+          ~f:(fun acc ({ fee_payer; other_parties; memo; _ } as zkapp_cmd) ->
+            (* add authorizations, not stored in the db *)
+            let (fee_payer : Party.Fee_payer.t) =
+              { body = fee_payer; authorization = Signature.dummy }
+            in
+            let (other_parties : Party.Simple.t list) =
+              List.map other_parties
+                ~f:(fun (body : Party.Body.Simple.t) : Party.Simple.t ->
+                  { body; authorization = None_given } )
+            in
+            let%map cmd_id =
+              User_command.Zkapp_command.add_if_doesn't_exist
+                (module Conn)
+                (Parties.of_simple { fee_payer; other_parties; memo })
+            in
+            (zkapp_cmd, cmd_id) :: acc )
+      in
+      let sequence_nos =
+        List.map block.zkapp_cmds ~f:(fun { sequence_no; _ } -> sequence_no)
+      in
+      List.zip_exn (List.rev zkapp_cmds_and_ids_rev) sequence_nos
+    in
+    (* add zkapp commands to join table *)
+    let%bind () =
+      Mina_caqti.deferred_result_list_fold zkapp_cmds_ids_and_seq_nos ~init:()
+        ~f:(fun () ((zkapp_command, zkapp_command_id), sequence_no) ->
+          let%map _block_id, _cmd_id, _sequence_no =
+            Block_and_zkapp_command.add_if_doesn't_exist
+              (module Conn)
+              ~block_id ~zkapp_command_id ~sequence_no
+              ~status:zkapp_command.status
+              ~failure_reasons:zkapp_command.failure_reasons
+          in
+          () )
+    in
+    (* add accounts accessed *)
+    let%bind _block_and_account_ids =
+      Accounts_accessed.add_accounts_if_don't_exist
+        (module Conn)
+        block_id block.accounts_accessed
+    in
+    (* add accounts created *)
+    let%bind _block_and_pk_ids =
+      Accounts_created.add_accounts_created_if_don't_exist
+        (module Conn)
+        block_id block.accounts_created
     in
     return block_id
 
@@ -2986,7 +2994,7 @@ module Block = struct
          {sql| UPDATE blocks SET parent_id = ?
                WHERE parent_hash = ?
                AND parent_id IS NULL
-         |sql})
+         |sql} )
       (parent_id, State_hash.to_base58_check parent_hash)
 
   let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
@@ -2995,14 +3003,20 @@ module Block = struct
          Caqti_type.(tup2 int int)
          typ
          {sql| WITH RECURSIVE chain AS (
-              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                     next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
+              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
+                     staking_epoch_data_id,next_epoch_data_id,
+                     min_window_density,total_currency,
+                     ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,
+                     timestamp,chain_status
               FROM blocks b WHERE b.id = $1
 
               UNION ALL
 
-              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,b.staking_epoch_data_id,
-                     b.next_epoch_data_id,b.ledger_hash,b.height,b.global_slot,b.global_slot_since_genesis,b.timestamp,b.chain_status
+              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,
+                     b.staking_epoch_data_id,b.next_epoch_data_id,
+                     b.min_window_density,b.total_currency,
+                     b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,
+                     b.timestamp,b.chain_status
               FROM blocks b
 
               INNER JOIN chain
@@ -3011,10 +3025,14 @@ module Block = struct
 
            )
 
-           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
-                  next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp,chain_status
+           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
+                  staking_epoch_data_id, next_epoch_data_id,
+                  min_window_density, total_currency,
+                  ledger_hash,height,
+                  global_slot_since_hard_fork,global_slot_since_genesis,
+                  timestamp,chain_status
            FROM chain ORDER BY height ASC
-      |sql})
+      |sql} )
       (end_block_id, start_block_id)
 
   let get_highest_canonical_block_opt (module Conn : CONNECTION) =
@@ -3022,14 +3040,14 @@ module Block = struct
       (Caqti_request.find_opt Caqti_type.unit
          Caqti_type.(tup2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' ORDER BY \
-          height DESC LIMIT 1")
+          height DESC LIMIT 1" )
 
   let get_nearest_canonical_block_above (module Conn : CONNECTION) height =
     Conn.find
       (Caqti_request.find Caqti_type.int64
          Caqti_type.(tup2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' AND \
-          height > ? ORDER BY height ASC LIMIT 1")
+          height > ? ORDER BY height ASC LIMIT 1" )
       height
 
   let get_nearest_canonical_block_below (module Conn : CONNECTION) height =
@@ -3037,13 +3055,13 @@ module Block = struct
       (Caqti_request.find Caqti_type.int64
          Caqti_type.(tup2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' AND \
-          height < ? ORDER BY height DESC LIMIT 1")
+          height < ? ORDER BY height DESC LIMIT 1" )
       height
 
   let mark_as_canonical (module Conn : CONNECTION) ~state_hash =
     Conn.exec
       (Caqti_request.exec Caqti_type.string
-         "UPDATE blocks SET chain_status='canonical' WHERE state_hash = ?")
+         "UPDATE blocks SET chain_status='canonical' WHERE state_hash = ?" )
       state_hash
 
   let mark_as_orphaned (module Conn : CONNECTION) ~state_hash ~height =
@@ -3053,7 +3071,7 @@ module Block = struct
          {sql| UPDATE blocks SET chain_status='orphaned'
                WHERE height = $2
                AND state_hash <> $1
-         |sql})
+         |sql} )
       (state_hash, height)
 
   (* update chain_status for blocks now known to be canonical or orphaned *)
@@ -3080,7 +3098,7 @@ module Block = struct
           (* mark canonical, orphaned blocks in subchain at least k behind the new block *)
           let canonical_blocks =
             List.filter subchain_blocks ~f:(fun subchain_block ->
-                Int64.( <= ) subchain_block.height block_height_less_k_int64)
+                Int64.( <= ) subchain_block.height block_height_less_k_int64 )
           in
           Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
             ~f:(fun () block ->
@@ -3089,7 +3107,7 @@ module Block = struct
               in
               mark_as_orphaned
                 (module Conn)
-                ~state_hash:block.state_hash ~height:block.height)
+                ~state_hash:block.state_hash ~height:block.height )
         else if Int64.( < ) block.height greatest_canonical_height then
           (* a missing block added in the middle of canonical chain *)
           let%bind canonical_block_above_id, _above_height =
@@ -3113,7 +3131,7 @@ module Block = struct
               in
               mark_as_orphaned
                 (module Conn)
-                ~state_hash:block.state_hash ~height:block.height)
+                ~state_hash:block.state_hash ~height:block.height )
         else
           (* a block at or above highest canonical block, not high enough to mark any blocks as canonical *)
           Deferred.Result.return ()
@@ -3129,7 +3147,7 @@ module Block = struct
           match%map
             Conn.find_opt
               (Caqti_request.find_opt Caqti_type.unit Caqti_type.int
-                 "SELECT MAX(height) FROM blocks")
+                 "SELECT MAX(height) FROM blocks" )
               ()
           with
           | Some max_block_height ->
@@ -3150,7 +3168,7 @@ module Block = struct
               WHERE id IN\n\
               (SELECT user_command_id FROM blocks_user_commands\n\
               INNER JOIN blocks ON blocks.id = block_id\n\
-              WHERE (blocks.height < ? OR blocks.timestamp < ?))")
+              WHERE (blocks.height < ? OR blocks.timestamp < ?))" )
           (height, timestamp)
       in
       let%bind () =
@@ -3159,7 +3177,7 @@ module Block = struct
           (Caqti_request.exec
              Caqti_type.(tup2 int int64)
              "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < \
-              ?")
+              ?" )
           (height, timestamp)
       in
       let%bind () =
@@ -3170,7 +3188,7 @@ module Block = struct
               WHERE id NOT IN\n\
               (SELECT internal_commands.id FROM internal_commands\n\
               INNER JOIN blocks_internal_commands ON\n\
-              internal_command_id = internal_commands.id)")
+              internal_command_id = internal_commands.id)" )
           ()
       in
       let%bind () =
@@ -3179,7 +3197,7 @@ module Block = struct
           (Caqti_request.exec Caqti_type.unit
              "DELETE FROM snarked_ledger_hashes\n\
               WHERE id NOT IN\n\
-              (SELECT snarked_ledger_hash_id FROM blocks)")
+              (SELECT snarked_ledger_hash_id FROM blocks)" )
           ()
       in
       let%bind () =
@@ -3191,7 +3209,7 @@ module Block = struct
               AND id NOT IN (SELECT source_id FROM user_commands)\n\
               AND id NOT IN (SELECT receiver_id FROM user_commands)\n\
               AND id NOT IN (SELECT receiver_id FROM internal_commands)\n\
-              AND id NOT IN (SELECT creator_id FROM blocks)")
+              AND id NOT IN (SELECT creator_id FROM blocks)" )
           ()
       in
       return ()
@@ -3214,9 +3232,27 @@ let retry ~f ~logger ~error_str retries =
   in
   go retries
 
-let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
-    pool block =
+let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+    ~delete_older_than ~accounts_accessed ~accounts_created ~tokens_used block =
+  let state_hash = hash block in
+
+  (* the block itself is added in a single transaction with a transaction block
+
+     once that transaction is committed, we can get a block id
+
+     so we add accounts accessed, accounts created, contained in another
+     transaction block
+  *)
   let add () =
+    [%log info]
+      "Populating token owners table for block with state hash $state_hash"
+      ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
+    List.iter tokens_used ~f:(fun (token_id, owner) ->
+        match owner with
+        | None ->
+            ()
+        | Some acct_id ->
+            Token_owners.add_if_doesn't_exist token_id acct_id ) ;
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
         let%bind res =
@@ -3224,7 +3260,7 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
           let%bind () = Conn.start () in
           [%log info] "Attempting to add block data for $state_hash"
             ~metadata:
-              [ ("state_hash", Mina_base.State_hash.to_yojson (hash block)) ] ;
+              [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
           let%bind block_id = add_block (module Conn : CONNECTION) block in
           (* if an existing block has a parent hash that's for the block just added,
              set its parent id
@@ -3236,63 +3272,148 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
           in
           (* update chain status for existing blocks *)
           let%bind () = Block.update_chain_status (module Conn) ~block_id in
-          match delete_older_than with
-          | Some num_blocks ->
-              Block.delete_if_older_than ~num_blocks (module Conn)
-          | None ->
-              return ()
+          let%bind () =
+            match delete_older_than with
+            | Some num_blocks ->
+                Block.delete_if_older_than ~num_blocks (module Conn)
+            | None ->
+                return ()
+          in
+          return block_id
         in
         match res with
         | Error e as err ->
             (*Error in the current transaction*)
             [%log warn]
-              "Error when adding block data to the database, rolling it back: \
-               $error"
+              "Error when adding block data to the database, rolling back \
+               transaction: $error"
               ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
             let%map _ = Conn.rollback () in
             err
-        | Ok _ ->
-            [%log info] "Committing block data for $state_hash"
-              ~metadata:
-                [ ("state_hash", Mina_base.State_hash.to_yojson (hash block)) ] ;
-            Conn.commit ())
+        | Ok block_id -> (
+            match%bind Conn.commit () with
+            | Error err ->
+                [%log warn]
+                  "Could not commit data for block with state hash \
+                   $state_hash, rolling back transaction: $error"
+                  ~metadata:
+                    [ ("state_hash", State_hash.to_yojson state_hash)
+                    ; ("error", `String (Caqti_error.show err))
+                    ] ;
+                Conn.rollback ()
+            | Ok () -> (
+                (* added block data, now add accounts accessed *)
+                [%log info]
+                  "Added block with state hash $state_hash to archive database"
+                  ~metadata:
+                    [ ("state_hash", State_hash.to_yojson state_hash)
+                    ; ( "num_accounts_accessed"
+                      , `Int (List.length accounts_accessed) )
+                    ] ;
+                let%bind.Deferred.Result () = Conn.start () in
+                match%bind
+                  Caqti_async.Pool.use
+                    (fun (module Conn : CONNECTION) ->
+                      Accounts_accessed.add_accounts_if_don't_exist
+                        (module Conn)
+                        block_id accounts_accessed )
+                    pool
+                with
+                | Error err ->
+                    [%log error]
+                      "Could not add accounts accessed in block with state \
+                       hash $state_hash to archive database: $error"
+                      ~metadata:
+                        [ ("state_hash", State_hash.to_yojson state_hash)
+                        ; ("error", `String (Caqti_error.show err))
+                        ] ;
+                    Conn.rollback ()
+                | Ok _block_and_account_ids -> (
+                    [%log info]
+                      "Added accounts accessed for block with state hash \
+                       $state_hash to archive database"
+                      ~metadata:
+                        [ ("state_hash", State_hash.to_yojson state_hash)
+                        ; ( "num_accounts_accessed"
+                          , `Int (List.length accounts_accessed) )
+                        ] ;
+                    match%bind
+                      Caqti_async.Pool.use
+                        (fun (module Conn : CONNECTION) ->
+                          Accounts_created.add_accounts_created_if_don't_exist
+                            (module Conn)
+                            block_id accounts_created )
+                        pool
+                    with
+                    | Ok _block_and_public_key_ids ->
+                        [%log info]
+                          "Added accounts created for block with state hash \
+                           $state_hash to archive database"
+                          ~metadata:
+                            [ ( "state_hash"
+                              , Mina_base.State_hash.to_yojson (hash block) )
+                            ; ( "num_accounts_created"
+                              , `Int (List.length accounts_created) )
+                            ] ;
+                        Conn.commit ()
+                    | Error err ->
+                        [%log warn]
+                          "Could not add accounts created in block with state \
+                           hash $state_hash to archive database: $error"
+                          ~metadata:
+                            [ ("state_hash", State_hash.to_yojson state_hash)
+                            ; ("error", `String (Caqti_error.show err))
+                            ] ;
+
+                        Conn.rollback () ) ) ) )
       pool
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
-let add_block_aux_precomputed ~constraint_constants =
-  add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
+let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
+    ~delete_older_than block =
+  add_block_aux ~logger ?retries ~pool ~delete_older_than
+    ~add_block:(Block.add_from_precomputed ~constraint_constants)
     ~hash:(fun block ->
-      ( block.External_transition.Precomputed_block.protocol_state
-      |> Protocol_state.hashes )
-        .state_hash)
+      (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
+    ~accounts_accessed:block.Precomputed.accounts_accessed
+    ~accounts_created:block.Precomputed.accounts_created
+    ~tokens_used:block.Precomputed.tokens_used block
 
-let add_block_aux_extensional =
-  add_block_aux ~add_block:Block.add_from_extensional
+let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
+  add_block_aux ~logger ?retries ~pool ~delete_older_than
+    ~add_block:Block.add_from_extensional
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
+    ~accounts_accessed:block.Extensional.Block.accounts_accessed
+    ~accounts_created:block.Extensional.Block.accounts_created
+    ~tokens_used:block.Extensional.Block.tokens_used block
 
-let run pool reader ~constraint_constants ~logger ~delete_older_than =
+let run pool reader ~constraint_constants ~logger ~delete_older_than :
+    unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
-    | Diff.Transition_frontier (Breadcrumb_added { block; _ }) -> (
+    | Diff.Transition_frontier
+        (Breadcrumb_added
+          { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
-        match%map
-          add_block_aux ~logger ~delete_older_than ~hash ~add_block pool
+        match%bind
+          add_block_aux ~logger ~pool ~delete_older_than ~hash ~add_block
+            ~accounts_accessed ~accounts_created ~tokens_used
             (With_hash.map ~f:External_transition.decompose block)
         with
         | Error e ->
+            let state_hash = hash block in
             [%log warn]
               ~metadata:
-                [ ( "block"
-                  , State_hash.With_state_hashes.state_hash block
-                    |> State_hash.to_yojson )
+                [ ("state_hash", State_hash.to_yojson state_hash)
                 ; ("error", `String (Caqti_error.show e))
                 ]
-              "Failed to archive block: $block, see $error"
+              "Failed to archive block with state hash $state_hash, see $error" ;
+            Deferred.unit
         | Ok () ->
-            () )
+            Deferred.unit )
     | Transition_frontier _ ->
-        Deferred.return ()
+        Deferred.unit
     | Transaction_pool { added; removed = _ } ->
         let%map _ =
           Caqti_async.Pool.use
@@ -3312,12 +3433,12 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than =
                               , Mina_base.User_command.to_yojson command )
                             ]
                           "Failed to archive user command $command from \
-                           transaction pool: $block, see $error")
+                           transaction pool: see $error" )
               in
-              Ok ())
+              Ok () )
             pool
         in
-        ())
+        () )
 
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     pool =
@@ -3325,64 +3446,157 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      let accounts =
-        match Option.map runtime_config.ledger ~f:(fun l -> l.base) with
-        | Some (Accounts accounts) ->
-            Genesis_ledger_helper.Accounts.to_full accounts
-        | Some (Named name) -> (
-            match Genesis_ledger.fetch_ledger name with
-            | Some (module M) ->
-                [%log info] "Found ledger with name $ledger_name"
-                  ~metadata:[ ("ledger_name", `String name) ] ;
-                Lazy.force M.accounts
+      match runtime_config.ledger with
+      | None ->
+          [%log fatal] "Runtime config does not contain a ledger" ;
+          failwith
+            "Runtime config does not contain a ledger, could not add genesis \
+             accounts"
+      | Some runtime_config_ledger -> (
+          (* blocks depend on having the protocol version set, which the daemon does on startup;
+             the actual value doesn't affect the block state hash, which is how we
+             identify a block in the archive db
+
+             here, we just set the protocol version to a dummy value
+          *)
+          Protocol_version.(set_current zero) ;
+          let proof_level = Genesis_constants.Proof_level.compiled in
+          let%bind precomputed_values =
+            match%map
+              Genesis_ledger_helper.init_from_config_file ~logger
+                ~proof_level:(Some proof_level) runtime_config
+            with
+            | Ok (precomputed_values, _) ->
+                precomputed_values
+            | Error err ->
+                failwithf "Could not get precomputed values, error: %s"
+                  (Error.to_string_hum err) ()
+          in
+          (* code modeled on replayer ledger initialization *)
+          let%bind padded_accounts =
+            match
+              Genesis_ledger_helper.Ledger
+              .padded_accounts_from_runtime_config_opt ~logger ~proof_level
+                runtime_config_ledger ~ledger_name_prefix:"genesis_ledger"
+            with
             | None ->
-                [%log error]
-                  "Could not find a built-in ledger named $ledger_name"
-                  ~metadata:[ ("ledger_name", `String name) ] ;
-                failwith
-                  "Could not add genesis accounts: Named ledger not found" )
-        | _ ->
-            failwith "No accounts found in runtime config file"
-      in
-      let add_accounts () =
-        Caqti_async.Pool.use
-          (fun (module Conn : CONNECTION) ->
-            let open Deferred.Result.Let_syntax in
-            let%bind () = Conn.start () in
-            let rec go accounts =
-              let open Deferred.Let_syntax in
-              match accounts with
-              | [] ->
-                  Deferred.Result.return ()
-              | (_, account) :: accounts' -> (
-                  match%bind
-                    Timing_info.add_if_doesn't_exist (module Conn) account
-                  with
-                  | Error e as err ->
-                      [%log error]
-                        ~metadata:
-                          [ ("account", Account.to_yojson account)
-                          ; ("error", `String (Caqti_error.show e))
-                          ]
-                        "Failed to add genesis account: $account, see $error" ;
-                      let%map _ = Conn.rollback () in
-                      err
-                  | Ok _ ->
-                      go accounts' )
+                [%log fatal]
+                  "Could not load accounts from runtime config ledger" ;
+                exit 1
+            | Some accounts ->
+                return accounts
+          in
+          let constraint_constants =
+            Genesis_constants.Constraint_constants.compiled
+          in
+          let packed_ledger =
+            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+              ~depth:constraint_constants.ledger_depth padded_accounts
+          in
+          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+          let account_ids =
+            Mina_ledger.Ledger.accounts ledger |> Account_id.Set.to_list
+          in
+          let genesis_block =
+            let With_hash.{ data = block; hash = the_hash }, _ =
+              Mina_block.genesis ~precomputed_values
             in
-            let%bind () = go accounts in
-            Conn.commit ())
-          pool
-      in
-      match%map
-        retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
-      with
-      | Error e ->
-          [%log warn] "genesis accounts could not be added"
-            ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
-          failwith "Failed to add genesis accounts"
-      | Ok () ->
-          () )
+            With_hash.{ data = block; hash = the_hash }
+          in
+          let add_accounts () =
+            Caqti_async.Pool.use
+              (fun (module Conn : CONNECTION) ->
+                let%bind.Deferred.Result genesis_block_id =
+                  Block.add_if_doesn't_exist
+                    (module Conn)
+                    ~constraint_constants genesis_block
+                in
+                let%bind.Deferred.Result { ledger_hash; _ } =
+                  Block.load (module Conn) ~id:genesis_block_id
+                in
+                let db_ledger_hash =
+                  Ledger_hash.of_base58_check_exn ledger_hash
+                in
+                let actual_ledger_hash =
+                  Mina_ledger.Ledger.merkle_root ledger
+                in
+                if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
+                  [%log info]
+                    "Archived genesis block ledger hash equals actual genesis \
+                     ledger hash"
+                    ~metadata:
+                      [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash)
+                      ]
+                else (
+                  [%log error]
+                    "Archived genesis block ledger hash different than actual \
+                     genesis ledger hash"
+                    ~metadata:
+                      [ ( "archived_ledger_hash"
+                        , Ledger_hash.to_yojson db_ledger_hash )
+                      ; ( "actual_ledger_hash"
+                        , Ledger_hash.to_yojson actual_ledger_hash )
+                      ] ;
+                  exit 1 ) ;
+                let%bind.Deferred.Result () = Conn.start () in
+                let open Deferred.Let_syntax in
+                let%bind () =
+                  Deferred.List.iter account_ids ~f:(fun acct_id ->
+                      match
+                        Mina_ledger.Ledger.location_of_account ledger acct_id
+                      with
+                      | None ->
+                          [%log error] "Could not get location for account"
+                            ~metadata:
+                              [ ("account_id", Account_id.to_yojson acct_id) ] ;
+                          failwith "Could not get location for genesis account"
+                      | Some loc -> (
+                          let index =
+                            Mina_ledger.Ledger.index_of_account_exn ledger
+                              acct_id
+                          in
+                          let acct =
+                            match Mina_ledger.Ledger.get ledger loc with
+                            | None ->
+                                [%log error]
+                                  "Could not get account, given a location"
+                                  ~metadata:
+                                    [ ( "account_id"
+                                      , Account_id.to_yojson acct_id )
+                                    ] ;
+                                failwith
+                                  "Could not get genesis account, given a \
+                                   location"
+                            | Some acct ->
+                                acct
+                          in
+                          match%bind
+                            Accounts_accessed.add_if_doesn't_exist
+                              (module Conn)
+                              genesis_block_id (index, acct)
+                          with
+                          | Ok _ ->
+                              return ()
+                          | Error err ->
+                              [%log error] "Could not add genesis account"
+                                ~metadata:
+                                  [ ("account_id", Account_id.to_yojson acct_id)
+                                  ; ("error", `String (Caqti_error.show err))
+                                  ] ;
+                              failwith "Could not add add genesis account" ) )
+                in
+                Conn.commit () )
+              pool
+          in
+          match%map
+            retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
+          with
+          | Error e ->
+              [%log warn] "genesis accounts could not be added"
+                ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
+              failwith "Failed to add genesis accounts"
+          | Ok () ->
+              () ) )
 
 let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
     pool =
@@ -3424,13 +3638,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
   in
   let implementations =
     [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
-          Strict_pipe.Writer.write writer archive_diff)
+          Strict_pipe.Writer.write writer archive_diff )
     ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
         (fun () precomputed_block ->
-          Strict_pipe.Writer.write precomputed_block_writer precomputed_block)
+          Strict_pipe.Writer.write precomputed_block_writer precomputed_block )
     ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
         (fun () extensional_block ->
-          Strict_pipe.Writer.write extensional_block_writer extensional_block)
+          Strict_pipe.Writer.write extensional_block_writer extensional_block )
     ]
   in
   match Caqti_async.connect_pool ~max_size:30 postgres_address with
@@ -3440,14 +3654,21 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
+      [%log info]
+        "Starting archive process; built with commit $commit on branch $branch"
+        ~metadata:
+          [ ("commit", `String Mina_version.commit_id)
+          ; ("branch", `String Mina_version.branch)
+          ; ("commit_date", `String Mina_version.commit_date)
+          ] ;
       let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
       run ~constraint_constants pool reader ~logger ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~logger ~constraint_constants
-              ~delete_older_than pool precomputed_block
+            add_block_aux_precomputed ~logger ~pool ~constraint_constants
+              ~delete_older_than precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -3458,13 +3679,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                         .state_hash |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e))
                   ]
-          | Ok () ->
-              ())
+          | Ok _block_id ->
+              () )
       |> don't_wait_for ;
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~logger ~delete_older_than pool
+            add_block_aux_extensional ~logger ~pool ~delete_older_than
               extensional_block
           with
           | Error e ->
@@ -3475,8 +3696,8 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                     , extensional_block.state_hash |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e))
                   ]
-          | Ok () ->
-              ())
+          | Ok _block_id ->
+              () )
       |> don't_wait_for ;
       Deferred.ignore_m
       @@ Tcp.Server.create
@@ -3488,14 +3709,14 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                    ~metadata:
                      [ ("error", `String (Core.Exn.to_string_mach exn))
                      ; ("context", `String "rpc_tcp_server")
-                     ]))
+                     ] ) )
            where_to_listen
            (fun address reader writer ->
              let address = Socket.Address.Inet.addr address in
              Async.Rpc.Connection.server_with_close reader writer
                ~implementations:
                  (Async.Rpc.Implementations.create_exn ~implementations
-                    ~on_unknown_rpc:`Raise)
+                    ~on_unknown_rpc:`Raise )
                ~connection_state:(fun _ -> ())
                ~on_handshake_error:
                  (`Call
@@ -3509,7 +3730,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                          ; ( "address"
                            , `String (Unix.Inet_addr.to_string address) )
                          ] ;
-                     Deferred.unit)))
+                     Deferred.unit ) ) )
       |> don't_wait_for ;
       (*Update archive metrics*)
       create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width

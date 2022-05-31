@@ -2,13 +2,13 @@ open Async_kernel
 open Core
 open Mina_base
 open Mina_state
-open Mina_transition
+open Mina_block
 open Pipe_lib
 open Signature_lib
 module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
-module Subscriptions = Coda_subscriptions
+module Subscriptions = Mina_subscriptions
 
 type t
 
@@ -29,7 +29,7 @@ exception Offline_shutdown
 
 val time_controller : t -> Block_time.Controller.t
 
-val subscription : t -> Coda_subscriptions.t
+val subscription : t -> Mina_subscriptions.t
 
 val daemon_start_time : Time_ns.t
 
@@ -170,7 +170,7 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 val start : t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-  t -> Block_producer.Precomputed_block.t Sequence.t -> unit Deferred.t
+  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
@@ -187,10 +187,10 @@ val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 
-val subscriptions : t -> Coda_subscriptions.t
+val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
-  t -> External_transition.Initial_validated.t Broadcast_pipe.Reader.t
+  t -> Mina_block.initial_valid_block Broadcast_pipe.Reader.t
 
 val block_produced_bvar :
   t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t

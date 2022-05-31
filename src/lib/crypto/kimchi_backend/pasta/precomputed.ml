@@ -19,7 +19,7 @@ let g s =
       | i ->
           let i = i - 2 in
           let byte = i / 2 in
-          s.[2 + (2 * (num_bytes - 1 - byte)) + (i mod 2)])
+          s.[2 + (2 * (num_bytes - 1 - byte)) + (i mod 2)] )
 
 module Lagrange_precomputations = struct
   let index_of_domain_log2 d = d - 1

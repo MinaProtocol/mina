@@ -19,7 +19,7 @@ let net_configs n =
       let net = Or_error.ok_exn net in
       let ips =
         List.init n ~f:(fun i ->
-            Unix.Inet_addr.of_string @@ sprintf "127.0.0.1%i" i)
+            Unix.Inet_addr.of_string @@ sprintf "127.0.0.1%i" i )
       in
       let%bind addrs_and_ports_list =
         Deferred.List.mapi ips ~f:(fun i ip ->
@@ -32,19 +32,19 @@ let net_configs n =
               ; peer =
                   Some
                     (Network_peer.Peer.create ip ~libp2p_port
-                       ~peer_id:(Mina_net2.Keypair.to_peer_id key))
+                       ~peer_id:(Mina_net2.Keypair.to_peer_id key) )
               ; libp2p_port
               ; client_port
               }
-            , key ))
+            , key ) )
       in
       let all_peers = addrs_and_ports_list in
       let peers =
         List.init n ~f:(fun i ->
-            List.take all_peers i @ List.drop all_peers (i + 1))
+            List.take all_peers i @ List.drop all_peers (i + 1) )
       in
       let%map () = Mina_net2.shutdown net in
-      (addrs_and_ports_list, List.map ~f:(List.map ~f:fst) peers))
+      (addrs_and_ports_list, List.map ~f:(List.map ~f:fst) peers) )
 
 let offset (consensus_constants : Consensus.Constants.t) =
   Core.Time.(
@@ -79,7 +79,7 @@ let local_configs ?block_production_interval
     List.mapi args ~f:(fun i ((addrs_and_ports, libp2p_keypair), peers) ->
         let public_key =
           Option.bind snark_worker_public_keys ~f:(fun keys ->
-              List.nth_exn keys i)
+              List.nth_exn keys i )
         in
         let addrs_and_ports = Node_addrs_and_ports.to_display addrs_and_ports in
         let peers = List.map ~f:Node_addrs_and_ports.to_multiaddr_exn peers in
@@ -89,7 +89,7 @@ let local_configs ?block_production_interval
           ~block_production_key:(block_production_keys i) ~work_selection_method
           ~trace_dir ~is_archive_rocksdb:(is_archive_rocksdb i)
           ~archive_process_location:(archive_process_location i)
-          ~offset ~max_concurrent_connections ~runtime_config ())
+          ~offset ~max_concurrent_connections ~runtime_config () )
   in
   configs
 

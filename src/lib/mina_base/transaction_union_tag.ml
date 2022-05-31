@@ -39,7 +39,7 @@ let to_string = function
 
 let gen =
   Quickcheck.Generator.map (Int.gen_incl min max) ~f:(fun i ->
-      Option.value_exn (of_enum i))
+      Option.value_exn (of_enum i) )
 
 module Bits = struct
   type t = bool * bool * bool [@@deriving equal]
@@ -178,7 +178,7 @@ module Unpacked = struct
        ; is_coinbase
        ; is_user_command = _
        } :
-        var) =
+        var ) =
     (* For each bit, compute the sum of all the tags for which that bit is true
        in its bit representation.
 
@@ -200,7 +200,8 @@ module Unpacked = struct
           let add_if_true bit acc =
             if bit then Field.Var.add acc (bool_var :> Field.Var.t) else acc
           in
-          (add_if_true bit1 acc1, add_if_true bit2 acc2, add_if_true bit3 acc3))
+          (add_if_true bit1 acc1, add_if_true bit2 acc2, add_if_true bit3 acc3)
+          )
     in
     Boolean.Unsafe.(of_cvar b1, of_cvar b2, of_cvar b3)
 
@@ -228,11 +229,11 @@ module Unpacked = struct
                    ; is_mint_tokens
                    ; is_fee_transfer
                    ; is_coinbase
-                   ])
+                   ] )
             in
             [%with_label "User command flag is correctly set"]
               (Boolean.Assert.exactly_one
-                 [ is_user_command; is_fee_transfer; is_coinbase ]))
+                 [ is_user_command; is_fee_transfer; is_coinbase ] ) )
       }
 
   let constant
@@ -244,7 +245,7 @@ module Unpacked = struct
        ; is_coinbase
        ; is_user_command
        } :
-        t) : var =
+        t ) : var =
     { is_payment = Boolean.var_of_value is_payment
     ; is_stake_delegation = Boolean.var_of_value is_stake_delegation
     ; is_create_account = Boolean.var_of_value is_create_account

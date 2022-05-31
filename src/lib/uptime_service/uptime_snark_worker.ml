@@ -30,7 +30,7 @@ module Worker_state = struct
            in
            Prod.perform_single worker_state ~message single_spec
        end in
-      (module M : S))
+      (module M : S) )
 
   let get = Fn.id
 end
@@ -105,7 +105,8 @@ let create ~logger ~pids : t Deferred.t =
   [%log info] "Starting a new uptime service SNARK worker process" ;
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() logger
+      ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
+      logger
   in
   [%log info]
     "Daemon started process of kind $process_kind with pid \
@@ -131,14 +132,14 @@ let create ~logger ~pids : t Deferred.t =
        ~f:(fun stdout ->
          return
          @@ [%log debug] "Uptime SNARK worker stdout: $stdout"
-              ~metadata:[ ("stdout", `String stdout) ]) ;
+              ~metadata:[ ("stdout", `String stdout) ] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
          @@ [%log error] "Uptime SNARK worker stderr: $stderr"
-              ~metadata:[ ("stderr", `String stderr) ]) ;
+              ~metadata:[ ("stderr", `String stderr) ] ) ;
   { connection; process; logger }
 
 let perform_single { connection; _ } ((_message, _single_spec) as arg) =

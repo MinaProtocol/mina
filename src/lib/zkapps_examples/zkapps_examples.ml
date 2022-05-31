@@ -17,7 +17,6 @@ module Party_under_construction = struct
         { balance = Ignore
         ; nonce = Ignore
         ; receipt_chain_hash = Ignore
-        ; public_key = Ignore
         ; delegate = Ignore
         ; state =
             [ Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore ]
@@ -115,7 +114,6 @@ module Party_under_construction = struct
     ; events = []
     ; sequence_events = []
     ; call_data = Field.Constant.zero
-    ; call_depth = 0
     ; protocol_state_precondition =
         { snarked_ledger_hash = Ignore
         ; timestamp = Ignore
@@ -187,7 +185,6 @@ module Party_under_construction = struct
                { balance = Ignore
                ; nonce = Ignore
                ; receipt_chain_hash = Ignore
-               ; public_key = Ignore
                ; delegate = Ignore
                ; state =
                    [ Ignore
@@ -201,7 +198,7 @@ module Party_under_construction = struct
                    ]
                ; sequence_state = Ignore
                ; proved_state = Ignore
-               })
+               } )
         in
         let proved_state =
           (* TODO: This is not great. *)
@@ -267,7 +264,7 @@ module Party_under_construction = struct
                 *)
                 Zkapp_basic.Set_or_keep.Checked.keep ~dummy:Field.zero
             | Some x ->
-                Zkapp_basic.Set_or_keep.Checked.set x)
+                Zkapp_basic.Set_or_keep.Checked.set x )
         in
         { default with app_state }
 
@@ -323,7 +320,6 @@ module Party_under_construction = struct
       ; events = var_of_t Zkapp_account.Events.typ []
       ; sequence_events = var_of_t Zkapp_account.Events.typ []
       ; call_data = Field.zero
-      ; call_depth = As_prover.Ref.create (fun () -> 0)
       ; protocol_state_precondition =
           var_of_t Zkapp_precondition.Protocol_state.typ
             { snarked_ledger_hash = Ignore

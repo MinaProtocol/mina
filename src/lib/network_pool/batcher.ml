@@ -100,7 +100,7 @@ let rec determine_outcome :
             Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
             None
         | `Potentially_invalid new_hint ->
-            Some (elt, new_hint))
+            Some (elt, new_hint) )
   in
   let open Deferred.Or_error.Let_syntax in
   match potentially_invalid with
@@ -119,7 +119,7 @@ let rec determine_outcome :
         let%bind res_xs =
           call_verifier v
             (List.map xs ~f:(fun (_e, new_hint) ->
-                 `Partially_validated new_hint))
+                 `Partially_validated new_hint ) )
         in
         determine_outcome (List.map xs ~f:fst) res_xs v
       in
@@ -141,7 +141,7 @@ let order_proofs t =
 (* When new proofs come in put them in the queue.
       If state = Waiting, verify those proofs immediately.
       Whenever the verifier returns, if the queue is nonempty, flush it into the verifier.
-  *)
+*)
 
 let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
  fun t ->
@@ -179,7 +179,7 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
           , `List
               (List.map
                  ~f:(fun { id; _ } -> `Int (Id.to_int_exn id))
-                 out_for_verification) )
+                 out_for_verification ) )
         ] ;
     let res =
       match%bind
@@ -198,8 +198,8 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
             ()
         | Error e ->
             List.iter out_for_verification ~f:(fun x ->
-                Ivar.fill_if_empty x.res (Error e)) ) ;
-        start_verifier t) )
+                Ivar.fill_if_empty x.res (Error e) ) ) ;
+        start_verifier t ) )
 
 let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
     (r, Verifier.invalid) Result.t Deferred.Or_error.t =
@@ -274,14 +274,14 @@ module Transaction_pool = struct
               | `Valid c ->
                   `Valid c
               | `Valid_assuming x ->
-                  `Valid_assuming x)))
+                  `Valid_assuming x ) ) )
 
   let list_of_array_map a ~f = List.init (Array.length a) ~f:(fun i -> f a.(i))
 
   let all_valid a =
     Option.all
       (Array.to_list
-         (Array.map a ~f:(function `Valid c -> Some c | _ -> None)))
+         (Array.map a ~f:(function `Valid c -> Some c | _ -> None)) )
 
   let create verifier : t =
     let logger = Logger.create () in
@@ -305,7 +305,7 @@ module Transaction_pool = struct
                           None
                       | `Valid_assuming (v, _) ->
                           (* TODO: This rechecks the signatures on snapp transactions... oh well for now *)
-                          Some ((i, j), v)))
+                          Some ((i, j), v) ) )
         in
         let%map res =
           (* Verify the unknowns *)
@@ -349,7 +349,7 @@ module Transaction_pool = struct
                 | `Missing_verification_key _ ->
                     ()
                 | `In_progress a ->
-                    a.(j) <- `Valid c )) ;
+                    a.(j) <- `Valid c ) ) ;
         list_of_array_map result ~f:(function
           | `Invalid_keys keys ->
               `Invalid_keys keys
@@ -373,7 +373,7 @@ module Transaction_pool = struct
                       | `Valid c ->
                           `Valid c
                       | `Valid_assuming (v, xs) ->
-                          `Valid_assuming (v, xs))) )))
+                          `Valid_assuming (v, xs) ) ) ) ) )
 
   let verify (t : t) = verify t
 end
@@ -400,7 +400,7 @@ module Snark_pool = struct
     *)
       ~max_weight_per_call:
         (Option.value_map ~default:1000 ~f:Int.of_string
-           (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE"))
+           (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE") )
       ~compare_init:compare_envelope ~logger
       (fun ps0 ->
         [%log info] "Dispatching $num_proofs snark pool proofs to verifier"
@@ -409,7 +409,7 @@ module Snark_pool = struct
           List.concat_map ps0 ~f:(function
               | `Partially_validated env | `Init env ->
               let ps, message = env.data in
-              One_or_two.map ps ~f:(fun p -> (p, message)) |> One_or_two.to_list)
+              One_or_two.map ps ~f:(fun p -> (p, message)) |> One_or_two.to_list )
         in
         let open Deferred.Or_error.Let_syntax in
         let%map result = Verifier.verify_transaction_snarks verifier ps in
@@ -418,7 +418,7 @@ module Snark_pool = struct
             List.map ps0 ~f:(fun _ -> `Valid ())
         | false ->
             List.map ps0 ~f:(function `Partially_validated env | `Init env ->
-                `Potentially_invalid env))
+                `Potentially_invalid env ) )
 
   module Work_key = struct
     module T = struct
@@ -430,7 +430,7 @@ module Snark_pool = struct
 
     let of_proof_envelope t =
       Envelope.Incoming.map t ~f:(fun (ps, message) ->
-          (One_or_two.map ~f:Ledger_proof.statement ps, message))
+          (One_or_two.map ~f:Ledger_proof.statement ps, message) )
 
     include T
     include Comparable.Make (T)
@@ -440,7 +440,7 @@ module Snark_pool = struct
     let open Deferred.Or_error.Let_syntax in
     let%map invalid =
       Deferred.Or_error.List.filter_map ps ~f:(fun p ->
-          match%map verify t p with true -> None | false -> Some p)
+          match%map verify t p with true -> None | false -> Some p )
     in
     `Invalid
       (Work_key.Set.of_list (List.map invalid ~f:Work_key.of_proof_envelope))
@@ -461,7 +461,7 @@ module Snark_pool = struct
         Async.Thread_safe.block_on_async_exn (fun () ->
             Verifier.create ~logger ~proof_level ~constraint_constants
               ~conf_dir:None
-              ~pids:(Child_processes.Termination.create_pid_table ()))
+              ~pids:(Child_processes.Termination.create_pid_table ()) )
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in
@@ -493,7 +493,7 @@ module Snark_pool = struct
           let message = Mina_base.Sok_message.create ~fee ~prover in
           ( One_or_two.map statements ~f:(fun statement ->
                 Ledger_proof.create ~statement ~sok_digest
-                  ~proof:Proof.transaction_dummy)
+                  ~proof:Proof.transaction_dummy )
           , message )
         in
         Envelope.Incoming.gen data_gen
@@ -503,7 +503,7 @@ module Snark_pool = struct
         Deferred.List.iter proof_lists ~f:(fun (invalid_proofs, proof_list) ->
             let%map r = verify' batcher proof_list in
             let (`Invalid ps) = Or_error.ok_exn r in
-            assert (Work_key.Set.equal ps invalid_proofs))
+            assert (Work_key.Set.equal ps invalid_proofs) )
 
       let gen ~(valid_count : [ `Any | `Count of int ])
           ~(invalid_count : [ `Any | `Count of int ]) =
@@ -522,27 +522,27 @@ module Snark_pool = struct
         in
         List.map lst ~f:(fun (valid, invalid) ->
             ( Work_key.(Set.of_list (List.map ~f:of_proof_envelope invalid))
-            , List.permute valid @ invalid ))
+            , List.permute valid @ invalid ) )
 
       let%test_unit "all valid proofs" =
         Quickcheck.test ~trials:10
           (gen ~valid_count:`Any ~invalid_count:(`Count 0))
           ~f:(fun proof_lists ->
             Async.Thread_safe.block_on_async_exn (fun () ->
-                run_test proof_lists))
+                run_test proof_lists ) )
 
       let%test_unit "some invalid proofs" =
         Quickcheck.test ~trials:10
           (gen ~valid_count:`Any ~invalid_count:`Any)
           ~f:(fun proof_lists ->
             Async.Thread_safe.block_on_async_exn (fun () ->
-                run_test proof_lists))
+                run_test proof_lists ) )
 
       let%test_unit "all invalid proofs" =
         Quickcheck.test ~trials:10
           (gen ~valid_count:(`Count 0) ~invalid_count:`Any)
           ~f:(fun proof_lists ->
             Async.Thread_safe.block_on_async_exn (fun () ->
-                run_test proof_lists))
+                run_test proof_lists ) )
     end )
 end

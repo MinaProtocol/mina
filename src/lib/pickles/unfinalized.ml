@@ -64,19 +64,19 @@ module Constant = struct
         ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
         ~field_of_hex:
           (Core_kernel.Fn.compose Tock.Field.of_bigint
-             Kimchi_pasta.Pasta.Bigint256.of_hex_string)
+             Kimchi_pasta.Pasta.Bigint256.of_hex_string )
         ~domain:
           (Plonk_checks.domain
              (module Tock.Field)
-             wrap_domains.h ~shifts:Common.tock_shifts
-             ~domain_generator:Tock.Field.domain_generator)
+             (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
+             ~domain_generator:Tock.Field.domain_generator )
         chals evals
     in
     { deferred_values =
         { plonk =
             { (Plonk_checks.derive_plonk
                  (module Tock.Field)
-                 ~env ~shift chals evals)
+                 ~env ~shift chals evals )
               with
               alpha
             ; beta
@@ -92,3 +92,12 @@ module Constant = struct
     ; sponge_digest_before_evaluations = Digest.Constant.dummy
     }
 end
+
+let typ ~wrap_rounds : (t, Constant.t) Typ.t =
+  Types.Step.Proof_state.Per_proof.In_circuit.spec wrap_rounds
+  |> Spec.typ (module Impl) (Shifted_value.typ Other_field.typ)
+  |> Typ.transport ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
+       ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data
+  |> Typ.transport_var
+       ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
+       ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data

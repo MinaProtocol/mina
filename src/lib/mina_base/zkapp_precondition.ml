@@ -180,18 +180,14 @@ module Numeric = struct
 
   let deriver name inner obj =
     let closed_interval obj' = Closed_interval.deriver ~name inner obj' in
-    Or_ignore.deriver closed_interval obj
+    Or_ignore.deriver_implicit closed_interval obj
 
   module Derivers = struct
     open Fields_derivers_zkapps.Derivers
 
-    let token_id_inner obj =
-      iso_string obj ~name:"TokenId" ~to_string:Token_id.to_string
-        ~of_string:Token_id.of_string
-
     let block_time_inner obj =
       let ( ^^ ) = Fn.compose in
-      iso_string ~name:"BlockTime"
+      iso_string ~name:"BlockTime" ~js_type:UInt64
         ~of_string:(Block_time.of_uint64 ^^ Unsigned_extended.UInt64.of_string)
         ~to_string:(Unsigned_extended.UInt64.to_string ^^ Block_time.to_uint64)
         obj
@@ -206,7 +202,7 @@ module Numeric = struct
 
     let global_slot obj = deriver "GlobalSlot" uint32 obj
 
-    let token_id obj = deriver "TokenId" token_id_inner obj
+    let token_id obj = deriver "TokenId" Token_id.deriver obj
 
     let block_time obj = deriver "BlockTime" block_time_inner obj
   end
@@ -262,7 +258,7 @@ module Numeric = struct
 
     let check { lte_checked = ( <= ); _ } (t : 'a t) (x : 'a) =
       Or_ignore.Checked.check t ~f:(fun { lower; upper } ->
-          Boolean.all [ lower <= x; x <= upper ])
+          Boolean.all [ lower <= x; x <= upper ] )
 
     let is_constant { eq_checked = ( = ); _ } (t : 'a t) =
       let is_constant ({ lower; upper } : _ Closed_interval.t) =
@@ -270,7 +266,7 @@ module Numeric = struct
       in
       Or_ignore.Checked.map t ~f_implicit:is_constant
         ~f_explicit:(fun { is_some; data } ->
-          Boolean.( &&& ) is_some (is_constant data))
+          Boolean.( &&& ) is_some (is_constant data) )
   end
 
   let typ { equal = eq; zero; max_value; typ; _ } =
@@ -484,20 +480,6 @@ module Account = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field, 'bool) t =
-          { balance : 'balance
-          ; nonce : 'nonce
-          ; receipt_chain_hash : 'receipt_chain_hash
-          ; public_key : 'pk
-          ; delegate : 'pk
-          ; state : 'field Zkapp_state.V.Stable.V1.t
-          ; sequence_state : 'field
-          ; proved_state : 'bool
-          }
-        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
-      end
-
       module V1 = struct
         type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field) t =
           { balance : 'balance
@@ -516,14 +498,15 @@ module Account = struct
   module Stable = struct
     module V2 = struct
       type t =
-        ( Balance.Stable.V1.t Numeric.Stable.V1.t
-        , Account_nonce.Stable.V1.t Numeric.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        , F.Stable.V1.t Eq_data.Stable.V1.t
-        , bool Eq_data.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, equal, yojson, hash, compare]
+        { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
+        ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
+        ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
+        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; sequence_state : F.Stable.V1.t Eq_data.Stable.V1.t
+        ; proved_state : bool Eq_data.Stable.V1.t
+        }
+      [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
     end
@@ -539,12 +522,17 @@ module Account = struct
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest
-          ({ balance; nonce; receipt_chain_hash; public_key; delegate; state } :
-            t) : V2.t =
+          ({ balance
+           ; nonce
+           ; receipt_chain_hash
+           ; public_key = _
+           ; delegate
+           ; state
+           } :
+            t ) : V2.t =
         { balance
         ; nonce
         ; receipt_chain_hash
-        ; public_key
         ; delegate
         ; state
         ; sequence_state = Ignore
@@ -558,7 +546,6 @@ module Account = struct
     let%bind balance = Numeric.gen Balance.gen Balance.compare in
     let%bind nonce = Numeric.gen Account_nonce.gen Account_nonce.compare in
     let%bind receipt_chain_hash = Or_ignore.gen Receipt.Chain_hash.gen in
-    let%bind public_key = Eq_data.gen Public_key.Compressed.gen in
     let%bind delegate = Eq_data.gen Public_key.Compressed.gen in
     let%bind state =
       let%bind fields =
@@ -574,10 +561,9 @@ module Account = struct
       Or_ignore.gen field_gen
     in
     let%map proved_state = Or_ignore.gen Quickcheck.Generator.bool in
-    { Poly.balance
+    { balance
     ; nonce
     ; receipt_chain_hash
-    ; public_key
     ; delegate
     ; state
     ; sequence_state
@@ -588,7 +574,6 @@ module Account = struct
     { balance = Ignore
     ; nonce = Ignore
     ; receipt_chain_hash = Ignore
-    ; public_key = Ignore
     ; delegate = Ignore
     ; state =
         Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
@@ -600,23 +585,21 @@ module Account = struct
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
-    Poly.Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
-      ~public_key:!.(Or_ignore.deriver public_key)
       ~delegate:!.(Or_ignore.deriver public_key)
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
-      ~sequence_state:!.(Or_ignore.deriver field)
+      ~sequence_state:!.(Or_ignore.deriver_implicit field)
       ~proved_state:!.(Or_ignore.deriver bool)
-    |> finish "AccountPrecondition" ~t_toplevel_annots:Poly.t_toplevel_annots
+    |> finish "AccountPrecondition" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let b = Balance.of_int 1000 in
     let predicate : t =
       { accept with
         balance = Or_ignore.Check { Closed_interval.lower = b; upper = b }
-      ; public_key = Or_ignore.Check Public_key.Compressed.empty
       ; sequence_state = Or_ignore.Check (Field.of_int 99)
       ; proved_state = Or_ignore.Check true
       }
@@ -629,19 +612,17 @@ module Account = struct
       ({ balance
        ; nonce
        ; receipt_chain_hash
-       ; public_key
        ; delegate
        ; state
        ; sequence_state
        ; proved_state
        } :
-        t) =
+        t ) =
     let open Random_oracle_input.Chunked in
     List.reduce_exn ~f:append
       [ Numeric.(to_input Tc.balance balance)
       ; Numeric.(to_input Tc.nonce nonce)
       ; Hash.(to_input Tc.receipt_chain_hash receipt_chain_hash)
-      ; Eq_data.(to_input_explicit (Tc.public_key ()) public_key)
       ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
           (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
@@ -657,31 +638,31 @@ module Account = struct
 
   module Checked = struct
     type t =
-      ( Balance.var Numeric.Checked.t
-      , Account_nonce.Checked.t Numeric.Checked.t
-      , Receipt.Chain_hash.var Hash.Checked.t
-      , Public_key.Compressed.var Eq_data.Checked.t
-      , Field.Var.t Eq_data.Checked.t
-      , Boolean.var Eq_data.Checked.t )
-      Poly.Stable.Latest.t
+      { balance : Balance.var Numeric.Checked.t
+      ; nonce : Account_nonce.Checked.t Numeric.Checked.t
+      ; receipt_chain_hash : Receipt.Chain_hash.var Hash.Checked.t
+      ; delegate : Public_key.Compressed.var Eq_data.Checked.t
+      ; state : Field.Var.t Eq_data.Checked.t Zkapp_state.V.t
+      ; sequence_state : Field.Var.t Eq_data.Checked.t
+      ; proved_state : Boolean.var Eq_data.Checked.t
+      }
+    [@@deriving hlist]
 
     let to_input
         ({ balance
          ; nonce
          ; receipt_chain_hash
-         ; public_key
          ; delegate
          ; state
          ; sequence_state
          ; proved_state
          } :
-          t) =
+          t ) =
       let open Random_oracle_input.Chunked in
       List.reduce_exn ~f:append
         [ Numeric.(Checked.to_input Tc.balance balance)
         ; Numeric.(Checked.to_input Tc.nonce nonce)
         ; Hash.(to_input_checked Tc.receipt_chain_hash receipt_chain_hash)
-        ; Eq_data.(to_input_checked (Tc.public_key ()) public_key)
         ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
         ; Vector.reduce_exn ~f:append
             (Vector.map state ~f:Eq_data.(to_input_checked Tc.field))
@@ -692,54 +673,57 @@ module Account = struct
 
     open Impl
 
-    let nonsnapp
-        ({ balance
-         ; nonce
-         ; receipt_chain_hash
-         ; public_key
-         ; delegate
-         ; state = _
-         ; sequence_state = _
-         ; proved_state = _
-         } :
-          t) (a : Account.Checked.Unhashed.t) =
-      [ Numeric.(Checked.check Tc.balance balance a.balance)
-      ; Numeric.(Checked.check Tc.nonce nonce a.nonce)
-      ; Eq_data.(
-          check_checked Tc.receipt_chain_hash receipt_chain_hash
-            a.receipt_chain_hash)
-      ; Eq_data.(check_checked (Tc.public_key ()) delegate a.delegate)
-      ; Eq_data.(check_checked (Tc.public_key ()) public_key a.public_key)
+    let checks
+        { balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate
+        ; state
+        ; sequence_state
+        ; proved_state
+        } (a : Account.Checked.Unhashed.t) =
+      [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
+        , Numeric.(Checked.check Tc.balance balance a.balance) )
+      ; ( Transaction_status.Failure.Account_nonce_precondition_unsatisfied
+        , Numeric.(Checked.check Tc.nonce nonce a.nonce) )
+      ; ( Transaction_status.Failure
+          .Account_receipt_chain_hash_precondition_unsatisfied
+        , Eq_data.(
+            check_checked Tc.receipt_chain_hash receipt_chain_hash
+              a.receipt_chain_hash) )
+      ; ( Transaction_status.Failure.Account_delegate_precondition_unsatisfied
+        , Eq_data.(check_checked (Tc.public_key ()) delegate a.delegate) )
       ]
+      @ [ ( Transaction_status.Failure
+            .Account_sequence_state_precondition_unsatisfied
+          , Boolean.any
+              Vector.(
+                to_list
+                  (map a.zkapp.sequence_state
+                     ~f:
+                       Eq_data.(
+                         check_checked
+                           (Lazy.force Tc.sequence_state)
+                           sequence_state) )) )
+        ]
+      @ ( Vector.(
+            to_list
+              (map2 state a.zkapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+        |> List.mapi ~f:(fun i check ->
+               let failure =
+                 Transaction_status.Failure
+                 .Account_app_state_precondition_unsatisfied
+                   i
+               in
+               (failure, check) ) )
+      @ [ ( Transaction_status.Failure
+            .Account_proved_state_precondition_unsatisfied
+          , Eq_data.(check_checked Tc.boolean proved_state a.zkapp.proved_state)
+          )
+        ]
 
-    let check_nonsnapp t a = Boolean.all (nonsnapp t a)
-
-    let snapp
-        ({ balance = _
-         ; nonce = _
-         ; receipt_chain_hash = _
-         ; public_key = _
-         ; delegate = _
-         ; state
-         ; sequence_state
-         ; proved_state
-         } :
-          t) (snapp : Zkapp_account.Checked.t) =
-      Boolean.any
-        Vector.(
-          to_list
-            (map snapp.sequence_state
-               ~f:
-                 Eq_data.(
-                   check_checked (Lazy.force Tc.sequence_state) sequence_state)))
-      :: Eq_data.(check_checked Tc.boolean proved_state snapp.proved_state)
-      :: Vector.(
-           to_list
-             (map2 state snapp.app_state ~f:Eq_data.(check_checked Tc.field)))
-
-    let check_snapp t a = Boolean.all (snapp t a)
-
-    let check t a = Boolean.all (nonsnapp t a @ snapp t a.zkapp)
+    let check ~check t a =
+      List.iter ~f:(fun (failure, passed) -> check failure passed) (checks t a)
 
     let digest (t : t) =
       Random_oracle.Checked.(
@@ -748,84 +732,85 @@ module Account = struct
   end
 
   let typ () : (Checked.t, Stable.Latest.t) Typ.t =
-    let open Poly.Stable.Latest in
     let open Leaf_typs in
     Typ.of_hlistable
       [ balance
       ; nonce
       ; receipt_chain_hash
       ; public_key ()
-      ; public_key ()
       ; Zkapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
       ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
           ~ignore:(Lazy.force Zkapp_account.Sequence_events.empty_hash)
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
       ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let check
-      ({ balance
-       ; nonce
-       ; receipt_chain_hash
-       ; public_key
-       ; delegate
-       ; state
-       ; sequence_state
-       ; proved_state
-       } :
-        t) (a : Account.t) =
-    let open Or_error.Let_syntax in
-    let%bind () =
-      Numeric.(check ~label:"balance" Tc.balance balance a.balance)
-    in
-    let%bind () = Numeric.(check ~label:"nonce" Tc.nonce nonce a.nonce) in
-    let%bind () =
-      Eq_data.(
-        check ~label:"receipt_chain_hash" Tc.receipt_chain_hash
-          receipt_chain_hash a.receipt_chain_hash)
-    in
-    let%bind () =
-      let tc = Eq_data.Tc.public_key () in
-      Eq_data.(
-        check ~label:"delegate" tc delegate
-          (Option.value ~default:tc.default a.delegate))
-    in
-    let%bind () =
-      Eq_data.(
-        check ~label:"public_key" (Tc.public_key ()) public_key a.public_key)
-    in
-    let%bind () =
-      match a.zkapp with
-      | None ->
-          return ()
-      | Some zkapp ->
-          let%bind (_ : int) =
-            List.fold_result ~init:0
-              Vector.(to_list (zip state zkapp.app_state))
-              ~f:(fun i (c, v) ->
-                let%map () =
-                  Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v)
-                in
-                i + 1)
-          in
-          let%bind () =
-            Eq_data.(
-              check ~label:"proved_state" Tc.boolean proved_state
-                zkapp.proved_state)
-          in
-          if
-            Option.is_some
-            @@ List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
-                   Eq_data.(
-                     check
-                       (Lazy.force Tc.sequence_state)
-                       ~label:"" sequence_state state)
-                   |> Or_error.is_ok)
-          then Ok ()
-          else Or_error.errorf "Equality check failed: sequence_state"
-    in
-    return ()
+  let checks
+      { balance
+      ; nonce
+      ; receipt_chain_hash
+      ; delegate
+      ; state
+      ; sequence_state
+      ; proved_state
+      } (a : Account.t) =
+    [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
+      , Numeric.(check ~label:"balance" Tc.balance balance a.balance) )
+    ; ( Transaction_status.Failure.Account_nonce_precondition_unsatisfied
+      , Numeric.(check ~label:"nonce" Tc.nonce nonce a.nonce) )
+    ; ( Transaction_status.Failure
+        .Account_receipt_chain_hash_precondition_unsatisfied
+      , Eq_data.(
+          check ~label:"receipt_chain_hash" Tc.receipt_chain_hash
+            receipt_chain_hash a.receipt_chain_hash) )
+    ; ( Transaction_status.Failure.Account_delegate_precondition_unsatisfied
+      , let tc = Eq_data.Tc.public_key () in
+        Eq_data.(
+          check ~label:"delegate" tc delegate
+            (Option.value ~default:tc.default a.delegate)) )
+    ]
+    @
+    match a.zkapp with
+    | None ->
+        []
+    | Some zkapp ->
+        [ ( Transaction_status.Failure
+            .Account_sequence_state_precondition_unsatisfied
+          , match
+              List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
+                  Eq_data.(
+                    check
+                      (Lazy.force Tc.sequence_state)
+                      ~label:"" sequence_state state)
+                  |> Or_error.is_ok )
+            with
+            | None ->
+                Error (Error.createf "Sequence state mismatch")
+            | Some _ ->
+                Ok () )
+        ]
+        @ List.mapi
+            Vector.(to_list (zip state zkapp.app_state))
+            ~f:(fun i (c, v) ->
+              let failure =
+                Transaction_status.Failure
+                .Account_app_state_precondition_unsatisfied
+                  i
+              in
+              ( failure
+              , Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v) ) )
+        @ [ ( Transaction_status.Failure
+              .Account_proved_state_precondition_unsatisfied
+            , Eq_data.(
+                check ~label:"proved_state" Tc.boolean proved_state
+                  zkapp.proved_state) )
+          ]
+
+  let check ~check t a =
+    List.iter
+      ~f:(fun (failure, res) -> check failure (Result.is_ok res))
+      (checks t a)
 end
 
 module Protocol_state = struct
@@ -913,7 +898,7 @@ module Protocol_state = struct
         Numeric.gen
           (Length.gen_incl
              (Length.of_int min_epoch_length)
-             (Length.of_int max_epoch_length))
+             (Length.of_int max_epoch_length) )
           Length.compare
       in
       { Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length }
@@ -925,7 +910,7 @@ module Protocol_state = struct
          ; lock_checkpoint
          ; epoch_length
          } :
-          t) =
+          t ) =
       let open Random_oracle.Input.Chunked in
       List.reduce_exn ~f:append
         [ Hash.(to_input Tc.frozen_ledger_hash hash)
@@ -954,7 +939,7 @@ module Protocol_state = struct
            ; lock_checkpoint
            ; epoch_length
            } :
-            t) =
+            t ) =
         let open Random_oracle.Input.Chunked in
         List.reduce_exn ~f:append
           [ Hash.(to_input_checked Tc.frozen_ledger_hash hash)
@@ -1098,7 +1083,7 @@ module Protocol_state = struct
        ; staking_epoch_data
        ; next_epoch_data
        } :
-        t) =
+        t ) =
     let open Random_oracle.Input.Chunked in
     let () = last_vrf_output in
     let length = Numeric.(to_input Tc.length) in
@@ -1186,7 +1171,7 @@ module Protocol_state = struct
          ; staking_epoch_data
          ; next_epoch_data
          } :
-          t) =
+          t ) =
       let open Random_oracle.Input.Chunked in
       let () = last_vrf_output in
       let length = Numeric.(Checked.to_input Tc.length) in
@@ -1220,7 +1205,7 @@ module Protocol_state = struct
            ; staking_epoch_data
            ; next_epoch_data
            } :
-            t) (s : View.Checked.t) =
+            t ) (s : View.Checked.t) =
       let open Impl in
       let epoch_ledger ({ hash; total_currency } : _ Epoch_ledger.Poly.t)
           (t : Epoch_ledger.var) =
@@ -1230,7 +1215,7 @@ module Protocol_state = struct
       in
       let epoch_data
           ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
-            _ Epoch_data.Poly.t) (t : _ Epoch_data.Poly.t) =
+            _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
         ignore seed ;
         epoch_ledger ledger t.ledger
         @ [ Hash.(check_checked Tc.state_hash)
@@ -1349,7 +1334,7 @@ module Protocol_state = struct
          ; staking_epoch_data
          ; next_epoch_data
          } :
-          t) (s : View.t) =
+          t ) (s : View.t) =
     let open Or_error.Let_syntax in
     let epoch_ledger ({ hash; total_currency } : _ Epoch_ledger.Poly.t)
         (t : Epoch_ledger.Value.t) =
@@ -1365,7 +1350,7 @@ module Protocol_state = struct
     in
     let epoch_data label
         ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
-          _ Epoch_data.Poly.t) (t : _ Epoch_data.Poly.t) =
+          _ Epoch_data.Poly.t ) (t : _ Epoch_data.Poly.t) =
       let l s = sprintf "%s_%s" label s in
       let%bind () = epoch_ledger ledger t.ledger in
       ignore seed ;
@@ -1483,7 +1468,7 @@ module Account_type = struct
       let open Random_oracle_input.Chunked in
       Array.reduce_exn ~f:append
         (Array.map [| user; zkapp |] ~f:(fun b ->
-             packed ((b :> Field.Var.t), 1)))
+             packed ((b :> Field.Var.t), 1) ) )
 
     let constant =
       let open Boolean in
@@ -1516,7 +1501,7 @@ module Account_type = struct
         | None ->
             [ false; false ]
         | Any ->
-            [ true; true ])
+            [ true; true ] )
       ~value_of_hlist:(fun [ user; zkapp ] ->
         match (user, zkapp) with
         | true, false ->
@@ -1526,7 +1511,7 @@ module Account_type = struct
         | false, false ->
             None
         | true, true ->
-            Any)
+            Any )
 end
 
 module Other = struct
@@ -1670,8 +1655,8 @@ end]
 
 module Digested = F
 
-let to_input
-    ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) =
+let to_input ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
+    =
   let open Random_oracle_input.Chunked in
   List.reduce_exn ~f:append
     [ Account.to_input self_predicate
@@ -1683,43 +1668,6 @@ let to_input
 let digest t =
   Random_oracle.(
     hash ~init:Hash_prefix.zkapp_precondition (pack_input (to_input t)))
-
-let check ({ self_predicate; other; fee_payer; protocol_state_predicate } : t)
-    ~state_view ~self ~(other_prev : A.t option) ~(other_next : unit option)
-    ~fee_payer_pk =
-  let open Or_error.Let_syntax in
-  let%bind () = Protocol_state.check protocol_state_predicate state_view in
-  let%bind () = Account.check self_predicate self in
-  let%bind () =
-    Eq_data.(check (Tc.public_key ()) ~label:"fee_payer" fee_payer fee_payer_pk)
-  in
-  let%bind () =
-    let check (s : Account_state.t) (a : _ option) =
-      match (s, a) with
-      | Any, _ | Empty, None | Non_empty, Some _ ->
-          return ()
-      | _ ->
-          Or_error.error_string "Bad account state"
-    in
-    let%bind () = check other.account_transition.prev other_prev
-    and () = check other.account_transition.next other_next in
-    match other_prev with
-    | None ->
-        return ()
-    | Some other_account -> (
-        let%bind () = Account.check other.predicate other_account in
-        match other_account.zkapp with
-        | None ->
-            assert_
-              ([%equal: _ Or_ignore.t] other.account_vk Ignore)
-              "other_account_vk must be ignore for user account"
-        | Some zkapp ->
-            Hash.(check ~label:"other_account_vk" Tc.field)
-              other.account_vk
-              (Option.value_map ~f:With_hash.hash zkapp.verification_key
-                 ~default:Field.zero) )
-  in
-  return ()
 
 let accept : t =
   { self_predicate = Account.accept

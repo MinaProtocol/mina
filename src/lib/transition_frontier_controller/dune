@@ -15,7 +15,7 @@
    mina_metrics
    network_peer
    cache_lib
-   mina_transition
+   mina_block
    o1trace
    pipe_lib
    mina_base
@@ -25,4 +25,5 @@
    transition_frontier_base
    precomputed_values
    logger
+   with_hash
 ))

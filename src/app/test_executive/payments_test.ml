@@ -8,6 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -49,11 +51,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ]
+    ; num_archive_nodes = 1
     ; num_snark_workers = 4
     ; snark_worker_fee = "0.0001"
-    ; work_delay = Some 1
-    ; transaction_capacity =
-        Some Runtime_config.Proof_keys.Transaction_capacity.small
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   (* Call [f] [n] times in sequence *)
@@ -80,7 +86,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (List.to_string (Network.extra_genesis_keypairs network)
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
-           |> Bigstring.to_string)) ;
+           |> Bigstring.to_string ) ) ;
     let[@warning "-8"] [ fish1; fish2 ] =
       Network.extra_genesis_keypairs network
     in
@@ -126,15 +132,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ] ;
     let%bind txn_signed =
       User_command_input.to_user_command
-        ~get_current_nonce:(fun _ ->
-          failwith "get_current_nonce, don't call me")
+        ~get_current_nonce:(fun _ -> failwith "get_current_nonce, don't call me")
         ~nonce_map:
           (Account_id.Map.of_alist_exn
              [ ( Account_id.create sender_pub_key Account_id.Digest.default
                , (sender_current_nonce, sender_current_nonce) )
-             ])
+             ] )
         ~get_account:(fun _ : Account.t option Participating_state.t ->
-          `Bootstrapping)
+          `Bootstrapping )
         ~constraint_constants:test_constants ~logger user_command_input
       |> Deferred.bind ~f:Malleable_error.or_hard_error
     in
@@ -152,8 +157,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~sender_pub_key:
                (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
              ~receiver_pub_key:
-               (Signed_command_payload.Body.receiver_pk
-                  signed_cmmd.payload.body)
+               (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
              ~amount:
                ( Signed_command_payload.amount signed_cmmd.payload
                |> Option.value_exn )
@@ -161,7 +165,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~nonce:signed_cmmd.payload.common.nonce
              ~memo:
                (Signed_command_memo.to_raw_bytes_exn
-                  signed_cmmd.payload.common.memo)
+                  signed_cmmd.payload.common.memo )
              ~token:(Signed_command_payload.token signed_cmmd.payload)
              ~valid_until:signed_cmmd.payload.common.valid_until
              ~raw_signature:
@@ -169,7 +173,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~txn_hash:hash ~node_included_in:(`Node untimed_node_b)))
+              ~txn_hash:hash ~node_included_in:(`Node untimed_node_b) ) )
     in
     let%bind () =
       section
@@ -231,7 +235,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Amount.to_int receiver_expected)
              (Currency.Balance.to_int sender_balance)
              (Currency.Amount.to_int sender_expected)
-             (Currency.Amount.to_int amount))
+             (Currency.Amount.to_int amount) )
     in
     let%bind () =
       section
@@ -251,7 +255,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~nonce:signed_cmmd.payload.common.nonce
             ~memo:
               (Signed_command_memo.to_raw_bytes_exn
-                 signed_cmmd.payload.common.memo)
+                 signed_cmmd.payload.common.memo )
             ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
@@ -300,7 +304,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               (Mina_numbers.Account_nonce.succ signed_cmmd.payload.common.nonce)
             ~memo:
               (Signed_command_memo.to_raw_bytes_exn
-                 signed_cmmd.payload.common.memo)
+                 signed_cmmd.payload.common.memo )
             ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
@@ -351,11 +355,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          [%log info] "timed_node_c liquid balance: %s"
            (Currency.Balance.to_formatted_string
               ( timed_node_c_liquid_opt
-              |> Option.value ~default:Currency.Balance.zero )) ;
+              |> Option.value ~default:Currency.Balance.zero ) ) ;
          [%log info] "timed_node_c liquid locked: %s"
            (Currency.Balance.to_formatted_string
               ( timed_node_c_locked_opt
-              |> Option.value ~default:Currency.Balance.zero )) ;
+              |> Option.value ~default:Currency.Balance.zero ) ) ;
          [%log info]
            "Attempting to send txn from timed_node_c to untimed_node_a for \
             amount of %s"
@@ -366,7 +370,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
-              ~txn_hash:hash ~node_included_in:(`Node timed_node_c)))
+              ~txn_hash:hash ~node_included_in:(`Node timed_node_c) ) )
     in
     let%bind () =
       section "unable to send payment from timed account using illiquid tokens"
@@ -413,17 +417,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  "Payment failed in GraphQL, but for unexpected reason: %s"
                  err_str ;
                Malleable_error.soft_error_format ~value:()
-                 "Payment failed for unexpected reason: %s" err_str ))
+                 "Payment failed for unexpected reason: %s" err_str ) )
     in
-    section
-      "send out a bunch more txns to fill up the snark ledger, then wait for \
-       proofs to be emitted"
-      (let receiver = untimed_node_a in
-       let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-       let sender = untimed_node_b in
-       let%bind sender_pub_key = Util.pub_key_of_node sender in
-       let%bind () =
-         (*
+    let%bind () =
+      section_hard
+        "send out a bunch more txns to fill up the snark ledger, then wait for \
+         proofs to be emitted"
+        (let receiver = untimed_node_a in
+         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let sender = untimed_node_b in
+         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let%bind () =
+           (*
             To fill up a `small` transaction capacity with work delay of 1, 
             there needs to be 12 total txns sent.
 
@@ -438,11 +443,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
             2 successful txn are sent in the prior course of this test,
             so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
-         repeat_seq ~n:10 ~f:(fun () ->
-             Network.Node.must_send_payment ~logger sender ~sender_pub_key
-               ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-             >>| ignore)
+           repeat_seq ~n:10 ~f:(fun () ->
+               Network.Node.must_send_payment ~logger sender ~sender_pub_key
+                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+               >>| ignore )
+         in
+         wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+    in
+    section_hard "running replayer"
+      (let%bind logs =
+         Network.Node.run_replayer ~logger
+           (List.hd_exn @@ Network.archive_nodes network)
        in
-       wait_for t
-         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1))
+       check_replayer_logs ~logger logs )
 end

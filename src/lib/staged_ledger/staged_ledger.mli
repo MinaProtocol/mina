@@ -170,7 +170,7 @@ val create_diff :
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
-        -> Transaction_snark_work.Checked.t option)
+        -> Transaction_snark_work.Checked.t option )
   -> supercharge_coinbase:bool
   -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
      , Pre_diff_info.Error.t )
@@ -220,3 +220,9 @@ val check_commands :
   -> User_command.t list
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t
+
+(** account ids created in the latest block, taken from the previous_empty_accounts
+    in the latest and next-to-latest trees of the scan state
+*)
+val latest_block_accounts_created :
+  t -> previous_block_state_hash:State_hash.t -> Account_id.t list

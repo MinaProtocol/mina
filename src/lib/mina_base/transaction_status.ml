@@ -21,6 +21,8 @@ module Failure = struct
         | Receiver_already_exists
         | Token_owner_not_caller
         | Overflow
+        | Global_excess_overflow
+        | Local_excess_overflow
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
@@ -37,18 +39,26 @@ module Failure = struct
         | Parties_replay_check_failed
         | Fee_payer_nonce_must_increase
         | Fee_payer_must_be_signed
-        | Account_precondition_unsatisfied
+        | Account_balance_precondition_unsatisfied
+        | Account_nonce_precondition_unsatisfied
+        | Account_receipt_chain_hash_precondition_unsatisfied
+        | Account_delegate_precondition_unsatisfied
+        | Account_sequence_state_precondition_unsatisfied
+        | Account_app_state_precondition_unsatisfied of int
+        | Account_proved_state_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
-      [@@deriving sexp, yojson, equal, compare, enum, hash]
+      [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
     end
   end]
 
   module Collection = struct
-    type display = (int * t list) list [@@deriving to_yojson, sexp]
+    (* bin_io used to archive extensional blocks, doesn't need versioning *)
+    type display = (int * Stable.Latest.t list) list
+    [@@deriving equal, yojson, sexp, bin_io_unversioned]
 
     [%%versioned
     module Stable = struct
@@ -64,7 +74,7 @@ module Failure = struct
       let _, display =
         List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
             if List.is_empty bucket then (index + 1, acc)
-            else (index + 1, (index, bucket) :: acc))
+            else (index + 1, (index, bucket) :: acc) )
       in
       display
 
@@ -81,15 +91,35 @@ module Failure = struct
 
   let failure_max = max
 
-  let failure_num_bits =
-    let num_values = failure_max - failure_min + 1 in
-    Int.ceil_log2 num_values
+  let all =
+    let add acc var = var.Variantslib.Variant.constructor :: acc in
+    Variants.fold ~init:[] ~predicate:add ~source_not_present:add
+      ~receiver_not_present:add ~amount_insufficient_to_create_account:add
+      ~cannot_pay_creation_fee_in_token:add ~source_insufficient_balance:add
+      ~source_minimum_balance_violation:add ~receiver_already_exists:add
+      ~token_owner_not_caller:add ~overflow:add ~global_excess_overflow:add
+      ~local_excess_overflow:add ~signed_command_on_zkapp_account:add
+      ~zkapp_account_not_present:add ~update_not_permitted_balance:add
+      ~update_not_permitted_timing_existing_account:add
+      ~update_not_permitted_delegate:add ~update_not_permitted_app_state:add
+      ~update_not_permitted_verification_key:add
+      ~update_not_permitted_sequence_state:add
+      ~update_not_permitted_zkapp_uri:add ~update_not_permitted_token_symbol:add
+      ~update_not_permitted_permissions:add ~update_not_permitted_nonce:add
+      ~update_not_permitted_voting_for:add ~parties_replay_check_failed:add
+      ~fee_payer_nonce_must_increase:add ~fee_payer_must_be_signed:add
+      ~account_balance_precondition_unsatisfied:add
+      ~account_nonce_precondition_unsatisfied:add
+      ~account_receipt_chain_hash_precondition_unsatisfied:add
+      ~account_delegate_precondition_unsatisfied:add
+      ~account_sequence_state_precondition_unsatisfied:add
+      ~account_app_state_precondition_unsatisfied:(fun acc var ->
+        List.init 8 ~f:var.constructor @ acc )
+      ~account_proved_state_precondition_unsatisfied:add
+      ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
+      ~invalid_fee_excess:add
 
-  let gen =
-    let open Quickcheck.Let_syntax in
-    let%map ndx = Int.gen_uniform_incl failure_min failure_max in
-    (* bounds are checked, of_enum always returns Some *)
-    Option.value_exn (of_enum ndx)
+  let gen = Quickcheck.Generator.of_list all
 
   let to_string = function
     | Predicate ->
@@ -112,6 +142,10 @@ module Failure = struct
         "Token_owner_not_caller"
     | Overflow ->
         "Overflow"
+    | Global_excess_overflow ->
+        "Global_excess_overflow"
+    | Local_excess_overflow ->
+        "Local_excess_overflow"
     | Signed_command_on_zkapp_account ->
         "Signed_command_on_zkapp_account"
     | Zkapp_account_not_present ->
@@ -144,8 +178,20 @@ module Failure = struct
         "Fee_payer_nonce_must_increase"
     | Fee_payer_must_be_signed ->
         "Fee_payer_must_be_signed"
-    | Account_precondition_unsatisfied ->
-        "Account_precondition_unsatisfied"
+    | Account_balance_precondition_unsatisfied ->
+        "Account_balance_precondition_unsatisfied"
+    | Account_nonce_precondition_unsatisfied ->
+        "Account_nonce_precondition_unsatisfied"
+    | Account_receipt_chain_hash_precondition_unsatisfied ->
+        "Account_receipt_chain_hash_precondition_unsatisfied"
+    | Account_delegate_precondition_unsatisfied ->
+        "Account_delegate_precondition_unsatisfied"
+    | Account_sequence_state_precondition_unsatisfied ->
+        "Account_sequence_state_precondition_unsatisfied"
+    | Account_app_state_precondition_unsatisfied i ->
+        sprintf "Account_app_state_%i_precondition_unsatisfied" i
+    | Account_proved_state_precondition_unsatisfied ->
+        "Account_proved_state_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "Protocol_state_precondition_unsatisfied"
     | Incorrect_nonce ->
@@ -174,6 +220,10 @@ module Failure = struct
         Ok Token_owner_not_caller
     | "Overflow" ->
         Ok Overflow
+    | "Global_excess_overflow" ->
+        Ok Global_excess_overflow
+    | "Local_excess_overflow" ->
+        Ok Local_excess_overflow
     | "Signed_command_on_zkapp_account" ->
         Ok Signed_command_on_zkapp_account
     | "Zkapp_account_not_present" ->
@@ -206,24 +256,60 @@ module Failure = struct
         Ok Fee_payer_nonce_must_increase
     | "Fee_payer_must_be_signed" ->
         Ok Fee_payer_must_be_signed
-    | "Account_precondition_unsatisfied" ->
-        Ok Account_precondition_unsatisfied
+    | "Account_balance_precondition_unsatisfied" ->
+        Ok Account_balance_precondition_unsatisfied
+    | "Account_nonce_precondition_unsatisfied" ->
+        Ok Account_nonce_precondition_unsatisfied
+    | "Account_receipt_chain_hash_precondition_unsatisfied" ->
+        Ok Account_receipt_chain_hash_precondition_unsatisfied
+    | "Account_delegate_precondition_unsatisfied" ->
+        Ok Account_delegate_precondition_unsatisfied
+    | "Account_sequence_state_precondition_unsatisfied" ->
+        Ok Account_sequence_state_precondition_unsatisfied
+    | "Account_proved_state_precondition_unsatisfied" ->
+        Ok Account_proved_state_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
         Ok Protocol_state_precondition_unsatisfied
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
         Ok Invalid_fee_excess
-    | _ ->
-        Error "Signed_command_status.Failure.of_string: Unknown value"
+    | str -> (
+        let res =
+          List.find_map
+            ~f:(fun (prefix, suffix, parse) ->
+              Option.try_with (fun () ->
+                  assert (
+                    String.length str
+                    >= String.length prefix + String.length suffix ) ;
+                  for i = 0 to String.length prefix - 1 do
+                    assert (Char.equal prefix.[i] str.[i])
+                  done ;
+                  let offset = String.length str - String.length suffix in
+                  for i = 0 to String.length suffix - 1 do
+                    assert (Char.equal suffix.[i] str.[offset + i])
+                  done ;
+                  parse
+                    (String.sub str ~pos:(String.length prefix)
+                       ~len:(offset - String.length prefix) ) ) )
+            [ ( "Account_app_state_"
+              , "_precondition_unsatisfied"
+              , fun str ->
+                  Account_app_state_precondition_unsatisfied (int_of_string str)
+              )
+            ]
+        in
+        match res with
+        | Some res ->
+            Ok res
+        | None ->
+            Error "Transaction_status.Failure.of_string: Unknown value" )
 
   let%test_unit "of_string(to_string) roundtrip" =
-    for i = failure_min to failure_max do
-      let failure = Option.value_exn (of_enum i) in
-      [%test_eq: (t, string) Result.t]
-        (of_string (to_string failure))
-        (Ok failure)
-    done
+    List.iter all ~f:(fun failure ->
+        [%test_eq: (t, string) Result.t]
+          (of_string (to_string failure))
+          (Ok failure) )
 
   let describe = function
     | Predicate ->
@@ -249,6 +335,10 @@ module Failure = struct
          owner"
     | Overflow ->
         "The resulting balance is too large to store"
+    | Global_excess_overflow ->
+        "The resulting global fee excess is too large to store"
+    | Local_excess_overflow ->
+        "The resulting local fee excess is too large to store"
     | Signed_command_on_zkapp_account ->
         "The source of a signed command cannot be a snapp account"
     | Zkapp_account_not_present ->
@@ -292,8 +382,21 @@ module Failure = struct
         "Fee payer party must increment its nonce"
     | Fee_payer_must_be_signed ->
         "Fee payer party must have a valid signature"
-    | Account_precondition_unsatisfied ->
-        "The party's account precondition unsatisfied"
+    | Account_balance_precondition_unsatisfied ->
+        "The party's account balance precondition was unsatisfied"
+    | Account_nonce_precondition_unsatisfied ->
+        "The party's account nonce precondition was unsatisfied"
+    | Account_receipt_chain_hash_precondition_unsatisfied ->
+        "The party's account receipt-chain hash precondition was unsatisfied"
+    | Account_delegate_precondition_unsatisfied ->
+        "The party's account delegate precondition was unsatisfied"
+    | Account_sequence_state_precondition_unsatisfied ->
+        "The party's account sequence state precondition was unsatisfied"
+    | Account_app_state_precondition_unsatisfied i ->
+        sprintf
+          "The party's account app state (%i) precondition was unsatisfied" i
+    | Account_proved_state_precondition_unsatisfied ->
+        "The party's account proved state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "The party's protocol state precondition unsatisfied"
     | Incorrect_nonce ->
@@ -302,157 +405,12 @@ module Failure = struct
         "Fee excess from parties transaction more than the transaction fees"
 end
 
-module Balance_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { fee_payer_balance : Currency.Balance.Stable.V1.t option
-        ; source_balance : Currency.Balance.Stable.V1.t option
-        ; receiver_balance : Currency.Balance.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let empty =
-    { fee_payer_balance = None; source_balance = None; receiver_balance = None }
-end
-
-module Coinbase_balance_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { coinbase_receiver_balance : Currency.Balance.Stable.V1.t
-        ; fee_transfer_receiver_balance : Currency.Balance.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let of_balance_data_exn
-      { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
-    ( match source_balance with
-    | Some _ ->
-        failwith
-          "Unexpected source balance for Coinbase_balance_data.of_balance_data"
-    | None ->
-        () ) ;
-    let coinbase_receiver_balance =
-      match fee_payer_balance with
-      | Some balance ->
-          balance
-      | None ->
-          failwith
-            "Missing fee-payer balance for \
-             Coinbase_balance_data.of_balance_data"
-    in
-    { coinbase_receiver_balance
-    ; fee_transfer_receiver_balance = receiver_balance
-    }
-
-  let to_balance_data
-      { coinbase_receiver_balance; fee_transfer_receiver_balance } =
-    { Balance_data.fee_payer_balance = Some coinbase_receiver_balance
-    ; source_balance = None
-    ; receiver_balance = fee_transfer_receiver_balance
-    }
-end
-
-module Fee_transfer_balance_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { receiver1_balance : Currency.Balance.Stable.V1.t
-        ; receiver2_balance : Currency.Balance.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let of_balance_data_exn
-      { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
-    ( match source_balance with
-    | Some _ ->
-        failwith
-          "Unexpected source balance for \
-           Fee_transfer_balance_data.of_balance_data"
-    | None ->
-        () ) ;
-    let receiver1_balance =
-      match fee_payer_balance with
-      | Some balance ->
-          balance
-      | None ->
-          failwith
-            "Missing fee-payer balance for \
-             Fee_transfer_balance_data.of_balance_data"
-    in
-    { receiver1_balance; receiver2_balance = receiver_balance }
-
-  let to_balance_data { receiver1_balance; receiver2_balance } =
-    { Balance_data.fee_payer_balance = Some receiver1_balance
-    ; source_balance = None
-    ; receiver_balance = receiver2_balance
-    }
-end
-
-module Internal_command_balance_data = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        | Coinbase of Coinbase_balance_data.Stable.V1.t
-        | Fee_transfer of Fee_transfer_balance_data.Stable.V1.t
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
-module Auxiliary_data = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        { fee_payer_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        ; receiver_account_creation_fee_paid :
-            Currency.Amount.Stable.V1.t option
-        }
-      [@@deriving sexp, yojson, equal, compare]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  let empty =
-    { fee_payer_account_creation_fee_paid = None
-    ; receiver_account_creation_fee_paid = None
-    }
-end
-
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t =
-      | Applied of Auxiliary_data.Stable.V2.t * Balance_data.Stable.V1.t
-      | Failed of Failure.Collection.Stable.V1.t * Balance_data.Stable.V1.t
+    type t = Applied | Failed of Failure.Collection.Stable.V1.t
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
   end
 end]
-
-let balance_data = function
-  | Applied (_, balances) | Failed (_, balances) ->
-      balances

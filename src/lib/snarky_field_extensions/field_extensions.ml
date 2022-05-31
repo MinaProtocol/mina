@@ -22,7 +22,7 @@ module Make_test (F : Intf.Basic) = struct
             !"%s test failure: %{sexp:arg} -> %{sexp:F.Unchecked.t} vs \
               %{sexp:F.Unchecked.t}"
             label x r1 r2 ()
-        else ())
+        else () )
 
   let test1 l f g = test F.typ F.Unchecked.gen F.Unchecked.sexp_of_t l f g
 
@@ -56,7 +56,7 @@ module Make (F : Intf.Basic) = struct
     assert_all
       (List.map2_exn
          ~f:(fun x y -> Constraint.equal x y)
-         (F.to_list x) (F.to_list y))
+         (F.to_list x) (F.to_list y) )
 
   let ( + ) = F.( + )
 
@@ -170,7 +170,8 @@ struct
       try
         Some
           (A.map t ~f:(fun x ->
-               match F.to_constant x with Some x -> x | None -> raise None_exn))
+               match F.to_constant x with Some x -> x | None -> raise None_exn )
+          )
       with None_exn -> None
 
   let if_ b ~then_ ~else_ =
@@ -743,13 +744,14 @@ module F6
       val frobenius_coeffs_c1 : Fq.Unchecked.t array
     end) =
 struct
-  include E2
-            (Fq3)
-            (struct
-              let non_residue : Fq3.Unchecked.t = Fq.Unchecked.(zero, one, zero)
+  include
+    E2
+      (Fq3)
+      (struct
+        let non_residue : Fq3.Unchecked.t = Fq.Unchecked.(zero, one, zero)
 
-              let mul_by_non_residue = Fq3.mul_by_primitive_element
-            end)
+        let mul_by_non_residue = Fq3.mul_by_primitive_element
+      end)
 
   let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
 
@@ -786,7 +788,7 @@ struct
         Fq.assert_r1cs a01
           (Fq.scale b02 Fq3.Params.non_residue)
           (Field.Var.linear_combination
-             [ (Field.one, c00); (Field.negate Fq3.Params.non_residue, v12) ])
+             [ (Field.one, c00); (Field.negate Fq3.Params.non_residue, v12) ] )
       and () =
         Fq.assert_r1cs a02 (Fq.scale b02 Fq3.Params.non_residue) Fq.(c01 - v10)
       and () = Fq.assert_r1cs a00 b02 Fq.(c02 - v11) in
@@ -807,11 +809,12 @@ struct
   (* TODO: Make sure this is ok *)
   let special_div = special_div_unsafe
 
-  include Cyclotomic_square.Make_F6
-            (Fq2)
-            (struct
-              let cubic_non_residue = Fq3.Params.non_residue
-            end)
+  include
+    Cyclotomic_square.Make_F6
+      (Fq2)
+      (struct
+        let cubic_non_residue = Fq3.Params.non_residue
+      end)
 
   let frobenius ((c00, c01, c02), (c10, c11, c12)) power =
     let module Field = Impl.Field in
@@ -840,13 +843,14 @@ module F4
       val frobenius_coeffs_c1 : Fq2.Impl.Field.t array
     end) =
 struct
-  include E2
-            (Fq2)
-            (struct
-              let non_residue = Fq2.Impl.Field.(zero, one)
+  include
+    E2
+      (Fq2)
+      (struct
+        let non_residue = Fq2.Impl.Field.(zero, one)
 
-              let mul_by_non_residue = Fq2.mul_by_primitive_element
-            end)
+        let mul_by_non_residue = Fq2.mul_by_primitive_element
+      end)
 
   let special_mul = ( * )
 

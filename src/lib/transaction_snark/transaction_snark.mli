@@ -350,7 +350,7 @@ type local_state =
   ( Stack_frame.value
   , Stack_frame.value list
   , Token_id.t
-  , Currency.Amount.t
+  , Currency.Amount.Signed.t
   , Mina_ledger.Sparse_ledger.t
   , bool
   , unit
@@ -521,7 +521,8 @@ module For_tests : sig
   end
 
   val deploy_snapp :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       ?no_auth:bool
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
     -> Parties.t
 

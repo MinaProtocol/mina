@@ -28,8 +28,8 @@
    precomputed_values
    consensus
    network_peer
-   mina_transition
    mina_ledger
+   mina_block
    mina_base
    mina_transaction_logic
    mina_state
@@ -45,6 +45,9 @@
    ledger_proof
    protocol_version
    mina_net2
+   transaction_snark
+   non_empty_list
+   coda_genesis_proof
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))

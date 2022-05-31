@@ -30,7 +30,7 @@ module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
     List.map accounts ~f:(fun { pk; sk; balance; timing } ->
         let account_id = Account_id.create pk Token_id.default in
         let balance = Balance.of_formatted_string (Int.to_string balance) in
-        (Some sk, account_with_timing account_id balance timing))
+        (Some sk, account_with_timing account_id balance timing) )
 end
 
 module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
@@ -43,7 +43,7 @@ module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
         let account_id = Account_id.create pk Token_id.default in
         let balance = Balance.of_int balance in
         let base_acct = account_with_timing account_id balance timing in
-        (None, { base_acct with delegate = Option.value ~default:pk delegate }))
+        (None, { base_acct with delegate = Option.value ~default:pk delegate }) )
 end
 
 (** Generate a ledger using the sample keypairs from [Mina_base] with the given
@@ -64,7 +64,7 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
           ; pk = fst keypairs.(i)
           ; sk = snd keypairs.(i)
           ; timing = Untimed
-          })
+          } )
   end)
 end
 
@@ -95,7 +95,7 @@ module Utils = struct
     find_account_record_exn accounts ~f:(fun new_account ->
         not
           (List.mem ~equal:Public_key.Compressed.equal old_account_pks
-             (Account.public_key new_account)))
+             (Account.public_key new_account) ) )
 
   let find_new_account_record_exn accounts old_account_pks =
     find_new_account_record_exn_ accounts
@@ -123,7 +123,7 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       List.iter (Lazy.force accounts) ~f:(fun (_, account) ->
           Ledger.create_new_account_exn ledger
             (Account.identifier account)
-            account) ;
+            account ) ;
     ledger
 
   include Utils
@@ -144,8 +144,8 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
     in
     Memo.unit (fun () ->
         List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
-            Balance.compare a.balance b.balance)
-        |> Option.value_exn ?here:None ?error:None ~message:error_msg)
+            Balance.compare a.balance b.balance )
+        |> Option.value_exn ?here:None ?error:None ~message:error_msg )
 
   let largest_account_id_exn =
     Memo.unit (fun () -> largest_account_exn () |> id_of_account_record)
@@ -213,8 +213,8 @@ end) : Intf.S = struct
     in
     Memo.unit (fun () ->
         List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
-            Balance.compare a.Account.Poly.balance b.Account.Poly.balance)
-        |> Option.value_exn ?here:None ?error:None ~message:error_msg)
+            Balance.compare a.Account.Poly.balance b.Account.Poly.balance )
+        |> Option.value_exn ?here:None ?error:None ~message:error_msg )
 
   let largest_account_id_exn =
     Memo.unit (fun () -> largest_account_exn () |> id_of_account_record)
@@ -252,7 +252,7 @@ module Testnet_postake_many_producers = Register (Balances (struct
     lazy
       (let high_balances = List.init 50 ~f:(Fn.const 5_000_000) in
        let low_balances = List.init 10 ~f:(Fn.const 1_000) in
-       high_balances @ low_balances)
+       high_balances @ low_balances )
 end))
 
 module Test = Register (Balances (Test_ledger))
@@ -291,7 +291,7 @@ module Integration_tests = struct
       lazy
         (let high_balances = List.init 2 ~f:(Fn.const 5_000_000) in
          let low_balances = List.init 16 ~f:(Fn.const 1_000) in
-         high_balances @ low_balances)
+         high_balances @ low_balances )
   end))
 
   module Three_even_stakes = Register (Balances (struct

@@ -14,6 +14,11 @@ Mina, this is the right file!
 Building Mina can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
+If you are already a Nix user, or are comfortable installing Nix, it
+can be an easy way to build Mina locally. See
+[nix/README.md](./nix/README.md) for more information and
+instructions.
+
 Currently, Mina builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/MinaProtocol/coda/issues/962).
 
 The short version:
@@ -82,7 +87,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
 - Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
 - Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
-- If you use vscode, you might like these extensions
+- If you use vscode, you might like this extension
 
   - [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
   - [OCaml Platform](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
