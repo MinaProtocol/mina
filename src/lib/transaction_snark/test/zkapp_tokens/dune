@@ -7,6 +7,7 @@
    async_kernel
    async_unix
    core_kernel
+   sexplib0
    ;; local libraries
    mina_base.import
    transaction_snark
