@@ -318,7 +318,7 @@ let%test_module "multisig_account" =
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party_data : Party.Wire.t =
+              let sender_party_data : Party.Simple.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -340,7 +340,7 @@ let%test_module "multisig_account" =
                 ; authorization = Signature Signature.dummy
                 }
               in
-              let snapp_party_data : Party.Wire.t =
+              let snapp_party_data : Party.Simple.t =
                 { body =
                     { public_key = multisig_account_pk
                     ; update = update_empty_permissions
@@ -365,9 +365,9 @@ let%test_module "multisig_account" =
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
-                  ~party_depth:(fun (p : Party.Wire.t) -> p.body.call_depth)
+                  ~party_depth:(fun (p : Party.Simple.t) -> p.body.call_depth)
                   [ sender_party_data; snapp_party_data ]
-                |> Parties.Call_forest.add_callers'
+                |> Parties.Call_forest.add_callers_simple
                 |> Parties.Call_forest.accumulate_hashes_predicated
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
@@ -422,7 +422,7 @@ let%test_module "multisig_account" =
                       (Random_oracle.Input.Chunked.field txn_comm)
                 }
               in
-              let sender : Party.Wire.t =
+              let sender : Party.Simple.t =
                 { body = sender_party_data.body
                 ; authorization =
                     Signature
@@ -431,7 +431,7 @@ let%test_module "multisig_account" =
                 }
               in
               let parties : Parties.t =
-                Parties.of_wire
+                Parties.of_simple
                   { fee_payer
                   ; other_parties =
                       [ sender

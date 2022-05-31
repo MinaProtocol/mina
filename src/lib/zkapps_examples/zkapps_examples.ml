@@ -114,7 +114,6 @@ module Party_under_construction = struct
     ; events = []
     ; sequence_events = []
     ; call_data = Field.Constant.zero
-    ; call_depth = 0
     ; protocol_state_precondition =
         { snarked_ledger_hash = Ignore
         ; timestamp = Ignore
@@ -321,7 +320,6 @@ module Party_under_construction = struct
       ; events = var_of_t Zkapp_account.Events.typ []
       ; sequence_events = var_of_t Zkapp_account.Events.typ []
       ; call_data = Field.zero
-      ; call_depth = As_prover.Ref.create (fun () -> 0)
       ; protocol_state_precondition =
           var_of_t Zkapp_precondition.Protocol_state.typ
             { snarked_ledger_hash = Ignore
