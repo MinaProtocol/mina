@@ -30,7 +30,7 @@ in  Pipeline.build
         spec = JobSpec::{
         , dirtyWhen = [
             S.strictlyStart (S.contains "src/"),
-            S.strictlyStart (S.contains "rfcs/"),
+            S.strictlyStart (S.contains "rfcs/")
           ]
         , path = "Lint"
         , name = "Fast"
