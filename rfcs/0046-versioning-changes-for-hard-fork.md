@@ -163,7 +163,11 @@ such tests were needed; that check can be removed.
 
 Shape digests will also allow detecting changes to serializations
 provided by hand-written `bin_io` code. We may wish to add a module
-annotation like `%versioned_custom` for that use case.
+annotation like `%versioned_custom` for that use case. If the
+`bin_shape_t` for a type with a custom serialization is built with
+`Bin_prot.Shape.basetype`, the shape should use a new UUID
+if the serialization changes (effectively, a version), for change
+detection to be effective.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
