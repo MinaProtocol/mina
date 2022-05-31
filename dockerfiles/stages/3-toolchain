@@ -70,8 +70,8 @@ RUN test "$deb_codename" = "buster" \
       || exit 0
 
 # --- deb-s3 tool
-# tweag version, with lock only on manifest upload
-RUN curl -sLO https://github.com/tweag/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
+# Custom version, with lock only on manifest upload
+RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
     && sudo gem install deb-s3-${DEBS3_VERSION}.gem \
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
