@@ -123,13 +123,43 @@ branch by comparing those types with counterparts in the base
 branch. The linter will complain if a new version is added, and later
 modified, even if there are no deployed nodes using the new version.
 
-Instead, the linter should use a release branch for comparison. It
-should be enough to change the script `ci_diff_types.sh` to use a
-release branch instead of `$BASE_BRANCH_NAME`. There may need to be a
+Instead, the linter should use both the PR base branch and a release
+branch for comparison, according to this table:
+
+Base diff  Release diff  Significance              Warn?
+---------  ------------  ------------              -----
+   N           N         No version changes          N
+   Y           Y         Version changed             Y
+   N           Y         Previous force merge        N
+   Y           N         Modified new version        N
+
+Under this regime, a new version can be added and modified as needed,
+without triggering a linter warning. If a PR contains an innocuous
+change to a versioned type, such as a field renaming, that can be
+accomplished with a force-merge, without triggering warnings in later
+PRs.
+
+It should be enough to change the script `ci_diff_types.sh` to compare
+the PR branch against the release branch, in addition to the
+comparison made with `$BASE_BRANCH_NAME`.  There may need to be a
 mechanism to automate that change when releases become available,
-which is beyond the scope of this RFC. The same change should be made
-to `compare_ci_diff_binables.sh`, which looks for changes to `Binable`
-functors applied in version-type modules.
+which is beyond the scope of this RFC.
+
+The version linter had been using the text of type definitions for
+comparisons, and the "Binable" linter had been using the text of the
+uses of the `Binable` functors. We can instead use `Bin_prot` shape
+digests for comparisons in both cases. For a type `t`, the digest is
+available as a string:
+```ocaml
+  Bin_prot.Shape.eval_to_digest_string bin_shape_t
+```
+With this approach to comparisons, we can use a single linter task in
+CI, rather than separate version and Binable linters.
+
+Using shape digests to detect changes to serializations also means we
+no longer need unit tests for version-asserted types. `ppx_version`
+was checking for a `For_tests` module in that case, to remind that
+such tests were needed; that check can be removed.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
