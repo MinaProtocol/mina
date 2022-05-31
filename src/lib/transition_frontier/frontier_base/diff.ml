@@ -248,7 +248,7 @@ module Lite_binable = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
         | New_node of Mina_block.Validated.Stable.V2.t
         | Root_transitioned of Root_transition.Lite.Stable.V4.t
@@ -268,8 +268,8 @@ module Lite = struct
       module Stable = struct
         [@@@no_toplevel_latest_type]
 
-        module V2 = struct
-          type t = Lite_binable.Stable.V2.t
+        module V3 = struct
+          type t = Lite_binable.Stable.V3.t
 
           let to_latest = Fn.id
         end
@@ -280,7 +280,7 @@ module Lite = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
+      module V3 = struct
         type t = E : (lite, 'mutant) diff -> t
 
         module T_nonbinable = struct
@@ -288,14 +288,14 @@ module Lite = struct
 
           let to_binable = function
             | E (New_node (Lite x)) ->
-                (New_node x : Binable_arg.Stable.V2.t)
+                (New_node x : Binable_arg.Stable.V3.t)
             | E (Root_transitioned x) ->
                 Root_transitioned x
             | E (Best_tip_changed x) ->
                 Best_tip_changed x
 
           let of_binable = function
-            | (New_node x : Binable_arg.Stable.V2.t) ->
+            | (New_node x : Binable_arg.Stable.V3.t) ->
                 E (New_node (Lite x))
             | Root_transitioned x ->
                 E (Root_transitioned x)
@@ -303,7 +303,7 @@ module Lite = struct
                 E (Best_tip_changed x)
         end
 
-        include Binable.Of_binable (Binable_arg.Stable.V2) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V3) (T_nonbinable)
 
         let to_latest = Fn.id
       end
