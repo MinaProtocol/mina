@@ -36,7 +36,7 @@
 ;; copy from $MARLIN_PLONK_STUBS if this exists
 (copy_files
   (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
-  (files %{env:MARLIN_PLONK_STUBS=n}/libwires_15_stubs.a))
+  (files %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a))
 
 ;; libraries
 
@@ -104,5 +104,5 @@
  (deps ../../../../.ocamlformat)
  (action
   (progn
-   (run %{env:MARLIN_PLONK_STUBS=n}/../bin/binding_generation %{targets})
+   (run %{env:MARLIN_PLONK_STUBS=n}/bin/binding_generation %{targets})
    (run ocamlformat -i %{targets}))))
