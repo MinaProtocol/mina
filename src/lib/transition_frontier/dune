@@ -17,6 +17,7 @@
    result
    core.uuid
    ;;local libraries
+   mina_metrics
    merkle_ledger
    staged_ledger
    mina_state
