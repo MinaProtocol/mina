@@ -56,7 +56,7 @@ For the purposes of this README we are assuming the following:
 
 - You have `node` version `14.x` installed to your machine. (Note that later releases of `node` and `npm` may cause compatibility issues with the `node-fetch` module used for certain scripts and ledger generation. The newer version of `node-fetch` has not been tested: https://github.com/node-fetch/node-fetch/blob/HEAD/docs/v3-UPGRADE-GUIDE.md)
 
-- You have installed and initialized the `yarn` build tool by running `yarn install` and `yarn build` from within the ./automation directory 
+- You have installed and initialized the `yarn` build tool by running `yarn install` and `yarn build` from within the ./automation directory, before building your testnet
 
 # What is a Testnet
 
