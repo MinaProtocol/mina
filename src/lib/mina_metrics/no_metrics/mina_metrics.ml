@@ -124,6 +124,10 @@ module Network = struct
     module Processing_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Snark_work = struct
@@ -142,6 +146,10 @@ module Network = struct
     module Processing_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Transaction = struct
@@ -158,6 +166,10 @@ module Network = struct
     end
 
     module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
   end

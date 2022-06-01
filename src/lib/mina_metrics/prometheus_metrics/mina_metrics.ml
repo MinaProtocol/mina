@@ -472,7 +472,24 @@ module Network = struct
           let name = "processing_time"
 
           let help =
-            "average time, in ms, for blocks to be accepted or rejected"
+            "average time, in ms, for blocks to be accepted (the difference \
+             between Validation_time and Processing_time is that \
+             Validation_time is computed using `expiration_time - \
+             acceptance_time` while Processing_time is computed using \
+             `acceptance_time - start_time`)"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help = "average time, in ms, for blocks to be rejected"
         end)
         ()
   end
@@ -521,7 +538,24 @@ module Network = struct
           let name = "processing_time"
 
           let help =
-            "average delay, in ms, for snark work to be accepted or rejected"
+            "average delay, in ms, for snark work to be accepted (the \
+             difference between Validation_time and Processing_time is that \
+             Validation_time is computed using `expiration_time - \
+             acceptance_time` while Processing_time is computed using \
+             `acceptance_time - start_time`)"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help = "average time, in ms, for snark work to be rejected"
         end)
         ()
   end
@@ -569,8 +603,20 @@ module Network = struct
 
           let name = "processing_time"
 
-          let help =
-            "average delay, in ms, for transactions to be accepted or rejected"
+          let help = "average delay, in ms, for transactions to be accepted "
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help = "average time, in ms, for transactions to be rejected"
         end)
         ()
   end
