@@ -21,6 +21,7 @@ type t =
   ; mutable best_seen_transition : Mina_block.initial_valid_block
   ; mutable current_root : Mina_block.initial_valid_block
   ; network : Mina_networking.t
+  ; mutable num_of_root_snarked_ledger_retargeted : int
   }
 
 type time = Time.Span.t
@@ -149,8 +150,11 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
-            else
+            else (
+              t.num_of_root_snarked_ledger_retargeted <-
+                t.num_of_root_snarked_ledger_retargeted + 1 ;
               start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip root
+              )
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
@@ -186,6 +190,7 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
             ; ( "external_transition"
               , Mina_block.to_yojson (With_hash.data transition) )
             ] ;
+
         Deferred.ignore_m
         @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
              transition )
@@ -260,6 +265,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           ; precomputed_values
           ; best_seen_transition = initial_root_transition
           ; current_root = initial_root_transition
+          ; num_of_root_snarked_ledger_retargeted = 0
           }
         in
         let transition_graph = Transition_cache.create () in
@@ -296,6 +302,12 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
              Sync_ledger.Db.destroy root_sync_ledger ;
              data )
         in
+        Mina_metrics.(
+          Gauge.set Bootstrap.root_snarked_ledger_sync_ms
+            Time.Span.(to_ms sync_ledger_time)) ;
+        Mina_metrics.(
+          Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
+            (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
         let%bind ( staged_ledger_data_download_time
                  , staged_ledger_construction_time
                  , staged_ledger_aux_result ) =
@@ -704,6 +716,7 @@ let%test_module "Bootstrap_controller tests" =
       ; best_seen_transition = transition
       ; current_root = transition
       ; network
+      ; num_of_root_snarked_ledger_retargeted = 0
       }
 
     let%test_unit "Bootstrap controller caches all transitions it is passed \

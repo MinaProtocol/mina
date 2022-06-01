@@ -329,6 +329,16 @@ module Bootstrap = struct
   let next_epoch_ledger_sync_ms =
     let help = "time elapsed when sync next epoch ledger in ms" in
     Gauge.v "next_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let root_snarked_ledger_sync_ms =
+    let help = "time elapsed when sync root snarked ledger in ms" in
+    Gauge.v "root_snarked_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let num_of_root_snarked_ledger_retargeted =
+    let help =
+      "number of times root_snarked_ledger retargeted during bootstrap"
+    in
+    Gauge.v "num_of_root_snarked_ledger_retargeted" ~help ~namespace ~subsystem
 end
 
 module Transaction_pool = struct
