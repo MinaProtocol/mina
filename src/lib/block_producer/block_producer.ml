@@ -139,6 +139,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       let coinbase_receiver =
         Consensus.Data.Block_data.coinbase_receiver block_data
       in
+      let start = Time.now () in
       let diff =
         let diff =
           Staged_ledger.create_diff ~constraint_constants staged_ledger
@@ -170,6 +171,12 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         | _ ->
             diff
       in
+      let staged_ledger_diff_creation_time =
+        Time.(diff (now ()) start) |> Time.Span.to_ms
+      in
+      Mina_metrics.(
+        Gauge.set Block_producer.staged_ledger_diff_creation_ms
+          staged_ledger_diff_creation_time) ;
       match%map
         let%bind.Deferred.Result diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants

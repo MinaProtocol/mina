@@ -63,6 +63,10 @@ end
 
 module Bootstrap : sig
   val bootstrap_time_ms : Gauge.t
+
+  val staking_epoch_ledger_sync_ms : Gauge.t
+
+  val next_epoch_ledger_sync_ms : Gauge.t
 end
 
 module Transaction_pool : sig
@@ -71,6 +75,12 @@ module Transaction_pool : sig
   val pool_size : Gauge.t
 
   val transactions_added_to_pool : Counter.t
+end
+
+module Persistent_database : sig
+  val writing_to_disk_ms : Gauge.t
+
+  val reading_from_disk_ms : Gauge.t
 end
 
 module Network : sig
@@ -349,6 +359,8 @@ module Block_producer : sig
   module Block_production_delay_histogram : Histogram
 
   val block_production_delay : Block_production_delay_histogram.t
+
+  val staged_ledger_diff_creation_ms : Gauge.t
 end
 
 module Transition_frontier : sig
