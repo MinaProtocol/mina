@@ -81,9 +81,6 @@ struct
       L12.f branch_data.rule.prevs prev_vars_length
     in
     let lte = branch_data.lte in
-    let inners_must_verify =
-      branch_data.rule.main_value prev_values next_state
-    in
     let module X_hat = struct
       type t = Tock.Field.t Double.t
     end in
@@ -116,8 +113,10 @@ struct
            * Unfinalized.Constant.t
            * Statement_with_hashes.t
            * X_hat.t
-           * (value, local_max_proofs_verified, m) Per_proof_witness.Constant.t
-        =
+           * ( value
+             , local_max_proofs_verified
+             , m )
+             Per_proof_witness.Constant.No_app_state.t =
      fun dlog_vk dlog_index app_state (T t) tag ~must_verify ->
       let t =
         { t with
@@ -311,8 +310,8 @@ struct
         if not must_verify then Ipa.Wrap.compute_sg new_bulletproof_challenges
         else t.proof.openings.proof.challenge_polynomial_commitment
       in
-      let witness : _ Per_proof_witness.Constant.t =
-        { app_state = t.P.Base.Wrap.statement.pass_through.app_state
+      let witness : _ Per_proof_witness.Constant.No_app_state.t =
+        { app_state = ()
         ; proof_state =
             { prev_statement_with_hashes.proof_state with me_only = () }
         ; prev_proof_evals = t.prev_evals
@@ -434,7 +433,7 @@ struct
     let statements_with_hashes = ref None in
     let x_hats = ref None in
     let witnesses = ref None in
-    let compute_prev_proof_parts () =
+    let compute_prev_proof_parts inners_must_verify =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
@@ -445,13 +444,16 @@ struct
                values H1.T(Id).t
             -> (ns, ns) H2.T(Proof).t
             -> (vars, values, ns, ms) H4.T(Tag).t
-            -> vars H1.T(E01(Bool)).t
+            -> values H1.T(E01(Bool)).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t
                * (Statement_with_hashes.t, k) Vector.t
                * (X_hat.t, k) Vector.t
-               * (values, ns, ms) H3.T(Per_proof_witness.Constant).t =
+               * ( values
+                 , ns
+                 , ms )
+                 H3.T(Per_proof_witness.Constant.No_app_state).t =
          fun app_states ps ts must_verifys l ->
           match (app_states, ps, ts, must_verifys, l) with
           | [], [], [], [], Z ->
@@ -576,15 +578,17 @@ struct
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
-      | Req.Compute_prev_proof_parts ->
-          compute_prev_proof_parts () ;
+      | Req.Compute_prev_proof_parts inners_must_verify ->
+          compute_prev_proof_parts inners_must_verify ;
           k ()
+      | Req.Prev_inputs ->
+          k prev_values
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
           k self_dlog_plonk_index
       | Req.App_state ->
-          k (Lazy.force next_me_only_prepared).app_state
+          k next_state
       | Req.Unfinalized_proofs ->
           k (Lazy.force unfinalized_proofs_extended)
       | Req.Pass_through ->

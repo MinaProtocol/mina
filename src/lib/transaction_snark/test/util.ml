@@ -239,7 +239,6 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   let open Tick in
   { identifier = "dummy"
   ; prevs = [ self; self ]
-  ; main_value = (fun [ _; _ ] _ -> [ true; true ])
   ; main =
       (fun [ _; _ ] _ ->
         Transaction_snark.dummy_constraints ()

@@ -2249,7 +2249,6 @@ module Base = struct
       | Proved ->
           { identifier = "proved"
           ; prevs = M.[ side_loaded 0 ]
-          ; main_value = (fun [ _ ] _ -> [ prev_should_verify ])
           ; main =
               (fun [ snapp_statement ] stmt ->
                 main ?witness:!witness s ~constraint_constants
@@ -2260,7 +2259,6 @@ module Base = struct
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
           ; prevs = M.[]
-          ; main_value = (fun [] _ -> [])
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
@@ -2269,7 +2267,6 @@ module Base = struct
       | Opt_signed ->
           { identifier = "opt_signed"
           ; prevs = M.[]
-          ; main_value = (fun [] _ -> [])
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
@@ -3073,7 +3070,6 @@ module Base = struct
         (fun [] x ->
           Run.run_checked (main ~constraint_constants x) ;
           [] )
-    ; main_value = (fun [] _ -> [])
     }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3171,7 +3167,6 @@ module Merge = struct
         (fun ps x ->
           Run.run_checked (main ps x) ;
           [ b; b ] )
-    ; main_value = (fun _ _ -> [ prev_should_verify; prev_should_verify ])
     }
 end
 
@@ -4221,7 +4216,6 @@ module For_tests = struct
                        (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                      .t ->
               [] )
-        ; main_value = (fun [] _ -> [])
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
@@ -4238,7 +4232,6 @@ module For_tests = struct
           [ trivial_rule
           ; { identifier = "dummy"
             ; prevs = [ self; self ]
-            ; main_value = (fun [ _; _ ] _ -> [ true; true ])
             ; main =
                 (fun [ _; _ ] _ ->
                   Impl.run_checked (dummy_constraints ())
