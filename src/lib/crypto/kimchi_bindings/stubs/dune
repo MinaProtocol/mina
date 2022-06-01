@@ -19,6 +19,7 @@
  (deps
   Cargo.toml
   (source_tree src)
+  (source_tree binding_generation)
   (source_tree ../../proof-systems))
  (locks /cargo-lock)
  (action
