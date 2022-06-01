@@ -387,7 +387,7 @@ module Options = struct
           ; errors= Lazy.force Errors.all_errors
           ; historical_balance_lookup=
               true
-              (* TODO: .6872 We should expose info for the timestamp_start_index via GraphQL then consume it here *)
+              (* TODO: #6872 We should expose info for the timestamp_start_index via GraphQL then consume it here *)
           ; timestamp_start_index=
               None
               (* If we implement the /call endpoint we'll need to list its supported methods here *)
