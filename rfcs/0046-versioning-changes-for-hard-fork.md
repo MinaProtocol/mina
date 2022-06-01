@@ -21,6 +21,16 @@ nodes. Therefore, version-tagging of the serialized data is not needed
 for that use case. Removing the version tags will reduce the amount of
 data sent over the network.
 
+Some precomputed blocks from Mainnet show the amount of data currently
+used by version tags:
+
+ Bin_io size         Number of tags    Proportion
+ ------------        --------------    ----------
+      9956                  930            9%
+   1682720               121776            7%
+   1826633               131088            7%
+   1803712               129340            7%
+
 We may wish to save serialized data and be able to determine its
 version. For that use case, a single "top" tag for the containing type
 suffices.
@@ -34,8 +44,9 @@ The CI version linter currently compares changes to versioned types
 against the PR base branch. That's more fine-grained than needed, if
 the goal of preventing version changes is to allow interoperability
 with deployed software. Instead, compare the types against the branch
-of the latest released software. That strategy will reduce the amount
-of noise produced by the linter, and provide more useful results.
+of the latest released software, as well as the base branch. That
+strategy will reduce the amount of noise produced by the linter, and
+provide more useful results.
 
 ## Detailed design
 [detailed-design]: #detailed-design
