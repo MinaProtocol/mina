@@ -2159,8 +2159,11 @@ let%test_module _ =
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = Some protocol_state_precondition
-        ; account_precondition = None
+        ; preconditions =
+            Some
+              { Party.Preconditions.network = protocol_state_precondition
+              ; account = Party.Account_precondition.Accept
+              }
         }
       in
       let parties = Transaction_snark.For_tests.multiple_transfers test_spec in

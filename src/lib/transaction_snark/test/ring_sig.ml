@@ -58,7 +58,6 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
                  (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                .t ->
         [] )
-  ; main_value = (fun [] _ -> [])
   }
 
 let%test_unit "1-of-1" =
@@ -205,11 +204,13 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; sequence_events = []
                 ; call_data = Field.zero
                 ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; use_full_commitment = false
+                ; preconditions =
+                    { Party.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Nonce (Account.Nonce.succ sender_nonce)
+                    }
                 ; caller = Call
-                ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
+                ; use_full_commitment = false
                 }
             ; authorization = Signature Signature.dummy
             }
@@ -225,9 +226,11 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Full Zkapp_precondition.Account.accept
+                ; preconditions =
+                    { Party.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Full Zkapp_precondition.Account.accept
+                    }
                 ; use_full_commitment = false
                 ; caller = Call
                 }
