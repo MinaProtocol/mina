@@ -521,9 +521,12 @@ let%test_unit "tokens test" =
       ; sequence_events = []
       ; call_data = Pickles.Impls.Step.Field.Constant.zero
       ; call_depth = 0
-      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+      ; preconditions =
+          { Party.Preconditions.network =
+              Zkapp_precondition.Protocol_state.accept
+          ; account = Accept
+          }
       ; use_full_commitment = true
-      ; account_precondition = Accept
       ; caller
       }
     in

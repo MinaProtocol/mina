@@ -633,8 +633,10 @@ module Party_body_components = struct
     ; sequence_events = t.sequence_events
     ; call_data = t.call_data
     ; call_depth = t.call_depth
-    ; protocol_state_precondition = t.protocol_state_precondition
-    ; account_precondition = t.account_precondition
+    ; preconditions =
+        { Party.Preconditions.network = t.protocol_state_precondition
+        ; account = t.account_precondition
+        }
     ; use_full_commitment = t.use_full_commitment
     ; caller = t.caller
     }

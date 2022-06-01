@@ -19,24 +19,20 @@
  (deps
   Cargo.toml
   (source_tree src)
-  (source_tree binding_generation)
   (source_tree ../../proof-systems))
  (locks /cargo-lock)
  (action
   (progn
    (setenv
-    CARGO_TARGET_DIR
-    "./target"
-   (setenv
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
-    (run cargo build --release)))
-   (run cp ./target/release/libwires_15_stubs.a .))))
+    (run cargo build --release))
+   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .))))
 
 ;; copy from $MARLIN_PLONK_STUBS if this exists
 (copy_files
   (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
-  (files %{env:MARLIN_PLONK_STUBS=n}/libwires_15_stubs.a))
+  (files %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a))
 
 ;; libraries
 
@@ -93,6 +89,8 @@
   (chdir
    binding_generation
    (progn
+    (run rm -rf ./target)
+    (run rm -f ./Cargo.lock)
     (run cargo run %{targets})
     (run ocamlformat -i %{targets})))))
 
@@ -104,5 +102,5 @@
  (deps ../../../../.ocamlformat)
  (action
   (progn
-   (run %{env:MARLIN_PLONK_STUBS=n}/../bin/binding_generation %{targets})
+   (run %{env:MARLIN_PLONK_STUBS=n}/bin/binding_generation %{targets})
    (run ocamlformat -i %{targets}))))
