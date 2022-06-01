@@ -114,6 +114,8 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
       ~equal:(fun (hash1, _, _) (hash2, _, _) -> State_hash.equal hash1 hash2)
   with
   | `New ->
+      t.num_of_root_snarked_ledger_retargeted <-
+        t.num_of_root_snarked_ledger_retargeted + 1 ;
       `Syncing_new_snarked_ledger
   | `Update_data ->
       `Updating_root_transition
@@ -148,11 +150,8 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
-            else (
-              t.num_of_root_snarked_ledger_retargeted <-
-                t.num_of_root_snarked_ledger_retargeted + 1 ;
+            else
               start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip root
-              )
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
