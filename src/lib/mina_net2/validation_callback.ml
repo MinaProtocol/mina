@@ -46,6 +46,10 @@ module type Metric_intf = sig
   module Processing_time : sig
     val update : Time.Span.t -> unit
   end
+
+  module Rejection_time : sig
+    val update : Time.Span.t -> unit
+  end
 end
 
 let metrics_of_message_type m : (module Metric_intf) option =
@@ -81,7 +85,7 @@ let record_validation_metrics message_type (result : validation_result)
           M.Processing_time.update processing_time
       | `Reject ->
           Mina_metrics.Counter.inc_one M.rejected ;
-          M.Processing_time.update processing_time )
+          M.Rejection_time.update processing_time )
 
 let await_timeout cb =
   if is_expired cb then Deferred.return ()
