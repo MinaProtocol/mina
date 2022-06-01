@@ -120,6 +120,15 @@ struct
   let serialize = unimplemented_serializer "public_key"
 end
 
+module Public_key_s :
+  S_STRING with type t = Signature_lib.Public_key.Compressed.t = struct
+  type t = Signature_lib.Public_key.Compressed.t
+
+  let parse = Signature_lib.Public_key.of_base58_check_decompress_exn
+
+  let serialize = unimplemented_serializer "public_key"
+end
+
 module Optional_public_key = Optional (Public_key)
 
 module Balance : S_JSON with type t = Currency.Balance.t = struct
@@ -160,4 +169,21 @@ module Memo : S_STRING with type t = Mina_base.Signed_command_memo.t = struct
   let parse = Mina_base.Signed_command_memo.of_base58_check_exn
 
   let serialize = Mina_base.Signed_command_memo.to_base58_check
+end
+
+module State_hash : S_STRING with type t = Mina_base.State_hash.t = struct
+  type t = Mina_base.State_hash.t
+
+  let parse = Mina_base.State_hash.of_base58_check_exn
+
+  let serialize = unimplemented_serializer "state_hash"
+end
+
+module Transaction_hash : S_STRING with type t = Mina_base.Transaction_hash.t =
+struct
+  type t = Mina_base.Transaction_hash.t
+
+  let parse = Mina_base.Transaction_hash.of_base58_check_exn
+
+  let serialize = unimplemented_serializer "transaction_hash"
 end

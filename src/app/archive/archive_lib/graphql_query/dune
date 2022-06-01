@@ -3,10 +3,12 @@
  (public_name graphql_query)
  (libraries
    ;;opam libraries
+   base
    core
    yojson
    core_kernel
    ;;local libraries
+   graphql_lib
    block_time
    currency
    signature_lib
