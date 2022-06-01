@@ -1207,8 +1207,8 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
               Result.ok_if_true
                 Currency.Fee.(increment > zero)
                 ~error:
-                  (Insufficient_replace_fee (`Replace_fee Currency.Fee.zero, increment)
-                  )
+                  (Insufficient_replace_fee
+                     (`Replace_fee Currency.Fee.zero, increment) )
               |> M.of_result
               (* C3 *)
             in
