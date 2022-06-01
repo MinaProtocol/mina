@@ -77,7 +77,7 @@ module Node = struct
     ; ("pod_id", `String node.pod_id)
     ]
 
-  module Decoders = Graphql_lib.Decoders
+  module Serializing = Graphql_lib.Serializing
 
   module Graphql = struct
     let ingress_uri node =
@@ -93,12 +93,15 @@ module Node = struct
       let headers = String.Map.empty
     end)
 
+    (* graphql_ppx uses Stdlib symbols instead of Base *)
+    open Stdlib
+
     module Unlock_account =
     [%graphql
     {|
       mutation ($password: String!, $public_key: PublicKey!) {
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+          public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
         }
       }
     |}]
@@ -196,11 +199,11 @@ module Node = struct
     module Get_account_data =
     [%graphql
     {|
-      query ($public_key: PublicKey) {
+      query ($public_key: PublicKey!) {
         account(publicKey: $public_key) {
           nonce
           balance {
-            total @bsDecoder(fn: "Decoders.balance")
+            total @ppxCustom(module: "Serializing.Balance")
           }
         }
       }
@@ -312,21 +315,21 @@ module Node = struct
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
       ~metadata:(logger_metadata t) ;
-    let query_obj = Graphql.Query_peer_id.make () in
+    let query_obj = Graphql.Query_peer_id.(make @@ makeVariables ()) in
     let%bind query_result_obj =
       exec_graphql_request ~logger ~node:t ~query_name:"query_peer_id" query_obj
     in
     [%log info] "get_peer_id, finished exec_graphql_request" ;
-    let self_id_obj = query_result_obj#daemonStatus#addrsAndPorts#peer in
+    let self_id_obj = query_result_obj.daemonStatus.addrsAndPorts.peer in
     let%bind self_id =
       match self_id_obj with
       | None ->
           Deferred.Or_error.error_string "Peer not found"
       | Some peer ->
-          return peer#peerId
+          return peer.peerId
     in
-    let peers = query_result_obj#daemonStatus#peers |> Array.to_list in
-    let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
+    let peers = query_result_obj.daemonStatus.peers |> Array.to_list in
+    let peer_ids = List.map peers ~f:(fun peer -> peer.peerId) in
     [%log info] "get_peer_id, result of graphql query (self_id,[peers]) (%s,%s)"
       self_id
       (String.concat ~sep:" " peer_ids) ;
@@ -337,11 +340,11 @@ module Node = struct
 
   let get_best_chain ?max_length ~logger t =
     let open Deferred.Or_error.Let_syntax in
-    let query = Graphql.Best_chain.make ?max_length () in
+    let query = Graphql.Best_chain.(make @@ makeVariables ?max_length ()) in
     let%bind result =
       exec_graphql_request ~logger ~node:t ~query_name:"best_chain" query
     in
-    match result#bestChain with
+    match result.bestChain with
     | None | Some [||] ->
         Deferred.Or_error.error_string "failed to get best chains"
     | Some chain ->
@@ -349,10 +352,10 @@ module Node = struct
         @@ List.map
              ~f:(fun block ->
                Intf.
-                 { state_hash = block#stateHash
-                 ; command_transaction_count = block#commandTransactionCount
+                 { state_hash = block.stateHash
+                 ; command_transaction_count = block.commandTransactionCount
                  ; creator_pk =
-                     ( match block#creatorAccount#publicKey with
+                     ( match block.creatorAccount.publicKey with
                      | `String pk ->
                          pk
                      | _ ->
@@ -376,16 +379,18 @@ module Node = struct
     (* let pk = Mina_base.Account_id.public_key account_id in *)
     (* let token = Mina_base.Account_id.token_id account_id in *)
     let get_balance_obj =
-      Graphql.Get_account_data.make
-        ~public_key:(Graphql_lib.Encoders.public_key public_key)
-        (* ~token:(Graphql_lib.Encoders.token token) *)
-        ()
+      Graphql.Get_account_data.(
+        make
+        @@ makeVariables
+             ~public_key:(Graphql_lib.Encoders.public_key public_key)
+             (* ~token:(Graphql_lib.Encoders.token token) *)
+             ())
     in
     let%bind balance_obj =
       exec_graphql_request ~logger ~node:t ~query_name:"get_balance_graphql"
         get_balance_obj
     in
-    match balance_obj#account with
+    match balance_obj.account with
     | None ->
         Deferred.Or_error.errorf
           !"Account with public_key %s not found"
@@ -393,10 +398,10 @@ module Node = struct
     | Some acc ->
         return
           { nonce =
-              acc#nonce
+              acc.nonce
               |> Option.value_exn ~message:"the nonce from get_balance is None"
               |> Unsigned.UInt32.of_string
-          ; total_balance = acc#balance#total
+          ; total_balance = acc.balance.total
           }
 
   let must_get_account_data ~logger t ~public_key =
@@ -417,9 +422,11 @@ module Node = struct
       ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
     let unlock_sender_account_graphql () =
       let unlock_account_obj =
-        Graphql.Unlock_account.make ~password:"naughty blue worm"
-          ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
-          ()
+        Graphql.Unlock_account.(
+          make
+          @@ makeVariables ~password:"naughty blue worm"
+               ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
+               ())
       in
       exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
@@ -427,22 +434,24 @@ module Node = struct
     let%bind _ = unlock_sender_account_graphql () in
     let send_payment_graphql () =
       let send_payment_obj =
-        Graphql.Send_payment.make
-          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-          ~amount:(Graphql_lib.Encoders.amount amount)
-          ~fee:(Graphql_lib.Encoders.fee fee)
-          ()
+        Graphql.Send_payment.(
+          make
+          @@ makeVariables
+               ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+               ~amount:(Graphql_lib.Encoders.amount amount)
+               ~fee:(Graphql_lib.Encoders.fee fee)
+               ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
         send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
-    let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
+    let return_obj = sent_payment_obj.sendPayment.payment in
     let res =
-      { id = return_obj#id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
-      ; nonce = Unsigned.UInt32.of_int return_obj#nonce
+      { id = return_obj.id
+      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      ; nonce = Unsigned.UInt32.of_int return_obj.nonce
       }
     in
     [%log info] "Sent payment"
@@ -468,9 +477,11 @@ module Node = struct
       ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
     let unlock_sender_account_graphql () =
       let unlock_account_obj =
-        Graphql.Unlock_account.make ~password:"naughty blue worm"
-          ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
-          ()
+        Graphql.Unlock_account.(
+          make
+          @@ makeVariables ~password:"naughty blue worm"
+               ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
+               ())
       in
       exec_graphql_request ~logger ~node:t
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
@@ -478,22 +489,24 @@ module Node = struct
     let%bind _ = unlock_sender_account_graphql () in
     let send_delegation_graphql () =
       let send_delegation_obj =
-        Graphql.Send_delegation.make
-          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-          ~amount:(Graphql_lib.Encoders.amount amount)
-          ~fee:(Graphql_lib.Encoders.fee fee)
-          ()
+        Graphql.Send_delegation.(
+          make
+          @@ makeVariables
+               ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+               ~amount:(Graphql_lib.Encoders.amount amount)
+               ~fee:(Graphql_lib.Encoders.fee fee)
+               ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_delegation_graphql"
         send_delegation_obj
     in
     let%map result_obj = send_delegation_graphql () in
-    let (`UserCommand return_obj) = result_obj#sendDelegation#delegation in
+    let return_obj = result_obj.sendDelegation.delegation in
     let res =
-      { id = return_obj#id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
-      ; nonce = Unsigned.UInt32.of_int return_obj#nonce
+      { id = return_obj.id
+      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      ; nonce = Unsigned.UInt32.of_int return_obj.nonce
       }
     in
     [%log info] "stake delegation sent"
@@ -510,8 +523,9 @@ module Node = struct
       ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
     let send_payment_graphql () =
-      let send_payment_obj =
-        Graphql.Send_payment_with_raw_sig.make
+      let open Graphql.Send_payment_with_raw_sig in
+      let variables =
+        makeVariables
           ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
           ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
           ~amount:(Graphql_lib.Encoders.amount amount)
@@ -522,17 +536,25 @@ module Node = struct
           ~validUntil:(Graphql_lib.Encoders.uint32 valid_until)
           ~rawSignature:raw_signature ()
       in
+      let send_payment_obj = make variables in
+      let variables_json_basic =
+        variablesToJson (serializeVariables variables)
+      in
+      (* An awkward conversion from Yojson.Basic to Yojson.Safe *)
+      let variables_json =
+        Yojson.Basic.to_string variables_json_basic |> Yojson.Safe.from_string
+      in
       [%log info] "send_payment_obj with $variables "
-        ~metadata:[ ("variables", send_payment_obj#variables) ] ;
+        ~metadata:[ ("variables", variables_json) ] ;
       exec_graphql_request ~logger ~node:t
         ~query_name:"Send_payment_with_raw_sig_graphql" send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
-    let (`UserCommand return_obj) = sent_payment_obj#sendPayment#payment in
+    let return_obj = sent_payment_obj.sendPayment.payment in
     let res =
-      { id = return_obj#id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj#hash
-      ; nonce = Unsigned.UInt32.of_int return_obj#nonce
+      { id = return_obj.id
+      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      ; nonce = Unsigned.UInt32.of_int return_obj.nonce
       }
     in
     [%log info] "Sent payment"
@@ -561,16 +583,18 @@ module Node = struct
     let open Deferred.Or_error.Let_syntax in
     let send_payment_graphql () =
       let send_payment_obj =
-        Graphql.Send_test_payments.make
-          ~senders:
-            (Array.of_list
-               (List.map ~f:Signature_lib.Private_key.to_yojson senders) )
-          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-          ~amount:(Graphql_lib.Encoders.amount amount)
-          ~fee:(Graphql_lib.Encoders.fee fee)
-          ~repeat_count:(Graphql_lib.Encoders.uint32 repeat_count)
-          ~repeat_delay_ms:(Graphql_lib.Encoders.uint32 repeat_delay_ms)
-          ()
+        Graphql.Send_test_payments.(
+          make
+          @@ makeVariables
+               ~senders:
+                 (Array.of_list
+                    (List.map ~f:Signature_lib.Private_key.to_yojson senders) )
+               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+               ~amount:(Graphql_lib.Encoders.amount amount)
+               ~fee:(Graphql_lib.Encoders.fee fee)
+               ~repeat_count:(Graphql_lib.Encoders.uint32 repeat_count)
+               ~repeat_delay_ms:(Graphql_lib.Encoders.uint32 repeat_delay_ms)
+               ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
         send_payment_obj
@@ -708,15 +732,15 @@ module Node = struct
     [%log info] "get_metrics, finished exec_graphql_request" ;
     let block_production_delay =
       Array.to_list
-      @@ query_result_obj#daemonStatus#metrics#blockProductionDelay
+      @@ query_result_obj.daemonStatus.metrics.blockProductionDelay
     in
-    let metrics = query_result_obj#daemonStatus#metrics in
-    let transaction_pool_diff_received = metrics#transactionPoolDiffReceived in
+    let metrics = query_result_obj.daemonStatus.metrics in
+    let transaction_pool_diff_received = metrics.transactionPoolDiffReceived in
     let transaction_pool_diff_broadcasted =
-      metrics#transactionPoolDiffBroadcasted
+      metrics.transactionPoolDiffBroadcasted
     in
-    let transactions_added_to_pool = metrics#transactionsAddedToPool in
-    let transaction_pool_size = metrics#transactionPoolSize in
+    let transactions_added_to_pool = metrics.transactionsAddedToPool in
+    let transaction_pool_size = metrics.transactionPoolSize in
     [%log info]
       "get_metrics, result of graphql query (block_production_delay; \
        tx_received; tx_broadcasted; txs_added_to_pool; tx_pool_size) (%s; %d; \
