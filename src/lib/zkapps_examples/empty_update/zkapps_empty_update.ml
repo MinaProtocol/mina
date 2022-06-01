@@ -1,4 +1,3 @@
-open Pickles_types.Hlist
 open Signature_lib
 open Mina_base
 open Zkapps_examples
@@ -13,19 +12,8 @@ let main public_key =
         ~token_id:Token_id.(Checked.constant default)
         () )
 
-(* TODO: This shouldn't exist, the circuit should just return the requisite
-         values.
-*)
-let main_value ([] : _ H1.T(Id).t) (_ : Zkapp_statement.t) :
-    _ H1.T(E01(Core_kernel.Bool)).t =
-  []
-
 let rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Empty update"
-  ; prevs = []
-  ; main = main public_key
-  ; main_value
-  }
+  { identifier = "Empty update"; prevs = []; main = main public_key }
 
 (* TODO: This shouldn't exist, the circuit should just return the requisite
          value.

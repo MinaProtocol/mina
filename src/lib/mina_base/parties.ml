@@ -10,8 +10,7 @@ let add_caller (p : Party.Wire.t) caller : Party.t =
     ; events = p.events
     ; sequence_events = p.sequence_events
     ; call_data = p.call_data
-    ; protocol_state_precondition = p.protocol_state_precondition
-    ; account_precondition = p.account_precondition
+    ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
     }
@@ -28,8 +27,7 @@ let add_caller_simple (p : Party.Simple.t) caller : Party.t =
     ; events = p.events
     ; sequence_events = p.sequence_events
     ; call_data = p.call_data
-    ; protocol_state_precondition = p.protocol_state_precondition
-    ; account_precondition = p.account_precondition
+    ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
     }
@@ -922,8 +920,7 @@ let to_simple (t : t) : Simple.t =
               ; events = b.events
               ; sequence_events = b.sequence_events
               ; call_data = b.call_data
-              ; protocol_state_precondition = b.protocol_state_precondition
-              ; account_precondition = b.account_precondition
+              ; preconditions = b.preconditions
               ; use_full_commitment = b.use_full_commitment
               ; caller = call_type
               ; call_depth = 0

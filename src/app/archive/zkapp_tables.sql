@@ -211,7 +211,7 @@ CREATE TABLE zkapp_epoch_data
 );
 
 /* NULL convention */
-CREATE TABLE zkapp_protocol_state_precondition
+CREATE TABLE zkapp_network_precondition
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
 , timestamp_id                     int                            REFERENCES zkapp_timestamp_bounds(id)
@@ -235,7 +235,7 @@ CREATE TABLE zkapp_fee_payer_body
 , fee                                   text      NOT NULL
 , events_id                             int       NOT NULL REFERENCES zkapp_events(id)
 , sequence_events_id                    int       NOT NULL REFERENCES zkapp_events(id)
-, zkapp_protocol_state_precondition_id  int       NOT NULL REFERENCES zkapp_protocol_state_precondition(id)
+, zkapp_network_precondition_id  int       NOT NULL REFERENCES zkapp_network_precondition(id)
 , nonce                                 bigint    NOT NULL
 );
 
@@ -254,7 +254,7 @@ CREATE TABLE zkapp_other_party_body
 , sequence_events_id                    int             NOT NULL  REFERENCES zkapp_events(id)
 , call_data_id                          int             NOT NULL  REFERENCES zkapp_state_data(id)
 , call_depth                            int             NOT NULL
-, zkapp_protocol_state_precondition_id  int             NOT NULL  REFERENCES zkapp_protocol_state_precondition(id)
+, zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean         NOT NULL
 , caller                                call_type_type  NOT NULL

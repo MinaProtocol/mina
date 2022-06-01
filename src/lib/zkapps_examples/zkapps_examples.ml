@@ -114,35 +114,36 @@ module Party_under_construction = struct
     ; events = []
     ; sequence_events = []
     ; call_data = Field.Constant.zero
-    ; protocol_state_precondition =
-        { snarked_ledger_hash = Ignore
-        ; timestamp = Ignore
-        ; blockchain_length = Ignore
-        ; min_window_density = Ignore
-        ; last_vrf_output = ()
-        ; total_currency = Ignore
-        ; global_slot_since_hard_fork = Ignore
-        ; global_slot_since_genesis = Ignore
-        ; staking_epoch_data =
-            { ledger =
-                { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-            ; seed = Ignore
-            ; start_checkpoint = Ignore
-            ; lock_checkpoint = Ignore
-            ; epoch_length = Ignore
+    ; preconditions =
+        { Party.Preconditions.network =
+            { snarked_ledger_hash = Ignore
+            ; timestamp = Ignore
+            ; blockchain_length = Ignore
+            ; min_window_density = Ignore
+            ; last_vrf_output = ()
+            ; total_currency = Ignore
+            ; global_slot_since_hard_fork = Ignore
+            ; global_slot_since_genesis = Ignore
+            ; staking_epoch_data =
+                { ledger =
+                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+                ; seed = Ignore
+                ; start_checkpoint = Ignore
+                ; lock_checkpoint = Ignore
+                ; epoch_length = Ignore
+                }
+            ; next_epoch_data =
+                { ledger =
+                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+                ; seed = Ignore
+                ; start_checkpoint = Ignore
+                ; lock_checkpoint = Ignore
+                ; epoch_length = Ignore
+                }
             }
-        ; next_epoch_data =
-            { ledger =
-                { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-            ; seed = Ignore
-            ; start_checkpoint = Ignore
-            ; lock_checkpoint = Ignore
-            ; epoch_length = Ignore
-            }
+        ; account = Full (Account_condition.to_predicate t.account_condition)
         }
     ; use_full_commitment = false
-    ; account_precondition =
-        Full (Account_condition.to_predicate t.account_condition)
     ; caller = t.token_id
     }
 
@@ -320,36 +321,41 @@ module Party_under_construction = struct
       ; events = var_of_t Zkapp_account.Events.typ []
       ; sequence_events = var_of_t Zkapp_account.Events.typ []
       ; call_data = Field.zero
-      ; protocol_state_precondition =
-          var_of_t Zkapp_precondition.Protocol_state.typ
-            { snarked_ledger_hash = Ignore
-            ; timestamp = Ignore
-            ; blockchain_length = Ignore
-            ; min_window_density = Ignore
-            ; last_vrf_output = ()
-            ; total_currency = Ignore
-            ; global_slot_since_hard_fork = Ignore
-            ; global_slot_since_genesis = Ignore
-            ; staking_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
+      ; preconditions =
+          { Party.Preconditions.Checked.network =
+              var_of_t Zkapp_precondition.Protocol_state.typ
+                { snarked_ledger_hash = Ignore
+                ; timestamp = Ignore
+                ; blockchain_length = Ignore
+                ; min_window_density = Ignore
+                ; last_vrf_output = ()
+                ; total_currency = Ignore
+                ; global_slot_since_hard_fork = Ignore
+                ; global_slot_since_genesis = Ignore
+                ; staking_epoch_data =
+                    { ledger =
+                        { Epoch_ledger.Poly.hash = Ignore
+                        ; total_currency = Ignore
+                        }
+                    ; seed = Ignore
+                    ; start_checkpoint = Ignore
+                    ; lock_checkpoint = Ignore
+                    ; epoch_length = Ignore
+                    }
+                ; next_epoch_data =
+                    { ledger =
+                        { Epoch_ledger.Poly.hash = Ignore
+                        ; total_currency = Ignore
+                        }
+                    ; seed = Ignore
+                    ; start_checkpoint = Ignore
+                    ; lock_checkpoint = Ignore
+                    ; epoch_length = Ignore
+                    }
                 }
-            ; next_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
-            }
+          ; account = Account_condition.to_predicate t.account_condition
+          }
       ; use_full_commitment = Boolean.false_
-      ; account_precondition =
-          Account_condition.to_predicate t.account_condition
       ; caller = t.token_id
       }
 
