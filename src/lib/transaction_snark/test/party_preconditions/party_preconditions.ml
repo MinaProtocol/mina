@@ -77,11 +77,13 @@ let%test_module "Protocol state precondition tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
-            ; protocol_state_precondition =
+            ; preconditions =
                 Some
-                  (precondition_exact
-                     (Mina_state.Protocol_state.Body.view state_body) )
-            ; account_precondition = None
+                  { Party.Preconditions.network =
+                      precondition_exact
+                        (Mina_state.Protocol_state.Body.view state_body)
+                  ; account = Party.Account_precondition.Accept
+                  }
             }
           in
           U.test_snapp_update test_spec ~state_body ~init_ledger ~vk
@@ -93,15 +95,14 @@ let%test_module "Protocol state precondition tests" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ledger = U.gen_snapp_ledger in
-        let%map protocol_state_precondition =
+        let%map network_precondition =
           Mina_generators.Parties_generators.gen_protocol_state_precondition
             (Mina_state.Protocol_state.Body.view state_body)
         in
-        (ledger, protocol_state_precondition)
+        (ledger, network_precondition)
       in
       Quickcheck.test ~trials:2 gen
-        ~f:(fun (({ init_ledger; specs }, new_kp), protocol_state_precondition)
-           ->
+        ~f:(fun (({ init_ledger; specs }, new_kp), network_precondition) ->
           let fee = Fee.of_int 1_000_000 in
           let _amount = Amount.of_int 10_000_000_000 in
           let spec = List.hd_exn specs in
@@ -119,8 +120,11 @@ let%test_module "Protocol state precondition tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
-            ; protocol_state_precondition = Some protocol_state_precondition
-            ; account_precondition = None
+            ; preconditions =
+                Some
+                  { Party.Preconditions.network = network_precondition
+                  ; account = Party.Account_precondition.Accept
+                  }
             }
           in
           U.test_snapp_update test_spec ~state_body ~init_ledger ~vk
@@ -133,14 +137,13 @@ let%test_module "Protocol state precondition tests" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ledger = U.gen_snapp_ledger in
-        let%map protocol_state_precondition =
+        let%map network_precondition =
           Mina_generators.Parties_generators.gen_protocol_state_precondition psv
         in
-        (ledger, protocol_state_precondition)
+        (ledger, network_precondition)
       in
       Quickcheck.test ~trials:1 gen
-        ~f:(fun (({ init_ledger; specs }, new_kp), protocol_state_precondition)
-           ->
+        ~f:(fun (({ init_ledger; specs }, new_kp), network_precondition) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let fee = Fee.of_int 1_000_000 in
@@ -149,8 +152,8 @@ let%test_module "Protocol state precondition tests" =
                   let new_slot =
                     Mina_numbers.Global_slot.succ psv.global_slot_since_genesis
                   in
-                  let invalid_protocol_state_precondition =
-                    { protocol_state_precondition with
+                  let invalid_network_precondition =
+                    { network_precondition with
                       global_slot_since_genesis =
                         Zkapp_basic.Or_ignore.(
                           Check
@@ -172,9 +175,12 @@ let%test_module "Protocol state precondition tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition =
-                        Some invalid_protocol_state_precondition
-                    ; account_precondition = None
+                    ; preconditions =
+                        Some
+                          { Party.Preconditions.network =
+                              invalid_network_precondition
+                          ; account = Party.Account_precondition.Accept
+                          }
                     }
                   in
                   let open Async.Deferred.Let_syntax in
@@ -209,14 +215,13 @@ let%test_module "Protocol state precondition tests" =
       let gen =
         let open Quickcheck.Let_syntax in
         let%bind ledger = U.gen_snapp_ledger in
-        let%map protocol_state_precondition =
+        let%map network_precondition =
           Mina_generators.Parties_generators.gen_protocol_state_precondition psv
         in
-        (ledger, protocol_state_precondition)
+        (ledger, network_precondition)
       in
       Quickcheck.test ~trials:1 gen
-        ~f:(fun (({ init_ledger; specs }, new_kp), protocol_state_precondition)
-           ->
+        ~f:(fun (({ init_ledger; specs }, new_kp), network_precondition) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let fee = Fee.of_int 1_000_000 in
@@ -225,8 +230,8 @@ let%test_module "Protocol state precondition tests" =
                   let new_slot =
                     Mina_numbers.Global_slot.succ psv.global_slot_since_genesis
                   in
-                  let invalid_protocol_state_precondition =
-                    { protocol_state_precondition with
+                  let invalid_network_precondition =
+                    { network_precondition with
                       global_slot_since_genesis =
                         Zkapp_basic.Or_ignore.(
                           Check
@@ -248,14 +253,14 @@ let%test_module "Protocol state precondition tests" =
                         ; fee
                         ; events = []
                         ; sequence_events = []
-                        ; protocol_state_precondition
+                        ; protocol_state_precondition = network_precondition
                         ; nonce = sender_nonce
                         }
                         (*To be updated later*)
                     ; authorization = Signature.dummy
                     }
                   in
-                  let sender_party : Party.Wire.t =
+                  let sender_party : Party.Simple.t =
                     { body =
                         { public_key = sender_pk
                         ; update = Party.Update.noop
@@ -267,10 +272,11 @@ let%test_module "Protocol state precondition tests" =
                         ; sequence_events = []
                         ; call_data = Snark_params.Tick.Field.zero
                         ; call_depth = 0
-                        ; protocol_state_precondition =
-                            invalid_protocol_state_precondition
-                        ; account_precondition =
-                            Nonce (Account.Nonce.succ sender_nonce)
+                        ; preconditions =
+                            { Party.Preconditions.network =
+                                invalid_network_precondition
+                            ; account = Nonce (Account.Nonce.succ sender_nonce)
+                            }
                         ; use_full_commitment = false
                         ; caller = Call
                         }
@@ -278,7 +284,7 @@ let%test_module "Protocol state precondition tests" =
                     ; authorization = Control.Signature Signature.dummy
                     }
                   in
-                  let snapp_party : Party.Wire.t =
+                  let snapp_party : Party.Simple.t =
                     { body =
                         { public_key = snapp_pk
                         ; update = snapp_update
@@ -296,10 +302,11 @@ let%test_module "Protocol state precondition tests" =
                         ; sequence_events = []
                         ; call_data = Snark_params.Tick.Field.zero
                         ; call_depth = 0
-                        ; protocol_state_precondition =
-                            invalid_protocol_state_precondition
-                        ; account_precondition =
-                            Party.Account_precondition.Accept
+                        ; preconditions =
+                            { Party.Preconditions.network =
+                                invalid_network_precondition
+                            ; account = Party.Account_precondition.Accept
+                            }
                         ; use_full_commitment = true
                         ; caller = Call
                         }
@@ -309,7 +316,7 @@ let%test_module "Protocol state precondition tests" =
                     }
                   in
                   let ps =
-                    Parties.Call_forest.With_hashes.of_parties_list
+                    Parties.Call_forest.With_hashes.of_parties_simple_list
                       (List.map
                          ~f:(fun p -> (p, ()))
                          [ sender_party; snapp_party ] )
@@ -333,7 +340,7 @@ let%test_module "Protocol state precondition tests" =
                     in
                     { fee_payer with authorization = fee_payer_signature_auth }
                   in
-                  let sender_party : Party.Wire.t =
+                  let sender_party : Party.Simple.t =
                     let signature_auth : Signature.t =
                       Signature_lib.Schnorr.Chunked.sign sender.private_key
                         (Random_oracle.Input.Chunked.field commitment)
@@ -356,7 +363,7 @@ let%test_module "Protocol state precondition tests" =
                     ; memo
                     ; other_parties = [ sender_party; snapp_party ]
                     }
-                    |> Parties.of_wire
+                    |> Parties.of_simple
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
@@ -478,9 +485,12 @@ let%test_module "Account precondition tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition =
-                        Some (precondition_exact snapp_account)
+                    ; preconditions =
+                        Some
+                          { Party.Preconditions.network =
+                              Zkapp_precondition.Protocol_state.accept
+                          ; account = precondition_exact snapp_account
+                          }
                     }
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
@@ -542,8 +552,12 @@ let%test_module "Account precondition tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = Some account_precondition
+                    ; preconditions =
+                        Some
+                          { Party.Preconditions.network =
+                              Zkapp_precondition.Protocol_state.accept
+                          ; account = account_precondition
+                          }
                     }
                   in
                   let%bind parties =
@@ -589,8 +603,12 @@ let%test_module "Account precondition tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = Some account_precondition
+                    ; preconditions =
+                        Some
+                          { Party.Preconditions.network =
+                              Zkapp_precondition.Protocol_state.accept
+                          ; account = account_precondition
+                          }
                     }
                   in
                   let open Async.Deferred.Let_syntax in
@@ -644,7 +662,7 @@ let%test_module "Account precondition tests" =
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party : Party.Wire.t =
+              let sender_party : Party.Simple.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -656,10 +674,11 @@ let%test_module "Account precondition tests" =
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
-                    ; account_precondition =
-                        Nonce (Account.Nonce.succ sender_nonce)
+                    ; preconditions =
+                        { Party.Preconditions.network =
+                            Zkapp_precondition.Protocol_state.accept
+                        ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        }
                     ; use_full_commitment = false
                     ; caller = Call
                     }
@@ -667,7 +686,7 @@ let%test_module "Account precondition tests" =
                 ; authorization = Control.Signature Signature.dummy
                 }
               in
-              let snapp_party : Party.Wire.t =
+              let snapp_party : Party.Simple.t =
                 { body =
                     { public_key = snapp_pk
                     ; update = snapp_update
@@ -683,9 +702,11 @@ let%test_module "Account precondition tests" =
                     ; sequence_events = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
-                    ; account_precondition = Party.Account_precondition.Accept
+                    ; preconditions =
+                        { Party.Preconditions.network =
+                            Zkapp_precondition.Protocol_state.accept
+                        ; account = Party.Account_precondition.Accept
+                        }
                     ; use_full_commitment = true
                     ; caller = Call
                     }
@@ -694,7 +715,7 @@ let%test_module "Account precondition tests" =
                 }
               in
               let ps =
-                Parties.Call_forest.With_hashes.of_parties_list
+                Parties.Call_forest.With_hashes.of_parties_simple_list
                   (List.map ~f:(fun p -> (p, ())) [ sender_party; snapp_party ])
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
@@ -735,7 +756,7 @@ let%test_module "Account precondition tests" =
                 }
               in
               let parties_with_invalid_fee_payer =
-                Parties.of_wire
+                Parties.of_simple
                   { fee_payer
                   ; memo
                   ; other_parties = [ sender_party; snapp_party ]
