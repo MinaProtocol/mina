@@ -33,8 +33,7 @@ let%test_module "Snapp deploy tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =
@@ -76,8 +75,7 @@ let%test_module "Snapp deploy tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =
@@ -113,8 +111,7 @@ let%test_module "Snapp deploy tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =
@@ -151,8 +148,7 @@ let%test_module "Snapp deploy tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =
@@ -189,8 +185,7 @@ let%test_module "Snapp deploy tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =

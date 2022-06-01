@@ -32,7 +32,7 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      Parties.of_wire
+      Parties.of_simple
         { fee_payer =
             { body =
                 { public_key = acct1.account.public_key
@@ -69,10 +69,12 @@ let%test_module "Zkapp payments tests" =
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state_precondition =
-                      Zkapp_precondition.Protocol_state.accept
+                  ; preconditions =
+                      { Party.Preconditions.network =
+                          Zkapp_precondition.Protocol_state.accept
+                      ; account = Accept
+                      }
                   ; use_full_commitment = false
-                  ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = Signature Signature.dummy
@@ -87,10 +89,12 @@ let%test_module "Zkapp payments tests" =
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state_precondition =
-                      Zkapp_precondition.Protocol_state.accept
+                  ; preconditions =
+                      { Party.Preconditions.network =
+                          Zkapp_precondition.Protocol_state.accept
+                      ; account = Accept
+                      }
                   ; use_full_commitment = false
-                  ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = None_given
@@ -189,8 +193,7 @@ let%test_module "Zkapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =
@@ -257,8 +260,7 @@ let%test_module "Zkapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =

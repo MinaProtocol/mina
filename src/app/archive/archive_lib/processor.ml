@@ -1203,7 +1203,7 @@ module Zkapp_epoch_data = struct
       id
 end
 
-module Zkapp_protocol_state_precondition = struct
+module Zkapp_network_precondition = struct
   type t =
     { snarked_ledger_hash_id : int option
     ; timestamp_id : int option
@@ -1231,7 +1231,7 @@ module Zkapp_protocol_state_precondition = struct
         ; int
         ]
 
-  let table_name = "zkapp_protocol_state_precondition"
+  let table_name = "zkapp_network_precondition"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
@@ -1340,7 +1340,7 @@ module Zkapp_other_party_body = struct
     ; sequence_events_id : int
     ; call_data_id : int
     ; call_depth : int
-    ; zkapp_protocol_state_precondition_id : int
+    ; zkapp_network_precondition_id : int
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
     ; caller : string
@@ -1354,8 +1354,8 @@ module Zkapp_other_party_body = struct
 
   let table_name = "zkapp_other_party_body"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (body : Party.Body.Wire.t)
-      =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (body : Party.Body.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let account_identifier = Account_id.create body.public_key body.token_id in
     let%bind account_identifier_id =
@@ -1374,8 +1374,8 @@ module Zkapp_other_party_body = struct
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
     in
-    let%bind zkapp_protocol_state_precondition_id =
-      Zkapp_protocol_state_precondition.add_if_doesn't_exist
+    let%bind zkapp_network_precondition_id =
+      Zkapp_network_precondition.add_if_doesn't_exist
         (module Conn)
         body.preconditions.network
     in
@@ -1404,7 +1404,7 @@ module Zkapp_other_party_body = struct
       ; sequence_events_id
       ; call_data_id
       ; call_depth
-      ; zkapp_protocol_state_precondition_id
+      ; zkapp_network_precondition_id
       ; zkapp_account_precondition_id
       ; use_full_commitment
       ; caller
@@ -1460,7 +1460,7 @@ module Zkapp_other_party = struct
 
   let table_name = "zkapp_other_party"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.Wire.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) (party : Party.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
       Zkapp_other_party_body.add_if_doesn't_exist (module Conn) party.body
@@ -1486,7 +1486,7 @@ module Zkapp_fee_payer_body = struct
     ; fee : string
     ; events_id : int
     ; sequence_events_id : int
-    ; zkapp_protocol_state_precondition_id : int
+    ; zkapp_network_precondition_id : int
     ; nonce : int64
     }
   [@@deriving fields, hlist]
@@ -1515,8 +1515,8 @@ module Zkapp_fee_payer_body = struct
     let%bind sequence_events_id =
       Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
     in
-    let%bind zkapp_protocol_state_precondition_id =
-      Zkapp_protocol_state_precondition.add_if_doesn't_exist
+    let%bind zkapp_network_precondition_id =
+      Zkapp_network_precondition.add_if_doesn't_exist
         (module Conn)
         body.protocol_state_precondition
     in
@@ -1531,7 +1531,7 @@ module Zkapp_fee_payer_body = struct
       ; fee
       ; events_id
       ; sequence_events_id
-      ; zkapp_protocol_state_precondition_id
+      ; zkapp_network_precondition_id
       ; nonce
       }
     in
@@ -1800,7 +1800,7 @@ module User_command = struct
 
     let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Parties.t) =
       let open Deferred.Result.Let_syntax in
-      let parties = Parties.to_wire ps in
+      let parties = Parties.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
         Zkapp_fee_payer_body.add_if_doesn't_exist
           (module Conn)
@@ -2942,15 +2942,15 @@ module Block = struct
             let (fee_payer : Party.Fee_payer.t) =
               { body = fee_payer; authorization = Signature.dummy }
             in
-            let (other_parties : Party.Wire.t list) =
+            let (other_parties : Party.Simple.t list) =
               List.map other_parties
-                ~f:(fun (body : Party.Body.Wire.t) : Party.Wire.t ->
+                ~f:(fun (body : Party.Body.Simple.t) : Party.Simple.t ->
                   { body; authorization = None_given } )
             in
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
-                (Parties.of_wire { fee_payer; other_parties; memo })
+                (Parties.of_simple { fee_payer; other_parties; memo })
             in
             (zkapp_cmd, cmd_id) :: acc )
       in

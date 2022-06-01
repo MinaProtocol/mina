@@ -31,6 +31,13 @@ module Call_type = struct
     end
   end]
 
+  let gen =
+    Quickcheck.Generator.(map bool) ~f:(function
+      | true ->
+          Call
+      | false ->
+          Delegate_call )
+
   let to_string = function Call -> "call" | Delegate_call -> "delegate_call"
 
   let of_string = function
@@ -508,6 +515,17 @@ module Account_precondition = struct
     end
   end]
 
+  let gen : t Quickcheck.Generator.t =
+    Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
+      Account.Nonce.gen Unit.quickcheck_generator
+    |> Quickcheck.Generator.map ~f:(function
+         | `A x ->
+             Full x
+         | `B x ->
+             Nonce x
+         | `C () ->
+             Accept )
+
   let to_full = function
     | Full s ->
         s
@@ -654,6 +672,12 @@ module Preconditions = struct
       ; Random_oracle_input.Chunked.field (Account_precondition.digest account)
       ]
 
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map network = Zkapp_precondition.Protocol_state.gen
+    and account = Account_precondition.gen in
+    { network; account }
+
   module Checked = struct
     module Type_of_var (V : sig
       type var
@@ -679,8 +703,6 @@ module Preconditions = struct
             (Account_precondition.Checked.digest account)
         ]
   end
-
-  let x = Zkapp_precondition.Protocol_state.to_input
 
   let typ () : (Checked.t, t) Typ.t =
     Typ.of_hlistable
@@ -724,12 +746,115 @@ module Body = struct
           ; events : Events'.Stable.V1.t
           ; sequence_events : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-          ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; caller : Call_type.Stable.V1.t
           }
         [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map public_key = Public_key.Compressed.gen
+      and token_id = Token_id.gen
+      and update = Update.gen ()
+      and balance_change = Currency.Amount.Signed.gen
+      and increment_nonce = Quickcheck.Generator.bool
+      and events = return []
+      and sequence_events = return []
+      and call_data = Field.gen
+      and preconditions = Preconditions.gen
+      and use_full_commitment = Quickcheck.Generator.bool
+      and caller = Call_type.gen in
+      { public_key
+      ; token_id
+      ; update
+      ; balance_change
+      ; increment_nonce
+      ; events
+      ; sequence_events
+      ; call_data
+      ; preconditions
+      ; use_full_commitment
+      ; caller
+      }
+  end
+
+  module Graphql_repr = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V1.t
+          ; update : Update.Stable.V1.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; sequence_events : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V1.t
+          ; use_full_commitment : bool
+          ; caller : Token_id.Stable.V1.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let deriver obj =
+      let open Fields_derivers_zkapps in
+      let ( !. ) = ( !. ) ~t_fields_annots in
+      Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
+        ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
+        ~increment_nonce:!.bool ~events:!.Events.deriver
+        ~sequence_events:!.Events.deriver ~call_data:!.field
+        ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
+        ~caller:!.Token_id.deriver ~call_depth:!.int
+      |> finish "PartyBody" ~t_toplevel_annots
+
+    let dummy : t =
+      { public_key = Public_key.Compressed.empty
+      ; update = Update.dummy
+      ; token_id = Token_id.default
+      ; balance_change = Amount.Signed.zero
+      ; increment_nonce = false
+      ; events = []
+      ; sequence_events = []
+      ; call_data = Field.zero
+      ; call_depth = 0
+      ; preconditions = Preconditions.accept
+      ; use_full_commitment = false
+      ; caller = Token_id.default
+      }
+  end
+
+  module Simple = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V1.t
+          ; update : Update.Stable.V1.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; sequence_events : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V1.t
+          ; use_full_commitment : bool
+          ; caller : Call_type.Stable.V1.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
         let to_latest = Fn.id
       end
@@ -749,7 +874,6 @@ module Body = struct
         ; events : Events'.Stable.V1.t
         ; sequence_events : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-        ; call_depth : int
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
         ; caller : Token_id.Stable.V1.t
@@ -769,10 +893,65 @@ module Body = struct
     ; events = p.events
     ; sequence_events = p.sequence_events
     ; call_data = p.call_data
-    ; call_depth = p.call_depth
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
     ; caller
+    }
+
+  let of_graphql_repr
+      ({ public_key
+       ; token_id
+       ; update
+       ; balance_change
+       ; increment_nonce
+       ; events
+       ; sequence_events
+       ; call_data
+       ; preconditions
+       ; use_full_commitment
+       ; caller
+       ; call_depth = _
+       } :
+        Graphql_repr.t ) : t =
+    { public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; sequence_events
+    ; call_data
+    ; preconditions
+    ; use_full_commitment
+    ; caller
+    }
+
+  let to_graphql_repr
+      ({ public_key
+       ; token_id
+       ; update
+       ; balance_change
+       ; increment_nonce
+       ; events
+       ; sequence_events
+       ; call_data
+       ; preconditions
+       ; use_full_commitment
+       ; caller
+       } :
+        t ) ~call_depth : Graphql_repr.t =
+    { Graphql_repr.public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; sequence_events
+    ; call_data
+    ; preconditions
+    ; use_full_commitment
+    ; caller
+    ; call_depth
     }
 
   (* * Balance change for the fee payer is always going to be Neg, so represent it using
@@ -803,6 +982,24 @@ module Body = struct
         let to_latest = Fn.id
       end
     end]
+
+    let gen : t Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map public_key = Public_key.Compressed.gen
+      and update = Update.gen ()
+      and fee = Currency.Fee.gen
+      and nonce = Account.Nonce.gen
+      and events = return []
+      and sequence_events = return []
+      and protocol_state_precondition = Zkapp_precondition.Protocol_state.gen in
+      { public_key
+      ; update
+      ; fee
+      ; events
+      ; sequence_events
+      ; protocol_state_precondition
+      ; nonce
+      }
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
@@ -844,7 +1041,6 @@ module Body = struct
     ; events = t.events
     ; sequence_events = t.sequence_events
     ; call_data = Field.zero
-    ; call_depth = 0
     ; preconditions =
         { Preconditions.network = t.protocol_state_precondition
         ; account = Account_precondition.Nonce t.nonce
@@ -862,7 +1058,6 @@ module Body = struct
         ; events
         ; sequence_events
         ; call_data = _
-        ; call_depth = _
         ; preconditions
         ; use_full_commitment = _
         ; caller = _
@@ -910,7 +1105,6 @@ module Body = struct
       ; events : Events.var
       ; sequence_events : Events.var
       ; call_data : Field.Var.t
-      ; call_depth : int As_prover.Ref.t
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
       ; caller : Token_id.Checked.t
@@ -926,7 +1120,6 @@ module Body = struct
          ; events
          ; sequence_events
          ; call_data
-         ; call_depth = _depth (* ignored *)
          ; preconditions
          ; use_full_commitment
          ; caller
@@ -964,7 +1157,6 @@ module Body = struct
       ; Events.typ
       ; Events.typ
       ; Field.typ
-      ; Typ.Internal.ref ()
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
       ; Token_id.typ
@@ -981,28 +1173,17 @@ module Body = struct
     ; events = []
     ; sequence_events = []
     ; call_data = Field.zero
-    ; call_depth = 0
     ; preconditions = Preconditions.accept
     ; use_full_commitment = false
     ; caller = Token_id.default
     }
 
-  let deriver obj =
-    let open Fields_derivers_zkapps in
-    let ( !. ) = ( !. ) ~t_fields_annots in
-    Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-      ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
-      ~increment_nonce:!.bool ~events:!.Events.deriver
-      ~sequence_events:!.Events.deriver ~call_data:!.field ~call_depth:!.int
-      ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
-      ~caller:!.Token_id.deriver
-    |> finish "PartyBody" ~t_toplevel_annots
-
   let%test_unit "json roundtrip" =
     let open Fields_derivers_zkapps.Derivers in
     let full = o () in
-    let _a = deriver full in
-    [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
+    let _a = Graphql_repr.deriver full in
+    [%test_eq: Graphql_repr.t] Graphql_repr.dummy
+      (Graphql_repr.dummy |> to_json full |> of_json full)
 
   let to_input
       ({ public_key
@@ -1013,7 +1194,6 @@ module Body = struct
        ; events
        ; sequence_events
        ; call_data
-       ; call_depth = _ (* ignored *)
        ; preconditions
        ; use_full_commitment
        ; caller
@@ -1043,9 +1223,73 @@ module Body = struct
       type t = Random_oracle.Checked.Digest.t
     end
   end
+
+  let gen caller =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map public_key = Public_key.Compressed.gen
+    and token_id = Token_id.gen
+    and update = Update.gen ()
+    and balance_change = Currency.Amount.Signed.gen
+    and increment_nonce = Quickcheck.Generator.bool
+    and events = return []
+    and sequence_events = return []
+    and call_data = Field.gen
+    and preconditions = Preconditions.gen
+    and use_full_commitment = Quickcheck.Generator.bool in
+    { public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; sequence_events
+    ; call_data
+    ; preconditions
+    ; use_full_commitment
+    ; caller
+    }
 end
 
 module T = struct
+  module Graphql_repr = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        (** A party to a zkApp transaction *)
+        type t =
+          { body : Body.Graphql_repr.Stable.V1.t
+          ; authorization : Control.Stable.V2.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let deriver obj =
+      let open Fields_derivers_zkapps.Derivers in
+      let ( !. ) = ( !. ) ~t_fields_annots in
+      Fields.make_creator obj
+        ~body:!.Body.Graphql_repr.deriver
+        ~authorization:!.Control.deriver
+      |> finish "ZkappParty" ~t_toplevel_annots
+  end
+
+  module Simple = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { body : Body.Simple.Stable.V1.t
+          ; authorization : Control.Stable.V2.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   module Wire = struct
     [%%versioned
     module Stable = struct
@@ -1057,6 +1301,20 @@ module T = struct
         let to_latest = Fn.id
       end
     end]
+
+    let gen : t Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map body = Body.Wire.gen
+      and authorization = Control.gen_with_dummies in
+      { body; authorization }
+
+    let quickcheck_generator : t Quickcheck.Generator.t = gen
+
+    let quickcheck_observer : t Quickcheck.Observer.t =
+      Quickcheck.Observer.of_hash (module Stable.Latest)
+
+    let quickcheck_shrinker : t Quickcheck.Shrinker.t =
+      Quickcheck.Shrinker.empty ()
   end
 
   [%%versioned
@@ -1070,6 +1328,19 @@ module T = struct
     end
   end]
 
+  let of_graphql_repr ({ body; authorization } : Graphql_repr.t) : t =
+    { authorization; body = Body.of_graphql_repr body }
+
+  let to_graphql_repr ({ body; authorization } : t) ~call_depth : Graphql_repr.t
+      =
+    { authorization; body = Body.to_graphql_repr ~call_depth body }
+
+  let gen caller : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map body = Body.gen caller
+    and authorization = Control.gen_with_dummies in
+    { body; authorization }
+
   let to_wire (p : t) caller : Wire.t =
     { body = Body.to_wire p.body caller; authorization = p.authorization }
 
@@ -1081,20 +1352,15 @@ module T = struct
     let digest (t : t) = Body.Checked.digest t
   end
 
-  let deriver obj =
-    let open Fields_derivers_zkapps.Derivers in
-    let ( !. ) = ( !. ) ~t_fields_annots in
-    Fields.make_creator obj ~body:!.Body.deriver
-      ~authorization:!.Control.deriver
-    |> finish "ZkappParty" ~t_toplevel_annots
-
   let%test_unit "json roundtrip dummy" =
-    let dummy : t =
-      { body = Body.dummy; authorization = Control.dummy_of_tag Signature }
+    let dummy : Graphql_repr.t =
+      to_graphql_repr ~call_depth:0
+        { body = Body.dummy; authorization = Control.dummy_of_tag Signature }
     in
     let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver @@ Fd.o () in
-    [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+    let full = Graphql_repr.deriver @@ Fd.o () in
+    [%test_eq: Graphql_repr.t] dummy
+      (dummy |> Fd.to_json full |> Fd.of_json full)
 end
 
 module Fee_payer = struct
@@ -1110,6 +1376,20 @@ module Fee_payer = struct
       let to_latest = Fn.id
     end
   end]
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Let_syntax in
+    let%map body = Body.Fee_payer.gen in
+    let authorization = Signature.dummy in
+    { body; authorization }
+
+  let quickcheck_generator : t Quickcheck.Generator.t = gen
+
+  let quickcheck_obserber : t Quickcheck.Observer.t =
+    Quickcheck.Observer.of_hash (module Stable.Latest)
+
+  let quickcheck_shrinker : t Quickcheck.Shrinker.t =
+    Quickcheck.Shrinker.empty ()
 
   let account_id (t : t) : Account_id.t =
     Account_id.create t.body.public_key Token_id.default
