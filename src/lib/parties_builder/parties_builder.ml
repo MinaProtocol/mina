@@ -23,9 +23,11 @@ let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
   ; sequence_events = []
   ; call_data = Pickles.Impls.Step.Field.Constant.zero
   ; call_depth = 0
-  ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+  ; preconditions =
+      { network = Zkapp_precondition.Protocol_state.accept
+      ; account = Party.Account_precondition.Accept
+      }
   ; use_full_commitment = true
-  ; account_precondition = Accept
   ; caller
   }
 
