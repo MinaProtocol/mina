@@ -61,7 +61,7 @@ module Zkapp_command = struct
   type t =
     { sequence_no : int
     ; fee_payer : Party.Body.Fee_payer.Stable.Latest.t
-    ; other_parties : Party.Body.Wire.Stable.Latest.t list
+    ; other_parties : Party.Body.Simple.Stable.Latest.t list
     ; memo : Signed_command_memo.Stable.Latest.t
     ; hash : Transaction_hash.Stable.Latest.t
           [@to_yojson Transaction_hash.to_yojson]

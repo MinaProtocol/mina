@@ -521,7 +521,8 @@ module For_tests : sig
   end
 
   val deploy_snapp :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       ?no_auth:bool
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
     -> Parties.t
 
