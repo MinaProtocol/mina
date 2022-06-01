@@ -23,6 +23,7 @@
    mina_numbers
    pipe_lib
    mina_base
+   mina_transaction
    transition_frontier
    network_pool
    transition_frontier_base
@@ -31,6 +32,7 @@
    genesis_constants
    non_empty_list
    inline_test_quiet_logs
+   mina_base.import
    mina_block
 )
  (instrumentation (backend bisect_ppx))

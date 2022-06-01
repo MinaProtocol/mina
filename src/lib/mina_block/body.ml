@@ -3,7 +3,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = { staged_ledger_diff : Staged_ledger_diff.Stable.V1.t }
+    type t = { staged_ledger_diff : Staged_ledger_diff.Stable.V2.t }
     [@@deriving compare, sexp, fields]
 
     let to_latest = Fn.id

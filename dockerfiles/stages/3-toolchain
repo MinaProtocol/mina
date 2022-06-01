@@ -19,6 +19,11 @@ ARG MINA_DIR=mina
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
+# Rust nightly toolchain for WebAssembly builds
+ARG RUST_NIGHTLY=2021-11-16
+
+ENV PATH "$PATH:$HOME/.cargo/bin"
+
 # don't keep sources, to force reinstall of pinned packages from Mina sources
 # and to keep Docker image reasonable size
 ENV OPAMKEEPBUILDDIR=false
@@ -73,8 +78,8 @@ RUN test "$deb_codename" = "buster" \
       || exit 0
 
 # --- deb-s3 tool
-# tweag version, with lock only on manifest upload
-RUN curl -sLO https://github.com/tweag/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
+# Custom version, with lock only on manifest upload
+RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
     && sudo gem install deb-s3-${DEBS3_VERSION}.gem \
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
@@ -101,8 +106,8 @@ RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
     && sudo apt-get update -y \
     && sudo apt-get install -y helm
 
-# Get yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
+# --- yarn + nodejs
+RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && sudo apt update \
@@ -115,3 +120,8 @@ RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHAL
     | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
     | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
+
+# --- extra Rust toolchain and wasm-pack for Wasm builds
+RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
+    && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}"
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh

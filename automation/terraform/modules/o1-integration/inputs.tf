@@ -81,6 +81,11 @@ variable "mina_archive_schema" {
   type = string
 }
 
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
+}
+
 variable "block_producer_configs" {
   type = list(
     object({
