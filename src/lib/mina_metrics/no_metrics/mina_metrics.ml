@@ -77,6 +77,10 @@ module Bootstrap = struct
   let staking_epoch_ledger_sync_ms : Gauge.t = ()
 
   let next_epoch_ledger_sync_ms : Gauge.t = ()
+
+  let root_snarked_ledger_sync_ms : Gauge.t = ()
+
+  let num_of_root_snarked_ledger_retargeted : Gauge.t = ()
 end
 
 module Transaction_pool = struct

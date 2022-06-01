@@ -67,6 +67,10 @@ module Bootstrap : sig
   val staking_epoch_ledger_sync_ms : Gauge.t
 
   val next_epoch_ledger_sync_ms : Gauge.t
+
+  val root_snarked_ledger_sync_ms : Gauge.t
+
+  val num_of_root_snarked_ledger_retargeted : Gauge.t
 end
 
 module Transaction_pool : sig
