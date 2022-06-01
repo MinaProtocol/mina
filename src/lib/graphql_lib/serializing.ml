@@ -61,6 +61,14 @@ module type S_JSON = S with type conv := Yojson.Basic.t
 
 module type S_STRING = S with type conv := string
 
+module String : S_JSON with type t = string = struct
+  type t = string
+
+  let parse = Yojson.Basic.Util.to_string
+
+  let serialize = unimplemented_serializer "string"
+end
+
 module Optional (F : S_JSON) : S_JSON with type t = F.t option = struct
   type t = F.t option
 
@@ -69,12 +77,38 @@ module Optional (F : S_JSON) : S_JSON with type t = F.t option = struct
   let serialize = Encoders.optional ~f:F.serialize
 end
 
+module UInt32 : S_JSON with type t = Unsigned.UInt32.t = struct
+  type t = Unsigned.UInt32.t
+
+  let parse = Decoders.uint32
+
+  let serialize = Encoders.uint32
+end
+
+module Optional_uint32 = Optional (UInt32)
+
 module UInt64 : S_JSON with type t = Unsigned.UInt64.t = struct
   type t = Unsigned.UInt64.t
 
   let parse = Decoders.uint64
 
   let serialize = Encoders.uint64
+end
+
+module Int64 : S_JSON with type t = Signed.Int64.t = struct
+  type t = Signed.Int64.t
+
+  let parse = Decoders.int64
+
+  let serialize = unimplemented_serializer "int64"
+end
+
+module Int64_s : S_STRING with type t = Signed.Int64.t = struct
+  type t = Signed.Int64.t
+
+  let parse = Signed.Int64.of_string
+
+  let serialize = unimplemented_serializer "int64"
 end
 
 module Public_key : S_JSON with type t = Signature_lib.Public_key.Compressed.t =
