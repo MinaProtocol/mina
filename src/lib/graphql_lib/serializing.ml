@@ -139,6 +139,8 @@ module Balance : S_JSON with type t = Currency.Balance.t = struct
   let serialize = unimplemented_serializer "balance"
 end
 
+module Optional_balance = Optional (Balance)
+
 module Token : S_JSON with type t = Mina_base.Token_id.t = struct
   type t = Mina_base.Token_id.t
 

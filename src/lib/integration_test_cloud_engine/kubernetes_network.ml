@@ -267,11 +267,11 @@ module Node = struct
     module Account =
     [%graphql
     {|
-      query ($public_key: PublicKey, $token: UInt64) {
+      query ($public_key: PublicKey!, $token: UInt64) {
         account (publicKey : $public_key, token : $token) {
-          balance { liquid @bsDecoder(fn: "Decoders.optional_balance")
-                    locked @bsDecoder(fn: "Decoders.optional_balance")
-                    total @bsDecoder(fn: "Decoders.balance")
+          balance { liquid @ppxCustom(module: "Serializing.Balance")
+                    locked @ppxCustom(module: "Serializing.Balance")
+                    total @ppxCustom(module: "Serializing.Balance")
                   }
           delegate
           nonce
@@ -426,10 +426,12 @@ module Node = struct
         ( ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pk)
         :: logger_metadata t ) ;
     let get_account_obj =
-      Graphql.Account.make
-        ~public_key:(Graphql_lib.Encoders.public_key pk)
-        ~token:(Graphql_lib.Encoders.token token)
-        ()
+      Graphql.Account.(
+        make
+        @@ makeVariables
+             ~public_key:(Graphql_lib.Encoders.public_key pk)
+             ~token:(Graphql_lib.Encoders.token token)
+             ())
     in
     exec_graphql_request ~logger ~node:t ~query_name:"get_account_graphql"
       get_account_obj
@@ -491,19 +493,20 @@ module Node = struct
       | `Signature ->
           Signature
     in
+    let open Graphql.Account in
     { edit_sequence_state =
-        to_auth_required account_permissions#editSequenceState
-    ; edit_state = to_auth_required account_permissions#editState
-    ; increment_nonce = to_auth_required account_permissions#incrementNonce
-    ; receive = to_auth_required account_permissions#receive
-    ; send = to_auth_required account_permissions#send
-    ; set_delegate = to_auth_required account_permissions#setDelegate
-    ; set_permissions = to_auth_required account_permissions#setPermissions
-    ; set_zkapp_uri = to_auth_required account_permissions#setZkappUri
-    ; set_token_symbol = to_auth_required account_permissions#setTokenSymbol
+        to_auth_required account_permissions.editSequenceState
+    ; edit_state = to_auth_required account_permissions.editState
+    ; increment_nonce = to_auth_required account_permissions.incrementNonce
+    ; receive = to_auth_required account_permissions.receive
+    ; send = to_auth_required account_permissions.send
+    ; set_delegate = to_auth_required account_permissions.setDelegate
+    ; set_permissions = to_auth_required account_permissions.setPermissions
+    ; set_zkapp_uri = to_auth_required account_permissions.setZkappUri
+    ; set_token_symbol = to_auth_required account_permissions.setTokenSymbol
     ; set_verification_key =
-        to_auth_required account_permissions#setVerificationKey
-    ; set_voting_for = to_auth_required account_permissions#setVotingFor
+        to_auth_required account_permissions.setVerificationKey
+    ; set_voting_for = to_auth_required account_permissions.setVotingFor
     }
 
   let graphql_uri node = Graphql.ingress_uri node |> Uri.to_string
@@ -512,9 +515,9 @@ module Node = struct
     let open Deferred.Or_error in
     let open Let_syntax in
     let%bind account_obj = get_account ~logger t ~account_id in
-    match account_obj#account with
+    match account_obj.account with
     | Some account -> (
-        match account#permissions with
+        match account.permissions with
         | Some ledger_permissions ->
             return @@ permissions_of_account_permissions ledger_permissions
         | None ->
@@ -532,11 +535,11 @@ module Node = struct
     let open Deferred.Or_error in
     let open Let_syntax in
     let%bind account_obj = get_account ~logger t ~account_id in
-    match account_obj#account with
+    match account_obj.account with
     | Some account ->
         let open Mina_base.Zkapp_basic.Set_or_keep in
         let%bind app_state =
-          match account#zkappState with
+          match account.zkappState with
           | Some strs ->
               let fields =
                 Array.to_list strs
@@ -554,7 +557,7 @@ module Node = struct
                          (Mina_base.Account_id.public_key account_id) ) ) )
         in
         let%bind delegate =
-          match account#delegate with
+          match account.delegate with
           | Some (`String s) ->
               return
                 (Set (Signature_lib.Public_key.Compressed.of_base58_check_exn s))
@@ -567,13 +570,13 @@ module Node = struct
               fail (Error.of_string "Expected delegate in account")
         in
         let%bind verification_key =
-          match account#verificationKey with
+          match account.verificationKey with
           | Some vk_obj ->
               let data =
                 Pickles.Side_loaded.Verification_key.of_base58_check_exn
-                  vk_obj#verificationKey
+                  vk_obj.verificationKey
               in
-              let hash = Pickles.Backend.Tick.Field.of_string vk_obj#hash in
+              let hash = Pickles.Backend.Tick.Field.of_string vk_obj.hash in
               return (Set ({ data; hash } : _ With_hash.t))
           | None ->
               fail
@@ -585,33 +588,33 @@ module Node = struct
                          (Mina_base.Account_id.public_key account_id) ) ) )
         in
         let%bind permissions =
-          match account#permissions with
+          match account.permissions with
           | Some perms ->
               return @@ Set (permissions_of_account_permissions perms)
           | None ->
               fail (Error.of_string "Expected permissions in account")
         in
         let%bind zkapp_uri =
-          match account#zkappUri with
+          match account.zkappUri with
           | Some s ->
               return @@ Set s
           | None ->
               fail (Error.of_string "Expected zkApp URI in account")
         in
         let%bind token_symbol =
-          match account#tokenSymbol with
+          match account.tokenSymbol with
           | Some s ->
               return @@ Set s
           | None ->
               fail (Error.of_string "Expected token symbol in account")
         in
         let%bind timing =
-          let timing = account#timing in
-          let cliff_amount = timing#cliffAmount in
-          let cliff_time = timing#cliffTime in
-          let vesting_period = timing#vestingPeriod in
-          let vesting_increment = timing#vestingIncrement in
-          let initial_minimum_balance = timing#initialMinimumBalance in
+          let timing = account.timing in
+          let cliff_amount = timing.cliffAmount in
+          let cliff_time = timing.cliffTime in
+          let vesting_period = timing.vestingPeriod in
+          let vesting_increment = timing.vestingIncrement in
+          let initial_minimum_balance = timing.initialMinimumBalance in
           match
             ( cliff_amount
             , cliff_time
@@ -682,7 +685,7 @@ module Node = struct
               fail (Error.of_string "Some pieces of account timing are missing")
         in
         let%bind voting_for =
-          match account#votingFor with
+          match account.votingFor with
           | Some s ->
               return @@ Set (Mina_base.State_hash.of_base58_check_exn s)
           | None ->
@@ -776,14 +779,14 @@ module Node = struct
     in
     let send_zkapp_graphql () =
       let send_zkapp_obj =
-        Graphql.Send_test_zkapp.make ~parties:parties_json ()
+        Graphql.Send_test_zkapp.(make @@ makeVariables ~parties:parties_json ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
         send_zkapp_obj
     in
     let%bind sent_zkapp_obj = send_zkapp_graphql () in
     let%bind () =
-      match sent_zkapp_obj#internalSendZkapp#zkapp#failureReason with
+      match sent_zkapp_obj.internalSendZkapp.zkapp.failureReason with
       | None ->
           return ()
       | Some s ->
@@ -793,18 +796,18 @@ module Node = struct
                   | None ->
                       acc
                   | Some f ->
-                      ( Int.of_string (Option.value_exn f#index)
+                      ( Int.of_string (Option.value_exn f.index)
                       , Array.map
                           ~f:(fun s ->
                             Mina_base.Transaction_status.Failure.of_string s
                             |> Result.ok_or_failwith )
-                          f#failures
+                          f.failures
                         |> Array.to_list |> List.rev )
                       :: acc )
             |> Mina_base.Transaction_status.Failure.Collection.display_to_yojson
             |> Yojson.Safe.to_string )
     in
-    let zkapp_id = sent_zkapp_obj#internalSendZkapp#zkapp#id in
+    let zkapp_id = sent_zkapp_obj.internalSendZkapp.zkapp.id in
     [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
     return zkapp_id
 
