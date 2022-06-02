@@ -1054,35 +1054,6 @@ let pooled_zkapp_commands =
          in
          print_string (Yojson.Safe.to_string json_response) ) )
 
-let pooled_zkapp_commands =
-  let public_key_flag =
-    Command.Param.(
-      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
-  in
-  Command.async
-    ~summary:"Retrieve all the zkApp commands that are pending inclusion"
-    (Cli_lib.Background_daemon.graphql_init public_key_flag
-       ~f:(fun graphql_endpoint maybe_public_key ->
-         let public_key =
-           Yojson.Safe.to_basic
-           @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
-         in
-         let graphql =
-           Graphql_queries.Pooled_zkapp_commands.make ~public_key ()
-         in
-         let%bind raw_response =
-           Graphql_client.query_json_exn graphql graphql_endpoint
-         in
-         let%map json_response =
-           try
-             let kvs = Yojson.Safe.Util.to_assoc raw_response in
-             List.hd_exn kvs |> snd |> return
-           with _ ->
-             eprintf "Failed to read result of pooled zkApp commands" ;
-             exit 1
-         in
-         print_string (Yojson.Safe.to_string json_response) ) )
-
 let to_signed_fee_exn sign magnitude =
   let sgn = match sign with `PLUS -> Sgn.Pos | `MINUS -> Neg in
   let magnitude = Currency.Fee.of_uint64 magnitude in
