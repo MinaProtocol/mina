@@ -19,6 +19,7 @@ pkgs.mkShell {
     ncurses
     rustup
     wasm-pack
+    lmdb
   ];
   OPAMSWITCH = "mina";
   shellHook = ''

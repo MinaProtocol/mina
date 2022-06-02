@@ -180,8 +180,6 @@ github.com/frankban/quicktest v1.11.3/go.mod h1:wRf/ReqHper53s+kmmSZizM8NamnL3IM
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/fsnotify/fsnotify v1.4.9 h1:hsms1Qyu0jgnwNXIxa+/V/PDsU6CfLf6CNO8H7IWoS4=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
-github.com/georgeee/go-bs-lmdb v1.0.6-0.20211007111842-a06db2e6401e h1:J5dE4W883gC6J7ids6qCKMs2c+WE1aoWb18YwETxfeA=
-github.com/georgeee/go-bs-lmdb v1.0.6-0.20211007111842-a06db2e6401e/go.mod h1:IUSfftm2h5Qz8YRBRFI4OcUDimRJF0e+kwO79ClgJzc=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/gliderlabs/ssh v0.1.1/go.mod h1:U7qILu1NlMHj9FlMhZLlkCdDnU1DBEAqr0aevW3Awn0=
 github.com/go-check/check v0.0.0-20180628173108-788fd7840127/go.mod h1:9ES+weclKsC9YodN5RgxqK/VD9HM9JsCSh7rNhMZE98=
@@ -868,6 +866,10 @@ github.com/neelance/sourcemap v0.0.0-20151028013722-8c68805598ab/go.mod h1:Qr6/a
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=
+github.com/o1-labs/go-bs-lmdb v1.0.8 h1:pO6K0N+2T8LtMMgUd9jNXQFytFIoULqHu/fctIQj6AE=
+github.com/o1-labs/go-bs-lmdb v1.0.8/go.mod h1:R6T7F9jtUMbRY/KatWn/SLWpErFs7nFPRuhX2N/kGv0=
+github.com/o1-labs/go-bs-lmdb v1.0.9 h1:KrS0kHa17NLFnhp39NTWr5lVAGLfaEGlgY9YTV5VSGo=
+github.com/o1-labs/go-bs-lmdb v1.0.9/go.mod h1:R6T7F9jtUMbRY/KatWn/SLWpErFs7nFPRuhX2N/kGv0=
 github.com/oklog/oklog v0.3.2/go.mod h1:FCV+B7mhrz4o+ueLpx+KqkyXRGMWOYEvfiXtdGtbWGs=
 github.com/oklog/run v1.0.0/go.mod h1:dlhp/R75TPv97u0XWUtDeV/lRKWPKSdTuV0TZvrmrQA=
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=

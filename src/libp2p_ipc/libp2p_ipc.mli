@@ -88,10 +88,12 @@ val rpc_response_to_or_error : rpc_response -> rpc_response_body Or_error.t
 
 val rpc_request_to_outgoing_message : rpc_request -> outgoing_message
 
-val create_push_message :
+val create_validation_push_message :
      validation_id:validation_id
   -> validation_result:validation_result
   -> push_message
+
+val create_add_resource_push_message : tag:int -> data:string -> push_message
 
 val push_message_to_outgoing_message : push_message -> outgoing_message
 
