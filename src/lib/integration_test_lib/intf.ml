@@ -467,7 +467,9 @@ module Dsl = struct
       -> log_error_accumulator
 
     val lift_accumulated_log_errors :
-      log_error_accumulator -> Test_error.remote_error Test_error.Set.t
+         ?exit_code:int
+      -> log_error_accumulator
+      -> Test_error.remote_error Test_error.Set.t
   end
 end
 

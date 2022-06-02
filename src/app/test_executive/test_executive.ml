@@ -162,17 +162,21 @@ let report_test_errors ~log_error_set ~internal_error_set =
         false
   in
   Print.eprintf "\n" ;
-  let result =
+  let exit_code =
     if test_failed then (
       color_eprintf Bash_colors.red
         "The test has failed. See the above errors for details.\n\n" ;
-      false )
+      match (internal_error_set.exit_code, log_error_set.exit_code) with
+      | None, None ->
+          Some 1
+      | Some exit_code, _ | None, Some exit_code ->
+          Some exit_code )
     else (
       color_eprintf Bash_colors.green "The test has completed successfully.\n\n" ;
-      true )
+      None )
   in
   let%bind () = Writer.(flushed (Lazy.force stderr)) in
-  return result
+  return exit_code
 
 (* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
 
@@ -194,7 +198,7 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       let open Test_error.Set in
       combine [ test_error_set; of_hard_or_error log_engine_cleanup_result ]
     in
-    let%bind test_was_successful =
+    let%bind exit_code =
       report_test_errors ~log_error_set ~internal_error_set
     in
     let%bind () = pause_cleanup_func () in
@@ -202,7 +206,7 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       Option.value_map !net_manager_ref ~default:Deferred.unit
         ~f:network_cleanup_func
     in
-    if not test_was_successful then exit 1 else Deferred.unit
+    Deferred.Option.map ~f:exit (return exit_code) >>| ignore
   in
   match !cleanup_deferred_ref with
   | Some deferred ->
