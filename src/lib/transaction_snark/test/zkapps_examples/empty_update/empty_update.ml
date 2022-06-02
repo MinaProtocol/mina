@@ -27,9 +27,9 @@ let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
     ~name:"empty_update"
     ~constraint_constants:
       (Genesis_constants.Constraint_constants.to_snark_keys_header
-         constraint_constants)
+         constraint_constants )
     ~choices:(fun ~self ->
-      [ Zkapps_empty_update.rule pk_compressed; dummy_rule self ])
+      [ Zkapps_empty_update.rule pk_compressed; dummy_rule self ] )
 
 module P = (val p_module)
 
@@ -43,13 +43,15 @@ let party_proof =
       prover []
         { transaction = Party.Body.digest party_body
         ; at_party = Parties.Call_forest.empty
-        })
+        } )
 
-let party : Party.t = { body = party_body; authorization = Proof party_proof }
+let party : Party.Graphql_repr.t =
+  Party.to_graphql_repr ~call_depth:0
+    { body = party_body; authorization = Proof party_proof }
 
-let deploy_party_body : Party.Body.t =
+let deploy_party_body : Party.Body.Graphql_repr.t =
   (* TODO: This is a pain. *)
-  { Party.Body.dummy with
+  { Party.Body.Graphql_repr.dummy with
     public_key = pk_compressed
   ; update =
       { Party.Update.dummy with
@@ -63,12 +65,15 @@ let deploy_party_body : Party.Body.t =
                 Zkapp_account.digest_vk vk
             }
       }
-  ; account_precondition = Accept
+  ; preconditions =
+      { Party.Preconditions.network = Zkapp_precondition.Protocol_state.accept
+      ; account = Accept
+      }
   ; caller = Token_id.default
   ; use_full_commitment = true
   }
 
-let deploy_party : Party.t =
+let deploy_party : Party.Graphql_repr.t =
   (* TODO: This is a pain. *)
   { body = deploy_party_body; authorization = Signature Signature.dummy }
 
@@ -77,8 +82,9 @@ let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
 let ps =
   (* TODO: This is a pain. *)
   Parties.Call_forest.of_parties_list
-    ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+    ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
     [ deploy_party; party ]
+  |> Parties.Call_forest.map ~f:Party.of_graphql_repr
   |> Parties.Call_forest.accumulate_hashes_predicated
 
 let memo = Signed_command_memo.empty
@@ -124,7 +130,7 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
          } as party :
-          Party.t)
+          Party.t )
         when Public_key.Compressed.equal public_key pk_compressed ->
           let commitment =
             if use_full_commitment then full_commitment
@@ -134,10 +140,10 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
             authorization =
               Control.Signature
                 (Schnorr.Chunked.sign sk
-                   (Random_oracle.Input.Chunked.field commitment))
+                   (Random_oracle.Input.Chunked.field commitment) )
           }
       | party ->
-          party)
+          party )
   in
   { fee_payer; other_parties; memo }
 
@@ -146,7 +152,8 @@ let parties : Parties.t =
     { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
     ; other_parties =
         Parties.Call_forest.of_parties_list [ deploy_party; party ]
-          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+          ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
+        |> Parties.Call_forest.map ~f:Party.of_graphql_repr
         |> Parties.Call_forest.accumulate_hashes'
     ; memo
     }
@@ -157,6 +164,6 @@ let () =
         Ledger.get_or_create_account ledger account_id
           (Account.create account_id
              Currency.Balance.(
-               Option.value_exn (add_amount zero (Currency.Amount.of_int 500))))
+               Option.value_exn (add_amount zero (Currency.Amount.of_int 500))) )
       in
-      ignore (apply_parties ledger [ parties ] : Sparse_ledger.t))
+      ignore (apply_parties ledger [ parties ] : Sparse_ledger.t) )

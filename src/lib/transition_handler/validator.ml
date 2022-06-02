@@ -25,7 +25,7 @@ let validate_transition ~consensus_constants ~logger ~frontier
   let%bind () =
     Option.fold
       (Unprocessed_transition_cache.final_state unprocessed_transition_cache
-         enveloped_transition)
+         enveloped_transition )
       ~init:Result.(Ok ())
       ~f:(fun _ final_state -> Result.Error (`In_process final_state))
   in
@@ -36,11 +36,11 @@ let validate_transition ~consensus_constants ~logger ~frontier
             ~logger:
               (Logger.extend logger
                  [ ("selection_context", `String "Transition_handler.Validator")
-                 ])
+                 ] )
             ~existing:
               (Transition_frontier.Breadcrumb.consensus_state_with_hashes
-                 root_breadcrumb)
-            ~candidate:(With_hash.map ~f:Mina_block.consensus_state transition)))
+                 root_breadcrumb )
+            ~candidate:(With_hash.map ~f:Mina_block.consensus_state transition) ) )
       ~error:`Disconnected
   in
   (* we expect this to be Ok since we just checked the cache *)
@@ -57,7 +57,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
          * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
        , drop_head buffered
        , unit )
-       Writer.t) ~unprocessed_transition_cache =
+       Writer.t ) ~unprocessed_transition_cache =
   let module Lru = Core_extended_cache.Lru in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
       Reader.iter transition_reader
@@ -91,7 +91,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                 ~name:"accepted_transition_remote_latency"
                 (Core_kernel.Time.diff
                    Block_time.(now time_controller |> to_time)
-                   transition_time) ;
+                   transition_time ) ;
               Writer.write valid_transition_writer
                 (`Block cached_transition, `Valid_cb vc)
           | Error (`In_frontier _) | Error (`In_process _) ->
@@ -123,4 +123,4 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                         , Envelope.Sender.to_yojson
                             (Envelope.Incoming.sender transition_env) )
                       ; ("transition", Mina_block.to_yojson transition)
-                      ] ) )))
+                      ] ) ) ) )

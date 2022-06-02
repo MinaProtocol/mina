@@ -94,8 +94,8 @@ let var_to_input
     ]
 
 let to_input
-    ({ staged_ledger_hash; genesis_ledger_hash; registers; timestamp } :
-      Value.t) =
+    ({ staged_ledger_hash; genesis_ledger_hash; registers; timestamp } : Value.t)
+    =
   let open Random_oracle.Input.Chunked in
   let registers =
     (* TODO: If this were the actual Registers itself (without the unit arg)
@@ -142,7 +142,7 @@ let display
      ; registers = { ledger; pending_coinbase_stack = (); local_state }
      ; timestamp
      } :
-      Value.t) : display =
+      Value.t ) : display =
   { Poly.staged_ledger_hash =
       Visualization.display_prefix_of_string @@ Ledger_hash.to_base58_check
       @@ Staged_ledger_hash.ledger_hash staged_ledger_hash

@@ -21,6 +21,8 @@ module Transition_frontier = struct
         ; accounts_accessed : (int * Mina_base.Account.Stable.Latest.t) list
         ; accounts_created :
             (Account_id.Stable.Latest.t * Currency.Fee.Stable.Latest.t) list
+        ; tokens_used :
+            (Token_id.Stable.Latest.t * Account_id.Stable.Latest.t option) list
         ; sender_receipt_chains_from_parent_ledger :
             (Account_id.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
             list
@@ -45,7 +47,8 @@ type t =
 [@@deriving bin_io_unversioned]
 
 module Builder = struct
-  let breadcrumb_added ~(precomputed_values : Precomputed_values.t) breadcrumb =
+  let breadcrumb_added ~(precomputed_values : Precomputed_values.t) ~logger
+      breadcrumb =
     let validated_block = Breadcrumb.validated_transition breadcrumb in
     let commands = Mina_block.Validated.valid_commands validated_block in
     let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
@@ -54,7 +57,7 @@ module Builder = struct
       let senders =
         commands
         |> List.map ~f:(fun { data; _ } ->
-               User_command.(fee_payer (forget_check data)))
+               User_command.(fee_payer (forget_check data)) )
         |> Account_id.Set.of_list
       in
       Set.to_list senders
@@ -67,21 +70,31 @@ module Builder = struct
                let%map { receipt_chain_hash; _ } =
                  Mina_ledger.Ledger.get ledger ledger_location
                in
-               (sender, receipt_chain_hash)))
+               (sender, receipt_chain_hash)) )
     in
     let block_with_hash = Mina_block.Validated.forget validated_block in
     let block = With_hash.data block_with_hash in
+    let state_hash = (With_hash.hash block_with_hash).state_hash in
+    let start = Time.now () in
+    let account_ids_accessed = Mina_block.account_ids_accessed block in
     let accounts_accessed =
-      let account_ids_accessed = Mina_block.account_ids_accessed block in
       List.filter_map account_ids_accessed ~f:(fun acct_id ->
           (* an accessed account may not be the ledger *)
           let%bind.Option index =
             Option.try_with (fun () ->
-                Mina_ledger.Ledger.index_of_account_exn ledger acct_id)
+                Mina_ledger.Ledger.index_of_account_exn ledger acct_id )
           in
           let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
-          Some (index, account))
+          Some (index, account) )
     in
+    let accounts_accessed_time = Time.now () in
+    [%log debug]
+      "Archive data generation for $state_hash: accounts-accessed took $time ms"
+      ~metadata:
+        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+        ; ( "time"
+          , `Float (Time.Span.to_ms (Time.diff accounts_accessed_time start)) )
+        ] ;
     let accounts_created =
       let account_creation_fee =
         precomputed_values.constraint_constants.account_creation_fee
@@ -92,13 +105,33 @@ module Builder = struct
       in
       List.map
         (Staged_ledger.latest_block_accounts_created staged_ledger
-           ~previous_block_state_hash) ~f:(fun acct_id ->
-          (acct_id, account_creation_fee))
+           ~previous_block_state_hash ) ~f:(fun acct_id ->
+          (acct_id, account_creation_fee) )
     in
+    let tokens_used =
+      let unique_tokens =
+        List.map account_ids_accessed ~f:Account_id.token_id
+        |> List.dedup_and_sort ~compare:Token_id.compare
+      in
+      List.map unique_tokens ~f:(fun token_id ->
+          let owner = Mina_ledger.Ledger.token_owner ledger token_id in
+          (token_id, owner) )
+    in
+    let account_created_time = Time.now () in
+    [%log debug]
+      "Archive data generation for $state_hash: accounts-created took $time ms"
+      ~metadata:
+        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+        ; ( "time"
+          , `Float
+              (Time.Span.to_ms
+                 (Time.diff account_created_time accounts_accessed_time) ) )
+        ] ;
     Transition_frontier.Breadcrumb_added
       { block = With_hash.map ~f:External_transition.compose block_with_hash
       ; accounts_accessed
       ; accounts_created
+      ; tokens_used
       ; sender_receipt_chains_from_parent_ledger
       }
 

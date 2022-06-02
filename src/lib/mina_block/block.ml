@@ -18,12 +18,12 @@ module Stable = struct
         ; ( "current_protocol_version"
           , `String
               (Protocol_version.to_string
-                 (Header.current_protocol_version t.header)) )
+                 (Header.current_protocol_version t.header) ) )
         ; ( "proposed_protocol_version"
           , `String
               (Option.value_map
                  (Header.proposed_protocol_version_opt t.header)
-                 ~default:"<None>" ~f:Protocol_version.to_string) )
+                 ~default:"<None>" ~f:Protocol_version.to_string ) )
         ]
 
     let to_latest = Fn.id
@@ -99,13 +99,13 @@ let payments block =
          } ->
            Some { With_status.data = c; status }
        | _ ->
-           None)
+           None )
 
 let equal =
   Comparable.lift Consensus.Data.Consensus_state.Value.equal
     ~f:
       (Fn.compose Mina_state.Protocol_state.consensus_state
-         (Fn.compose Header.protocol_state header))
+         (Fn.compose Header.protocol_state header) )
 
 let account_ids_accessed t =
   let transactions =
@@ -113,6 +113,6 @@ let account_ids_accessed t =
       ~constraint_constants:Genesis_constants.Constraint_constants.compiled t
   in
   List.map transactions ~f:(fun { data = txn; _ } ->
-      Mina_transaction.Transaction.accounts_accessed txn)
+      Mina_transaction.Transaction.accounts_accessed txn )
   |> List.concat
   |> List.dedup_and_sort ~compare:Account_id.compare

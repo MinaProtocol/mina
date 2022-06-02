@@ -84,7 +84,7 @@ module Repr = struct
         { commitments :
             Backend.Tock.Curve.Affine.Stable.V1.t
             Plonk_verification_key_evals.Stable.V2.t
-        ; step_domains : Domains.Stable.V1.t array
+        ; step_domains : Domains.Stable.V2.t array
         ; data : Data.Stable.V1.t
         }
       [@@deriving to_yojson]
@@ -104,7 +104,7 @@ module Stable = struct
           (Impls.Wrap.Verification_key.t
           [@to_yojson
             Verifier_index_json.to_yojson Backend.Tock.Field.to_yojson
-              Backend.Tick.Field.to_yojson])
+              Backend.Tick.Field.to_yojson] )
       ; data : Data.t
       }
     [@@deriving fields, to_yojson]
@@ -139,23 +139,24 @@ module Stable = struct
              ; complete_add_comm = g c.complete_add_comm
              ; endomul_scalar_comm = g c.endomul_scalar_comm
              ; chacha_comm = None
-             })
+             } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
         }
       in
       { commitments = c; step_domains; data = d; index = t }
 
-    include Binable.Of_binable
-              (Repr.Stable.V2)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable
+        (Repr.Stable.V2)
+        (struct
+          type nonrec t = t
 
-                let to_binable { commitments; step_domains; data; index = _ } =
-                  { Repr.commitments; data; step_domains }
+          let to_binable { commitments; step_domains; data; index = _ } =
+            { Repr.commitments; data; step_domains }
 
-                let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
-              end)
+          let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
+        end)
   end
 end]
 
@@ -182,4 +183,4 @@ let dummy =
      ; step_domains = [||]
      ; data = { constraints = rows }
      }
-     |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1))
+     |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1) )

@@ -36,11 +36,11 @@ module Api = struct
           let user_cmds_under_inspection =
             Hashtbl.create (module User_command)
           in
-          `On (`Synced user_cmds_under_inspection))
+          `On (`Synced user_cmds_under_inspection) )
     in
     let locks =
       Array.init (Array.length workers) ~f:(fun _ ->
-          (ref 0, Condition.create ()))
+          (ref 0, Condition.create ()) )
     in
     let root_lengths = Array.init (Array.length workers) ~f:(fun _ -> 0) in
     let restart_signals =
@@ -114,7 +114,7 @@ module Api = struct
     ( match t.status.(i) with
     | `On (`Synced user_cmds_under_inspection) ->
         Hashtbl.iter user_cmds_under_inspection ~f:(fun { passed_root; _ } ->
-            Ivar.fill passed_root ())
+            Ivar.fill passed_root () )
     | _ ->
         () ) ;
     t.status.(i) <- `Off ;
@@ -135,7 +135,7 @@ module Api = struct
         ~memo ~valid_until ~body
         ~sign_choice:
           (User_command_input.Sign_choice.Keypair
-             (Keypair.of_private_key_exn sk))
+             (Keypair.of_private_key_exn sk) )
         ()
     in
     let%map user_cmd =
@@ -153,7 +153,7 @@ module Api = struct
       t i delegator_sk fee valid_until
       ~body:
         (Stake_delegation
-           (Set_delegate { delegator; new_delegate = delegate_pk }))
+           (Set_delegate { delegator; new_delegate = delegate_pk }) )
 
   let send_payment t i sender_sk receiver_pk amount fee valid_until =
     let source_pk =
@@ -177,7 +177,7 @@ module Api = struct
   let validated_transitions_keyswaptest t i =
     run_online_worker
       ~f:(fun worker ->
-        Coda_process.validated_transitions_keyswaptest_exn worker)
+        Coda_process.validated_transitions_keyswaptest_exn worker )
       t i
 
   let new_user_command_and_subscribe t i key =
@@ -186,7 +186,7 @@ module Api = struct
 
   let teardown t ~logger =
     Deferred.Array.iteri ~how:`Parallel t.workers ~f:(fun i _ ->
-        stop t i ~logger)
+        stop t i ~logger )
 
   let setup_bootstrap_signal t i =
     let signal = Ivar.create () in
@@ -209,7 +209,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
   let%map chains =
     Deferred.Array.init (Array.length workers) ~f:(fun i ->
-        Coda_process.best_path workers.(i))
+        Coda_process.best_path workers.(i) )
   in
   let check_chains (chains : State_hash.Stable.Latest.t list array) =
     let online_chains =
@@ -227,7 +227,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               *)
               false
           | _ ->
-              Api.synced testnet i)
+              Api.synced testnet i )
     in
     let chain_sets =
       Array.map online_chains
@@ -237,7 +237,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
       `List
         ( Array.to_list online_chains
         |> List.map ~f:(fun chain ->
-               `List (List.map ~f:State_hash.Stable.Latest.to_yojson chain)) )
+               `List (List.map ~f:State_hash.Stable.Latest.to_yojson chain) ) )
     in
     match
       Array.fold ~init:None
@@ -246,7 +246,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
           | None ->
               Some chain
           | Some acc ->
-              Some (Hash_set.inter acc chain))
+              Some (Hash_set.inter acc chain) )
         chain_sets
     with
     | Some hashes_in_common ->
@@ -260,7 +260,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                [ ("chains", chains_json ())
                ; ("tf_vizs", `List (List.map ~f:(fun s -> `String s) tfs))
                ] ;
-           exit 7)
+           exit 7 )
           |> don't_wait_for
         else
           [%log info] "Chains are OK, they have hashes $hashes in common"
@@ -305,7 +305,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
        let%bind () = after (Time.Span.of_sec 1.0) in
        go ()
      in
-     go ()) ;
+     go () ) ;
   don't_wait_for
     (Deferred.ignore_m
        (Linear_pipe.fold ~init:chains all_transitions_r
@@ -315,10 +315,10 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
                 chains.(i) <- path ;
                 last_time := Time.now () ;
                 check_chains chains ;
-                chains)))) ;
+                chains ) ) ) ) ;
   don't_wait_for
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
-         Linear_pipe.write all_transitions_w (prev, curr, i)))
+         Linear_pipe.write all_transitions_w (prev, curr, i) ) )
 
 type user_cmd_status =
   { snapshots : int option array
@@ -362,12 +362,12 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                      [%log info] "Filled catchup ivar" ;
                      Ivar.fill signal () ;
                      testnet.restart_signals.(i) <- None )
-                   else ()) ;
+                   else () ) ;
              let earliest_user_cmd =
                List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
                  ~compare:(fun (_user_cmd1, status1) (_user_cmd2, status2) ->
                    Int.compare status1.expected_deadline
-                     status2.expected_deadline)
+                     status2.expected_deadline )
              in
              Option.iter earliest_user_cmd
                ~f:(fun (user_cmd, { expected_deadline; _ }) ->
@@ -380,7 +380,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                      "Transaction $user_cmd took too long to get into the root \
                       of node $worker_id. Length expected: %d got: %d"
                      expected_deadline root_length ;
-                   exit 9 |> ignore )) ;
+                   exit 9 |> ignore ) ) ;
              List.iter commands ~f:(fun user_cmd ->
                  Hashtbl.change user_cmds_under_inspection user_cmd.data
                    ~f:(function
@@ -396,10 +396,10 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                           node $worker_id, when root length is $length" ;
                        None
                    | None ->
-                       None)) ;
+                       None ) ) ;
              Deferred.unit
          | _ ->
-             Deferred.unit )))
+             Deferred.unit ) ) )
 
 let events ~(precomputed_values : Genesis_proof.Inputs.t) workers start_reader =
   let event_r, event_w = Linear_pipe.create () in
@@ -433,9 +433,9 @@ let events ~(precomputed_values : Genesis_proof.Inputs.t) workers start_reader =
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_sync) in
-               synced ()) ;
-            connect_worker i worker) ;
-         Deferred.unit)) ;
+               synced () ) ;
+            connect_worker i worker ) ;
+         Deferred.unit ) ) ;
   Array.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
   (event_r, root_r)
 
@@ -446,13 +446,13 @@ let start_checks logger (workers : Coda_process.t array) start_reader
   in
   let%bind initialization_finish_signals =
     Deferred.Array.map workers ~f:(fun worker ->
-        Coda_process.initialization_finish_signal_exn worker)
+        Coda_process.initialization_finish_signal_exn worker )
   in
   [%log info] "downloaded initialization signal" ;
   let%map () =
     Deferred.all_unit
       (List.map (Array.to_list initialization_finish_signals) ~f:(fun p ->
-           Linear_pipe.read p >>| ignore))
+           Linear_pipe.read p >>| ignore ) )
   in
   [%log info] "initialization finishes, start check" ;
   don't_wait_for
@@ -537,7 +537,7 @@ end = struct
                   } ;
               Option.return passed_root
           | _ ->
-              return None)
+              return None )
         >>| Option.return
       in
       Deferred.List.iter all_passed_root ~f:Ivar.read
@@ -608,18 +608,18 @@ end = struct
                                          .k
                                    + delay
                                ; passed_root
-                               }) ;
+                               } ) ;
                         Option.return passed_root
                     | _ ->
-                        return None)
+                        return None )
                   >>| Option.return
                 in
-                all_passed_root)
+                all_passed_root )
             |> Deferred.Option.all
           in
           Deferred.map
             (Deferred.List.iter (List.concat all_passed_root's) ~f:Ivar.read)
-            ~f:(Fn.const (Some ())))
+            ~f:(Fn.const (Some ())) )
     in
     Deferred.unit
 
@@ -634,7 +634,7 @@ end = struct
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
           let pk = Public_key.(compress @@ of_private_key_exn sender) in
           let%map pipe = Api.new_user_command_and_subscribe testnet i pk in
-          Option.value_exn pipe)
+          Option.value_exn pipe )
     in
     Deferred.List.init ~how:`Sequential n ~f:(fun _i ->
         let receiver_keypair = List.random_element_exn keypairs in
@@ -661,7 +661,7 @@ end = struct
           Deferred.List.for_all new_payment_readers ~f:read_until_match
         in
         assert result ;
-        user_command)
+        user_command )
 end
 
 module Restarts : sig

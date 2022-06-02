@@ -7,7 +7,7 @@ open Mina_base
 let pk_of_id pool pk_id =
   let%map pk_str =
     Mina_caqti.query pool ~f:(fun db ->
-        Processor.Public_key.find_by_id db pk_id)
+        Processor.Public_key.find_by_id db pk_id )
   in
   Signature_lib.Public_key.Compressed.of_base58_check_exn pk_str
 
@@ -20,7 +20,7 @@ let token_of_id pool token_id =
 let account_identifier_of_id pool account_identifier_id =
   let%bind { public_key_id; token_id } =
     Mina_caqti.query pool ~f:(fun db ->
-        Processor.Account_identifiers.load db account_identifier_id)
+        Processor.Account_identifiers.load db account_identifier_id )
   in
   let%bind pk = pk_of_id pool public_key_id in
   let%map token = token_of_id pool token_id in
@@ -34,21 +34,15 @@ let get_amount_bounds pool amount_id =
         let%map amount =
           query_db ~f:(fun db -> Processor.Zkapp_amount_bounds.load db id)
         in
-        Some amount)
+        Some amount )
   in
   let amount_opt =
     Option.map amount_db_opt
       ~f:(fun { amount_lower_bound; amount_upper_bound } ->
-        let lower =
-          amount_lower_bound |> Unsigned.UInt64.of_int64
-          |> Currency.Amount.of_uint64
-        in
-        let upper =
-          amount_upper_bound |> Unsigned.UInt64.of_int64
-          |> Currency.Amount.of_uint64
-        in
+        let lower = Currency.Amount.of_string amount_lower_bound in
+        let upper = Currency.Amount.of_string amount_upper_bound in
         ( { lower; upper }
-          : Currency.Amount.t Zkapp_precondition.Closed_interval.t ))
+          : Currency.Amount.t Zkapp_precondition.Closed_interval.t ) )
   in
   Or_ignore.of_option amount_opt
 
@@ -66,7 +60,7 @@ let get_global_slot_bounds pool id =
         in
         let lower = slot_of_int64 bounds.global_slot_lower_bound in
         let upper = slot_of_int64 bounds.global_slot_upper_bound in
-        Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t))
+        Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t) )
   in
   Or_ignore.of_option bounds_opt
 
@@ -78,14 +72,14 @@ let get_length_bounds pool id =
         let%map ts =
           query_db ~f:(fun db -> Processor.Zkapp_length_bounds.load db id)
         in
-        Some ts)
+        Some ts )
   in
   let bl_opt =
     Option.map bl_db_opt ~f:(fun { length_lower_bound; length_upper_bound } ->
         let lower = Unsigned.UInt32.of_int64 length_lower_bound in
         let upper = Unsigned.UInt32.of_int64 length_upper_bound in
         ( { lower; upper }
-          : Unsigned.UInt32.t Zkapp_precondition.Closed_interval.t ))
+          : Unsigned.UInt32.t Zkapp_precondition.Closed_interval.t ) )
   in
   Or_ignore.of_option bl_opt
 
@@ -120,12 +114,12 @@ let update_of_id pool update_id =
               let%map field =
                 query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id)
               in
-              Some field))
+              Some field ) )
     in
     let fields =
       List.map field_strs ~f:(fun str_opt ->
           Option.value_map str_opt ~default:Set_or_keep.Keep ~f:(fun str ->
-              Set_or_keep.Set (F.of_string str)))
+              Set_or_keep.Set (F.of_string str) ) )
     in
     Zkapp_state.V.of_list_exn fields
   in
@@ -143,7 +137,7 @@ let update_of_id pool update_id =
           let%map vk =
             query_db ~f:(fun db -> Processor.Zkapp_verification_keys.load db id)
           in
-          Some vk)
+          Some vk )
     in
     Set_or_keep.of_option
       (Option.map vk_opt ~f:(fun { verification_key; hash } ->
@@ -157,7 +151,8 @@ let update_of_id pool update_id =
                let hash = Pickles.Backend.Tick.Field.of_string hash in
                { With_hash.data; hash }
            | Error (`Msg err) ->
-               failwithf "Could not Base64-decode verification key: %s" err ()))
+               failwithf "Could not Base64-decode verification key: %s" err () )
+      )
   in
   let%bind permissions =
     let%map perms_opt =
@@ -190,7 +185,7 @@ let update_of_id pool update_id =
               ; increment_nonce
               ; set_voting_for
               }
-              : Permissions.t ))
+              : Permissions.t ) )
     in
     Set_or_keep.of_option perms_opt
   in
@@ -214,25 +209,18 @@ let update_of_id pool update_id =
             query_db ~f:(fun db -> Processor.Zkapp_timing_info.load db id)
           in
           let initial_minimum_balance =
-            initial_minimum_balance |> Unsigned.UInt64.of_int64
-            |> Currency.Balance.of_uint64
+            Currency.Balance.of_string initial_minimum_balance
           in
           let cliff_time =
             cliff_time |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
           in
-          let cliff_amount =
-            cliff_amount |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
-          in
+          let cliff_amount = Currency.Amount.of_string cliff_amount in
           let vesting_period =
             vesting_period |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
           in
-          let vesting_increment =
-            vesting_increment |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
-          in
+          let vesting_increment = Currency.Amount.of_string vesting_increment in
           Some
             ( { initial_minimum_balance
               ; cliff_time
@@ -240,7 +228,7 @@ let update_of_id pool update_id =
               ; vesting_period
               ; vesting_increment
               }
-              : Party.Update.Timing_info.t ))
+              : Party.Update.Timing_info.t ) )
     in
     Set_or_keep.of_option tm_opt
   in
@@ -279,7 +267,7 @@ let staking_data_of_id pool id =
   let%bind ledger =
     let%bind { hash_id; total_currency_id } =
       query_db ~f:(fun db ->
-          Processor.Zkapp_epoch_ledger.load db epoch_ledger_id)
+          Processor.Zkapp_epoch_ledger.load db epoch_ledger_id )
     in
     let%bind hash =
       let%map hash_opt =
@@ -287,7 +275,7 @@ let staking_data_of_id pool id =
             let%map hash_str =
               query_db ~f:(fun db -> Processor.Snarked_ledger_hash.load db id)
             in
-            Some (Frozen_ledger_hash.of_base58_check_exn hash_str))
+            Some (Frozen_ledger_hash.of_base58_check_exn hash_str) )
       in
       Or_ignore.of_option hash_opt
     in
@@ -327,9 +315,8 @@ let protocol_state_precondition_of_id pool id =
             ; staking_epoch_data_id
             ; next_epoch_data_id
             }
-             : Processor.Zkapp_protocol_state_precondition.t) =
-    query_db ~f:(fun db ->
-        Processor.Zkapp_protocol_state_precondition.load db id)
+             : Processor.Zkapp_network_precondition.t ) =
+    query_db ~f:(fun db -> Processor.Zkapp_network_precondition.load db id)
   in
   let%bind snarked_ledger_hash =
     let%map hash_opt =
@@ -338,7 +325,7 @@ let protocol_state_precondition_of_id pool id =
           let%map hash =
             query_db ~f:(fun db -> Processor.Snarked_ledger_hash.load db id)
           in
-          Some (Frozen_ledger_hash.of_base58_check_exn hash))
+          Some (Frozen_ledger_hash.of_base58_check_exn hash) )
     in
     Or_ignore.of_option hash_opt
   in
@@ -348,14 +335,14 @@ let protocol_state_precondition_of_id pool id =
           let%map ts =
             query_db ~f:(fun db -> Processor.Zkapp_timestamp_bounds.load db id)
           in
-          Some ts)
+          Some ts )
     in
     let ts_opt =
       Option.map ts_db_opt
         ~f:(fun { timestamp_lower_bound; timestamp_upper_bound } ->
-          let lower = Block_time.of_int64 timestamp_lower_bound in
-          let upper = Block_time.of_int64 timestamp_upper_bound in
-          ({ lower; upper } : Block_time.t Zkapp_precondition.Closed_interval.t))
+          let lower = Block_time.of_string_exn timestamp_lower_bound in
+          let upper = Block_time.of_string_exn timestamp_upper_bound in
+          ({ lower; upper } : Block_time.t Zkapp_precondition.Closed_interval.t) )
     in
     Or_ignore.of_option ts_opt
   in
@@ -393,14 +380,14 @@ let load_events pool id =
     Deferred.List.map (Array.to_list field_array_ids) ~f:(fun array_id ->
         let%bind field_ids =
           query_db ~f:(fun db ->
-              Processor.Zkapp_state_data_array.load db array_id)
+              Processor.Zkapp_state_data_array.load db array_id )
         in
         Deferred.List.map (Array.to_list field_ids) ~f:(fun field_id ->
             let%map field_str =
               query_db ~f:(fun db ->
-                  Processor.Zkapp_state_data.load db field_id)
+                  Processor.Zkapp_state_data.load db field_id )
             in
-            Zkapp_basic.F.of_string field_str))
+            Zkapp_basic.F.of_string field_str ) )
   in
   List.map fields_list ~f:Array.of_list
 
@@ -411,7 +398,7 @@ let get_fee_payer_body ~pool body_id =
            ; fee
            ; events_id
            ; sequence_events_id
-           ; zkapp_protocol_state_precondition_id
+           ; zkapp_network_precondition_id
            ; nonce
            } =
     query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
@@ -419,15 +406,11 @@ let get_fee_payer_body ~pool body_id =
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
   let public_key = Account_id.public_key account_id in
   let%bind update = update_of_id pool update_id in
-  let fee =
-    (* fee payer balance change stored unsigned *)
-    assert (Int64.is_non_negative fee) ;
-    fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
-  in
+  let fee = Currency.Fee.of_string fee in
   let%bind events = load_events pool events_id in
   let%bind sequence_events = load_events pool sequence_events_id in
   let%bind protocol_state_precondition =
-    protocol_state_precondition_of_id pool zkapp_protocol_state_precondition_id
+    protocol_state_precondition_of_id pool zkapp_network_precondition_id
   in
   let nonce =
     nonce |> Unsigned.UInt32.of_int64 |> Mina_numbers.Account_nonce.of_uint32
@@ -455,7 +438,7 @@ let get_other_party_body ~pool body_id =
            ; sequence_events_id
            ; call_data_id
            ; call_depth
-           ; zkapp_protocol_state_precondition_id
+           ; zkapp_network_precondition_id
            ; zkapp_account_precondition_id
            ; use_full_commitment
            ; caller
@@ -467,11 +450,15 @@ let get_other_party_body ~pool body_id =
   let token_id = Account_id.token_id account_id in
   let%bind update = update_of_id pool update_id in
   let balance_change =
-    let magnitude =
-      balance_change |> Int64.abs |> Unsigned.UInt64.of_int64
-      |> Currency.Amount.of_uint64
+    let magnitude, sgn =
+      match String.split balance_change ~on:'-' with
+      | [ s ] ->
+          (Currency.Amount.of_string s, Sgn.Pos)
+      | [ ""; s ] ->
+          (Currency.Amount.of_string s, Sgn.Neg)
+      | _ ->
+          failwith "Ill-formatted string for balance change"
     in
-    let sgn = if Int64.is_negative balance_change then Sgn.Neg else Sgn.Pos in
     Currency.Amount.Signed.create ~magnitude ~sgn
   in
   let%bind events = load_events pool events_id in
@@ -483,14 +470,14 @@ let get_other_party_body ~pool body_id =
     Zkapp_basic.F.of_string field_str
   in
   let%bind protocol_state_precondition =
-    protocol_state_precondition_of_id pool zkapp_protocol_state_precondition_id
+    protocol_state_precondition_of_id pool zkapp_network_precondition_id
   in
   let%bind account_precondition =
     let%bind ({ kind; precondition_account_id; nonce }
-               : Processor.Zkapp_account_precondition.t) =
+               : Processor.Zkapp_account_precondition.t ) =
       query_db ~f:(fun db ->
           Processor.Zkapp_account_precondition.load db
-            zkapp_account_precondition_id)
+            zkapp_account_precondition_id )
     in
     match kind with
     | Nonce ->
@@ -514,22 +501,18 @@ let get_other_party_body ~pool body_id =
                  } =
           query_db ~f:(fun db ->
               Processor.Zkapp_precondition_account.load db
-                (Option.value_exn precondition_account_id))
+                (Option.value_exn precondition_account_id) )
         in
         let%bind balance =
           let%map balance_opt =
             Option.value_map balance_id ~default:(return None) ~f:(fun id ->
                 let%map { balance_lower_bound; balance_upper_bound } =
                   query_db ~f:(fun db ->
-                      Processor.Zkapp_balance_bounds.load db id)
+                      Processor.Zkapp_balance_bounds.load db id )
                 in
-                let balance_of_int64 int64 =
-                  int64 |> Unsigned.UInt64.of_int64
-                  |> Currency.Balance.of_uint64
-                in
-                let lower = balance_of_int64 balance_lower_bound in
-                let upper = balance_of_int64 balance_upper_bound in
-                Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t))
+                let lower = Currency.Balance.of_string balance_lower_bound in
+                let upper = Currency.Balance.of_string balance_upper_bound in
+                Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t) )
           in
           Or_ignore.of_option balance_opt
         in
@@ -538,7 +521,7 @@ let get_other_party_body ~pool body_id =
             Option.value_map nonce_id ~default:(return None) ~f:(fun id ->
                 let%map { nonce_lower_bound; nonce_upper_bound } =
                   query_db ~f:(fun db ->
-                      Processor.Zkapp_nonce_bounds.load db id)
+                      Processor.Zkapp_nonce_bounds.load db id )
                 in
                 let balance_of_int64 int64 =
                   int64 |> Unsigned.UInt32.of_int64
@@ -546,7 +529,7 @@ let get_other_party_body ~pool body_id =
                 in
                 let lower = balance_of_int64 nonce_lower_bound in
                 let upper = balance_of_int64 nonce_upper_bound in
-                Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t))
+                Some ({ lower; upper } : _ Zkapp_precondition.Closed_interval.t) )
           in
           Or_ignore.of_option nonce_opt
         in
@@ -559,7 +542,7 @@ let get_other_party_body ~pool body_id =
           let%map pk_opt =
             Option.value_map id ~default:(return None) ~f:(fun id ->
                 let%map pk = pk_of_id id in
-                Some pk)
+                Some pk )
           in
           Or_ignore.of_option pk_opt
         in
@@ -573,9 +556,9 @@ let get_other_party_body ~pool body_id =
                 Option.value_map id_opt ~default:(return None) ~f:(fun id ->
                     let%map field_str =
                       query_db ~f:(fun db ->
-                          Processor.Zkapp_state_data.load db id)
+                          Processor.Zkapp_state_data.load db id )
                     in
-                    Some (Zkapp_basic.F.of_string field_str)))
+                    Some (Zkapp_basic.F.of_string field_str) ) )
           in
           List.map fields ~f:Or_ignore.of_option |> Zkapp_state.V.of_list_exn
         in
@@ -586,7 +569,7 @@ let get_other_party_body ~pool body_id =
                 let%map field_str =
                   query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id)
                 in
-                Some (Zkapp_basic.F.of_string field_str))
+                Some (Zkapp_basic.F.of_string field_str) )
           in
           Or_ignore.of_option sequence_state_opt
         in
@@ -600,7 +583,7 @@ let get_other_party_body ~pool body_id =
              ; state
              ; sequence_state
              ; proved_state
-             })
+             } )
   in
   let caller = Party.Call_type.of_string caller in
   return
@@ -613,12 +596,14 @@ let get_other_party_body ~pool body_id =
       ; sequence_events
       ; call_data
       ; call_depth
-      ; protocol_state_precondition
-      ; account_precondition
+      ; preconditions =
+          { Party.Preconditions.network = protocol_state_precondition
+          ; account = account_precondition
+          }
       ; use_full_commitment
       ; caller
       }
-      : Party.Body.Wire.t )
+      : Party.Body.Simple.t )
 
 let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =
@@ -644,21 +629,19 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
        ; permissions_id
        ; zkapp_id
        }
-        : Processor.Accounts_accessed.t) =
+        : Processor.Accounts_accessed.t ) =
     account
   in
   let%bind ({ public_key_id; token_id } : Processor.Account_identifiers.t) =
     query_db ~f:(fun db ->
-        Processor.Account_identifiers.load db account_identifier_id)
+        Processor.Account_identifiers.load db account_identifier_id )
   in
   let%bind public_key = pk_of_id public_key_id in
   let%bind token_id = token_of_id token_id in
   let%bind token_symbol =
     query_db ~f:(fun db -> Processor.Token_symbols.load db token_symbol_id)
   in
-  let balance =
-    balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
-  in
+  let balance = Currency.Balance.of_string balance in
   let nonce = nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32 in
   let receipt_chain_hash =
     receipt_chain_hash |> Receipt.Chain_hash.of_base58_check_exn
@@ -691,40 +674,29 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
              ; vesting_increment
              ; _
              }
-              : Processor.Timing_info.t) =
+              : Processor.Timing_info.t ) =
           timing
         in
         if
-          List.for_all
-            [ initial_minimum_balance
-            ; cliff_time
-            ; cliff_amount
-            ; vesting_period
-            ; vesting_increment
-            ]
-            ~f:Int64.(equal zero)
+          List.for_all [ cliff_time; vesting_period ] ~f:Int64.(equal zero)
+          && List.for_all
+               [ initial_minimum_balance; cliff_amount; vesting_increment ]
+               ~f:String.(equal "0")
         then Untimed
         else
           let initial_minimum_balance =
-            initial_minimum_balance |> Unsigned.UInt64.of_int64
-            |> Currency.Balance.of_uint64
+            Currency.Balance.of_string initial_minimum_balance
           in
           let cliff_time =
             cliff_time |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
           in
-          let cliff_amount =
-            cliff_amount |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
-          in
+          let cliff_amount = Currency.Amount.of_string cliff_amount in
           let vesting_period =
             vesting_period |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Global_slot.of_uint32
           in
-          let vesting_increment =
-            vesting_increment |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
-          in
+          let vesting_increment = Currency.Amount.of_string vesting_increment in
           Timed
             { initial_minimum_balance
             ; cliff_time
@@ -787,7 +759,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           let%map field_strs =
             Deferred.List.init (Array.length app_state_ints) ~f:(fun ndx ->
                 let id = Option.value_exn app_state_ints.(ndx) in
-                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id))
+                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Zkapp_state.V.of_list_exn fields
@@ -797,7 +769,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ~f:(fun id ->
               let%map { verification_key; hash } =
                 query_db ~f:(fun db ->
-                    Processor.Zkapp_verification_keys.load db id)
+                    Processor.Zkapp_verification_keys.load db id )
               in
               let data =
                 match Base64.decode verification_key with
@@ -810,7 +782,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                       ()
               in
               let hash = Zkapp_basic.F.of_string hash in
-              Some ({ data; hash } : _ With_hash.t))
+              Some ({ data; hash } : _ With_hash.t) )
         in
         let zkapp_version =
           zkapp_version |> Unsigned.UInt32.of_int64
@@ -818,13 +790,13 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         in
         let%bind sequence_state_ints =
           query_db ~f:(fun db ->
-              Processor.Zkapp_sequence_states.load db sequence_state_id)
+              Processor.Zkapp_sequence_states.load db sequence_state_id )
         in
         let%map sequence_state =
           let%map field_strs =
             Deferred.List.init (Array.length sequence_state_ints) ~f:(fun ndx ->
                 let id = Option.value_exn app_state_ints.(ndx) in
-                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id))
+                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Pickles_types.Vector.Vector_5.of_list_exn fields
@@ -841,13 +813,13 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; last_sequence_slot
             ; proved_state
             }
-            : Mina_base.Zkapp_account.t ))
+            : Mina_base.Zkapp_account.t ) )
   in
   (* TODO: the URI will be moved to the zkApp, no longer in the account *)
   let%bind zkapp_uri =
     Option.value_map zkapp_db ~default:(return "https://dummy.com")
       ~f:(fun zkapp ->
-        query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp.zkapp_uri_id))
+        query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp.zkapp_uri_id) )
   in
   (* TODO: token permissions is going away *)
   let account =

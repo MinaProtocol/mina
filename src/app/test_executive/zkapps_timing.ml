@@ -81,13 +81,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    }
                    : Party.Update.Timing_info.value )
              in
-             { Party.Update.dummy with timing })
+             { Party.Update.dummy with timing } )
         ; current_auth = Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       let timing_account_id =
@@ -129,8 +128,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -162,8 +160,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       return @@ Transaction_snark.For_tests.multiple_transfers parties_spec
@@ -203,8 +200,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       Transaction_snark.For_tests.update_states ~constraint_constants
@@ -258,7 +254,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Malleable_error.hard_error
              (Error.of_string
                 "Ledger update and requested update with timing are \
-                 incompatible") ))
+                 incompatible" ) ) )
     in
     let%bind { total_balance = before_balance; _ } =
       Network.Node.must_get_account_data ~logger node
@@ -292,7 +288,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         | None ->
             Malleable_error.hard_error
               (Error.of_string
-                 "Unexpected underflow when taking balance difference")
+                 "Unexpected underflow when taking balance difference" )
         | Some diff ->
             let sender_party =
               (List.hd_exn parties_transfer_from_timed_account.other_parties)
@@ -321,7 +317,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    (Currency.Amount.to_string total_debited)
                    (Currency.Amount.to_string amount_to_send)
                    (Currency.Amount.to_string fee)
-                   (Currency.Amount.to_string diff)) )
+                   (Currency.Amount.to_string diff) ) )
     in
     let%bind () =
       section
@@ -329,7 +325,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          balance"
         (let sender_party =
            (List.hd_exn
-              parties_invalid_transfer_from_timed_account.other_parties)
+              parties_invalid_transfer_from_timed_account.other_parties )
              .elt
              .party
          in
@@ -367,14 +363,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          assert (
            Currency.Amount.( < ) proposed_balance
              (Option.value_exn locked_balance |> Currency.Balance.to_amount) ) ;
-         send_zkapp ~logger node parties_invalid_transfer_from_timed_account)
+         send_zkapp ~logger node parties_invalid_transfer_from_timed_account )
     in
     let%bind () =
       section
         "Waiting for snapp with transfer from timed account that fails due to \
          min balance"
         (wait_for_snapp ~has_failures:true
-           parties_invalid_transfer_from_timed_account)
+           parties_invalid_transfer_from_timed_account )
     in
     (* TODO: use transaction status to see that the transaction failed
        as things are, we examine the balance of the sender to see that no funds were transferred
@@ -396,7 +392,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Currency.Balance.to_amount after_balance)
              (Currency.Amount.of_fee
                 (Mina_base.Parties.fee
-                   parties_invalid_transfer_from_timed_account))
+                   parties_invalid_transfer_from_timed_account ) )
            |> Option.value_exn
          in
          (* the invalid transfer should result in a fee deduction only *)
@@ -412,7 +408,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  expected a balance of %s"
                 (Currency.Balance.to_string after_invalid_balance)
                 (Currency.Amount.to_string
-                   expected_after_invalid_balance_as_amount)))
+                   expected_after_invalid_balance_as_amount ) ) )
     in
     let%bind () =
       section "Send a snapp with invalid timing update"
@@ -440,12 +436,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Ledger update contains new timing, which should not have been \
               applied" ;
            Malleable_error.hard_error
-             (Error.of_string "Ledger update contains a timing update") ))
+             (Error.of_string "Ledger update contains a timing update") ) )
     in
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
            (List.hd_exn @@ Network.archive_nodes network)
        in
-       check_replayer_logs ~logger logs)
+       check_replayer_logs ~logger logs )
 end

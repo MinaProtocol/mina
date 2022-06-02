@@ -52,7 +52,7 @@ module Wrap = struct
   type ('mb, 'ml) t =
     (module S
        with type max_proofs_verified = 'mb
-        and type max_local_max_proofs_verifieds = 'ml)
+        and type max_local_max_proofs_verifieds = 'ml )
 
   let create : type mb ml. unit -> (mb, ml) t =
    fun () ->
@@ -111,14 +111,19 @@ module Step = struct
     type local_branches
 
     type _ t +=
+      | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
+      | Prev_inputs : prev_values H1.T(Id).t t
       | Proof_with_datas :
           ( prev_values
           , local_signature
           , local_branches )
-          H3.T(Per_proof_witness.Constant).t
+          H3.T(Per_proof_witness.Constant.No_app_state).t
           t
       | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
       | App_state : statement t
+      | Unfinalized_proofs :
+          (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
+      | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
   end
 
   let create :
@@ -129,7 +134,7 @@ module Step = struct
              and type local_branches = local_branches
              and type statement = statement
              and type prev_values = prev_values
-             and type max_proofs_verified = max_proofs_verified) =
+             and type max_proofs_verified = max_proofs_verified ) =
    fun () ->
     let module R = struct
       type nonrec max_proofs_verified = max_proofs_verified
@@ -143,14 +148,19 @@ module Step = struct
       type nonrec local_branches = local_branches
 
       type _ t +=
+        | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
+        | Prev_inputs : prev_values H1.T(Id).t t
         | Proof_with_datas :
             ( prev_values
             , local_signature
             , local_branches )
-            H3.T(Per_proof_witness.Constant).t
+            H3.T(Per_proof_witness.Constant.No_app_state).t
             t
         | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
         | App_state : statement t
+        | Unfinalized_proofs :
+            (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
+        | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
     end in
     (module R)
 end

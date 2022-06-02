@@ -9,7 +9,7 @@ open Mina_transaction
 
 let%test_module "Fee payer tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_snapp
+    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
 
@@ -19,7 +19,7 @@ let%test_module "Fee payer tests" =
       { Party.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
-              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i))
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
       }
 
     let%test_unit "update a snapp account with signature and fee paid by the \
@@ -42,12 +42,11 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
-            ; protocol_state_precondition = None
-            ; account_precondition = None
+            ; preconditions = None
             }
           in
           U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
-            ~snapp_pk:(Public_key.compress new_kp.public_key))
+            ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "update a snapp account with signature and fee paid by a \
                    non-snapp account" =
@@ -70,12 +69,11 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
-            ; protocol_state_precondition = None
-            ; account_precondition = None
+            ; preconditions = None
             }
           in
           U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
-            ~snapp_pk:(Public_key.compress new_kp.public_key))
+            ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "update a snapp account with proof and fee paid by the snapp \
                    account" =
@@ -97,15 +95,14 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
-            ; protocol_state_precondition = None
-            ; account_precondition = None
+            ; preconditions = None
             }
           in
           U.test_snapp_update
             ~snapp_permissions:
               (U.permissions_from_update snapp_update ~auth:Proof)
             test_spec ~init_ledger ~vk ~snapp_prover
-            ~snapp_pk:(Public_key.compress new_kp.public_key))
+            ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "update a snapp account with proof and fee paid by a \
                    non-snapp account" =
@@ -128,15 +125,14 @@ let%test_module "Fee payer tests" =
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
             ; sequence_events = []
-            ; protocol_state_precondition = None
-            ; account_precondition = None
+            ; preconditions = None
             }
           in
           U.test_snapp_update
             ~snapp_permissions:
               (U.permissions_from_update snapp_update ~auth:Proof)
             test_spec ~init_ledger ~vk ~snapp_prover
-            ~snapp_pk:(Public_key.compress new_kp.public_key))
+            ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "snapp transaction with non-existent fee payer account" =
       let open Mina_transaction_logic.For_tests in
@@ -161,8 +157,7 @@ let%test_module "Fee payer tests" =
                 ; call_data = Snark_params.Tick.Field.zero
                 ; events = []
                 ; sequence_events = []
-                ; protocol_state_precondition = None
-                ; account_precondition = None
+                ; preconditions = None
                 }
               in
               let parties =
@@ -191,12 +186,12 @@ let%test_module "Fee payer tests" =
                       [ ( `Pending_coinbase_init_stack U.init_stack
                         , `Pending_coinbase_of_statement
                             (U.pending_coinbase_state_stack
-                               ~state_body_hash:U.genesis_state_body_hash)
+                               ~state_body_hash:U.genesis_state_body_hash )
                         , parties )
-                      ])
+                      ] )
               with
               | Ok _a ->
                   failwith "Expected sparse ledger application to fail"
               | Error _e ->
-                  ()))
+                  () ) )
   end )

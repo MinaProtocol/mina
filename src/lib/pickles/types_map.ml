@@ -28,7 +28,10 @@ module Side_loaded = struct
     type t =
       { index :
           [ `In_circuit of Side_loaded_verification_key.Checked.t
-          | `In_prover of Side_loaded_verification_key.t ]
+          | `In_prover of Side_loaded_verification_key.t
+          | `In_both of
+            Side_loaded_verification_key.t
+            * Side_loaded_verification_key.Checked.t ]
       }
   end
 
@@ -64,7 +67,7 @@ module Side_loaded = struct
       } =
     let wrap_key, wrap_vk =
       match ephemeral with
-      | Some { index = `In_prover i } ->
+      | Some { index = `In_prover i | `In_both (i, _) } ->
           (i.wrap_index, i.wrap_vk)
       | _ ->
           failwithf "Side_loaded.to_basic: Expected `In_prover (%s)" __LOC__ ()
@@ -172,10 +175,10 @@ module For_step = struct
            ; var_to_field_elements
            }
        } :
-        (a, b, c, d) Side_loaded.t) : (a, b, c, d) t =
+        (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
     let index =
       match ephemeral with
-      | Some { index = `In_circuit i } ->
+      | Some { index = `In_circuit i | `In_both (_, i) } ->
           i
       | _ ->
           failwithf "For_step.side_loaded: Expected `In_circuit (%s)" __LOC__ ()
@@ -208,7 +211,7 @@ module For_step = struct
        ; wrap_domains
        ; step_domains
        } :
-        _ Compiled.t) =
+        _ Compiled.t ) =
     { branches
     ; max_width = None
     ; max_proofs_verified
@@ -271,12 +274,12 @@ let lookup_step_domains :
       match t.ephemeral with
       | Some { index = `In_circuit _ } | None ->
           failwith __LOC__
-      | Some { index = `In_prover k } ->
+      | Some { index = `In_prover k | `In_both (k, _) } ->
           let a =
             At_most.to_array (At_most.map k.step_data ~f:(fun (ds, _) -> ds.h))
           in
           Vector.init t.permanent.branches ~f:(fun i ->
-              try a.(i) with _ -> Domain.Pow_2_roots_of_unity 0) )
+              try a.(i) with _ -> Domain.Pow_2_roots_of_unity 0 ) )
 
 let max_proofs_verified :
     type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
@@ -309,7 +312,7 @@ let lookup_map (type a b c d) (t : (a, b, c, d) Tag.t) ~self ~default
     ~(f :
           [ `Compiled of (a, b, c, d) Compiled.t
           | `Side_loaded of (a, b, c, d) Side_loaded.t ]
-       -> _) =
+       -> _ ) =
   match Type_equal.Id.same_witness t.id self with
   | Some _ ->
       default
@@ -332,13 +335,26 @@ let add_side_loaded ~name permanent =
     ~data:(T (id, { ephemeral = None; permanent })) ;
   { Tag.kind = Side_loaded; id }
 
-let set_ephemeral { Tag.kind; id } eph =
+let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
   (match kind with Side_loaded -> () | _ -> failwith "Expected Side_loaded") ;
   Hashtbl.update univ.side_loaded (Type_equal.Id.uid id) ~f:(function
     | None ->
         assert false
     | Some (T (id, d)) ->
-        T (id, { d with ephemeral = Some eph }))
+        let ephemeral =
+          match (d.ephemeral, eph.index) with
+          | None, _ | Some _, `In_prover _ ->
+              (* Giving prover only always resets. *)
+              Some eph
+          | Some { index = `In_prover prover }, `In_circuit circuit
+          | Some { index = `In_both (prover, _) }, `In_circuit circuit ->
+              (* In-circuit extends prover if one was given. *)
+              Some { index = `In_both (prover, circuit) }
+          | _ ->
+              (* Otherwise, just use the given value. *)
+              Some eph
+        in
+        T (id, { d with ephemeral }) )
 
 let add_exn (type a b c d) (tag : (a, b, c, d) Tag.t)
     (data : (a, b, c, d) Compiled.t) =

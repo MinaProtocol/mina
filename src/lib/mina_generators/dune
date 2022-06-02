@@ -9,6 +9,8 @@
    core_kernel
    base_quickcheck
    core
+   async
+   async_unix
    base
    ;; local libraries
    sgn
@@ -18,6 +20,7 @@
    kimchi_backend.pasta
    mina_numbers
    mina_compile_config
+   parties_builder
    signature_lib
    mina_ledger
    mina_base
@@ -30,4 +33,5 @@
    pickles.backend
    random_oracle_input
    snark_params
+   snarky.backendless
 ))

@@ -113,7 +113,7 @@ let blocks_of_data ~max_block_size data =
         let link_buf = Bigstring.of_string (Blake2.to_raw_string link) in
         Bigstring.blit ~src:link_buf ~src_pos:0 ~dst:block
           ~dst_pos:(2 + (i * link_size))
-          ~len:link_size) ;
+          ~len:link_size ) ;
     Bigstring.blit ~src:chunk ~src_pos:0 ~dst:block
       ~dst_pos:(2 + (num_links * link_size))
       ~len:chunk_size ;
@@ -166,7 +166,7 @@ let parse_block block =
         List.init num_links ~f:(fun i ->
             block
             |> Bigstring.sub_shared ~pos:(2 + (i * link_size)) ~len:link_size
-            |> Bigstring.to_string |> Blake2.of_raw_string)
+            |> Bigstring.to_string |> Blake2.of_raw_string )
       in
       let data =
         Bigstring.sub_shared block ~pos:(2 + (num_links * link_size))
@@ -197,7 +197,7 @@ let data_of_blocks blocks root_hash =
           List.iter successive_links ~f:(Queue.enqueue links) ;
           Queue.enqueue chunks chunk
         done ;
-        Ok ())
+        Ok () )
   in
   let total_data_size = Queue.sum (module Int) chunks ~f:Bigstring.length in
   let data = Bigstring.create total_data_size in
@@ -205,7 +205,7 @@ let data_of_blocks blocks root_hash =
     ( Queue.fold chunks ~init:0 ~f:(fun dst_pos chunk ->
           Bigstring.blit ~src:chunk ~src_pos:0 ~dst:data ~dst_pos
             ~len:(Bigstring.length chunk) ;
-          dst_pos + Bigstring.length chunk)
+          dst_pos + Bigstring.length chunk )
       : int ) ;
   data
 
@@ -264,7 +264,7 @@ let%test_module "bitswap blocks" =
           let result =
             Or_error.ok_exn (data_of_blocks blocks root_block_hash)
           in
-          [%test_eq: Bigstring.t] data result)
+          [%test_eq: Bigstring.t] data result )
 
     let%test_unit "forall x: schema_of_blocks (blocks_of_data x) = \
                    create_schema x" =
@@ -272,7 +272,7 @@ let%test_module "bitswap blocks" =
           let schema = create_schema ~max_block_size (Bigstring.length data) in
           let blocks, root_block_hash = blocks_of_data ~max_block_size data in
           [%test_eq: schema] schema
-            (schema_of_blocks ~max_block_size blocks root_block_hash))
+            (schema_of_blocks ~max_block_size blocks root_block_hash) )
 
     let%test_unit "when x is aligned (has no partial branch block): \
                    data_of_blocks (blocks_of_data x) = x" =
@@ -305,7 +305,7 @@ let%test_module "bitswap blocks" =
             (fun () -> f helper)
             ~finally:(fun () ->
               let%bind () = Libp2p_helper.shutdown helper in
-              File_system.remove_dir conf_dir))
+              File_system.remove_dir conf_dir ) )
 
     let%test_unit "forall x: libp2p_helper#decode (daemon#encode x) = x" =
       Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
@@ -321,13 +321,13 @@ let%test_module "bitswap blocks" =
                 in
                 Libp2p_helper.do_rpc helper
                   (module TestDecodeBitswapBlocks)
-                  request)
+                  request )
             |> Or_error.ok_exn
             |> Libp2p_ipc.Reader.Libp2pHelperInterface.TestDecodeBitswapBlocks
                .Response
                .decoded_data_get |> Bigstring.of_string
           in
-          [%test_eq: Bigstring.t] data result)
+          [%test_eq: Bigstring.t] data result )
 
     let%test_unit "forall x: daemon#decode (libp2p_helper#encode x) = x" =
       Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
@@ -341,7 +341,7 @@ let%test_module "bitswap blocks" =
                   in
                   Libp2p_helper.do_rpc helper
                     (module TestEncodeBitswapBlocks)
-                    request)
+                    request )
               |> Or_error.ok_exn
             in
             let open Libp2p_ipc.Reader in
@@ -356,7 +356,7 @@ let%test_module "bitswap blocks" =
                   let block =
                     Bigstring.of_string @@ BlockWithId.block_get block_with_id
                   in
-                  (hash, block))
+                  (hash, block) )
             in
             let root_block_hash =
               Blake2.of_raw_string @@ RootBlockId.blake2b_hash_get
@@ -367,5 +367,5 @@ let%test_module "bitswap blocks" =
           let result =
             Or_error.ok_exn (data_of_blocks blocks root_block_hash)
           in
-          [%test_eq: Bigstring.t] data result)
+          [%test_eq: Bigstring.t] data result )
   end )

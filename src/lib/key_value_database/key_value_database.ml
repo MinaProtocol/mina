@@ -90,7 +90,7 @@ module Make_mock
   let to_sexp t ~key_sexp ~value_sexp =
     Key.Table.to_alist t
     |> List.map ~f:(fun (key, value) ->
-           [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value))
+           [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value) )
     |> [%sexp_of: Sexp.t list]
 
   let create _ = Key.Table.create ()

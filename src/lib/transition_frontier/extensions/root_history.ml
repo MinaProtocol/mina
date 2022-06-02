@@ -49,7 +49,7 @@ module T = struct
             |> Mina_block.Validated.forget
             |> With_hash.map ~f:(fun block ->
                    block |> Mina_block.header
-                   |> Mina_block.Header.protocol_state) )
+                   |> Mina_block.Header.protocol_state ) )
         |> List.map ~f:(fun s -> State_hash.With_state_hashes.(state_hash s, s))
         |> State_hash.Map.of_alist_exn
       in
@@ -60,7 +60,7 @@ module T = struct
            ( Mina_block.Validated.state_hash
            @@ External_transition.Validated.lower @@ transition t.current_root
            )
-           t.current_root) ) ;
+           t.current_root ) ) ;
     t.current_root <- new_root
 
   let handle_diffs root_history frontier diffs_with_mutants =
@@ -74,7 +74,7 @@ module T = struct
             |> Root_data.Historical.of_breadcrumb |> enqueue root_history ;
             true
         | E _ ->
-            false)
+            false )
     in
     Option.some_if should_produce_view root_history
 end
@@ -113,7 +113,8 @@ let protocol_states_for_scan_state
             in
             With_hash.data state_with_hash
       in
-      match res with None -> Stop None | Some state -> Continue (state :: acc))
+      match res with None -> Stop None | Some state -> Continue (state :: acc)
+      )
 
 let most_recent { history; _ } =
   (* unfortunately, there is not function to inspect the last element in the queue,

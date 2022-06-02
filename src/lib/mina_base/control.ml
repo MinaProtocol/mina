@@ -19,16 +19,20 @@ module Stable = struct
 end]
 
 (* lazy, to prevent spawning Rust threads at startup, which prevents daemonization *)
-let gen_with_dummies : t Quickcheck.Generator.t Lazy.t =
-  lazy
-    (Quickcheck.Generator.of_list
-       (let dummy_proof =
-          let n2 = Pickles_types.Nat.N2.n in
-          let proof = Pickles.Proof.dummy n2 n2 n2 in
-          Proof proof
-        in
-        let dummy_signature = Signature Signature.dummy in
-        [ dummy_proof; dummy_signature; None_given ]))
+let gen_with_dummies : t Quickcheck.Generator.t =
+  let gen =
+    lazy
+      (Quickcheck.Generator.of_list
+         (let dummy_proof =
+            let n2 = Pickles_types.Nat.N2.n in
+            let proof = Pickles.Proof.dummy n2 n2 n2 in
+            Proof proof
+          in
+          let dummy_signature = Signature Signature.dummy in
+          [ dummy_proof; dummy_signature; None_given ] ) )
+  in
+  Quickcheck.Generator.create (fun ~size ~random ->
+      Quickcheck.Generator.generate (Lazy.force gen) ~size ~random )
 
 [%%else]
 
@@ -92,7 +96,7 @@ let dummy_of_tag : Tag.t -> t = function
 
 let signature_deriver obj =
   Fields_derivers_zkapps.Derivers.iso_string obj ~name:"Signature"
-    ~to_string:Signature.to_base58_check
+    ~js_type:String ~to_string:Signature.to_base58_check
     ~of_string:Signature.of_base58_check_exn
 
 module As_record = struct
@@ -106,8 +110,8 @@ module As_record = struct
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
-      ~proof:!.(option @@ proof @@ o ())
-      ~signature:!.(option @@ signature_deriver @@ o ())
+      ~proof:!.(option ~js_type:`Or_undefined @@ proof @@ o ())
+      ~signature:!.(option ~js_type:`Or_undefined @@ signature_deriver @@ o ())
     |> finish "Control" ~t_toplevel_annots
 end
 

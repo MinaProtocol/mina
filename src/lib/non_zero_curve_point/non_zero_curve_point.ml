@@ -17,7 +17,7 @@ let gen_uncompressed =
   Quickcheck.Generator.filter_map Field.gen_uniform ~f:(fun x ->
       let open Option.Let_syntax in
       let%map y = Inner_curve.find_y x in
-      (x, y))
+      (x, y) )
 
 module Compressed = struct
   open Compressed_poly
@@ -180,7 +180,7 @@ module Uncompressed = struct
     Option.map (Inner_curve.find_y x) ~f:(fun y ->
         let y_parity = parity y in
         let y = if Bool.(is_odd = y_parity) then y else Field.negate y in
-        (x, y))
+        (x, y) )
 
   let decompress_exn t =
     match decompress t with
@@ -189,7 +189,7 @@ module Uncompressed = struct
     | None ->
         failwith
           (sprintf "Compressed public key %s could not be decompressed"
-             (Yojson.Safe.to_string @@ Compressed.to_yojson t))
+             (Yojson.Safe.to_string @@ Compressed.to_yojson t) )
 
   let of_base58_check_decompress_exn pk_str =
     let pk = Compressed.of_base58_check_exn pk_str in
@@ -205,15 +205,16 @@ module Uncompressed = struct
 
       let to_latest = Fn.id
 
-      include Binable.Of_binable
-                (Compressed.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable_without_uuid
+          (Compressed.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let of_binable = decompress_exn
+            let of_binable = decompress_exn
 
-                  let to_binable = compress
-                end)
+            let to_binable = compress
+          end)
 
       let gen : t Quickcheck.Generator.t = gen_uncompressed
 
@@ -266,7 +267,7 @@ module Uncompressed = struct
 
   let%test_unit "point-compression: decompress . compress = id" =
     Quickcheck.test gen ~f:(fun pk ->
-        assert (equal (decompress_exn (compress pk)) pk))
+        assert (equal (decompress_exn (compress pk)) pk) )
 
   [%%ifdef consensus_mechanism]
 

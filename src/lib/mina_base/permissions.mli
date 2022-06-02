@@ -1,5 +1,6 @@
 [%%import "/src/config.mlh"]
 
+open Core_kernel
 open Snark_params.Tick
 
 module Auth_required : sig
@@ -10,6 +11,8 @@ module Auth_required : sig
       [@@deriving sexp, equal, compare, hash, yojson, enum]
     end
   end]
+
+  val from : auth_tag:Control.Tag.t -> t
 
   val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
@@ -102,7 +105,8 @@ val deriver :
      (< contramap : (Auth_required.t Poly.t -> Auth_required.t Poly.t) ref
       ; graphql_arg :
           (   unit
-           -> Auth_required.t Poly.t Fields_derivers_graphql.Schema.Arg.arg_typ)
+           -> Auth_required.t Poly.t Fields_derivers_graphql.Schema.Arg.arg_typ
+          )
           ref
       ; graphql_arg_accumulator :
           Auth_required.t Poly.t Fields_derivers_zkapps.Graphql.Args.Acc.T.t ref
@@ -126,17 +130,20 @@ val deriver :
           ref
       ; of_json :
           (   [> `Assoc of (string * Yojson.Safe.t) list ]
-           -> Auth_required.t Poly.t)
+           -> Auth_required.t Poly.t )
           ref
       ; of_json_creator : Yojson.Safe.t Core_kernel.String.Map.t ref
       ; to_json :
           (   Auth_required.t Poly.t
-           -> [> `Assoc of (string * Yojson.Safe.t) list ])
+           -> [> `Assoc of (string * Yojson.Safe.t) list ] )
           ref
       ; to_json_accumulator :
           (string * (Auth_required.t Poly.t -> Yojson.Safe.t)) option list ref
       ; skip : bool ref
+      ; js_layout : Yojson.Safe.t ref
+      ; js_layout_accumulator :
+          Fields_derivers_zkapps.Js_layout.Accumulator.field option list ref
       ; .. >
       as
-      'a)
+      'a )
   -> 'a

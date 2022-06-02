@@ -168,7 +168,7 @@ CREATE TABLE public.accounts_accessed (
     block_id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     token_symbol_id integer NOT NULL,
-    balance bigint NOT NULL,
+    balance text NOT NULL,
     nonce bigint NOT NULL,
     receipt_chain_hash text NOT NULL,
     delegate_id integer,
@@ -186,7 +186,7 @@ CREATE TABLE public.accounts_accessed (
 CREATE TABLE public.accounts_created (
     block_id integer NOT NULL,
     account_identifier_id integer NOT NULL,
-    creation_fee bigint NOT NULL
+    creation_fee text NOT NULL
 );
 
 
@@ -205,12 +205,12 @@ CREATE TABLE public.blocks (
     staking_epoch_data_id integer NOT NULL,
     next_epoch_data_id integer NOT NULL,
     min_window_density bigint NOT NULL,
-    total_currency bigint NOT NULL,
+    total_currency text NOT NULL,
     ledger_hash text NOT NULL,
     height bigint NOT NULL,
     global_slot_since_hard_fork bigint NOT NULL,
     global_slot_since_genesis bigint NOT NULL,
-    "timestamp" bigint NOT NULL,
+    "timestamp" text NOT NULL,
     chain_status public.chain_status_type NOT NULL
 );
 
@@ -281,7 +281,7 @@ CREATE TABLE public.epoch_data (
     id integer NOT NULL,
     seed text NOT NULL,
     ledger_hash_id integer NOT NULL,
-    total_currency bigint NOT NULL,
+    total_currency text NOT NULL,
     start_checkpoint text NOT NULL,
     lock_checkpoint text NOT NULL,
     epoch_length bigint NOT NULL
@@ -316,7 +316,7 @@ CREATE TABLE public.internal_commands (
     id integer NOT NULL,
     typ public.internal_command_type NOT NULL,
     receiver_id integer NOT NULL,
-    fee bigint NOT NULL,
+    fee text NOT NULL,
     hash text NOT NULL
 );
 
@@ -409,11 +409,11 @@ CREATE TABLE public.timing_info (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     initial_balance bigint NOT NULL,
-    initial_minimum_balance bigint NOT NULL,
+    initial_minimum_balance text NOT NULL,
     cliff_time bigint NOT NULL,
-    cliff_amount bigint NOT NULL,
+    cliff_amount text NOT NULL,
     vesting_period bigint NOT NULL,
-    vesting_increment bigint NOT NULL
+    vesting_increment text NOT NULL
 );
 
 
@@ -510,8 +510,8 @@ CREATE TABLE public.user_commands (
     source_id integer NOT NULL,
     receiver_id integer NOT NULL,
     nonce bigint NOT NULL,
-    amount bigint,
-    fee bigint NOT NULL,
+    amount text,
+    fee text NOT NULL,
     valid_until bigint,
     memo text NOT NULL,
     hash text NOT NULL
@@ -642,8 +642,8 @@ ALTER SEQUENCE public.zkapp_accounts_id_seq OWNED BY public.zkapp_accounts.id;
 
 CREATE TABLE public.zkapp_amount_bounds (
     id integer NOT NULL,
-    amount_lower_bound bigint NOT NULL,
-    amount_upper_bound bigint NOT NULL
+    amount_lower_bound text NOT NULL,
+    amount_upper_bound text NOT NULL
 );
 
 
@@ -673,8 +673,8 @@ ALTER SEQUENCE public.zkapp_amount_bounds_id_seq OWNED BY public.zkapp_amount_bo
 
 CREATE TABLE public.zkapp_balance_bounds (
     id integer NOT NULL,
-    balance_lower_bound bigint NOT NULL,
-    balance_upper_bound bigint NOT NULL
+    balance_lower_bound text NOT NULL,
+    balance_upper_bound text NOT NULL
 );
 
 
@@ -834,10 +834,10 @@ CREATE TABLE public.zkapp_fee_payer_body (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     update_id integer NOT NULL,
-    fee bigint NOT NULL,
+    fee text NOT NULL,
     events_id integer NOT NULL,
     sequence_events_id integer NOT NULL,
-    zkapp_protocol_state_precondition_id integer NOT NULL,
+    zkapp_network_precondition_id integer NOT NULL,
     nonce bigint NOT NULL
 );
 
@@ -860,6 +860,37 @@ CREATE SEQUENCE public.zkapp_fee_payer_body_id_seq
 --
 
 ALTER SEQUENCE public.zkapp_fee_payer_body_id_seq OWNED BY public.zkapp_fee_payer_body.id;
+
+
+--
+-- Name: zkapp_fee_payers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.zkapp_fee_payers (
+    id integer NOT NULL,
+    body_id integer NOT NULL
+);
+
+
+--
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.zkapp_fee_payers_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.zkapp_fee_payers_id_seq OWNED BY public.zkapp_fee_payers.id;
+
 
 --
 -- Name: zkapp_global_slot_bounds; Type: TABLE; Schema: public; Owner: -
@@ -973,13 +1004,13 @@ CREATE TABLE public.zkapp_other_party_body (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
     update_id integer NOT NULL,
-    balance_change bigint NOT NULL,
+    balance_change text NOT NULL,
     increment_nonce boolean NOT NULL,
     events_id integer NOT NULL,
     sequence_events_id integer NOT NULL,
     call_data_id integer NOT NULL,
     call_depth integer NOT NULL,
-    zkapp_protocol_state_precondition_id integer NOT NULL,
+    zkapp_network_precondition_id integer NOT NULL,
     zkapp_account_precondition_id integer NOT NULL,
     use_full_commitment boolean NOT NULL,
     caller public.call_type_type NOT NULL
@@ -1134,10 +1165,10 @@ ALTER SEQUENCE public.zkapp_precondition_accounts_id_seq OWNED BY public.zkapp_p
 
 
 --
--- Name: zkapp_protocol_state_precondition; Type: TABLE; Schema: public; Owner: -
+-- Name: zkapp_network_precondition; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.zkapp_protocol_state_precondition (
+CREATE TABLE public.zkapp_network_precondition (
     id integer NOT NULL,
     snarked_ledger_hash_id integer,
     timestamp_id integer,
@@ -1152,10 +1183,10 @@ CREATE TABLE public.zkapp_protocol_state_precondition (
 
 
 --
--- Name: zkapp_protocol_state_precondition_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.zkapp_protocol_state_precondition_id_seq
+CREATE SEQUENCE public.zkapp_network_precondition_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1165,10 +1196,10 @@ CREATE SEQUENCE public.zkapp_protocol_state_precondition_id_seq
 
 
 --
--- Name: zkapp_protocol_state_precondition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.zkapp_protocol_state_precondition_id_seq OWNED BY public.zkapp_protocol_state_precondition.id;
+ALTER SEQUENCE public.zkapp_network_precondition_id_seq OWNED BY public.zkapp_network_precondition.id;
 
 
 --
@@ -1297,8 +1328,8 @@ ALTER SEQUENCE public.zkapp_states_id_seq OWNED BY public.zkapp_states.id;
 
 CREATE TABLE public.zkapp_timestamp_bounds (
     id integer NOT NULL,
-    timestamp_lower_bound bigint NOT NULL,
-    timestamp_upper_bound bigint NOT NULL
+    timestamp_lower_bound text NOT NULL,
+    timestamp_upper_bound text NOT NULL
 );
 
 
@@ -1328,11 +1359,11 @@ ALTER SEQUENCE public.zkapp_timestamp_bounds_id_seq OWNED BY public.zkapp_timest
 
 CREATE TABLE public.zkapp_timing_info (
     id integer NOT NULL,
-    initial_minimum_balance bigint NOT NULL,
+    initial_minimum_balance text NOT NULL,
     cliff_time bigint NOT NULL,
-    cliff_amount bigint NOT NULL,
+    cliff_amount text NOT NULL,
     vesting_period bigint NOT NULL,
-    vesting_increment bigint NOT NULL
+    vesting_increment text NOT NULL
 );
 
 
@@ -1626,6 +1657,13 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body ALTER COLUMN id SET DEFAULT nextval
 
 
 --
+-- Name: zkapp_fee_payers id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers ALTER COLUMN id SET DEFAULT nextval('public.zkapp_fee_payers_id_seq'::regclass);
+
+
+--
 -- Name: zkapp_global_slot_bounds id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1682,10 +1720,10 @@ ALTER TABLE ONLY public.zkapp_precondition_accounts ALTER COLUMN id SET DEFAULT 
 
 
 --
--- Name: zkapp_protocol_state_precondition id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition ALTER COLUMN id SET DEFAULT nextval('public.zkapp_protocol_state_precondition_id_seq'::regclass);
+ALTER TABLE ONLY public.zkapp_network_precondition ALTER COLUMN id SET DEFAULT nextval('public.zkapp_network_precondition_id_seq'::regclass);
 
 
 --
@@ -1759,22 +1797,22 @@ ALTER TABLE ONLY public.zkapp_verification_keys ALTER COLUMN id SET DEFAULT next
 
 
 --
--- Data for Name: zkapp_uris; Type: TABLE DATA; Schema: public; Owner: -
---
-
-COPY public.zkapp_uris (id, value) FROM stdin;
-1	
-2	https://www.example.com
-\.
-
-
---
 -- Data for Name: token_symbols; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.token_symbols (id, value) FROM stdin;
 1	
 2	BOLSYM
+\.
+
+
+--
+-- Data for Name: zkapp_uris; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.zkapp_uris (id, value) FROM stdin;
+1	
+2	https://www.example.com
 \.
 
 
@@ -2077,6 +2115,7 @@ COPY public.timing_info (id, account_identifier_id, initial_balance, initial_min
 5	5	11000000000	0	0	0	0	0
 \.
 
+
 --
 -- Data for Name: tokens; Type: TABLE DATA; Schema: public; Owner: -
 --
@@ -2364,11 +2403,23 @@ COPY public.zkapp_events (id, element_ids) FROM stdin;
 -- Data for Name: zkapp_fee_payer_body; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.zkapp_fee_payer_body (id, account_identifier_id, update_id, fee, events_id, sequence_events_id, zkapp_protocol_state_precondition_id, nonce) FROM stdin;
+COPY public.zkapp_fee_payer_body (id, account_identifier_id, update_id, fee, events_id, sequence_events_id, zkapp_network_precondition_id, nonce) FROM stdin;
 1	4	1	1000000000	1	1	1	0
 2	4	4	1000000000	1	1	4	2
 3	4	6	1000000000	1	1	6	3
 4	4	8	1000000000	1	1	8	4
+\.
+
+
+--
+-- Data for Name: zkapp_fee_payers; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.zkapp_fee_payers (id, body_id) FROM stdin;
+1	1
+2	2
+3	3
+4	4
 \.
 
 
@@ -2413,7 +2464,7 @@ COPY public.zkapp_other_party (id, body_id, authorization_kind) FROM stdin;
 -- Data for Name: zkapp_other_party_body; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.zkapp_other_party_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_protocol_state_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller) FROM stdin;
+COPY public.zkapp_other_party_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller) FROM stdin;
 1	4	2	-12000000000	t	1	1	1	0	2	1	f	call
 2	5	3	11000000000	f	1	1	1	0	3	2	t	call
 3	1	5	0	f	1	1	1	0	5	2	t	call
@@ -2450,10 +2501,10 @@ COPY public.zkapp_precondition_accounts (id, balance_id, nonce_id, receipt_chain
 
 
 --
--- Data for Name: zkapp_protocol_state_precondition; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: zkapp_network_precondition; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.zkapp_protocol_state_precondition (id, snarked_ledger_hash_id, timestamp_id, blockchain_length_id, min_window_density_id, total_currency_id, curr_global_slot_since_hard_fork, global_slot_since_genesis, staking_epoch_data_id, next_epoch_data_id) FROM stdin;
+COPY public.zkapp_network_precondition (id, snarked_ledger_hash_id, timestamp_id, blockchain_length_id, min_window_density_id, total_currency_id, curr_global_slot_since_hard_fork, global_slot_since_genesis, staking_epoch_data_id, next_epoch_data_id) FROM stdin;
 1	\N	\N	\N	\N	\N	\N	\N	1	2
 2	\N	\N	\N	\N	\N	\N	\N	3	4
 3	\N	\N	\N	\N	\N	\N	\N	5	6
@@ -2542,6 +2593,7 @@ COPY public.zkapp_updates (id, app_state_id, delegate_id, verification_key_id, p
 8	1	\N	\N	\N	\N	\N	\N	\N
 9	1	\N	\N	\N	\N	2	\N	\N
 \.
+
 
 --
 -- Data for Name: zkapp_verification_keys; Type: TABLE DATA; Schema: public; Owner: -
@@ -2693,6 +2745,13 @@ SELECT pg_catalog.setval('public.zkapp_fee_payer_body_id_seq', 4, true);
 
 
 --
+-- Name: zkapp_fee_payers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.zkapp_fee_payers_id_seq', 4, true);
+
+
+--
 -- Name: zkapp_global_slot_bounds_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
@@ -2749,10 +2808,10 @@ SELECT pg_catalog.setval('public.zkapp_precondition_accounts_id_seq', 1, false);
 
 
 --
--- Name: zkapp_protocol_state_precondition_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.zkapp_protocol_state_precondition_id_seq', 9, true);
+SELECT pg_catalog.setval('public.zkapp_network_precondition_id_seq', 9, true);
 
 
 --
@@ -3098,6 +3157,14 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 
 
 --
+-- Name: zkapp_fee_payers zkapp_fee_payers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers
+    ADD CONSTRAINT zkapp_fee_payers_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: zkapp_global_slot_bounds zkapp_global_slot_bounds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3162,11 +3229,11 @@ ALTER TABLE ONLY public.zkapp_precondition_accounts
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_pkey PRIMARY KEY (id);
 
 
 --
@@ -3725,11 +3792,11 @@ ALTER TABLE ONLY public.zkapp_accounts
 
 
 --
--- Name: zkapp_commands zkapp_commands_zkapp_fee_payer_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_commands zkapp_commands_zkapp_fee_payer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.zkapp_commands
-    ADD CONSTRAINT zkapp_commands_zkapp_fee_payer_body_id_fkey FOREIGN KEY (zkapp_fee_payer_body_id) REFERENCES public.zkapp_fee_payer_body(id);
+    ADD CONSTRAINT zkapp_commands_zkapp_fee_payer_id_fkey FOREIGN KEY (zkapp_fee_payer_body_id) REFERENCES public.zkapp_fee_payers(id);
 
 
 --
@@ -3797,11 +3864,19 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 
 
 --
--- Name: zkapp_fee_payer_body zkapp_fee_payer_body_zkapp_protocol_state_precondition_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_fee_payer_body zkapp_fee_payer_body_zkapp_network_precondition_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
-    ADD CONSTRAINT zkapp_fee_payer_body_zkapp_protocol_state_precondition_id_fkey FOREIGN KEY (zkapp_protocol_state_precondition_id) REFERENCES public.zkapp_protocol_state_precondition(id);
+    ADD CONSTRAINT zkapp_fee_payer_body_zkapp_network_precondition_id_fkey FOREIGN KEY (zkapp_network_precondition_id) REFERENCES public.zkapp_network_precondition(id);
+
+
+--
+-- Name: zkapp_fee_payers zkapp_fee_payers_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_fee_payers
+    ADD CONSTRAINT zkapp_fee_payers_body_id_fkey FOREIGN KEY (body_id) REFERENCES public.zkapp_fee_payer_body(id);
 
 
 --
@@ -3861,11 +3936,11 @@ ALTER TABLE ONLY public.zkapp_other_party_body
 
 
 --
--- Name: zkapp_other_party_body zkapp_other_party_body_zkapp_protocol_state_precondition_i_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_other_party_body zkapp_other_party_body_zkapp_network_precondition_i_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.zkapp_other_party_body
-    ADD CONSTRAINT zkapp_other_party_body_zkapp_protocol_state_precondition_i_fkey FOREIGN KEY (zkapp_protocol_state_precondition_id) REFERENCES public.zkapp_protocol_state_precondition(id);
+    ADD CONSTRAINT zkapp_other_party_body_zkapp_network_precondition_i_fkey FOREIGN KEY (zkapp_network_precondition_id) REFERENCES public.zkapp_network_precondition(id);
 
 
 --
@@ -3909,75 +3984,75 @@ ALTER TABLE ONLY public.zkapp_precondition_accounts
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondi_curr_global_slot_since_hard__fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_protocol_state_precondi_curr_global_slot_since_hard__fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
+ALTER TABLE ONLY public.zkapp_network_precondition
     ADD CONSTRAINT zkapp_protocol_state_precondi_curr_global_slot_since_hard__fkey FOREIGN KEY (curr_global_slot_since_hard_fork) REFERENCES public.zkapp_global_slot_bounds(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_preconditio_global_slot_since_genesis_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_protocol_state_preconditio_global_slot_since_genesis_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
+ALTER TABLE ONLY public.zkapp_network_precondition
     ADD CONSTRAINT zkapp_protocol_state_preconditio_global_slot_since_genesis_fkey FOREIGN KEY (global_slot_since_genesis) REFERENCES public.zkapp_global_slot_bounds(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_blockchain_length_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_blockchain_length_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_blockchain_length_id_fkey FOREIGN KEY (blockchain_length_id) REFERENCES public.zkapp_length_bounds(id);
-
-
---
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_min_window_density_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_min_window_density_id_fkey FOREIGN KEY (min_window_density_id) REFERENCES public.zkapp_length_bounds(id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_blockchain_length_id_fkey FOREIGN KEY (blockchain_length_id) REFERENCES public.zkapp_length_bounds(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_next_epoch_data_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_min_window_density_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_next_epoch_data_id_fkey FOREIGN KEY (next_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
-
-
---
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_snarked_ledger_hash_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_snarked_ledger_hash_id_fkey FOREIGN KEY (snarked_ledger_hash_id) REFERENCES public.snarked_ledger_hashes(id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_min_window_density_id_fkey FOREIGN KEY (min_window_density_id) REFERENCES public.zkapp_length_bounds(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_staking_epoch_data_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_next_epoch_data_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_staking_epoch_data_id_fkey FOREIGN KEY (staking_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
-
-
---
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_timestamp_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_timestamp_id_fkey FOREIGN KEY (timestamp_id) REFERENCES public.zkapp_timestamp_bounds(id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_next_epoch_data_id_fkey FOREIGN KEY (next_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_total_currency_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_snarked_ledger_hash_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_total_currency_id_fkey FOREIGN KEY (total_currency_id) REFERENCES public.zkapp_amount_bounds(id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_snarked_ledger_hash_id_fkey FOREIGN KEY (snarked_ledger_hash_id) REFERENCES public.snarked_ledger_hashes(id);
+
+
+--
+-- Name: zkapp_network_precondition zkapp_network_precondition_staking_epoch_data_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_staking_epoch_data_id_fkey FOREIGN KEY (staking_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
+
+
+--
+-- Name: zkapp_network_precondition zkapp_network_precondition_timestamp_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_timestamp_id_fkey FOREIGN KEY (timestamp_id) REFERENCES public.zkapp_timestamp_bounds(id);
+
+
+--
+-- Name: zkapp_network_precondition zkapp_network_precondition_total_currency_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_total_currency_id_fkey FOREIGN KEY (total_currency_id) REFERENCES public.zkapp_amount_bounds(id);
 
 
 --
@@ -4047,3 +4122,4 @@ ALTER TABLE ONLY public.zkapp_updates
 --
 -- PostgreSQL database dump complete
 --
+

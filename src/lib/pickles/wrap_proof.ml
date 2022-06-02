@@ -44,11 +44,11 @@ let typ : (Checked.t, Constant.t) Typ.t =
                 Shifted_value.Type2.of_field (module Tock.Field) ~shift x
               with
               | Shifted_value x ->
-                  x)
+                  x )
             ~back:(fun x ->
               Shifted_value.Type2.to_field
                 (module Tock.Field)
-                ~shift (Shifted_value x))
+                ~shift (Shifted_value x) )
         (* When reading, unshift *)
         |> Typ.transport_var
            (* For the var, we just wrap the now shifted underlying value. *)

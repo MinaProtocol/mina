@@ -67,7 +67,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
             map (read_var n) ~f:(fun n ->
                 List.init total_length ~f:(fun i ->
                     Bigint.(
-                      compare (of_field (Field.of_int i)) (of_field n) < 0))))
+                      compare (of_field (Field.of_int i)) (of_field n) < 0) ) ))
     in
     let%map () =
       Field.Checked.Assert.equal
@@ -152,7 +152,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
                As_prover.(
                  map2 (read Boolean.typ less)
                    (read Boolean.typ less_or_equal)
-                   ~f:Tuple2.create))
+                   ~f:Tuple2.create) )
             |> Or_error.ok_exn
           in
           let r = Bigint.(compare (of_field x) (of_field y)) in
@@ -170,7 +170,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
                 [ boolean_assert_lte Boolean.false_ Boolean.false_
                 ; boolean_assert_lte Boolean.false_ Boolean.true_
                 ; boolean_assert_lte Boolean.true_ Boolean.true_
-                ])) ;
+                ] ) ) ;
         assert (
           Or_error.is_error
             (check (boolean_assert_lte Boolean.true_ Boolean.false_)) )
@@ -193,7 +193,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
                 | N_ones ->
                     respond (Provide resp)
                 | _ ->
-                    unhandled)
+                    unhandled )
           in
           let correct = Int.pow 2 n - 1 in
           let to_bits k =

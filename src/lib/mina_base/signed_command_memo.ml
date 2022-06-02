@@ -97,7 +97,7 @@ let create_by_digesting_string_exn s =
   String.init memo_length ~f:(fun ndx ->
       if Int.(ndx = tag_index) then digest_tag
       else if Int.(ndx = length_index) then digest_length_byte
-      else digest.[ndx - 2])
+      else digest.[ndx - 2] )
 
 let create_by_digesting_string (s : string) =
   try Ok (create_by_digesting_string_exn s)
@@ -120,7 +120,7 @@ let create_from_value_exn (type t) (module M : Memoable with type t = t)
       if Int.(ndx = tag_index) then bytes_tag
       else if Int.(ndx = length_index) then Char.of_int_exn len
       else if Int.(ndx < len + 2) then M.get value (ndx - 2)
-      else '\x00')
+      else '\x00' )
 
 let create_from_bytes_exn bytes = create_from_value_exn (module Bytes) bytes
 
@@ -175,7 +175,7 @@ let fold_bits t =
             let b = (Char.to_int t.[i / 8] lsr (i mod 8)) land 1 = 1 in
             go (f acc b) (i + 1)
         in
-        go init 0)
+        go init 0 )
   }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
@@ -187,7 +187,7 @@ let gen =
 let hash memo =
   Random_oracle.hash ~init:Hash_prefix.zkapp_memo
     (Random_oracle.Legacy.pack_input
-       (Random_oracle_input.Legacy.bitstring (to_bits memo)))
+       (Random_oracle_input.Legacy.bitstring (to_bits memo)) )
 
 let to_plaintext (memo : t) : string Or_error.t =
   if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))
@@ -240,8 +240,8 @@ let typ : (Checked.t, t) Typ.t =
 [%%endif]
 
 let deriver obj =
-  Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~to_string:to_base58_check
-    ~of_string:of_base58_check_exn
+  Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~js_type:String
+    ~to_string:to_base58_check ~of_string:of_base58_check_exn
 
 let%test_module "user_command_memo" =
   ( module struct
@@ -289,13 +289,12 @@ let%test_module "user_command_memo" =
         memo |> typ.value_to_fields
         |> (fun (arr, aux) ->
              ( Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-             , aux ))
+             , aux ) )
         |> typ.var_of_fields
       in
       let memo_read =
         memo_var |> typ.var_to_fields
-        |> (fun (arr, aux) ->
-             (Array.map arr ~f:(fun x -> read_constant x), aux))
+        |> (fun (arr, aux) -> (Array.map arr ~f:(fun x -> read_constant x), aux))
         |> typ.value_of_fields
       in
       [%test_eq: string] memo memo_read

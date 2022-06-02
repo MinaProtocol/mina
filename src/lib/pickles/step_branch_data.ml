@@ -30,18 +30,18 @@ type ( 'a_var
           Inductive_rule.t
       ; main :
              step_domains:(Domains.t, 'branches) Vector.t
+          -> unit
           -> ( (Unfinalized.t, 'max_proofs_verified) Vector.t
              , Impls.Step.Field.t
              , (Impls.Step.Field.t, 'max_proofs_verified) Vector.t )
              Types.Step.Statement.t
-          -> unit
       ; requests :
           (module Requests.Step.S
              with type statement = 'a_value
               and type max_proofs_verified = 'max_proofs_verified
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
-              and type local_branches = 'local_heights)
+              and type local_branches = 'local_heights )
       }
       -> ( 'a_var
          , 'a_value
@@ -56,7 +56,7 @@ type ( 'a_var
 (* Compile an inductive rule. *)
 let create
     (type branches max_proofs_verified local_signature local_branches a_var
-    a_value prev_vars prev_values) ~index
+    a_value prev_vars prev_values ) ~index
     ~(self : (a_var, a_value, max_proofs_verified, branches) Tag.t)
     ~wrap_domains ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
@@ -129,9 +129,8 @@ let create
     in
     Fix_domains.domains
       (module Impls.Step)
-      etyp
-      (Snarky_backendless.Typ.unit ())
-      main
+      (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
+      etyp main
   in
   Timer.clock __LOC__ ;
   T

@@ -74,7 +74,7 @@ module Tick : S = struct
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        } :
-        a Env.t) =
+        a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
     let x_1 = pow (cell (var (Witness 1, Curr)), 7) in
     let x_2 = pow (cell (var (Witness 2, Curr)), 7) in
@@ -155,7 +155,7 @@ module Tick : S = struct
        ; endo_coefficient
        ; srs_length_log2 = _
        } :
-        a Env.t) =
+        a Env.t ) =
     Column.Table.of_alist_exn
       [ ( Index CompleteAdd
         , lazy
@@ -200,7 +200,7 @@ module Tick : S = struct
                  )
              + alpha_pow 6
                * ( (x_1 * cell (var (Witness 9, Curr)))
-                 - cell (var (Witness 6, Curr)) )) )
+                 - cell (var (Witness 6, Curr)) ) ) )
       ; ( Index VarBaseMul
         , lazy
             (let x_0 =
@@ -467,7 +467,7 @@ module Tick : S = struct
                * ( (cell (var (Witness 1, Next)) + cell (var (Witness 14, Curr)))
                    * x_13
                  - (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Next)))
-                   * x_14 )) )
+                   * x_14 ) ) )
       ; ( Index EndoMul
         , lazy
             (let x_0 =
@@ -556,7 +556,7 @@ module Tick : S = struct
                          + cell (var (Witness 12, Curr)) )
                      + cell (var (Witness 13, Curr)) )
                  + cell (var (Witness 14, Curr))
-                 - cell (var (Witness 6, Next)) )) )
+                 - cell (var (Witness 6, Next)) ) ) )
       ; ( Index EndoMulScalar
         , lazy
             (let x_0 =
@@ -684,19 +684,19 @@ module Tick : S = struct
                                                                          ( Witness
                                                                              0
                                                                          , Curr
-                                                                         ))))
+                                                                         ) ) ) )
                                                             + cell
                                                                 (var
                                                                    ( Witness 6
-                                                                   , Curr )) ))
+                                                                   , Curr ) ) ) )
                                                      + cell
                                                          (var (Witness 7, Curr))
-                                                     ))
-                                              + cell (var (Witness 8, Curr)) ))
-                                       + cell (var (Witness 9, Curr)) ))
-                                + cell (var (Witness 10, Curr)) ))
-                         + cell (var (Witness 11, Curr)) ))
-                  + cell (var (Witness 12, Curr)) ))
+                                                     ) )
+                                              + cell (var (Witness 8, Curr)) ) )
+                                       + cell (var (Witness 9, Curr)) ) )
+                                + cell (var (Witness 10, Curr)) ) )
+                         + cell (var (Witness 11, Curr)) ) )
+                  + cell (var (Witness 12, Curr)) ) )
              + cell (var (Witness 13, Curr))
              - cell (var (Witness 1, Curr))
              + alpha_pow 1
@@ -930,7 +930,7 @@ module Tick : S = struct
                    + field
                        "0x40000000000000000000000000000000224698FC094CF91B992D30ECFFFFFFFB"
                    )
-                 * cell (var (Witness 13, Curr)) )) )
+                 * cell (var (Witness 13, Curr)) ) ) )
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))
@@ -1057,7 +1057,7 @@ module Tock : S = struct
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        } :
-        a Env.t) =
+        a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
     let x_1 = pow (cell (var (Witness 1, Curr)), 7) in
     let x_2 = pow (cell (var (Witness 2, Curr)), 7) in
@@ -1138,7 +1138,7 @@ module Tock : S = struct
        ; endo_coefficient
        ; srs_length_log2 = _
        } :
-        a Env.t) =
+        a Env.t ) =
     Column.Table.of_alist_exn
       [ ( Index CompleteAdd
         , lazy
@@ -1183,7 +1183,7 @@ module Tock : S = struct
                  )
              + alpha_pow 6
                * ( (x_1 * cell (var (Witness 9, Curr)))
-                 - cell (var (Witness 6, Curr)) )) )
+                 - cell (var (Witness 6, Curr)) ) ) )
       ; ( Index VarBaseMul
         , lazy
             (let x_0 =
@@ -1450,7 +1450,7 @@ module Tock : S = struct
                * ( (cell (var (Witness 1, Next)) + cell (var (Witness 14, Curr)))
                    * x_13
                  - (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Next)))
-                   * x_14 )) )
+                   * x_14 ) ) )
       ; ( Index EndoMul
         , lazy
             (let x_0 =
@@ -1539,7 +1539,7 @@ module Tock : S = struct
                          + cell (var (Witness 12, Curr)) )
                      + cell (var (Witness 13, Curr)) )
                  + cell (var (Witness 14, Curr))
-                 - cell (var (Witness 6, Next)) )) )
+                 - cell (var (Witness 6, Next)) ) ) )
       ; ( Index EndoMulScalar
         , lazy
             (let x_0 =
@@ -1667,19 +1667,19 @@ module Tock : S = struct
                                                                          ( Witness
                                                                              0
                                                                          , Curr
-                                                                         ))))
+                                                                         ) ) ) )
                                                             + cell
                                                                 (var
                                                                    ( Witness 6
-                                                                   , Curr )) ))
+                                                                   , Curr ) ) ) )
                                                      + cell
                                                          (var (Witness 7, Curr))
-                                                     ))
-                                              + cell (var (Witness 8, Curr)) ))
-                                       + cell (var (Witness 9, Curr)) ))
-                                + cell (var (Witness 10, Curr)) ))
-                         + cell (var (Witness 11, Curr)) ))
-                  + cell (var (Witness 12, Curr)) ))
+                                                     ) )
+                                              + cell (var (Witness 8, Curr)) ) )
+                                       + cell (var (Witness 9, Curr)) ) )
+                                + cell (var (Witness 10, Curr)) ) )
+                         + cell (var (Witness 11, Curr)) ) )
+                  + cell (var (Witness 12, Curr)) ) )
              + cell (var (Witness 13, Curr))
              - cell (var (Witness 1, Curr))
              + alpha_pow 1
@@ -1913,7 +1913,7 @@ module Tock : S = struct
                    + field
                        "0x40000000000000000000000000000000224698FC0994A8DD8C46EB20FFFFFFFB"
                    )
-                 * cell (var (Witness 13, Curr)) )) )
+                 * cell (var (Witness 13, Curr)) ) ) )
       ; ( Coefficient 0
         , lazy
             ( cell (var (Index Poseidon, Curr))

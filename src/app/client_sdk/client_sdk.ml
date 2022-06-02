@@ -43,8 +43,9 @@ let _ =
          let other_parties = Parties.other_parties_of_json other_parties_json in
          let other_parties =
            Parties.Call_forest.of_parties_list
-             ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+             ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
              other_parties
+           |> Parties.Call_forest.map ~f:Party.of_graphql_repr
            |> Parties.Call_forest.accumulate_hashes
                 ~hash_party:(fun (p : Party.t) -> Parties.Digest.Party.create p)
          in
@@ -377,7 +378,7 @@ let _ =
            let bits_to_bytes bits =
              let byte_of_bits bs =
                List.foldi bs ~init:0 ~f:(fun i acc b ->
-                   if b then acc lor (1 lsl i) else acc)
+                   if b then acc lor (1 lsl i) else acc )
                |> Char.of_int_exn
              in
              List.map
@@ -390,9 +391,9 @@ let _ =
                   Bigint.(
                     equal
                       (shift_right Snark_params.Tick.Field.size i land one)
-                      one)))
+                      one) ) )
          in
          Hex.encode @@ field_order_bytes
 
        method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
-    end)
+    end )

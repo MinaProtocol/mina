@@ -23,7 +23,6 @@ module Load_data = Archive_lib.Load_data
    when all commands from a block have been replayed, we verify
    that the Merkle root of the replay ledger matches the stored
    ledger hash in the archive database
-
 *)
 
 type input =
@@ -69,7 +68,7 @@ let json_ledger_hash_of_ledger ledger =
 
 let create_ledger_as_list ledger =
   List.map (Ledger.to_list ledger) ~f:(fun acc ->
-      Genesis_ledger_helper.Accounts.Single.of_account acc None)
+      Genesis_ledger_helper.Accounts.Single.of_account acc None )
 
 let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
@@ -228,7 +227,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
               [%sexp_of:
                 (string * Signature_lib.Public_key.Compressed.t)
                 * (string * Token_id.t)]
-            |> Error.raise) ;
+            |> Error.raise ) ;
     epoch_ledger )
   else epoch_ledger
 
@@ -240,7 +239,7 @@ let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
   in
   let%bind staking_epoch_id =
     query_db ~f:(fun db ->
-        Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
+        Sql.Epoch_data.get_staking_epoch_data_id db state_hash )
   in
   let%map { epoch_ledger_hash; epoch_data_seed } =
     query_db ~f:(fun db -> Sql.Epoch_data.get_epoch_data db staking_epoch_id)
@@ -338,12 +337,12 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       let fee_transfer =
         Fee_transfer.create_single ~receiver_pk ~fee ~fee_token
       in
-      let undo_or_error =
+      let applied_or_error =
         Ledger.apply_fee_transfer ~constraint_constants ~txn_global_slot ledger
           fee_transfer
       in
-      match undo_or_error with
-      | Ok _undo ->
+      match applied_or_error with
+      | Ok _applied ->
           Deferred.unit
       | Error err ->
           fail_on_error err )
@@ -371,11 +370,11 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
             Error.tag err ~tag:"Error creating coinbase for internal command"
             |> Error.raise
       in
-      let undo_or_error =
+      let applied_or_error =
         apply_coinbase ~constraint_constants ~txn_global_slot ledger coinbase
       in
-      match undo_or_error with
-      | Ok _undo ->
+      match applied_or_error with
+      | Ok _applied ->
           Deferred.unit
       | Error err ->
           fail_on_error err )
@@ -431,7 +430,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
 module User_command_helpers = struct
   let body_of_sql_user_cmd pool
       ({ typ; source_id; receiver_id; amount; global_slot_since_genesis; _ } :
-        Sql.User_command.t) : Signed_command_payload.Body.t Deferred.t =
+        Sql.User_command.t ) : Signed_command_payload.Body.t Deferred.t =
     let open Signed_command_payload.Body in
     let open Deferred.Let_syntax in
     let account_identifier_of_id = Load_data.account_identifier_of_id pool in
@@ -454,7 +453,7 @@ module User_command_helpers = struct
     | "delegation" ->
         Stake_delegation
           (Stake_delegation.Set_delegate
-             { delegator = source_pk; new_delegate = receiver_pk })
+             { delegator = source_pk; new_delegate = receiver_pk } )
     | _ ->
         failwithf "Invalid user command type: %s" typ ()
 end
@@ -471,7 +470,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let valid_until =
     Option.map cmd.valid_until ~f:(fun slot ->
-        Mina_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot)
+        Mina_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
   in
   let payload =
     Signed_command_payload.create
@@ -502,7 +501,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
     Ledger.apply_user_command ~constraint_constants ~txn_global_slot ledger
       valid_signed_cmd
   with
-  | Ok _undo ->
+  | Ok _applied ->
       Deferred.unit
   | Error err ->
       Error.tag_arg err "User command failed on replay"
@@ -539,12 +538,12 @@ module Zkapp_helpers = struct
           let%bind snarked_ledger_hash_str =
             query_db ~f:(fun db ->
                 Sql.Snarked_ledger_hashes.run db
-                  parent_block.snarked_ledger_hash_id)
+                  parent_block.snarked_ledger_hash_id )
           in
           let snarked_ledger_hash =
             Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
           in
-          let timestamp = parent_block.timestamp |> Block_time.of_int64 in
+          let timestamp = Block_time.of_string_exn parent_block.timestamp in
           let blockchain_length =
             parent_block.height |> Unsigned.UInt32.of_int64
             |> Mina_numbers.Length.of_uint32
@@ -556,8 +555,7 @@ module Zkapp_helpers = struct
           (* TODO : this will change *)
           let last_vrf_output = () in
           let total_currency =
-            parent_block.total_currency |> Unsigned.UInt64.of_int64
-            |> Currency.Amount.of_uint64
+            Currency.Amount.of_string parent_block.total_currency
           in
           let global_slot_since_hard_fork =
             parent_block.global_slot_since_hard_fork |> Unsigned.UInt32.of_int64
@@ -572,12 +570,11 @@ module Zkapp_helpers = struct
               Mina_base.Epoch_data.Value.t Deferred.t =
             let%bind hash_str =
               query_db ~f:(fun db ->
-                  Sql.Snarked_ledger_hashes.run db raw_epoch_data.ledger_hash_id)
+                  Sql.Snarked_ledger_hashes.run db raw_epoch_data.ledger_hash_id )
             in
             let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
             let total_currency =
-              raw_epoch_data.total_currency |> Unsigned.UInt64.of_int64
-              |> Currency.Amount.of_uint64
+              Currency.Amount.of_string raw_epoch_data.total_currency
             in
             let ledger = { Mina_base.Epoch_ledger.Poly.hash; total_currency } in
             let seed = raw_epoch_data.seed |> Epoch_seed.of_base58_check_exn in
@@ -601,14 +598,14 @@ module Zkapp_helpers = struct
           in
           let%bind staking_epoch_raw =
             query_db ~f:(fun db ->
-                Processor.Epoch_data.load db parent_block.staking_epoch_data_id)
+                Processor.Epoch_data.load db parent_block.staking_epoch_data_id )
           in
           let%bind (staking_epoch_data : Mina_base.Epoch_data.Value.t) =
             epoch_data_of_raw_epoch_data staking_epoch_raw
           in
           let%bind next_epoch_raw =
             query_db ~f:(fun db ->
-                Processor.Epoch_data.load db parent_block.staking_epoch_data_id)
+                Processor.Epoch_data.load db parent_block.staking_epoch_data_id )
           in
           let%bind next_epoch_data =
             epoch_data_of_raw_epoch_data next_epoch_raw
@@ -640,7 +637,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     in
     ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
   in
-  let%bind (other_parties : Party.Wire.t list) =
+  let%bind (other_parties : Party.Simple.t list) =
     Deferred.List.map (Array.to_list cmd.zkapp_other_parties_ids) ~f:(fun id ->
         let%bind { body_id; authorization_kind } =
           query_db ~f:(fun db -> Processor.Zkapp_other_party.load db id)
@@ -657,10 +654,10 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
           | None_given ->
               None_given
         in
-        ({ body; authorization } : Party.Wire.t))
+        ({ body; authorization } : Party.Simple.t) )
   in
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
-  let parties = Parties.of_wire { fee_payer; other_parties; memo } in
+  let parties = Parties.of_simple { fee_payer; other_parties; memo } in
   return (parties : Parties.t)
 
 let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
@@ -740,7 +737,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
     | Error msg ->
         failwith
           (sprintf "Could not parse JSON in input file \"%s\": %s" input_file
-             msg)
+             msg )
   in
   let archive_uri = Uri.of_string archive_uri in
   match Caqti_async.connect_pool ~max_size:128 archive_uri with
@@ -783,7 +780,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             [%log info] "Retrieving fork block state_hash" ;
             query_db ~f:(fun db ->
                 Sql.Parent_block.get_parent_state_hash db
-                  epoch_ledgers_state_hash)
+                  epoch_ledgers_state_hash )
         | None ->
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
@@ -807,8 +804,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   ~key:global_slot_since_genesis
                   ~data:
                     ( State_hash.of_base58_check_exn state_hash
-                    , Ledger_hash.of_base58_check_exn ledger_hash )) ;
-            return (Int.Set.of_list ids))
+                    , Ledger_hash.of_base58_check_exn ledger_hash ) ) ;
+            return (Int.Set.of_list ids) )
       in
       (* check that genesis block is in chain to target hash
          assumption: genesis block occupies global slot 0
@@ -828,7 +825,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           Caqti_async.Pool.use
             (fun db ->
               Command_ids.run db ~state_hash:target_state_hash
-                ~start_slot:input.start_slot_since_genesis)
+                ~start_slot:input.start_slot_since_genesis )
             pool
         with
         | Ok ids ->
@@ -873,13 +870,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             | Error msg ->
                 failwithf
                   "Error querying for internal commands with id %d, error %s" id
-                  (Caqti_error.show msg) ())
+                  (Caqti_error.show msg) () )
       in
       let unsorted_internal_cmds = List.concat unsorted_internal_cmds_list in
       (* filter out internal commands in blocks not along chain from target state hash *)
       let filtered_internal_cmds =
         List.filter unsorted_internal_cmds ~f:(fun cmd ->
-            Int.Set.mem block_ids cmd.block_id)
+            Int.Set.mem block_ids cmd.block_id )
       in
       [%log info] "Will replay %d internal commands"
         (List.length filtered_internal_cmds) ;
@@ -902,7 +899,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                     "Two internal commands have the same global slot since \
                      genesis %Ld, sequence no %d, and secondary sequence no \
                      %d, but are not a coinbase and fee transfer via coinbase"
-            else cmp)
+            else cmp )
       in
       (* populate cache of fee transfer via coinbase items *)
       [%log info] "Populating fee transfer via coinbase cache" ;
@@ -924,13 +921,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             | Error msg ->
                 failwithf
                   "Error querying for user commands with id %d, error %s" id
-                  (Caqti_error.show msg) ())
+                  (Caqti_error.show msg) () )
       in
       let unsorted_user_cmds = List.concat unsorted_user_cmds_list in
       (* filter out user commands in blocks not along chain from target state hash *)
       let filtered_user_cmds =
         List.filter unsorted_user_cmds ~f:(fun cmd ->
-            Int.Set.mem block_ids cmd.block_id)
+            Int.Set.mem block_ids cmd.block_id )
       in
       [%log info] "Will replay %d user commands"
         (List.length filtered_user_cmds) ;
@@ -939,7 +936,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             let tuple (uc : Sql.User_command.t) =
               (uc.global_slot_since_genesis, uc.sequence_no)
             in
-            [%compare: int64 * int] (tuple uc1) (tuple uc2))
+            [%compare: int64 * int] (tuple uc1) (tuple uc2) )
       in
       [%log info] "Loading zkApp commands" ;
       let%bind unsorted_zkapp_cmds_list =
@@ -955,14 +952,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             | Error msg ->
                 failwithf
                   "Error querying for zkApp commands with id %d, error %s" id
-                  (Caqti_error.show msg) ())
+                  (Caqti_error.show msg) () )
       in
       let unsorted_zkapp_cmds = List.concat unsorted_zkapp_cmds_list in
       let filtered_zkapp_cmds =
         List.filter unsorted_zkapp_cmds ~f:(fun (cmd : Sql.Zkapp_command.t) ->
             Int64.( >= ) cmd.global_slot_since_genesis
               input.start_slot_since_genesis
-            && Int.Set.mem block_ids cmd.block_id)
+            && Int.Set.mem block_ids cmd.block_id )
       in
       [%log info] "Will replay %d zkApp commands"
         (List.length filtered_zkapp_cmds) ;
@@ -971,7 +968,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             let tuple (sc : Sql.Zkapp_command.t) =
               (sc.global_slot_since_genesis, sc.sequence_no)
             in
-            [%compare: int64 * int] (tuple sc1) (tuple sc2))
+            [%compare: int64 * int] (tuple sc1) (tuple sc2) )
       in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
@@ -1015,11 +1012,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             ~metadata:[ ("block_id", `Int last_block_id) ] ;
           let%bind accounts_accessed_db =
             query_db ~f:(fun db ->
-                Processor.Accounts_accessed.all_from_block db last_block_id)
+                Processor.Accounts_accessed.all_from_block db last_block_id )
           in
           let%bind accounts_created_db =
             query_db ~f:(fun db ->
-                Processor.Accounts_created.all_from_block db last_block_id)
+                Processor.Accounts_created.all_from_block db last_block_id )
           in
           [%log info]
             "Verifying that accounts created are also deemed accessed in block \
@@ -1032,7 +1029,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 Option.is_none
                   (List.find accounts_accessed_db
                      ~f:(fun { account_identifier_id = acct_id_accessed; _ } ->
-                       acct_id_accessed = acct_id_created))
+                       acct_id_accessed = acct_id_created ) )
               then (
                 [%log error] "Created account not present in accessed accounts"
                   ~metadata:
@@ -1040,7 +1037,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                     ; ("block_id", `Int last_block_id)
                     ] ;
                 if continue_on_error then incr error_count
-                else Core_kernel.exit 1 )) ;
+                else Core_kernel.exit 1 ) ) ;
           [%log info]
             "Verifying balances and nonces for accounts accessed in block with \
              global slot since genesis %Ld"
@@ -1111,7 +1108,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                           , Mina_numbers.Account_nonce.to_yojson nonce )
                         ] ;
                     if continue_on_error then incr error_count
-                    else Core_kernel.exit 1 ))
+                    else Core_kernel.exit 1 ) )
         in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
           let state_hash, _ledger_hash =
@@ -1296,7 +1293,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
       let%bind start_slot_since_genesis =
         let%map slot_opt =
           query_db ~f:(fun db ->
-              Sql.Block.get_next_slot db input.start_slot_since_genesis)
+              Sql.Block.get_next_slot db input.start_slot_since_genesis )
         in
         match slot_opt with
         | Some slot ->
@@ -1349,7 +1346,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
           return
           @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
-                 Out_channel.output_string oc replayer_checkpoint)
+                 Out_channel.output_string oc replayer_checkpoint )
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
@@ -1369,7 +1366,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 in
                 return
                 @@ Out_channel.with_file output_file ~f:(fun oc ->
-                       Out_channel.output_string oc output) )
+                       Out_channel.output_string oc output ) )
               else (
                 [%log error] "There were %d errors, not writing output"
                   !error_count ;
@@ -1398,4 +1395,4 @@ let () =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
          in
-         main ~input_file ~output_file_opt ~archive_uri ~continue_on_error)))
+         main ~input_file ~output_file_opt ~archive_uri ~continue_on_error )))

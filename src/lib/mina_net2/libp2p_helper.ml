@@ -48,7 +48,7 @@ module Go_log = struct
           | Error err ->
               Error
                 (Printf.sprintf "%sCould not parse field '%s': %s" prefix key
-                   err) )
+                   err ) )
       | None ->
           Error (Printf.sprintf "%sField '%s' is required" prefix key)
     in
@@ -61,7 +61,7 @@ module Go_log = struct
           | `Duplicate ->
               Error
                 (Printf.sprintf "%sField '%s' should not already exist" prefix
-                   good_key) )
+                   good_key ) )
       | None ->
           Ok map
     in
@@ -85,7 +85,7 @@ module Go_log = struct
           Some
             (Logger.Source.create
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
-               ~location:"(not tracked)")
+               ~location:"(not tracked)" )
       ; message = String.concat [ "libp2p_helper: "; r.msg ]
       ; metadata = r.metadata
       ; event_id = None
@@ -114,8 +114,8 @@ let%test "record_of_yojson 1" =
                true
            | Error _ ->
                false
-         with _ -> false)
-       lines)
+         with _ -> false )
+       lines )
     [ true; false ]
 
 type t =
@@ -130,7 +130,7 @@ type t =
 let handle_libp2p_helper_termination t ~pids ~killed result =
   Hashtbl.iter t.outstanding_requests ~f:(fun iv ->
       Ivar.fill_if_empty iv
-        (Or_error.error_string "libp2p_helper process died before answering")) ;
+        (Or_error.error_string "libp2p_helper process died before answering") ) ;
   Hashtbl.clear t.outstanding_requests ;
   Child_processes.Termination.remove pids (Child_processes.pid t.process) ;
   if (not killed) && not t.finished then (
@@ -201,13 +201,13 @@ let handle_incoming_message t msg ~handle_push_message =
           | None ->
               [%log' error t.logger]
                 "Attempted to fill outstanding libp2p_helper RPC request, but \
-                 not outstanding request was found") ;
+                 not outstanding request was found" ) ;
       Deferred.unit
   | PushMessage push_msg ->
       O1trace.thread "handle_libp2p_ipc_push" (fun () ->
           let push_header = DaemonInterface.PushMessage.header_get push_msg in
           record_message_delay (PushMessageHeader.time_sent_get push_header) ;
-          handle_push_message t (DaemonInterface.PushMessage.get push_msg))
+          handle_push_message t (DaemonInterface.PushMessage.get push_msg) )
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n ;
       Deferred.unit
@@ -223,7 +223,7 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
           ~termination:
             (`Handler
               (fun ~killed _process result ->
-                !termination_handler ~killed result)))
+                !termination_handler ~killed result ) ) )
   with
   | Error e ->
       Or_error.tag (Error e)
@@ -265,7 +265,7 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                        "failed to parse record over libp2p_helper stderr: \
                         $error"
                        ~metadata:[ ("error", `String error) ] ) ;
-                 Deferred.unit)) ;
+                 Deferred.unit ) ) ;
       O1trace.background_thread "handle_libp2p_ipc_incoming" (fun () ->
           Child_processes.stdout process
           |> Libp2p_ipc.read_incoming_messages
@@ -281,7 +281,7 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                       $error"
                      ~metadata:
                        [ ("error", `String (Error.to_string_hum error)) ] ;
-                   Deferred.unit)) ;
+                   Deferred.unit ) ) ;
       Or_error.return t
 
 let shutdown t =

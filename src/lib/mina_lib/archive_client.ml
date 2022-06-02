@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 
-let dispatch ?(max_tries = 5)
+let dispatch ?(max_tries = 5) ~logger
     (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name) diff =
   let rec go tries_left errs =
     if Int.( <= ) tries_left 0 then
@@ -14,10 +14,10 @@ let dispatch ?(max_tries = 5)
                  "Could not send archive diff data to archive process after %d \
                   tries. The process may not be running, please check the \
                   daemon-argument"
-                 max_tries)
+                 max_tries )
               ( ("host_and_port", archive_location.value)
               , ("daemon-argument", archive_location.name) )
-              [%sexp_of: (string * Host_and_port.t) * (string * string)]))
+              [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
     else
       match%bind
         Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff
@@ -26,6 +26,9 @@ let dispatch ?(max_tries = 5)
       | Ok () ->
           return (Ok ())
       | Error e ->
+          [%log error]
+            "Error sending data to the archive process $error. Retrying..."
+            ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
           go (tries_left - 1) (e :: errs)
   in
   go max_tries []
@@ -42,10 +45,10 @@ let make_dispatch_block rpc ?(max_tries = 5)
                  "Could not send block data to archive process after %d tries. \
                   The process may not be running, please check the \
                   daemon-argument"
-                 max_tries)
+                 max_tries )
               ( ("host_and_port", archive_location.value)
               , ("daemon-argument", archive_location.name) )
-              [%sexp_of: (string * Host_and_port.t) * (string * string)]))
+              [%sexp_of: (string * Host_and_port.t) * (string * string)] ) )
     else
       match%bind
         Daemon_rpcs.Client.dispatch rpc block archive_location.value
@@ -66,15 +69,37 @@ let dispatch_extensional_block =
 let transfer ~logger ~precomputed_values ~archive_location
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view
-      Broadcast_pipe.Reader.t) =
+      Broadcast_pipe.Reader.t ) =
   Broadcast_pipe.Reader.iter breadcrumb_reader ~f:(fun breadcrumbs ->
       Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
+          let start = Time.now () in
           let diff =
             Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
-              breadcrumb
+              ~logger breadcrumb
           in
-          match%map dispatch archive_location (Transition_frontier diff) with
+          let diff_time = Time.now () in
+          [%log debug] "Archive data generation for $state_hash took $time ms"
+            ~metadata:
+              [ ( "state_hash"
+                , Mina_base.State_hash.to_yojson
+                    (Transition_frontier.Breadcrumb.state_hash breadcrumb) )
+              ; ("time", `Float (Time.Span.to_ms (Time.diff diff_time start)))
+              ] ;
+          match%map
+            dispatch archive_location ~logger (Transition_frontier diff)
+          with
           | Ok () ->
+              [%log debug]
+                "Dispatched archive data for $state_hash, took $time ms"
+                ~metadata:
+                  [ ( "state_hash"
+                    , Mina_base.State_hash.to_yojson
+                        (Transition_frontier.Breadcrumb.state_hash breadcrumb)
+                    )
+                  ; ( "time"
+                    , `Float
+                        (Time.Span.to_ms (Time.diff (Time.now ()) diff_time)) )
+                  ] ;
               ()
           | Error e ->
               [%log warn]
@@ -83,11 +108,11 @@ let transfer ~logger ~precomputed_values ~archive_location
                   ; ( "breadcrumb"
                     , Transition_frontier.Breadcrumb.to_yojson breadcrumb )
                   ]
-                "Could not send breadcrumb to archive: $error"))
+                "Could not send breadcrumb to archive: $error" ) )
 
 let run ~logger ~precomputed_values
     ~(frontier_broadcast_pipe :
-       Transition_frontier.t option Broadcast_pipe.Reader.t) archive_location =
+       Transition_frontier.t option Broadcast_pipe.Reader.t ) archive_location =
   O1trace.background_thread "send_diffs_to_archiver" (fun () ->
       Broadcast_pipe.Reader.iter frontier_broadcast_pipe
         ~f:
@@ -101,4 +126,4 @@ let run ~logger ~precomputed_values
                    Transition_frontier.Extensions.New_breadcrumbs
                in
                transfer ~logger ~precomputed_values ~archive_location
-                 breadcrumb_reader)))
+                 breadcrumb_reader ) ) )

@@ -59,15 +59,16 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable_without_uuid
+        (Binable_arg.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable = to_tuple
+          let to_binable = to_tuple
 
-                let of_binable = of_tuple
-              end)
+          let of_binable = of_tuple
+        end)
 
     let sexp_of_t = Fn.compose sexp_of_string to_string
 
@@ -136,7 +137,7 @@ let to_int (path : t) : int =
   Sequence.range 0 (depth path)
   |> Sequence.fold ~init:0 ~f:(fun acc i ->
          let index = depth path - 1 - i in
-         acc + ((if get path index <> 0 then 1 else 0) lsl i))
+         acc + ((if get path index <> 0 then 1 else 0) lsl i) )
 
 let of_int_exn ~ledger_depth index =
   if index >= 1 lsl ledger_depth then failwith "Index is too large"
@@ -147,7 +148,7 @@ let of_int_exn ~ledger_depth index =
           (ledger_depth - 1) 0
         |> Sequence.fold ~init:index ~f:(fun i pos ->
                Bitstring.put buf pos (i % 2) ;
-               i / 2)
+               i / 2 )
         : int ) ;
     buf
 
@@ -256,7 +257,7 @@ module Range = struct
               Some (current_node, (current_node, `Stop))
             else
               Option.map (next current_node) ~f:(fun next_node ->
-                  (current_node, (next_node, `Don't_stop))))
+                  (current_node, (next_node, `Don't_stop)) ) )
 end
 
 let%test "Bitstring bin_io serialization does not change" =
@@ -282,32 +283,32 @@ struct
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t List.t * Direction.t]
       (Quickcheck.Generator.tuple2
          (Direction.gen_var_length_list Input.depth)
-         Direction.gen)
+         Direction.gen )
       ~f:(fun (path, direction) ->
         let address = of_directions path in
         [%test_eq: t]
           (parent_exn (child_exn ~ledger_depth:Input.depth address direction))
-          address)
+          address )
 
   let%test_unit "to_index(of_index_exn(i)) = i" =
     Quickcheck.test ~sexp_of:[%sexp_of: int]
       (Int.gen_incl 0 ((1 lsl Input.depth) - 1))
       ~f:(fun index ->
         [%test_result: int] ~expect:index
-          (to_int @@ of_int_exn ~ledger_depth:Input.depth index))
+          (to_int @@ of_int_exn ~ledger_depth:Input.depth index) )
 
   let%test_unit "of_index_exn(to_index(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
       (Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address
-          (of_int_exn ~ledger_depth:Input.depth @@ to_int address))
+          (of_int_exn ~ledger_depth:Input.depth @@ to_int address) )
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
       (Direction.gen_var_length_list ~start:1 Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
-        [%test_result: t] ~expect:address (sibling @@ sibling address))
+        [%test_result: t] ~expect:address (sibling @@ sibling address) )
 
   let%test_unit "prev(next(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
@@ -317,7 +318,7 @@ struct
         | None ->
             ()
         | Some addr' ->
-            [%test_result: t option] ~expect:(Some address) (prev addr'))
+            [%test_result: t option] ~expect:(Some address) (prev addr') )
 end
 
 let%test_module "Address" =

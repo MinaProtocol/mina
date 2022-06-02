@@ -124,7 +124,7 @@ let soften_error m =
   | Error { Hard_fail.soft_errors; hard_errors } ->
       Ok
         (Result_accumulator.create ()
-           (Error_accumulator.merge soft_errors hard_errors))
+           (Error_accumulator.merge soft_errors hard_errors) )
 
 let is_ok = function Ok acc -> Result_accumulator.is_ok acc | _ -> false
 
@@ -164,7 +164,7 @@ let combine_errors (malleable_errors : 'a t list) : 'a list t =
     List.fold_left malleable_errors ~init:(return []) ~f:(fun acc el ->
         let%bind t = acc in
         let%map h = el in
-        h :: t)
+        h :: t )
   in
   List.rev values
 
@@ -249,7 +249,7 @@ module List = struct
     let%map _ =
       fold ls ~init:0 ~f:(fun i x ->
           let%map () = f i x in
-          i + 1)
+          i + 1 )
     in
     ()
 
@@ -299,7 +299,7 @@ let%test_module "malleable error unit tests" =
             f (f (f (f (f (return 0)))))
           in
           let%map expected = T.return 5 in
-          [%test_eq: int inner] ~equal:(equal_inner Int.equal) actual expected)
+          [%test_eq: int inner] ~equal:(equal_inner Int.equal) actual expected )
 
     let%test_unit "malleable error test 2: completes string computation when \
                    no errors" =
@@ -312,7 +312,7 @@ let%test_module "malleable error unit tests" =
           in
           let%map expected = T.return "123" in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
 
     let%test_unit "malleable error test 3: ok result that accumulates soft \
                    errors" =
@@ -335,7 +335,7 @@ let%test_module "malleable error unit tests" =
               }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
 
     let%test_unit "malleable error test 4: do a basic hard error" =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -354,7 +354,7 @@ let%test_module "malleable error unit tests" =
               }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
 
     let%test_unit "malleable error test 5: hard error that accumulates a soft \
                    error" =
@@ -377,7 +377,7 @@ let%test_module "malleable error unit tests" =
               }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
 
     let%test_unit "malleable error test 6: hard error with multiple soft \
                    errors accumulating" =
@@ -404,5 +404,5 @@ let%test_module "malleable error unit tests" =
               }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
   end )

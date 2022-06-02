@@ -37,7 +37,7 @@ module Subchain = struct
       (make_sql
          ~join_condition:
            "b.id = chain.parent_id AND (chain.state_hash <> $2 OR b.state_hash \
-            = $2)")
+            = $2)" )
 
   let start_from_unparented (module Conn : Caqti_async.CONNECTION)
       ~end_state_hash =
@@ -74,6 +74,37 @@ module Blocks_and_user_commands = struct
     Conn.collect_list query block_id
 end
 
+module Block_user_command_tokens = struct
+  type t = Archive_lib.Processor.Token.t =
+    { value : string
+    ; owner_public_key_id : int option
+    ; owner_token_id : int option
+    }
+  [@@deriving hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; option int; option int ]
+
+  let query =
+    Caqti_request.collect Caqti_type.int typ
+      {sql| SELECT tokens.value, owner_public_key_id, owner_token_id
+            FROM (blocks_user_commands buc
+            INNER JOIN blocks
+            ON blocks.id = buc.block_id)
+            INNER JOIN user_commands uc
+            ON buc.user_command_id = uc.id
+            INNER JOIN account_identifiers ai
+            ON (uc.fee_payer_id = ai.id OR uc.source_id = ai.id OR uc.receiver_id = ai.id)
+            INNER JOIN tokens
+            ON ai.token_id = tokens.id
+            WHERE block_id = ?
+      |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+    Conn.collect_list query block_id
+end
+
 module Blocks_and_internal_commands = struct
   type t =
     { internal_command_id : int
@@ -99,12 +130,77 @@ module Blocks_and_internal_commands = struct
     Conn.collect_list query block_id
 end
 
+module Block_internal_command_tokens = struct
+  type t = Archive_lib.Processor.Token.t =
+    { value : string
+    ; owner_public_key_id : int option
+    ; owner_token_id : int option
+    }
+  [@@deriving hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; option int; option int ]
+
+  let query =
+    Caqti_request.collect Caqti_type.int typ
+      {sql| SELECT tokens.value, owner_public_key_id, owner_token_id
+            FROM (blocks_internal_commands bic
+            INNER JOIN blocks
+            ON blocks.id = bic.block_id)
+            INNER JOIN internal_commands ic
+            ON bic.internal_command_id = ic.id
+            INNER JOIN account_identifiers ai
+            ON ic.receiver_id = ai.id
+            INNER JOIN tokens
+            ON ai.token_id = tokens.id
+            WHERE block_id = ?
+      |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+    Conn.collect_list query block_id
+end
+
 module Blocks_and_zkapp_commands = struct
   let query =
     Caqti_request.collect Caqti_type.int
       Caqti_type.(tup2 int int)
       {sql| SELECT zkapp_command_id, sequence_no
             FROM blocks_zkapp_commands
+            WHERE block_id = ?
+      |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+    Conn.collect_list query block_id
+end
+
+module Block_zkapp_command_tokens = struct
+  type t = Archive_lib.Processor.Token.t =
+    { value : string
+    ; owner_public_key_id : int option
+    ; owner_token_id : int option
+    }
+  [@@deriving hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; option int; option int ]
+
+  let query =
+    Caqti_request.collect Caqti_type.int typ
+      {sql| SELECT tokens.value, owner_public_key_id, owner_token_id
+            FROM (blocks_zkapp_commands bzkc
+            INNER JOIN blocks
+            ON blocks.id = bzkc.block_id)
+            INNER JOIN zkapp_commands zkc
+            ON bzkc.zkapp_command_id = zkc.id
+            INNER JOIN account_identifiers ai
+
+
+
+            ON ic.receiver_id = ai.id
+            INNER JOIN tokens
+            ON ai.token_id = tokens.id
             WHERE block_id = ?
       |sql}
 

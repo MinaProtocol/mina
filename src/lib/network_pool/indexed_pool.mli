@@ -126,7 +126,7 @@ val add_from_gossip_exn_async :
   -> sender_local_state:Sender_local_state.t
   -> verify:
        (   User_command.Verifiable.t
-        -> User_command.Valid.t option Async.Deferred.t)
+        -> User_command.Valid.t option Async.Deferred.t )
   -> [ `Unchecked of Transaction_hash.User_command.t * User_command.Verifiable.t
      | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
   -> Account_nonce.t

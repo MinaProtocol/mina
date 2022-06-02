@@ -1,5 +1,4 @@
 open Core_kernel
-open Pickles_types.Hlist
 open Snark_params.Tick.Run
 open Signature_lib
 open Mina_base
@@ -29,7 +28,7 @@ let initialize public_key =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
       party |> Party_under_construction.In_circuit.assert_state_unproved
-      |> Party_under_construction.In_circuit.set_full_state initial_state)
+      |> Party_under_construction.In_circuit.set_full_state initial_state )
 
 type _ Snarky_backendless.Request.t +=
   | New_state : Field.Constant.t list Snarky_backendless.Request.t
@@ -54,25 +53,13 @@ let update_state public_key =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
       in
       party |> Party_under_construction.In_circuit.assert_state_proved
-      |> Party_under_construction.In_circuit.set_full_state new_state)
-
-let main_value ([] : _ H1.T(Id).t) (_ : Zkapp_statement.t) :
-    _ H1.T(E01(Core_kernel.Bool)).t =
-  []
+      |> Party_under_construction.In_circuit.set_full_state new_state )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Initialize snapp"
-  ; prevs = []
-  ; main = initialize public_key
-  ; main_value
-  }
+  { identifier = "Initialize snapp"; prevs = []; main = initialize public_key }
 
 let update_state_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Update state"
-  ; prevs = []
-  ; main = update_state public_key
-  ; main_value
-  }
+  { identifier = "Update state"; prevs = []; main = update_state public_key }
 
 let generate_initialize_party public_key =
   Party_under_construction.create ~public_key ~token_id:Token_id.default ()

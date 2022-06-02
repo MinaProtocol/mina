@@ -37,15 +37,17 @@ module Proof = struct
         Or_error.try_with (fun () -> of_bin_string str)
         |> Result.map_error ~f:(fun err ->
                sprintf "Precomputed_block.Proof.of_yojson: %s"
-                 (Error.to_string_hum err))
+                 (Error.to_string_hum err) )
     | json ->
         Proof.of_yojson json
 end
 
 module T = struct
-  (* the accounts_accessed and accounts_created fields are used
-     for storing blocks in the archive db, they're not needed
+  (* the accounts_accessed, accounts_created, and tokens_used fields
+     are used for storing blocks in the archive db, they're not needed
      for replaying blocks
+
+     in tokens_used, the account id is the token owner
   *)
   type t =
     { scheduled_time : Block_time.t
@@ -56,7 +58,7 @@ module T = struct
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
-          (* TODO : list of token ids and owners created *)
+    ; tokens_used : (Token_id.t * Account_id.t option) list
     }
   [@@deriving sexp, yojson]
 end
@@ -79,6 +81,8 @@ module Stable = struct
       ; accounts_accessed : (int * Account.Stable.V2.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
+      ; tokens_used :
+          (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
       }
 
     let to_latest = Fn.id
@@ -87,9 +91,14 @@ end]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~scheduled_time ~staged_ledger block =
+    ~scheduled_time ~staged_ledger block_with_hash =
   let ledger = Staged_ledger.ledger staged_ledger in
+  let block = With_hash.data block_with_hash in
+  let state_hash =
+    (With_hash.hash block_with_hash).State_hash.State_hashes.state_hash
+  in
   let account_ids_accessed = Block.account_ids_accessed block in
+  let start = Time.now () in
   let accounts_accessed =
     List.filter_map account_ids_accessed ~f:(fun acct_id ->
         try
@@ -104,9 +113,17 @@ let of_block ~logger
               [ ("account_id", Account_id.to_yojson acct_id)
               ; ("exception", `String (Exn.to_string exn))
               ] ;
-          None)
+          None )
   in
   let header = Block.header block in
+  let accounts_accessed_time = Time.now () in
+  [%log debug]
+    "Precomputed block for $state_hash: accounts-accessed took $time ms"
+    ~metadata:
+      [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+      ; ( "time"
+        , `Float (Time.Span.to_ms (Time.diff accounts_accessed_time start)) )
+      ] ;
   let accounts_created =
     let account_creation_fee = constraint_constants.account_creation_fee in
     let previous_block_state_hash =
@@ -115,9 +132,29 @@ let of_block ~logger
     in
     List.map
       (Staged_ledger.latest_block_accounts_created staged_ledger
-         ~previous_block_state_hash) ~f:(fun acct_id ->
-        (acct_id, account_creation_fee))
+         ~previous_block_state_hash ) ~f:(fun acct_id ->
+        (acct_id, account_creation_fee) )
   in
+  let tokens_used =
+    let unique_tokens =
+      List.map account_ids_accessed ~f:Account_id.token_id
+      |> List.dedup_and_sort ~compare:Token_id.compare
+    in
+    List.map unique_tokens ~f:(fun token_id ->
+        let owner = Mina_ledger.Ledger.token_owner ledger token_id in
+        (token_id, owner) )
+  in
+  let account_created_time = Time.now () in
+  [%log debug]
+    "Precomputed block for $state_hash: accounts-created took $time ms"
+    ~metadata:
+      [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+      ; ( "time"
+        , `Float
+            (Time.Span.to_ms
+               (Time.diff account_created_time accounts_accessed_time) ) )
+      ] ;
+
   { scheduled_time
   ; protocol_state = Header.protocol_state header
   ; protocol_state_proof = Header.protocol_state_proof header
@@ -125,6 +162,7 @@ let of_block ~logger
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; accounts_accessed
   ; accounts_created
+  ; tokens_used
   }
 
 (* NOTE: This serialization is used externally and MUST NOT change.
