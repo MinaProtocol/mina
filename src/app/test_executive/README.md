@@ -152,5 +152,5 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
 - Exit code `5` will be returned if some pods could not be found.
 - Exit code `6` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to retrieve logs.
 - Exit code `7` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a command in a container.
-- Exit code `8` will be returned if `kubectl` exited with a non-zero code or a singal while attempting to run a node's `start.sh` script.
-- Exit code `9` will be returned if `kubectl` exited with a non-zero code or a singal while attempting to run a node's `stop.sh` script.
+- Exit code `8` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `start.sh` script.
+- Exit code `9` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `stop.sh` script.
