@@ -44,7 +44,8 @@ let%test_module "Full_frontier tests" =
       Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ~verifier
         ?trust_system:None ~accounts_with_secret_keys
 
-    module Transfer = Ledger_transfer.Make (Ledger) (Ledger)
+    module Transfer =
+      Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)
 
     let add_breadcrumb frontier breadcrumb =
       let diffs = Full_frontier.calculate_diffs frontier breadcrumb in
@@ -66,24 +67,27 @@ let%test_module "Full_frontier tests" =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
           ~genesis_ledger:Genesis_ledger.t
           ~genesis_epoch_data:precomputed_values.genesis_epoch_data
-          ~epoch_ledger_location
-          ~ledger_depth:constraint_constants.ledger_depth
+          ~epoch_ledger_location ~ledger_depth:constraint_constants.ledger_depth
           ~genesis_state_hash:
-            (State_hash.With_state_hashes.state_hash precomputed_values.protocol_state_with_hashes)
+            (State_hash.With_state_hashes.state_hash
+               precomputed_values.protocol_state_with_hashes )
       in
       let root_ledger =
         Or_error.ok_exn
           (Transfer.transfer_accounts
              ~src:(Lazy.force Genesis_ledger.t)
-             ~dest:(Ledger.create ~depth:ledger_depth ()))
+             ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
       in
       Protocol_version.(set_current zero) ;
       let root_data =
         let open Root_data in
-        { transition= External_transition.Validated.lift @@ Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
-        ; staged_ledger=
+        { transition =
+            External_transition.Validated.lift @@ Mina_block.Validated.lift
+            @@ Mina_block.genesis ~precomputed_values
+        ; staged_ledger =
             Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
-        ; protocol_states= [] }
+        ; protocol_states = []
+        }
       in
       let persistent_root =
         Persistent_root.create ~logger
@@ -95,7 +99,10 @@ let%test_module "Full_frontier tests" =
         Persistent_root.create_instance_exn persistent_root
       in
       Full_frontier.create ~logger ~root_data
-        ~root_ledger:(Ledger.Any_ledger.cast (module Ledger) root_ledger)
+        ~root_ledger:
+          (Mina_ledger.Ledger.Any_ledger.cast
+             (module Mina_ledger.Ledger)
+             root_ledger )
         ~consensus_local_state ~max_length ~precomputed_values
         ~time_controller:(Block_time.Controller.basic ~logger)
         ~persistent_root_instance
@@ -148,8 +155,8 @@ let%test_module "Full_frontier tests" =
               test_best_tip
                 (List.last_exn short_branch)
                 ~message:
-                  "best tip should not change when only part of long branch \
-                   is added" ;
+                  "best tip should not change when only part of long branch is \
+                   added" ;
               add_breadcrumbs frontier (List.tl_exn long_branch) ;
               test_best_tip
                 (List.last_exn long_branch)
@@ -211,7 +218,7 @@ let%test_module "Full_frontier tests" =
                     ~f:(fun hash ->
                       ignore
                         ( Full_frontier.For_tests.find_protocol_state_exn
-                             frontier hash
+                            frontier hash
                           : Mina_state.Protocol_state.value ) ) ) ;
               clean_up_persistent_root ~frontier ) )
 
@@ -231,7 +238,7 @@ let%test_module "Full_frontier tests" =
                   [%test_pred: int] (( >= ) max_length)
                     (List.length
                        Full_frontier.(
-                         path_map frontier (best_tip frontier) ~f:Fn.id)) ) ;
+                         path_map frontier (best_tip frontier) ~f:Fn.id) ) ) ;
               clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Common ancestor can be reliably found" =

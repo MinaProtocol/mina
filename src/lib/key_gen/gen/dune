@@ -1,0 +1,28 @@
+(executable
+ (name gen)
+ (libraries
+   ;; opam libraries
+   base.caml
+   compiler-libs
+   yojson
+   digestif
+   async
+   core
+   ppxlib
+   ppxlib.ast
+   ppxlib.astlib
+   ocaml-migrate-parsetree
+   core_kernel
+   stdio
+   ocaml-compiler-libs.common
+   ;; local libraries
+   crypto_params
+   tuple_lib
+   crs
+   snarky.backendless
+   signature_lib
+)
+ (preprocess
+  (pps ppx_version ppx_jane ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx))
+ (modes native))
