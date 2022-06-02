@@ -20,9 +20,10 @@
   (source_tree ../../wasm/.cargo/config)
   (source_tree ../../../../../external/wasm-bindgen-rayon)
   (source_tree ../../../proof-systems) )
- (locks /cargo-lock)
+ (locks /cargo-kimchi-wasm-lock)
  (action
   (progn
    (run chmod -R +w ../../wasm .)
-   (run ./build.sh)
+   (setenv CARGO_TARGET_DIR "%{read:../../stubs/dune-build-root}/cargo_kimchi_wasm"
+    (run ./build.sh))
    (write-file flags.sexp "()"))))
