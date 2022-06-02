@@ -172,16 +172,39 @@ struct
     ; hard_timeout = Slots 20
     }
 
-  let snapp_to_be_included_in_frontier ~has_failures ~parties =
+  let zkapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
       match cmd with
       | Parties p ->
-          Parties.equal p parties
+          let result = Parties.equal p parties in
+          Format.eprintf "PARTY IN BREADCRUMB: %s@."
+            (Parties.to_yojson p |> Yojson.Safe.pretty_to_string) ;
+          Format.eprintf "PARTY SOUGHT: %s@."
+            (Parties.to_yojson parties |> Yojson.Safe.pretty_to_string) ;
+          Format.eprintf "PARTIES EQUAL: %B@." result ;
+          ( if not result then
+            let sexp1 = Parties.sexp_of_t p in
+            let sexp2 = Parties.sexp_of_t parties in
+            let diff =
+              Sexp_diff_kernel.Algo.diff ~original:sexp1 ~updated:sexp2 ()
+            in
+            let layout =
+              Sexp_diff_kernel.Display.Display_options.Layout.Two_column
+            in
+            let options =
+              Sexp_diff_kernel.Display.Display_options.create layout
+            in
+            Format.eprintf "DIFF: %s@."
+              (Sexp_diff_kernel.Display.display_with_ansi_colors options diff)
+          ) ;
+          result
       | Signed_command _ ->
           false
     in
     let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+      Format.eprintf "NO. USER CMDS: %d@."
+        (List.length breadcrumb_added.user_commands) ;
       let snapp_opt =
         List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
             cmd_with_status.With_status.data |> User_command.forget_check
@@ -209,7 +232,7 @@ struct
     let soft_timeout_in_slots = 8 in
     let is_first = ref true in
     { description =
-        sprintf "snapp with fee payer %s and other parties (%s)"
+        sprintf "zkApp with fee payer %s and other parties (%s)"
           (Signature_lib.Public_key.Compressed.to_base58_check
              parties.fee_payer.body.public_key )
           (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
