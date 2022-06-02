@@ -16,8 +16,12 @@
  (targets libwires_15_stubs.a)
  (deps
   Cargo.toml
+  ../../Cargo.toml
+  ../../rust-toolchain.toml
   (source_tree src)
   (source_tree binding_generation)
+  (source_tree ../wasm)
+  (source_tree ../../../../external/wasm-bindgen-rayon)
   (source_tree ../../proof-systems))
  (action
   (progn
@@ -81,6 +85,10 @@
  (deps
   Cargo.toml
   ../../../../.ocamlformat
+  ../../Cargo.toml
+  (source_tree ../../../../external/wasm-bindgen-rayon)
+  (source_tree ../../stubs)
+  (source_tree ../wasm)
   (source_tree src)
   (source_tree binding_generation)
   (source_tree ../../proof-systems))

@@ -2,10 +2,10 @@
 members = [
     "kimchi_bindings/stubs",
     "kimchi_bindings/stubs/binding_generation",
+    "kimchi_bindings/wasm",
 ]
 exclude = [
     "proof-systems",
-    "kimchi_bindings/wasm"
 ]
 
 [profile.release]
