@@ -4,6 +4,7 @@
    ;; opam libraries
    base.caml
    compiler-libs
+   ocaml-migrate-parsetree
    yojson
    digestif
    async
@@ -11,7 +12,6 @@
    ppxlib
    ppxlib.ast
    ppxlib.astlib
-   ocaml-migrate-parsetree
    core_kernel
    stdio
    ocaml-compiler-libs.common
