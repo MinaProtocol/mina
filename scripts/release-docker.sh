@@ -7,10 +7,51 @@
 set -eo pipefail
 set +x
 
+DHALL_VERSION=1.41.1
+DHALL_JSON_VERSION=1.7.10
+DHALL_BASH_VERSION=1.0.40
+
+tempdir=$(mktemp -d dhall-XXX)
+mkdir -p "$tempdir/bin"
+
+dhall-to-bash() {
+  if type -P dhall-to-bash > /dev/null; then
+    command dhall-to-bash "$@"
+  else
+    mkdir -p "$tempdir/bin"
+    printf "> Downloading dhall-bash to %s <\n" "$tempdir" > /dev/stderr
+    curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-x86_64-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory="$tempdir" ./bin/dhall-to-bash
+    "$tempdir/bin/dhall-to-bash" "$@"
+    code="$?"
+    return $code
+  fi
+}
+
+# shellcheck disable=SC2120
+dhall-to-yaml() {
+  if type -P dhall-to-yaml > /dev/null; then
+    command dhall-to-yaml "$@"
+  else
+    printf "> Downloading dhall-json to %s <\n" "$tempdir" > /dev/stderr
+    curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory="$tempdir" ./bin/dhall-to-yaml
+    "$tempdir/bin/dhall-to-yaml" "$@"
+    code="$?"
+    return $code
+  fi
+}
+
+cleanup() {
+  rm -rf "$tempdir"
+}
+
+trap cleanup EXIT
+
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
 ROOT="$(cd -- "$(dirname "$( dirname -- "${BASH_SOURCE[0]}" )")" &> /dev/null && pwd )"
 
@@ -34,8 +75,9 @@ function usage() {
 
 FUNCTION=cloudBuild
 
+extraArgs=()
+
 while [[ "$#" -gt 0 ]]; do case $1 in
-  --no-upload) NOUPLOAD=1;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -n|--network) NETWORK=", network = Some \"$2\""; shift;;
@@ -45,22 +87,21 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-release) DEB_RELEASE=", debRelease = Some \"$2\""; shift;;
   --deb-version) DEB_VERSION=", debVersion = Some \"$2\""; shift;;
   --local) FUNCTION=dockerBuild ;;
-  --extra-args) EXTRA=", extraArgs=[\"${@:2}\"]"; shift $((${#}-1));;
+  --extra-arg) extraArgs+=("\"$2\""); shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
-# Debug prints for visability
-# Substring removal to cut the --build-arg arguments on the = so that the output is exactly the input flags https://wiki.bash-hackers.org/syntax/pe#substring_removal
-echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
-echo ${EXTRA}
-echo "docker image: ${IMAGE}"
-
+if [ -n "${extraArgs[*]}" ]; then
+  EXTRA=", extraArgs = [$(IFS=, ; echo "${extraArgs[*]}")]"
+else
+  EXTRA=""
+fi
 # Verify Required Parameters are Present
 if [[ -z "$SERVICE" ]]; then usage "Service is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
 
-if ! [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
-  REPO=", repo=\"${BUILDKITE_PULL_REQUEST_REPO}\""
+if [[ -n "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
+  REPO=", repo = Some \"${BUILDKITE_PULL_REQUEST_REPO}\""
 fi
 
 pushd "$ROOT"
@@ -69,6 +110,7 @@ dhall="
   let cb = ./dockerfiles/cloudbuild.dhall
   in cb.$FUNCTION cb.$SERVICE cb.ServiceDescription::
        { version = \"$VERSION\"
+       $REPO
        $NETWORK
        $BRANCH
        $CACHE
@@ -79,13 +121,12 @@ dhall="
        }
 "
 
-
 if [[ $FUNCTION == cloudBuild ]]; then
-    dhall-to-yaml <<< "$dhall" > "cloudbuild.yaml"
+    dhall-to-yaml <<< "$dhall" | tee /dev/stderr > cloudbuild.yaml
     gcloud builds submit
 elif [[ $FUNCTION == dockerBuild ]]; then
     eval "$(dhall-to-bash --declare args <<< "$dhall")"
-    docker "${args[@]}"
+    set -x; docker "${args[@]}"; set +x
 else
     echo "Unknown function: $FUNCTION" > /dev/stderr
     exit 1

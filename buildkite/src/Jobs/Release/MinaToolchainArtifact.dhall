@@ -34,7 +34,7 @@ Pipeline.build
       let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="bullseye",
-        extra_args="--no-cache",
+        extra_args=["--no-cache"],
         step_key="toolchain-bullseye-docker-image"
       }
 
@@ -46,7 +46,7 @@ Pipeline.build
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="buster",
-        extra_args="--no-cache",
+        extra_args=["--no-cache"],
         step_key="toolchain-buster-docker-image"
       }
 
@@ -58,7 +58,7 @@ Pipeline.build
       let toolchainStretchSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="stretch",
-        extra_args="--no-cache",
+        extra_args=["--no-cache"],
         step_key="toolchain-stretch-docker-image"
       }
 
@@ -70,7 +70,7 @@ Pipeline.build
       let toolchainFocalSpec = DockerImage.ReleaseSpec::{
         service="mina-toolchain",
         deb_codename="focal",
-        extra_args="--no-cache",
+        extra_args=["--no-cache"],
         step_key="toolchain-focal-docker-image"
       }
 

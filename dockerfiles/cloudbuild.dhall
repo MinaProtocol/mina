@@ -52,7 +52,7 @@ let debInfo
                         , bookworm = "debian"
                         }
                         codename
-                  ++  text
+                  ++ ":${text}"
               }
 
 let debInfo_ =
@@ -172,7 +172,7 @@ let services =
       { mina-archive =
         { service = "mina-archive"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
-        , dockerContext = Some "dockerfiles/"
+        , dockerContext = Some "dockerfiles"
         }
       , bot =
         { service = "bot"

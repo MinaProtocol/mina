@@ -90,6 +90,8 @@ release
 Cargo.lock
 .vscode
 
+cloudbuild.yaml
+
 ### IntelliJ IDEA ###
 **/.idea/
 *.iws
