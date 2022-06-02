@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	lmdbbs "github.com/georgeee/go-bs-lmdb"
 	"github.com/ipfs/go-bitswap"
 	bitnet "github.com/ipfs/go-bitswap/network"
 	dsb "github.com/ipfs/go-ds-badger"
@@ -836,27 +835,18 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	if err != nil {
 		return nil, err
 	}
-
-	// 256MiB, a large enough mmap size to make mmap grow() a rare event
-	opt := lmdbbs.Options{
-		Path:            path.Join(statedir, "block-db"),
-		InitialMmapSize: 256 << 20,
-		CidToKeyMapper:  cidToKeyMapper,
-		KeyToCidMapper:  keyToCidMapper,
-	}
-	bstore, err := lmdbbs.Open(&opt)
+	bstore, err := OpenBitswapStorageLmdb(path.Join(statedir, "block-db"))
 	if err != nil {
 		return nil, err
 	}
-
 	bitswapNetwork := bitnet.NewFromIpfsHost(host, kad, bitnet.Prefix(BitSwapExchange))
-	bs := bitswap.New(context.Background(), bitswapNetwork, bstore).(*bitswap.Bitswap)
+	bs := bitswap.New(context.Background(), bitswapNetwork, bstore.Blockstore()).(*bitswap.Bitswap)
 
 	// nil fields are initialized by beginAdvertising
 	h := &Helper{
 		Host:              host,
 		Bitswap:           bs,
-		BitswapStorage:    (*BitswapStorageLmdb)(bstore),
+		BitswapStorage:    bstore,
 		Ctx:               ctx,
 		Mdns:              nil,
 		Dht:               kad,

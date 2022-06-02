@@ -36,7 +36,10 @@
    transition_frontier
    protocol_version
    yojson
+   mina_net2
+   libp2p_ipc
+   staged_ledger_diff
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version)))
+ (preprocess (pps ppx_jane ppx_version ppx_coda)))

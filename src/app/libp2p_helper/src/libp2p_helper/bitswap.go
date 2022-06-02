@@ -210,10 +210,8 @@ func (br *BitswapBlockRequester) RequestBlocks(ids []cid.Cid) error {
 // BitswapLoop: Bitswap processing loop
 //  Do not launch more than one instance of it
 func (bs *BitswapCtx) Loop() {
-	engine := bs.engine
-	storage := bs.storage
 	configuredCheck := func() {
-		if engine == nil || storage == nil {
+		if bs.engine == nil || bs.storage == nil {
 			panic("BitswapLoop: context not configured")
 		}
 	}
@@ -227,7 +225,7 @@ func (bs *BitswapCtx) Loop() {
 		case cmd := <-bs.addCmds:
 			configuredCheck()
 			blocks, root := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, cmd.data, BlockBodyTag)
-			err := announceNewRootBlock(engine, storage, blocks, root)
+			err := announceNewRootBlock(bs.engine, bs.storage, blocks, root)
 			if err == nil {
 				bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root)
 			} else {
