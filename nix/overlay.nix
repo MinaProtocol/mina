@@ -7,6 +7,23 @@ let
       rustc = rust;
       # override stdenv.targetPlatform here, if neccesary
     };
+  toolchainHashes = {
+    "1.58.0" = "sha256-eQBpSmy9+oHfVyPs0Ea+GVZ0fvIatj6QVhNhYKOJ6Jk=";
+    "nightly-2021-11-16" = "sha256-ErdLrUf9f3L/JtM5ghbefBMgsjDMYN3YHDTfGc008b4=";
+    # copy this line with the correct toolchain name
+    "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  };
+  rustChannelFromToolchainFileOf = file: with pkgs.lib; let
+    inherit (pkgs.lib) hasPrefix removePrefix readFile warn;
+    toolchain = (builtins.fromTOML (readFile file)).toolchain;
+    # nice error message if the toolchain is missing
+    placeholderPos = builtins.unsafeGetAttrPos "placeholder" toolchainHashes;
+    in pkgs.rustChannelOf rec {
+      channel = if hasPrefix "nightly-" toolchain.channel then "nightly" else toolchain.channel;
+      date = if channel == "nightly" then removePrefix "nightly-" toolchain.channel else null;
+      sha256 = toolchainHashes.${toolchain.channel} or
+        (warn ''Please add the rust toolchain hash (see error message below) for "${toolchain.channel}" at ${placeholderPos.file}:${toString placeholderPos.line}'' toolchainHashes.placeholder);
+    };
 in {
   # nixpkgs + musl problems
   postgresql =
@@ -77,13 +94,7 @@ in {
     inherit (prev.rust) toRustTarget toRustTargetSpec;
   };
 
-  crypto-rust = (final.rustChannelOf rec {
-    channel = (builtins.fromTOML (builtins.readFile
-      ../src/lib/crypto/rust-toolchain.toml)).toolchain.channel;
-    # update the hash if the assertion fails
-    sha256 = assert channel == "1.58.0";
-      "sha256-eQBpSmy9+oHfVyPs0Ea+GVZ0fvIatj6QVhNhYKOJ6Jk=";
-  }).rust;
+  crypto-rust = (rustChannelFromToolchainFileOf ../src/lib/crypto/rust-toolchain.toml).rust;
 
   # Dependencies which aren't in nixpkgs and local packages which need networking to build
   kimchi_bindings_stubs = (rustPlatformFor
@@ -159,31 +170,19 @@ in {
     '';
   };
 
-  kimchi-rust-wasm = ((final.rustChannelOf {
-    # todo: read src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml
-    channel = "nightly";
-    date = "2021-11-16";
-    sha256 = "sha256-ErdLrUf9f3L/JtM5ghbefBMgsjDMYN3YHDTfGc008b4=";
-  }).rust.override {
+  kimchi-rust-wasm = (rustChannelFromToolchainFileOf ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml).rust.override {
     targets = [ "wasm32-unknown-unknown" ];
     # rust-src is needed for -Zbuild-std
     extensions = [ "rust-src" ];
-  });
+  };
 
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
   kimchi-rust-std-deps = pkgs.rustPlatform.importCargoLock {
-    # IFD:
-    lockFileContents = import "${
-        (pkgs.runCommand "std-deps" { } ''
-          mkdir $out
-          cp ${pkgs.kimchi-rust-wasm}/lib/rustlib/src/rust/Cargo.lock $out/
-          echo builtins.readFile ./Cargo.lock > $out/std-deps.nix
-        '')
-      }/std-deps.nix";
+    lockFile = pkgs.runCommand "cargo.lock" { } ''
+      cp ${pkgs.kimchi-rust-wasm}/lib/rustlib/src/rust/Cargo.lock $out
+    '';
   };
 
-  # TODO: these should be built for both web and nodejs, see the dune files
-  # at ../src/lib/crypto/kimchi_bindings/js/{chrome,node_js}/dune
   plonk_wasm = let
 
     lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
