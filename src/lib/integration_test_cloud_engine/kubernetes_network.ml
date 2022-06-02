@@ -1272,7 +1272,7 @@ let initialize_infra ~logger network =
             "Not all pods were found when querying namespace; this indicates a \
              deployment error. Refusing to continue. Expected pods: [%s]"
             (String.Set.elements all_pods |> String.concat ~sep:"; ") ;
-          Malleable_error.hard_error_string
+          Malleable_error.hard_error_string ~exit_code:5
             "Some pods were not found in namespace." )
         else if any_pods_are_not_running then (
           let failed_pod_statuses =
