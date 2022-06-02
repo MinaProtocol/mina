@@ -1,8 +1,4 @@
-(* snapp_generators -- Quickcheck generators for Snapp transactions *)
-
-(* Ledger depends on Party, so Party generators can't refer back to Ledger
-   so we put the generators that rely on Ledger and Party here
-*)
+(* parties_generators -- Quickcheck generators for zkApp transactions *)
 
 open Core_kernel
 open Mina_base
@@ -657,8 +653,10 @@ module Party_body_components = struct
     ; sequence_events = t.sequence_events
     ; call_data = t.call_data
     ; call_depth = t.call_depth
-    ; protocol_state_precondition = t.protocol_state_precondition
-    ; account_precondition = t.account_precondition
+    ; preconditions =
+        { Party.Preconditions.network = t.protocol_state_precondition
+        ; account = t.account_precondition
+        }
     ; use_full_commitment = t.use_full_commitment
     ; caller = t.caller
     }
@@ -1243,7 +1241,7 @@ let gen_parties_from ?(failure = None)
     in
     go [] num_parties
   in
-  (* at least 1 party, so that `succeed` affects at least one predicate *)
+  (* at least 1 party *)
   let%bind num_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
   let num_old_parties = num_parties - num_new_accounts in
@@ -1290,110 +1288,20 @@ let gen_parties_from ?(failure = None)
   in
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
-  let memo_hash = Signed_command_memo.hash memo in
   let parties_dummy_signatures : Parties.t =
     Parties.of_simple { fee_payer; other_parties; memo }
   in
-  (* replace dummy signature in fee payer *)
-  let fee_payer_hash =
-    Party.of_fee_payer parties_dummy_signatures.fee_payer
-    |> Parties.Digest.Party.create
-  in
-  let fee_payer_signature =
-    Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
-      (Random_oracle.Input.Chunked.field
-         ( Parties.commitment parties_dummy_signatures
-         |> Parties.Transaction_commitment.create_complete ~memo_hash
-              ~fee_payer_hash ) )
-  in
-  let fee_payer_with_valid_signature =
-    { parties_dummy_signatures.fee_payer with
-      authorization = fee_payer_signature
-    }
-  in
-  let other_parties_hash =
-    Parties.other_parties_hash parties_dummy_signatures
-  in
-  let tx_commitment =
-    Parties.Transaction_commitment.create ~other_parties_hash
-  in
-  let full_tx_commitment =
-    Parties.Transaction_commitment.create_complete tx_commitment ~memo_hash
-      ~fee_payer_hash
-  in
-  let sign_for_other_party ~use_full_commitment sk =
-    let commitment =
-      if use_full_commitment then full_tx_commitment else tx_commitment
-    in
-    Signature_lib.Schnorr.Chunked.sign sk
-      (Random_oracle.Input.Chunked.field commitment)
-  in
-  (* replace dummy signatures and dummy proofs in other parties *)
-  let other_parties_with_valid_signatures =
-    Parties.Call_forest.mapi parties_dummy_signatures.other_parties
-      ~f:(fun idx ({ body; authorization } : Party.t) ->
-        let valid_authorization =
-          match authorization with
-          | Control.Signature _dummy ->
-              let pk = body.public_key in
-              let sk =
-                match
-                  Signature_lib.Public_key.Compressed.Map.find keymap pk
-                with
-                | Some sk ->
-                    sk
-                | None ->
-                    failwithf
-                      "gen_from: Could not find secret key for public key %s \
-                       in keymap"
-                      (Signature_lib.Public_key.Compressed.to_base58_check pk)
-                      ()
-              in
-              let use_full_commitment = body.use_full_commitment in
-              let signature = sign_for_other_party ~use_full_commitment sk in
-              Control.Signature signature
-          | Proof _dummy -> (
-              match prover with
-              | None ->
-                  authorization
-              | Some prover ->
-                  let proof_party =
-                    Parties.Call_forest.hash
-                      (List.drop parties_dummy_signatures.other_parties idx)
-                  in
-                  let txn_stmt : Zkapp_statement.t =
-                    let commitment =
-                      if body.use_full_commitment then full_tx_commitment
-                      else tx_commitment
-                    in
-                    { transaction = commitment
-                    ; at_party = (proof_party :> Snark_params.Tick.Field.t)
-                    }
-                  in
-                  let handler
-                      (Snarky_backendless.Request.With { request; respond }) =
-                    match request with _ -> respond Unhandled
-                  in
-                  let proof =
-                    Async.Thread_safe.block_on_async_exn (fun () ->
-                        prover ?handler:(Some handler)
-                          ( []
-                            : ( unit
-                              , unit
-                              , unit )
-                              Pickles_types.Hlist.H3.T
-                                (Pickles.Statement_with_proof)
-                              .t )
-                          txn_stmt )
-                  in
-                  Control.Proof proof )
-          | None_given ->
-              authorization
-        in
-        { Party.body; authorization = valid_authorization } )
+  (* add fee payer keys to keymap, if not present *)
+  let keymap =
+    match
+      Signature_lib.Public_key.Compressed.Map.add keymap ~key:fee_payer_pk
+        ~data:fee_payer_keypair.private_key
+    with
+    | `Duplicate ->
+        keymap
+    | `Ok keymap' ->
+        keymap'
   in
   return
-    { parties_dummy_signatures with
-      fee_payer = fee_payer_with_valid_signature
-    ; other_parties = other_parties_with_valid_signatures
-    }
+  @@ Parties_builder.replace_authorizations ?prover ~keymap
+       parties_dummy_signatures

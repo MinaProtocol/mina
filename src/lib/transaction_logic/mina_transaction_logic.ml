@@ -381,14 +381,14 @@ let timing_error_to_user_command_status err =
     * [[`Insufficient_balance of bool | `Invalid_timing of bool]] encodes
       possible errors, with the invariant that the return value is always
       [`Invalid_timing false] if there was no error.
-      - [`Insufficient_balance true] results if [txn_amount] is larger than the
+    - [`Insufficient_balance true] results if [txn_amount] is larger than the
         balance held in [account].
-      - [`Invalid_timing true] results if [txn_amount] is larger than the
+    - [`Invalid_timing true] results if [txn_amount] is larger than the
         balance available in [account] at global slot [txn_global_slot].
     * [Timing.t], the new timing for [account] calculated at [txn_global_slot].
     * [[`Min_balance of Balance.t]] returns the computed available balance at
       [txn_global_slot].
-      - NOTE: We skip this calculation if the error is
+    - NOTE: We skip this calculation if the error is
         [`Insufficient_balance true].  In this scenario, this value MUST NOT be
         used, as it contains an incorrect placeholder value.
 *)
@@ -1297,7 +1297,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       module Account_precondition = struct
         include Party.Account_precondition
 
-        let nonce (t : Party.t) = nonce t.body.account_precondition
+        let nonce (t : Party.t) = nonce t.body.preconditions.account
       end
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
@@ -1504,7 +1504,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_account_precondition (party, account, local_state) -> (
-          match party.body.account_precondition with
+          match party.body.preconditions.account with
           | Accept ->
               local_state
           | Nonce n ->
@@ -2066,9 +2066,11 @@ module For_tests = struct
                 ; sequence_events = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Nonce (Account.Nonce.succ actual_nonce)
+                ; preconditions =
+                    { Party.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Nonce (Account.Nonce.succ actual_nonce)
+                    }
                 ; caller = Call
                 ; use_full_commitment
                 }
@@ -2091,9 +2093,11 @@ module For_tests = struct
                 ; sequence_events = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Accept
+                ; preconditions =
+                    { Party.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Accept
+                    }
                 ; caller = Call
                 ; use_full_commitment = false
                 }
@@ -2118,7 +2122,7 @@ module For_tests = struct
     in
     let other_parties =
       Parties.Call_forest.map parties.other_parties ~f:(fun (party : Party.t) ->
-          match party.body.account_precondition with
+          match party.body.preconditions.account with
           | Nonce _ ->
               { party with
                 authorization = Control.Signature other_parties_signature

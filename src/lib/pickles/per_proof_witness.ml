@@ -85,6 +85,11 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
   }
 [@@deriving hlist]
 
+module No_app_state = struct
+  type nonrec (_, 'max_proofs_verified, 'num_branches) t =
+    (unit, 'max_proofs_verified, 'num_branches) t
+end
+
 module Constant = struct
   open Kimchi_backend
 
@@ -110,6 +115,11 @@ module Constant = struct
         (Tick.Inner_curve.Affine.t, 'max_proofs_verified) Vector.t
     }
   [@@deriving hlist]
+
+  module No_app_state = struct
+    type nonrec (_, 'max_proofs_verified, 'num_branches) t =
+      (unit, 'max_proofs_verified, 'num_branches) t
+  end
 end
 
 open Core_kernel

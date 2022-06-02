@@ -1795,7 +1795,7 @@ module Base = struct
           let balance_change (t : t) = t.party.data.balance_change
 
           let protocol_state_precondition (t : t) =
-            t.party.data.protocol_state_precondition
+            t.party.data.preconditions.network
 
           let token_id (t : t) = t.party.data.token_id
 
@@ -1884,7 +1884,8 @@ module Base = struct
           end
 
           module Account_precondition = struct
-            let nonce ({ party; _ } : t) = party.data.account_precondition.nonce
+            let nonce ({ party; _ } : t) =
+              party.data.preconditions.account.nonce
           end
         end
 
@@ -1966,7 +1967,7 @@ module Base = struct
               local_state := Inputs.Local_state.add_check !local_state failure b
             in
             Zkapp_precondition.Account.Checked.check ~check
-              party.data.account_precondition account.data ;
+              party.data.preconditions.account account.data ;
             !local_state
         | Init_account { party = { party; _ }; account } ->
             let account' : Account.Checked.Unhashed.t =
@@ -2248,7 +2249,6 @@ module Base = struct
       | Proved ->
           { identifier = "proved"
           ; prevs = M.[ side_loaded 0 ]
-          ; main_value = (fun [ _ ] _ -> [ prev_should_verify ])
           ; main =
               (fun [ snapp_statement ] stmt ->
                 main ?witness:!witness s ~constraint_constants
@@ -2259,7 +2259,6 @@ module Base = struct
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
           ; prevs = M.[]
-          ; main_value = (fun [] _ -> [])
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
@@ -2268,7 +2267,6 @@ module Base = struct
       | Opt_signed ->
           { identifier = "opt_signed"
           ; prevs = M.[]
-          ; main_value = (fun [] _ -> [])
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
@@ -2993,11 +2991,11 @@ module Base = struct
      constraints pass iff there exists
         t : Tagged_transaction.t
      such that
-      - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
-      - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]
-      - t has fee excess equal to [fee_excess]
-      - t has supply increase equal to [supply_increase]
-     where statement includes
+     - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
+     - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]
+     - t has fee excess equal to [fee_excess]
+     - t has supply increase equal to [supply_increase]
+       where statement includes
         l1 : Frozen_ledger_hash.t,
         l2 : Frozen_ledger_hash.t,
         fee_excess : Amount.Signed.t,
@@ -3072,7 +3070,6 @@ module Base = struct
         (fun [] x ->
           Run.run_checked (main ~constraint_constants x) ;
           [] )
-    ; main_value = (fun [] _ -> [])
     }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3170,7 +3167,6 @@ module Merge = struct
         (fun ps x ->
           Run.run_checked (main ps x) ;
           [ b; b ] )
-    ; main_value = (fun _ _ -> [ prev_should_verify; prev_should_verify ])
     }
 end
 
@@ -4194,8 +4190,7 @@ module For_tests = struct
       ; sequence_events : Tick.Field.t array list
       ; events : Tick.Field.t array list
       ; call_data : Tick.Field.t
-      ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t option
-      ; account_precondition : Party.Account_precondition.t option
+      ; preconditions : Party.Preconditions.t option
       }
     [@@deriving sexp]
   end
@@ -4221,7 +4216,6 @@ module For_tests = struct
                        (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
                      .t ->
               [] )
-        ; main_value = (fun [] _ -> [])
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
@@ -4238,7 +4232,6 @@ module For_tests = struct
           [ trivial_rule
           ; { identifier = "dummy"
             ; prevs = [ self; self ]
-            ; main_value = (fun [ _; _ ] _ -> [ true; true ])
             ; main =
                 (fun [ _; _ ] _ ->
                   Impl.run_checked (dummy_constraints ())
@@ -4276,15 +4269,10 @@ module For_tests = struct
         ; sequence_events
         ; events
         ; call_data
-        ; protocol_state_precondition
-        ; account_precondition
+        ; preconditions
         ; _
         } =
       spec
-    in
-    let protocol_state_precondition =
-      Option.value protocol_state_precondition
-        ~default:Zkapp_precondition.Protocol_state.accept
     in
     let sender_pk = sender.public_key |> Public_key.compress in
     let fee_payer : Party.Fee_payer.t =
@@ -4295,19 +4283,32 @@ module For_tests = struct
         | Some (fee_payer_kp, fee_payer_nonce) ->
             (fee_payer_kp.public_key |> Public_key.compress, fee_payer_nonce)
       in
-
       { body =
           { public_key
           ; update = Party.Update.noop
           ; fee
           ; events = []
           ; sequence_events = []
-          ; protocol_state_precondition
+          ; protocol_state_precondition =
+              Option.map preconditions ~f:(fun { network; _ } -> network)
+              |> Option.value ~default:Zkapp_precondition.Protocol_state.accept
           ; nonce
           }
       ; authorization = Signature.dummy
       }
     in
+    let preconditions' =
+      Option.value preconditions
+        ~default:
+          { Party.Preconditions.network =
+              fee_payer.body.protocol_state_precondition
+          ; account =
+              ( if Option.is_none fee_payer_opt then
+                Nonce (Account.Nonce.succ sender_nonce)
+              else Nonce sender_nonce )
+          }
+    in
+
     let sender_party : Party.Simple.t option =
       let sender_party_body : Party.Body.Simple.t =
         { public_key = sender_pk
@@ -4319,11 +4320,7 @@ module For_tests = struct
         ; sequence_events = []
         ; call_data = Field.zero
         ; call_depth = 0
-        ; protocol_state_precondition
-        ; account_precondition =
-            ( if Option.is_none fee_payer_opt then
-              Nonce (Account.Nonce.succ sender_nonce)
-            else Nonce sender_nonce )
+        ; preconditions = preconditions'
         ; use_full_commitment = false
         ; caller = Call
         }
@@ -4382,9 +4379,13 @@ module For_tests = struct
                 ; sequence_events
                 ; call_data
                 ; call_depth = 0
-                ; protocol_state_precondition
-                ; account_precondition =
-                    Option.value ~default:Accept account_precondition
+                ; preconditions =
+                    { preconditions' with
+                      account =
+                        Option.map preconditions ~f:(fun { account; _ } ->
+                            account )
+                        |> Option.value ~default:Accept
+                    }
                 ; use_full_commitment = true
                 ; caller = Call
                 }
@@ -4405,8 +4406,7 @@ module For_tests = struct
               ; sequence_events = []
               ; call_data = Field.zero
               ; call_depth = 0
-              ; protocol_state_precondition
-              ; account_precondition = Accept
+              ; preconditions = { preconditions' with account = Accept }
               ; use_full_commitment = false
               ; caller = Call
               }
@@ -4710,8 +4710,10 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state_precondition = protocol_state_predicate
-          ; account_precondition = Nonce (Account.Nonce.succ sender_nonce)
+          ; preconditions =
+              { network = protocol_state_predicate
+              ; account = Nonce (Account.Nonce.succ sender_nonce)
+              }
           ; use_full_commitment = false
           ; caller = Call
           }
@@ -4729,10 +4731,12 @@ module For_tests = struct
           ; sequence_events = []
           ; call_data = Field.zero
           ; call_depth = 0
-          ; protocol_state_precondition = protocol_state_predicate
+          ; preconditions =
+              { network = protocol_state_predicate
+              ; account = Full Zkapp_precondition.Account.accept
+              }
           ; use_full_commitment = false
           ; caller = Call
-          ; account_precondition = Full Zkapp_precondition.Account.accept
           }
       ; authorization = Proof Mina_base.Proof.blockchain_dummy
       }

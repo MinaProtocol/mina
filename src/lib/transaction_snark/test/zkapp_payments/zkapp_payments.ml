@@ -69,10 +69,12 @@ let%test_module "Zkapp payments tests" =
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state_precondition =
-                      Zkapp_precondition.Protocol_state.accept
+                  ; preconditions =
+                      { Party.Preconditions.network =
+                          Zkapp_precondition.Protocol_state.accept
+                      ; account = Accept
+                      }
                   ; use_full_commitment = false
-                  ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = Signature Signature.dummy
@@ -87,10 +89,12 @@ let%test_module "Zkapp payments tests" =
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state_precondition =
-                      Zkapp_precondition.Protocol_state.accept
+                  ; preconditions =
+                      { Party.Preconditions.network =
+                          Zkapp_precondition.Protocol_state.accept
+                      ; account = Accept
+                      }
                   ; use_full_commitment = false
-                  ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = None_given
@@ -131,8 +135,7 @@ let%test_module "Zkapp payments tests" =
                 party_send ~constraint_constants (List.hd_exn specs)
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ] )
-          |> fun _ -> () )
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t) ) )
 
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
@@ -148,7 +151,7 @@ let%test_module "Zkapp payments tests" =
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger partiess |> fun _ -> () ) )
+              ignore (U.apply_parties ledger partiess : Sparse_ledger.t) ) )
 
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in
@@ -189,8 +192,7 @@ let%test_module "Zkapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =
@@ -257,8 +259,7 @@ let%test_module "Zkapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =
