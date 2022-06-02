@@ -1038,7 +1038,8 @@ let pooled_zkapp_commands =
            @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
          in
          let graphql =
-           Graphql_queries.Pooled_zkapp_commands.make ~public_key ()
+           Graphql_queries.Pooled_zkapp_commands.(
+             make @@ makeVariables ~public_key ())
          in
          let%bind raw_response =
            Graphql_client.query_json_exn graphql graphql_endpoint

@@ -77,7 +77,7 @@ module Public_key = Signature_lib.Public_key
 module Signed_command_payload = Mina_base.Signed_command_payload
 module User_command = Mina_base.User_command
 module Signed_command = Mina_base.Signed_command
-module Transaction_hash = Mina_base.Transaction_hash
+module Transaction_hash = Mina_transaction.Transaction_hash
 
 module Options = struct
   type t =
@@ -922,7 +922,7 @@ module Submit = struct
             (fun ~payment ~signature () ->
               Graphql.query_and_catch
                 Send_payment.(make @@ makeVariables ~from:(`String payment.from)
-                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
+                   ~to_:(`String payment.to_) ~token:(`String payment.token)
                    ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
                    ?validUntil:(Option.map ~f:uint32 payment.valid_until)
                    ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature

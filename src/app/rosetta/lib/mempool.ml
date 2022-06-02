@@ -28,7 +28,7 @@ module Get_transactions_by_hash =
         amount @ppxCustom(module: "Serializing.UInt64")
         fee @ppxCustom(module: "Serializing.UInt64")
         kind
-        feeToken @ppxCustom(module: "Serializing.Token_id")
+        feeToken @ppxCustom(module: "Serializing.Token_s")
         validUntil @ppxCustom(module: "Serializing.Optional_uint32")
         memo
         feePayer {
@@ -41,7 +41,7 @@ module Get_transactions_by_hash =
         source {
           publicKey
         }
-        token  @ppxCustom(module: "Serializing.Token_id")
+        token  @ppxCustom(module: "Serializing.Token_s")
       }
     }
 |}]
