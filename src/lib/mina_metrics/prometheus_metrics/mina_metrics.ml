@@ -472,11 +472,8 @@ module Network = struct
           let name = "processing_time"
 
           let help =
-            "average time, in ms, for blocks to be accepted (the difference \
-             between Validation_time and Processing_time is that \
-             Validation_time is computed using `expiration_time - \
-             acceptance_time` while Processing_time is computed using \
-             `acceptance_time - start_time`)"
+            "average time, in ms, for blocks to be accepted after the OCaml \
+             process receives it"
         end)
         ()
 
@@ -489,7 +486,9 @@ module Network = struct
 
           let name = "rejection_time"
 
-          let help = "average time, in ms, for blocks to be rejected"
+          let help =
+            "average time, in ms, for blocks to be rejected after the OCaml \
+             process receives it"
         end)
         ()
   end
@@ -538,11 +537,8 @@ module Network = struct
           let name = "processing_time"
 
           let help =
-            "average delay, in ms, for snark work to be accepted (the \
-             difference between Validation_time and Processing_time is that \
-             Validation_time is computed using `expiration_time - \
-             acceptance_time` while Processing_time is computed using \
-             `acceptance_time - start_time`)"
+            "average delay, in ms, for snark work to be accepted after the \
+             OCaml process receives it"
         end)
         ()
 
@@ -555,7 +551,9 @@ module Network = struct
 
           let name = "rejection_time"
 
-          let help = "average time, in ms, for snark work to be rejected"
+          let help =
+            "average time, in ms, for snark work to be rejected after the \
+             OCaml process receives it"
         end)
         ()
   end
@@ -603,7 +601,9 @@ module Network = struct
 
           let name = "processing_time"
 
-          let help = "average delay, in ms, for transactions to be accepted "
+          let help =
+            "average delay, in ms, for transactions to be accepted after the \
+             OCaml process receives it"
         end)
         ()
 
@@ -616,7 +616,9 @@ module Network = struct
 
           let name = "rejection_time"
 
-          let help = "average time, in ms, for transactions to be rejected"
+          let help =
+            "average time, in ms, for transactions to be rejected after the \
+             OCaml process receives it"
         end)
         ()
   end
