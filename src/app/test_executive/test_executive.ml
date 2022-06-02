@@ -302,20 +302,20 @@ let main inputs =
            ~test_result:(Malleable_error.hard_error_string "fatal error") )
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
-        let init_result =
-          let open Deferred.Or_error.Let_syntax in
-          let lift = Deferred.map ~f:Or_error.return in
+        let open Malleable_error.Let_syntax in
+        let%bind network, dsl =
+          let lift = Deferred.bind ~f:Malleable_error.or_hard_error in
           [%log trace] "initializing network manager" ;
           let%bind net_manager =
-            lift @@ Engine.Network_manager.create ~logger network_config
+            Engine.Network_manager.create ~logger network_config
           in
           net_manager_ref := Some net_manager ;
           [%log trace] "deploying network" ;
-          let%bind network =
-            lift @@ Engine.Network_manager.deploy net_manager
-          in
+          let%bind network = Engine.Network_manager.deploy net_manager in
           [%log trace] "initializing log engine" ;
-          let%map log_engine = Engine.Log_engine.create ~logger ~network in
+          let%map log_engine =
+            lift @@ Engine.Log_engine.create ~logger ~network
+          in
           log_engine_ref := Some log_engine ;
           let event_router =
             Dsl.Event_router.create ~logger
@@ -333,10 +333,6 @@ let main inputs =
             Dsl.create ~logger ~network ~event_router ~network_state_reader
           in
           (network, dsl)
-        in
-        let open Malleable_error.Let_syntax in
-        let%bind network, dsl =
-          Deferred.bind init_result ~f:Malleable_error.or_hard_error
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
