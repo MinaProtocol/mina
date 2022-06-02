@@ -20,7 +20,7 @@ let ReleaseSpec = {
     deb_codename: Text,
     deb_release: Text,
     deb_version: Text,
-    extra_args: Text,
+    extra_args: List Text,
     step_key: Text
   },
   default = {
@@ -32,7 +32,7 @@ let ReleaseSpec = {
     deb_codename = "stretch",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
-    extra_args = "",
+    extra_args = [] : List Text,
     step_key = "daemon-devnet-docker-image"
   }
 }
@@ -43,7 +43,8 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     [
         Cmd.run (
           "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
-              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
+              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version}"
+              ++ Prelude.Text.concatSep "" (Prelude.List.map Text Text (\(arg : Text) -> " --extra-arg '${arg}'") spec.extra_args)
         )
     ]
 
