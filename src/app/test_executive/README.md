@@ -146,3 +146,7 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
     - structured log events are not an integration test construct, they are defined in various places around the protocol code.  For example, the  `Rejecting_command_for_reason` structured event is defined in `network_pool/transaction_pool.ml`.
     - The structured log events that matter to the integration test are in `src/lib/integration_test_lib/event_type.ml`.  The events integration-test-side will trigger based on logic defined in each event type's `parse` function, which parses messages from the logs, often trying to match for exact strings
 - Please bear in mind that the nodes on GCP run the image that you link in your argument, it does NOT run whatever code you have locally.  Only that which relates to the test executive is run from local.  If you make a change in the protocol code, first this needs to be pushed to CI, where CI will bake a fresh image, and that image can be obtained to run on one's nodes.
+
+# Exit codes
+
+- Exit code `5` will be returned if some pods could not be found.
