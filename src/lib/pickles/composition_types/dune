@@ -11,12 +11,13 @@
    core_kernel
    base.caml
    ;; local libraries
+   kimchi_backend.pasta
    snarky.backendless
    pickles_types
    pickles.limb_vector
+   kimchi_backend
    pickles_base
    pickles.backend
-   pasta
-   marlin_plonk_bindings_types
+   kimchi_backend.common
  )
 )
