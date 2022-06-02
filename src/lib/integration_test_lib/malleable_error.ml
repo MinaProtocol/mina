@@ -155,8 +155,12 @@ let soft_error_string ~value = Fn.compose (soft_error ~value) Error.of_string
 let soft_error_format ~value format =
   Printf.ksprintf (soft_error_string ~value) format
 
-let or_hard_error or_error =
-  match or_error with Ok x -> return x | Error error -> hard_error error
+let or_hard_error ?exit_code or_error =
+  match or_error with
+  | Ok x ->
+      return x
+  | Error error ->
+      hard_error ?exit_code error
 
 let hard_error_string ?exit_code =
   Fn.compose (hard_error ?exit_code) Error.of_string

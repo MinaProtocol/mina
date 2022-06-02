@@ -72,6 +72,11 @@ let run_cmd_exn dir prog args =
   | Error error ->
       Error.raise error
 
+let run_cmd_or_hard_error dir prog args =
+  let%bind output = run_cmd dir prog args in
+  Deferred.bind ~f:Malleable_error.or_hard_error
+    (check_cmd_output ~prog ~args output)
+
 let run_cmd_exn_timeout ~timeout_seconds dir prog args =
   match%map run_cmd_or_error_timeout ~timeout_seconds dir prog args with
   | Ok output ->
