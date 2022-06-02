@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	capnproto.org/go/capnp/v3 v3.0.0-alpha.1
-	github.com/georgeee/go-bs-lmdb v1.0.6-0.20211007111842-a06db2e6401e
 	github.com/go-errors/errors v1.4.1
 	github.com/ipfs/go-bitswap v0.4.0
 	github.com/ipfs/go-block-format v0.0.3
@@ -13,6 +12,7 @@ require (
 	github.com/ipfs/go-ipfs-blockstore v1.0.3
 	github.com/ipfs/go-ipfs-exchange-interface v0.0.1
 	github.com/ipfs/go-log/v2 v2.3.0
+	github.com/ledgerwatch/lmdb-go v1.18.2
 	github.com/libp2p/go-libp2p v0.15.1
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
 	github.com/libp2p/go-libp2p-core v0.9.0
@@ -26,6 +26,7 @@ require (
 	github.com/libp2p/go-mplex v0.3.0
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multihash v0.0.15
+	github.com/o1-labs/go-bs-lmdb v1.0.9
 	github.com/prometheus/client_golang v1.11.0
 	github.com/shirou/gopsutil/v3 v3.21.11
 	github.com/stretchr/testify v1.7.0

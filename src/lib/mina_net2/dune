@@ -21,6 +21,8 @@
    base.caml
    base.base_internalhash_types
    splittable_random
+   lmdb
+   integers
    ;; local libraries
    blake2
    error_json
@@ -33,6 +35,7 @@
    mina_metrics
    o1trace
    staged_ledger_diff
+   consensus
    )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

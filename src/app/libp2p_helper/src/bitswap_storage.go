@@ -3,9 +3,11 @@ package codanet
 import (
 	"fmt"
 
-	lmdbbs "github.com/georgeee/go-bs-lmdb"
 	"github.com/ipfs/go-cid"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/ledgerwatch/lmdb-go/lmdb"
 	"github.com/multiformats/go-multihash"
+	lmdbbs "github.com/o1-labs/go-bs-lmdb"
 )
 
 type RootBlockStatus int
@@ -24,7 +26,34 @@ type BitswapStorage interface {
 	ViewBlock(key [32]byte, callback func([]byte) error) error
 }
 
-type BitswapStorageLmdb lmdbbs.Blockstore
+type BitswapStorageLmdb struct {
+	blockstore *lmdbbs.Blockstore
+	statusDB   lmdb.DBI
+}
+
+func OpenBitswapStorageLmdb(path string) (*BitswapStorageLmdb, error) {
+	// 256MiB, a large enough mmap size to make mmap grow() a rare event
+	opt := lmdbbs.Options{
+		Path:            path,
+		InitialMmapSize: 256 << 20,
+		CidToKeyMapper:  cidToKeyMapper,
+		KeyToCidMapper:  keyToCidMapper,
+		MaxDBs:          2,
+	}
+	blockstore, err := lmdbbs.Open(&opt)
+	if err != nil {
+		return nil, err
+	}
+	statusDB, err := blockstore.OpenDB("status")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create/open lmdb status database: %w", err)
+	}
+	return &BitswapStorageLmdb{blockstore: blockstore, statusDB: statusDB}, nil
+}
+
+func (b *BitswapStorageLmdb) Blockstore() blockstore.Blockstore {
+	return b.blockstore
+}
 
 func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
 	err = fmt.Errorf("wrong root block status retrieved: %v", r)
@@ -38,22 +67,12 @@ func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
 	return
 }
 
-func statusKey(key [32]byte) []byte {
-	return append([]byte{BS_STATUS_PREFIX}, key[:]...)
+func (bs *BitswapStorageLmdb) ViewBlock(key [32]byte, callback func([]byte) error) error {
+	return bs.blockstore.View(BlockHashToCid(key), callback)
 }
 
-func blockKey(key []byte) []byte {
-	return append([]byte{BS_BLOCK_PREFIX}, key...)
-}
-
-func (bs_ *BitswapStorageLmdb) ViewBlock(key [32]byte, callback func([]byte) error) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.View(BlockHashToCid(key), callback)
-}
-
-func (bs_ *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err error) {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	r, err := bs.GetData(statusKey(key))
+func (bs *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err error) {
+	r, err := bs.blockstore.GetData(bs.statusDB, key[:])
 	if err != nil {
 		return
 	}
@@ -61,9 +80,8 @@ func (bs_ *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err
 	return
 }
 
-func (bs_ *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) ([]byte, bool, error) {
+func (bs *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
+	return bs.blockstore.PutData(bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		prev, err := UnmarshalRootBlockStatus(prevVal)
 		if err != nil {
 			return nil, false, err
@@ -82,9 +100,8 @@ func isStatusTransitionAllowed(exists bool, prev RootBlockStatus, newStatus Root
 	return allowed
 }
 
-func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
-	return bs.PutData(statusKey(key), func(prevVal []byte, exists bool) ([]byte, bool, error) {
+func (bs *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus) error {
+	return bs.blockstore.PutData(bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		var prev RootBlockStatus
 		if exists {
 			var err error
@@ -99,13 +116,12 @@ func (bs_ *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus
 		return []byte{byte(newStatus)}, true, nil
 	})
 }
-func (bs_ *BitswapStorageLmdb) DeleteBlocks(keys [][32]byte) error {
-	bs := (*lmdbbs.Blockstore)(bs_)
+func (bs *BitswapStorageLmdb) DeleteBlocks(keys [][32]byte) error {
 	cids := make([]cid.Cid, len(keys))
 	for i, key := range keys {
 		cids[i] = BlockHashToCid(key)
 	}
-	return bs.DeleteMany(cids)
+	return bs.blockstore.DeleteMany(cids)
 }
 
 const (
@@ -118,7 +134,7 @@ var MULTI_HASH_CODE = multihash.Names["blake2b-256"]
 func cidToKeyMapper(id cid.Cid) []byte {
 	mh, err := multihash.Decode(id.Hash())
 	if err == nil && mh.Code == MULTI_HASH_CODE && id.Prefix().Codec == cid.Raw {
-		return blockKey(mh.Digest)
+		return mh.Digest
 	}
 	return nil
 }
@@ -135,9 +151,14 @@ func BlockHashToCid(h [32]byte) cid.Cid {
 }
 
 func keyToCidMapper(key []byte) (id cid.Cid) {
-	if len(key) == 33 && key[0] == BS_BLOCK_PREFIX {
-		mh, _ := multihash.Encode(key[1:], MULTI_HASH_CODE)
+	if len(key) == 32 {
+		mh, _ := multihash.Encode(key, MULTI_HASH_CODE)
 		id = cid.NewCidV1(cid.Raw, mh)
 	}
 	return
+}
+
+func (b *BitswapStorageLmdb) Close() {
+	b.blockstore.CloseDB(b.statusDB)
+	b.blockstore.Close()
 }
