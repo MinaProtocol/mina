@@ -6,7 +6,7 @@
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)
- (preprocess (pps ppx_jane graphql_ppx ppx_version)))
+ (preprocess (pps ppx_base graphql_ppx ppx_version)))
 
 (rule
  (targets generated_graphql_queries.ml)
