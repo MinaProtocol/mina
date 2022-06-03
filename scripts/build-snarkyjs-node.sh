@@ -5,6 +5,8 @@ pushd "$SNARKY_JS_PATH"
   [ -d node_modules ] || npm i
 popd
 
+export DUNE_USE_DEFAULT_LINKER="y"
+
 dune b src/lib/crypto/kimchi_bindings/js/node_js \
 && dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js \
 && dune b src/lib/snarky_js_bindings/snarkyjs/src/snarky/gen/js-layout.ts || exit 1
