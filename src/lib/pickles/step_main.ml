@@ -45,9 +45,8 @@ let verify_one
           sponge
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
-        finalize_other_proof d.max_proofs_verified ~max_width:d.max_width
-          ~step_domains:d.step_domains ~sponge ~prev_challenges
-          proof_state.deferred_values prev_proof_evals )
+        finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
+          ~sponge ~prev_challenges proof_state.deferred_values prev_proof_evals )
   in
   let branch_data = proof_state.deferred_values.branch_data in
   let statement =
@@ -78,8 +77,7 @@ let verify_one
   in
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~proofs_verified:d.max_proofs_verified
-          ~wrap_domain:d.wrap_domains.h
+        verify ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
           ~is_base_case:(Boolean.not should_verify)
           ~sg_old:prev_challenge_polynomial_commitments ~proof:wrap_proof
           ~wrap_verification_key:d.wrap_key statement unfinalized )
@@ -295,11 +293,10 @@ let step_main :
                         `Known
                           (Vector.map basic.proofs_verifieds ~f:Field.of_int)
                     ; max_proofs_verified = (module Max_proofs_verified)
-                    ; max_width = None
                     ; typ = basic.typ
                     ; var_to_field_elements = basic.var_to_field_elements
                     ; value_to_field_elements = basic.value_to_field_elements
-                    ; wrap_domains = basic.wrap_domains
+                    ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
                     }
