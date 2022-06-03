@@ -178,7 +178,7 @@ let wrap_main
                ; xi
                ; combined_inner_product
                ; b
-               ; which_branch
+               ; branch_data
                ; bulletproof_challenges
                }
            ; sponge_digest_before_evaluations
@@ -194,17 +194,47 @@ let wrap_main
         , _
         , _
         , _
-        , _ )
+        , Field.t )
         Types.Wrap.Statement.In_circuit.t ) =
     with_label __LOC__ (fun () ->
         let which_branch =
+          exists
+            (Typ.transport Field.typ ~there:Field.Constant.of_int
+               ~back:(fun _ -> failwith "unimplemented") )
+            ~request:(fun () -> Req.Which_branch)
+        in
+        let which_branch =
           One_hot_vector.of_index which_branch ~length:branches
+        in
+        let actual_proofs_verified_mask =
+          Util.ones_vector
+            (module Impl)
+            ~first_zero:
+              (Pseudo.choose (which_branch, step_widths) ~f:Field.of_int)
+            Max_proofs_verified.n
+        in
+        let domain_log2 =
+          Pseudo.choose
+            ( which_branch
+            , Vector.map ~f:(fun ds -> Domain.log2_size ds.h) step_domains )
+            ~f:Field.of_int
+        in
+        let () =
+          (* Check that the branch_data public-input is correct *)
+          Branch_data.Checked.pack
+            (module Impl)
+            { proofs_verified_mask =
+                Vector.extend_exn actual_proofs_verified_mask Nat.N2.n
+                  Boolean.false_
+            ; domain_log2
+            }
+          |> Field.Assert.equal branch_data
         in
         let prev_proof_state =
           with_label __LOC__ (fun () ->
               let open Types.Step.Proof_state in
               let typ =
-                typ
+                typ ~assert_16_bits:(assert_n_bits ~n:16)
                   (module Impl)
                   Max_proofs_verified.n
                   (Shifted_value.Type2.typ Field.typ)
@@ -342,10 +372,14 @@ let wrap_main
                           , old_bulletproof_challenges ) ) =
                       old_bulletproof_challenges
                     in
+                    let old_bulletproof_challenges =
+                      Wrap_hack.Checked.pad_challenges
+                        old_bulletproof_challenges
+                    in
                     let finalized, chals =
                       with_label __LOC__ (fun () ->
                           finalize_other_proof
-                            (Nat.Add.create max_local_max_proofs_verified)
+                            (module Wrap_hack.Padded_length)
                             ~max_quot_size ~actual_proofs_verified
                             ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
                             ~sponge ~old_bulletproof_challenges deferred_values
@@ -360,7 +394,7 @@ let wrap_main
           let prev_me_onlys =
             Vector.map2 prev_step_accs old_bp_chals
               ~f:(fun sacc (T (max_local_max_proofs_verified, chals)) ->
-                hash_me_only max_local_max_proofs_verified
+                Wrap_hack.Checked.hash_me_only max_local_max_proofs_verified
                   { challenge_polynomial_commitment = sacc
                   ; old_bulletproof_challenges = chals
                   } )
@@ -411,8 +445,8 @@ let wrap_main
           with_label __LOC__ (fun () ->
               incrementally_verify_proof
                 (module Max_proofs_verified)
-                ~step_widths ~step_domains ~verification_key:step_plonk_index
-                ~xi ~sponge
+                ~actual_proofs_verified_mask ~step_domains
+                ~verification_key:step_plonk_index ~xi ~sponge
                 ~public_input:
                   (Array.map
                      (pack_statement Max_proofs_verified.n prev_statement)
@@ -429,7 +463,7 @@ let wrap_main
             Boolean.Assert.is_true bulletproof_success ) ;
         with_label __LOC__ (fun () ->
             Field.Assert.equal me_only_digest
-              (hash_me_only Max_proofs_verified.n
+              (Wrap_hack.Checked.hash_me_only Max_proofs_verified.n
                  { Types.Wrap.Proof_state.Me_only
                    .challenge_polynomial_commitment =
                      openings_proof.challenge_polynomial_commitment

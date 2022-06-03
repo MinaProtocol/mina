@@ -21,6 +21,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     Boolean.Assert.any (Vector.to_list v) ;
     v
 
+  let of_vector_unsafe = Fn.id
+
   let typ (n : 'n Nat.t) : ('n t, Constant.t) Typ.t =
     let (Typ typ) = Vector.typ Boolean.typ n in
     let typ : _ Typ.t =

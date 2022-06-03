@@ -149,19 +149,14 @@ module For_step = struct
     { branches : 'branches Nat.t
     ; max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds : (Impls.Step.Field.t, 'branches) Vector.t
+    ; proofs_verifieds :
+        [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
     ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
     ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
     ; wrap_domains : Domains.t
-    ; step_domains :
-        [ `Known of (Domains.t, 'branches) Vector.t
-        | `Side_loaded of
-          ( Impls.Step.Field.t Side_loaded_verification_key.Domain.t
-            Side_loaded_verification_key.Domains.t
-          , 'branches )
-          Vector.t ]
+    ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     ; max_width : Side_loaded_verification_key.Width.Checked.t option
     }
 
@@ -186,9 +181,7 @@ module For_step = struct
     let T = Nat.eq_exn branches Side_loaded_verification_key.Max_branches.n in
     { branches
     ; max_proofs_verified
-    ; proofs_verifieds =
-        Vector.map index.step_widths
-          ~f:Side_loaded_verification_key.Width.Checked.to_field
+    ; proofs_verifieds = `Side_loaded
     ; typ
     ; value_to_field_elements
     ; var_to_field_elements
@@ -196,7 +189,7 @@ module For_step = struct
     ; wrap_domains =
         Common.wrap_domains
           ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
-    ; step_domains = `Side_loaded index.step_domains
+    ; step_domains = `Side_loaded
     ; max_width = Some index.max_width
     }
 
@@ -215,7 +208,8 @@ module For_step = struct
     { branches
     ; max_width = None
     ; max_proofs_verified
-    ; proofs_verifieds = Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int
+    ; proofs_verifieds =
+        `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
     ; typ
     ; value_to_field_elements
     ; var_to_field_elements
@@ -261,25 +255,6 @@ let lookup_basic : type a b n m. (a, b, n, m) Tag.t -> (a, b, n, m) Basic.t =
       Compiled.to_basic (lookup_compiled t.id)
   | Side_loaded ->
       Side_loaded.to_basic (lookup_side_loaded t.id)
-
-let lookup_step_domains :
-    type a b n m. (a, b, n, m) Tag.t -> (Domain.t, m) Vector.t =
- fun t ->
-  let f = Vector.map ~f:Domains.h in
-  match t.kind with
-  | Compiled ->
-      f (lookup_compiled t.id).step_domains
-  | Side_loaded -> (
-      let t = lookup_side_loaded t.id in
-      match t.ephemeral with
-      | Some { index = `In_circuit _ } | None ->
-          failwith __LOC__
-      | Some { index = `In_prover k | `In_both (k, _) } ->
-          let a =
-            At_most.to_array (At_most.map k.step_data ~f:(fun (ds, _) -> ds.h))
-          in
-          Vector.init t.permanent.branches ~f:(fun i ->
-              try a.(i) with _ -> Domain.Pow_2_roots_of_unity 0 ) )
 
 let max_proofs_verified :
     type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
