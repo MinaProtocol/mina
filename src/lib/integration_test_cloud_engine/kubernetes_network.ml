@@ -40,7 +40,7 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Integration_test_lib.Util.run_cmd_or_error ~exit_code:6 cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:6 cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
   let run_in_container ?(exit_code = 7) ?container_id ~cmd t =
@@ -979,9 +979,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     [%log info] "Dumping container logs from (node: %s, container: %s)" t.pod_id
       t.info.primary_container_id ;
-    let%map logs =
-      Deferred.bind ~f:Malleable_error.or_hard_error (get_logs_in_container t)
-    in
+    let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
         Out_channel.output_string out_ch logs )
@@ -991,9 +989,7 @@ module Node = struct
     [%log info]
       "Dumping precomputed blocks from logs for (node: %s, container: %s)"
       t.pod_id t.info.primary_container_id ;
-    let%bind logs =
-      Deferred.bind ~f:Malleable_error.or_hard_error (get_logs_in_container t)
-    in
+    let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
       String.split logs ~on:'\n'
