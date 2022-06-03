@@ -96,104 +96,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
             Token_id.default )
     in
-    let account_creation_fee_int =
-      Currency.Fee.to_int constraint_constants.account_creation_fee
-    in
-    let token_funder = List.hd_exn @@ Network.block_producer_keypairs network in
-    let token_owner = Signature_lib.Keypair.create () in
-    let token_account1 = Signature_lib.Keypair.create () in
-    let token_account2 = Signature_lib.Keypair.create () in
-    let custom_token_id =
-      Account_id.derive_token_id
-        ~owner:
-          (Account_id.create
-             (Signature_lib.Public_key.compress token_owner.public_key)
-             Token_id.default )
-    in
-    let keymap =
-      List.fold [ token_funder; token_owner; token_account1; token_account2 ]
-        ~init:Signature_lib.Public_key.Compressed.Map.empty
-        ~f:(fun map { private_key; public_key } ->
-          Signature_lib.Public_key.Compressed.Map.add_exn map
-            ~key:(Signature_lib.Public_key.compress public_key)
-            ~data:private_key )
-    in
-    let parties_create_token_owner =
-      let open Parties_builder in
-      let fee_payer_pk =
-        Signature_lib.Public_key.compress token_funder.public_key
-      in
-      let with_dummy_signatures =
-        mk_forest
-          [ mk_node
-              (mk_party_body Call token_funder Token_id.default
-                 (-(4 * account_creation_fee_int)) )
-              []
-          ; mk_node
-              (mk_party_body Call token_owner Token_id.default
-                 (3 * account_creation_fee_int) )
-              []
-          ]
-        |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk
-             ~fee_payer_nonce:Account.Nonce.zero
-      in
-      replace_authorizations ~keymap with_dummy_signatures
-    in
-    let parties_mint_token =
-      let open Parties_builder in
-      let fee_payer_pk =
-        Signature_lib.Public_key.compress token_funder.public_key
-      in
-      let with_dummy_signatures =
-        mk_forest
-          [ mk_node
-              (mk_party_body Call token_owner Token_id.default
-                 (-account_creation_fee_int) )
-              [ mk_node
-                  (mk_party_body Call token_account1 custom_token_id 10000)
-                  []
-              ]
-          ]
-        |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk
-             ~fee_payer_nonce:(Account.Nonce.of_int 1)
-      in
-      replace_authorizations ~keymap with_dummy_signatures
-    in
-    let parties_token_transfer =
-      let open Parties_builder in
-      let fee_payer_pk =
-        Signature_lib.Public_key.compress token_funder.public_key
-      in
-      let with_dummy_signatures =
-        mk_forest
-          [ mk_node
-              (mk_party_body Call token_owner Token_id.default
-                 (-account_creation_fee_int) )
-              [ mk_node
-                  (mk_party_body Call token_account1 custom_token_id (-30))
-                  []
-              ; mk_node
-                  (mk_party_body Call token_account2 custom_token_id 30)
-                  []
-              ; mk_node
-                  (mk_party_body Call token_account1 custom_token_id (-10))
-                  []
-              ; mk_node
-                  (mk_party_body Call token_account2 custom_token_id 10)
-                  []
-              ; mk_node
-                  (mk_party_body Call token_account2 custom_token_id (-5))
-                  []
-              ; mk_node (mk_party_body Call token_account1 custom_token_id 5) []
-              ]
-          ]
-        |> mk_parties_transaction ~fee:1_000_000 ~fee_payer_pk
-             ~fee_payer_nonce:(Account.Nonce.of_int 2)
-      in
-      replace_authorizations ~keymap with_dummy_signatures
-    in
-    let%bind parties_create_account =
-      (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
+    let%bind parties_create_accounts =
+      (* construct a Parties.t, similar to zkapp_test_transaction create-zkapp-account *)
       let amount = Currency.Amount.of_int 10_000_000_000 in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -227,7 +131,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp update permissions"
       in
-      (*Lower fee so that parties_create_account gets applied first*)
+      (*Lower fee so that parties_create_accounts gets applied first*)
       let fee = Currency.Fee.of_int 10_000_000 in
       let new_permissions : Permissions.t =
         { Permissions.user_default with
@@ -412,6 +316,89 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
+    let parties_mint_token, parties_token_transfer =
+      let account_creation_fee_int =
+        Currency.Fee.to_int constraint_constants.account_creation_fee
+      in
+      let token_funder =
+        List.hd_exn @@ Network.block_producer_keypairs network
+      in
+      let token_owner = List.hd_exn zkapp_keypairs in
+      let token_account1 = Signature_lib.Keypair.create () in
+      let token_account2 = Signature_lib.Keypair.create () in
+      let custom_token_id =
+        Account_id.derive_token_id
+          ~owner:
+            (Account_id.create
+               (Signature_lib.Public_key.compress token_owner.public_key)
+               Token_id.default )
+      in
+      let keymap =
+        List.fold [ token_funder; token_owner; token_account1; token_account2 ]
+          ~init:Signature_lib.Public_key.Compressed.Map.empty
+          ~f:(fun map { private_key; public_key } ->
+            Signature_lib.Public_key.Compressed.Map.add_exn map
+              ~key:(Signature_lib.Public_key.compress public_key)
+              ~data:private_key )
+      in
+      let parties_mint_token =
+        let open Parties_builder in
+        let fee_payer_pk =
+          Signature_lib.Public_key.compress token_funder.public_key
+        in
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_party_body Call token_owner Token_id.default
+                   (-account_creation_fee_int) )
+                [ mk_node
+                    (mk_party_body Call token_account1 custom_token_id 10000)
+                    []
+                ]
+            ]
+          |> mk_parties_transaction ~fee:2_000_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 1)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
+      let parties_token_transfer =
+        let open Parties_builder in
+        let fee_payer_pk =
+          Signature_lib.Public_key.compress token_funder.public_key
+        in
+        (* lower fee than minting Parties.t *)
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_party_body Call token_owner Token_id.default
+                   (-account_creation_fee_int) )
+                [ mk_node
+                    (mk_party_body Call token_account1 custom_token_id (-30))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id 30)
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account1 custom_token_id (-10))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id 10)
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id (-5))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account1 custom_token_id 5)
+                    []
+                ]
+            ]
+          |> mk_parties_transaction ~fee:1_000_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 2)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
+      (parties_mint_token, parties_token_transfer)
+    in
     let with_timeout =
       let soft_slots = 4 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -508,33 +495,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Deferred.return `Continue )
     in
     let%bind () =
-      section_hard "Send a zkApp transaction to create token owner"
-        (send_zkapp ~logger node parties_create_token_owner)
-    in
-    let%bind () =
-      section_hard "Wait for zkApp transaction to create token owner"
-        (wait_for_zkapp parties_create_token_owner)
-    in
-    let%bind () =
-      section_hard "Send a zkApp transaction to mint token"
-        (send_zkapp ~logger node parties_mint_token)
-    in
-    let%bind () =
-      section_hard "Wait for zkApp transaction to mint token"
-        (wait_for_zkapp parties_mint_token)
-    in
-    let%bind () =
-      section_hard "Send a zkApp transaction to transfer tokens"
-        (send_zkapp ~logger node parties_token_transfer)
-    in
-    let%bind () =
-      section_hard "Wait for zkApp transaction to transfer tokens"
-        (wait_for_zkapp parties_token_transfer)
-    in
-    ignore (Core.exit 0 : int) ;
-    let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
-        (send_zkapp ~logger node parties_create_account)
+        (send_zkapp ~logger node parties_create_accounts)
     in
     let%bind () =
       section_hard "Send a zkApp transaction to update permissions"
@@ -554,7 +516,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Wait for zkapp to create accounts to be included in transition \
          frontier"
-        (wait_for_zkapp parties_create_account)
+        (wait_for_zkapp parties_create_accounts)
     in
     let%bind () =
       section_hard
@@ -625,6 +587,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkApp transaction with a nonexistent fee payer"
         (send_invalid_zkapp ~logger node parties_nonexistent_fee_payer
            "Fee_payer_account_not_found" )
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction to mint token"
+        (send_zkapp ~logger node parties_mint_token)
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction to transfer tokens"
+        (send_zkapp ~logger node parties_token_transfer)
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to mint token"
+        (wait_for_zkapp parties_mint_token)
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to transfer tokens"
+        (wait_for_zkapp parties_token_transfer)
     in
     let%bind () =
       section_hard "Verify zkApp transaction updates in ledger"
