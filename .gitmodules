@@ -7,9 +7,6 @@
 [submodule "src/external/async_kernel"]
 	path = src/external/async_kernel
 	url = https://github.com/MinaProtocol/async_kernel
-[submodule "src/external/ocaml-extlib"]
-	path = src/external/ocaml-extlib
-	url = https://github.com/MinaProtocol/ocaml-extlib.git
 [submodule "src/external/rpc_parallel"]
 	path = src/external/rpc_parallel
 	url = https://github.com/MinaProtocol/rpc_parallel.git
