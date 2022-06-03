@@ -4,46 +4,7 @@ open Pickles_types
 (** Data specific to a branch of a proof-system that's necessary for
     finalizing the deferred-values in a wrap proof of that branch. *)
 
-(** Inside the circuit, we will represent a value of this type
-    as a sequence of 2 bits:
-    00: N0
-    10: N1
-    11: N2 *)
-module Proofs_verified = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = N0 | N1 | N2
-      [@@deriving sexp, sexp, compare, yojson, hash, equal]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  module Checked = struct
-    type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
-
-    type 'f t = ('f boolean, Nat.N2.n) Vector.t
-  end
-
-  let to_mask : t -> (bool, Nat.N2.n) Vector.t = function
-    | N0 ->
-        [ false; false ]
-    | N1 ->
-        [ true; false ]
-    | N2 ->
-        [ true; true ]
-
-  let of_mask_exn : (bool, Nat.N2.n) Vector.t -> t = function
-    | [ false; false ] ->
-        N0
-    | [ true; false ] ->
-        N1
-    | [ true; true ] ->
-        N2
-    | [ false; true ] ->
-        failwith "Invalid mask"
-end
+module Proofs_verified = Pickles_base.Proofs_verified
 
 module Domain_log2 = struct
   [%%versioned
@@ -98,14 +59,15 @@ let pack (type f)
   (* shift domain_log2 over by 2 bits (multiply by 4) *)
   times4 domain_log2
   + project
-      (Pickles_types.Vector.to_list (Proofs_verified.to_mask proofs_verified))
+      (Pickles_types.Vector.to_list
+         (Proofs_verified.Prefix_mask.there proofs_verified) )
 
 let unpack (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) (x : f)
     : t =
   match Impl.Field.Constant.unpack x with
   | x0 :: x1 :: y0 :: y1 :: y2 :: y3 :: y4 :: y5 :: y6 :: y7 :: _ ->
-      { proofs_verified = Proofs_verified.of_mask_exn [ x0; x1 ]
+      { proofs_verified = Proofs_verified.Prefix_mask.back [ x0; x1 ]
       ; domain_log2 = Domain_log2.of_bits_msb [ y7; y6; y5; y4; y3; y2; y1; y0 ]
       }
   | _ ->
@@ -113,7 +75,7 @@ let unpack (type f)
 
 module Checked = struct
   type 'f t =
-    { proofs_verified_mask : 'f Proofs_verified.Checked.t
+    { proofs_verified_mask : 'f Proofs_verified.Prefix_mask.Checked.t
     ; domain_log2 : 'f Snarky_backendless.Cvar.t
     }
   [@@deriving hlist]
@@ -141,10 +103,8 @@ let typ (type f)
     (assert_16_bits : Impl.Field.t -> unit) : (f Checked.t, t) Impl.Typ.t =
   let open Impl in
   let proofs_verified_mask :
-      (f Proofs_verified.Checked.t, Proofs_verified.t) Typ.t =
-    Typ.transport
-      (Vector.typ Boolean.typ Nat.N2.n)
-      ~there:Proofs_verified.to_mask ~back:Proofs_verified.of_mask_exn
+      (f Proofs_verified.Prefix_mask.Checked.t, Proofs_verified.t) Typ.t =
+    Proofs_verified.Prefix_mask.typ (module Impl)
   in
   let domain_log2 : (Field.t, Domain_log2.t) Typ.t =
     let (Typ t) =
