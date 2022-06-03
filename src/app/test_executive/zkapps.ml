@@ -527,15 +527,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     "Ledger update and requested update are incompatible" ) ) )
         )
     in
+    let stop_logging_snark_work = Ivar.create () in
     (* Log snark work as it comes in. *)
     don't_wait_for
       (let rec go () =
          let open Deferred.Let_syntax in
-         match%bind wait_for t (Wait_condition.snark_work ()) with
+         match%bind
+           Deferred.any
+             [ Deferred.Result.map_error ~f:ignore
+                 (wait_for t (Wait_condition.snark_work ()))
+             ; Ivar.read stop_logging_snark_work
+             ]
+         with
          | Ok _ ->
              [%log info] "Received new snark work" ;
              go ()
-         | Error _ ->
+         | Error () ->
              Deferred.return ()
        in
        go () ) ;
@@ -544,6 +551,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
     in
+    Ivar.fill stop_logging_snark_work (Error ()) ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
