@@ -38,5 +38,8 @@
 
 (rule
  (targets version.ml)
- (deps (:< gen_version.sh) (source_tree src/lib/marlin))
+ (deps
+  (:< gen_version.sh)
+  (source_tree src/lib/marlin)
+  (sandbox none))
  (action (run %{<} %{targets})))
