@@ -406,6 +406,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       [%log info] "ZkApp transactions included in transition frontier"
     in
+    let stop_logging_snark_work = Ivar.create () in
+    (* Log snark work as it comes in. *)
+    don't_wait_for
+      (let rec go () =
+         let open Deferred.Let_syntax in
+         match%bind
+           Deferred.any
+             [ Deferred.Result.map_error ~f:ignore
+                 (wait_for t (Wait_condition.snark_work ()))
+             ; Ivar.read stop_logging_snark_work
+             ]
+         with
+         | Ok _ ->
+             [%log info] "Received new snark work" ;
+             go ()
+         | Error () ->
+             Deferred.return ()
+       in
+       go () ) ;
     let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
         (send_zkapp ~logger node parties_create_account)
@@ -527,25 +546,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     "Ledger update and requested update are incompatible" ) ) )
         )
     in
-    let stop_logging_snark_work = Ivar.create () in
-    (* Log snark work as it comes in. *)
-    don't_wait_for
-      (let rec go () =
-         let open Deferred.Let_syntax in
-         match%bind
-           Deferred.any
-             [ Deferred.Result.map_error ~f:ignore
-                 (wait_for t (Wait_condition.snark_work ()))
-             ; Ivar.read stop_logging_snark_work
-             ]
-         with
-         | Ok _ ->
-             [%log info] "Received new snark work" ;
-             go ()
-         | Error () ->
-             Deferred.return ()
-       in
-       go () ) ;
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
