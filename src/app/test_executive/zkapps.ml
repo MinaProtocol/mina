@@ -406,25 +406,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       [%log info] "ZkApp transactions included in transition frontier"
     in
-    let stop_logging_snark_work = Ivar.create () in
-    (* Log snark work as it comes in. *)
-    don't_wait_for
-      (let rec go () =
-         let open Deferred.Let_syntax in
-         match%bind
-           Deferred.any
-             [ Deferred.Result.map_error ~f:ignore
-                 (wait_for t (Wait_condition.snark_work ()))
-             ; Ivar.read stop_logging_snark_work
-             ]
-         with
-         | Ok _ ->
-             [%log info] "Received new snark work" ;
-             go ()
-         | Error () ->
-             Deferred.return ()
-       in
-       go () ) ;
+    let snark_work_event_subscription =
+      Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->
+          [%log info] "Received new snark work" ;
+          Deferred.return `Continue )
+    in
     let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
         (send_zkapp ~logger node parties_create_account)
@@ -551,7 +537,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
     in
-    Ivar.fill stop_logging_snark_work (Error ()) ;
+    Event_router.cancel (event_router t) snark_work_event_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger

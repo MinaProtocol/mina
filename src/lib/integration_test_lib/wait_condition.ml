@@ -226,12 +226,4 @@ struct
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
-
-  let snark_work () =
-    let check () _ _ = Predicate_passed in
-    { description = "snark work was received"
-    ; predicate = Event_predicate (Event_type.Snark_work_gossip, (), check)
-    ; soft_timeout = Slots 1
-    ; hard_timeout = Slots 1
-    }
 end

@@ -374,8 +374,6 @@ module Dsl = struct
 
     val snapp_to_be_included_in_frontier :
       has_failures:bool -> parties:Mina_base.Parties.t -> t
-
-    val snark_work : unit -> t
   end
 
   module type Util_intf = sig
@@ -447,6 +445,8 @@ module Dsl = struct
     val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
+
+    val event_router : t -> Event_router.t
 
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 
