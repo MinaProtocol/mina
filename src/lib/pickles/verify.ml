@@ -74,7 +74,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let { Deferred_values.xi
             ; plonk = plonk0
             ; combined_inner_product
-            ; which_branch
+            ; branch_data
             ; bulletproof_challenges
             } =
           Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
@@ -82,10 +82,9 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
-        let step_domains = key.step_domains.(Index.to_int which_branch) in
+        let step_domain = Branch_data.domain branch_data in
         let w =
-          Tick.Field.domain_generator
-            ~log2_size:(Domain.log2_size step_domains.h)
+          Tick.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
         in
         let zetaw = Tick.Field.mul zeta w in
         let tick_plonk_minimal :
@@ -103,7 +102,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let tick_domain =
           Plonk_checks.domain
             (module Tick.Field)
-            step_domains.h ~shifts:Common.tick_shifts
+            step_domain ~shifts:Common.tick_shifts
             ~domain_generator:Backend.Tick.Field.domain_generator
         in
         let tick_env =
@@ -178,7 +177,7 @@ let verify_heterogenous (ts : Instance.t list) =
             ~old_bulletproof_challenges:
               (Vector.map ~f:Ipa.Step.compute_challenges
                  statement.pass_through.old_bulletproof_challenges )
-            ~r:r_actual ~xi ~zeta ~zetaw ~step_branch_domains:step_domains
+            ~r:r_actual ~xi ~zeta ~zetaw
         in
         let check_eq lab x y =
           check

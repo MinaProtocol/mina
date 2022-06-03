@@ -84,12 +84,17 @@ struct
   let scalar_to_field s =
     SC.to_field_checked (module Impl) s ~endo:Endo.Wrap_inner_curve.scalar
 
+  let assert_n_bits ~n a =
+    (* Scalar_challenge.to_field_checked has the side effect of
+        checking that the input fits in n bits. *)
+    ignore
+      ( SC.to_field_checked
+          (module Impl)
+          (SC.SC.create a) ~endo:Endo.Wrap_inner_curve.scalar ~num_bits:n
+        : Field.t )
+
   let lowest_128_bits ~constrain_low_bits x =
-    let assert_128_bits a =
-      (* Scalar_challenge.to_field_checked has the side effect of
-         checking that the input fits in 128 bits. *)
-      ignore (scalar_to_field (SC.SC.create a) : Field.t)
-    in
+    let assert_128_bits = assert_n_bits ~n:128 in
     Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
 
   module Scalar_challenge =
@@ -479,53 +484,11 @@ struct
 
   module O = One_hot_vector.Make (Impl)
 
-  let side_loaded_input_domain =
+  let side_loaded_domain (type branches) =
     let open Side_loaded_verification_key in
-    let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
-    let max_width = Width.Max.n in
-    let domain_log2s =
-      Vector.init (S max_width) ~f:(fun w -> Int.ceil_log2 (input_size w))
-    in
-    let (T max_log2_size) =
-      let n = Int.ceil_log2 (input_size (Nat.to_int max_width)) in
-      assert (List.last_exn (Vector.to_list domain_log2s) = n) ;
-      Nat.of_int n
-    in
-    fun ~width ->
-      let mask = O.of_index width ~length:(S max_width) in
-      let shifts = lazy (Pseudo.Domain.shifts (mask, domain_log2s) ~shifts) in
-      let generator =
-        lazy (Pseudo.Domain.generator (mask, domain_log2s) ~domain_generator)
-      in
-      let vp =
-        let log2_size = Pseudo.choose (mask, domain_log2s) ~f:Field.of_int in
-        let mask =
-          ones_vector (module Impl) max_log2_size ~first_zero:log2_size
-        in
-        vanishing_polynomial mask
-      in
-      let size =
-        lazy
-          (Pseudo.choose (mask, domain_log2s) ~f:(fun x ->
-               Field.of_int (1 lsl x) ) )
-      in
-      object
-        method shifts = Lazy.force shifts
-
-        method generator = Lazy.force generator
-
-        method size = Lazy.force size
-
-        method vanishing_polynomial = vp
-      end
-
-  let side_loaded_domains (type branches) =
-    let open Side_loaded_verification_key in
-    fun (domains : (Field.t Domain.t Domains.t, branches) Vector.t)
-        (branch : branches One_hot_vector.T(Impl).t) ->
-      let domain v ~max =
+    fun ~(log2_size : Field.t) ->
+      let domain ~max =
         let (T max_n) = Nat.of_int max in
-        let log2_size = Pseudo.choose ~f:Domain.log2_size (branch, v) in
         let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
         let log2_sizes =
           (O.of_index log2_size ~length:max_n, Vector.init max_n ~f:Fn.id)
@@ -533,16 +496,7 @@ struct
         let shifts = Pseudo.Domain.shifts log2_sizes ~shifts in
         let generator = Pseudo.Domain.generator log2_sizes ~domain_generator in
         let vanishing_polynomial = vanishing_polynomial mask in
-        let size =
-          Vector.map mask ~f:(fun b ->
-              (* 0 -> 1
-                  1 -> 2 *)
-              Field.((b :> t) + one) )
-          |> Vector.reduce_exn ~f:Field.( * )
-        in
         object
-          method size = size
-
           method log2_size = log2_size
 
           method vanishing_polynomial x = vanishing_polynomial x
@@ -552,11 +506,7 @@ struct
           method generator = generator
         end
       in
-      { Domains.h =
-          domain
-            (Vector.map domains ~f:(fun { h; _ } -> h))
-            ~max:(Domain.log2_size max_domains.h)
-      }
+      domain ~max:(Domain.log2_size max_domains.h)
 
   let%test_module "side loaded domains" =
     ( module struct
@@ -569,62 +519,24 @@ struct
         in
         y
 
-      let%test_unit "side loaded input domain" =
+      let%test_unit "side loaded domains" =
+        let module O = One_hot_vector.Make (Impl) in
         let open Side_loaded_verification_key in
-        let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
-        let possibilities =
-          Vector.init (S Width.Max.n) ~f:(fun w -> Int.ceil_log2 (input_size w))
-        in
+        let domains = [ { Domains.h = 10 }; { h = 15 } ] in
         let pt = Field.Constant.random () in
-        List.iteri (Vector.to_list possibilities) ~f:(fun i d ->
+        List.iteri domains ~f:(fun i ds ->
             let d_unchecked =
               Plonk_checks.domain
                 (module Field.Constant)
-                (Pow_2_roots_of_unity d) ~shifts:Common.tick_shifts
+                (Pow_2_roots_of_unity ds.h) ~shifts:Common.tick_shifts
                 ~domain_generator:Backend.Tick.Field.domain_generator
             in
-            let checked_domain () =
-              side_loaded_input_domain ~width:(Field.of_int i)
-            in
+            let checked_domain () = side_loaded_domain (Field.of_int ds.h) in
             [%test_eq: Field.Constant.t]
               (d_unchecked#vanishing_polynomial pt)
               (run (fun () ->
                    (checked_domain ())#vanishing_polynomial (Field.constant pt) )
               ) )
-
-      let%test_unit "side loaded domains" =
-        let module O = One_hot_vector.Make (Impl) in
-        let open Side_loaded_verification_key in
-        let branches = Nat.N2.n in
-        let domains = Vector.[ { Domains.h = 10 }; { h = 15 } ] in
-        let pt = Field.Constant.random () in
-        List.iteri (Vector.to_list domains) ~f:(fun i ds ->
-            let check field1 field2 =
-              let d_unchecked =
-                Plonk_checks.domain
-                  (module Field.Constant)
-                  (Pow_2_roots_of_unity (field1 ds))
-                  ~shifts:Common.tick_shifts
-                  ~domain_generator:Backend.Tick.Field.domain_generator
-              in
-              let checked_domain () =
-                side_loaded_domains
-                  (Vector.map domains
-                     ~f:
-                       (Domains.map ~f:(fun x ->
-                            Domain.Pow_2_roots_of_unity (Field.of_int x) ) ) )
-                  (O.of_index (Field.of_int i) ~length:branches)
-                |> field2
-              in
-              [%test_eq: Field.Constant.t] d_unchecked#size
-                (run (fun () -> (checked_domain ())#size)) ;
-              [%test_eq: Field.Constant.t]
-                (d_unchecked#vanishing_polynomial pt)
-                (run (fun () ->
-                     (checked_domain ())#vanishing_polynomial
-                       (Field.constant pt) ) )
-            in
-            check Domains.h Domains.h )
     end )
 
   module Split_evaluations = struct
@@ -749,6 +661,28 @@ struct
     include Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
   end
 
+  let domain_for_compiled (type branches)
+      (domains : (Domains.t, branches) Vector.t)
+      (branch_data : Impl.field Branch_data.Checked.t) :
+      Field.t Plonk_checks.plonk_domain =
+    let (T unique_domains) =
+      List.map (Vector.to_list domains) ~f:Domains.h
+      |> List.dedup_and_sort ~compare:(fun d1 d2 ->
+             Int.compare (Domain.log2_size d1) (Domain.log2_size d2) )
+      |> Vector.of_list
+    in
+    let which_log2 =
+      Vector.map unique_domains ~f:(fun d ->
+          Field.equal
+            (Field.of_int (Domain.log2_size d))
+            branch_data.domain_log2 )
+      |> O.of_vector_unsafe
+      (* This should be ok... think it through a little more *)
+    in
+    Pseudo.Domain.to_domain
+      (which_log2, unique_domains)
+      ~shifts ~domain_generator
+
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
      1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
@@ -763,19 +697,14 @@ struct
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b) ~max_width
       ~(step_domains :
-         [ `Known of (Domains.t, branches) Vector.t
-         | `Side_loaded of
-           ( Field.t Side_loaded_verification_key.Domain.t
-             Side_loaded_verification_key.Domains.t
-           , branches )
-           Vector.t ] ) ~step_widths
+         [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
           carry around dummy "old bulletproof challenges" *)
        sponge ~(prev_challenges : (_, b) Vector.t)
       ({ xi
        ; combined_inner_product
        ; bulletproof_challenges
-       ; which_branch
+       ; branch_data
        ; b
        ; plonk
        } :
@@ -784,7 +713,7 @@ struct
         , Field.t Shifted_value.Type1.t
         , _
         , _
-        , _ )
+        , Field.Constant.t Branch_data.Checked.t )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.ft_eval1
       ; evals =
@@ -792,15 +721,7 @@ struct
           , { evals = evals2; public_input = x_hat2 } )
       } =
     let open Vector in
-    let step_domains =
-      with_label "step_domains" (fun () ->
-          match step_domains with
-          | `Known domains ->
-              `Known domains
-          | `Side_loaded ds ->
-              `Side_loaded (side_loaded_domains ds which_branch) )
-    in
-    let actual_width = Pseudo.choose (which_branch, step_widths) ~f:Fn.id in
+    let actual_width_mask = branch_data.proofs_verified_mask in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let absorb_evals x_hat e =
@@ -830,10 +751,10 @@ struct
     let domain =
       match step_domains with
       | `Known ds ->
-          let hs = map ds ~f:(fun { Domains.h; _ } -> h) in
-          Pseudo.Domain.to_domain (which_branch, hs) ~shifts ~domain_generator
-      | `Side_loaded { h } ->
-          (h :> _ Plonk_checks.plonk_domain)
+          domain_for_compiled ds branch_data
+      | `Side_loaded ->
+          ( side_loaded_domain ~log2_size:branch_data.domain_log2
+            :> _ Plonk_checks.plonk_domain )
     in
     let zetaw = Field.mul domain#generator plonk.zeta in
     let xi = scalar xi in
@@ -880,9 +801,8 @@ struct
           let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
           let sg_evals =
             Vector.map2
-              (ones_vector
-                 (module Impl)
-                 ~first_zero:actual_width Proofs_verified.n )
+              (Vector.trim actual_width_mask
+                 (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
               sg_olds
               ~f:(fun keep f -> [| (keep, f pt) |])
           in
@@ -897,7 +817,7 @@ struct
           | `Known _ ->
               Split_evaluations.combine_split_evaluations' pi ~xi
                 ~evaluation_point:pt v b
-          | `Side_loaded _ ->
+          | `Side_loaded ->
               Split_evaluations.combine_split_evaluations_side_loaded pi ~xi
                 ~evaluation_point:pt v b
         in
@@ -983,22 +903,16 @@ struct
         ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
     in
-    stage (fun t ~widths ~max_width ~which_branch ->
-        let mask =
-          ones_vector
-            (module Impl)
-            max_width
-            ~first_zero:(Pseudo.choose ~f:Fn.id (which_branch, widths))
-        in
+    stage (fun t ~widths ~max_width ~proofs_verified_mask ->
         let sponge = Sponge.copy after_index in
         let t =
           { t with
             old_bulletproof_challenges =
-              Vector.map2 mask t.old_bulletproof_challenges ~f:(fun b v ->
-                  Vector.map v ~f:(fun x -> `Opt (b, x)) )
+              Vector.map2 proofs_verified_mask t.old_bulletproof_challenges
+                ~f:(fun b v -> Vector.map v ~f:(fun x -> `Opt (b, x)))
           ; challenge_polynomial_commitments =
-              Vector.map2 mask t.challenge_polynomial_commitments ~f:(fun b g ->
-                  (b, g) )
+              Vector.map2 proofs_verified_mask
+                t.challenge_polynomial_commitments ~f:(fun b g -> (b, g))
           }
         in
         let not_opt x = `Not_opt x in

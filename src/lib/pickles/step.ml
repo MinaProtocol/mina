@@ -95,7 +95,7 @@ struct
         , Digest.Constant.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
-        , Index.t )
+        , Branch_data.t )
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
@@ -129,11 +129,7 @@ struct
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
-          (Vector.to_array (Types_map.lookup_step_domains tag)).(Index.to_int
-                                                                   t.statement
-                                                                     .proof_state
-                                                                     .deferred_values
-                                                                     .which_branch)
+          Branch_data.domain t.statement.proof_state.deferred_values.branch_data
         in
         let to_field =
           SC.to_field_constant
@@ -627,12 +623,10 @@ struct
           ~wrap_rounds:Tock.Rounds.n
       in
       let { Domains.h } =
-        List.nth_exn
-          (Vector.to_list step_domains)
-          (Index.to_int branch_data.index)
+        List.nth_exn (Vector.to_list step_domains) branch_data.index
       in
-      ksprintf Common.time "step-prover %d (%d)"
-        (Index.to_int branch_data.index) (Domain.size h) (fun () ->
+      ksprintf Common.time "step-prover %d (%d)" branch_data.index
+        (Domain.size h) (fun () ->
           Impls.Step.generate_witness_conv
             ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
                     next_statement_hashed ->

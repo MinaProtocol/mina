@@ -120,12 +120,17 @@ struct
   let scalar_to_field s =
     SC.to_field_checked (module Impl) s ~endo:Endo.Step_inner_curve.scalar
 
+  let assert_n_bits ~n a =
+    (* Scalar_challenge.to_field_checked has the side effect of
+        checking that the input fits in n bits. *)
+    ignore
+      ( SC.to_field_checked
+          (module Impl)
+          (SC.SC.create a) ~endo:Endo.Step_inner_curve.scalar ~num_bits:n
+        : Field.t )
+
   let lowest_128_bits ~constrain_low_bits x =
-    let assert_128_bits a =
-      (* Scalar_challenge.to_field_checked has the side effect of
-         checking that the input fits in 128 bits. *)
-      ignore (scalar_to_field (SC.SC.create a) : Field.t)
-    in
+    let assert_128_bits = assert_n_bits ~n:128 in
     Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
 
   let squeeze_challenge sponge : Field.t =
@@ -458,9 +463,9 @@ struct
         Field.Assert.equal t1 t2 )
 
   let incrementally_verify_proof (type b)
-      (module Max_proofs_verified : Nat.Add.Intf with type n = b) ~step_widths
-      ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge
+      (module Max_proofs_verified : Nat.Add.Intf with type n = b)
+      ~actual_proofs_verified_mask ~step_domains
+      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
          array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
@@ -476,15 +481,8 @@ struct
     in
     let sg_old =
       with_label __LOC__ (fun () ->
-          let actual_width =
-            Pseudo.choose (which_branch, step_widths) ~f:Field.of_int
-          in
-          Vector.map2
-            (ones_vector
-               (module Impl)
-               ~first_zero:actual_width Max_proofs_verified.n )
-            sg_old
-            ~f:(fun keep sg -> [| (keep, sg) |]) )
+          Vector.map2 actual_proofs_verified_mask sg_old ~f:(fun keep sg ->
+              [| (keep, sg) |] ) )
     in
     with_label __LOC__ (fun () ->
         let sample () = Opt.challenge sponge in
