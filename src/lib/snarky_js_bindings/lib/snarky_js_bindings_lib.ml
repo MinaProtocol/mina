@@ -51,30 +51,56 @@ module As_field = struct
 
   let of_field_obj (x : field_class Js.t) : t = Obj.magic x
 
+  let of_number_exn (value : t) : Impl.Field.t =
+    let number : Js.number Js.t = Obj.magic value in
+    let float = Js.float_of_number number in
+    if Float.is_integer float then
+      if float >= 0. then
+        Impl.Field.(
+          constant @@ Constant.of_string @@ Js.to_string @@ number##toString)
+      else
+        let number : Js.number Js.t = Obj.magic (-.float) in
+        Impl.Field.negate
+          Impl.Field.(
+            constant @@ Constant.of_string @@ Js.to_string @@ number##toString)
+    else raise_error "Cannot convert a float to a field element"
+
+  let of_boolean (value : t) : Impl.Field.t =
+    let value = Js.to_bool (Obj.magic value) in
+    if value then Impl.Field.one else Impl.Field.zero
+
+  let of_string_exn (value : t) : Impl.Field.t =
+    let value : Js.js_string Js.t = Obj.magic value in
+    let s = Js.to_string value in
+    try
+      Impl.Field.constant
+        ( if
+          String.length s >= 2
+          && Char.equal s.[0] '0'
+          && Char.equal (Char.lowercase_ascii s.[1]) 'x'
+        then Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
+        else if String.length s >= 1 && Char.equal s.[0] '-' then
+          String.sub s 1 (String.length s - 1)
+          |> Impl.Field.Constant.of_string |> Impl.Field.Constant.negate
+        else Impl.Field.Constant.of_string s )
+    with Failure e -> raise_error e
+
+  let of_bigint_exn (value : t) : Impl.Field.t =
+    let bigint : < toString : Js.js_string Js.t Js.meth > Js.t =
+      Obj.magic value
+    in
+    bigint##toString |> Obj.magic |> of_string_exn
+
   let value (value : t) : Impl.Field.t =
     match Js.to_string (Js.typeof (Obj.magic value)) with
     | "number" ->
-        let value = Js.float_of_number (Obj.magic value) in
-        if Float.is_integer value then
-          let value = Float.to_int value in
-          if value >= 0 then Impl.Field.of_int value
-          else Impl.Field.negate (Impl.Field.of_int (-value))
-        else raise_error "Cannot convert a float to a field element"
+        of_number_exn value
     | "boolean" ->
-        let value = Js.to_bool (Obj.magic value) in
-        if value then Impl.Field.one else Impl.Field.zero
-    | "string" -> (
-        let value : Js.js_string Js.t = Obj.magic value in
-        let s = Js.to_string value in
-        try
-          Impl.Field.constant
-            ( if
-              String.length s >= 2
-              && Char.equal s.[0] '0'
-              && Char.equal (Char.lowercase_ascii s.[1]) 'x'
-            then Kimchi_pasta.Pasta.Fp.(of_bigint (Bigint.of_hex_string s))
-            else Impl.Field.Constant.of_string s )
-        with Failure e -> raise_error e )
+        of_boolean value
+    | "string" ->
+        of_string_exn value
+    | "bigint" ->
+        of_bigint_exn value
     | "object" ->
         let is_array = Js.to_bool (Js.Unsafe.global ##. Array##isArray value) in
         if is_array then
@@ -228,6 +254,11 @@ let optdef_arg_method (type a) class_ (name : string)
   in
   Js.Unsafe.set prototype (Js.string name) meth
 
+let to_js_bigint =
+  let bigint_constr = Js.Unsafe.eval_string {js|BigInt|js} in
+  fun (s : Js.js_string Js.t) ->
+    Js.Unsafe.fun_call bigint_constr [| Js.Unsafe.inject s |]
+
 let to_js_field x : field_class Js.t = new%js field_constr (As_field.of_field x)
 
 let of_js_field (x : field_class Js.t) : Field.t = x##.value
@@ -278,6 +309,7 @@ let () =
   method_ "sizeInFields" (fun _this : int -> 1) ;
   method_ "toFields" (fun this : field_class Js.t Js.js_array Js.t ->
       singleton_array this ) ;
+  method_ "toBigInt" (fun this -> to_string this##.value |> to_js_bigint) ;
   ((* TODO: Make this work with arbitrary bit length *)
    let bit_length = Field.size_in_bits - 2 in
    let cmp_method (name, f) =
@@ -358,6 +390,10 @@ let () =
   in
   field_class##.one := mk Field.one ;
   field_class##.zero := mk Field.zero ;
+  field_class##.minusOne := mk @@ Field.negate Field.one ;
+  Js.Unsafe.set field_class (Js.string "ORDER")
+    ( to_js_bigint @@ Js.string @@ Pasta_bindings.BigInt256.to_string
+    @@ Pasta_bindings.Fp.size () ) ;
   field_class##.random :=
     Js.wrap_callback (fun () : field_class Js.t ->
         mk (Field.constant (Field.Constant.random ())) ) ;
@@ -494,7 +530,11 @@ let () =
                  else Field.Constant.of_string s ) )
           with Failure _ -> Js.Opt.empty )
       | _ ->
-          Js.Opt.empty )
+          Js.Opt.empty ) ;
+  let from f x = new%js field_constr (As_field.of_field (f x)) in
+  static_method "fromNumber" (from As_field.of_number_exn) ;
+  static_method "fromString" (from As_field.of_string_exn) ;
+  static_method "fromBigInt" (from As_field.of_bigint_exn)
 
 let () =
   let handle_constants2 f f_constant (x : Boolean.var) (y : Boolean.var) =
@@ -517,6 +557,8 @@ let () =
     method_ name (fun this (y : As_bool.t) : bool_class Js.t ->
         mk (f this##.value (As_bool.value y)) )
   in
+  Js.Unsafe.set bool_class (Js.string "true") (mk Boolean.true_) ;
+  Js.Unsafe.set bool_class (Js.string "false") (mk Boolean.false_) ;
   method_ "toField" (fun this : field_class Js.t ->
       new%js field_constr (As_field.of_field (this##.value :> Field.t)) ) ;
   add_op1 "not" Boolean.not ;
@@ -524,6 +566,9 @@ let () =
   add_op2 "or" Boolean.( ||| ) ;
   method_ "assertEquals" (fun this (y : As_bool.t) : unit ->
       Boolean.Assert.( = ) this##.value (As_bool.value y) ) ;
+  method_ "assertTrue" (fun this : unit -> Boolean.Assert.is_true this##.value) ;
+  method_ "assertFalse" (fun this : unit ->
+      Boolean.Assert.( = ) this##.value Boolean.false_ ) ;
   add_op2 "equals" equal ;
   method_ "toBoolean" (fun this : bool Js.t ->
       match (this##.value :> Field.t) with
