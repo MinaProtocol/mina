@@ -317,6 +317,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
     let parties_mint_token, parties_token_transfer =
+      (* similar to tokens tests in transaction_snark/tests/zkapp_tokens.ml
+         and `Mina_ledger.Ledger`
+
+         the token owner account has already been created here, so don't
+         need that as a separate transaction
+      *)
       let account_creation_fee_int =
         Currency.Fee.to_int constraint_constants.account_creation_fee
       in
