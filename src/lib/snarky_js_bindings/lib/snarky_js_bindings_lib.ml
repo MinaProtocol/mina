@@ -557,6 +557,8 @@ let () =
     method_ name (fun this (y : As_bool.t) : bool_class Js.t ->
         mk (f this##.value (As_bool.value y)) )
   in
+  Js.Unsafe.set bool_class (Js.string "true") (mk Boolean.true_) ;
+  Js.Unsafe.set bool_class (Js.string "false") (mk Boolean.false_) ;
   method_ "toField" (fun this : field_class Js.t ->
       new%js field_constr (As_field.of_field (this##.value :> Field.t)) ) ;
   add_op1 "not" Boolean.not ;
@@ -564,6 +566,9 @@ let () =
   add_op2 "or" Boolean.( ||| ) ;
   method_ "assertEquals" (fun this (y : As_bool.t) : unit ->
       Boolean.Assert.( = ) this##.value (As_bool.value y) ) ;
+  method_ "assertTrue" (fun this : unit -> Boolean.Assert.is_true this##.value) ;
+  method_ "assertFalse" (fun this : unit ->
+      Boolean.Assert.( = ) this##.value Boolean.false_ ) ;
   add_op2 "equals" equal ;
   method_ "toBoolean" (fun this : bool Js.t ->
       match (this##.value :> Field.t) with
