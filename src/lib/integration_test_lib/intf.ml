@@ -374,6 +374,8 @@ module Dsl = struct
 
     val snapp_to_be_included_in_frontier :
       has_failures:bool -> parties:Mina_base.Parties.t -> t
+
+    val snark_work : unit -> t
   end
 
   module type Util_intf = sig
