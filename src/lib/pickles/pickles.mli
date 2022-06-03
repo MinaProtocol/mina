@@ -73,7 +73,7 @@ end
 module Proof : sig
   type ('max_width, 'mlmb) t
 
-  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
+  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> domain_log2:int -> ('w, 'm) t
 
   module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
     type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]
@@ -189,6 +189,8 @@ module Side_loaded : sig
         val of_base64 : string -> (t, string) Result.t
       end
     end]
+
+    val of_proof : _ Proof.t -> t
 
     val to_base64 : t -> string
 

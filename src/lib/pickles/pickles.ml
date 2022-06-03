@@ -365,9 +365,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       Constraints.log ~weight (Impls.Step.make_checked main)
     in
     if profile_constraints then
-      Snarky_log.to_file
-        (sprintf "step-snark-%s-%d.json" name (Index.to_int index))
-        log
+      Snarky_log.to_file (sprintf "step-snark-%s-%d.json" name index) log
 
   let log_wrap main typ name id =
     let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
@@ -507,7 +505,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:(Index.of_int_exn !i)
+                    Step_branch_data.create ~index:!i
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~typ A.to_field_elements
                       A_value.to_field_elements rule ~wrap_domains
@@ -565,13 +563,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                        ; identifier = name ^ "-" ^ b.rule.identifier
                        }
                        cs_hash
-                   , Index.to_int b.index
+                   , b.index
                    , cs ) )
               in
               let k_v =
                 match disk_keys with
                 | Some ks ->
-                    Lazy.return ks.(Index.to_int b.index)
+                    Lazy.return ks.(b.index)
                 | None ->
                     lazy
                       (let id, _header, index, cs = Lazy.force k_p in
@@ -678,9 +676,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate
-              (Vector.to_array step_domains)
-              cache disk_key_prover disk_key_verifier typ
+            Cache.Wrap.read_or_generate cache disk_key_prover disk_key_verifier
+              typ
               (Snarky_backendless.Typ.unit ())
               main )
       in
@@ -709,35 +706,35 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
         let _, prev_vars_length = b.proofs_verified in
-        let step handler prevs next_state =
+        let step handler prev_values prev_proofs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
-            wrap_vk.index prevs
+            wrap_vk.index prev_values prev_proofs
         in
         let step_vk = fst (Lazy.force step_vk) in
         let wrap ?handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
-          let prevs =
-            let module M =
-              H3.Map (Statement_with_proof) (P.With_data)
-                (struct
-                  let f ((app_state, T proof) : _ Statement_with_proof.t) =
-                    P.T
-                      { proof with
-                        statement =
-                          { proof.statement with
-                            pass_through =
-                              { proof.statement.pass_through with app_state }
-                          }
-                      }
-                end)
+          let app_states, prevs =
+            let rec go :
+                type prev_values local_widths local_heights.
+                   ( prev_values
+                   , local_widths
+                   , local_heights )
+                   H3.T(Statement_with_proof).t
+                -> prev_values H1.T(Id).t
+                   * (local_widths, local_widths) H2.T(Proof).t = function
+              | [] ->
+                  ([], [])
+              | (app_state, proof) :: tl ->
+                  let app_states, proofs = go tl in
+                  (app_state :: app_states, proof :: proofs)
             in
-            M.f prevs
+            go prevs
           in
           let%bind.Promise proof =
-            step handler ~maxes:(module Maxes) prevs next_state
+            step handler ~maxes:(module Maxes) app_states prevs next_state
           in
           let proof =
             { proof with
@@ -754,7 +751,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
               full_signature.maxes wrap_requests
               ~dlog_plonk_index:wrap_vk.commitments wrap_main
-              A_value.to_field_elements ~step_vk ~step_domains:b.domains
+              A_value.to_field_elements ~step_vk
               ~step_plonk_indices:(Lazy.force step_vks) ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
@@ -823,11 +820,6 @@ module Side_loaded = struct
       ; wrap_index = Lazy.force d.wrap_key
       ; max_width =
           Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_proofs_verified))
-      ; step_data =
-          At_most.of_vector
-            (Vector.map2 d.proofs_verifieds d.step_domains ~f:(fun width ds ->
-                 ({ Domains.h = ds.h }, Width.of_int_exn width) ) )
-            (Nat.lte_exn (Vector.length d.step_domains) Max_branches.n)
       }
 
     module Max_width = Width.Max
@@ -847,7 +839,11 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       }
 
-  module Proof = Proof.Proofs_verified_max
+  module Proof = struct
+    include Proof.Proofs_verified_max
+
+    let of_proof : _ Proof.t -> t = Wrap_hack.pad_proof
+  end
 
   let verify_promise (type t) ~(value_to_field_elements : t -> _)
       (ts : (Verification_key.t * t * Proof.t) list) =
@@ -868,9 +864,6 @@ module Side_loaded = struct
         List.map ts ~f:(fun (vk, x, p) ->
             let vk : V.t =
               { commitments = vk.wrap_index
-              ; step_domains =
-                  Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
-                      { Domains.h = d.h } )
               ; index =
                   ( match vk.wrap_vk with
                   | None ->
@@ -1075,7 +1068,6 @@ let%test_module "test no side-loaded" =
                         dummy_constraints () ;
                         Field.Assert.equal self Field.zero ;
                         [] )
-                  ; main_value = (fun _ _self -> [])
                   }
                 ] ) )
 
@@ -1127,11 +1119,6 @@ let%test_module "test no side-loaded" =
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
                         [ proof_must_verify ] )
-                  ; main_value =
-                      (fun _ self ->
-                        let is_base_case = Field.Constant.(equal zero self) in
-                        let proof_must_verify = not is_base_case in
-                        [ proof_must_verify ] )
                   }
                 ] ) )
 
@@ -1140,18 +1127,16 @@ let%test_module "test no side-loaded" =
       let example =
         let s_neg_one = Field.Constant.(negate one) in
         let b_neg_one : (Nat.N1.n, Nat.N1.n) Proof0.t =
-          Proof0.dummy Nat.N1.n Nat.N1.n Nat.N1.n
+          Proof0.dummy Nat.N1.n Nat.N1.n Nat.N1.n ~domain_log2:14
         in
         let b0 =
           Common.time "b0" (fun () ->
               Promise.block_on_async_exn (fun () ->
                   step [ (s_neg_one, b_neg_one) ] Field.Constant.zero ) )
         in
-        (*
         assert (
           Promise.block_on_async_exn (fun () ->
-              Proof.verify_promise [ (Field.Constant.zero, b0) ])
-        ) ; *)
+              Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
         let b1 =
           Common.time "b1" (fun () ->
               Promise.block_on_async_exn (fun () ->
@@ -1196,11 +1181,6 @@ let%test_module "test no side-loaded" =
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
                         [ Boolean.true_; proof_must_verify ] )
-                  ; main_value =
-                      (fun _ self ->
-                        let is_base_case = Field.Constant.(equal zero self) in
-                        let proof_must_verify = not is_base_case in
-                        [ true; proof_must_verify ] )
                   }
                 ] ) )
 
@@ -1209,7 +1189,7 @@ let%test_module "test no side-loaded" =
       let example =
         let s_neg_one = Field.Constant.(negate one) in
         let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
-          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
+          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
         in
         let b0 =
           Common.time "tree b0" (fun () ->
@@ -1293,7 +1273,6 @@ let%test_module "test" =
             ~choices:(fun ~self ->
               (* TODO: Make it possible to have a system that doesn't use its "self" *)
               [ { prevs= []
-                ; main_value= (fun [] _ -> [])
                 ; main=
                     (fun [] s ->
                        dummy_constraints () ;
@@ -1302,7 +1281,6 @@ let%test_module "test" =
                       [] ) }
                 (* TODO: Shouldn't have to have this dummy *)
               ; { prevs= [self; self]
-                ; main_value= (fun [_; _] _ -> [true; true])
                 ; main=
                     (fun [_; _] s ->
                        dummy_constraints () ;
@@ -1348,8 +1326,7 @@ let%test_module "test" =
                     for i = 0 to 10_000 do
                       assert_r1cs t t t
                     done ;
-                    [] )
-              ; main_value= (fun [] _ -> []) }
+                    [] ) }
             ; { prevs= [side_loaded]
               ; main=
                   (fun [hash] x ->
@@ -1357,14 +1334,12 @@ let%test_module "test" =
                       (exists Side_loaded_verification_key.typ
                          ~compute:(fun () -> Know_preimage.side_loaded_vk)) ;
                     Field.Assert.equal hash x ;
-                    [Boolean.true_] )
-              ; main_value= (fun [_] _ -> [true]) }
+                    [Boolean.true_] ) }
             ; { prevs= [self; self]
               ; main=
                   (fun [l; r] res ->
                     assert_r1cs l r res ;
-                    [Boolean.true_; Boolean.true_] )
-              ; main_value= (fun _ _ -> [true; true]) } ] )
+                    [Boolean.true_; Boolean.true_] ) } ] )
 
       module Proof = (val p)
     end
@@ -1452,11 +1427,6 @@ let%test_module "test" =
                         let proof_must_verify = Boolean.not is_base_case in
                         Boolean.Assert.any
                           [Field.(equal (one + prev) self); is_base_case] ;
-                        [proof_must_verify; proof_must_verify] )
-                  ; main_value=
-                      (fun _ self ->
-                        let is_base_case = Field.Constant.(equal zero self) in
-                        let proof_must_verify = not is_base_case in
                         [proof_must_verify; proof_must_verify] ) } ] ) )
 
       module Proof = (val p)
