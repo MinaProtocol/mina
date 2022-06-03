@@ -1,5 +1,8 @@
 open Core_kernel
 open Poly_types
+module Id = Hlist0.Id
+module HlistId = Hlist0.HlistId
+module H1_1 = Hlist0.H1_1
 
 module E13 (T : T1) = struct
   type ('a, _, _) t = 'a T.t
@@ -227,6 +230,40 @@ module H2 = struct
       | x :: xs ->
           let y = C.f x in
           y :: f xs
+  end
+
+  module Typ (Impl : sig
+    type field
+
+    module Typ : sig
+      type ('var, 'value) t = ('var, 'value, field) Snarky_backendless.Typ.t
+    end
+  end) =
+  struct
+    let transport, transport_var, tuple2, unit =
+      Snarky_backendless.Typ.(transport, transport_var, tuple2, unit)
+
+    let rec f :
+        type vars values.
+           (vars, values) T(Impl.Typ).t
+        -> ( vars H1.T(Id).t
+           , values H1.T(Id).t
+           , Impl.field )
+           Snarky_backendless.Typ.t =
+     fun ts ->
+      match ts with
+      | [] ->
+          let there _ = () in
+          transport (unit ()) ~there ~back:(fun () : _ H1.T(Id).t -> [])
+          |> transport_var ~there ~back:(fun () : _ H1.T(Id).t -> [])
+      | t :: ts ->
+          transport
+            (tuple2 t (f ts))
+            ~there:(fun (x :: xs : _ H1.T(Id).t) -> (x, xs))
+            ~back:(fun (x, xs) -> x :: xs)
+          |> transport_var
+               ~there:(fun (x :: xs : _ H1.T(Id).t) -> (x, xs))
+               ~back:(fun (x, xs) -> x :: xs)
   end
 end
 
@@ -715,10 +752,6 @@ struct
         let (T (n, p)) = length xs in
         T (S n, S p)
 end
-
-module Id = Hlist0.Id
-module HlistId = Hlist0.HlistId
-module H1_1 = Hlist0.H1_1
 
 module Map_1_specific
     (F : T2)

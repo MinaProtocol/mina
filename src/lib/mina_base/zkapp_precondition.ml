@@ -1026,8 +1026,7 @@ module Protocol_state = struct
       ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
       ~staking_epoch_data:!.Epoch_data.deriver
       ~next_epoch_data:!.Epoch_data.deriver
-    |> finish "ProtocolStatePrecondition"
-         ~t_toplevel_annots:Poly.t_toplevel_annots
+    |> finish "NetworkPrecondition" ~t_toplevel_annots:Poly.t_toplevel_annots
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in

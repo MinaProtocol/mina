@@ -1004,8 +1004,6 @@ module T = struct
       =
     ((a :> Transaction.t With_status.t list), b, c, d)
 
-  [%%if feature_zkapps]
-
   let check_commands ledger ~verifier (cs : User_command.t list) =
     let cs =
       List.map cs
@@ -1032,35 +1030,6 @@ module T = struct
             Error
               (Verifier.Failure.Verification_failed
                  (Error.of_string "batch verification failed") ) ) )
-
-  [%%else]
-
-  (* imeckler: added this version because the call to the verifier was
-     causing super catchup to proceed more slowly than it could have otherwise.
-
-     The reason is as follows: catchup would have, say 100 blocks in the "to verify"
-     queue and 20 in the "already verified, to apply" queue. Those 20 would be
-     processed very slowly because each one would have to call the verifier, which
-     the other queue was trying to call as well. *)
-  let check_commands _ledger ~verifier:_ (cs : User_command.t list) :
-      (User_command.Valid.t list, _) result Deferred.Or_error.t =
-    Result.all
-      (List.map cs ~f:(function
-        | Parties _ ->
-            Error
-              (Verifier.Failure.Verification_failed
-                 (Error.of_string "check_commands: snapp commands disabled") )
-        | Signed_command c -> (
-            match Signed_command.check c with
-            | Some c ->
-                Ok (User_command.Signed_command c)
-            | None ->
-                Error
-                  (Verifier.Failure.Verification_failed
-                     (Error.of_string "signature failed to verify") ) ) ) )
-    |> Deferred.Or_error.return
-
-  [%%endif]
 
   let apply ?skip_verification ~constraint_constants t
       (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
