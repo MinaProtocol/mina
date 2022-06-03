@@ -839,7 +839,11 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       }
 
-  module Proof = Proof.Proofs_verified_max
+  module Proof = struct
+    include Proof.Proofs_verified_max
+
+    let of_proof : _ Proof.t -> t = Wrap_hack.pad_proof
+  end
 
   let verify_promise (type t) ~(value_to_field_elements : t -> _)
       (ts : (Verification_key.t * t * Proof.t) list) =
@@ -1130,11 +1134,9 @@ let%test_module "test no side-loaded" =
               Promise.block_on_async_exn (fun () ->
                   step [ (s_neg_one, b_neg_one) ] Field.Constant.zero ) )
         in
-        (*
         assert (
           Promise.block_on_async_exn (fun () ->
-              Proof.verify_promise [ (Field.Constant.zero, b0) ])
-        ) ; *)
+              Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
         let b1 =
           Common.time "b1" (fun () ->
               Promise.block_on_async_exn (fun () ->

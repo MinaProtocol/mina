@@ -277,9 +277,9 @@ module Wrap = struct
           { challenge_polynomial_commitment; old_bulletproof_challenges }
           ~g1:(g1_to_field_elements : g -> f list) =
         Array.concat
-          [ Array.of_list (g1_to_field_elements challenge_polynomial_commitment)
-          ; Vector.to_array old_bulletproof_challenges
+          [ Vector.to_array old_bulletproof_challenges
             |> Array.concat_map ~f:Vector.to_array
+          ; Array.of_list (g1_to_field_elements challenge_polynomial_commitment)
           ]
 
       let typ g1 chal ~length =

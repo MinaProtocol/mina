@@ -127,7 +127,7 @@ let wrap
            H1.Map (P.Base.Me_only.Wrap.Prepared) (E01 (Digest.Constant))
              (struct
                let f (type n) (m : n P.Base.Me_only.Wrap.Prepared.t) =
-                 Common.hash_dlog_me_only
+                 Wrap_hack.hash_dlog_me_only
                    (Vector.length m.old_bulletproof_challenges)
                    m
              end)
@@ -374,7 +374,7 @@ let wrap
                       { Tock.Proof.Challenge_polynomial.commitment = sg
                       ; challenges = Vector.to_array chals
                       } )
-                |> Vector.to_list ) )
+                |> Wrap_hack.pad_accumulator ) )
           [ input ]
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
@@ -383,7 +383,8 @@ let wrap
           ; proof_state =
               { next_statement.proof_state with
                 me_only =
-                  Common.hash_dlog_me_only max_proofs_verified me_only_prepared
+                  Wrap_hack.hash_dlog_me_only max_proofs_verified
+                    me_only_prepared
               }
           } )
   in

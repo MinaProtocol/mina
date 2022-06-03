@@ -215,7 +215,7 @@ struct
                     }
                 }
             ; me_only =
-                Common.hash_dlog_me_only Local_max_proofs_verified.n
+                Wrap_hack.hash_dlog_me_only Local_max_proofs_verified.n
                   { old_bulletproof_challenges = prev_challenges
                   ; challenge_polynomial_commitment =
                       statement.proof_state.me_only
@@ -230,8 +230,7 @@ struct
           tock_public_input_of_statement prev_statement_with_hashes
         in
         O.create dlog_vk
-          Vector.(
-            map2
+          ( Vector.map2
               (Vector.extend_exn
                  statement.pass_through.challenge_polynomial_commitments
                  Local_max_proofs_verified.n
@@ -242,7 +241,7 @@ struct
                 { Tock.Proof.Challenge_polynomial.commitment
                 ; challenges = Vector.to_array chals
                 } )
-            |> to_list)
+          |> Wrap_hack.pad_accumulator )
           public_input t.proof
       in
       let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
@@ -360,7 +359,7 @@ struct
           Vector.map
             ~f:(fun chals ->
               unstage (challenge_polynomial (Vector.to_array chals)) )
-            prev_challenges
+            (Wrap_hack.pad_challenges prev_challenges)
         in
         let open As_field in
         let combine ~ft_eval (x_hat : Tock.Field.t) pt e =
@@ -369,11 +368,11 @@ struct
             Vector.append
               (Vector.map b_polys ~f:(fun f -> [| f pt |]))
               ([| x_hat |] :: [| ft_eval |] :: a)
-              (snd (Local_max_proofs_verified.add Nat.N26.n))
+              (snd (Wrap_hack.Padded_length.add Nat.N26.n))
           in
           let open Tock.Field in
           Pcs_batch.combine_split_evaluations
-            (Common.dlog_pcs_batch (Local_max_proofs_verified.add Nat.N26.n))
+            (Common.dlog_pcs_batch (Wrap_hack.Padded_length.add Nat.N26.n))
             ~xi ~init:Fn.id ~mul ~last:Array.last
             ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
             ~evaluation_point:pt
@@ -563,7 +562,7 @@ struct
                       Dummy.Ipa.Wrap.challenges_computed )
               }
             in
-            Common.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
+            Wrap_hack.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
       in
       lazy
         (pad

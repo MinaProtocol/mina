@@ -413,7 +413,9 @@ struct
           *)
           let num_commitments_without_degree_bound = Nat.N26.n in
           let without_degree_bound =
-            let T = Proofs_verified.eq in
+            let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
+              Wrap_hack.Checked.pad_commitments sg_old
+            in
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
@@ -421,13 +423,16 @@ struct
               :: Vector.append w_comm
                    (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
                    (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
-              (snd (Proofs_verified.add num_commitments_without_degree_bound))
+              (snd
+                 (Wrap_hack.Padded_length.add
+                    num_commitments_without_degree_bound ) )
           in
           with_label "check_bulletproof" (fun () ->
               check_bulletproof
                 ~pcs_batch:
                   (Common.dlog_pcs_batch
-                     (Proofs_verified.add num_commitments_without_degree_bound) )
+                     (Wrap_hack.Padded_length.add
+                        num_commitments_without_degree_bound ) )
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
