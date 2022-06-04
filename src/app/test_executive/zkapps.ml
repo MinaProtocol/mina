@@ -25,8 +25,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "1000000000"; timing = Untimed }
         ]
     ; extra_genesis_accounts =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+        [ { balance = "5000000000"; timing = Untimed }
+        ; { balance = "5000000000"; timing = Untimed }
         ]
     ; num_archive_nodes = 1
     ; num_snark_workers = 2
@@ -329,7 +329,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let token_funder =
         List.hd_exn @@ Network.block_producer_keypairs network
       in
-      let token_owner = List.hd_exn zkapp_keypairs in
+      let token_owner = fish2_kp in
       let token_account1 = Signature_lib.Keypair.create () in
       let token_account2 = Signature_lib.Keypair.create () in
       let custom_token_id =
@@ -362,8 +362,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     []
                 ]
             ]
-          |> mk_parties_transaction ~fee:2_000_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 1)
+          |> mk_parties_transaction ~fee:12_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 2)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -398,8 +398,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     []
                 ]
             ]
-          |> mk_parties_transaction ~fee:1_000_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 2)
+          |> mk_parties_transaction ~fee:11_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 3)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
