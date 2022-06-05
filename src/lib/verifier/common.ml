@@ -98,22 +98,6 @@ let check :
                           ; at_party = (at_party :> Snark_params.Tick.Field.t)
                           }
                         in
-                        let logger = Logger.create () in
-                        [%log warn]
-                          "Verifier.Common.check\n\
-                           Transaction statement: $statement\n\
-                           Proof: $proof\n\
-                           Verification key: $vk"
-                          ~metadata:
-                            [ ("statement", Zkapp_statement.to_yojson stmt)
-                            ; ( "proof"
-                              , `String (Pickles.Side_loaded.Proof.to_base64 pi)
-                              )
-                            ; ( "vk"
-                              , `String
-                                  (Pickles.Side_loaded.Verification_key
-                                   .to_base58_check vk ) )
-                            ] ;
                         Some (vk, stmt, pi) ) )
           in
           let v : User_command.Valid.t =
