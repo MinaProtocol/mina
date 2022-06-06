@@ -3,6 +3,7 @@ open Impls.Step
 open Pickles_types
 open Common
 open Import
+module Shifted_value = Shifted_value.Type2
 
 (* Unfinalized dlog-based proof, along with a flag which is true iff it
    is expected to verify. This allows for situations like the blockchain
@@ -17,7 +18,12 @@ type t =
     Pickles_types.Vector.t
   , Field.t
   , Boolean.var )
-  Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+  Types.Step.Proof_state.Per_proof.In_circuit.t
+
+module Plonk_checks = struct
+  include Plonk_checks
+  include Plonk_checks.Make (Shifted_value) (Plonk_checks.Scalars.Tock)
+end
 
 module Constant = struct
   type t =
@@ -29,35 +35,48 @@ module Constant = struct
       Vector.t
     , Digest.Constant.t
     , bool )
-    Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
+    Types.Step.Proof_state.Per_proof.In_circuit.t
 
   let shift = Shifted_value.Shift.create (module Tock.Field)
 
-  let dummy : t =
+  let dummy () : t =
     let one_chal = Challenge.Constant.dummy in
     let open Ro in
     let alpha = scalar_chal () in
     let beta = chal () in
     let gamma = chal () in
     let zeta = scalar_chal () in
+    let chals :
+        _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
+      { alpha = Common.Ipa.Wrap.endo_to_field alpha
+      ; beta = Challenge.Constant.to_tock_field beta
+      ; gamma = Challenge.Constant.to_tock_field gamma
+      ; zeta = Common.Ipa.Wrap.endo_to_field zeta
+      }
+    in
+    let evals =
+      Tuple_lib.Double.map Dummy.evals_combined.evals ~f:(fun e -> e.evals)
+    in
+    let env =
+      Plonk_checks.scalars_env
+        (module Tock.Field)
+        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
+        ~field_of_hex:
+          (Core_kernel.Fn.compose Tock.Field.of_bigint
+             Kimchi_pasta.Pasta.Bigint256.of_hex_string )
+        ~domain:
+          (Plonk_checks.domain
+             (module Tock.Field)
+             (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
+             ~domain_generator:Tock.Field.domain_generator )
+        chals evals
+    in
     { deferred_values =
         { plonk =
-            { ( Plonk_checks.derive_plonk
-                  (module Tock.Field)
-                  ~shift ~endo:Endo.Wrap_inner_curve.base
-                  ~mds:Tock_field_sponge.params.mds
-                  ~domain:
-                    (Plonk_checks.domain
-                       (module Tock.Field)
-                       wrap_domains.h ~shifts:Common.tock_shifts
-                       ~domain_generator:Tock.Field.domain_generator )
-                  { alpha = Common.Ipa.Wrap.endo_to_field alpha
-                  ; beta = Challenge.Constant.to_tock_field beta
-                  ; gamma = Challenge.Constant.to_tock_field gamma
-                  ; zeta = Common.Ipa.Wrap.endo_to_field zeta
-                  }
-                  Dummy.evals_combined Tock.Field.zero
-              |> fst )
+            { (Plonk_checks.derive_plonk
+                 (module Tock.Field)
+                 ~env ~shift chals evals )
               with
               alpha
             ; beta
@@ -65,7 +84,7 @@ module Constant = struct
             ; zeta
             }
         ; combined_inner_product = Shifted_value (tock ())
-        ; xi = Scalar_challenge one_chal
+        ; xi = Scalar_challenge.create one_chal
         ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
         ; b = Shifted_value (tock ())
         }
@@ -73,3 +92,15 @@ module Constant = struct
     ; sponge_digest_before_evaluations = Digest.Constant.dummy
     }
 end
+
+let typ ~wrap_rounds : (t, Constant.t) Typ.t =
+  Types.Step.Proof_state.Per_proof.In_circuit.spec wrap_rounds
+  |> Spec.typ
+       (module Impl)
+       ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
+       (Shifted_value.typ Other_field.typ)
+  |> Typ.transport ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
+       ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data
+  |> Typ.transport_var
+       ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
+       ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data

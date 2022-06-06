@@ -82,7 +82,7 @@ module type Ledger_input_intf = sig
 end
 
 module type S = sig
-  val t : Ledger.t Lazy.t
+  val t : Mina_ledger.Ledger.t Lazy.t
 
   val depth : int
 

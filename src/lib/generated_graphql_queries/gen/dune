@@ -1,0 +1,8 @@
+(executable
+ (name gen)
+ (libraries core_kernel ppxlib ppxlib.ast yojson mina_base base.caml compiler-libs ocaml-migrate-parsetree stdio)
+ (preprocess
+  (pps ppx_jane ppx_version graphql_ppx ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx))
+ (modes native))
+

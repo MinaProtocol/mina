@@ -12,14 +12,14 @@ module Extend_blockchain_input = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        { chain : Blockchain.Stable.V1.t
-        ; next_state : Protocol_state.Value.Stable.V1.t
-        ; block : Snark_transition.Value.Stable.V1.t
-        ; ledger_proof : Ledger_proof.Stable.V1.t option
-        ; prover_state : Consensus.Data.Prover_state.Stable.V1.t
-        ; pending_coinbase : Pending_coinbase_witness.Stable.V1.t
+        { chain : Blockchain.Stable.V2.t
+        ; next_state : Protocol_state.Value.Stable.V2.t
+        ; block : Snark_transition.Value.Stable.V2.t
+        ; ledger_proof : Ledger_proof.Stable.V2.t option
+        ; prover_state : Consensus.Data.Prover_state.Stable.V2.t
+        ; pending_coinbase : Pending_coinbase_witness.Stable.V2.t
         }
 
       let to_latest = Fn.id
@@ -71,20 +71,17 @@ module Worker_state = struct
           ({ (statement t) with sok_digest = sok_digest t }, underlying_proof t)
     | None ->
         let bs = Protocol_state.blockchain_state in
-        let lh x = Blockchain_state.snarked_ledger_hash (bs x) in
-        let tok x = Blockchain_state.snarked_next_available_token (bs x) in
+        let reg x =
+          { (bs x).Blockchain_state.Poly.registers with
+            pending_coinbase_stack = Pending_coinbase.Stack.empty
+          }
+        in
         let chain_state = Blockchain_snark.Blockchain.state chain in
-        ( { source = lh chain_state
-          ; target = lh next_state
+        ( { source = reg chain_state
+          ; target = reg next_state
           ; supply_increase = Currency.Amount.zero
           ; fee_excess = Fee_excess.zero
           ; sok_digest = Sok_message.Digest.default
-          ; next_available_token_before = tok chain_state
-          ; next_available_token_after = tok next_state
-          ; pending_coinbase_stack_state =
-              { source = Pending_coinbase.Stack.empty
-              ; target = Pending_coinbase.Stack.empty
-              }
           }
         , Proof.transaction_dummy )
 
@@ -279,7 +276,7 @@ module Worker = struct
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-prover.log" ~max_size ~num_rotate ) ;
         [%log info] "Prover started" ;
         Worker_state.create
@@ -296,6 +293,7 @@ type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
 let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
+  [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -445,7 +443,9 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
         data.staking.ledger
   in
   let open Pickles_types in
-  let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
+  let blockchain_dummy =
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+  in
   let snark_transition =
     Snark_transition.genesis ~constraint_constants ~consensus_constants
       ~genesis_ledger

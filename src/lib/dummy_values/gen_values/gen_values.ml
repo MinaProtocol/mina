@@ -6,13 +6,13 @@ open Core
 open Async
 open Pickles_types
 
-let proof_string prev_width =
-  let dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n prev_width in
-  Binable.to_string (module Pickles.Proof.Branching_2.Stable.Latest) dummy
+let proof_string prev_width domain_log2 =
+  let dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n prev_width ~domain_log2 in
+  Binable.to_string (module Pickles.Proof.Proofs_verified_2.Stable.Latest) dummy
 
-let blockchain_proof_string = proof_string Nat.N2.n
+let blockchain_proof_string = proof_string Nat.N2.n 16
 
-let transaction_proof_string = proof_string Nat.N0.n
+let transaction_proof_string = proof_string Nat.N0.n 14
 
 let str ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -22,10 +22,10 @@ let str ~loc =
   [%str
     let blockchain_proof, transaction_proof =
       ( Core_kernel.Binable.of_string
-          (module Pickles.Proof.Branching_2.Stable.Latest)
+          (module Pickles.Proof.Proofs_verified_2.Stable.Latest)
           [%e estring blockchain_proof_string]
       , Core_kernel.Binable.of_string
-          (module Pickles.Proof.Branching_2.Stable.Latest)
+          (module Pickles.Proof.Proofs_verified_2.Stable.Latest)
           [%e estring transaction_proof_string] )]
 
 let main () =

@@ -1,0 +1,54 @@
+(env
+  (_ (js_of_ocaml (compilation_mode whole_program))))
+
+(executable
+ (name snarky_js_node)
+ (modules snarky_js_node)
+ (modes js)
+ (link_flags (-noautolink))
+ (js_of_ocaml
+  (flags +toplevel.js +dynlink.js))
+ (libraries snarky_js_bindings_lib node_backend)
+ (link_deps
+  ../crypto/kimchi_bindings/js/node_js/plonk_wasm.js
+  ../crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm)
+ (instrumentation
+  (backend bisect_ppx))
+ (forbidden_libraries async core re2 ctypes)
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))
+
+(executable
+ (name snarky_js_chrome)
+ (modules snarky_js_chrome)
+ (modes js)
+ (link_flags (-noautolink))
+ (js_of_ocaml
+  (flags +toplevel.js +dynlink.js))
+ (libraries snarky_js_bindings_lib chrome_backend)
+ (link_deps
+  ../crypto/kimchi_bindings/js/chrome/plonk_wasm.js
+  ../crypto/kimchi_bindings/js/chrome/plonk_wasm_bg.wasm)
+ (instrumentation
+  (backend bisect_ppx))
+ (forbidden_libraries async core re2 ctypes)
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))
+
+(executable
+ (name snarky_js_types)
+ (modules snarky_js_types)
+ (link_flags (-linkall))
+ (modes native)
+ (libraries mina_base fields_derivers_zkapps yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
+
+(rule
+ (targets jsLayout.json)
+ (action
+  (with-stdout-to
+   jsLayout.json
+   (run %{exe:./snarky_js_types.exe}))))

@@ -22,7 +22,7 @@ module Width : sig
 
   val zero : t
 
-  module Max : Nat.Add.Intf_transparent
+  module Max = Nat.N2
 
   module Max_vector : Vector.With_version(Max).S
 
@@ -146,14 +146,12 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type 'g t =
-        { step_data :
-            (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
-        ; max_width : Width.Stable.V1.t
-        ; wrap_index : 'g list Plonk_verification_key_evals.Stable.V1.t
+        { max_width : Width.Stable.V1.t
+        ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         }
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -163,16 +161,13 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('g, 'vk) t =
-        { step_data :
-            (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
-        ; max_width : Width.Stable.V1.t
-        ; wrap_index : 'g list Plonk_verification_key_evals.Stable.V1.t
+        { max_width : Width.Stable.V1.t
+        ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option
         }
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving hash]
     end
   end]
 end
@@ -181,76 +176,28 @@ let dummy_domains = { Domains.h = Domain.Pow_2_roots_of_unity 0 }
 
 let dummy_width = Width.zero
 
-let wrap_index_to_input (type gs f) (g : gs -> f array) =
-  let open Random_oracle_input in
-  fun t ->
-    let [ g1
-        ; g2
-        ; g3
-        ; g4
-        ; g5
-        ; g6
-        ; g7
-        ; g8
-        ; g9
-        ; g10
-        ; g11
-        ; g12
-        ; g13
-        ; g14
-        ; g15
-        ; g16
-        ; g17
-        ; g18
-        ] =
-      Plonk_verification_key_evals.to_hlist t
-    in
-    List.map
-      [ g1
-      ; g2
-      ; g3
-      ; g4
-      ; g5
-      ; g6
-      ; g7
-      ; g8
-      ; g9
-      ; g10
-      ; g11
-      ; g12
-      ; g13
-      ; g14
-      ; g15
-      ; g16
-      ; g17
-      ; g18
-      ]
-      ~f:(Fn.compose field_elements g)
-    |> List.reduce_exn ~f:append
+let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
+  let [ v1; v2; g1; g2; g3; g4; g5; g6 ] =
+    Plonk_verification_key_evals.to_hlist k
+  in
+  List.map
+    (Vector.to_list v1 @ Vector.to_list v2 @ [ g1; g2; g3; g4; g5; g6 ])
+    ~f:g
+  |> Array.concat
 
-let to_input : _ Poly.t -> _ =
-  let open Random_oracle_input in
-  let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
-  fun { step_data; max_width; wrap_index } : _ Random_oracle_input.t ->
-    let bits ~len n = bitstring (bits ~len n) in
-    let num_branches =
-      bits ~len:(Nat.to_int Max_branches.Log2.n) (At_most.length step_data)
-    in
-    let step_domains, step_widths =
-      At_most.extend_to_vector step_data
-        (dummy_domains, dummy_width)
-        Max_branches.n
-      |> Vector.unzip
-    in
+let wrap_index_to_input (type gs f) (g : gs -> f array) t =
+  Random_oracle_input.Chunked.field_elements (index_to_field_elements t ~g)
+
+let width_size = Nat.to_int Width.Length.n
+
+let to_input (type a) ~(field_of_int : int -> a) :
+    (a * a, _) Poly.t -> a Random_oracle_input.Chunked.t =
+  let open Random_oracle_input.Chunked in
+  fun { max_width; wrap_index } : _ Random_oracle_input.Chunked.t ->
+    let width w = (field_of_int (Width.to_int w), width_size) in
     List.reduce_exn ~f:append
-      [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
-            map_reduce [| h |] ~f:(fun (Pow_2_roots_of_unity x) ->
-                bits ~len:max_log2_degree x ) )
-      ; Array.map (Vector.to_array step_widths) ~f:Width.to_bits |> bitstrings
-      ; bitstring (Width.to_bits max_width)
+      [ packed (width max_width)
       ; wrap_index_to_input
-          (Fn.compose Array.of_list
-             (List.concat_map ~f:(fun (x, y) -> [ x; y ])) )
+          (Fn.compose Array.of_list (fun (x, y) -> [ x; y ]))
           wrap_index
-      ; num_branches
       ]

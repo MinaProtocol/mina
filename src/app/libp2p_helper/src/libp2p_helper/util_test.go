@@ -250,3 +250,20 @@ func withCustomTimeoutAsync(registerDone func(done chan interface{}), timeout ti
 		return true
 	}
 }
+
+func handleErrChan(t *testing.T, errChan chan error, ctxCancel context.CancelFunc) {
+	go func() {
+		err, has := <-errChan
+		if has {
+			ctxCancel()
+			errChan <- err
+		}
+	}()
+	t.Cleanup(func() {
+		ctxCancel()
+		close(errChan)
+		for err := range errChan {
+			t.Errorf("failed with %s", err)
+		}
+	})
+}
