@@ -74,11 +74,11 @@ end
 module Bootstrap = struct
   let bootstrap_time_ms : Gauge.t = ()
 
-  let staking_epoch_ledger_sync_ms : Gauge.t = ()
+  let staking_epoch_ledger_sync_ms : Counter.t = ()
 
-  let next_epoch_ledger_sync_ms : Gauge.t = ()
+  let next_epoch_ledger_sync_ms : Counter.t = ()
 
-  let root_snarked_ledger_sync_ms : Gauge.t = ()
+  let root_snarked_ledger_sync_ms : Counter.t = ()
 
   let num_of_root_snarked_ledger_retargeted : Gauge.t = ()
 end
@@ -89,12 +89,6 @@ module Transaction_pool = struct
   let pool_size : Gauge.t = ()
 
   let transactions_added_to_pool : Counter.t = ()
-end
-
-module Persistent_database = struct
-  let writing_to_disk_ms : Gauge.t = ()
-
-  let reading_from_disk_ms : Gauge.t = ()
 end
 
 module Network = struct
@@ -385,8 +379,6 @@ module Block_producer = struct
   module Block_production_delay_histogram = Histogram
 
   let block_production_delay : Block_production_delay_histogram.t = ()
-
-  let staged_ledger_diff_creation_ms : Gauge.t = ()
 end
 
 module Transition_frontier = struct
@@ -438,7 +430,7 @@ module Transition_frontier = struct
 
   let best_tip_block_height : Gauge.t = ()
 
-  let root_snarked_ledger_accounts : Gauge.t = ()
+  let root_snarked_ledger_accounts : Counter.t = ()
 
   let root_snarked_ledger_total_currency : Gauge.t = ()
 end

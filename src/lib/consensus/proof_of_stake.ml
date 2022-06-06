@@ -2950,11 +2950,11 @@ module Hooks = struct
         ( match snapshot_id with
         | Staking_epoch_snapshot ->
             Mina_metrics.(
-              Gauge.set Bootstrap.staking_epoch_ledger_sync_ms
+              Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
                 Core.Time.(diff (now ()) start |> Span.to_ms))
         | Next_epoch_snapshot ->
             Mina_metrics.(
-              Gauge.set Bootstrap.next_epoch_ledger_sync_ms
+              Counter.inc Bootstrap.next_epoch_ledger_sync_ms
                 Core.Time.(diff (now ()) start |> Span.to_ms)) ) ;
         result
     | Both { staking; next } ->
@@ -2965,14 +2965,14 @@ module Hooks = struct
           sync { snapshot_id = Staking_epoch_snapshot; expected_root = staking }
         in
         Mina_metrics.(
-          Gauge.set Bootstrap.staking_epoch_ledger_sync_ms
+          Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
             Core.Time.(diff (now ()) start |> Span.to_ms)) ;
         let start = Core.Time.now () in
         let%map () =
           sync { snapshot_id = Next_epoch_snapshot; expected_root = next }
         in
         Mina_metrics.(
-          Gauge.set Bootstrap.next_epoch_ledger_sync_ms
+          Counter.inc Bootstrap.next_epoch_ledger_sync_ms
             Core.Time.(diff (now ()) start |> Span.to_ms))
 
   let received_within_window ~constants (epoch, slot) ~time_received =
