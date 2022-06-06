@@ -14,6 +14,7 @@
    sexplib0
    extlib
    ;;local libraries
+   o1trace
    mina_metrics
    trust_system
    truth

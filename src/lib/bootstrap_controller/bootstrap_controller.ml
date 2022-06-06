@@ -302,7 +302,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
              data )
         in
         Mina_metrics.(
-          Gauge.set Bootstrap.root_snarked_ledger_sync_ms
+          Counter.inc Bootstrap.root_snarked_ledger_sync_ms
             Time.Span.(to_ms sync_ledger_time)) ;
         Mina_metrics.(
           Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
