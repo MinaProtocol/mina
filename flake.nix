@@ -59,7 +59,10 @@
       pipeline = with flake-buildkite-pipeline.lib; {
         steps = flakeStepsCachix {
           pushToBinaryCaches = [ "mina-demo" ];
-          commonExtraStepConfig.agents = [ "nix" ];
+          commonExtraStepConfig = {
+            agents = [ "nix" ];
+            soft_fail = "true";
+          };
         } self;
       };
     } // utils.lib.eachDefaultSystem (system:
