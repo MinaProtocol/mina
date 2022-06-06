@@ -5,7 +5,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
-    constraints::Shifts,
+    polynomials::permutation::Shifts,
     polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
 };
@@ -375,7 +375,7 @@ macro_rules! impl_verification_key {
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
-                let (linearization, powers_of_alpha) = expr_linearization(domain, false, None);
+                let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
 
                 let index =
                     DlogVerifierIndex {
@@ -394,13 +394,22 @@ macro_rules! impl_verification_key {
                         endomul_scalar_comm: (&evals.endomul_scalar_comm).into(),
                         // TODO
                         chacha_comm: None,
-                        w: zk_w3(domain),
+                        range_check_comm: vec![],
+                        w: {
+                            let res = once_cell::sync::OnceCell::new();
+                            res.set(zk_w3(domain)).unwrap();
+                            res
+                        },
                         fr_sponge_params: $FrSpongeParams::params(),
                         fq_sponge_params: $FqSpongeParams::params(),
                         endo: endo_q,
                         max_poly_size: max_poly_size as usize,
                         max_quot_size: max_quot_size as usize,
-                        zkpm: zk_polynomial(domain),
+                        zkpm: {
+                            let res = once_cell::sync::OnceCell::new();
+                            res.set(zk_polynomial(domain)).unwrap();
+                            res
+                        },
                         shift: [
                             shifts.s0.into(),
                             shifts.s1.into(),
@@ -410,7 +419,11 @@ macro_rules! impl_verification_key {
                             shifts.s5.into(),
                             shifts.s6.into()
                         ],
-                        srs: srs.0.clone(),
+                        srs: {
+                            let res = once_cell::sync::OnceCell::new();
+                            res.set(srs.0.clone()).unwrap();
+                            res
+                        },
                         linearization,
                         powers_of_alpha,
                         // TODO
@@ -443,7 +456,7 @@ macro_rules! impl_verification_key {
                 let fq_sponge_params = $FqSpongeParams::params();
                 let fr_sponge_params = $FrSpongeParams::params();
                 DlogVerifierIndex::<$G>::from_file(
-                    srs.0.clone(),
+                    Some(srs.0.clone()),
                     path,
                     offset.map(|x| x as u64),
                     endo_q,
