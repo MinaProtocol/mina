@@ -324,15 +324,15 @@ module Bootstrap = struct
 
   let staking_epoch_ledger_sync_ms =
     let help = "time elapsed when sync staking epoch ledger in ms" in
-    Gauge.v "staking_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+    Counter.v "staking_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
 
   let next_epoch_ledger_sync_ms =
     let help = "time elapsed when sync next epoch ledger in ms" in
-    Gauge.v "next_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+    Counter.v "next_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
 
   let root_snarked_ledger_sync_ms =
     let help = "time elapsed when sync root snarked ledger in ms" in
-    Gauge.v "root_snarked_ledger_sync_ms" ~help ~namespace ~subsystem
+    Counter.v "root_snarked_ledger_sync_ms" ~help ~namespace ~subsystem
 
   let num_of_root_snarked_ledger_retargeted =
     let help =
@@ -359,18 +359,6 @@ module Transaction_pool = struct
       "Number of transactions added to the pool since the node start"
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
-end
-
-module Persistent_database = struct
-  let subsystem = "Persistent_database"
-
-  let writing_to_disk_ms : Gauge.t =
-    let help = "Time spent writing to the rocksdb database in ms" in
-    Gauge.v "writing_to_disk_ms" ~help ~namespace ~subsystem
-
-  let reading_from_disk_ms : Gauge.t =
-    let help = "Time spent reading from the rocksdb database in ms" in
-    Gauge.v "reading_from_disk_ms" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -1198,10 +1186,6 @@ module Block_producer = struct
     in
     Block_production_delay_histogram.v "block_production_delay" ~help ~namespace
       ~subsystem
-
-  let staged_ledger_diff_creation_ms : Gauge.t =
-    let help = "Time elapsed during staged_ledger_diff creation in ms" in
-    Gauge.v "staged_ledger_diff_creation_ms" ~help ~namespace ~subsystem
 end
 
 module Transition_frontier = struct

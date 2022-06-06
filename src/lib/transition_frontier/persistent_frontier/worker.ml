@@ -122,27 +122,25 @@ module Worker = struct
         deferred_result_list_fold t ~init ~f
 
   let perform t input =
-    let start = Time.now () in
-    match%map
-      [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
-        (List.length input) ;
-      (* Iterating over the diff application in this way
-         * effectively allows the scheduler to scheduler
-         * other tasks in between diff applications.
-         * If implemented otherwise, all diffs would be
-         * applied during the same scheduler cycle.
-         *)
-      deferred_result_list_fold input ~init:() ~f:(fun () diff ->
-          Deferred.return (handle_diff t diff) )
-    with
-    | Ok () ->
-        Mina_metrics.(
-          Gauge.set Persistent_database.writing_to_disk_ms
-            Time.(Span.to_ms @@ diff (now ()) start)) ;
-        ()
-    (* TODO: log the diff that failed *)
-    | Error (`Apply_diff _) ->
-        failwith "Failed to apply a diff to the persistent transition frontier"
+    O1trace.thread "persistent_frontier_write_to_disk" (fun () ->
+        match%map
+          [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
+            (List.length input) ;
+          (* Iterating over the diff application in this way
+             * effectively allows the scheduler to scheduler
+             * other tasks in between diff applications.
+             * If implemented otherwise, all diffs would be
+             * applied during the same scheduler cycle.
+          *)
+          deferred_result_list_fold input ~init:() ~f:(fun () diff ->
+              Deferred.return (handle_diff t diff) )
+        with
+        | Ok () ->
+            ()
+        (* TODO: log the diff that failed *)
+        | Error (`Apply_diff _) ->
+            failwith
+              "Failed to apply a diff to the persistent transition frontier" )
 end
 
 include Worker_supervisor.Make (Worker)
