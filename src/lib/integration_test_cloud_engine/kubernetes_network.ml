@@ -41,7 +41,7 @@ module Node = struct
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:6 cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
-  let run_in_container ?(exit_code = 7) ?container_id ~cmd t =
+  let run_in_container ?(exit_code = 10) ?container_id ~cmd t =
     let { pod_id; config; info; _ } = t in
     let container_id =
       Option.value container_id ~default:info.primary_container_id
@@ -76,11 +76,11 @@ module Node = struct
         >>| ignore
       else Malleable_error.return ()
     in
-    run_in_container ~exit_code:8 node ~cmd:[ "/start.sh" ] >>| ignore
+    run_in_container ~exit_code:11 node ~cmd:[ "/start.sh" ] >>| ignore
 
   let stop node =
     let open Malleable_error.Let_syntax in
-    run_in_container ~exit_code:9 node ~cmd:[ "/stop.sh" ] >>| ignore
+    run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
 
   let logger_metadata node =
     [ ("namespace", `String node.config.namespace)
