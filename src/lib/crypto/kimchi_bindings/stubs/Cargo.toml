@@ -9,7 +9,7 @@ edition = "2021"
 
 [lib]
 name = "wires_15_stubs"
-crate-type = ["lib", "staticlib"]
+crate-type = ["lib", "staticlib", "cdylib"]
 
 [dependencies]
 array-init = "2.0.0"
