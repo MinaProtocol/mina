@@ -139,44 +139,41 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       let coinbase_receiver =
         Consensus.Data.Block_data.coinbase_receiver block_data
       in
-      let start = Time.now () in
+
       let diff =
-        let diff =
-          Staged_ledger.create_diff ~constraint_constants staged_ledger
-            ~coinbase_receiver ~logger ~current_state_view:previous_state_view
-            ~transactions_by_fee:transactions ~get_completed_work
-            ~log_block_creation ~supercharge_coinbase
-          |> Result.map_error ~f:(fun err ->
-                 Staged_ledger.Staged_ledger_error.Pre_diff err )
-        in
-        match (diff, block_reward_threshold) with
-        | Ok d, Some threshold ->
-            let net_return =
-              Option.value ~default:Currency.Amount.zero
-                (Staged_ledger_diff.net_return ~constraint_constants
-                   ~supercharge_coinbase
-                   (Staged_ledger_diff.forget d) )
+        O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
+            let diff =
+              Staged_ledger.create_diff ~constraint_constants staged_ledger
+                ~coinbase_receiver ~logger
+                ~current_state_view:previous_state_view
+                ~transactions_by_fee:transactions ~get_completed_work
+                ~log_block_creation ~supercharge_coinbase
+              |> Result.map_error ~f:(fun err ->
+                     Staged_ledger.Staged_ledger_error.Pre_diff err )
             in
-            if Currency.Amount.(net_return >= threshold) then diff
-            else (
-              [%log info]
-                "Block reward $reward is less than the min-block-reward \
-                 $threshold, creating empty block"
-                ~metadata:
-                  [ ("threshold", Currency.Amount.to_yojson threshold)
-                  ; ("reward", Currency.Amount.to_yojson net_return)
-                  ] ;
-              Ok Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
-              )
-        | _ ->
-            diff
+            match (diff, block_reward_threshold) with
+            | Ok d, Some threshold ->
+                let net_return =
+                  Option.value ~default:Currency.Amount.zero
+                    (Staged_ledger_diff.net_return ~constraint_constants
+                       ~supercharge_coinbase
+                       (Staged_ledger_diff.forget d) )
+                in
+                if Currency.Amount.(net_return >= threshold) then diff
+                else (
+                  [%log info]
+                    "Block reward $reward is less than the min-block-reward \
+                     $threshold, creating empty block"
+                    ~metadata:
+                      [ ("threshold", Currency.Amount.to_yojson threshold)
+                      ; ("reward", Currency.Amount.to_yojson net_return)
+                      ] ;
+                  Ok
+                    Staged_ledger_diff.With_valid_signatures_and_proofs
+                    .empty_diff )
+            | _ ->
+                diff )
       in
-      let staged_ledger_diff_creation_time =
-        Time.(diff (now ()) start) |> Time.Span.to_ms
-      in
-      Mina_metrics.(
-        Gauge.set Block_producer.staged_ledger_diff_creation_ms
-          staged_ledger_diff_creation_time) ;
       match%map
         let%bind.Deferred.Result diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants

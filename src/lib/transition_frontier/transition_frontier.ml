@@ -99,25 +99,22 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
           Error (`Failure msg) )
   in
   let%bind full_frontier, extensions =
-    let start = Time.now () in
-    let open Deferred.Let_syntax in
-    match%map
-      Persistent_frontier.Instance.load_full_frontier
-        persistent_frontier_instance ~max_length
-        ~root_ledger:
-          (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-        ~consensus_local_state ~ignore_consensus_local_state ~precomputed_values
-        ~persistent_root_instance
-    with
-    | Error `Sync_cannot_be_running ->
-        Error (`Failure "sync job is already running on persistent frontier")
-    | Error (`Failure _) as err ->
-        err
-    | Ok result ->
-        Mina_metrics.(
-          Gauge.set Persistent_database.reading_from_disk_ms
-            Time.(Span.to_ms @@ diff (now ()) start)) ;
-        Ok result
+    O1trace.sync_thread "persistent_frontier_read_from_disk" (fun () ->
+        let open Deferred.Let_syntax in
+        match%map
+          Persistent_frontier.Instance.load_full_frontier
+            persistent_frontier_instance ~max_length
+            ~root_ledger:
+              (Persistent_root.Instance.snarked_ledger persistent_root_instance)
+            ~consensus_local_state ~ignore_consensus_local_state
+            ~precomputed_values ~persistent_root_instance
+        with
+        | Error `Sync_cannot_be_running ->
+            Error (`Failure "sync job is already running on persistent frontier")
+        | Error (`Failure _) as err ->
+            err
+        | Ok result ->
+            Ok result )
   in
   [%log info] "Loaded full frontier and extensions" ;
   let%map () =
