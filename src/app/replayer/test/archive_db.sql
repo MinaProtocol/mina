@@ -1860,7 +1860,7 @@ COPY public.accounts_created (block_id, account_identifier_id, creation_fee) FRO
 --
 
 COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, "timestamp", chain_status) FROM stdin;
-1	3NLDRvvByy2GMYivoFg7FADtNzjqZZ71jX2AZDVdxqtYLusb7AcV	\N	3NKBXHShSYqxwWuxRiFXCSCNKmDVJaEgTHh4FRSYWzMTJ9MRseTC	5	5	1	1	2	77	11616000000065089	jxgSP5L3y7YLoG37xJ5XQmCGb7676TDuek4j3qZVs9LjUF6Gbd4	1	0	0	1651708749987	canonical
+1	3NLDRvvByy2GMYivoFg7FADtNzjqZZ71jX2AZDVdxqtYLusb7AcV	\N	3NKBXHShSYqxwWuxRiFXCSCNKmDVJaEgTHh4FRSYWzMTJ9MRseTC	5	5	1	1	2	77	11616000000065089	jxjJQUU4K3u2yXpLPCFqcYbqA3ZfTrEgn3Gqw96V5rwWRgkGZtr	1	0	0	1651708749987	canonical
 2	3NKHwN7Hg65eGsM2fY3kn3m5KvVsK6GVFgAgVNoXDRnCRhr1UVWJ	1	3NLDRvvByy2GMYivoFg7FADtNzjqZZ71jX2AZDVdxqtYLusb7AcV	4	3	1	1	3	77	11616000000065089	jxHbatt2mrbNoNwFJJbZdWVqSHGejMcwbRkS85yJBy91eHZixxt	2	1	1	1651708944856	pending
 3	3NLejSrDnJMo1BRVSq6fqzZMAupQRiA1eB98yEbh6SNxyiGXWYRJ	2	3NKHwN7Hg65eGsM2fY3kn3m5KvVsK6GVFgAgVNoXDRnCRhr1UVWJ	4	3	1	1	4	77	11616000000065089	jxiLr7L1xNDGtqRAh4UpA3bJC1C1Tvk8UoVboR3hkhNUppHP9Z1	3	2	2	1651709109987	pending
 4	3NKRDvPbuYVUX23tMVCMA33U5Qrua6A4EFpTfyu4UJzsa27x97aY	3	3NLejSrDnJMo1BRVSq6fqzZMAupQRiA1eB98yEbh6SNxyiGXWYRJ	4	3	1	1	5	77	11616000000065089	jw7bVbZrKcaxZKEvm1xj2rqrmb42FNVuLQ6yyhJE9CmycZ9wzVY	4	3	3	1651709289987	pending
@@ -2099,7 +2099,7 @@ COPY public.public_keys (id, value) FROM stdin;
 --
 
 COPY public.snarked_ledger_hashes (id, value) FROM stdin;
-1	jxgSP5L3y7YLoG37xJ5XQmCGb7676TDuek4j3qZVs9LjUF6Gbd4
+1	jxjJQUU4K3u2yXpLPCFqcYbqA3ZfTrEgn3Gqw96V5rwWRgkGZtr
 \.
 
 
