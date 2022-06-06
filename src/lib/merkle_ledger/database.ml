@@ -329,7 +329,10 @@ module Make (Inputs : Inputs_intf) :
 
   let get_at_index_exn mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
+    Format.eprintf "LOOKING UP INDEX: %d@." index ;
+    let result = get mdb (Location.Account addr) |> Option.value_exn in
+    Format.eprintf "GOT ACCT AT INDEX: %d@." index ;
+    result
 
   let all_accounts (t : t) =
     match Account_location.last_location_address t with
@@ -638,6 +641,9 @@ module Make (Inputs : Inputs_intf) :
               try index_of_account_exn t account_id with _ -> -1
               (* dummy index for accounts not in database *) )
         in
+        Format.eprintf "IGNORED: %s@."
+          ( List.map (Int.Set.to_list ignored_indices) ~f:Int.to_string
+          |> String.concat ~sep:"," ) ;
         let last = Addr.to_int last_addr in
         Sequence.range ~stop:`inclusive 0 last
         (* filter out indices corresponding to ignored accounts *)
