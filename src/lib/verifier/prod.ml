@@ -50,6 +50,7 @@ module Worker_state = struct
     Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
+        Pickles.Side_loaded.srs_precomputation () ;
         Deferred.return
           (let module M = struct
              module T = Transaction_snark.Make (struct

@@ -21,6 +21,7 @@ type nonrec 'caml_f lookup_evaluations =
   { sorted : 'caml_f array array
   ; aggreg : 'caml_f array
   ; table : 'caml_f array
+  ; runtime : 'caml_f array option
   }
 
 type nonrec 'caml_f proof_evaluations =
@@ -50,6 +51,7 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array
   ; generic_selector : 'caml_f array
   ; poseidon_selector : 'caml_f array
+  ; lookup : 'caml_f lookup_evaluations option
   }
 
 type nonrec 'caml_g poly_comm =
@@ -107,6 +109,8 @@ type nonrec gate_type =
   | CairoInstruction
   | CairoFlags
   | CairoTransition
+  | RangeCheck0
+  | RangeCheck1
 
 type nonrec 'f circuit_gate =
   { typ : gate_type
@@ -127,12 +131,15 @@ module VerifierIndex = struct
   module Lookup = struct
     type nonrec lookups_used = Single | Joint
 
+    type nonrec 't lookup_selectors = { lookup_gate : 't option }
+
     type nonrec 'poly_comm t =
       { lookup_used : lookups_used
       ; lookup_table : 'poly_comm array
-      ; lookup_selectors : 'poly_comm array
+      ; lookup_selectors : 'poly_comm lookup_selectors
       ; table_ids : 'poly_comm option
       ; max_joint_size : int
+      ; runtime_tables_selector : 'poly_comm option
       }
   end
 

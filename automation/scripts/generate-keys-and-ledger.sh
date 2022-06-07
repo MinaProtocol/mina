@@ -374,7 +374,7 @@ ${TESTNET}_extra-fish
 add_another_to_prompt ${TESTNET}_offline-whales ${WHALE_AMOUNT} ${TESTNET}_online-whales
 add_another_to_prompt ${TESTNET}_offline-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
 add_another_to_prompt ${TESTNET}_online-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
-add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
+# add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
 
 if [ -s keys/keysets/${TESTNET}_bots_keyfiles ];
 then

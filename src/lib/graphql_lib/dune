@@ -19,6 +19,7 @@
    mina_numbers
    currency
    signature_lib
+   mina_transaction
    mina_base
  )
  (instrumentation (backend bisect_ppx))

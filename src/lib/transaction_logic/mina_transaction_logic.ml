@@ -381,14 +381,14 @@ let timing_error_to_user_command_status err =
     * [[`Insufficient_balance of bool | `Invalid_timing of bool]] encodes
       possible errors, with the invariant that the return value is always
       [`Invalid_timing false] if there was no error.
-      - [`Insufficient_balance true] results if [txn_amount] is larger than the
+    - [`Insufficient_balance true] results if [txn_amount] is larger than the
         balance held in [account].
-      - [`Invalid_timing true] results if [txn_amount] is larger than the
+    - [`Invalid_timing true] results if [txn_amount] is larger than the
         balance available in [account] at global slot [txn_global_slot].
     * [Timing.t], the new timing for [account] calculated at [txn_global_slot].
     * [[`Min_balance of Balance.t]] returns the computed available balance at
       [txn_global_slot].
-      - NOTE: We skip this calculation if the error is
+    - NOTE: We skip this calculation if the error is
         [`Insufficient_balance true].  In this scenario, this value MUST NOT be
         used, as it contains an incorrect placeholder value.
 *)
@@ -1136,6 +1136,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               ~f:Party.Update.Timing_info.to_account_timing timing
         }
 
+      let is_timed (a : t) =
+        match a.timing with Account_timing.Untimed -> false | _ -> true
+
       let set_token_id (a : t) (id : Token_id.t) : t = { a with token_id = id }
 
       let balance (a : t) : Balance.t = a.balance
@@ -1294,7 +1297,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       module Account_precondition = struct
         include Party.Account_precondition
 
-        let nonce (t : Party.t) = nonce t.body.account_precondition
+        let nonce (t : Party.t) = nonce t.body.preconditions.account
       end
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
@@ -1501,7 +1504,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_account_precondition (party, account, local_state) -> (
-          match party.body.account_precondition with
+          match party.body.preconditions.account with
           | Accept ->
               local_state
           | Nonce n ->
@@ -1576,6 +1579,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             { parties; memo_hash = Signed_command_memo.hash c.memo }
             { perform } initial_state )
     in
+    let account_states_after_fee_payer =
+      List.map (Parties.accounts_accessed c) ~f:(fun id ->
+          ( id
+          , Option.Let_syntax.(
+              let%bind loc = L.location_of_account ledger id in
+              let%map a = L.get ledger loc in
+              (loc, a)) ) )
+    in
     let accounts () =
       List.map original_account_states
         ~f:(Tuple2.map_snd ~f:(Option.map ~f:snd))
@@ -1589,28 +1600,61 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ~f:(fun (acct_id, loc_and_acct) ->
               if Option.is_none loc_and_acct then Some acct_id else None )
         in
+        let successfully_applied =
+          Transaction_status.Failure.Collection.is_empty failure_status_tbl
+        in
         (* accounts not originally in ledger, now present in ledger *)
         let previous_empty_accounts =
           List.filter_map account_ids_originally_not_in_ledger
             ~f:(fun acct_id ->
-              Option.map (L.location_of_account ledger acct_id) ~f:(fun _ ->
-                  acct_id ) )
+              let open Option.Let_syntax in
+              let%bind loc = L.location_of_account ledger acct_id in
+              let%bind acc = L.get ledger loc in
+              (*Check account ids because sparse ledger stores empty
+                accounts at new account locations*)
+              Option.some_if
+                (Account_id.equal (Account.identifier acc) acct_id)
+                acct_id )
         in
-        Ok
-          ( { Transaction_applied.Parties_applied.accounts = accounts ()
-            ; command =
-                { With_status.data = c
-                ; status =
-                    (* TODO *)
-                    ( if
-                      Transaction_status.Failure.Collection.is_empty
-                        failure_status_tbl
-                    then Applied
-                    else Failed failure_status_tbl )
-                }
-            ; previous_empty_accounts
-            }
-          , s )
+        let valid_result =
+          Ok
+            ( { Transaction_applied.Parties_applied.accounts = accounts ()
+              ; command =
+                  { With_status.data = c
+                  ; status =
+                      ( if successfully_applied then Applied
+                      else Failed failure_status_tbl )
+                  }
+              ; previous_empty_accounts
+              }
+            , s )
+        in
+        if successfully_applied then valid_result
+        else
+          let other_party_accounts_unchanged =
+            List.fold_until account_states_after_fee_payer ~init:true
+              ~f:(fun acc (_, loc_opt) ->
+                match
+                  let open Option.Let_syntax in
+                  let%bind loc, a = loc_opt in
+                  let%bind a' = L.get ledger loc in
+                  Option.some_if (not (Account.equal a a')) ()
+                with
+                | None ->
+                    Continue acc
+                | Some _ ->
+                    Stop false )
+              ~finish:Fn.id
+          in
+          (*Other parties failed, therefore, updates in those should not get applied*)
+          if
+            List.is_empty previous_empty_accounts
+            && other_party_accounts_unchanged
+          then valid_result
+          else
+            Or_error.error_string
+              "Parties application failed but new accounts created or some of \
+               the other party updates applied"
 
   let apply_parties_unchecked ~constraint_constants ~state_view ledger c =
     apply_parties_unchecked_aux ~constraint_constants ~state_view ledger c
@@ -1996,7 +2040,7 @@ module For_tests = struct
       |> Unsigned.UInt32.(mul (of_int 2))
       |> Account.Nonce.to_uint32
     in
-    let parties : Parties.Wire.t =
+    let parties : Parties.Simple.t =
       { fee_payer =
           { Party.Fee_payer.body =
               { public_key = sender_pk
@@ -2022,9 +2066,11 @@ module For_tests = struct
                 ; sequence_events = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Nonce (Account.Nonce.succ actual_nonce)
+                ; preconditions =
+                    { Party.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Nonce (Account.Nonce.succ actual_nonce)
+                    }
                 ; caller = Call
                 ; use_full_commitment
                 }
@@ -2047,9 +2093,11 @@ module For_tests = struct
                 ; sequence_events = []
                 ; call_data = Snark_params.Tick.Field.zero
                 ; call_depth = 0
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; account_precondition = Accept
+                ; preconditions =
+                    { Party.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Accept
+                    }
                 ; caller = Call
                 ; use_full_commitment = false
                 }
@@ -2059,7 +2107,7 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let parties = Parties.of_wire parties in
+    let parties = Parties.of_simple parties in
     let commitment = Parties.commitment parties in
     let full_commitment =
       Parties.Transaction_commitment.create_complete commitment
@@ -2074,7 +2122,7 @@ module For_tests = struct
     in
     let other_parties =
       Parties.Call_forest.map parties.other_parties ~f:(fun (party : Party.t) ->
-          match party.body.account_precondition with
+          match party.body.preconditions.account with
           | Nonce _ ->
               { party with
                 authorization = Control.Signature other_parties_signature

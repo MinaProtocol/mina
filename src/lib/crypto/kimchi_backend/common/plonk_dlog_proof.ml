@@ -273,6 +273,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; s = tuple6_of_vec s
     ; generic_selector
     ; poseidon_selector
+    ; lookup = None
     }
 
   let vec_to_array (type t elt)
