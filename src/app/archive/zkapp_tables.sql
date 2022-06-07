@@ -89,11 +89,11 @@ CREATE TABLE zkapp_permissions
 
 CREATE TABLE zkapp_timing_info
 ( id                       serial  PRIMARY KEY
-, initial_minimum_balance  bigint  NOT NULL
+, initial_minimum_balance  text    NOT NULL
 , cliff_time               bigint  NOT NULL
-, cliff_amount             bigint  NOT NULL
+, cliff_amount             text    NOT NULL
 , vesting_period           bigint  NOT NULL
-, vesting_increment        bigint  NOT NULL
+, vesting_increment        text    NOT NULL
 );
 
 CREATE TABLE zkapp_uris
@@ -116,8 +116,8 @@ CREATE TABLE zkapp_updates
 
 CREATE TABLE zkapp_balance_bounds
 ( id                       serial           PRIMARY KEY
-, balance_lower_bound      bigint           NOT NULL
-, balance_upper_bound      bigint           NOT NULL
+, balance_lower_bound      text             NOT NULL
+, balance_upper_bound      text             NOT NULL
 );
 
 CREATE TABLE zkapp_nonce_bounds
@@ -171,8 +171,8 @@ CREATE TABLE zkapp_token_id_bounds
 
 CREATE TABLE zkapp_timestamp_bounds
 ( id                        serial          PRIMARY KEY
-, timestamp_lower_bound     bigint          NOT NULL
-, timestamp_upper_bound     bigint          NOT NULL
+, timestamp_lower_bound     text            NOT NULL
+, timestamp_upper_bound     text            NOT NULL
 );
 
 CREATE TABLE zkapp_length_bounds
@@ -183,8 +183,8 @@ CREATE TABLE zkapp_length_bounds
 
 CREATE TABLE zkapp_amount_bounds
 ( id                       serial          PRIMARY KEY
-, amount_lower_bound       bigint          NOT NULL
-, amount_upper_bound       bigint          NOT NULL
+, amount_lower_bound       text            NOT NULL
+, amount_upper_bound       text            NOT NULL
 );
 
 CREATE TABLE zkapp_global_slot_bounds
@@ -211,7 +211,7 @@ CREATE TABLE zkapp_epoch_data
 );
 
 /* NULL convention */
-CREATE TABLE zkapp_protocol_state_precondition
+CREATE TABLE zkapp_network_precondition
 ( id                               serial                         NOT NULL PRIMARY KEY
 , snarked_ledger_hash_id           int                            REFERENCES snarked_ledger_hashes(id)
 , timestamp_id                     int                            REFERENCES zkapp_timestamp_bounds(id)
@@ -232,10 +232,10 @@ CREATE TABLE zkapp_fee_payer_body
 ( id                                    serial    PRIMARY KEY
 , account_identifier_id                 int       NOT NULL REFERENCES account_identifiers(id)
 , update_id                             int       NOT NULL REFERENCES zkapp_updates(id)
-, fee                                   bigint    NOT NULL
+, fee                                   text      NOT NULL
 , events_id                             int       NOT NULL REFERENCES zkapp_events(id)
 , sequence_events_id                    int       NOT NULL REFERENCES zkapp_events(id)
-, zkapp_protocol_state_precondition_id  int       NOT NULL REFERENCES zkapp_protocol_state_precondition(id)
+, zkapp_network_precondition_id  int       NOT NULL REFERENCES zkapp_network_precondition(id)
 , nonce                                 bigint    NOT NULL
 );
 
@@ -248,13 +248,13 @@ CREATE TABLE zkapp_other_party_body
 ( id                                    serial          PRIMARY KEY
 , account_identifier_id                 int             NOT NULL  REFERENCES account_identifiers(id)
 , update_id                             int             NOT NULL  REFERENCES zkapp_updates(id)
-, balance_change                        bigint          NOT NULL
+, balance_change                        text            NOT NULL
 , increment_nonce                       boolean         NOT NULL
 , events_id                             int             NOT NULL  REFERENCES zkapp_events(id)
 , sequence_events_id                    int             NOT NULL  REFERENCES zkapp_events(id)
 , call_data_id                          int             NOT NULL  REFERENCES zkapp_state_data(id)
 , call_depth                            int             NOT NULL
-, zkapp_protocol_state_precondition_id  int             NOT NULL  REFERENCES zkapp_protocol_state_precondition(id)
+, zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
 , use_full_commitment                   boolean         NOT NULL
 , caller                                call_type_type  NOT NULL

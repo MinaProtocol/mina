@@ -6,6 +6,7 @@
 
 (rule
  (targets cargo-target-path)
+ (locks /cargo-lock)
  (action
   (with-stdout-to cargo-target-path
    (pipe-stdout
@@ -13,18 +14,26 @@
     (run cargo_target_dir/cargo_target_dir.exe)))))
 
 (rule
- (targets libwires_15_stubs.a)
+ (enabled_if (= %{env:MARLIN_PLONK_STUBS=n} n))
+ (targets libwires_15_stubs.a dllwires_15_stubs.so)
  (deps
   Cargo.toml
   (source_tree src)
   (source_tree ../../proof-systems))
+ (locks /cargo-lock)
  (action
   (progn
    (setenv
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
     (run cargo build --release))
-   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .))))
+   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .)
+   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.so dllwires_15_stubs.so))))
+
+;; copy from $MARLIN_PLONK_STUBS if this exists
+(copy_files
+  (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
+  (files %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a))
 
 ;; libraries
 
@@ -68,6 +77,7 @@
 
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (enabled_if (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
   Cargo.toml
@@ -75,6 +85,7 @@
   (source_tree src)
   (source_tree binding_generation)
   (source_tree ../../proof-systems))
+ (locks /cargo-lock)
  (action
   (chdir
    binding_generation
@@ -83,3 +94,14 @@
     (run rm -f ./Cargo.lock)
     (run cargo run %{targets})
     (run ocamlformat -i %{targets})))))
+
+;; run from $MARLIN_PLONK_STUBS if this exists
+(rule
+ (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
+ (mode promote)
+ (deps ../../../../.ocamlformat)
+ (action
+  (progn
+   (run %{env:MARLIN_PLONK_STUBS=n}/bin/binding_generation %{targets})
+   (run ocamlformat -i %{targets}))))

@@ -15,10 +15,12 @@
    flags.sexp
    snippets/)
  (deps
-  (source_tree ../../wasm)
+  ../../wasm/Cargo.toml
+  (source_tree ../../wasm/src)
   (source_tree ../../wasm/.cargo/config)
   (source_tree ../../../../../external/wasm-bindgen-rayon)
   (source_tree ../../../proof-systems) )
+ (locks /cargo-lock)
  (action
   (progn
    (run chmod -R +w ../../wasm .)

@@ -1,9 +1,6 @@
 [%%import "/src/config.mlh"]
 
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core_kernel
 module Impl = Pickles.Impls.Step.Internal_Basic
 module Group = Pickles.Backend.Tick.Inner_curve

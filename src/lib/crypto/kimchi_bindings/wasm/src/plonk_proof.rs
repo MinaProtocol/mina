@@ -649,7 +649,7 @@ macro_rules! impl_proof {
                 let maybe_proof = ProverProof::create_recursive::<
                     DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                >(&group_map, witness, index, prev);
+                >(&group_map, witness, &[], index, prev);
                 return match maybe_proof {
                     Ok(proof) => proof.into(),
                     Err(err) => {
@@ -951,7 +951,7 @@ pub mod to_test {
         ProverProof::create_recursive::<
             DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, &index, vec![prev])
+        >(&group_map, witness, &[], &index, vec![prev])
         .unwrap();
     }
 }

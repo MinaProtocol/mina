@@ -11,6 +11,7 @@
    core_kernel
    yojson
    ;; local libraries
+   logger
    mina_base.import
    data_hash_lib
    mina_generators
@@ -38,5 +39,5 @@
    )
   (link_flags (-linkall))
   (preprocess
-    (pps ppx_snarky ppx_version ppx_jane))
+    (pps ppx_coda ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

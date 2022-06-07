@@ -23,6 +23,7 @@
    sgn
    syncable_ledger
    snark_params
+   parties_builder
    pickles
    pickles.backend
    mina_base.import

@@ -15,9 +15,10 @@
  (libraries dune.configurator)
  )
 
+;; todo: fails with sandbox, since the generated flags are opaque to dune
 (rule
  (targets flags.sexp)
- (deps librocksdb_stubs.a)
+ (deps librocksdb_stubs.a (sandbox none))
  (action (run ./rocks_linker_flags_gen.exe)))
 
 (rule

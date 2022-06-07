@@ -25,7 +25,12 @@ let with_file ?size filename access_level ~f =
     | Some sz ->
         sz
   in
-  let buf = Bigstring.map_file ~shared fd buf_size in
+  (* Bigstring.map_file has been removed. We copy its old implementation. *)
+  let buf =
+    Bigarray.(
+      array1_of_genarray
+        (Core.Unix.map_file fd char c_layout ~shared [| buf_size |]))
+  in
   let x = f buf in
   Bigstring.unsafe_destroy buf ;
   Unix.close fd ;
