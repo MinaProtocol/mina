@@ -39,7 +39,7 @@ module Make () = struct
         [%%define_locally T1.(to_string, of_string)]
       end
 
-      include Binable.Of_stringable (Arg)
+      include Binable.Of_stringable_without_uuid (Arg)
     end
   end]
 

@@ -1894,8 +1894,8 @@ let%test_module _ =
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
             let%map (parties : Parties.t) =
-              Mina_generators.Parties_generators.gen_parties_from ~succeed:true
-                ~keymap ~fee_payer_keypair ~ledger ()
+              Mina_generators.Parties_generators.gen_parties_from ~keymap
+                ~fee_payer_keypair ~ledger ()
             in
             User_command.Parties parties
           in
@@ -2159,8 +2159,11 @@ let%test_module _ =
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = Some protocol_state_precondition
-        ; account_precondition = None
+        ; preconditions =
+            Some
+              { Party.Preconditions.network = protocol_state_precondition
+              ; account = Party.Account_precondition.Accept
+              }
         }
       in
       let parties = Transaction_snark.For_tests.multiple_transfers test_spec in

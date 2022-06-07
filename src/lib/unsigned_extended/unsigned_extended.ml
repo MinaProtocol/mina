@@ -89,7 +89,7 @@ module UInt64 = struct
         , to_yojson
         , of_yojson )]
 
-      include Bin_prot.Utils.Make_binable (struct
+      include Bin_prot.Utils.Make_binable_without_uuid (struct
         module Binable = Int64
 
         type t = Unsigned.UInt64.t
@@ -139,7 +139,7 @@ module UInt32 = struct
         , to_yojson
         , of_yojson )]
 
-      include Bin_prot.Utils.Make_binable (struct
+      include Bin_prot.Utils.Make_binable_without_uuid (struct
         module Binable = Int32
 
         type t = Unsigned.UInt32.t

@@ -9,7 +9,7 @@ use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
-use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionIntoWasmAbi, OptionFromWasmAbi};
+use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 use wasm_bindgen::prelude::*;
 
 #[repr(C)]

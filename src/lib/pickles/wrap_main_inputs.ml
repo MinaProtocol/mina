@@ -13,7 +13,7 @@ let sponge_params_constant =
   Sponge.Params.(map pasta_q_kimchi ~f:Impl.Field.Constant.of_string)
 
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
-  Me.Field.of_bits (bits_random_oracle ~length s)
+  Me.Field.of_bits (Ro.bits_random_oracle ~length s)
 
 let unrelated_g =
   let group_map =

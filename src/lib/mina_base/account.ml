@@ -114,7 +114,7 @@ module Token_symbol = struct
       include T
 
       include
-        Binable.Of_binable
+        Binable.Of_binable_without_uuid
           (Core_kernel.String.Stable.V1)
           (struct
             type t = string
@@ -337,27 +337,6 @@ end
 
 let check = Fn.id
 
-[%%if not feature_zkapps]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  match t.zkapp with
-  | None ->
-      t
-  | Some _ ->
-      failwith "Snapp accounts not supported"
-
-[%%endif]
-
-[%%if not feature_tokens]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  if Token_id.equal Token_id.default t.token_id then t
-  else failwith "Token accounts not supported"
-
-[%%endif]
-
 [%%versioned_binable
 module Stable = struct
   module V2 = struct
@@ -365,7 +344,7 @@ module Stable = struct
     [@@deriving sexp, equal, hash, compare, yojson]
 
     include
-      Binable.Of_binable
+      Binable.Of_binable_without_uuid
         (Binable_arg.Stable.V2)
         (struct
           type nonrec t = t
