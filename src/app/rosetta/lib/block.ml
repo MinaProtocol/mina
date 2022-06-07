@@ -1,7 +1,4 @@
-open Core_kernel
-open Async
-open Rosetta_lib
-open Rosetta_models
+module Serializing = Graphql_lib.Serializing
 
 module Get_coinbase_and_genesis =
 [%graphql
@@ -9,10 +6,10 @@ module Get_coinbase_and_genesis =
   query {
     genesisBlock {
       creatorAccount {
-        publicKey @bsDecoder(fn: "Decoders.public_key")
+        publicKey @ppxCustom(module: "Serializing.String")
       }
       winnerAccount {
-        publicKey @bsDecoder(fn: "Decoders.public_key")
+        publicKey @ppxCustom(module: "Serializing.String")
       }
       protocolState {
         blockchainState {
@@ -27,6 +24,12 @@ module Get_coinbase_and_genesis =
     initialPeers
   }
 |}]
+
+(* Avoid shadowing graphql_ppx functions *)
+open Core_kernel
+open Async
+open Rosetta_lib
+open Rosetta_models
 
 let account_id = User_command_info.account_id
 
@@ -73,7 +76,8 @@ end
 
 module Op = User_command_info.Op
 
-(* TODO: Populate postgres DB with at least one of each kind of transaction and then make sure ops make sense: #5501 *)
+(* TODO: Populate postgres DB with at least one of each kind of transaction and
+ * then make sure ops make sense: #5501 *)
 
 module Internal_command_info = struct
   module Kind = struct
@@ -716,23 +720,23 @@ module Specific = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
-      let genesisBlock = res#genesisBlock in
+      let genesisBlock = res.Get_coinbase_and_genesis.genesisBlock in
       let%bind block_info =
-        if Query.is_genesis ~hash:genesisBlock#stateHash query then
+        if Query.is_genesis ~hash:genesisBlock.stateHash query then
           let genesis_block_identifier =
             { Block_identifier.index= Network.genesis_block_height
-            ; hash= genesisBlock#stateHash }
+            ; hash= genesisBlock.stateHash }
           in
           M.return
             { Block_info.block_identifier=
                 genesis_block_identifier
-                (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html#correct-example *)
+                (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html.correct-example *)
             ; parent_block_identifier= genesis_block_identifier
-            ; creator= `Pk (genesisBlock#creatorAccount)#publicKey
-            ; winner= `Pk (genesisBlock#winnerAccount)#publicKey
+            ; creator= `Pk (genesisBlock.creatorAccount).publicKey
+            ; winner= `Pk (genesisBlock.winnerAccount).publicKey
             ; timestamp=
                 Int64.of_string
-                  ((genesisBlock#protocolState)#blockchainState)#date
+                  ((genesisBlock.protocolState).blockchainState).date
             ; internal_info= []
             ; user_commands= [] }
         else env.db_block query

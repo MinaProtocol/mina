@@ -4283,7 +4283,6 @@ module For_tests = struct
         | Some (fee_payer_kp, fee_payer_nonce) ->
             (fee_payer_kp.public_key |> Public_key.compress, fee_payer_nonce)
       in
-
       { body =
           { public_key
           ; update = Party.Update.noop

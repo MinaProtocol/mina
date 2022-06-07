@@ -37,6 +37,8 @@ let optional_nonce_from_string = Option.map ~f:Mina_base.Account.Nonce.of_string
 let token json =
   Yojson.Basic.Util.to_string json |> Mina_base.Token_id.of_string
 
+let int64 json = Yojson.Basic.Util.to_string json |> Int64.of_string
+
 let timing json = Mina_base.Account_timing.of_yojson json |> Result.ok
 
 let optional_account_id (json : Yojson.Basic.t option) =

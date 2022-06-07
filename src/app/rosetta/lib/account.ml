@@ -6,7 +6,7 @@ open Rosetta_lib
 (* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
 module MinaCurrency = Currency
 open Rosetta_models
-module Decoders = Graphql_lib.Decoders
+module Serializing = Graphql_lib.Serializing
 
 module Get_balance =
 [%graphql
@@ -14,10 +14,10 @@ module Get_balance =
     query get_balance($public_key: PublicKey!, $token_id: TokenId) {
       account(publicKey: $public_key, token: $token_id) {
         balance {
-          blockHeight @bsDecoder(fn: "Decoders.uint32")
+          blockHeight @ppxCustom(module: "Serializing.UInt32")
           stateHash
-          liquid @bsDecoder(fn: "Decoders.optional_uint64")
-          total @bsDecoder(fn: "Decoders.uint64")
+          liquid @ppxCustom(module: "Serializing.UInt64")
+          total @ppxCustom(module: "Serializing.UInt64")
         }
         nonce
       }
@@ -580,7 +580,7 @@ module Balance = struct
       { gql=
           (fun ?token_id ~address () ->
             Graphql.query
-              (Get_balance.make ~public_key:(`String address)
+              Get_balance.(make @@ makeVariables ~public_key:(`String address)
                  ~token_id:
                    (match token_id with Some s -> `String s | None -> `Null)
                  ())

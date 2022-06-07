@@ -1,0 +1,29 @@
+(library
+ (name parties_builder)
+ (public_name parties_builder)
+ (library_flags -linkall)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   async_unix
+   core_kernel
+   ;; local libraries
+   mina_base
+   currency
+   kimchi_backend
+   kimchi_backend.pasta
+   pickles
+   pickles.backend
+   pickles_types
+   random_oracle
+   random_oracle_input
+   signature_lib
+   sgn
+   snark_params
+   snarky.backendless
+ )
+ (preprocessor_deps ../../config.mlh)
+ (preprocess
+  (pps ppx_annot ppx_snarky ppx_here ppx_coda ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Builder Parties.t via combinators"))

@@ -21,6 +21,7 @@
    kimchi_backend.pasta
    mina_numbers
    mina_compile_config
+   parties_builder
    signature_lib
    mina_ledger
    mina_base

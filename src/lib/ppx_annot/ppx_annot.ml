@@ -15,7 +15,8 @@ let extract_string_attrs (attributes : attributes) =
       | PStr
           [ { pstr_desc =
                 Pstr_eval
-                  ({ pexp_desc = Pexp_constant (Pconst_string (str, _)); _ }, _)
+                  ( { pexp_desc = Pexp_constant (Pconst_string (str, _, _)); _ }
+                  , _ )
             ; _
             }
           ] ->
