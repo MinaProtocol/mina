@@ -829,8 +829,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
                 run_node node ) )
     | To_verify (tv, valid_cb) -> (
         [%log debug] "To_verify $state_hash %s callback"
-          ~metadata:
-            [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
         let start_time = Time.now () in
         let iv = Cached.peek tv in
@@ -886,8 +885,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
                 run_node node ) )
     | Wait_for_parent (av, valid_cb) ->
         [%log debug] "Wait_for_parent $state_hash %s callback"
-          ~metadata:
-            [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
         let%bind parent =
           step
@@ -899,8 +897,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
                  (* TODO consider rejecting the callback in some cases,
                     see https://github.com/MinaProtocol/mina/issues/11087 *)
                  Option.value_map valid_cb ~default:ignore
-                   ~f:
-                     Mina_net2.Validation_callback.fire_if_not_already_fired
+                   ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
                    `Ignore ;
                  ignore
                    ( Cached.invalidate_with_failure av
@@ -912,8 +909,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
         run_node node
     | To_build_breadcrumb (`Parent parent_hash, c, valid_cb) -> (
         [%log debug] "To_build_breadcrumb $state_hash %s callback"
-          ~metadata:
-            [ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
+          ~metadata:[ ("state_hash", node.state_hash |> State_hash.to_yojson) ]
           (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
         let start_time = Time.now () in
         let transition_receipt_time = Some start_time in
@@ -937,6 +933,10 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
           step (Deferred.map ~f:Result.return s)
         with
         | Error e ->
+            (* TODO consider rejecting the callback in some cases,
+               see https://github.com/MinaProtocol/mina/issues/11087 *)
+            Option.value_map valid_cb ~default:ignore
+              ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
             ignore
               ( Cached.invalidate_with_failure c
                 : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
