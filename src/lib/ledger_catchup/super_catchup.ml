@@ -945,6 +945,12 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
               step (Deferred.map ~f:Result.return s)
             with
             | Error e ->
+                (* TODO consider rejecting the callback in some cases,
+                   see https://github.com/MinaProtocol/mina/issues/11087 *)
+                Option.value_map valid_cb ~default:ignore
+                  ~f:
+                    Mina_net2.Validation_callback.fire_if_not_already_fired
+                  `Ignore ;
                 ignore
                   ( Cached.invalidate_with_failure c
                     : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
