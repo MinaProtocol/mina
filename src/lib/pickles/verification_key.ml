@@ -10,12 +10,18 @@ module Verifier_index_json = struct
       | Joint
     [@@deriving yojson]
 
+    type 't lookup_selectors =
+          't Kimchi_types.VerifierIndex.Lookup.lookup_selectors =
+      { lookup_gate : 't option }
+    [@@deriving yojson]
+
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
       { lookup_used : lookups_used
       ; lookup_table : 'polyComm array
-      ; lookup_selectors : 'polyComm array
+      ; lookup_selectors : 'polyComm lookup_selectors
       ; table_ids : 'polyComm option
       ; max_joint_size : int
+      ; runtime_tables_selector : 'polyComm option
       }
     [@@deriving yojson]
   end

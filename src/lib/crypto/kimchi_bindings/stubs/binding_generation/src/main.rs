@@ -14,7 +14,7 @@ use wires_15_stubs::{
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
     plonk_verifier_index::{
-        CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain, CamlPlonkVerificationEvals,
+        CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain, CamlPlonkVerificationEvals,
         CamlPlonkVerifierIndex,
     },
     projective::{pallas::*, vesta::*},
@@ -106,6 +106,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_module!(w, env, "VerifierIndex", {
         decl_module!(w, env, "Lookup", {
             decl_type!(w, env, CamlLookupsUsed => "lookups_used");
+            decl_type!(w, env, CamlLookupSelectors<T1> => "lookup_selectors");
             decl_type!(w, env, CamlLookupVerifierIndex<T1> => "t");
         });
         decl_type!(w, env, CamlPlonkDomain<T1> => "domain");

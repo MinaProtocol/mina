@@ -50,12 +50,10 @@ pub fn caml_pasta_fq_plonk_index_create(
     } */
 
     // create constraint system
-    let cs = match ConstraintSystem::<Fq>::create(
-        gates,
-        vec![],
-        oracle::pasta::fq_kimchi::params(),
-        public_ as usize,
-    ) {
+    let cs = match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq_kimchi::params())
+        .public(public_ as usize)
+        .build()
+    {
         Err(_) => {
             return Err(JsValue::from_str(
                 "caml_pasta_fq_plonk_index_create: could not create constraint system",
@@ -136,7 +134,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     t.cs.fr_sponge_params = oracle::pasta::fq_kimchi::params();
     t.srs = srs.0.clone();
     t.fq_sponge_params = oracle::pasta::fp_kimchi::params();
-    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, None);
+    let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 
