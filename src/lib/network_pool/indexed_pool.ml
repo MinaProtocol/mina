@@ -11,7 +11,7 @@ open Signature_lib
    of currency, but a made up number will do for the testnets at least. See
    issue #2385.
 *)
-let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5_000_000_000
+let replace_fee : Currency.Fee.t = Currency.Fee.of_int 1
 
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
