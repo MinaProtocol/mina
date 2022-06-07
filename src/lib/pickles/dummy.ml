@@ -33,8 +33,7 @@ module Ipa = struct
           Ipa.Wrap.compute_challenge prechallenge )
 
     let sg =
-      lazy
-        (Common.time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
+      lazy (time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
   end
 
   module Step = struct
@@ -48,7 +47,6 @@ module Ipa = struct
           Ipa.Step.compute_challenge prechallenge )
 
     let sg =
-      lazy
-        (Common.time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
+      lazy (time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
   end
 end

@@ -61,7 +61,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , Digest.Make(Impl).t
       , Challenge.Make(Impl).t Scalar_challenge.t Types.Bulletproof_challenge.t
         Types.Step_bp_vec.t
-      , 'num_branches One_hot_vector.t )
+      , Impl.field Branch_data.Checked.t )
       Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
@@ -105,7 +105,7 @@ module Constant = struct
         , Digest.Constant.t
         , Challenge.Constant.t Scalar_challenge.t Types.Bulletproof_challenge.t
           Types.Step_bp_vec.t
-        , Types.Index.t )
+        , Branch_data.t )
         Types.Wrap.Proof_state.In_circuit.t
     ; prev_proof_evals :
         (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
@@ -130,10 +130,6 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
   let open Impls.Step in
   let open Step_main_inputs in
   let open Step_verifier in
-  let index =
-    Typ.transport (One_hot_vector.typ branches) ~there:Types.Index.to_int
-      ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
-  in
   Snarky_backendless.Typ.of_hlistable ~var_to_hlist:to_hlist
     ~var_of_hlist:of_hlist ~value_to_hlist:Constant.to_hlist
     ~value_of_hlist:Constant.of_hlist
@@ -144,7 +140,10 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
         (Shifted_value.Type1.typ Field.typ)
         Other_field.typ
         (Snarky_backendless.Typ.unit ())
-        Digest.typ index
+        Digest.typ
+        (Branch_data.typ
+           (module Impl)
+           ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
     ; (let lengths = Evaluation_lengths.create ~of_int:Fn.id in
        Plonk_types.All_evals.typ lengths Field.typ ~default:Field.Constant.zero
       )

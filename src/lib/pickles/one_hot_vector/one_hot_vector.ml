@@ -5,10 +5,13 @@ module Constant = struct
   type t = int
 end
 
+(* TODO: Optimization(?) Have this have length n - 1 since the last one is
+    determined by the remaining ones. *)
+type ('f, 'n) t =
+  ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t, 'n) Vector.t
+
 module T (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  (* TODO: Optimization. Have this have length n - 1 since the last one is
-     determined by the remaining ones. *)
-  type 'n t = (Impl.Boolean.var, 'n) Vector.t
+  type nonrec 'n t = (Impl.field, 'n) t
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
@@ -20,6 +23,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     let v = Vector.init length ~f:(fun j -> Field.equal (Field.of_int j) i) in
     Boolean.Assert.any (Vector.to_list v) ;
     v
+
+  let of_vector_unsafe = Fn.id
 
   let typ (n : 'n Nat.t) : ('n t, Constant.t) Typ.t =
     let (Typ typ) = Vector.typ Boolean.typ n in
