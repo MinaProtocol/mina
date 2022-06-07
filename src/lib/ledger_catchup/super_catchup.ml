@@ -948,8 +948,7 @@ let setup_state_machine_runner ~t ~verifier ~downloader ~logger
                 (* TODO consider rejecting the callback in some cases,
                    see https://github.com/MinaProtocol/mina/issues/11087 *)
                 Option.value_map valid_cb ~default:ignore
-                  ~f:
-                    Mina_net2.Validation_callback.fire_if_not_already_fired
+                  ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
                   `Ignore ;
                 ignore
                   ( Cached.invalidate_with_failure c
