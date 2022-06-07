@@ -28,7 +28,10 @@ module Side_loaded = struct
     type t =
       { index :
           [ `In_circuit of Side_loaded_verification_key.Checked.t
-          | `In_prover of Side_loaded_verification_key.t ]
+          | `In_prover of Side_loaded_verification_key.t
+          | `In_both of
+            Side_loaded_verification_key.t
+            * Side_loaded_verification_key.Checked.t ]
       }
   end
 
@@ -64,7 +67,7 @@ module Side_loaded = struct
       } =
     let wrap_key, wrap_vk =
       match ephemeral with
-      | Some { index = `In_prover i } ->
+      | Some { index = `In_prover i | `In_both (i, _) } ->
           (i.wrap_index, i.wrap_vk)
       | _ ->
           failwithf "Side_loaded.to_basic: Expected `In_prover (%s)" __LOC__ ()
@@ -152,9 +155,11 @@ module For_step = struct
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
     ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
-    ; wrap_domains : Domains.t
+    ; wrap_domain :
+        [ `Known of Domain.t
+        | `Side_loaded of
+          Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
-    ; max_width : Side_loaded_verification_key.Width.Checked.t option
     }
 
   let of_side_loaded (type a b c d)
@@ -170,7 +175,7 @@ module For_step = struct
         (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
     let index =
       match ephemeral with
-      | Some { index = `In_circuit i } ->
+      | Some { index = `In_circuit i | `In_both (_, i) } ->
           i
       | _ ->
           failwithf "For_step.side_loaded: Expected `In_circuit (%s)" __LOC__ ()
@@ -183,11 +188,8 @@ module For_step = struct
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key = index.wrap_index
-    ; wrap_domains =
-        Common.wrap_domains
-          ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
+    ; wrap_domain = `Side_loaded index.max_proofs_verified
     ; step_domains = `Side_loaded
-    ; max_width = Some index.max_width
     }
 
   let of_compiled
@@ -203,7 +205,6 @@ module For_step = struct
        } :
         _ Compiled.t ) =
     { branches
-    ; max_width = None
     ; max_proofs_verified
     ; proofs_verifieds =
         `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
@@ -213,7 +214,7 @@ module For_step = struct
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
           ~f:Step_main_inputs.Inner_curve.constant
-    ; wrap_domains
+    ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
     }
 end
@@ -307,13 +308,26 @@ let add_side_loaded ~name permanent =
     ~data:(T (id, { ephemeral = None; permanent })) ;
   { Tag.kind = Side_loaded; id }
 
-let set_ephemeral { Tag.kind; id } eph =
+let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
   (match kind with Side_loaded -> () | _ -> failwith "Expected Side_loaded") ;
   Hashtbl.update univ.side_loaded (Type_equal.Id.uid id) ~f:(function
     | None ->
         assert false
     | Some (T (id, d)) ->
-        T (id, { d with ephemeral = Some eph }) )
+        let ephemeral =
+          match (d.ephemeral, eph.index) with
+          | None, _ | Some _, `In_prover _ ->
+              (* Giving prover only always resets. *)
+              Some eph
+          | Some { index = `In_prover prover }, `In_circuit circuit
+          | Some { index = `In_both (prover, _) }, `In_circuit circuit ->
+              (* In-circuit extends prover if one was given. *)
+              Some { index = `In_both (prover, circuit) }
+          | _ ->
+              (* Otherwise, just use the given value. *)
+              Some eph
+        in
+        T (id, { d with ephemeral }) )
 
 let add_exn (type a b c d) (tag : (a, b, c, d) Tag.t)
     (data : (a, b, c, d) Compiled.t) =

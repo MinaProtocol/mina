@@ -14,8 +14,8 @@ let console_log_string s = Js_of_ocaml.Firebug.console##log (Js.string s)
 let console_log s = Js_of_ocaml.Firebug.console##log s
 
 let raise_error s =
-  let s = Js.string s in
-  Js.raise_js_error (new%js Js.error_constr s)
+  Js_of_ocaml.Js_error.(
+    raise_ @@ of_error (new%js Js.error_constr (Js.string s)))
 
 let raise_errorf fmt = Core_kernel.ksprintf raise_error fmt
 
@@ -1949,10 +1949,9 @@ module Ledger = struct
   (* helper function to check whether the fields we produce from JS are correct *)
   let fields_of_json
       (typ : ('var, 'value, Field.Constant.t, 'tmp) Impl.Internal_Basic.Typ.typ)
-      deriver (json : Js.js_string Js.t) : field_class Js.t Js.js_array Js.t =
+      of_json (json : Js.js_string Js.t) : field_class Js.t Js.js_array Js.t =
     let json = json |> Js.to_string |> Yojson.Safe.from_string in
-    let obj = deriver @@ Fields_derivers_zkapps.o () in
-    let value = Fields_derivers_zkapps.of_json obj json in
+    let value = of_json json in
     let (Typ typ) = typ in
     let fields, _ = typ.value_to_fields value in
     Js.array
@@ -1961,7 +1960,7 @@ module Ledger = struct
   (* TODO: need to construct `aux` in JS, which has some extra data needed for `value_of_fields`  *)
   let fields_to_json
       (typ : ('var, 'value, Field.Constant.t, _) Impl.Internal_Basic.Typ.typ)
-      deriver (fields : field_class Js.t Js.js_array Js.t) aux :
+      to_json (fields : field_class Js.t Js.js_array Js.t) aux :
       Js.js_string Js.t =
     let fields =
       fields |> Js.to_array
@@ -1969,11 +1968,7 @@ module Ledger = struct
     in
     let (Typ typ) = typ in
     let value = typ.value_of_fields (fields, Obj.magic aux) in
-    let json =
-      Fields_derivers_zkapps.to_json
-        (deriver @@ Fields_derivers_zkapps.o ())
-        value
-    in
+    let json = to_json value in
     json |> Yojson.Safe.to_string |> Js.string
 
   module To_js = struct
@@ -2039,10 +2034,13 @@ module Ledger = struct
   module Parties = Mina_base.Parties
 
   let party_of_json =
-    let deriver = Party.deriver @@ Fields_derivers_zkapps.Derivers.o () in
+    let deriver =
+      Party.Graphql_repr.deriver @@ Fields_derivers_zkapps.Derivers.o ()
+    in
     let party_of_json (party : Js.js_string Js.t) : Party.t =
       Fields_derivers_zkapps.of_json deriver
         (party |> Js.to_string |> Yojson.Safe.from_string)
+      |> Party.of_graphql_repr
     in
     party_of_json
 
@@ -2352,14 +2350,23 @@ module Ledger = struct
          Mina_base.Party.Checked.digest ) ;
 
     (* TODO this is for debugging, maybe remove later *)
+    let body_deriver =
+      Mina_base.Party.Body.Graphql_repr.deriver @@ Fields_derivers_zkapps.o ()
+    in
+    let body_to_json value =
+      value
+      |> Party.Body.to_graphql_repr ~call_depth:0
+      |> Fields_derivers_zkapps.to_json body_deriver
+    in
+    let body_of_json json =
+      json
+      |> Fields_derivers_zkapps.of_json body_deriver
+      |> Party.Body.of_graphql_repr
+    in
     static_method "fieldsToJson"
-      (fields_to_json
-         (Mina_base.Party.Body.typ ())
-         Mina_base.Party.Body.deriver ) ;
+      (fields_to_json (Mina_base.Party.Body.typ ()) body_to_json) ;
     static_method "fieldsOfJson"
-      (fields_of_json
-         (Mina_base.Party.Body.typ ())
-         Mina_base.Party.Body.deriver ) ;
+      (fields_of_json (Mina_base.Party.Body.typ ()) body_of_json) ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;

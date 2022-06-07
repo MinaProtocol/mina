@@ -1,22 +1,5 @@
 open Core_kernel
-
-module Proofs_verified : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = N0 | N1 | N2
-      [@@deriving sexp, sexp, compare, yojson, hash, equal]
-    end
-  end]
-
-  module Checked : sig
-    type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
-
-    open Pickles_types
-
-    type 'f t = ('f boolean, Nat.N2.n) Vector.t
-  end
-end
+module Proofs_verified = Pickles_base.Proofs_verified
 
 module Domain_log2 : sig
   [%%versioned:
@@ -42,7 +25,7 @@ end]
 
 module Checked : sig
   type 'f t =
-    { proofs_verified_mask : 'f Proofs_verified.Checked.t
+    { proofs_verified_mask : 'f Proofs_verified.Prefix_mask.Checked.t
     ; domain_log2 : 'f Snarky_backendless.Cvar.t
     }
 

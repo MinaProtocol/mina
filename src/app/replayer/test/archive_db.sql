@@ -837,7 +837,7 @@ CREATE TABLE public.zkapp_fee_payer_body (
     fee text NOT NULL,
     events_id integer NOT NULL,
     sequence_events_id integer NOT NULL,
-    zkapp_protocol_state_precondition_id integer NOT NULL,
+    zkapp_network_precondition_id integer NOT NULL,
     nonce bigint NOT NULL
 );
 
@@ -1010,7 +1010,7 @@ CREATE TABLE public.zkapp_other_party_body (
     sequence_events_id integer NOT NULL,
     call_data_id integer NOT NULL,
     call_depth integer NOT NULL,
-    zkapp_protocol_state_precondition_id integer NOT NULL,
+    zkapp_network_precondition_id integer NOT NULL,
     zkapp_account_precondition_id integer NOT NULL,
     use_full_commitment boolean NOT NULL,
     caller public.call_type_type NOT NULL
@@ -1165,10 +1165,10 @@ ALTER SEQUENCE public.zkapp_precondition_accounts_id_seq OWNED BY public.zkapp_p
 
 
 --
--- Name: zkapp_protocol_state_precondition; Type: TABLE; Schema: public; Owner: -
+-- Name: zkapp_network_precondition; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.zkapp_protocol_state_precondition (
+CREATE TABLE public.zkapp_network_precondition (
     id integer NOT NULL,
     snarked_ledger_hash_id integer,
     timestamp_id integer,
@@ -1183,10 +1183,10 @@ CREATE TABLE public.zkapp_protocol_state_precondition (
 
 
 --
--- Name: zkapp_protocol_state_precondition_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.zkapp_protocol_state_precondition_id_seq
+CREATE SEQUENCE public.zkapp_network_precondition_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1196,10 +1196,10 @@ CREATE SEQUENCE public.zkapp_protocol_state_precondition_id_seq
 
 
 --
--- Name: zkapp_protocol_state_precondition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.zkapp_protocol_state_precondition_id_seq OWNED BY public.zkapp_protocol_state_precondition.id;
+ALTER SEQUENCE public.zkapp_network_precondition_id_seq OWNED BY public.zkapp_network_precondition.id;
 
 
 --
@@ -1720,10 +1720,10 @@ ALTER TABLE ONLY public.zkapp_precondition_accounts ALTER COLUMN id SET DEFAULT 
 
 
 --
--- Name: zkapp_protocol_state_precondition id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition ALTER COLUMN id SET DEFAULT nextval('public.zkapp_protocol_state_precondition_id_seq'::regclass);
+ALTER TABLE ONLY public.zkapp_network_precondition ALTER COLUMN id SET DEFAULT nextval('public.zkapp_network_precondition_id_seq'::regclass);
 
 
 --
@@ -1860,11 +1860,11 @@ COPY public.accounts_created (block_id, account_identifier_id, creation_fee) FRO
 --
 
 COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, "timestamp", chain_status) FROM stdin;
-1	3NLDRvvByy2GMYivoFg7FADtNzjqZZ71jX2AZDVdxqtYLusb7AcV	\N	3NKBXHShSYqxwWuxRiFXCSCNKmDVJaEgTHh4FRSYWzMTJ9MRseTC	5	5	1	1	2	77	11616000000065089	jxgSP5L3y7YLoG37xJ5XQmCGb7676TDuek4j3qZVs9LjUF6Gbd4	1	0	0	1651708749987	canonical
-2	3NKHwN7Hg65eGsM2fY3kn3m5KvVsK6GVFgAgVNoXDRnCRhr1UVWJ	1	3NLDRvvByy2GMYivoFg7FADtNzjqZZ71jX2AZDVdxqtYLusb7AcV	4	3	1	1	3	77	11616000000065089	jxHbatt2mrbNoNwFJJbZdWVqSHGejMcwbRkS85yJBy91eHZixxt	2	1	1	1651708944856	pending
-3	3NLejSrDnJMo1BRVSq6fqzZMAupQRiA1eB98yEbh6SNxyiGXWYRJ	2	3NKHwN7Hg65eGsM2fY3kn3m5KvVsK6GVFgAgVNoXDRnCRhr1UVWJ	4	3	1	1	4	77	11616000000065089	jxiLr7L1xNDGtqRAh4UpA3bJC1C1Tvk8UoVboR3hkhNUppHP9Z1	3	2	2	1651709109987	pending
-4	3NKRDvPbuYVUX23tMVCMA33U5Qrua6A4EFpTfyu4UJzsa27x97aY	3	3NLejSrDnJMo1BRVSq6fqzZMAupQRiA1eB98yEbh6SNxyiGXWYRJ	4	3	1	1	5	77	11616000000065089	jw7bVbZrKcaxZKEvm1xj2rqrmb42FNVuLQ6yyhJE9CmycZ9wzVY	4	3	3	1651709289987	pending
-5	3NLuycS3WqnYZBxgLTYBXv8a1qYaS6CSt2ZQ4cG3gi4rvD64yDsg	4	3NKRDvPbuYVUX23tMVCMA33U5Qrua6A4EFpTfyu4UJzsa27x97aY	4	3	1	1	6	77	11616000000065089	jx5XboJuVNJ4u8m7KpQi3SwtG4gE9cxE5toj8xDWYBBBY4urWh3	5	4	4	1651709469987	pending
+1	3NLDRvvByy2GMYivoFg7FADtNzjqZZ71jX2AZDVdxqtYLusb7AcV	\N	3NKBXHShSYqxwWuxRiFXCSCNKmDVJaEgTHh4FRSYWzMTJ9MRseTC	5	5	1	1	2	77	11616000000065089	jxjJQUU4K3u2yXpLPCFqcYbqA3ZfTrEgn3Gqw96V5rwWRgkGZtr	1	0	0	1651708749987	canonical
+2	3NKHwN7Hg65eGsM2fY3kn3m5KvVsK6GVFgAgVNoXDRnCRhr1UVWJ	1	3NLDRvvByy2GMYivoFg7FADtNzjqZZ71jX2AZDVdxqtYLusb7AcV	4	3	1	1	3	77	11616000000065089	jwtggYGqA1qVbLqrpuXoEksBi3ddT7GM1qVAbUMvDg2jz3nMj64	2	1	1	1651708944856	pending
+3	3NLejSrDnJMo1BRVSq6fqzZMAupQRiA1eB98yEbh6SNxyiGXWYRJ	2	3NKHwN7Hg65eGsM2fY3kn3m5KvVsK6GVFgAgVNoXDRnCRhr1UVWJ	4	3	1	1	4	77	11616000000065089	jxcKVgdor95eAatRgWe3TZWrweSjxvAwvcZJ1g6TMHb4dcDVU7n	3	2	2	1651709109987	pending
+4	3NKRDvPbuYVUX23tMVCMA33U5Qrua6A4EFpTfyu4UJzsa27x97aY	3	3NLejSrDnJMo1BRVSq6fqzZMAupQRiA1eB98yEbh6SNxyiGXWYRJ	4	3	1	1	5	77	11616000000065089	jwztmpmEC61N5QYkaMb1tbiNCDeNVhoyhj8bU7eKV65syUDEqT6	4	3	3	1651709289987	pending
+5	3NLuycS3WqnYZBxgLTYBXv8a1qYaS6CSt2ZQ4cG3gi4rvD64yDsg	4	3NKRDvPbuYVUX23tMVCMA33U5Qrua6A4EFpTfyu4UJzsa27x97aY	4	3	1	1	6	77	11616000000065089	jwexhTzbjxHmy7wrbEPLzt3aQKsszzwoq9vYqkgdV43dCh6iq6A	5	4	4	1651709469987	pending
 \.
 
 
@@ -2099,7 +2099,7 @@ COPY public.public_keys (id, value) FROM stdin;
 --
 
 COPY public.snarked_ledger_hashes (id, value) FROM stdin;
-1	jxgSP5L3y7YLoG37xJ5XQmCGb7676TDuek4j3qZVs9LjUF6Gbd4
+1	jxjJQUU4K3u2yXpLPCFqcYbqA3ZfTrEgn3Gqw96V5rwWRgkGZtr
 \.
 
 
@@ -2403,7 +2403,7 @@ COPY public.zkapp_events (id, element_ids) FROM stdin;
 -- Data for Name: zkapp_fee_payer_body; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.zkapp_fee_payer_body (id, account_identifier_id, update_id, fee, events_id, sequence_events_id, zkapp_protocol_state_precondition_id, nonce) FROM stdin;
+COPY public.zkapp_fee_payer_body (id, account_identifier_id, update_id, fee, events_id, sequence_events_id, zkapp_network_precondition_id, nonce) FROM stdin;
 1	4	1	1000000000	1	1	1	0
 2	4	4	1000000000	1	1	4	2
 3	4	6	1000000000	1	1	6	3
@@ -2464,7 +2464,7 @@ COPY public.zkapp_other_party (id, body_id, authorization_kind) FROM stdin;
 -- Data for Name: zkapp_other_party_body; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.zkapp_other_party_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_protocol_state_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller) FROM stdin;
+COPY public.zkapp_other_party_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller) FROM stdin;
 1	4	2	-12000000000	t	1	1	1	0	2	1	f	call
 2	5	3	11000000000	f	1	1	1	0	3	2	t	call
 3	1	5	0	f	1	1	1	0	5	2	t	call
@@ -2501,10 +2501,10 @@ COPY public.zkapp_precondition_accounts (id, balance_id, nonce_id, receipt_chain
 
 
 --
--- Data for Name: zkapp_protocol_state_precondition; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: zkapp_network_precondition; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.zkapp_protocol_state_precondition (id, snarked_ledger_hash_id, timestamp_id, blockchain_length_id, min_window_density_id, total_currency_id, curr_global_slot_since_hard_fork, global_slot_since_genesis, staking_epoch_data_id, next_epoch_data_id) FROM stdin;
+COPY public.zkapp_network_precondition (id, snarked_ledger_hash_id, timestamp_id, blockchain_length_id, min_window_density_id, total_currency_id, curr_global_slot_since_hard_fork, global_slot_since_genesis, staking_epoch_data_id, next_epoch_data_id) FROM stdin;
 1	\N	\N	\N	\N	\N	\N	\N	1	2
 2	\N	\N	\N	\N	\N	\N	\N	3	4
 3	\N	\N	\N	\N	\N	\N	\N	5	6
@@ -2600,7 +2600,7 @@ COPY public.zkapp_updates (id, app_state_id, delegate_id, verification_key_id, p
 --
 
 COPY public.zkapp_verification_keys (id, verification_key, hash) FROM stdin;
-1	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	19079293979474920563146704039152670161084248765333687110610215570697279088632
+1	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	19079293979474920563146704039152670161084248765333687110610215570697279088632
 \.
 
 
@@ -2808,10 +2808,10 @@ SELECT pg_catalog.setval('public.zkapp_precondition_accounts_id_seq', 1, false);
 
 
 --
--- Name: zkapp_protocol_state_precondition_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.zkapp_protocol_state_precondition_id_seq', 9, true);
+SELECT pg_catalog.setval('public.zkapp_network_precondition_id_seq', 9, true);
 
 
 --
@@ -3229,11 +3229,11 @@ ALTER TABLE ONLY public.zkapp_precondition_accounts
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_pkey PRIMARY KEY (id);
 
 
 --
@@ -3864,11 +3864,11 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 
 
 --
--- Name: zkapp_fee_payer_body zkapp_fee_payer_body_zkapp_protocol_state_precondition_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_fee_payer_body zkapp_fee_payer_body_zkapp_network_precondition_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
-    ADD CONSTRAINT zkapp_fee_payer_body_zkapp_protocol_state_precondition_id_fkey FOREIGN KEY (zkapp_protocol_state_precondition_id) REFERENCES public.zkapp_protocol_state_precondition(id);
+    ADD CONSTRAINT zkapp_fee_payer_body_zkapp_network_precondition_id_fkey FOREIGN KEY (zkapp_network_precondition_id) REFERENCES public.zkapp_network_precondition(id);
 
 
 --
@@ -3936,11 +3936,11 @@ ALTER TABLE ONLY public.zkapp_other_party_body
 
 
 --
--- Name: zkapp_other_party_body zkapp_other_party_body_zkapp_protocol_state_precondition_i_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_other_party_body zkapp_other_party_body_zkapp_network_precondition_i_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.zkapp_other_party_body
-    ADD CONSTRAINT zkapp_other_party_body_zkapp_protocol_state_precondition_i_fkey FOREIGN KEY (zkapp_protocol_state_precondition_id) REFERENCES public.zkapp_protocol_state_precondition(id);
+    ADD CONSTRAINT zkapp_other_party_body_zkapp_network_precondition_i_fkey FOREIGN KEY (zkapp_network_precondition_id) REFERENCES public.zkapp_network_precondition(id);
 
 
 --
@@ -3984,75 +3984,75 @@ ALTER TABLE ONLY public.zkapp_precondition_accounts
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondi_curr_global_slot_since_hard__fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_protocol_state_precondi_curr_global_slot_since_hard__fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
+ALTER TABLE ONLY public.zkapp_network_precondition
     ADD CONSTRAINT zkapp_protocol_state_precondi_curr_global_slot_since_hard__fkey FOREIGN KEY (curr_global_slot_since_hard_fork) REFERENCES public.zkapp_global_slot_bounds(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_preconditio_global_slot_since_genesis_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_protocol_state_preconditio_global_slot_since_genesis_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
+ALTER TABLE ONLY public.zkapp_network_precondition
     ADD CONSTRAINT zkapp_protocol_state_preconditio_global_slot_since_genesis_fkey FOREIGN KEY (global_slot_since_genesis) REFERENCES public.zkapp_global_slot_bounds(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_blockchain_length_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_blockchain_length_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_blockchain_length_id_fkey FOREIGN KEY (blockchain_length_id) REFERENCES public.zkapp_length_bounds(id);
-
-
---
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_min_window_density_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_min_window_density_id_fkey FOREIGN KEY (min_window_density_id) REFERENCES public.zkapp_length_bounds(id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_blockchain_length_id_fkey FOREIGN KEY (blockchain_length_id) REFERENCES public.zkapp_length_bounds(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_next_epoch_data_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_min_window_density_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_next_epoch_data_id_fkey FOREIGN KEY (next_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
-
-
---
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_snarked_ledger_hash_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_snarked_ledger_hash_id_fkey FOREIGN KEY (snarked_ledger_hash_id) REFERENCES public.snarked_ledger_hashes(id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_min_window_density_id_fkey FOREIGN KEY (min_window_density_id) REFERENCES public.zkapp_length_bounds(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_staking_epoch_data_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_next_epoch_data_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_staking_epoch_data_id_fkey FOREIGN KEY (staking_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
-
-
---
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_timestamp_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_timestamp_id_fkey FOREIGN KEY (timestamp_id) REFERENCES public.zkapp_timestamp_bounds(id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_next_epoch_data_id_fkey FOREIGN KEY (next_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
 
 
 --
--- Name: zkapp_protocol_state_precondition zkapp_protocol_state_precondition_total_currency_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: zkapp_network_precondition zkapp_network_precondition_snarked_ledger_hash_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.zkapp_protocol_state_precondition
-    ADD CONSTRAINT zkapp_protocol_state_precondition_total_currency_id_fkey FOREIGN KEY (total_currency_id) REFERENCES public.zkapp_amount_bounds(id);
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_snarked_ledger_hash_id_fkey FOREIGN KEY (snarked_ledger_hash_id) REFERENCES public.snarked_ledger_hashes(id);
+
+
+--
+-- Name: zkapp_network_precondition zkapp_network_precondition_staking_epoch_data_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_staking_epoch_data_id_fkey FOREIGN KEY (staking_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
+
+
+--
+-- Name: zkapp_network_precondition zkapp_network_precondition_timestamp_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_timestamp_id_fkey FOREIGN KEY (timestamp_id) REFERENCES public.zkapp_timestamp_bounds(id);
+
+
+--
+-- Name: zkapp_network_precondition zkapp_network_precondition_total_currency_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zkapp_network_precondition
+    ADD CONSTRAINT zkapp_network_precondition_total_currency_id_fkey FOREIGN KEY (total_currency_id) REFERENCES public.zkapp_amount_bounds(id);
 
 
 --

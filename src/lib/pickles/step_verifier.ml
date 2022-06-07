@@ -107,25 +107,27 @@ struct
     let ( + ) = Ops.add_fast
   end
 
+  module Public_input_scalar = struct
+    type t = Field.t
+
+    let typ = Field.typ
+
+    module Constant = struct
+      include Field.Constant
+
+      let to_bigint = Impl.Bigint.of_field
+    end
+  end
+
   let multiscale_known
       (ts :
         ( [ `Field of Field.t | `Packed_bits of Field.t * int ]
         * Inner_curve.Constant.t )
         array ) =
+    let module F = Public_input_scalar in
     let rec pow2pow x i =
       if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
     in
-    let module F = struct
-      type t = Field.t
-
-      let typ = Field.typ
-
-      module Constant = struct
-        include Field.Constant
-
-        let to_bigint = Impl.Bigint.of_field
-      end
-    end in
     with_label __LOC__ (fun () ->
         let correction, acc =
           Array.mapi ts ~f:(fun i (s, x) ->
@@ -339,9 +341,108 @@ struct
     | _ ->
         assert false
 
+  module O = One_hot_vector.Make (Impl)
+  open Tuple_lib
+
+  let public_input_commitment_dynamic (type n) (which : n O.t)
+      (domains : (Domains.t, n) Vector.t) ~public_input =
+    (*
+    let domains : (Domains.t, Nat.N3.n) Vector.t =
+      Vector.map ~f:(fun proofs_verified -> Common.wrap_domains ~proofs_verified)
+        [ 0; 1 ; 2 ]
+    in *)
+    let precomputations = Precomputed.Lagrange_precomputations.pallas in
+    let lagrange_commitment (d : Domains.t) (i : int) : Inner_curve.Constant.t =
+      let d =
+        Precomputed.Lagrange_precomputations.index_of_domain_log2
+          (Domain.log2_size d.h)
+      in
+      match precomputations.(d).(i) with
+      | [| g |] ->
+          Inner_curve.Constant.of_affine g
+      | _ ->
+          assert false
+    in
+    let select_curve_points (type k)
+        ~(points_for_domain : Domains.t -> (Inner_curve.Constant.t, k) Vector.t)
+        : (Inner_curve.t, k) Vector.t =
+      match domains with
+      | [] ->
+          assert false
+      | d :: ds ->
+          if Vector.for_all ds ~f:(fun d' -> Domain.equal d.h d'.h) then
+            Vector.map ~f:Inner_curve.constant (points_for_domain d)
+          else
+            Vector.map2
+              (which :> (Boolean.var, n) Vector.t)
+              domains
+              ~f:(fun b d ->
+                let points = points_for_domain d in
+                Vector.map points ~f:(fun g ->
+                    let x, y = Inner_curve.constant g in
+                    Field.((b :> t) * x, (b :> t) * y) ) )
+            |> Vector.reduce_exn
+                 ~f:(Vector.map2 ~f:(Double.map2 ~f:Field.( + )))
+            |> Vector.map ~f:(Double.map ~f:(Util.seal (module Impl)))
+    in
+    let lagrange i =
+      select_curve_points ~points_for_domain:(fun d ->
+          [ lagrange_commitment d i ] )
+      |> Vector.unsingleton
+    in
+    let lagrange_with_correction (type n) ~input_length i :
+        (Inner_curve.t, Nat.N2.n) Vector.t =
+      let actual_shift =
+        (* TODO: num_bits should maybe be input_length - 1. *)
+        Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:input_length
+      in
+      let rec pow2pow x i =
+        if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
+      in
+      select_curve_points ~points_for_domain:(fun d ->
+          let g = lagrange_commitment d i in
+          let open Inner_curve.Constant in
+          [ g; negate (pow2pow g actual_shift) ] )
+    in
+    let x_hat =
+      let terms =
+        Array.mapi public_input ~f:(fun i x ->
+            match x with
+            | b, 1 ->
+                assert_ (Constraint.boolean (b :> Field.t)) ;
+                `Cond_add (Boolean.Unsafe.of_cvar b, lagrange i)
+            | x, n ->
+                `Add_with_correction
+                  ((x, n), lagrange_with_correction ~input_length:n i) )
+      in
+      let correction =
+        Array.reduce_exn
+          (Array.filter_map terms ~f:(function
+            | `Cond_add _ ->
+                None
+            | `Add_with_correction (_, [ _; corr ]) ->
+                Some corr ) )
+          ~f:Ops.add_fast
+      in
+      Array.foldi terms ~init:correction ~f:(fun i acc term ->
+          match term with
+          | `Cond_add (b, g) ->
+              with_label __LOC__ (fun () ->
+                  Inner_curve.if_ b ~then_:(Ops.add_fast g acc) ~else_:acc )
+          | `Add_with_correction ((x, num_bits), [ g; _ ]) ->
+              Ops.add_fast acc
+                (Ops.scale_fast2' (module Public_input_scalar) g x ~num_bits) )
+      |> Inner_curve.negate
+    in
+    x_hat
+
   let incrementally_verify_proof (type b)
-      (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain
-      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      (module Proofs_verified : Nat.Add.Intf with type n = b)
+      ~(domain :
+         [ `Known of Domain.t
+         | `Side_loaded of
+           _ Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
+         ) ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
       ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice
@@ -362,10 +463,24 @@ struct
         let open Plonk_types.Messages in
         let x_hat =
           with_label "x_hat" (fun () ->
-              multiscale_known
-                (Array.mapi public_input ~f:(fun i x ->
-                     (x, lagrange_commitment ~domain i) ) )
-              |> Inner_curve.negate )
+              match domain with
+              | `Known domain ->
+                  multiscale_known
+                    (Array.mapi public_input ~f:(fun i x ->
+                         (x, lagrange_commitment ~domain i) ) )
+                  |> Inner_curve.negate
+              | `Side_loaded which ->
+                  public_input_commitment_dynamic which
+                    (Vector.map
+                       ~f:(fun proofs_verified ->
+                         Common.wrap_domains ~proofs_verified )
+                       [ 0; 1; 2 ] )
+                    ~public_input:
+                      (Array.map public_input ~f:(function
+                        | `Field x ->
+                            (x, Public_input_scalar.Constant.size_in_bits)
+                        | `Packed_bits (b, n) ->
+                            (b, n) ) ) )
         in
         let without = Type.Without_degree_bound in
         let absorb_g gs = absorb sponge without gs in
@@ -413,7 +528,9 @@ struct
           *)
           let num_commitments_without_degree_bound = Nat.N26.n in
           let without_degree_bound =
-            let T = Proofs_verified.eq in
+            let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
+              Wrap_hack.Checked.pad_commitments sg_old
+            in
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
@@ -421,13 +538,16 @@ struct
               :: Vector.append w_comm
                    (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
                    (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
-              (snd (Proofs_verified.add num_commitments_without_degree_bound))
+              (snd
+                 (Wrap_hack.Padded_length.add
+                    num_commitments_without_degree_bound ) )
           in
           with_label "check_bulletproof" (fun () ->
               check_bulletproof
                 ~pcs_batch:
                   (Common.dlog_pcs_batch
-                     (Proofs_verified.add num_commitments_without_degree_bound) )
+                     (Wrap_hack.Padded_length.add
+                        num_commitments_without_degree_bound ) )
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
@@ -481,8 +601,6 @@ struct
 
   let domain_generator ~log2_size =
     Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
-
-  module O = One_hot_vector.Make (Impl)
 
   let side_loaded_domain (type branches) =
     let open Side_loaded_verification_key in
@@ -695,7 +813,7 @@ struct
   (* TODO: This needs to handle the fact of variable length evaluations.
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
-      (module Proofs_verified : Nat.Add.Intf with type n = b) ~max_width
+      (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't

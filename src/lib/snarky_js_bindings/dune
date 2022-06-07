@@ -1,7 +1,11 @@
+(env
+  (_ (js_of_ocaml (compilation_mode whole_program))))
+
 (executable
  (name snarky_js_node)
  (modules snarky_js_node)
  (modes js)
+ (link_flags (-noautolink))
  (js_of_ocaml
   (flags +toplevel.js +dynlink.js))
  (libraries snarky_js_bindings_lib node_backend)
@@ -18,6 +22,7 @@
  (name snarky_js_chrome)
  (modules snarky_js_chrome)
  (modes js)
+ (link_flags (-noautolink))
  (js_of_ocaml
   (flags +toplevel.js +dynlink.js))
  (libraries snarky_js_bindings_lib chrome_backend)
@@ -33,6 +38,7 @@
 (executable
  (name snarky_js_types)
  (modules snarky_js_types)
+ (link_flags (-linkall))
  (modes native)
  (libraries mina_base fields_derivers_zkapps yojson)
  (instrumentation

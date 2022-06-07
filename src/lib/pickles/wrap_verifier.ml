@@ -825,18 +825,20 @@ struct
               let pi = Proofs_verified.add Nat.N26.n in
               let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
               let sg_evals =
-                match actual_proofs_verified with
-                | None ->
-                    Vector.map sg_olds ~f:(fun f -> [| f pt |])
-                | Some proofs_verified ->
-                    let mask =
-                      ones_vector
-                        (module Impl)
-                        ~first_zero:proofs_verified (Vector.length sg_olds)
-                    in
-                    with_label __LOC__ (fun () ->
-                        Vector.map2 mask sg_olds ~f:(fun b f ->
-                            [| Field.((b :> t) * f pt) |] ) )
+                Vector.map sg_olds ~f:(fun f -> [| f pt |])
+                (* TODO: This was the code before the wrap hack was put in
+                   match actual_proofs_verified with
+                   | None ->
+                       Vector.map sg_olds ~f:(fun f -> [| f pt |])
+                   | Some proofs_verified ->
+                       let mask =
+                         ones_vector
+                           (module Impl)
+                           ~first_zero:proofs_verified (Vector.length sg_olds)
+                       in
+                       with_label __LOC__ (fun () ->
+                           Vector.map2 mask sg_olds ~f:(fun b f ->
+                               [| Field.((b :> t) * f pt) |] ) ) *)
               in
               let v =
                 Vector.append sg_evals ([| x_hat |] :: [| ft |] :: a) (snd pi)
@@ -907,17 +909,4 @@ struct
     ; xi = scalar xi
     ; b
     }
-
-  (* TODO: No need to hash the entire bulletproof challenges. Could
-     just hash the segment of the public input LDE corresponding to them
-     that we compute when verifying the previous proof. That is a commitment
-     to them. *)
-
-  let hash_me_only (type n) (_max_proofs_verified : n Nat.t)
-      (t : (_, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
-    let sponge = Sponge.create sponge_params in
-    Array.iter ~f:(Sponge.absorb sponge)
-      (Types.Wrap.Proof_state.Me_only.to_field_elements
-         ~g1:Inner_curve.to_field_elements t ) ;
-    Sponge.squeeze_field sponge
 end

@@ -237,7 +237,7 @@ let verify_heterogenous (ts : Instance.t list) =
                    deferred_values =
                      { t.statement.proof_state.deferred_values with plonk }
                  ; me_only =
-                     Common.hash_dlog_me_only Max_proofs_verified.n
+                     Wrap_hack.hash_dlog_me_only Max_proofs_verified.n
                        (Reduced_me_only.Wrap.prepare
                           t.statement.proof_state.me_only )
                  }
@@ -250,7 +250,7 @@ let verify_heterogenous (ts : Instance.t list) =
            , t.proof
            , input
            , Some
-               (Vector.to_list
+               (Wrap_hack.pad_accumulator
                   (Vector.map2
                      ~f:(fun g cs ->
                        { Challenge_polynomial.challenges =

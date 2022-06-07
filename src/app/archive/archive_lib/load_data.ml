@@ -315,9 +315,8 @@ let protocol_state_precondition_of_id pool id =
             ; staking_epoch_data_id
             ; next_epoch_data_id
             }
-             : Processor.Zkapp_protocol_state_precondition.t ) =
-    query_db ~f:(fun db ->
-        Processor.Zkapp_protocol_state_precondition.load db id )
+             : Processor.Zkapp_network_precondition.t ) =
+    query_db ~f:(fun db -> Processor.Zkapp_network_precondition.load db id)
   in
   let%bind snarked_ledger_hash =
     let%map hash_opt =
@@ -399,7 +398,7 @@ let get_fee_payer_body ~pool body_id =
            ; fee
            ; events_id
            ; sequence_events_id
-           ; zkapp_protocol_state_precondition_id
+           ; zkapp_network_precondition_id
            ; nonce
            } =
     query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
@@ -411,7 +410,7 @@ let get_fee_payer_body ~pool body_id =
   let%bind events = load_events pool events_id in
   let%bind sequence_events = load_events pool sequence_events_id in
   let%bind protocol_state_precondition =
-    protocol_state_precondition_of_id pool zkapp_protocol_state_precondition_id
+    protocol_state_precondition_of_id pool zkapp_network_precondition_id
   in
   let nonce =
     nonce |> Unsigned.UInt32.of_int64 |> Mina_numbers.Account_nonce.of_uint32
@@ -439,7 +438,7 @@ let get_other_party_body ~pool body_id =
            ; sequence_events_id
            ; call_data_id
            ; call_depth
-           ; zkapp_protocol_state_precondition_id
+           ; zkapp_network_precondition_id
            ; zkapp_account_precondition_id
            ; use_full_commitment
            ; caller
@@ -471,7 +470,7 @@ let get_other_party_body ~pool body_id =
     Zkapp_basic.F.of_string field_str
   in
   let%bind protocol_state_precondition =
-    protocol_state_precondition_of_id pool zkapp_protocol_state_precondition_id
+    protocol_state_precondition_of_id pool zkapp_network_precondition_id
   in
   let%bind account_precondition =
     let%bind ({ kind; precondition_account_id; nonce }
@@ -597,12 +596,14 @@ let get_other_party_body ~pool body_id =
       ; sequence_events
       ; call_data
       ; call_depth
-      ; protocol_state_precondition
-      ; account_precondition
+      ; preconditions =
+          { Party.Preconditions.network = protocol_state_precondition
+          ; account = account_precondition
+          }
       ; use_full_commitment
       ; caller
       }
-      : Party.Body.Wire.t )
+      : Party.Body.Simple.t )
 
 let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =

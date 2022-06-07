@@ -178,7 +178,11 @@ end
 module Stable = struct
   module V2 = struct
     module T = struct
-      type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V2.t
+      type t =
+        ( Backend.Tock.Curve.Affine.t
+        , Pickles_base.Proofs_verified.Stable.V1.t
+        , Vk.t )
+        Poly.Stable.V2.t
       [@@deriving hash]
 
       let to_latest = Fn.id
@@ -187,13 +191,17 @@ module Stable = struct
 
       let version_byte = Base58_check.Version_bytes.verification_key
 
-      let to_repr { Poly.max_width; wrap_index; wrap_vk = _ } =
-        { Repr.Stable.V2.max_width; wrap_index }
+      let to_repr { Poly.max_proofs_verified; wrap_index; wrap_vk = _ } =
+        { Repr.Stable.V2.max_proofs_verified; wrap_index }
 
-      let of_repr ({ Repr.Stable.V2.max_width; wrap_index = c } : R.Stable.V2.t)
-          : t =
+      let of_repr
+          ({ Repr.Stable.V2.max_proofs_verified; wrap_index = c } :
+            R.Stable.V2.t ) : t =
         let d =
-          (Common.wrap_domains ~proofs_verified:(Width.to_int max_width)).h
+          (Common.wrap_domains
+             ~proofs_verified:
+               (Pickles_base.Proofs_verified.to_int max_proofs_verified) )
+            .h
         in
         let log2_size = Import.Domain.log2_size d in
         let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
@@ -231,7 +239,7 @@ module Stable = struct
               ; lookup_index = None
               } )
         in
-        { Poly.max_width; wrap_index = c; wrap_vk }
+        { Poly.max_proofs_verified; wrap_index = c; wrap_vk }
 
       (* Proxy derivers to [R.t]'s, ignoring [wrap_vk] *)
 
@@ -277,7 +285,7 @@ Stable.Latest.
   , compare )]
 
 let dummy : t =
-  { max_width = Width.zero
+  { max_proofs_verified = N2
   ; wrap_index =
       (let g = Backend.Tock.Curve.(to_affine_exn one) in
        { sigma_comm = Vector.init Plonk_types.Permuts.n ~f:(fun _ -> g)
@@ -297,8 +305,8 @@ module Checked = struct
   open Impl
 
   type t =
-    { (* TODO: Not sure this is used *)
-      max_width : Width.Checked.t
+    { max_proofs_verified :
+        Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
           (** The plonk verification key for the 'wrapping' proof that this key
@@ -312,10 +320,13 @@ module Checked = struct
 
   let to_input =
     let open Random_oracle_input.Chunked in
-    fun { max_width; wrap_index } : _ Random_oracle_input.Chunked.t ->
-      let width w = (Width.Checked.to_field w, width_size) in
+    fun { max_proofs_verified; wrap_index } : _ Random_oracle_input.Chunked.t ->
+      let max_proofs_verified =
+        Pickles_base.Proofs_verified.One_hot.Checked.to_input
+          max_proofs_verified
+      in
       List.reduce_exn ~f:append
-        [ packed (width max_width)
+        [ max_proofs_verified
         ; wrap_index_to_input
             (Fn.compose Array.of_list Inner_curve.to_field_elements)
             wrap_index
@@ -339,9 +350,11 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
   let open Impl in
   Typ.of_hlistable
-    [ Width.typ; Plonk_verification_key_evals.typ Inner_curve.typ ]
+    [ Pickles_base.Proofs_verified.One_hot.typ (module Impls.Step)
+    ; Plonk_verification_key_evals.typ Inner_curve.typ
+    ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
       failwith "Side_loaded_verification_key: value_of_hlist" )
-    ~value_to_hlist:(fun { Poly.wrap_index; max_width; _ } ->
-      [ max_width; wrap_index ] )
+    ~value_to_hlist:(fun { Poly.wrap_index; max_proofs_verified; _ } ->
+      [ max_proofs_verified; wrap_index ] )

@@ -449,107 +449,76 @@ let apply_initial_ledger_state : t -> init_state -> unit =
 
 let%test_unit "tokens test" =
   let open Mina_transaction_logic.For_tests in
+  let open Parties_builder in
   let constraint_constants =
     Genesis_constants.Constraint_constants.for_unit_tests
   in
-  let keypairs = Quickcheck.random_value (Init_ledger.gen ()) in
-  let get ledger pk token =
+  let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
+  let ledger_get_exn ledger pk token =
     match
       Ledger_inner.get_or_create ledger (Account_id.create pk token)
       |> Or_error.ok_exn
     with
     | `Added, _, _ ->
         failwith "Account did not exist"
-    | `Existed, a, _ ->
-        a
+    | `Existed, acct, _ ->
+        acct
   in
-  let mk_parties_transaction ledger other_parties : Parties.t =
-    let fee_payer : Party.Fee_payer.t =
-      let kp, _ = keypairs.(0) in
-      let pk = Public_key.compress kp.public_key in
+  let pk =
+    let kp, _ = keypair_and_amounts.(0) in
+    Public_key.compress kp.public_key
+  in
+  let main (ledger : t) =
+    let execute_parties_transaction
+        (parties : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t) :
+        unit =
       let _, ({ nonce; _ } : Account.t), _ =
         Ledger_inner.get_or_create ledger
           (Account_id.create pk Token_id.default)
         |> Or_error.ok_exn
       in
-      { body =
-          { update = Party.Update.noop
-          ; public_key = pk
-          ; fee = Currency.Fee.of_int 7
-          ; events = []
-          ; sequence_events = []
-          ; protocol_state_precondition =
-              Zkapp_precondition.Protocol_state.accept
-          ; nonce
-          }
-      ; authorization = Signature.dummy
-      }
-    in
-    { fee_payer
-    ; memo = Signed_command_memo.dummy
-    ; other_parties =
-        other_parties
-        |> Parties.Call_forest.map
-             ~f:(fun (p : Party.Body.Wire.t) : Party.Wire.t ->
-               { body = p; authorization = Signature Signature.dummy } )
-        |> Parties.Call_forest.add_callers'
-        |> Parties.Call_forest.accumulate_hashes_predicated
-    }
-  in
-  let main (ledger : t) =
-    let execute_parties_transaction
-        (parties : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t) : unit
-        =
-      let _res =
+      match
         apply_parties_unchecked ~constraint_constants ~state_view:view ledger
-          (mk_parties_transaction ledger parties)
-        |> Or_error.ok_exn
-      in
-      ()
+          (mk_parties_transaction ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+             parties )
+      with
+      | Ok ({ command = { status; _ }; _ }, _) -> (
+          match status with
+          | Transaction_status.Applied ->
+              ()
+          | Failed failures ->
+              let indexed_failures :
+                  (int * Transaction_status.Failure.t list) list =
+                Transaction_status.Failure.Collection.to_display failures
+              in
+              let formatted_failures =
+                List.map indexed_failures ~f:(fun (ndx, fails) ->
+                    sprintf "Index: %d  Failures: %s" ndx
+                      ( List.map fails ~f:Transaction_status.Failure.to_string
+                      |> String.concat ~sep:"," ) )
+                |> String.concat ~sep:"; "
+              in
+              failwithf "Transaction failed: %s" formatted_failures () )
+      | Error err ->
+          failwithf "Error executing transaction: %s" (Error.to_string_hum err)
+            ()
     in
-    let party caller kp token_id balance_change : Party.Body.Wire.t =
-      { update = Party.Update.noop
-      ; public_key = Public_key.compress kp.Keypair.public_key
-      ; token_id
-      ; balance_change =
-          Currency.Amount.Signed.create
-            ~magnitude:(Currency.Amount.of_int (Int.abs balance_change))
-            ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
-      ; increment_nonce = false
-      ; events = []
-      ; sequence_events = []
-      ; call_data = Pickles.Impls.Step.Field.Constant.zero
-      ; call_depth = 0
-      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-      ; use_full_commitment = true
-      ; account_precondition = Accept
-      ; caller
-      }
-    in
-    let token_funder, _ = keypairs.(1) in
+    let token_funder, _ = keypair_and_amounts.(1) in
     let token_owner = Keypair.create () in
     let token_account1 = Keypair.create () in
     let token_account2 = Keypair.create () in
-    let forest ps : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
-      List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
-    in
-    let node party calls =
-      { Parties.Call_forest.Tree.party
-      ; party_digest = ()
-      ; calls = forest calls
-      }
-    in
     let account_creation_fee =
       Currency.Fee.to_int constraint_constants.account_creation_fee
     in
-    let create_token : (Party.Body.Wire.t, unit, unit) Parties.Call_forest.t =
-      forest
-        [ node
-            (party Call token_funder Token_id.default
+    let create_token : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
+      mk_forest
+        [ mk_node
+            (mk_party_body Call token_funder Token_id.default
                (-(4 * account_creation_fee)) )
             []
-        ; node
-            (party Call token_owner Token_id.default (3 * account_creation_fee))
+        ; mk_node
+            (mk_party_body Call token_owner Token_id.default
+               (3 * account_creation_fee) )
             []
         ]
     in
@@ -561,41 +530,58 @@ let%test_unit "tokens test" =
              Token_id.default )
     in
     let token_minting =
-      forest
-        [ node
-            (party Call token_owner Token_id.default (-account_creation_fee))
-            [ node (party Call token_account1 custom_token_id 100) [] ]
+      mk_forest
+        [ mk_node
+            (mk_party_body Call token_owner Token_id.default
+               (-account_creation_fee) )
+            [ mk_node (mk_party_body Call token_account1 custom_token_id 100) []
+            ]
         ]
     in
-    let token_transfer =
-      forest
-        [ node
-            (party Call token_owner Token_id.default (-account_creation_fee))
-            [ node (party Call token_account1 custom_token_id (-30)) []
-            ; node (party Call token_account2 custom_token_id 30) []
+    let token_transfers =
+      mk_forest
+        [ mk_node
+            (mk_party_body Call token_owner Token_id.default
+               (-account_creation_fee) )
+            [ mk_node
+                (mk_party_body Call token_account1 custom_token_id (-30))
+                []
+            ; mk_node (mk_party_body Call token_account2 custom_token_id 30) []
+            ; mk_node
+                (mk_party_body Call token_account1 custom_token_id (-10))
+                []
+            ; mk_node (mk_party_body Call token_account2 custom_token_id 10) []
+            ; mk_node
+                (mk_party_body Call token_account2 custom_token_id (-5))
+                []
+            ; mk_node (mk_party_body Call token_account1 custom_token_id 5) []
             ]
         ]
     in
     let check_token_balance k balance =
       [%test_eq: Currency.Balance.t]
-        (get ledger (Public_key.compress k.Keypair.public_key) custom_token_id)
+        (ledger_get_exn ledger
+           (Public_key.compress k.Keypair.public_key)
+           custom_token_id )
           .balance
         (Currency.Balance.of_int balance)
     in
     execute_parties_transaction create_token ;
     (* Check that token_owner exists *)
-    get ledger (Public_key.compress token_owner.public_key) Token_id.default
+    ledger_get_exn ledger
+      (Public_key.compress token_owner.public_key)
+      Token_id.default
     |> ignore ;
     execute_parties_transaction token_minting ;
     check_token_balance token_account1 100 ;
-    execute_parties_transaction token_transfer ;
-    check_token_balance token_account1 70 ;
-    check_token_balance token_account2 30
+    execute_parties_transaction token_transfers ;
+    check_token_balance token_account1 65 ;
+    check_token_balance token_account2 35
   in
   Ledger_inner.with_ledger ~depth ~f:(fun ledger ->
       Init_ledger.init
         (module Ledger_inner)
-        [| keypairs.(0); keypairs.(1) |]
+        [| keypair_and_amounts.(0); keypair_and_amounts.(1) |]
         ledger ;
       main ledger )
 
