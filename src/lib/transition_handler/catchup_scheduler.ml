@@ -80,7 +80,17 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
   let validation_callbacks = State_hash.Table.create () in
   upon (Ivar.read clean_up_signal) (fun () ->
       Hashtbl.iter collected_transitions
-        ~f:(List.iter ~f:(Fn.compose ignore Cached.invalidate_with_failure)) ;
+        ~f:
+          (List.iter ~f:(fun b ->
+               let hash =
+                 Cached.peek b |> Envelope.Incoming.data
+                 |> Validation.block_with_hash
+                 |> State_hash.With_state_hashes.state_hash
+               in
+               let vc = Hashtbl.find validation_callbacks hash in
+               Option.value_map ~default:ignore
+                 ~f:Validation_callback.fire_if_not_already_fired vc `Ignore ;
+               ignore @@ Cached.invalidate_with_failure b ) ) ;
       Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
           Block_time.Timeout.cancel time_controller timeout () ) ) ;
   let breadcrumb_builder_supervisor =
@@ -104,8 +114,12 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
-                Rose_tree.iter subtree ~f:(fun (cached_transition, _vc) ->
-                    (* TODO reject callback? *)
+                Rose_tree.iter subtree ~f:(fun (cached_transition, vc) ->
+                    (* TODO consider rejecting the callback in some cases,
+                       see https://github.com/MinaProtocol/mina/issues/11087 *)
+                    Option.value_map vc ~default:ignore
+                      ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+                      `Ignore ;
                     ignore
                       ( Cached.invalidate_with_failure cached_transition
                         : Mina_block.initial_valid_block Envelope.Incoming.t ) ) ) )
@@ -193,17 +207,15 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb =
   Option.value_map valid_cb ~default:() ~f:(fun data ->
       match Hashtbl.add t.validation_callbacks ~key:hash ~data with
       | `Ok ->
-          don't_wait_for
-            (* Clean up entry upon callback resolution *)
-            (let%bind.Deferred _ = Mina_net2.Validation_callback.await data in
-             Hashtbl.remove t.validation_callbacks hash ;
-             Deferred.unit )
+          (* Clean up entry upon callback resolution *)
+          upon
+            (Deferred.ignore_m @@ Mina_net2.Validation_callback.await data)
+            (fun () -> Hashtbl.remove t.validation_callbacks hash)
       | `Duplicate ->
           [%log' warn t.logger] "Double validation callback for $state_hash"
             ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson hash) ] ) ;
   let make_timeout duration =
     Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
-        (* TODO inject valid_cb ? *)
         let forest = extract_forest t parent_hash in
         Hashtbl.remove t.parent_root_timeouts parent_hash ;
         Mina_metrics.(

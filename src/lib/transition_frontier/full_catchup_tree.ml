@@ -293,13 +293,13 @@ let remove_node' t (node : Node.t) =
       ()
   | To_initial_validate _ ->
       ()
-  | To_verify (c, _vc) ->
-      (* TODO should we reject the validation callback? *)
+  | To_verify (c, vc) ->
+      Option.value_map ~default:ignore ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore;
       ignore
         ( Cached.invalidate_with_failure c
           : Mina_block.initial_valid_block Envelope.Incoming.t )
-  | To_build_breadcrumb (_parent, c, _vc) ->
-      (* TODO should we reject the validation callback? *)
+  | To_build_breadcrumb (_parent, c, vc) ->
+      Option.value_map ~default:ignore ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore;
       ignore
         ( Cached.invalidate_with_failure c
           : Mina_block.almost_valid_block Envelope.Incoming.t )
