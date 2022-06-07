@@ -134,11 +134,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              in
              { Party.Update.dummy with timing } )
         ; current_auth = Permissions.Auth_required.Signature
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; events = []
+        ; call_data = Snark_params.Tick.Field.zero
+        ; preconditions = None
         }
       in
       return
