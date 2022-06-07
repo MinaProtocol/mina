@@ -104,7 +104,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind parties_create_second_account_with_timing =
       let open Mina_base in
       let fee = Currency.Fee.of_int 1_000_000 in
-      let amount = Currency.Amount.of_int 10_000_000_000 in
+      let amount_int = 10_000_000_000 in
+      let amount = Currency.Amount.of_int amount_int in
       let nonce = Account.Nonce.of_int 2 in
       let memo =
         Signed_command_memo.create_from_string_exn
@@ -124,7 +125,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (* some maximal values to see GraphQL accepts them *)
             (let timing =
                Zkapp_basic.Set_or_keep.Set
-                 ( { initial_minimum_balance = Currency.Balance.max_int
+                 ( { initial_minimum_balance = Currency.Balance.of_int amount_int
                    ; cliff_time = Mina_numbers.Global_slot.max_value
                    ; cliff_amount = Currency.Amount.max_int
                    ; vesting_period = Mina_numbers.Global_slot.of_int 2
