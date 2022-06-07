@@ -11,6 +11,7 @@ import {
   Mina,
   signFeePayer,
   Permissions,
+  Ledger,
 } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
 
@@ -89,6 +90,16 @@ partiesJsonInitialize = signFeePayer(partiesJsonInitialize, senderKey, {
   transactionFee,
 });
 toc();
+
+// verify the proof
+tic("verify transaction proof");
+let parties = JSON.parse(partiesJsonInitialize);
+let proof = parties.otherParties[0].authorization.proof;
+let statement = Ledger.transactionStatement(partiesJsonInitialize, 0);
+let ok = await Ledger.verifyPartyProof(statement, proof, verificationKey.data);
+toc();
+console.log("did proof verify?", ok);
+if (!ok) console.log("proof didn't verify");
 
 tic("apply initialize transaction");
 Local.applyJsonTransaction(partiesJsonInitialize);
