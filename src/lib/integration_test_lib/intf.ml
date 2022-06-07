@@ -210,11 +210,11 @@ module Engine = struct
 
     type t
 
-    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Malleable_error.t
 
-    val deploy : t -> Network.t Deferred.t
+    val deploy : t -> Network.t Malleable_error.t
 
-    val destroy : t -> unit Deferred.t
+    val destroy : t -> unit Malleable_error.t
 
     val cleanup : t -> unit Deferred.t
   end
@@ -428,7 +428,9 @@ module Dsl = struct
       -> log_error_accumulator
 
     val lift_accumulated_log_errors :
-      log_error_accumulator -> Test_error.remote_error Test_error.Set.t
+         ?exit_code:int
+      -> log_error_accumulator
+      -> Test_error.remote_error Test_error.Set.t
   end
 end
 

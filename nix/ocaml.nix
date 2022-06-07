@@ -12,22 +12,21 @@ let
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
-  export =
-    opam-nix.opamListToQuery (opam-nix.importOpam ../src/opam.export).installed;
+  export = opam-nix.importOpam ../src/opam.export;
   external-packages = pkgs.lib.getAttrs [
     "sodium"
     "capnp"
     "rpc_parallel"
     "async_kernel"
     "base58"
-    "graphql_ppx"
-    "ppx_deriving_yojson"
   ] (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
-  implicit-deps = export // external-packages;
+  implicit-deps = (opam-nix.opamListToQuery export.installed) // external-packages;
+
+  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
 
   scope = opam-nix.applyOverlays opam-nix.__overlays
-    (opam-nix.defsToScope pkgs (opam-nix.queryToDefs repos implicit-deps));
+    (opam-nix.defsToScope pkgs ((opam-nix.queryToDefs repos implicit-deps) // pins));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);

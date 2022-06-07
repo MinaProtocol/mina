@@ -37,6 +37,7 @@ maintenance/*.dot
 maintenance/*.png
 
 scripts/genesis_ledger.json
+scripts/annotated_ledger.json
 
 automation/*config.json
 automation/!bsconfig.json
@@ -81,3 +82,14 @@ automation/services/watchdog/check_libp2p/check_libp2p
 
 *.terraform.lock.hcl
 _opam
+
+target
+release
+Cargo.lock
+.vscode
+
+### IntelliJ IDEA ###
+**/.idea/
+*.iws
+*.iml
+*.ipr

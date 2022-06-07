@@ -6,7 +6,8 @@ open Mina_base
 module Global_slot = Mina_numbers.Global_slot
 module Memo = Signed_command_memo
 
-let raise_js_error s = Js.raise_js_error (new%js Js.error_constr (Js.string s))
+let raise_js_error s =
+  Js_error.(raise_ @@ of_error (new%js Js.error_constr (Js.string s)))
 
 type string_js = Js.js_string Js.t
 

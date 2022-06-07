@@ -347,9 +347,13 @@ module Network_manager = struct
 
   let run_cmd_exn t prog args = Util.run_cmd_exn t.testnet_dir prog args
 
+  let run_cmd_or_hard_error t prog args =
+    Util.run_cmd_or_hard_error t.testnet_dir prog args
+
   let create ~logger (network_config : Network_config.t) =
+    let open Malleable_error.Let_syntax in
     let%bind all_namespaces_str =
-      Util.run_cmd_exn "/" "kubectl"
+      Util.run_cmd_or_hard_error "/" "kubectl"
         [ "get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}" ]
     in
     let all_namespaces = String.split ~on:' ' all_namespaces_str in
@@ -364,21 +368,23 @@ module Network_manager = struct
       then
         let%bind () =
           if network_config.debug_arg then
-            Util.prompt_continue
-              "Existing namespace of same name detected, pausing startup. \
-               Enter [y/Y] to continue on and remove existing namespace, start \
-               clean, and run the test; press Cntrl-C to quit out: "
+            Deferred.bind ~f:Malleable_error.return
+              (Util.prompt_continue
+                 "Existing namespace of same name detected, pausing startup. \
+                  Enter [y/Y] to continue on and remove existing namespace, \
+                  start clean, and run the test; press Cntrl-C to quit out: " )
           else
-            Deferred.return
+            Malleable_error.return
               ([%log info]
                  "Existing namespace of same name detected; removing to start \
                   clean" )
         in
-        Util.run_cmd_exn "/" "kubectl"
+        Util.run_cmd_or_hard_error "/" "kubectl"
           [ "delete"; "namespace"; network_config.terraform.testnet_name ]
         >>| Fn.const ()
       else return ()
     in
+    let open Deferred.Let_syntax in
     let%bind () =
       if%bind File_system.dir_exists testnet_dir then (
         [%log info] "Old terraform directory found; removing to start clean" ;
@@ -482,16 +488,20 @@ module Network_manager = struct
             ~f:(fun { keypair; _ } -> keypair)
       }
     in
+    let open Malleable_error.Let_syntax in
     [%log info] "Initializing terraform" ;
-    let%bind _ = run_cmd_exn t "terraform" [ "init" ] in
-    let%map _ = run_cmd_exn t "terraform" [ "validate" ] in
+    let%bind _ = run_cmd_or_hard_error t "terraform" [ "init" ] in
+    let%map _ = run_cmd_or_hard_error t "terraform" [ "validate" ] in
     t
 
   let deploy t =
+    let open Malleable_error.Let_syntax in
     let logger = t.logger in
     if t.deployed then failwith "network already deployed" ;
     [%log info] "Deploying network" ;
-    let%bind _ = run_cmd_exn t "terraform" [ "apply"; "-auto-approve" ] in
+    let%bind _ =
+      run_cmd_or_hard_error t "terraform" [ "apply"; "-auto-approve" ]
+    in
     t.deployed <- true ;
     let config : Kubernetes_network.config =
       { testnet_name = t.testnet_name
@@ -501,20 +511,25 @@ module Network_manager = struct
       }
     in
     let%map seeds =
-      Deferred.List.concat_map t.seed_workloads
+      Malleable_error.List.map t.seed_workloads
         ~f:(Kubernetes_network.Workload.get_nodes ~config)
+      >>| List.concat
     and block_producers =
-      Deferred.List.concat_map t.block_producer_workloads
+      Malleable_error.List.map t.block_producer_workloads
         ~f:(Kubernetes_network.Workload.get_nodes ~config)
+      >>| List.concat
     and snark_coordinators =
-      Deferred.List.concat_map t.snark_coordinator_workloads
+      Malleable_error.List.map t.snark_coordinator_workloads
         ~f:(Kubernetes_network.Workload.get_nodes ~config)
+      >>| List.concat
     and snark_workers =
-      Deferred.List.concat_map t.snark_worker_workloads
+      Malleable_error.List.map t.snark_worker_workloads
         ~f:(Kubernetes_network.Workload.get_nodes ~config)
+      >>| List.concat
     and archive_nodes =
-      Deferred.List.concat_map t.archive_workloads
+      Malleable_error.List.map t.archive_workloads
         ~f:(Kubernetes_network.Workload.get_nodes ~config)
+      >>| List.concat
     in
     let all_nodes =
       seeds @ block_producers @ snark_coordinators @ snark_workers
@@ -564,4 +579,8 @@ module Network_manager = struct
     [%log' info t.logger] "Cleaning up network configuration" ;
     let%bind () = File_system.remove_dir t.testnet_dir in
     Deferred.unit
+
+  let destroy t =
+    Deferred.Or_error.try_with (fun () -> destroy t)
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 end
