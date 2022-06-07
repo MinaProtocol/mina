@@ -1,7 +1,4 @@
-open Core_kernel
-open Async
-open Rosetta_lib
-open Rosetta_models
+module Serializing = Graphql_lib.Serializing
 
 module Get_all_transactions =
 [%graphql
@@ -28,11 +25,11 @@ module Get_transactions_by_hash =
       }
       pooledUserCommands(hashes: $hashes) {
         hash
-        amount @bsDecoder(fn: "Decoders.uint64")
-        fee @bsDecoder(fn: "Decoders.uint64")
+        amount @ppxCustom(module: "Serializing.UInt64")
+        fee @ppxCustom(module: "Serializing.UInt64")
         kind
-        feeToken @bsDecoder(fn: "Decoders.token_id")
-        validUntil @bsDecoder(fn: "Decoders.optional_uint32")
+        feeToken @ppxCustom(module: "Serializing.Token_s")
+        validUntil @ppxCustom(module: "Serializing.Optional_uint32")
         memo
         feePayer {
           publicKey
@@ -44,11 +41,17 @@ module Get_transactions_by_hash =
         source {
           publicKey
         }
-        token  @bsDecoder(fn: "Decoders.token_id")
+        token  @ppxCustom(module: "Serializing.Token_s")
       }
     }
 |}]
 let _ = Decoders.uint32
+
+(* Avoid shadowing graphql_ppx functions *)
+open Core_kernel
+open Async
+open Rosetta_lib
+open Rosetta_models
 
 module All = struct
   module Env = struct
@@ -74,18 +77,14 @@ module All = struct
     let mock : 'gql Mock.t =
       { gql=
           (fun () ->
-            Result.return
-            @@ object
-                 method pooledUserCommands =
-                   [| `UserCommand
-                        (object
-                           method hash = "TXN_1"
-                        end)
-                    ; `UserCommand
-                        (object
-                           method hash = "TXN_2"
-                        end) |]
-               end )
+            Result.return {
+              Get_all_transactions.pooledUserCommands = [|
+                {hash = "TXN_1"};
+                {hash = "TXN_2"}
+              |];
+              initialPeers = [||];
+              daemonStatus = {chainId = "dummy"}
+            })
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
 
@@ -102,10 +101,10 @@ module All = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
+      let open Get_all_transactions in
       { Mempool_response.transaction_identifiers=
-          res#pooledUserCommands |> Array.to_list
-          |> List.map ~f:(fun (`UserCommand obj) ->
-                 {Transaction_identifier.hash= obj#hash} ) }
+          res.pooledUserCommands |> Array.to_list
+          |> List.map ~f:(fun cmd -> {Transaction_identifier.hash = cmd.hash} ) }
   end
 
   module Real = Impl (Deferred.Result)
@@ -142,7 +141,7 @@ module Transaction = struct
       { gql=
           (fun ~hash ->
             Graphql.query
-              (Get_transactions_by_hash.make ~hashes:[|hash|] ())
+              Get_transactions_by_hash.(make @@ makeVariables ~hashes:[|hash|] ())
               graphql_uri )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
@@ -208,7 +207,7 @@ module Transaction = struct
     let user_command_info_of_obj obj =
       let open M.Let_syntax in
       let extract_public_key data =
-        match data#publicKey with
+        match data with
         | `String pk ->
             M.return (`Pk pk)
         | x ->
@@ -222,7 +221,7 @@ module Transaction = struct
                  `Invariant_violation)
       in
       let%bind kind =
-        match obj#kind with
+        match obj.Get_transactions_by_hash.kind with
         | `String "PAYMENT" ->
             M.return `Payment
         | `String "STAKE_DELEGATION" ->
@@ -237,22 +236,22 @@ module Transaction = struct
                       (Yojson.Basic.pretty_to_string kind))
                  `Invariant_violation)
       in
-      let%bind fee_payer = extract_public_key obj#feePayer in
-      let%bind source = extract_public_key obj#source in
-      let%map receiver = extract_public_key obj#receiver in
+      let%bind fee_payer = extract_public_key obj.feePayer.publicKey in
+      let%bind source = extract_public_key obj.source.publicKey in
+      let%map receiver = extract_public_key obj.receiver.publicKey in
       { User_command_info.kind
       ; fee_payer
       ; source
-      ; token= obj#token
-      ; fee= obj#fee
+      ; token= obj.token
+      ; fee= obj.fee
       ; receiver
-      ; fee_token= obj#feeToken
-      ; nonce= Unsigned.UInt32.of_int obj#nonce
-      ; amount= Some obj#amount
-      ; valid_until= obj#validUntil
-      ; memo = if String.equal obj#memo "" then None else Some obj#memo
+      ; fee_token= obj.feeToken
+      ; nonce= Unsigned.UInt32.of_int obj.nonce
+      ; amount= Some obj.amount
+      ; valid_until= obj.validUntil
+      ; memo = if String.equal obj.memo "" then None else Some obj.memo
       ; failure_status= None
-      ; hash= obj#hash }
+      ; hash= obj.hash }
 
     let handle :
       graphql_uri:Uri.t
@@ -266,13 +265,14 @@ module Transaction = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
+      let open Get_transactions_by_hash in
       let%bind user_command_obj =
-        if Array.is_empty res#pooledUserCommands then
+        if Array.is_empty res.pooledUserCommands then
           M.fail
             (Errors.create
                (`Transaction_not_found req.transaction_identifier.hash))
         else
-          let (`UserCommand cmd) = res#pooledUserCommands.(0) in
+          let cmd = res.pooledUserCommands.(0) in
           M.return cmd
       in
       let%map user_command_info = user_command_info_of_obj user_command_obj in

@@ -11,6 +11,7 @@
    core
    ppxlib
    ppxlib.ast
+   ppxlib.astlib
    core_kernel
    stdio
    ocaml-compiler-libs.common
