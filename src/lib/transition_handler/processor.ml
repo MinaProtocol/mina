@@ -43,18 +43,13 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
-  (let metadata =
-     [ ( "state_hash"
-       , Transition_frontier.Breadcrumb.state_hash breadcrumb
-         |> State_hash.to_yojson )
-     ]
-   in
-   Option.value_map valid_cb
-     ~default:(fun () ->
-       [%log debug] "add_and_finalize $state_hash without callback" ~metadata )
-     ~f:(fun _ () ->
-       [%log debug] "add_and_finalize $state_hash with callback" ~metadata )
-     () ) ;
+  [%log debug] "add_and_finalize $state_hash %s callback"
+    ~metadata:
+      [ ( "state_hash"
+        , Transition_frontier.Breadcrumb.state_hash breadcrumb
+          |> State_hash.to_yojson )
+      ]
+    (Option.value_map valid_cb ~default:"without" ~f:(const "with")) ;
   let%map () =
     if only_if_present then (
       let parent_hash = Transition_frontier.Breadcrumb.parent_hash breadcrumb in
@@ -296,7 +291,6 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                       List.iter breadcrumb_subtrees ~f:(fun tree ->
                           Rose_tree.iter tree
                             ~f:(fun (cached_breadcrumb, _vc) ->
-                              (* TODO reject callback? *)
                               let (_ : Transition_frontier.Breadcrumb.t) =
                                 Cached.invalidate_with_failure cached_breadcrumb
                               in

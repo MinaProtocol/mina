@@ -520,8 +520,12 @@ let verify_transitions_and_build_breadcrumbs ~logger
             ~trust_system ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
-            List.iter acc ~f:(fun (node, _vc) ->
-                (* TODO reject callback? *)
+            List.iter acc ~f:(fun (node, vc) ->
+                (* TODO consider rejecting the callback in some cases,
+                   see https://github.com/MinaProtocol/mina/issues/11087 *)
+                Option.value_map vc ~default:ignore
+                  ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+                  `Ignore ;
                 ignore @@ Cached.invalidate_with_failure node ) ;
             Deferred.Or_error.fail e
         | Ok (`In_frontier initial_hash) ->
@@ -590,8 +594,12 @@ let verify_transitions_and_build_breadcrumbs ~logger
           ]
         "build of breadcrumbs failed with $error" ;
       ( try
-          List.iter transitions_with_initial_validation ~f:(fun (node, _vc) ->
-              (* TODO reject callback? *)
+          List.iter transitions_with_initial_validation ~f:(fun (node, vc) ->
+              (* TODO consider rejecting the callback in some cases,
+                 see https://github.com/MinaProtocol/mina/issues/11087 *)
+              Option.value_map vc ~default:ignore
+                ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
+                `Ignore ;
               ignore @@ Cached.invalidate_with_failure node )
         with e ->
           [%log error]
@@ -601,8 +609,11 @@ let verify_transitions_and_build_breadcrumbs ~logger
 
 let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
-      Rose_tree.iter subtree ~f:(fun (node, _vc) ->
-          (* TODO reject callback? *)
+      Rose_tree.iter subtree ~f:(fun (node, vc) ->
+          (* TODO consider rejecting the callback in some cases,
+             see https://github.com/MinaProtocol/mina/issues/11087 *)
+          Option.value_map vc ~default:ignore
+            ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
           ignore @@ Cached.invalidate_with_failure node ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
