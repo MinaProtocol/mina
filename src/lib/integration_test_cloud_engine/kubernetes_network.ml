@@ -134,7 +134,7 @@ module Node = struct
         sendTestPayments(
           senders: $senders, receiver: $receiver, amount: $amount, fee: $fee,
           repeat_count: $repeat_count,
-          repeat_delay_ms: $repeat_delay_ms) 
+          repeat_delay_ms: $repeat_delay_ms)
       }
     |}]
 

@@ -389,6 +389,24 @@ module H2 : sig
     -> sig
     val f : ('a, 'b) T(A).t -> ('a, 'b) T(B).t
   end
+
+  (** See {!H1.Typ}. *)
+  module Typ : functor
+    (Impl : sig
+       type field
+
+       module Typ : sig
+         type ('var, 'value) t = ('var, 'value, field) Snarky_backendless.Typ.t
+       end
+     end)
+    -> sig
+    val f :
+         ('vars, 'values) T(Impl.Typ).t
+      -> ( 'vars H1.T(Id).t
+         , 'values H1.T(Id).t
+         , Impl.field )
+         Snarky_backendless.Typ.t
+  end
 end
 
 (** Data type of heterogeneous lists whose content type varies over two type

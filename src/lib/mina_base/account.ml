@@ -337,27 +337,6 @@ end
 
 let check = Fn.id
 
-[%%if not feature_zkapps]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  match t.zkapp with
-  | None ->
-      t
-  | Some _ ->
-      failwith "Snapp accounts not supported"
-
-[%%endif]
-
-[%%if not feature_tokens]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  if Token_id.equal Token_id.default t.token_id then t
-  else failwith "Token accounts not supported"
-
-[%%endif]
-
 [%%versioned_binable
 module Stable = struct
   module V2 = struct

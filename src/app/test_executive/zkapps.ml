@@ -118,8 +118,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       return
@@ -163,8 +162,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       let%map.Deferred parties =
@@ -233,8 +231,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       let%bind.Deferred parties_update_all =
@@ -314,8 +311,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       Transaction_snark.For_tests.update_states ~constraint_constants spec
@@ -409,6 +405,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~parties
       in
       [%log info] "ZkApp transactions included in transition frontier"
+    in
+    let snark_work_event_subscription =
+      Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->
+          [%log info] "Received new snark work" ;
+          Deferred.return `Continue )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
@@ -536,6 +537,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
     in
+    Event_router.cancel (event_router t) snark_work_event_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
