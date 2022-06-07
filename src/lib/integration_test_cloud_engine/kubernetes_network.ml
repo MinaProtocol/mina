@@ -40,16 +40,16 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:6 cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
-  let run_in_container ?container_id ~cmd t =
+  let run_in_container ?(exit_code = 10) ?container_id ~cmd t =
     let { pod_id; config; info; _ } = t in
     let container_id =
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code cwd "kubectl"
       ( base_kube_args config
       @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
       @ cmd )
@@ -67,28 +67,22 @@ module Node = struct
     Out_channel.close oc ;
     let%bind cwd = Unix.getcwd () in
     let dest_file = sprintf "%s/%s:%s" config.namespace pod_id dest in
-    Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
       (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
 
   let start ~fresh_state node : unit Malleable_error.t =
-    let open Deferred.Let_syntax in
+    let open Malleable_error.Let_syntax in
     let%bind () =
       if fresh_state then
-        Deferred.ignore_m
-          (run_in_container node ~cmd:[ "sh"; "-c"; "rm -rf .mina-config/*" ])
-      else Deferred.return ()
+        run_in_container node ~cmd:[ "sh"; "-c"; "rm -rf .mina-config/*" ]
+        >>| ignore
+      else Malleable_error.return ()
     in
-    let%bind () =
-      Deferred.ignore_m (run_in_container node ~cmd:[ "/start.sh" ])
-    in
-    Malleable_error.return ()
+    run_in_container ~exit_code:11 node ~cmd:[ "/start.sh" ] >>| ignore
 
   let stop node =
-    let open Deferred.Let_syntax in
-    let%bind () =
-      Deferred.ignore_m (run_in_container node ~cmd:[ "/stop.sh" ])
-    in
-    Malleable_error.return ()
+    let open Malleable_error.Let_syntax in
+    run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
 
   let logger_metadata node =
     [ ("namespace", `String node.config.namespace)
@@ -938,14 +932,13 @@ module Node = struct
     [%log info] "Dumping archive data from (node: %s, container: %s)" t.pod_id
       mina_archive_container_id ;
     let%map data =
-      Deferred.bind ~f:Malleable_error.return
-        (run_in_container t ~container_id:mina_archive_container_id
-           ~cmd:
-             [ "pg_dump"
-             ; "--create"
-             ; "--no-owner"
-             ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
-             ] )
+      run_in_container t ~container_id:mina_archive_container_id
+        ~cmd:
+          [ "pg_dump"
+          ; "--create"
+          ; "--no-owner"
+          ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+          ]
     in
     [%log info] "Dumping archive data to file %s" data_file ;
     Out_channel.with_file data_file ~f:(fun out_ch ->
@@ -956,9 +949,8 @@ module Node = struct
       t.pod_id mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
     let%bind accounts =
-      Deferred.bind ~f:Malleable_error.return
-        (run_in_container t
-           ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/config/daemon.json" ] )
+      run_in_container t
+        ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/config/daemon.json" ]
     in
     let replayer_input =
       sprintf
@@ -971,26 +963,23 @@ module Node = struct
         (cp_string_to_container_file t ~container_id:mina_archive_container_id
            ~str:replayer_input ~dest )
     in
-    Deferred.bind ~f:Malleable_error.return
-      (run_in_container t ~container_id:mina_archive_container_id
-         ~cmd:
-           [ "mina-replayer"
-           ; "--archive-uri"
-           ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
-           ; "--input-file"
-           ; dest
-           ; "--output-file"
-           ; "/dev/null"
-           ; "--continue-on-error"
-           ] )
+    run_in_container t ~container_id:mina_archive_container_id
+      ~cmd:
+        [ "mina-replayer"
+        ; "--archive-uri"
+        ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+        ; "--input-file"
+        ; dest
+        ; "--output-file"
+        ; "/dev/null"
+        ; "--continue-on-error"
+        ]
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
     [%log info] "Dumping container logs from (node: %s, container: %s)" t.pod_id
       t.info.primary_container_id ;
-    let%map logs =
-      Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
-    in
+    let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
         Out_channel.output_string out_ch logs )
@@ -1000,9 +989,7 @@ module Node = struct
     [%log info]
       "Dumping precomputed blocks from logs for (node: %s, container: %s)"
       t.pod_id t.info.primary_container_id ;
-    let%bind logs =
-      Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
-    in
+    let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
       String.split logs ~on:'\n'
@@ -1117,18 +1104,20 @@ module Workload = struct
 
   let get_nodes t ~config =
     let%bind cwd = Unix.getcwd () in
+    let open Malleable_error.Let_syntax in
     let%bind app_id =
-      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
-        ( base_kube_args config
-        @ [ "get"
-          ; "deployment"
-          ; t.workload_id
-          ; "-o"
-          ; "jsonpath={.spec.selector.matchLabels.app}"
-          ] )
+      Deferred.bind ~f:Malleable_error.or_hard_error
+        (Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
+           ( base_kube_args config
+           @ [ "get"
+             ; "deployment"
+             ; t.workload_id
+             ; "-o"
+             ; "jsonpath={.spec.selector.matchLabels.app}"
+             ] ) )
     in
     let%map pod_ids_str =
-      Integration_test_lib.Util.run_cmd_exn cwd "kubectl"
+      Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
         ( base_kube_args config
         @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
     in
@@ -1251,7 +1240,7 @@ let initialize_infra ~logger network =
         poll (n + 1)
       else (
         [%log fatal] "Not all pods were assigned to nodes and ready in time." ;
-        Malleable_error.hard_error_string
+        Malleable_error.hard_error_string ~exit_code:4
           "Some pods either were not assigned to nodes or did not deploy \
            properly." )
     in
@@ -1272,7 +1261,7 @@ let initialize_infra ~logger network =
             "Not all pods were found when querying namespace; this indicates a \
              deployment error. Refusing to continue. Expected pods: [%s]"
             (String.Set.elements all_pods |> String.concat ~sep:"; ") ;
-          Malleable_error.hard_error_string
+          Malleable_error.hard_error_string ~exit_code:5
             "Some pods were not found in namespace." )
         else if any_pods_are_not_running then (
           let failed_pod_statuses =
