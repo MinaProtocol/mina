@@ -372,7 +372,7 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
 
-    val snapp_to_be_included_in_frontier :
+    val zkapp_to_be_included_in_frontier :
       has_failures:bool -> parties:Mina_base.Parties.t -> t
   end
 

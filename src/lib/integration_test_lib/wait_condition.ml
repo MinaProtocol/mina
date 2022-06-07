@@ -172,7 +172,7 @@ struct
     ; hard_timeout = Slots 20
     }
 
-  let snapp_to_be_included_in_frontier ~has_failures ~parties =
+  let zkapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
       match cmd with
@@ -209,7 +209,7 @@ struct
     let soft_timeout_in_slots = 8 in
     let is_first = ref true in
     { description =
-        sprintf "snapp with fee payer %s and other parties (%s)"
+        sprintf "zkApp with fee payer %s and other parties (%s)"
           (Signature_lib.Public_key.Compressed.to_base58_check
              parties.fee_payer.body.public_key )
           (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
