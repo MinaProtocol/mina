@@ -1,7 +1,4 @@
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core_kernel
 open Signature_lib
 
