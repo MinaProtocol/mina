@@ -195,7 +195,10 @@ let step_main :
               typ )
               d
           in
-          let t = Per_proof_witness.typ typ n1 n2 in
+          (* TODO: Determine these based on the proof. *)
+          let uses_lookup = false in
+          let uses_runtime = false in
+          let t = Per_proof_witness.typ ~uses_lookup ~uses_runtime typ n1 n2 in
           t :: join ds ns1 ns2 ld ln1 ln2
       | [], _, _, _, _, _ ->
           .

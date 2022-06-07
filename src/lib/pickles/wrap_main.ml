@@ -265,8 +265,11 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
+                    (* TODO: Determine these *)
+                    let uses_lookup = false in
+                    let uses_runtime = false in
                     Plonk_types.All_evals.typ
-                      (Evaluation_lengths.create ~of_int:Fn.id)
+                      (Evaluation_lengths.create ~uses_lookup ~uses_runtime ~of_int:Fn.id)
                       Field.typ ~default:Field.Constant.zero
                   in
                   Vector.typ ty Max_proofs_verified.n

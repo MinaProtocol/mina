@@ -39,7 +39,7 @@ module Constant = struct
 
   let shift = Shifted_value.Shift.create (module Tock.Field)
 
-  let dummy () : t =
+  let dummy ~uses_lookup ~uses_runtime () : t =
     let one_chal = Challenge.Constant.dummy in
     let open Ro in
     let alpha = scalar_chal () in
@@ -57,7 +57,9 @@ module Constant = struct
       }
     in
     let evals =
-      Tuple_lib.Double.map Dummy.evals_combined.evals ~f:(fun e -> e.evals)
+      Tuple_lib.Double.map
+        (Dummy.evals_combined ~uses_lookup ~uses_runtime).evals ~f:(fun e ->
+          e.evals )
     in
     let env =
       Plonk_checks.scalars_env

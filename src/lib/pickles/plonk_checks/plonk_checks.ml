@@ -119,6 +119,18 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
         failwithf
           !"Coefficient index %d\n%! should have been linearized away"
           i ()
+    | LookupTable ->
+        failwithf "TODO" ()
+    | LookupAggreg ->
+        failwithf "TODO" ()
+    | LookupSorted _ ->
+        failwithf "TODO" ()
+    | LookupKindIndex _ ->
+        failwithf "TODO" ()
+    | LookupRuntimeSelector ->
+        failwithf "TODO" ()
+    | LookupRuntimeTable ->
+        failwithf "TODO" ()
   in
   let open F in
   let square x = x * x in
@@ -158,13 +170,20 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
   let unnormalized_lagrange_basis i =
     let w_to_i =
       match i with
-      | 0 -> one
-      | 1 -> domain#generator
-      | -1 -> w1
-      | -2 -> w2
-      | -3 -> w3
-      | -4 -> w4
-      | _ -> failwith "TODO"
+      | 0 ->
+          one
+      | 1 ->
+          domain#generator
+      | -1 ->
+          w1
+      | -2 ->
+          w2
+      | -3 ->
+          w3
+      | -4 ->
+          w4
+      | _ ->
+          failwith "TODO"
     in
     zeta_to_n_minus_1 / (zeta - w_to_i)
   in

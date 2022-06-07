@@ -810,7 +810,8 @@ struct
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let absorb_evals x_hat e =
       with_label "absorb_evals" (fun () ->
-          let xs, ys = Evals.to_vectors e in
+          let xs, ys, _lookups = Evals.to_vectors e in
+          (* TODO: Mixin lookups *)
           List.iter
             Vector.([| x_hat |] :: (to_list xs @ to_list ys))
             ~f:(Array.iter ~f:(fun x -> Sponge.absorb sponge (`Field x))) )
@@ -882,7 +883,7 @@ struct
         in
         let combine ~ft pt x_hat e =
           let pi = Proofs_verified.add Nat.N26.n in
-          let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
+          let a, b, lookups = Evals.to_vectors (e : Field.t array Evals.t) in
           let sg_evals =
             Vector.map2
               (ones_vector
@@ -898,6 +899,8 @@ struct
                  ~f:(Array.map ~f:(fun x -> (Boolean.true_, x))) )
               (snd pi)
           in
+          (* TODO: mixin lookups *)
+          ignore lookups ;
           match step_domains with
           | `Known _ ->
               Split_evaluations.combine_split_evaluations' pi ~xi

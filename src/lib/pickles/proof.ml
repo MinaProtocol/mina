@@ -113,13 +113,14 @@ end
 
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
-let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t)
-    : (w, h) t =
+let dummy (type w h r) ~uses_lookup ~uses_runtime (_w : w Nat.t) (h : h Nat.t)
+    (most_recent_width : r Nat.t) : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
   let lengths = Commitment_lengths.create ~of_int:Fn.id in
+  let dummy_evals = Dummy.evals ~uses_lookup ~uses_runtime in
   T
     { statement =
         { proof_state =
@@ -173,14 +174,14 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t
                 ; challenge_polynomial_commitment = g0
                 }
             ; evals =
-                Tuple_lib.Double.map Dummy.evals.evals ~f:(fun e -> e.evals)
-            ; ft_eval1 = Dummy.evals.ft_eval1
+                Tuple_lib.Double.map dummy_evals.evals ~f:(fun e -> e.evals)
+            ; ft_eval1 = dummy_evals.ft_eval1
             }
         }
     ; prev_evals =
         (let e () =
            Plonk_types.Evals.map
-             (Evaluation_lengths.create ~of_int:Fn.id)
+             (Evaluation_lengths.create ~uses_lookup ~uses_runtime ~of_int:Fn.id)
              ~f:tick_arr
          in
          let ex () =

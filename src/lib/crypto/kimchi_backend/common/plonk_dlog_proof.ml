@@ -241,6 +241,18 @@ module Make (Inputs : Inputs_intf) = struct
                ; s = tuple6_to_vec e.s
                ; generic_selector = e.generic_selector
                ; poseidon_selector = e.poseidon_selector
+               ; lookup_evals =
+                   Option.map e.lookup ~f:(fun lookup ->
+                       { Pickles_types.Plonk_types.Evals.Lookup_evals
+                         .lookup_sorted =
+                           (let s = lookup.sorted in
+                            [ s.(0); s.(1); s.(2); s.(3) ] )
+                       ; lookup_aggreg = lookup.aggreg
+                       ; lookup_table = lookup.table
+                       ; lookup_runtime_table =
+                           (* TODO: Do this properly. *)
+                           Option.value ~default:[||] lookup.runtime
+                       } )
                } )
     in
     let wo x : Inputs.Curve.Affine.t array =
@@ -267,12 +279,25 @@ module Make (Inputs : Inputs_intf) = struct
       ; s
       ; generic_selector
       ; poseidon_selector
+      ; lookup_evals
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
     ; z
     ; s = tuple6_of_vec s
     ; generic_selector
     ; poseidon_selector
+    ; lookup =
+        Option.map lookup_evals ~f:(fun lookup ->
+            { Kimchi_types.sorted =
+                (let [ s0; s1; s2; s3 ] = lookup.lookup_sorted in
+                 [| s0; s1; s2; s3 |] )
+            ; aggreg = lookup.lookup_aggreg
+            ; table = lookup.lookup_table
+            ; runtime =
+                (* TODO: Do this properly. *)
+                ( if Array.length lookup.lookup_runtime_table = 0 then None
+                else Some lookup.lookup_runtime_table )
+            } )
     }
 
   let vec_to_array (type t elt)

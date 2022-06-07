@@ -56,13 +56,15 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
   in
   let pi = AB.add Nat.N26.n in
   let combine ~ft (x_hat : Tick.Field.t) pt e =
-    let a, b = Plonk_types.Evals.(to_vectors (e : _ array t)) in
+    let a, b, lookup = Plonk_types.Evals.(to_vectors (e : _ array t)) in
     let v : (Tick.Field.t array, _) Vector.t =
       Vector.append
         (Vector.map challenge_polys ~f:(fun f -> [| f pt |]))
         ([| x_hat |] :: [| ft |] :: a)
         (snd pi)
     in
+    (* TODO: Mixin lookup *)
+    ignore lookup ;
     let open Tick.Field in
     Pcs_batch.combine_split_evaluations
       (Common.dlog_pcs_batch (AB.add Nat.N26.n))

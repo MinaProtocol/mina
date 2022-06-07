@@ -51,6 +51,7 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array
   ; generic_selector : 'caml_f array
   ; poseidon_selector : 'caml_f array
+  ; lookup : 'caml_f lookup_evaluations option
   }
 
 type nonrec 'caml_g poly_comm =

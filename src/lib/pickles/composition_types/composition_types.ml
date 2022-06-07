@@ -693,6 +693,8 @@ module Wrap = struct
             }
         ; pass_through
         }
+
+      let round_trip x = of_data (to_data x)
     end
 
     let to_minimal (t : _ In_circuit.t) : _ Minimal.t =

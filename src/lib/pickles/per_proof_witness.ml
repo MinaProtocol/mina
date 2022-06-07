@@ -115,8 +115,8 @@ end
 open Core_kernel
 
 let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
-    (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
-    ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
+    (max_proofs_verified : n Nat.t) (branches : m Nat.t) ~uses_lookup
+    ~uses_runtime : ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
   let open Impls.Step in
   let open Step_main_inputs in
   let open Step_verifier in
@@ -135,7 +135,9 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
         Other_field.typ
         (Snarky_backendless.Typ.unit ())
         Digest.typ index
-    ; (let lengths = Evaluation_lengths.create ~of_int:Fn.id in
+    ; (let lengths =
+         Evaluation_lengths.create ~uses_lookup ~uses_runtime ~of_int:Fn.id
+       in
        Plonk_types.All_evals.typ lengths Field.typ ~default:Field.Constant.zero
       )
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified

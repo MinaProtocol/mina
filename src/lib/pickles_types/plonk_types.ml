@@ -19,6 +19,58 @@ module Permuts = Nat.N7
 module Permuts_vec = Vector.Vector_7
 
 module Evals = struct
+  module Lookup_evals = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'a t =
+          { lookup_table : 'a
+          ; lookup_aggreg : 'a
+          ; lookup_sorted : 'a Vector.Vector_4.Stable.V1.t
+          ; lookup_runtime_table : 'a
+          }
+        [@@deriving fields, sexp, compare, yojson, hash, equal]
+      end
+    end]
+
+    let map (type a b)
+        ({ lookup_table; lookup_aggreg; lookup_sorted; lookup_runtime_table } :
+          a t ) ~(f : a -> b) : b t =
+      { lookup_table = f lookup_table
+      ; lookup_aggreg = f lookup_aggreg
+      ; lookup_sorted = Vector.map ~f lookup_sorted
+      ; lookup_runtime_table = f lookup_runtime_table
+      }
+
+    let map2 (type a b c) (evals1 : a t) (evals2 : b t) ~(f : a -> b -> c) : c t
+        =
+      { lookup_table = f evals1.lookup_table evals2.lookup_table
+      ; lookup_aggreg = f evals1.lookup_aggreg evals2.lookup_aggreg
+      ; lookup_sorted = Vector.map2 ~f evals1.lookup_sorted evals2.lookup_sorted
+      ; lookup_runtime_table =
+          f evals1.lookup_runtime_table evals2.lookup_runtime_table
+      }
+
+    let to_vector
+        { lookup_table
+        ; lookup_aggreg
+        ; lookup_sorted = [ s1; s2; s3; s4 ]
+        ; lookup_runtime_table
+        } =
+      Vector.
+        [ lookup_table; lookup_aggreg; s1; s2; s3; s4; lookup_runtime_table ]
+
+    let of_vector
+        Vector.
+          [ lookup_table; lookup_aggreg; s1; s2; s3; s4; lookup_runtime_table ]
+        =
+      { lookup_table
+      ; lookup_aggreg
+      ; lookup_sorted = [ s1; s2; s3; s4 ]
+      ; lookup_runtime_table
+      }
+  end
+
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -28,18 +80,21 @@ module Evals = struct
         ; s : 'a Permuts_minus_1_vec.Stable.V1.t
         ; generic_selector : 'a
         ; poseidon_selector : 'a
+        ; lookup_evals : 'a Lookup_evals.Stable.V1.t option
         }
       [@@deriving fields, sexp, compare, yojson, hash, equal]
     end
   end]
 
-  let map (type a b) ({ w; z; s; generic_selector; poseidon_selector } : a t)
+  let map (type a b)
+      ({ w; z; s; generic_selector; poseidon_selector; lookup_evals } : a t)
       ~(f : a -> b) : b t =
     { w = Vector.map w ~f
     ; z = f z
     ; s = Vector.map s ~f
     ; generic_selector = f generic_selector
     ; poseidon_selector = f poseidon_selector
+    ; lookup_evals = Option.map ~f:(Lookup_evals.map ~f) lookup_evals
     }
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
@@ -48,6 +103,8 @@ module Evals = struct
     ; s = Vector.map2 t1.s t2.s ~f
     ; generic_selector = f t1.generic_selector t2.generic_selector
     ; poseidon_selector = f t1.poseidon_selector t2.poseidon_selector
+    ; lookup_evals =
+        Option.map2 ~f:(Lookup_evals.map2 ~f) t1.lookup_evals t2.lookup_evals
     }
 
   let w_s_len, w_s_add_proof = Columns.add Permuts_minus_1.n
@@ -65,15 +122,25 @@ module Evals = struct
      - w (witness columns)
      - s (sigma columns)
   *)
-  let to_vectors { w; z; s; generic_selector; poseidon_selector } =
+  let to_vectors { w; z; s; generic_selector; poseidon_selector; lookup_evals }
+      =
     let w_s = Vector.append w s w_s_add_proof in
-    (Vector.(z :: generic_selector :: poseidon_selector :: w_s), Vector.[])
+    ( Vector.(z :: generic_selector :: poseidon_selector :: w_s)
+    , Vector.[]
+    , Option.map ~f:Lookup_evals.to_vector lookup_evals )
 
   let of_vectors
       ( (z :: generic_selector :: poseidon_selector :: w_s : ('a, _) Vector.t)
-      , Vector.[] ) : 'a t =
+      , Vector.[]
+      , lookup_evals ) : 'a t =
     let w, s = Vector.split w_s w_s_add_proof in
-    { w; z; s; generic_selector; poseidon_selector }
+    { w
+    ; z
+    ; s
+    ; generic_selector
+    ; poseidon_selector
+    ; lookup_evals = Option.map ~f:Lookup_evals.of_vector lookup_evals
+    }
 
   let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky_backendless.Typ.t) ~default
       : ('a array t, 'b array t, 'f) Snarky_backendless.Typ.t =
@@ -87,8 +154,27 @@ module Evals = struct
                ~back:Fn.id )
     in
     let t =
-      let l1, l2 = to_vectors lengths in
-      Snarky_backendless.Typ.tuple2 (Vector.typ' (v l1)) (Vector.typ' (v l2))
+      let l1, l2, l3 = to_vectors lengths in
+      let typ3 =
+        let open Snarky_backendless.Typ in
+        match l3 with
+        | None ->
+            unit ()
+            |> transport ~there:(fun _ -> ()) ~back:(fun () -> None)
+            |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> None)
+        | Some l3 ->
+            Vector.typ' (v l3)
+            |> transport
+                 ~there:(fun x -> Option.value_exn x)
+                 ~back:(fun x -> Some x)
+            |> transport_var
+                 ~there:(fun x -> Option.value_exn x)
+                 ~back:(fun x -> Some x)
+      in
+      Snarky_backendless.Typ.tuple3
+        (Vector.typ' (v l1))
+        (Vector.typ' (v l2))
+        typ3
     in
     Snarky_backendless.Typ.transport t ~there:to_vectors ~back:of_vectors
     |> Snarky_backendless.Typ.transport_var ~there:to_vectors ~back:of_vectors

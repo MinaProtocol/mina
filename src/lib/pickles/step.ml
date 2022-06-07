@@ -390,7 +390,8 @@ struct
           in
           let open As_field in
           let combine ~ft_eval (x_hat : Tock.Field.t) pt e =
-            let a, b = Plonk_types.Evals.(to_vectors (e : _ array t)) in
+            let a, b, _lookup = Plonk_types.Evals.(to_vectors (e : _ array t)) in
+            (* TODO: Mixin lookup *)
             let v : (Tock.Field.t array, _) Vector.t =
               Vector.append
                 (Vector.map b_polys ~f:(fun f -> [| f pt |]))

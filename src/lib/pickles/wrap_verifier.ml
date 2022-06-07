@@ -771,7 +771,8 @@ struct
     let open Field in
     let absorb_evals x_hat e =
       with_label __LOC__ (fun () ->
-          let xs, ys = Evals.to_vectors e in
+          let xs, ys, _lookups = Evals.to_vectors e in
+          (* TODO: Mixin lookups *)
           List.iter
             Vector.([| x_hat |] :: (to_list xs @ to_list ys))
             ~f:(Array.iter ~f:(Sponge.absorb sponge)) )
@@ -830,7 +831,9 @@ struct
             in
             let combine ~ft pt x_hat e =
               let pi = Proofs_verified.add Nat.N26.n in
-              let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
+              let a, b, lookups =
+                Evals.to_vectors (e : Field.t array Evals.t)
+              in
               let sg_evals =
                 match actual_proofs_verified with
                 | None ->
@@ -848,6 +851,8 @@ struct
               let v =
                 Vector.append sg_evals ([| x_hat |] :: [| ft |] :: a) (snd pi)
               in
+              (* TODO: mixin lookups *)
+              ignore lookups ;
               combined_evaluation pi ~xi ~evaluation_point:pt (v, b)
                 ~max_quot_size
             in

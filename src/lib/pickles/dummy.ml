@@ -6,19 +6,22 @@ open Common
 
 let wrap_domains = Common.wrap_domains
 
-let evals =
+let evals ~uses_lookup ~uses_runtime =
   let open Plonk_types in
   let e () =
-    Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
-        Array.create n (Ro.tock ()) )
+    Evals.map
+      (Evaluation_lengths.create ~uses_lookup ~uses_runtime ~of_int:Fn.id)
+      ~f:(fun n -> Array.create n (Ro.tock ()))
   in
   let ex () =
     { All_evals.With_public_input.evals = e (); public_input = Ro.tock () }
   in
   { All_evals.ft_eval1 = Ro.tock (); evals = (ex (), ex ()) }
 
-let evals_combined =
-  Plonk_types.All_evals.map evals ~f1:Fn.id
+let evals_combined ~uses_lookup ~uses_runtime =
+  Plonk_types.All_evals.map
+    (evals ~uses_lookup ~uses_runtime)
+    ~f1:Fn.id
     ~f2:(Array.reduce_exn ~f:Backend.Tock.Field.( + ))
 
 module Ipa = struct
