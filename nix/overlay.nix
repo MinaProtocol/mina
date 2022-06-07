@@ -104,7 +104,12 @@ in {
       final.crypto-rust)).buildRustPackage {
         pname = "kimchi_bindings_stubs";
         version = "0.1.0";
-        src = ../src/lib/crypto;
+        src = final.lib.sourceByRegex ../src [
+          "^lib(/crypto(/.*)?)?$"
+          "^external(/wasm-bindgen-rayon(/.*)?)?"
+        ];
+        cargoBuildFlags = ["-p wires_15_stubs" "-p binding_generation"];
+        sourceRoot = "source/lib/crypto";
         nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
         # FIXME: tests fail
         doCheck = false;
@@ -185,7 +190,7 @@ in {
 
   plonk_wasm = let
 
-    lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
+    lock = ../src/lib/crypto/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -218,11 +223,13 @@ in {
     pname = "plonk_wasm";
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
+      "^lib(/crypto(/.*)?)?$"
+      "^lib/crypto/Cargo\.(lock|toml)$"
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
       "^external(/wasm-bindgen-rayon(/.*)?)?"
     ];
-    sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
+    sourceRoot = "source/lib/crypto";
     nativeBuildInputs = [ pkgs.wasm-pack wasm-bindgen-cli ];
     cargoLock.lockFile = lock;
 
@@ -240,6 +247,7 @@ in {
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
+      cd kimchi_bindings/wasm
       wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
       wasm-pack build --mode no-install --target web --out-dir $out/web ./.
       )
