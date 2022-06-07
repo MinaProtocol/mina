@@ -155,9 +155,11 @@ module For_step = struct
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
     ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
-    ; wrap_domains : Domains.t
+    ; wrap_domain :
+        [ `Known of Domain.t
+        | `Side_loaded of
+          Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
-    ; max_width : Side_loaded_verification_key.Width.Checked.t option
     }
 
   let of_side_loaded (type a b c d)
@@ -186,11 +188,8 @@ module For_step = struct
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key = index.wrap_index
-    ; wrap_domains =
-        Common.wrap_domains
-          ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
+    ; wrap_domain = `Side_loaded index.max_proofs_verified
     ; step_domains = `Side_loaded
-    ; max_width = Some index.max_width
     }
 
   let of_compiled
@@ -206,7 +205,6 @@ module For_step = struct
        } :
         _ Compiled.t ) =
     { branches
-    ; max_width = None
     ; max_proofs_verified
     ; proofs_verifieds =
         `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
@@ -216,7 +214,7 @@ module For_step = struct
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
           ~f:Step_main_inputs.Inner_curve.constant
-    ; wrap_domains
+    ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
     }
 end

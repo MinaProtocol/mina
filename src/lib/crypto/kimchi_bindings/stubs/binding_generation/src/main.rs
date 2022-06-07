@@ -335,6 +335,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fp_srs_write => "write");
                 decl_func!(w, env, caml_fp_srs_read => "read");
                 decl_func!(w, env, caml_fp_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_fp_srs_add_lagrange_basis=> "add_lagrange_basis");
                 decl_func!(w, env, caml_fp_srs_commit_evaluations => "commit_evaluations");
                 decl_func!(w, env, caml_fp_srs_b_poly_commitment => "b_poly_commitment");
                 decl_func!(w, env, caml_fp_srs_batch_accumulator_check => "batch_accumulator_check");
@@ -348,6 +349,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fq_srs_write => "write");
                 decl_func!(w, env, caml_fq_srs_read => "read");
                 decl_func!(w, env, caml_fq_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_fq_srs_add_lagrange_basis=> "add_lagrange_basis");
                 decl_func!(w, env, caml_fq_srs_commit_evaluations => "commit_evaluations");
                 decl_func!(w, env, caml_fq_srs_b_poly_commitment => "b_poly_commitment");
                 decl_func!(w, env, caml_fq_srs_batch_accumulator_check => "batch_accumulator_check");
