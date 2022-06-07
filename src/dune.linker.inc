@@ -9,5 +9,8 @@
 
 (rule
   (target dune-linker)
-  (enabled_if (= %{bin-available:lld} false))
+  (enabled_if
+    (or
+      (= %{bin-available:lld} false)
+      (= %{env:DUNE_USE_DEFAULT_LINKER=n} n)))
   (action (with-stdout-to dune-linker (echo " "))))

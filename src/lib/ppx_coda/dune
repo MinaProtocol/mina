@@ -4,10 +4,7 @@
  (kind ppx_deriver)
  (libraries
    ;; opam libraries
-   ocaml-migrate-parsetree
-   ppxlib.ast
    ppx_deriving.api
-   compiler-libs.common
    ppxlib
    ppx_bin_prot
    core_kernel

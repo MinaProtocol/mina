@@ -76,7 +76,11 @@ let%test_module "Initialize state test" =
                   }
             }
         ; use_full_commitment = true
-        ; account_precondition = Accept
+        ; preconditions =
+            { Party.Preconditions.network =
+                Zkapp_precondition.Protocol_state.accept
+            ; account = Accept
+            }
         }
 
       let party : Party.Graphql_repr.t =

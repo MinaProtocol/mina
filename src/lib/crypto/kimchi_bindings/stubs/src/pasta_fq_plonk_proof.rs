@@ -82,7 +82,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
         let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, index, prev)
+        >(&group_map, witness, &[], index, prev)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok(proof.into())
     })

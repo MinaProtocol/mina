@@ -1,9 +1,6 @@
 [%%import "/src/config.mlh"]
 
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core
 open Async
 open Mina_state
