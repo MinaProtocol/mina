@@ -52,7 +52,7 @@ kubectl create configmap simplified-mainnet-dashboard --namespace gossipqa-metri
 kubectl label configmap simplified-mainnet-dashboard grafana_dashboard=1
 ```
 
-2.2: install grafana using a the stack deployer `kube-prometheus-stack`.  this stack theoretically could give us both prometheus and grafana, but we've turned off prometheus and are only deploying grafana since we are deploying prometheus separately
+3.2: install grafana using a the stack deployer `kube-prometheus-stack`.  this stack theoretically could give us both prometheus and grafana, but we've turned off prometheus and are only deploying grafana since we are deploying prometheus separately
 
 ```
 #install grafana
