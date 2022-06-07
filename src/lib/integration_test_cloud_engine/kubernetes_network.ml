@@ -913,7 +913,7 @@ let initialize_infra ~logger network =
         poll (n + 1)
       else (
         [%log fatal] "Not all pods were assigned to nodes and ready in time." ;
-        Malleable_error.hard_error_string
+        Malleable_error.hard_error_string ~exit_code:4
           "Some pods either were not assigned to nodes or did not deploy \
            properly." )
     in
