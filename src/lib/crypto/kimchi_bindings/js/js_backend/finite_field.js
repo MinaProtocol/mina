@@ -134,7 +134,7 @@ var caml_random_bytes = (function() {
     }
   } else if (typeof require !== "undefined") {
     // node (common JS)
-    crypto = require("node:crypto");
+    crypto = require("crypto");
     return function randomBytes(n) {
       return new Uint8Array_(crypto.randomBytes(n));
     }
