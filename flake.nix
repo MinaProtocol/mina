@@ -86,6 +86,10 @@
           } self ++ [
             (pushToRegistry "mina-docker")
             (pushToRegistry "mina-daemon-docker")
+            (runInEnv self.devShells.x86_64-linux.integration_tests ''
+              docker load -i=${self.packages.x86_64-linux.mina-daemon-docker}
+              test_executive cloud peers-reliability --mina-image mina-daemon:${self.sourceInfo.rev}
+            '')
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
@@ -250,6 +254,18 @@
 
         devShells.operations =
           pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
+
+        # TODO: think about rust toolchain in the dev shell
+        devShells.integration_tests = pkgs.mkShell {
+          buildInputs = [
+            self.packages.x86_64-linux.mina_integration_tests
+            pkgs.kubectl
+            pkgs.google-cloud-sdk
+            pkgs.terraform
+          ];
+        };
+        packages.impure-shell =
+          (import ./nix/impure-shell.nix pkgs).inputDerivation;
 
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 
