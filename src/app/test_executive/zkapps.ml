@@ -330,7 +330,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
-    let parties_mint_token, parties_token_transfer =
+    let parties_mint_token, parties_mint_token2, parties_token_transfer =
       (* similar to tokens tests in transaction_snark/tests/zkapp_tokens.ml
          and `Mina_ledger.Ledger`
 
@@ -342,8 +342,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let token_funder = fish1_kp in
       let token_owner = fish2_kp in
-      let token_account1 = Signature_lib.Keypair.create () in
-      let token_account2 = Signature_lib.Keypair.create () in
+      let token_accounts =
+        Array.init 4 ~f:(fun _ -> Signature_lib.Keypair.create ())
+      in
       let custom_token_id =
         Account_id.derive_token_id
           ~owner:
@@ -351,26 +352,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                (Signature_lib.Public_key.compress token_owner.public_key)
                Token_id.default )
       in
+      let custom_token_id2 =
+        Account_id.derive_token_id
+          ~owner:
+            (Account_id.create
+               (Signature_lib.Public_key.compress token_owner.public_key)
+               custom_token_id )
+      in
       let keymap =
-        List.fold [ token_funder; token_owner; token_account1; token_account2 ]
+        List.fold
+          ([ token_funder; token_owner ] @ Array.to_list token_accounts)
           ~init:Signature_lib.Public_key.Compressed.Map.empty
           ~f:(fun map { private_key; public_key } ->
             Signature_lib.Public_key.Compressed.Map.add_exn map
               ~key:(Signature_lib.Public_key.compress public_key)
               ~data:private_key )
       in
+      let fee_payer_pk =
+        Signature_lib.Public_key.compress token_funder.public_key
+      in
       let parties_mint_token =
         let open Parties_builder in
-        let fee_payer_pk =
-          Signature_lib.Public_key.compress token_funder.public_key
-        in
         let with_dummy_signatures =
           mk_forest
             [ mk_node
                 (mk_party_body Call token_owner Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_party_body Call token_account1 custom_token_id 10000)
+                    (mk_party_body Call token_accounts.(0) custom_token_id 10000)
                     []
                 ]
             ]
@@ -379,43 +388,78 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
+      let parties_mint_token2 =
+        let open Parties_builder in
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_party_body Call token_owner Token_id.default
+                   (-2 * account_creation_fee_int) )
+                [ mk_node
+                    (mk_party_body Call token_owner custom_token_id 0)
+                    [ mk_node
+                        (mk_party_body Call token_accounts.(2) custom_token_id2
+                           500 )
+                        []
+                    ]
+                ]
+            ]
+          |> mk_parties_transaction ~fee:11_500_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 3)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
       let parties_token_transfer =
         let open Parties_builder in
-        let fee_payer_pk =
-          Signature_lib.Public_key.compress token_funder.public_key
-        in
         (* lower fee than minting Parties.t *)
         let with_dummy_signatures =
           mk_forest
             [ mk_node
                 (mk_party_body Call token_owner Token_id.default
-                   (-account_creation_fee_int) )
+                   (-2 * account_creation_fee_int) )
                 [ mk_node
-                    (mk_party_body Call token_account1 custom_token_id (-30))
+                    (mk_party_body Call token_accounts.(0) custom_token_id (-30))
                     []
                 ; mk_node
-                    (mk_party_body Call token_account2 custom_token_id 30)
+                    (mk_party_body Call token_accounts.(1) custom_token_id 30)
                     []
                 ; mk_node
-                    (mk_party_body Call token_account1 custom_token_id (-10))
+                    (mk_party_body Call token_funder Token_id.default (-50))
                     []
                 ; mk_node
-                    (mk_party_body Call token_account2 custom_token_id 10)
+                    (mk_party_body Call token_funder Token_id.default 50)
                     []
                 ; mk_node
-                    (mk_party_body Call token_account2 custom_token_id (-5))
+                    (mk_party_body Call token_accounts.(0) custom_token_id (-10))
                     []
                 ; mk_node
-                    (mk_party_body Call token_account1 custom_token_id 5)
+                    (mk_party_body Call token_accounts.(1) custom_token_id 10)
                     []
+                ; mk_node
+                    (mk_party_body Call token_accounts.(1) custom_token_id (-5))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_accounts.(0) custom_token_id 5)
+                    []
+                ; mk_node
+                    (mk_party_body Call token_owner custom_token_id 0)
+                    [ mk_node
+                        (mk_party_body Call token_accounts.(2) custom_token_id2
+                           (-210) )
+                        []
+                    ; mk_node
+                        (mk_party_body Call token_accounts.(3) custom_token_id2
+                           210 )
+                        []
+                    ]
                 ]
             ]
           |> mk_parties_transaction ~fee:11_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 3)
+               ~fee_payer_nonce:(Account.Nonce.of_int 4)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
-      (parties_mint_token, parties_token_transfer)
+      (parties_mint_token, parties_mint_token2, parties_token_transfer)
     in
     let with_timeout =
       let soft_slots = 4 in
@@ -617,12 +661,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_mint_token)
     in
     let%bind () =
+      section_hard "Send a zkApp transaction to mint 2nd token"
+        (send_zkapp ~logger node parties_mint_token2)
+    in
+    let%bind () =
       section_hard "Send a zkApp transaction to transfer tokens"
         (send_zkapp ~logger node parties_token_transfer)
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to mint token"
         (wait_for_zkapp parties_mint_token)
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to mint 2nd token"
+        (wait_for_zkapp parties_mint_token2)
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to transfer tokens"
