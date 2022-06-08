@@ -833,26 +833,25 @@ struct
         , _
         , Field.Constant.t Branch_data.Checked.t )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
-      { Plonk_types.All_evals.ft_eval1
-      ; evals =
-          ( { evals = evals1; public_input = x_hat1 }
-          , { evals = evals2; public_input = x_hat2 } )
-      } =
+      { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
     let open Vector in
     let actual_width_mask = branch_data.proofs_verified_mask in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
-    let absorb_evals x_hat e =
-      with_label "absorb_evals" (fun () ->
-          let xs, ys = Evals.to_vectors e in
-          List.iter
-            Vector.([| x_hat |] :: (to_list xs @ to_list ys))
-            ~f:(Array.iter ~f:(fun x -> Sponge.absorb sponge (`Field x))) )
-    in
-    (* A lot of hashing. *)
-    absorb_evals x_hat1 evals1 ;
-    absorb_evals x_hat2 evals2 ;
     Sponge.absorb sponge (`Field ft_eval1) ;
+    let sponge_state =
+      Sponge.absorb sponge (`Field (fst evals.public_input)) ;
+      Sponge.absorb sponge (`Field (snd evals.public_input)) ;
+      let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
+      Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
+        ~f:(fun () (x1, x2) ->
+          let absorb =
+            Array.iter ~f:(fun x -> Sponge.absorb sponge (`Field x))
+          in
+          absorb x1 ; absorb x2 )
+        ~finish:(fun () -> Array.copy sponge.state)
+    in
+    sponge.state <- sponge_state ;
     let squeeze () = squeeze_challenge sponge in
     let xi_actual = squeeze () in
     let r_actual = squeeze () in

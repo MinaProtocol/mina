@@ -753,26 +753,24 @@ struct
         , _ Shifted_value.Type2.t
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
-      { Plonk_types.All_evals.ft_eval1
-      ; evals =
-          ( { evals = evals1; public_input = x_hat1 }
-          , { evals = evals2; public_input = x_hat2 } )
-      } =
+      { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
     let T = Proofs_verified.eq in
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
-    let absorb_evals x_hat e =
-      with_label __LOC__ (fun () ->
-          let xs, ys = Evals.to_vectors e in
-          List.iter
-            Vector.([| x_hat |] :: (to_list xs @ to_list ys))
-            ~f:(Array.iter ~f:(Sponge.absorb sponge)) )
-    in
-    (* A lot of hashing. *)
-    absorb_evals x_hat1 evals1 ;
-    absorb_evals x_hat2 evals2 ;
     Sponge.absorb sponge ft_eval1 ;
+    let sponge_state =
+      (* Absorb evals *)
+      Sponge.absorb sponge (fst evals.public_input) ;
+      Sponge.absorb sponge (snd evals.public_input) ;
+      let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
+      Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
+        ~f:(fun () (x1, x2) ->
+          let absorb = Array.iter ~f:(Sponge.absorb sponge) in
+          absorb x1 ; absorb x2 )
+        ~finish:(fun () -> Array.copy sponge.state)
+    in
+    sponge.state <- sponge_state ;
     let xi_actual = squeeze_scalar sponge in
     let r_actual = squeeze_challenge sponge in
     let xi_correct =
