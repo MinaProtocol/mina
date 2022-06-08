@@ -207,6 +207,7 @@ let
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
         psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
+        # TODO: investigate failing tests, ideally we should run all tests in src/
         dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
 
