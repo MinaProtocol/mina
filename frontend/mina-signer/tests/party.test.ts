@@ -18,7 +18,7 @@ let otherParties = {
           appState: ["10", null, null, null, null, null, null, null],
           delegate: null,
           verificationKey: {
-            data: "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",
+            data: "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",
             hash: "18753095584909191988538875989540962807093667505395285390425215897303813357929",
           },
           permissions: {
@@ -45,45 +45,48 @@ let otherParties = {
         sequenceEvents: [],
         callData: "0",
         callDepth: 0,
-        protocolStatePrecondition: {
-          snarkedLedgerHash: null,
-          timestamp: null,
-          blockchainLength: { lower: "0", upper: "4294967295" },
-          minWindowDensity: { lower: "0", upper: "4294967295" },
-          totalCurrency: { lower: "0", upper: "18446744073709551615" },
-          globalSlotSinceHardFork: { lower: "0", upper: "4294967295" },
-          globalSlotSinceGenesis: { lower: "0", upper: "4294967295" },
-          stakingEpochData: {
-            ledger: {
-              hash: null,
-              totalCurrency: { lower: "0", upper: "18446744073709551615" },
+        preconditions: {
+          network: {
+            snarkedLedgerHash: null,
+            timestamp: null,
+            blockchainLength: { lower: "0", upper: "4294967295" },
+            minWindowDensity: { lower: "0", upper: "4294967295" },
+            totalCurrency: { lower: "0", upper: "18446744073709551615" },
+            globalSlotSinceHardFork: { lower: "0", upper: "4294967295" },
+            globalSlotSinceGenesis: { lower: "0", upper: "4294967295" },
+            stakingEpochData: {
+              ledger: {
+                hash: null,
+                totalCurrency: { lower: "0", upper: "18446744073709551615" },
+              },
+              seed: null,
+              startCheckpoint: null,
+              lockCheckpoint: null,
+              epochLength: { lower: "0", upper: "4294967295" },
             },
-            seed: null,
-            startCheckpoint: null,
-            lockCheckpoint: null,
-            epochLength: { lower: "0", upper: "4294967295" },
+            nextEpochData: {
+              ledger: {
+                hash: null,
+                totalCurrency: { lower: "0", upper: "18446744073709551615" },
+              },
+              seed: null,
+              startCheckpoint: null,
+              lockCheckpoint: null,
+              epochLength: { lower: "0", upper: "4294967295" },
+            },
           },
-          nextEpochData: {
-            ledger: {
-              hash: null,
-              totalCurrency: { lower: "0", upper: "18446744073709551615" },
-            },
-            seed: null,
-            startCheckpoint: null,
-            lockCheckpoint: null,
-            epochLength: { lower: "0", upper: "4294967295" },
+          account: {
+            balance: { lower: "0", upper: "18446744073709551615" },
+            nonce: { lower: "0", upper: "4294967295" },
+            receiptChainHash: null,
+            publicKey: null,
+            delegate: null,
+            state: [null, null, null, null, null, null, null, null],
+            sequenceState: null,
+            provedState: null,
           },
         },
-        accountPrecondition: {
-          balance: { lower: "0", upper: "18446744073709551615" },
-          nonce: { lower: "0", upper: "4294967295" },
-          receiptChainHash: null,
-          publicKey: null,
-          delegate: null,
-          state: [null, null, null, null, null, null, null, null],
-          sequenceState: null,
-          provedState: null,
-        },
+
         useFullCommitment: true,
         caller: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
       },

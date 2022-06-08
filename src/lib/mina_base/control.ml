@@ -19,16 +19,20 @@ module Stable = struct
 end]
 
 (* lazy, to prevent spawning Rust threads at startup, which prevents daemonization *)
-let gen_with_dummies : t Quickcheck.Generator.t Lazy.t =
-  lazy
-    (Quickcheck.Generator.of_list
-       (let dummy_proof =
-          let n2 = Pickles_types.Nat.N2.n in
-          let proof = Pickles.Proof.dummy n2 n2 n2 in
-          Proof proof
-        in
-        let dummy_signature = Signature Signature.dummy in
-        [ dummy_proof; dummy_signature; None_given ] ) )
+let gen_with_dummies : t Quickcheck.Generator.t =
+  let gen =
+    lazy
+      (Quickcheck.Generator.of_list
+         (let dummy_proof =
+            let n2 = Pickles_types.Nat.N2.n in
+            let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
+            Proof proof
+          in
+          let dummy_signature = Signature Signature.dummy in
+          [ dummy_proof; dummy_signature; None_given ] ) )
+  in
+  Quickcheck.Generator.create (fun ~size ~random ->
+      Quickcheck.Generator.generate (Lazy.force gen) ~size ~random )
 
 [%%else]
 
@@ -83,7 +87,7 @@ let tag : t -> Tag.t = function
 let dummy_of_tag : Tag.t -> t = function
   | Proof ->
       let n2 = Pickles_types.Nat.N2.n in
-      let proof = Pickles.Proof.dummy n2 n2 n2 in
+      let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
       Proof proof
   | Signature ->
       Signature Signature.dummy

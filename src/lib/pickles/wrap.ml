@@ -36,8 +36,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     ~actual_proofs_verified:
       (module AB : Nat.Add.Intf with type n = actual_proofs_verified) (e1, e2)
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
-    ~plonk ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2)
-    ~(step_branch_domains : Domains.t) =
+    ~plonk ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2) =
   let combined_evals =
     Plonk_checks.evals_of_split_evals ~zeta ~zetaw
       (module Tick.Field)
@@ -91,8 +90,8 @@ let wrap
     (( module
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
-    ~dlog_plonk_index wrap_main to_field_elements ~step_vk ~step_domains
-    ~wrap_domains ~step_plonk_indices pk
+    ~dlog_plonk_index wrap_main to_field_elements ~step_vk ~wrap_domains
+    ~step_plonk_indices pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
@@ -128,7 +127,7 @@ let wrap
            H1.Map (P.Base.Me_only.Wrap.Prepared) (E01 (Digest.Constant))
              (struct
                let f (type n) (m : n P.Base.Me_only.Wrap.Prepared.t) =
-                 Common.hash_dlog_me_only
+                 Wrap_hack.hash_dlog_me_only
                    (Vector.length m.old_bulletproof_challenges)
                    m
              end)
@@ -168,6 +167,8 @@ let wrap
         k proof.openings.proof
     | Proof_state ->
         k prev_statement_with_hashes.proof_state
+    | Which_branch ->
+        k which_index
     | _ ->
         Snarky_backendless.Request.unhandled
   in
@@ -272,7 +273,6 @@ let wrap
       combined_inner_product (* Note: We do not pad here. *)
         ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
         proof.openings.evals ~x_hat ~r ~xi ~zeta ~zetaw
-        ~step_branch_domains:step_domains
         ~old_bulletproof_challenges:prev_challenges ~env:tick_env
         ~domain:tick_domain ~ft_eval1:proof.openings.ft_eval1
         ~plonk:tick_plonk_minimal
@@ -314,6 +314,21 @@ let wrap
     let shift_value =
       Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
     in
+    let branch_data : Branch_data.t =
+      { proofs_verified =
+          ( match actual_proofs_verified with
+          | Z ->
+              Branch_data.Proofs_verified.N0
+          | S Z ->
+              N1
+          | S (S Z) ->
+              N2
+          | _ ->
+              assert false )
+      ; domain_log2 =
+          Branch_data.Domain_log2.of_int_exn step_vk.domain.log_size_of_group
+      }
+    in
     { proof_state =
         { deferred_values =
             { xi
@@ -322,7 +337,7 @@ let wrap
                 Vector.of_array_and_length_exn new_bulletproof_challenges
                   Tick.Rounds.n
             ; combined_inner_product = shift_value combined_inner_product
-            ; which_branch = which_index
+            ; branch_data
             ; plonk =
                 { plonk with
                   zeta = plonk0.zeta
@@ -359,7 +374,7 @@ let wrap
                       { Tock.Proof.Challenge_polynomial.commitment = sg
                       ; challenges = Vector.to_array chals
                       } )
-                |> Vector.to_list ) )
+                |> Wrap_hack.pad_accumulator ) )
           [ input ]
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
@@ -368,7 +383,8 @@ let wrap
           ; proof_state =
               { next_statement.proof_state with
                 me_only =
-                  Common.hash_dlog_me_only max_proofs_verified me_only_prepared
+                  Wrap_hack.hash_dlog_me_only max_proofs_verified
+                    me_only_prepared
               }
           } )
   in

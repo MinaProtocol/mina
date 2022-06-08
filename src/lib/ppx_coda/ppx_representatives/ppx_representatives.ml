@@ -71,8 +71,7 @@ let rec core_type ~loc (typ : core_type) : expression =
                         (Stdlib.Format.asprintf
                            "%s: Illegal call to dummy functional value defined \
                             by %a"
-                           deriver_name Ocaml_common.Location.print_loc
-                           typ.ptyp_loc )]]]
+                           deriver_name Location.print typ.ptyp_loc )]]]
           ]]
   | Ptyp_tuple typs ->
       let exprs = List.map ~f:(core_type ~loc) typs in

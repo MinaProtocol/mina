@@ -3,10 +3,17 @@
  (public_name generated_graphql_queries)
  (libraries
    async cohttp core cohttp-async mina_base graphql-async graphql-cohttp yojson
+   graphql_lib base
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)
- (preprocess (pps ppx_jane graphql_ppx ppx_version)))
+ (preprocess (pps ppx_base ppx_version
+                  ; GraphQL with config
+                  graphql_ppx --
+                  -extend-query Graphql_lib.Serializing.ExtendQuery
+                  -extend-mutation Graphql_lib.Serializing.ExtendQuery
+                  -future-added-value false
+                  )))
 
 (rule
  (targets generated_graphql_queries.ml)

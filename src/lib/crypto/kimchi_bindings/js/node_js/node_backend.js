@@ -34,6 +34,16 @@ var wasm_ready = function(wasm) {
     wasm.wbg_rayon_start_worker(worker_threads.workerData.receiver);
 };
 
+// This function was previously exported by JSOO but was removed.
+// It is now copied here.
+// Provides: caml_js_export_var
+function caml_js_export_var (){
+  if(typeof module !== 'undefined' && module && module.exports)
+    return module.exports
+  else
+    return globalThis;
+}
+
 // Provides: startWorkers
 // Requires: worker_threads, _workers, caml_js_export_var
 var startWorkers = (function() {

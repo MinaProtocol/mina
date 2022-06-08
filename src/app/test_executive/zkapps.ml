@@ -25,8 +25,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "1000000000"; timing = Untimed }
         ]
     ; extra_genesis_accounts =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+        [ { balance = "2000000000"; timing = Untimed }
+        ; { balance = "2000000000"; timing = Untimed }
         ]
     ; num_archive_nodes = 1
     ; num_snark_workers = 2
@@ -71,7 +71,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let block_producer_nodes = Network.block_producers network in
-    (*TODO: capture snark worker processes' failures*)
+    (* TODO: capture snark worker processes' failures *)
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
@@ -96,8 +96,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
             Token_id.default )
     in
-    let%bind parties_create_account =
-      (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
+    let%bind parties_create_accounts =
+      (* construct a Parties.t, similar to zkapp_test_transaction create-zkapp-account *)
       let amount = Currency.Amount.of_int 10_000_000_000 in
       let nonce = Account.Nonce.zero in
       let memo =
@@ -118,8 +118,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       return
@@ -132,7 +131,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp update permissions"
       in
-      (*Lower fee so that parties_create_account gets applied first*)
+      (* Lower fee so that parties_create_accounts gets applied first *)
       let fee = Currency.Fee.of_int 10_000_000 in
       let new_permissions : Permissions.t =
         { Permissions.user_default with
@@ -163,8 +162,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       let%map.Deferred parties =
@@ -233,8 +231,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       let%bind.Deferred parties_update_all =
@@ -314,11 +311,97 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = None
-        ; account_precondition = None
+        ; preconditions = None
         }
       in
       Transaction_snark.For_tests.update_states ~constraint_constants spec
+    in
+    let parties_mint_token, parties_token_transfer =
+      (* similar to tokens tests in transaction_snark/tests/zkapp_tokens.ml
+         and `Mina_ledger.Ledger`
+
+         the token owner account has already been created here, so don't
+         need that as a separate transaction
+      *)
+      let account_creation_fee_int =
+        Currency.Fee.to_int constraint_constants.account_creation_fee
+      in
+      let token_funder = fish1_kp in
+      let token_owner = fish2_kp in
+      let token_account1 = Signature_lib.Keypair.create () in
+      let token_account2 = Signature_lib.Keypair.create () in
+      let custom_token_id =
+        Account_id.derive_token_id
+          ~owner:
+            (Account_id.create
+               (Signature_lib.Public_key.compress token_owner.public_key)
+               Token_id.default )
+      in
+      let keymap =
+        List.fold [ token_funder; token_owner; token_account1; token_account2 ]
+          ~init:Signature_lib.Public_key.Compressed.Map.empty
+          ~f:(fun map { private_key; public_key } ->
+            Signature_lib.Public_key.Compressed.Map.add_exn map
+              ~key:(Signature_lib.Public_key.compress public_key)
+              ~data:private_key )
+      in
+      let parties_mint_token =
+        let open Parties_builder in
+        let fee_payer_pk =
+          Signature_lib.Public_key.compress token_funder.public_key
+        in
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_party_body Call token_owner Token_id.default
+                   (-account_creation_fee_int) )
+                [ mk_node
+                    (mk_party_body Call token_account1 custom_token_id 10000)
+                    []
+                ]
+            ]
+          |> mk_parties_transaction ~fee:12_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 2)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
+      let parties_token_transfer =
+        let open Parties_builder in
+        let fee_payer_pk =
+          Signature_lib.Public_key.compress token_funder.public_key
+        in
+        (* lower fee than minting Parties.t *)
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_party_body Call token_owner Token_id.default
+                   (-account_creation_fee_int) )
+                [ mk_node
+                    (mk_party_body Call token_account1 custom_token_id (-30))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id 30)
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account1 custom_token_id (-10))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id 10)
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id (-5))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account1 custom_token_id 5)
+                    []
+                ]
+            ]
+          |> mk_parties_transaction ~fee:11_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 3)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
+      (parties_mint_token, parties_token_transfer)
     in
     let with_timeout =
       let soft_slots = 4 in
@@ -405,14 +488,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let wait_for_zkapp parties =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
              ~parties
       in
       [%log info] "ZkApp transactions included in transition frontier"
     in
+    let snark_work_event_subscription =
+      Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->
+          [%log info] "Received new snark work" ;
+          Deferred.return `Continue )
+    in
     let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
-        (send_zkapp ~logger node parties_create_account)
+        (send_zkapp ~logger node parties_create_accounts)
     in
     let%bind () =
       section_hard "Send a zkApp transaction to update permissions"
@@ -432,7 +520,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Wait for zkapp to create accounts to be included in transition \
          frontier"
-        (wait_for_zkapp parties_create_account)
+        (wait_for_zkapp parties_create_accounts)
     in
     let%bind () =
       section_hard
@@ -505,6 +593,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            "Fee_payer_account_not_found" )
     in
     let%bind () =
+      section_hard "Send a zkApp transaction to mint token"
+        (send_zkapp ~logger node parties_mint_token)
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction to transfer tokens"
+        (send_zkapp ~logger node parties_token_transfer)
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to mint token"
+        (wait_for_zkapp parties_mint_token)
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to transfer tokens"
+        (wait_for_zkapp parties_token_transfer)
+    in
+    let%bind () =
       section_hard "Verify zkApp transaction updates in ledger"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
@@ -536,6 +640,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
     in
+    Event_router.cancel (event_router t) snark_work_event_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger

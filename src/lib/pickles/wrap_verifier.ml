@@ -120,12 +120,17 @@ struct
   let scalar_to_field s =
     SC.to_field_checked (module Impl) s ~endo:Endo.Step_inner_curve.scalar
 
+  let assert_n_bits ~n a =
+    (* Scalar_challenge.to_field_checked has the side effect of
+        checking that the input fits in n bits. *)
+    ignore
+      ( SC.to_field_checked
+          (module Impl)
+          (SC.SC.create a) ~endo:Endo.Step_inner_curve.scalar ~num_bits:n
+        : Field.t )
+
   let lowest_128_bits ~constrain_low_bits x =
-    let assert_128_bits a =
-      (* Scalar_challenge.to_field_checked has the side effect of
-         checking that the input fits in 128 bits. *)
-      ignore (scalar_to_field (SC.SC.create a) : Field.t)
-    in
+    let assert_128_bits = assert_n_bits ~n:128 in
     Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
 
   let squeeze_challenge sponge : Field.t =
@@ -458,9 +463,9 @@ struct
         Field.Assert.equal t1 t2 )
 
   let incrementally_verify_proof (type b)
-      (module Max_proofs_verified : Nat.Add.Intf with type n = b) ~step_widths
-      ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge
+      (module Max_proofs_verified : Nat.Add.Intf with type n = b)
+      ~actual_proofs_verified_mask ~step_domains
+      ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
          array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
@@ -476,15 +481,8 @@ struct
     in
     let sg_old =
       with_label __LOC__ (fun () ->
-          let actual_width =
-            Pseudo.choose (which_branch, step_widths) ~f:Field.of_int
-          in
-          Vector.map2
-            (ones_vector
-               (module Impl)
-               ~first_zero:actual_width Max_proofs_verified.n )
-            sg_old
-            ~f:(fun keep sg -> [| (keep, sg) |]) )
+          Vector.map2 actual_proofs_verified_mask sg_old ~f:(fun keep sg ->
+              [| (keep, sg) |] ) )
     in
     with_label __LOC__ (fun () ->
         let sample () = Opt.challenge sponge in
@@ -827,18 +825,20 @@ struct
               let pi = Proofs_verified.add Nat.N26.n in
               let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
               let sg_evals =
-                match actual_proofs_verified with
-                | None ->
-                    Vector.map sg_olds ~f:(fun f -> [| f pt |])
-                | Some proofs_verified ->
-                    let mask =
-                      ones_vector
-                        (module Impl)
-                        ~first_zero:proofs_verified (Vector.length sg_olds)
-                    in
-                    with_label __LOC__ (fun () ->
-                        Vector.map2 mask sg_olds ~f:(fun b f ->
-                            [| Field.((b :> t) * f pt) |] ) )
+                Vector.map sg_olds ~f:(fun f -> [| f pt |])
+                (* TODO: This was the code before the wrap hack was put in
+                   match actual_proofs_verified with
+                   | None ->
+                       Vector.map sg_olds ~f:(fun f -> [| f pt |])
+                   | Some proofs_verified ->
+                       let mask =
+                         ones_vector
+                           (module Impl)
+                           ~first_zero:proofs_verified (Vector.length sg_olds)
+                       in
+                       with_label __LOC__ (fun () ->
+                           Vector.map2 mask sg_olds ~f:(fun b f ->
+                               [| Field.((b :> t) * f pt) |] ) ) *)
               in
               let v =
                 Vector.append sg_evals ([| x_hat |] :: [| ft |] :: a) (snd pi)
@@ -909,17 +909,4 @@ struct
     ; xi = scalar xi
     ; b
     }
-
-  (* TODO: No need to hash the entire bulletproof challenges. Could
-     just hash the segment of the public input LDE corresponding to them
-     that we compute when verifying the previous proof. That is a commitment
-     to them. *)
-
-  let hash_me_only (type n) (_max_proofs_verified : n Nat.t)
-      (t : (_, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t) =
-    let sponge = Sponge.create sponge_params in
-    Array.iter ~f:(Sponge.absorb sponge)
-      (Types.Wrap.Proof_state.Me_only.to_field_elements
-         ~g1:Inner_curve.to_field_elements t ) ;
-    Sponge.squeeze_field sponge
 end
