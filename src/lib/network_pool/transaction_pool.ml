@@ -367,7 +367,7 @@ struct
                   ~fee_payer_nonce:
                     ( Transaction_hash.User_command_with_valid_signature.command
                         cmd
-                    |> User_command.nonce_exn )
+                    |> User_command.application_nonce )
               with
               | Ok (t, _) ->
                   Some (cmd, t)
@@ -1608,7 +1608,7 @@ struct
                in
                let get_nonce txn =
                  Transaction_hash.User_command_with_valid_signature.command txn
-                 |> User_command.nonce_exn
+                 |> User_command.application_nonce
                in
                if cmp <> 0 then cmp
                else
@@ -1789,8 +1789,8 @@ let%test_module _ =
             (User_command.fee_payer cmd2)
         then
           Account.Nonce.compare
-            (User_command.nonce_exn cmd1)
-            (User_command.nonce_exn cmd2)
+            (User_command.application_nonce cmd1)
+            (User_command.application_nonce cmd2)
         else
           let get_fee_wu cmd = User_command.fee_per_wu cmd in
           (* descending order of fee/weight *)
@@ -2253,6 +2253,15 @@ let%test_module _ =
 
     let mk_expired_not_accepted_test assert_pool_txs pool ~padding cmds =
       assert_pool_txs [] ;
+      let%bind () =
+        let current_time = Block_time.now time_controller in
+        let slot_end =
+          Consensus.Data.Consensus_time.(
+            of_time_exn ~constants:consensus_constants current_time
+            |> end_time ~constants:consensus_constants)
+        in
+        at (Block_time.to_time slot_end)
+      in
       let curr_slot = current_global_slot () in
       let slot_padding = Mina_numbers.Global_slot.of_int padding in
       let curr_slot_plus_padding =
@@ -2304,7 +2313,7 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
             setup_test ()
           in
-          mk_expired_not_accepted_test assert_pool_txs pool ~padding:25
+          mk_expired_not_accepted_test assert_pool_txs pool ~padding:55
             (mk_parties_cmds pool) )
 
     let%test_unit "Expired transactions that are already in the pool are \
