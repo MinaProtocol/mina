@@ -1,6 +1,7 @@
 open Core
 open Async
 open Signature_lib
+module Decoders = Graphql_lib.Decoders
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -67,9 +68,7 @@ query ($public_key: PublicKey) {
   account(publicKey: $public_key) {
     nonce
     balance {
-      total
-      liquid
-      locked
+      total @bsDecoder(fn: "Decoders.balance")
     }
   }
 }

@@ -4,9 +4,9 @@ open Signature_lib
 open Txn_tool_graphql
 open Unsigned
 
-let gen_secret_keys count =
-  Quickcheck.random_value ~seed:`Nondeterministic
-    (Quickcheck.Generator.list_with_length count Private_key.gen)
+(* let gen_secret_keys count =
+   Quickcheck.random_value ~seed:`Nondeterministic
+     (Quickcheck.Generator.list_with_length count Private_key.gen) *)
 
 let gen_keys count =
   Quickcheck.random_value ~seed:`Nondeterministic
