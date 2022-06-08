@@ -54,10 +54,10 @@ let%test_module "Archive node unit tests" =
       Mina_generators.User_command_generators.payment_with_random_participants
         ~keys ~max_amount:1000 ~fee_range:10 ()
 
-    let genesis_state_body =
-      precomputed_values.protocol_state_with_hashes.data.body
-
     let genesis_state_view =
+      let genesis_state_body =
+        precomputed_values.protocol_state_with_hashes.data.body
+      in
       Mina_state.Protocol_state.Body.view genesis_state_body
 
     let user_command_zkapp_gen :
