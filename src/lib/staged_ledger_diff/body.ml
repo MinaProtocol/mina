@@ -1,5 +1,11 @@
 open Core_kernel
 
+(* TODO Consider moving to a different location. as in future this won't be only about block body *)
+module Tag = struct
+  type t = Body [@@deriving enum]
+  (* In future: | EpochLedger |... *)
+end
+
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -48,8 +54,16 @@ type t = Stable.Latest.t
 Stable.Latest.
   (create, to_yojson, sexp_of_t, t_of_sexp, compare, staged_ledger_diff)]
 
-let compute_reference b =
-  let sz = Stable.V1.bin_size_t b in
-  let buf = Bin_prot.Common.create_buf sz in
-  ignore (Stable.V1.bin_write_t buf ~pos:0 b : int) ;
-  snd @@ Bitswap_block.blocks_of_data ~max_block_size:1024 buf
+let serializize_with_len_and_tag b =
+  let len = Stable.V1.bin_size_t b in
+  let bs' = Bigstring.create (len + 5) in
+  ignore (Stable.V1.bin_write_t bs' ~pos:5 b : int) ;
+  Bigstring.set_uint8_exn ~pos:4 bs' (Tag.to_enum Body) ;
+  Bigstring.set_uint32_le_exn ~pos:0 bs' (len + 1) ;
+  bs'
+
+let compute_reference =
+  Fn.compose snd
+  @@ Fn.compose
+       (Bitswap_block.blocks_of_data ~max_block_size:262144)
+       serializize_with_len_and_tag

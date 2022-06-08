@@ -1,3 +1,8 @@
+(* TODO Consider moving to a different location. as in future this won't be only about block body *)
+module Tag : sig
+  type t = Body [@@deriving enum]
+end
+
 [%%versioned:
 module Stable : sig
   [@@@no_toplevel_latest_type]
