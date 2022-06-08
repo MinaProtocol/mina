@@ -1,18 +1,22 @@
-# Mina Signer
+# Mina Signer Experimental
 
-This is a NodeJS SDK that allows you to sign strings, payments, and delegations using Mina's key pairs for various specified networks.
+This is purly an experimental build, please use this with care. Please see the offical [mina-signer](https://www.npmjs.com/package/mina-signer) package first.
+
+This is a Browser/NodeJS SDK that allows you to sign strings, payments, and delegations using Mina's key pairs for various specified networks.
 
 # Install
 
 ```bash
-yarn add mina-signer
+yarn add mina-signer-experimental
 # or with npm:
-npm install --save mina-signer
+npm install --save mina-signer-experimental
 ```
 
 # Usage
 
 ```js
+import Client from "mina-signer-experimental";
+const client = new Client({ network: "mainnet" });
 import Client from "mina-signer";
 const client = new Client({ network: "mainnet" });
 
