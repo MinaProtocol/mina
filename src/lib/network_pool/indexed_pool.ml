@@ -757,8 +757,8 @@ let expired_by_predicate (t : t) :
   |> Sequence.filter_map ~f:(fun (cmd_hash, cmd) ->
          Transaction_hash.User_command_with_valid_signature.data cmd
          |> function
-         | User_command.Parties ps ->
-             Some (cmd_hash, ps)
+         | User_command.Parties (ps : Parties.Valid.t) ->
+             Some (cmd_hash, ps.parties)
          | User_command.Signed_command _ ->
              None )
   |> Sequence.filter ~f:(fun (_, ps) ->

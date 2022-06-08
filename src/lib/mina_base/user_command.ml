@@ -58,23 +58,6 @@ end
 
 module Gen = Gen_make (Signed_command)
 
-module Valid = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        ( Signed_command.With_valid_signature.Stable.V2.t
-        , Parties.Valid.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, compare, equal, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  module Gen = Gen_make (Signed_command.With_valid_signature)
-end
-
 [%%versioned
 module Stable = struct
   module V2 = struct
@@ -146,7 +129,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
         let account : Account.t =
           !(get ledger !(location_of_account ledger id))
         in
-        !(!(account.zkapp).verification_key).data )
+        !(!(account.zkapp).verification_key) )
   in
   match t with
   | Signed_command c ->
@@ -215,13 +198,6 @@ let target_nonce (t : t) =
   | Parties p ->
       Parties.target_nonce p
 
-let check (t : t) : Valid.t option =
-  match t with
-  | Signed_command x ->
-      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
-  | Parties p ->
-      Some (Parties (p :> Parties.Valid.t))
-
 let fee_token (t : t) =
   match t with
   | Signed_command x ->
@@ -236,12 +212,45 @@ let valid_until (t : t) =
   | Parties _ ->
       Mina_numbers.Global_slot.max_value
 
-let forget_check (t : Valid.t) : t = (t :> t)
+module Valid = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type t =
+        ( Signed_command.With_valid_signature.Stable.V2.t
+        , Parties.Valid.Stable.V1.t )
+        Poly.Stable.V2.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  module Gen = Gen_make (Signed_command.With_valid_signature)
+end
+
+let check ~ledger ~get ~location_of_account (t : t) : Valid.t option =
+  match t with
+  | Signed_command x ->
+      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
+  | Parties p ->
+      Option.map (Parties.Valid.to_valid ~ledger ~get ~location_of_account p)
+        ~f:(fun p -> Parties p)
+
+let forget_check (t : Valid.t) : t =
+  match t with
+  | Parties x ->
+      Parties (Parties.Valid.forget x)
+  | Signed_command c ->
+      Signed_command (c :> Signed_command.t)
 
 let to_valid_unsafe (t : t) =
   `If_this_is_used_it_should_have_a_comment_justifying_it
     ( match t with
     | Parties x ->
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it x) =
+          Parties.Valid.to_valid_unsafe x
+        in
         Parties x
     | Signed_command x ->
         (* This is safe due to being immediately wrapped again. *)
