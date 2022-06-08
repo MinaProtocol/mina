@@ -12,5 +12,5 @@
   (enabled_if
     (or
       (= %{bin-available:lld} false)
-      (= %{env:DUNE_USE_DEFAULT_LINKER=n} n)))
+      (= %{env:DUNE_USE_DEFAULT_LINKER=n} y)))
   (action (with-stdout-to dune-linker (echo " "))))

@@ -99,7 +99,7 @@ let statement = Ledger.transactionStatement(partiesJsonInitialize, 0);
 let ok = await Ledger.verifyPartyProof(statement, proof, verificationKey.data);
 toc();
 console.log("did proof verify?", ok);
-if (!ok) console.log("proof didn't verify");
+if (!ok) throw Error("proof didn't verify");
 
 tic("apply initialize transaction");
 Local.applyJsonTransaction(partiesJsonInitialize);
