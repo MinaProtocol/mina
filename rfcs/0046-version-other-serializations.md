@@ -18,7 +18,7 @@ in current code.
 
 ### Top-tagged JSON
 
-In RFC 0046, there is a suggestion to allow "top-tagging" of
+In RFC 0047, there is a suggestion to allow "top-tagging" of
 `Bin_prot` serializations.  For JSON serializations, that approach can
 be the default. In a versioned module `Vn`, we would shadow the
 generated Yojson functions:
@@ -44,7 +44,7 @@ For `Bin_prot`-serialized data, we already generate:
   val bin_read_to_latest_opt : Bin_prot.Common.buf -> pos_ref:(int ref) -> Stable.Latest.t option
 ```
 which allows reading serialized data of any version, and converting to
-the latest version. (RFC 0046 proposes generating that function in a
+the latest version. (RFC 0047 proposes generating that function in a
 slightly different way.)
 
 For JSON, we can have:
@@ -105,7 +105,7 @@ in a uniform way, without special handling for legacy blocks.
 ## Prior art
 [prior-art]: #prior-art
 
-The existing versioning system is prior art, and RFC 0046 describes
+The existing versioning system is prior art, and RFC 0047 describes
 top-tagging for `Bin_prot`-serialized data.
 
 ## Unresolved questions

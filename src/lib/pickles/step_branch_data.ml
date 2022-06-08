@@ -17,7 +17,7 @@ type ( 'a_var
   | T :
       { proofs_verified :
           'proofs_verified Nat.t * ('prev_vars, 'proofs_verified) Hlist.Length.t
-      ; index : Types.Index.t
+      ; index : int
       ; lte : ('proofs_verified, 'max_proofs_verified) Nat.Lte.t
       ; domains : Domains.t
       ; rule :
