@@ -1,5 +1,6 @@
 [%%import "/src/config.mlh"]
 
+open Core_kernel
 open Snark_params.Tick
 
 module Auth_required : sig
@@ -10,6 +11,8 @@ module Auth_required : sig
       [@@deriving sexp, equal, compare, hash, yojson, enum]
     end
   end]
+
+  val from : auth_tag:Control.Tag.t -> t
 
   val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
@@ -137,6 +140,9 @@ val deriver :
       ; to_json_accumulator :
           (string * (Auth_required.t Poly.t -> Yojson.Safe.t)) option list ref
       ; skip : bool ref
+      ; js_layout : Yojson.Safe.t ref
+      ; js_layout_accumulator :
+          Fields_derivers_zkapps.Js_layout.Accumulator.field option list ref
       ; .. >
       as
       'a )

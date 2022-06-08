@@ -63,13 +63,6 @@ let non_pc_registers_equal_var t1 t2 =
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
       |> Impl.Boolean.all )
 
-let non_pc_registers_equal t1 t2 =
-  let module F = Core_kernel.Field in
-  let f eq field = eq (F.get field t1) (F.get field t2) in
-  Registers.Fields.for_all
-    ~ledger:(f Frozen_ledger_hash.equal)
-    ~pending_coinbase_stack:(f Unit.equal) ~local_state:(f Local_state.equal)
-
 (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
       Input:
         old : Blockchain.t
@@ -319,23 +312,6 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
                [ x1; x2 ] x )
         in
         [ b1; b2 ] )
-  ; main_value =
-      (fun [ prev; (txn : Transaction_snark.Statement.With_sok.t) ] curr ->
-        let registers (t : Protocol_state.Value.t) =
-          (Protocol_state.blockchain_state t).registers
-        in
-        [ not
-            (Consensus.Data.Consensus_state.is_genesis_state
-               (Protocol_state.consensus_state curr) )
-        ; List.for_all ~f:Fn.id
-            [ non_pc_registers_equal (registers prev) (registers curr)
-            ; Currency.Amount.(equal zero)
-                txn.Transaction_snark.Statement.supply_increase
-            ; Pending_coinbase.Stack.equal txn.source.pending_coinbase_stack
-                txn.target.pending_coinbase_stack
-            ]
-          |> not
-        ] )
   }
 
 module Statement = struct

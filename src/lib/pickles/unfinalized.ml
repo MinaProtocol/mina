@@ -92,3 +92,12 @@ module Constant = struct
     ; sponge_digest_before_evaluations = Digest.Constant.dummy
     }
 end
+
+let typ ~wrap_rounds : (t, Constant.t) Typ.t =
+  Types.Step.Proof_state.Per_proof.In_circuit.spec wrap_rounds
+  |> Spec.typ (module Impl) (Shifted_value.typ Other_field.typ)
+  |> Typ.transport ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
+       ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data
+  |> Typ.transport_var
+       ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
+       ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data

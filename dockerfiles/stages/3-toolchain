@@ -9,6 +9,9 @@ ARG deb_codename=focal
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.14.11
 ARG DEBS3_VERSION=0.11.6
+ARG DHALL_VERSION=1.41.1
+ARG DHALL_JSON_VERSION=1.7.10
+ARG DHALL_BASH_VERSION=1.0.40
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
@@ -75,8 +78,8 @@ RUN test "$deb_codename" = "buster" \
       || exit 0
 
 # --- deb-s3 tool
-# tweag version, with lock only on manifest upload
-RUN curl -sLO https://github.com/tweag/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
+# Custom version, with lock only on manifest upload
+RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
     && sudo gem install deb-s3-${DEBS3_VERSION}.gem \
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
@@ -109,6 +112,14 @@ RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && sudo apt update \
     && sudo apt install -y nodejs yarn
+
+# Dhall
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \
+    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-x86_64-linux.tar.bz2 \
+    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
+    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
 
 # --- extra Rust toolchain and wasm-pack for Wasm builds
 RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
