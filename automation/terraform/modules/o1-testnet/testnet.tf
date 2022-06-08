@@ -28,7 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  use_local_charts   = false
+  use_local_charts   = true
   mina_image         = var.mina_image
   mina_archive_image = var.mina_archive_image
   mina_agent_image   = var.mina_agent_image

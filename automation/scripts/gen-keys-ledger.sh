@@ -54,8 +54,8 @@ fi
 
 mkdir "$KEYSDIR"
 
-export MINA_PRIVKEY_PASS='${PRIVKEY_PASS}'
-export MINA_LIBP2P_PASS='${PRIVKEY_PASS}'
+export MINA_PRIVKEY_PASS="${PRIVKEY_PASS}"
+export MINA_LIBP2P_PASS="${PRIVKEY_PASS}"
 
 echo "generating whale keys"
 for i in $(seq 1 $WHALES); do

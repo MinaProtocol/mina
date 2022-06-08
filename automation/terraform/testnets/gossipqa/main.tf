@@ -34,6 +34,12 @@ provider "google" {
   zone    = "us-central1-c"
 }
 
+provider "google" {
+  alias   = "mina-infra-canada"
+  project = "o1labs-192920"
+  region  = "northamerica-northeast1"
+  zone    = "northamerica-northeast1-c"
+}
 
 variable "whale_count" {
   type = number
@@ -78,14 +84,14 @@ locals {
 }
 
 module "gossipqa" {
-  providers = { google.gke = google.google-us-central1 }
+  providers = { google.gke = google.mina-infra-canada }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "mina-infra-canada"
+  cluster_region = "northamerica-northeast1"
+  k8s_context    = "gke_o1labs-192920_northamerica-northeast1_mina-infra-canada"
   testnet_name   = local.testnet_name
 
   mina_image         = local.mina_image
@@ -94,7 +100,7 @@ module "gossipqa" {
   mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
-  use_embedded_runtime_config = true
+  use_embedded_runtime_config = false
 
   archive_node_count  = 3
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql"
@@ -145,61 +151,61 @@ module "gossipqa" {
     {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qrtM9sqxvu3Y7s2KXBSzxZHs9SURN7xSRoBNRemUNaN494mybRVc"
+      snark_worker_public_key = "B62qoYAbgvbVB2QsmhJyZiEC8YHzumYvFDMGKWsu8A1n4bW3M3hv7yz"
       snark_coordinators_host_port = 10401
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qr6jbkibG3BdvUGEYZaMR2yrtQxwkumyLKd9QgGhJ6oLJ5A5sd4g"
+      snark_worker_public_key = "B62qkesaX38rXheQmochTPmaVEbmzqwzKD6tjVpmuXFMTXxW5Cj5rR8"
       snark_coordinators_host_port = 10402
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qm2XoqdhFQeyy5hrvyg5D9UnRXQw4xY9CYa5rqnNSZwFyVaENE7J"
+      snark_worker_public_key = "B62qrTrbQbVoTLrr22CxvDfN6CfvZzzwp36DKBMScy739vn2wpcCKhG"
       snark_coordinators_host_port = 10403
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qoREavDYSGa5L1UVZW42m29hcPYwEwmWdBJ1GUzsihVVFHkqF2x6"
+      snark_worker_public_key = "B62qjhpfPJAZCdLu2GAZ4x8Zfty6LuUiiuyEtQypJL4ESmPmgJKeSmH"
       snark_coordinators_host_port = 10404
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qmgEgYZYf6uwFifNyfigx4WRiGznchgStn7c5SKKe4vPQQZupuLz"
+      snark_worker_public_key = "B62qqEtDVSH2uiVyGBDfSTwXsFwMgVfH8yoDuApfPxK54fVwdpBVmBT"
       snark_coordinators_host_port = 10405
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qptG6paTZSV35CAtfhyEv6xSnxC9wagLkDUeg5oeyHcDqRFgeztH"
+      snark_worker_public_key = "B62qk1aSEpoyWSoxkyR2hsEeA2b6vz8dzWVwCugxeUZydsYDpXomZs4"
       snark_coordinators_host_port = 10406
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qmkdnR9LVbUFJygPBRJERZ2LbHNpktmpWUJRv5HyPXMu17LbGxSW"
+      snark_worker_public_key = "B62qoZ5hwfauSoVWTG4eHGoEWy4KV1S11vJUEaPwaBF9PbufpNhtfHS"
       snark_coordinators_host_port = 10407
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qpC52Xa9CJswwWnUbNrV56ia1a7TNfwcqMRkS4dL4Ca94rFUCEVU"
+      snark_worker_public_key = "B62qjCmmj2T64GiLAsJBhnBEyA28voEJsG3PFbXP1wRakTKNJePCtjS"
       snark_coordinators_host_port = 10408
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qkK6SYevpNwmCBMkKg9teBkBY398Ji5szhLbg9uesEXhu9x6dgcX"
+      snark_worker_public_key = "B62qjSqjAsjxBJMAY4wnybyCfMHYB9nypLU81wD68PCH8KEZeU4eNjm"
       snark_coordinators_host_port = 10409
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qrZXxFq7fr66mG5xNmUGgk8fAPrxqStNvRHWADsE4UQeTGbqNaKs"
+      snark_worker_public_key = "B62qokpZpTafUHAwx8UpR6Rwupz6kGiifmsdmmuq2sg8nMpoBmnjDAL"
       snark_coordinators_host_port = 10410
     }
   ]
