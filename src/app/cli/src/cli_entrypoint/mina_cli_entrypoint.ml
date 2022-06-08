@@ -1670,23 +1670,10 @@ let mina_commands logger =
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (module Coda_peers_test)
-        ; (module Coda_block_production_test)
-        ; (module Coda_shared_state_test)
+      ( [ (module Coda_shared_state_test)
         ; (module Coda_transitive_peers_test)
-        ; (module Coda_shared_prefix_test)
-        ; (module Coda_shared_prefix_multiproducer_test)
-        ; (module Coda_five_nodes_test)
-        ; (module Coda_restart_node_test)
-        ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
-        ; (module Coda_long_fork)
-        ; (module Coda_txns_and_restart_non_producers)
-        ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
-        ; (module Full_test)
-        ; (module Transaction_snark_profiler)
-        ; (module Coda_archive_processor_test)
         ]
         : (module Integration_test) list )
   in

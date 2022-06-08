@@ -23,10 +23,6 @@ let one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
-(* Converts a one hot vector to an Index.t value *)
-let one_hot_vector_to_index v =
-  one_hot_vector_to_num v |> Types.Index.of_field (module Impl)
-
 let verify_one
     ({ app_state
      ; wrap_proof
@@ -49,22 +45,10 @@ let verify_one
           sponge
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
-        finalize_other_proof d.max_proofs_verified ~max_width:d.max_width
-          ~step_widths:d.proofs_verifieds ~step_domains:d.step_domains ~sponge
-          ~prev_challenges proof_state.deferred_values prev_proof_evals )
+        finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
+          ~sponge ~prev_challenges proof_state.deferred_values prev_proof_evals )
   in
-  let which_branch = proof_state.deferred_values.which_branch in
-  let proof_state =
-    with_label __LOC__ (fun () ->
-        { proof_state with
-          deferred_values =
-            { proof_state.deferred_values with
-              which_branch =
-                one_hot_vector_to_num proof_state.deferred_values.which_branch
-                |> Types.Index.of_field (module Impl)
-            }
-        } )
-  in
+  let branch_data = proof_state.deferred_values.branch_data in
   let statement =
     let prev_me_only =
       with_label __LOC__ (fun () ->
@@ -74,7 +58,11 @@ let verify_one
           in
           hash ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
-            ~which_branch
+            ~proofs_verified_mask:
+              (Vector.trim branch_data.proofs_verified_mask
+                 (Nat.lte_exn
+                    (Vector.length prev_challenge_polynomial_commitments)
+                    Nat.N2.n ) )
             (* Use opt sponge for cutting off the bulletproof challenges early *)
             { app_state
             ; dlog_plonk_index = d.wrap_key
@@ -89,8 +77,7 @@ let verify_one
   in
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~proofs_verified:d.max_proofs_verified
-          ~wrap_domain:d.wrap_domains.h
+        verify ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
           ~is_base_case:(Boolean.not should_verify)
           ~sg_old:prev_challenge_polynomial_commitments ~proof:wrap_proof
           ~wrap_verification_key:d.wrap_key statement unfinalized )
@@ -332,13 +319,13 @@ let step_main :
                       Types_map.For_step.t =
                     { branches = self_branches
                     ; proofs_verifieds =
-                        Vector.map basic.proofs_verifieds ~f:Field.of_int
+                        `Known
+                          (Vector.map basic.proofs_verifieds ~f:Field.of_int)
                     ; max_proofs_verified = (module Max_proofs_verified)
-                    ; max_width = None
                     ; typ = basic.typ
                     ; var_to_field_elements = basic.var_to_field_elements
                     ; value_to_field_elements = basic.value_to_field_elements
-                    ; wrap_domains = basic.wrap_domains
+                    ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
                     }

@@ -73,7 +73,7 @@ end
 module Proof : sig
   type ('max_width, 'mlmb) t
 
-  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
+  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> domain_log2:int -> ('w, 'm) t
 
   module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
     type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]
@@ -190,6 +190,8 @@ module Side_loaded : sig
       end
     end]
 
+    val of_proof : _ Proof.t -> t
+
     val to_base64 : t -> string
 
     val of_base64 : string -> (t, string) Result.t
@@ -221,6 +223,8 @@ module Side_loaded : sig
   (* Must be called immediately before calling the prover for the inductive rule
      for which this tag is used as a predecessor. *)
   val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
+
+  val srs_precomputation : unit -> unit
 end
 
 (** This compiles a series of inductive rules defining a set into a proof

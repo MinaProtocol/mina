@@ -94,7 +94,7 @@ struct
         , Digest.Constant.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
-        , Index.t )
+        , Branch_data.t )
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
@@ -128,11 +128,7 @@ struct
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
-          (Vector.to_array (Types_map.lookup_step_domains tag)).(Index.to_int
-                                                                   t.statement
-                                                                     .proof_state
-                                                                     .deferred_values
-                                                                     .which_branch)
+          Branch_data.domain t.statement.proof_state.deferred_values.branch_data
         in
         let to_field =
           SC.to_field_constant
@@ -218,7 +214,7 @@ struct
                     }
                 }
             ; me_only =
-                Common.hash_dlog_me_only Local_max_proofs_verified.n
+                Wrap_hack.hash_dlog_me_only Local_max_proofs_verified.n
                   { old_bulletproof_challenges = prev_challenges
                   ; challenge_polynomial_commitment =
                       statement.proof_state.me_only
@@ -233,8 +229,7 @@ struct
           tock_public_input_of_statement prev_statement_with_hashes
         in
         O.create dlog_vk
-          Vector.(
-            map2
+          ( Vector.map2
               (Vector.extend_exn
                  statement.pass_through.challenge_polynomial_commitments
                  Local_max_proofs_verified.n
@@ -245,7 +240,7 @@ struct
                 { Tock.Proof.Challenge_polynomial.commitment
                 ; challenges = Vector.to_array chals
                 } )
-            |> to_list)
+          |> Wrap_hack.pad_accumulator )
           public_input t.proof
       in
       let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
@@ -363,7 +358,7 @@ struct
           Vector.map
             ~f:(fun chals ->
               unstage (challenge_polynomial (Vector.to_array chals)) )
-            prev_challenges
+            (Wrap_hack.pad_challenges prev_challenges)
         in
         let open As_field in
         let combine ~ft_eval (x_hat : Tock.Field.t) pt e =
@@ -372,11 +367,11 @@ struct
             Vector.append
               (Vector.map b_polys ~f:(fun f -> [| f pt |]))
               ([| x_hat |] :: [| ft_eval |] :: a)
-              (snd (Local_max_proofs_verified.add Nat.N26.n))
+              (snd (Wrap_hack.Padded_length.add Nat.N26.n))
           in
           let open Tock.Field in
           Pcs_batch.combine_split_evaluations
-            (Common.dlog_pcs_batch (Local_max_proofs_verified.add Nat.N26.n))
+            (Common.dlog_pcs_batch (Wrap_hack.Padded_length.add Nat.N26.n))
             ~xi ~init:Fn.id ~mul ~last:Array.last
             ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
             ~evaluation_point:pt
@@ -565,7 +560,7 @@ struct
                       Dummy.Ipa.Wrap.challenges_computed )
               }
             in
-            Common.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
+            Wrap_hack.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
       in
       lazy
         (pad
@@ -623,12 +618,10 @@ struct
           ~wrap_rounds:Tock.Rounds.n
       in
       let { Domains.h } =
-        List.nth_exn
-          (Vector.to_list step_domains)
-          (Index.to_int branch_data.index)
+        List.nth_exn (Vector.to_list step_domains) branch_data.index
       in
-      ksprintf Common.time "step-prover %d (%d)"
-        (Index.to_int branch_data.index) (Domain.size h) (fun () ->
+      ksprintf Common.time "step-prover %d (%d)" branch_data.index
+        (Domain.size h) (fun () ->
           Impls.Step.generate_witness_conv
             ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
                     next_statement_hashed ->

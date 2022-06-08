@@ -9,6 +9,7 @@
    core_kernel
    ppxlib
    ppxlib.ast
+   ppxlib.astlib
    async
    core
    ocaml-migrate-parsetree

@@ -25,7 +25,12 @@ module Basic = struct
             ; bulletproof_challenge2 : 'bp_chal2
             ; .. > )
           t
-    | Index : ('index1, 'index2, < index1 : 'index1 ; index2 : 'index2 ; .. >) t
+    | Branch_data
+        : ( 'branch_data1
+          , 'branch_data2
+          , < branch_data1 : 'branch_data1 ; branch_data2 : 'branch_data2 ; .. >
+          )
+          t
 end
 
 open Basic
@@ -51,8 +56,12 @@ type ('a, 'b, 'c) basic = ('a, 'b, 'c) Basic.t =
           ; bulletproof_challenge2 : 'bp_chal2
           ; .. > )
         basic
-  | Index
-      : ('index1, 'index2, < index1 : 'index1 ; index2 : 'index2 ; .. >) basic
+  | Branch_data
+      : ( 'branch_data1
+        , 'branch_data2
+        , < branch_data1 : 'branch_data1 ; branch_data2 : 'branch_data2 ; .. >
+        )
+        basic
 
 module rec T : sig
   type (_, _, _) t =
@@ -205,8 +214,8 @@ module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
       ; bulletproof_challenge1 :
           Challenge.Constant.t Sc.t Bulletproof_challenge.t
       ; bulletproof_challenge2 : Challenge.t Sc.t Bulletproof_challenge.t
-      ; index1 : Index.t
-      ; index2 : (Boolean.var, Nat.N8.n) Vector.t
+      ; branch_data1 : Branch_data.t
+      ; branch_data2 : Impl.field Branch_data.Checked.t
       ; .. >
       as
       'a
@@ -233,9 +242,11 @@ let pack_basic (type field other_field other_field_var)
         [| `Packed_bits (x, Field.size_in_bits) |]
     | Challenge ->
         [| `Packed_bits (x, Challenge.length) |]
-    | Index ->
-        let x = Vector.to_list x in
-        [| `Packed_bits (Field.pack x, List.length x) |]
+    | Branch_data ->
+        [| `Packed_bits
+             ( Branch_data.Checked.pack (module Impl) x
+             , Branch_data.length_in_bits )
+        |]
     | Bulletproof_challenge ->
         let { Bulletproof_challenge.prechallenge = { Sc.inner = pre } } = x in
         [| `Packed_bits (pre, Challenge.length) |]
@@ -246,7 +257,7 @@ let pack impl t = pack (pack_basic impl) t
 
 let typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    (field : (other_field_var, other_field) Impl.Typ.t) =
+    ~assert_16_bits (field : (other_field_var, other_field) Impl.Typ.t) =
   let open Impl in
   let module C = Common (Impl) in
   let open C in
@@ -260,8 +271,8 @@ let typ_basic (type field other_field other_field_var)
         field
     | Bool ->
         Boolean.typ
-    | Index ->
-        Index.typ Boolean.typ
+    | Branch_data ->
+        Branch_data.typ (module Impl) ~assert_16_bits
     | Digest ->
         Digest.typ
     | Challenge ->
@@ -271,7 +282,8 @@ let typ_basic (type field other_field other_field_var)
   in
   { typ }
 
-let typ impl field t = typ (typ_basic impl field) t
+let typ ~assert_16_bits impl field t =
+  typ (typ_basic ~assert_16_bits impl field) t
 
 let packed_typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
@@ -292,8 +304,8 @@ let packed_typ_basic (type field other_field other_field_var)
       ; bulletproof_challenge1 :
           Challenge.Constant.t Sc.t Bulletproof_challenge.t
       ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
-      ; index1 : Index.t
-      ; index2 : Field.t
+      ; branch_data1 : Branch_data.t
+      ; branch_data2 : Field.t
       ; .. >
       as
       'a
@@ -310,8 +322,8 @@ let packed_typ_basic (type field other_field other_field_var)
         T (Digest.typ, Fn.id, Fn.id)
     | Challenge ->
         T (Challenge.typ, Fn.id, Fn.id)
-    | Index ->
-        T (Index.packed_typ (module Impl), Fn.id, Fn.id)
+    | Branch_data ->
+        T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
     | Bulletproof_challenge ->
         let typ =
           let there { Bulletproof_challenge.prechallenge = { Sc.inner = pre } }

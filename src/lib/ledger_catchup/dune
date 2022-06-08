@@ -61,4 +61,5 @@
    snark_params
    kimchi_backend.pasta
    o1trace
+   mina_net2
 ))

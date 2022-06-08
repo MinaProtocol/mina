@@ -1,17 +1,17 @@
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
-module Decoders = Graphql_lib.Decoders
+module Serializing = Graphql_lib.Serializing
 
 module Get_tracked_accounts =
 [%graphql
 {|
 query {
   trackedAccounts {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
     locked
     balance {
-      total @bsDecoder(fn: "Decoders.balance")
+      total @ppxCustom(module: "Serializing.Balance")
     }
   }
 }
@@ -20,10 +20,10 @@ query {
 module Get_tracked_account =
 [%graphql
 {|
-query ($public_key: PublicKey, $token: UInt64) {
+query ($public_key: PublicKey!, $token: UInt64) {
   account(publicKey: $public_key, token: $token) {
     balance {
-      total @bsDecoder(fn: "Decoders.balance")
+      total @ppxCustom(module: "Serializing.Balance")
     }
   }
 }
@@ -32,9 +32,9 @@ query ($public_key: PublicKey, $token: UInt64) {
 module Get_all_accounts =
 [%graphql
 {|
-query ($public_key: PublicKey) {
+query ($public_key: PublicKey!) {
   accounts(publicKey: $public_key) {
-    token @bsDecoder(fn: "Decoders.token")
+    token @ppxCustom(module: "Serializing.Token")
   }
 }
 |}]
@@ -42,9 +42,9 @@ query ($public_key: PublicKey) {
 module Create_account =
 [%graphql
 {|
-mutation ($password: String) {
+mutation ($password: String!) {
   createAccount(input: {password: $password}) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
   }
 }
 |}]
@@ -52,9 +52,9 @@ mutation ($password: String) {
 module Create_hd_account =
 [%graphql
 {|
-mutation ($hd_index: UInt32) {
+mutation ($hd_index: UInt32!) {
   createHDAccount(input: {index: $hd_index}) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
   }
 }
 |}]
@@ -62,9 +62,9 @@ mutation ($hd_index: UInt32) {
 module Unlock_account =
 [%graphql
 {|
-mutation ($password: String, $public_key: PublicKey) {
+mutation ($password: String!, $public_key: PublicKey!) {
   unlockAccount(input: {password: $password, publicKey: $public_key }) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
   }
 }
 |}]
@@ -72,9 +72,9 @@ mutation ($password: String, $public_key: PublicKey) {
 module Lock_account =
 [%graphql
 {|
-mutation ($public_key: PublicKey) {
+mutation ($public_key: PublicKey!) {
   lockAccount(input: {publicKey: $public_key }) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
   }
 }
 |}]
@@ -90,8 +90,8 @@ module Snark_pool =
 {|
 query snarkPool {
   snarkPool {
-  fee @bsDecoder(fn: "Decoders.uint64")
-  prover @bsDecoder(fn: "Decoders.public_key")
+  fee @ppxCustom(module: "Serializing.UInt64")
+  prover @ppxCustom(module: "Serializing.Public_key")
   work_ids: workIds
 }
 }
@@ -107,9 +107,9 @@ query pendingSnarkWork {
       target_ledger_hash: targetLedgerHash
       fee_excess: feeExcess {
         sign
-        fee_magnitude: feeMagnitude @bsDecoder(fn: "Decoders.uint64")
+        fee_magnitude: feeMagnitude @ppxCustom(module: "Serializing.UInt64")
       }
-      supply_increase: supplyIncrease @bsDecoder(fn: "Decoders.uint64")
+      supply_increase: supplyIncrease @ppxCustom(module: "Serializing.UInt64")
       work_id: workId
       }
     }
@@ -121,8 +121,8 @@ module Set_coinbase_receiver =
 {|
 mutation ($public_key: PublicKey) {
   setCoinbaseReceiver(input : {publicKey: $public_key}) {
-    lastCoinbaseReceiver @bsDecoder(fn: "Decoders.optional_public_key")
-    currentCoinbaseReceiver @bsDecoder(fn: "Decoders.optional_public_key")
+    lastCoinbaseReceiver @ppxCustom(module: "Serializing.Public_key")
+    currentCoinbaseReceiver @ppxCustom(module: "Serializing.Public_key")
     }
   }
 |}]
@@ -132,7 +132,7 @@ module Set_snark_worker =
 {|
 mutation ($public_key: PublicKey) {
   setSnarkWorker (input : {publicKey: $public_key}) {
-      lastSnarkWorker @bsDecoder(fn: "Decoders.optional_public_key")
+      lastSnarkWorker @ppxCustom(module: "Serializing.Public_key")
     }
   }
 |}]
@@ -142,7 +142,7 @@ module Set_snark_work_fee =
 {|
 mutation ($fee: UInt64!) {
   setSnarkWorkFee(input: {fee: $fee}) {
-    lastFee @bsDecoder(fn: "Decoders.uint64")
+    lastFee @ppxCustom(module: "Serializing.UInt64")
     }
 }
 |}]
@@ -197,7 +197,7 @@ mutation ($basename: String) {
 module Get_inferred_nonce =
 [%graphql
 {|
-query nonce($public_key: PublicKey) {
+query nonce($public_key: PublicKey!) {
   account(publicKey: $public_key) {
     inferredNonce
   }
@@ -212,11 +212,11 @@ query user_commands($public_key: PublicKey) {
     id
     isDelegation
     nonce
-    from @bsDecoder(fn: "Decoders.public_key")
-    to_: to @bsDecoder(fn: "Decoders.public_key")
-    amount @bsDecoder(fn: "Decoders.amount")
-    fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_base58_check_exn")
+    from @ppxCustom(module: "Serializing.Public_key")
+    to_: to @ppxCustom(module: "Serializing.Public_key")
+    amount @ppxCustom(module: "Serializing.Amount")
+    fee @ppxCustom(module: "Serializing.Fee")
+    memo @ppxCustom(module: "Serializing.Memo")
   }
 }
 |}]
@@ -290,7 +290,7 @@ module Import_account =
 {|
 mutation ($path: String!, $password: String!) {
   importAccount (path: $path, password: $password) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
     already_imported: alreadyImported
     success
   }
