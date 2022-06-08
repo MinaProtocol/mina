@@ -1000,6 +1000,7 @@ let%test_module "test no side-loaded" =
 
     let () = Tick.Keypair.set_urs_info []
 
+    (*
     let%test_unit "test deserialization and verification for side-loaded keys" =
       Side_loaded.srs_precomputation () ;
       let pi =
@@ -1034,7 +1035,7 @@ let%test_module "test no side-loaded" =
       assert (
         Promise.block_on_async_exn (fun () ->
             Side_loaded.verify_promise ~value_to_field_elements:Fn.id
-              [ (vk, statement, pi) ] ) )
+              [ (vk, statement, pi) ] ) ) *)
 
     open Impls.Step
 
