@@ -15,7 +15,7 @@ data "local_file" "genesis_ledger" {
 
 data "local_file" "libp2p_seed_peers" {
   for_each = toset(local.seed_names)
-  filename = "${var.artifact_path}/keys/libp2p-keys/${each.key}"
+  filename = "${var.artifact_path}/keys/libp2p-keys/${each.key}.peerid"
   depends_on = [
     null_resource.block_producer_key_generation
   ]

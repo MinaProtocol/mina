@@ -40,13 +40,20 @@ function upload_keys_by_folder {
     kubectl create secret generic $secretname --cluster=$CLUSTER --namespace=$TESTNET --from-file=key=${privkey} --from-file=pub=${pubkey}
   done
 
+}
+
+function upload_libp2p_keys_by_folder {
   for pubkey in $1/*.peerid; do
     privkey="${pubkey%.*}" # strip peerid extension
     justfilename=$(basename -- "$privkey")
     secretname=$(echo $justfilename | tr _ -)-key
 
+    echo $justfilename
+    echo $secretname
+
     kubectl create secret generic $secretname --cluster=$CLUSTER --namespace=$TESTNET --from-file=key=${privkey} --from-file=pub=${pubkey}
   done
+
 }
 
 echo 'UPLOADING KEYS'
@@ -54,7 +61,7 @@ echo 'UPLOADING KEYS'
 #account keys
 upload_keys_by_folder $KEYS_DIR
 #libp2p
-upload_keys_by_folder $LIBP2P_KEYS_DIR
+upload_libp2p_keys_by_folder $LIBP2P_KEYS_DIR
 
 # #bots
 # if [ -e keys/testnet-keys/bots_keyfiles/echo_service.pub ]; then

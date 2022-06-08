@@ -69,6 +69,11 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../"
 PATH=$PATH:$(pwd)/bin
 
+if [[ -s $ARTIFACT_PATH/genesis_ledger.json ]]; then
+  echo "exiting because a genesis ledger already exists in the testnet dir"
+  exit 0
+fi
+
 if $RESET; then
   echo "resetting keys and genesis_ledger"
   ls keys/keysets/* | grep -v "bots_keyfiles" | xargs -I % rm "%"
