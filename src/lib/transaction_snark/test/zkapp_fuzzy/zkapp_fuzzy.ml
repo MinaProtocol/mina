@@ -123,8 +123,7 @@ let mk_invalid_test ~num_of_fee_payers ~trials ~type_of_failure
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~failure:(Some type_of_failure)
-             ~protocol_state_view:U.genesis_state_view
+             ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
              ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->

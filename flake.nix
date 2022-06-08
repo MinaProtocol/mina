@@ -30,11 +30,41 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
+  inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, ...
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
     }:
     {
       overlay = import ./nix/overlay.nix;
+      nixosModules.mina = import ./nix/modules/mina.nix inputs;
+      nixosConfigurations.container = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          self.nixosModules.mina
+          {
+            boot.isContainer = true;
+            networking.useDHCP = false;
+            networking.firewall.enable = false;
+
+            services.mina = {
+              enable = true;
+              waitForRpc = false;
+              external-ip = "0.0.0.0";
+              extraArgs = [ "--seed" ];
+            };
+          }
+        ];
+      };
+      pipeline = with flake-buildkite-pipeline.lib; {
+        steps = flakeStepsCachix {
+          pushToBinaryCaches = [ "mina-demo" ];
+          commonExtraStepConfig = {
+            agents = [ "nix" ];
+            soft_fail = "true";
+          };
+        } self;
+      };
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
