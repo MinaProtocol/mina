@@ -1,5 +1,6 @@
 open Core_kernel
 open Mina_base
+open Mina_transaction
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
@@ -43,25 +44,29 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  let nodes_to_initialize nodes =
-    let open Network_state in
+  let network_state ~description ~(f : Network_state.t -> bool) : t =
     let check () (state : Network_state.t) =
-      if
-        List.for_all nodes ~f:(fun node ->
-            String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false )
-      then Predicate_passed
-      else Predicate_continuation ()
-    in
-    let description =
-      nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-      |> Printf.sprintf "[%s] to initialize"
+      if f state then Predicate_passed else Predicate_continuation ()
     in
     { description
     ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Literal (Time.Span.of_min 10.0)
-    ; hard_timeout = Literal (Time.Span.of_min 15.0)
+    ; soft_timeout = Literal (Time.Span.of_hr 1.0)
+    ; hard_timeout = Literal (Time.Span.of_hr 2.0)
     }
+
+  let nodes_to_initialize nodes =
+    let open Network_state in
+    network_state
+      ~description:
+        ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
+        |> Printf.sprintf "[%s] to initialize" )
+      ~f:(fun (state : Network_state.t) ->
+        List.for_all nodes ~f:(fun node ->
+            String.Map.find state.node_initialization (Node.id node)
+            |> Option.value ~default:false ) )
+    |> with_timeouts
+         ~soft_timeout:(Literal (Time.Span.of_min 10.0))
+         ~hard_timeout:(Literal (Time.Span.of_min 15.0))
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
@@ -165,5 +170,60 @@ struct
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots 15
     ; hard_timeout = Slots 20
+    }
+
+  let zkapp_to_be_included_in_frontier ~has_failures ~parties =
+    let command_matches_parties cmd =
+      let open User_command in
+      match cmd with
+      | Parties p ->
+          Parties.equal p parties
+      | Signed_command _ ->
+          false
+    in
+    let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
+      let snapp_opt =
+        List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
+            cmd_with_status.With_status.data |> User_command.forget_check
+            |> command_matches_parties )
+      in
+      match snapp_opt with
+      | Some cmd_with_status ->
+          let actual_status = cmd_with_status.With_status.status in
+          let successful =
+            match actual_status with
+            | Transaction_status.Applied ->
+                not has_failures
+            | Failed _ ->
+                has_failures
+          in
+          if successful then Predicate_passed
+          else
+            Predicate_failure
+              (Error.createf "Unexpected status in matching payment: %s"
+                 ( Transaction_status.to_yojson actual_status
+                 |> Yojson.Safe.to_string ) )
+      | None ->
+          Predicate_continuation ()
+    in
+    let soft_timeout_in_slots = 8 in
+    let is_first = ref true in
+    { description =
+        sprintf "zkApp with fee payer %s and other parties (%s)"
+          (Signature_lib.Public_key.Compressed.to_base58_check
+             parties.fee_payer.body.public_key )
+          (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
+             ~f:(fun acc party ->
+               let str =
+                 Signature_lib.Public_key.Compressed.to_base58_check
+                   party.body.public_key
+               in
+               if !is_first then (
+                 is_first := false ;
+                 str )
+               else acc ^ ", " ^ str ) )
+    ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 end

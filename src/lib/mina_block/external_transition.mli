@@ -5,7 +5,7 @@ module Raw : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V1 : sig
+    module V2 : sig
       type nonrec t = t [@@deriving sexp]
     end
   end]
@@ -20,16 +20,8 @@ module Validated : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving sexp, to_yojson]
-    end
-
-    module V1 : sig
-      type t [@@deriving sexp, to_yojson]
-
-      val to_latest : t -> V2.t
-
-      val of_v2 : V2.t -> t
     end
   end]
 

@@ -220,6 +220,18 @@ module List = struct
         let%map t' = map t ~f in
         h' :: t'
 
+  let mapi ls ~f =
+    let open T.Let_syntax in
+    let rec go i ~f = function
+      | [] ->
+          return []
+      | h :: t ->
+          let%bind h' = f i h in
+          let%map t' = go (i + 1) t ~f in
+          h' :: t'
+    in
+    go 0 ~f ls
+
   let rec fold ls ~init ~f =
     let open T.Let_syntax in
     match ls with
@@ -249,6 +261,10 @@ module List = struct
           i + 1 )
     in
     ()
+
+  let for_all ls ~f =
+    let open T.Let_syntax in
+    fold ls ~init:true ~f:(fun acc x -> if acc then f x else return false)
 end
 
 let%test_module "malleable error unit tests" =

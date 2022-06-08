@@ -24,8 +24,8 @@ val create :
   -> ?max_weight_per_call:int
   -> (   [ `Init of 'init | `Partially_validated of 'partially_validated ] list
       -> [ `Valid of 'result
-         | `Invalid
-         | `Potentially_invalid of 'partially_validated ]
+         | `Potentially_invalid of 'partially_validated
+         | Verifier.invalid ]
          list
          Deferred.Or_error.t )
   -> ('init, 'partially_validated, 'result) t
@@ -33,7 +33,7 @@ val create :
 val verify :
      ('input, 'partial, 'result) t
   -> 'input
-  -> ('result, unit) Result.t Deferred.Or_error.t
+  -> ('result, Verifier.invalid) Result.t Deferred.Or_error.t
 
 val compare_envelope : _ Envelope.Incoming.t -> _ Envelope.Incoming.t -> int
 
@@ -47,5 +47,6 @@ module Transaction_pool : sig
   val verify :
        t
     -> User_command.Verifiable.t list Envelope.Incoming.t
-    -> (User_command.Valid.t list, unit) Result.t Deferred.Or_error.t
+    -> (User_command.Valid.t list, Verifier.invalid) Result.t
+       Deferred.Or_error.t
 end

@@ -18,7 +18,10 @@
    async_unix
    base.base_internalhash_types
    ;; local libraries
+   kimchi_backend.pasta
    random_oracle_input
+   mina_base.import
+   mina_ledger
    quickcheck_lib
    mina_metrics
    coda_genesis_ledger
@@ -34,6 +37,8 @@
    transaction_snark_scan_state
    sgn
    mina_base
+   mina_transaction
+   mina_transaction_logic
    verifier
    staged_ledger_diff
    signature_lib
@@ -50,7 +55,9 @@
    pickles
    snark_params
    with_hash
+   mina_generators
    random_oracle
+   kimchi_backend
    pickles.backend
  )
  (preprocessor_deps ../../config.mlh)

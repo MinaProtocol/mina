@@ -15,6 +15,7 @@
    base.caml
    sexplib0
    ;; local libraries
+   mina_ledger
    with_hash
    blockchain_snark
    error_json
@@ -39,6 +40,7 @@
    mina_compile_config
    pickles
    logger
+   mina_base.import
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_version ppx_inline_test ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf)))
