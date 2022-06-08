@@ -41,6 +41,8 @@ let%test_module "Command line tests" =
               ; genesis_ledger_dir
               ; "-current-protocol-version"
               ; "0.0.0"
+              ; "-external-ip"
+              ; "0.0.0.0"
               ]
             ()
         with

@@ -64,8 +64,8 @@ let%test_module "Archive node unit tests" =
         ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind initial_balance =
-        Base_quickcheck.Generator.int64_uniform_inclusive 2_000_000_000L
-          4_000_000_000L
+        Base_quickcheck.Generator.int64_uniform_inclusive 200_000_000_000_000L
+          400_000_000_000_000L
         >>| Unsigned.UInt64.of_int64 >>| Currency.Balance.of_uint64
       and fee_payer_key_index =
         Base_quickcheck.Generator.int_inclusive 0 @@ (Array.length keys - 1)
