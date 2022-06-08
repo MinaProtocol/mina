@@ -18,6 +18,126 @@ module Permuts_minus_1_vec = Vector.Vector_6
 module Permuts = Nat.N7
 module Permuts_vec = Vector.Vector_7
 
+module Opt = struct
+  type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
+
+  let of_option (t : 'a option) : ('a, 'bool) t =
+    match t with None -> None | Some x -> Some x
+
+  module Flag = struct
+    type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
+  end
+
+  let map t ~f =
+    match t with
+    | None ->
+        None
+    | Some x ->
+        Some (f x)
+    | Maybe (b, x) ->
+        Maybe (b, f x)
+
+  let map2_exn (type a b c bool) (t1 : (a, bool) t) (t2 : (b, bool) t)
+      ~(f : a -> b -> c) =
+    match (t1, t2) with
+    | None, None ->
+        None
+    | Some x1, Some x2 ->
+        Some (f x1 x2)
+    | Some x1, Maybe (b2, x2) ->
+        Maybe (b2, f x1 x2)
+    | Maybe (b1, x1), Some x2 ->
+        Maybe (b1, f x1 x2)
+    | Maybe (_b1, _x1), Maybe (_b2, _x2) ->
+        failwith "Opt.map2_exn: (Maybe, Maybe)"
+    | Some _, None ->
+        failwith "Opt.map2_exn: (Some, None)"
+    | None, Some _ ->
+        failwith "Opt.map2_exn: (None, Some)"
+    | Maybe _, None ->
+        failwith "Opt.map2_exn: (Maybe, None)"
+    | None, Maybe _ ->
+        failwith "Opt.map2_exn: (None, Maybe)"
+
+  open Snarky_backendless
+
+  let some_typ (type a a_var f bool_var) (t : (a_var, a, f) Typ.t) :
+      ((a_var, bool_var) t, a option, f) Typ.t =
+    Typ.transport t ~there:(fun x -> Option.value_exn x) ~back:Option.return
+    |> Typ.transport_var
+         ~there:(function
+           | Some x ->
+               x
+           | Maybe _ | None ->
+               failwith "Opt.some_typ: expected Some" )
+         ~back:(fun x -> Some x)
+
+  let none_typ (type a a_var f bool) () : ((a_var, bool) t, a option, f) Typ.t =
+    Typ.transport (Typ.unit ())
+      ~there:(fun _ -> ())
+      ~back:(fun () : _ Option.t -> None)
+    |> Typ.transport_var
+         ~there:(function
+           | None ->
+               ()
+           | Maybe _ | Some _ ->
+               failwith "Opt.none_typ: expected None" )
+         ~back:(fun () : _ t -> None)
+
+  let maybe_typ (type a a_var f)
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+      ~(dummy : a) (a_typ : (a_var, a, f) Typ.t) :
+      ((a_var, Impl.Boolean.var) t, a option, f) Typ.t =
+    Typ.transport
+      (Typ.tuple2 Impl.Boolean.typ a_typ)
+      ~there:(fun (t : a option) ->
+        match t with None -> (false, dummy) | Some x -> (true, x) )
+      ~back:(fun (b, x) -> if b then Some x else None)
+    |> Typ.transport_var
+         ~there:(fun (t : (a_var, Impl.Boolean.var) t) ->
+           match t with
+           | Maybe (b, x) ->
+               (b, x)
+           | None | Some _ ->
+               failwith "Opt.some_typ: expected Some" )
+         ~back:(fun (b, x) -> Maybe (b, x))
+
+  let typ (type a a_var f)
+      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+      (flag : Flag.t) (a_typ : (a_var, a, f) Typ.t) ~(dummy : a) =
+    match flag with
+    | Yes ->
+        some_typ a_typ
+    | No ->
+        none_typ ()
+    | Maybe ->
+        maybe_typ (module Impl) ~dummy a_typ
+
+  module Early_stop_sequence = struct
+    (* A sequence that should be considered to have stopped at
+       the first No flag *)
+    type nonrec ('a, 'bool) t = ('a, 'bool) t list
+
+    let fold (type a bool acc res)
+        (if_res : bool -> then_:res -> else_:res -> res) (t : (a, bool) t)
+        ~(init : acc) ~(f : acc -> a -> acc) ~(finish : acc -> res) =
+      let rec go acc = function
+        | [] ->
+            finish acc
+        | None :: xs ->
+            go acc xs
+        | Some x :: xs ->
+            go (f acc x) xs
+        | Maybe (b, x) :: xs ->
+            (* Computing this first makes mutation in f OK. *)
+            let stop_res = finish acc in
+            let continue_res = go (f acc x) xs in
+            if_res b ~then_:continue_res ~else_:stop_res
+      in
+      go init t
+  end
+end
+
 module Evals = struct
   [%%versioned
   module Stable = struct
