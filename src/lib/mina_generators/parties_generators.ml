@@ -891,8 +891,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
      | None ->
          None
      | Some zk ->
-         (*Duplicating what's in parties logic to get the account precondition
-           right*)
+         (*TODO: Deduplicate this from what's in parties logic to get the
+            account precondition right*)
          let app_state =
            let account_app_state = zk.app_state in
            List.zip_exn
@@ -1094,7 +1094,11 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
       let acct_id = Account.identifier acct in
       let pk = Account_id.public_key acct_id in
       (*Initialize account states*)
-      Account_id.Table.update account_state_tbl acct_id ~f:(fun _ -> acct) ;
+      Account_id.Table.update account_state_tbl acct_id ~f:(function
+        | None ->
+            acct
+        | Some a ->
+            a ) ;
       if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
       then
         failwithf "gen_parties_from: public key %s is in ledger, but not keymap"
@@ -1103,7 +1107,12 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   (* table of public keys not in the ledger, to be used for new parties
      we have the corresponding private keys, so we can create signatures for those new parties
   *)
-  let ledger_account_set = Ledger.accounts ledger in
+  let ledger_account_set =
+    Account_id.Set.union_list
+      [ Ledger.accounts ledger
+      ; Account_id.Set.of_hashtbl_keys account_state_tbl
+      ]
+  in
   let available_public_keys =
     let tbl = Signature_lib.Public_key.Compressed.Table.create () in
     Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
