@@ -22,11 +22,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; block_producers =
         [ { balance = "8000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
+        ; { balance = "2000000000"; timing = Untimed }
         ]
     ; extra_genesis_accounts =
-        [ { balance = "2000000000"; timing = Untimed }
-        ; { balance = "2000000000"; timing = Untimed }
+        [ { balance = "3000000000"; timing = Untimed }
+        ; { balance = "3000000000"; timing = Untimed }
         ]
     ; num_archive_nodes = 1
     ; num_snark_workers = 2
