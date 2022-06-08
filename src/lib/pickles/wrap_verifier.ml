@@ -634,37 +634,11 @@ struct
           { alpha; beta; gamma; zeta } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
-  module Split_evaluations = struct
-    let combine_split_evaluations' s =
-      Pcs_batch.combine_split_evaluations s
-        ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
-        ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
-          Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
-        ~init:(fun (_, fx) -> fx)
-        ~shifted_pow:
-          (Pseudo.Degree_bound.shifted_pow
-             ~crs_max_degree:Common.Max_degree.wrap )
-  end
-
   let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
       (choice : n One_hot_vector.t) (e : Field.t array Evals.t) :
       (Boolean.var * Field.t) array Evals.t =
     Evals.map2 lengths e ~f:(fun lengths e ->
         Array.zip_exn (mask lengths choice) e )
-
-  let combined_evaluation (type b b_plus_26) b_plus_26 ~xi ~evaluation_point
-      ((without_degree_bound : (_, b_plus_26) Vector.t), with_degree_bound)
-      ~max_quot_size =
-    let open Field in
-    with_label __LOC__ (fun () ->
-        Pcs_batch.combine_split_evaluations ~mul ~last:Array.last
-          ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
-          ~shifted_pow:
-            (Pseudo.Degree_bound.shifted_pow
-               ~crs_max_degree:Common.Max_degree.wrap )
-          ~init:Fn.id ~evaluation_point ~xi
-          (Common.dlog_pcs_batch b_plus_26)
-          without_degree_bound with_degree_bound )
 
   let compute_challenges ~scalar chals =
     Vector.map chals ~f:(fun { Bulletproof_challenge.prechallenge } ->
@@ -745,7 +719,7 @@ struct
      4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ?actual_proofs_verified ~domain ~max_quot_size ~sponge
+      ?actual_proofs_verified ~domain ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _
@@ -791,8 +765,9 @@ struct
       (* TODO: zeta_n is recomputed in [env] below *)
       let zeta_n = pow2pow plonk.zeta n in
       let zetaw_n = pow2pow zetaw n in
-      ( Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zeta_n) evals1
-      , Plonk_types.Evals.map ~f:(actual_evaluation ~pt_to_n:zetaw_n) evals2 )
+      Evals.In_circuit.map evals.evals ~f:(fun (x0, x1) ->
+          ( actual_evaluation ~pt_to_n:zeta_n x0
+          , actual_evaluation ~pt_to_n:zetaw_n x1 ) )
     in
     let env =
       Plonk_checks.scalars_env
@@ -806,12 +781,15 @@ struct
         ~domain (Plonk.to_minimal plonk) combined_evals
     in
     let combined_inner_product_correct =
+      let evals1, evals2 =
+        All_evals.With_public_input.In_circuit.factor evals
+      in
       with_label __LOC__ (fun () ->
           let ft_eval0 : Field.t =
             with_label __LOC__ (fun () ->
                 Plonk_checks.ft_eval0
                   (module Field)
-                  ~env ~domain plonk_minimal combined_evals x_hat1 )
+                  ~env ~domain plonk_minimal combined_evals evals1.public_input )
           in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =
@@ -819,11 +797,22 @@ struct
               Vector.map old_bulletproof_challenges ~f:(fun chals ->
                   unstage (challenge_polynomial (Vector.to_array chals)) )
             in
-            let combine ~ft pt x_hat e =
-              let pi = Proofs_verified.add Nat.N26.n in
-              let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
+            let combine ~ft pt x_hat (e : (Field.t array, _) Evals.In_circuit.t)
+                =
+              let a =
+                Evals.In_circuit.to_list e
+                |> List.map ~f:(function
+                     | None ->
+                         [||]
+                     | Some a ->
+                         Array.map a ~f:(fun x -> Plonk_types.Opt.Some x)
+                     | Maybe (b, a) ->
+                         Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
+              in
               let sg_evals =
-                Vector.map sg_olds ~f:(fun f -> [| f pt |])
+                Vector.map sg_olds ~f:(fun f ->
+                    [| Plonk_types.Opt.Some (f pt) |] )
+                |> Vector.to_list
                 (* TODO: This was the code before the wrap hack was put in
                    match actual_proofs_verified with
                    | None ->
@@ -839,13 +828,12 @@ struct
                                [| Field.((b :> t) * f pt) |] ) ) *)
               in
               let v =
-                Vector.append sg_evals ([| x_hat |] :: [| ft |] :: a) (snd pi)
+                List.append sg_evals ([| Some x_hat |] :: [| Some ft |] :: a)
               in
-              combined_evaluation pi ~xi ~evaluation_point:pt (v, b)
-                ~max_quot_size
+              Common.combined_evaluation (module Impl) ~xi v
             in
-            combine ~ft:ft_eval0 plonk.zeta x_hat1 evals1
-            + (r * combine ~ft:ft_eval1 zetaw x_hat2 evals2)
+            combine ~ft:ft_eval0 plonk.zeta evals1.public_input evals1.evals
+            + (r * combine ~ft:ft_eval1 zetaw evals2.public_input evals2.evals)
           in
           with_label __LOC__ (fun () ->
               equal
