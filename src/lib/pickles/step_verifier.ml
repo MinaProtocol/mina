@@ -460,7 +460,7 @@ struct
         in
         let sample () = squeeze_challenge sponge in
         let sample_scalar () = squeeze_scalar sponge in
-        let open Plonk_types.Messages in
+        let open Plonk_types.Messages.In_circuit in
         let x_hat =
           with_label "x_hat" (fun () ->
               match domain with
@@ -769,6 +769,9 @@ struct
     Pseudo.Domain.to_domain
       (which_log2, unique_domains)
       ~shifts ~domain_generator
+
+  let field_array_if b ~then_ ~else_ =
+    Array.map2_exn then_ else_ ~f:(fun x1 x2 -> Field.if_ b ~then_:x1 ~else_:x2)
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
