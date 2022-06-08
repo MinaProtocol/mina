@@ -213,7 +213,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_int 1_000_000 in
       let amount = Currency.Amount.zero in
-      let nonce = Account.Nonce.of_int 3 in
+      let nonce = Account.Nonce.of_int 4 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp, invalid update timing"
