@@ -462,23 +462,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (parties_mint_token, parties_mint_token2, parties_token_transfer)
     in
-    let make_timeout soft_slots =
+    let with_timeout =
+      let soft_slots = 4 in
       let soft_timeout = Network_time_span.Slots soft_slots in
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
-    let with_timeout = make_timeout 4 in
-    let with_long_timeout = make_timeout 12 in
-    let make_wait_for_zkapp timeout parties =
+    let wait_for_zkapp parties =
       let%map () =
-        wait_for t @@ timeout
+        wait_for t @@ with_timeout
         @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
              ~parties
       in
       [%log info] "ZkApp transactions included in transition frontier"
     in
-    let wait_for_zkapp = make_wait_for_zkapp with_timeout in
-    let long_wait_for_zkapp = make_wait_for_zkapp with_long_timeout in
     let compatible req_item ledg_item ~equal =
       match (req_item, ledg_item) with
       | Zkapp_basic.Set_or_keep.Keep, _ ->
@@ -567,16 +564,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Send a zkApp transaction to update permissions"
         (send_zkapp ~logger node parties_update_permissions)
-    in
-    let%bind () =
-      let padding_payments =
-        (* for work_delay=1 and transaction_capacity=4 per block*)
-        let needed = 12 in
-        if !transactions_sent >= needed then 0 else needed - !transactions_sent
-      in
-      let fee = Currency.Fee.of_int 1_000_000 in
-      send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:padding_payments
     in
     let%bind () =
       section_hard
@@ -682,7 +669,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to transfer tokens"
-        (long_wait_for_zkapp parties_token_transfer)
+        (wait_for_zkapp parties_token_transfer)
     in
     let%bind () =
       section_hard "Verify zkApp transaction updates in ledger"
@@ -710,6 +697,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Error.of_string
                     "Ledger update and requested update are incompatible" ) ) )
         )
+    in
+    let%bind () =
+      let padding_payments =
+        (* for work_delay=1 and transaction_capacity=4 per block*)
+        let needed = 12 in
+        if !transactions_sent >= needed then 0 else needed - !transactions_sent
+      in
+      let fee = Currency.Fee.of_int 1_000_000 in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:padding_payments
     in
     let%bind () =
       section_hard "Wait for proof to be emitted"
