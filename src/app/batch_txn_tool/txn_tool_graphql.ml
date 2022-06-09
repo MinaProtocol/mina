@@ -1,7 +1,7 @@
 open Core
 open Async
 open Signature_lib
-module Decoders = Graphql_lib.Decoders
+module Serializing = Graphql_lib.Serializing
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -63,16 +63,14 @@ mutation ($sender: PublicKey!,
 module Get_account_data =
 [%graphql
 {|
-
-query ($public_key: PublicKey) {
-  account(publicKey: $public_key) {
-    nonce
-    balance {
-      total @bsDecoder(fn: "Decoders.balance")
+  query ($public_key: PublicKey!) {
+    account(publicKey: $public_key) {
+      nonce
+      balance {
+        total @ppxCustom(module: "Serializing.Balance")
+      }
     }
   }
-}
-
 |}]
 
 let get_account_data ~public_key ~graphql_target_node =
