@@ -383,8 +383,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     []
                 ]
             ]
-          |> mk_parties_transaction ~fee:12_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 2)
+          |> mk_parties_transaction ~memo:"mint token" ~fee:12_000_000
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 2)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -404,8 +404,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     ]
                 ]
             ]
-          |> mk_parties_transaction ~fee:11_500_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 3)
+          |> mk_parties_transaction ~memo:"zkapp to mint token2" ~fee:11_500_000
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -454,7 +454,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     ]
                 ]
             ]
-          |> mk_parties_transaction ~fee:11_000_000 ~fee_payer_pk
+          |> mk_parties_transaction ~memo:"zkapp for tokens transfer"
+               ~fee:11_000_000 ~fee_payer_pk
                ~fee_payer_nonce:(Account.Nonce.of_int 4)
         in
         replace_authorizations ~keymap with_dummy_signatures
