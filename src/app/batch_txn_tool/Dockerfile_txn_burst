@@ -1,8 +1,7 @@
 #build with: 
-# cat /home/helenl1/work/mina/dockerfiles/Dockerfile-rosetta | docker build -t gcr.io/o1labs-192920/mina-rosetta-builder:latest --target builder --build-arg deb_codename=stretch --build-arg MINA_BRANCH=<this branch> -
 # docker build -t txn_burst_util -f Dockerfile_txn_burst .
 
-#or run with:
+#or directly run with:
 # docker run -v <local keypath>:/keys --entrypoint ./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe txn_burst_util --num-txn-per-acct 10 --origin-sender-sk-path "/keys/<origin key path>" --origin-sender-sk-pw "some password" --returner-sk-path "/keys/<origin key path>" --returner-sk-pw "some password"
 
 FROM minaprotocol/mina-toolchain:1.3.1beta1-compatible-9839d34-bullseye
@@ -19,7 +18,7 @@ RUN sudo echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) s
 # compile txn burst tool
 COPY ./batch_txn_tool.ml /home/opam
 COPY ./txn_tool_graphql.ml /home/opam
-ENV DUNE_PROFILE devnet
+COPY ./dune /home/opam
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 RUN eval $(opam config env) \
   && git config pull.rebase false \
@@ -28,7 +27,8 @@ RUN eval $(opam config env) \
   && git submodule update --init --recursive \
   && mv /home/opam/batch_txn_tool.ml src/app/batch_txn_tool \
   && mv /home/opam/txn_tool_graphql.ml src/app/batch_txn_tool \
-  && dune build --profile=${DUNE_PROFILE} src/app/cli/src/mina_testnet_signatures.exe src/app/batch_txn_tool/batch_txn_tool.exe
+  && mv /home/opam/dune src/app/batch_txn_tool \
+  && dune build src/app/batch_txn_tool/batch_txn_tool.exe
 
 USER root
 # prepare the key directories
