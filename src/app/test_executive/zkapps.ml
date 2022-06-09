@@ -461,12 +461,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (parties_mint_token, parties_mint_token2, parties_token_transfer)
     in
-    let with_timeout =
-      let soft_slots = 4 in
+    let make_timeout soft_slots =
       let soft_timeout = Network_time_span.Slots soft_slots in
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
+    let with_timeout = make_timeout 4 in
+    let with_long_timeout = make_timeout 10 in
+    let make_wait_for_zkapp timeout parties =
+      let%map () =
+        wait_for t @@ timeout
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
+             ~parties
+      in
+      [%log info] "ZkApp transactions included in transition frontier"
+    in
+    let wait_for_zkapp = make_wait_for_zkapp with_timeout in
+    let long_wait_for_zkapp = make_wait_for_zkapp with_long_timeout in
     let compatible req_item ledg_item ~equal =
       match (req_item, ledg_item) with
       | Zkapp_basic.Set_or_keep.Keep, _ ->
@@ -543,14 +554,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
         ~f:Fn.id
     in
-    let wait_for_zkapp parties =
-      let%map () =
-        wait_for t @@ with_timeout
-        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
-             ~parties
-      in
-      [%log info] "ZkApp transactions included in transition frontier"
-    in
     let snark_work_event_subscription =
       Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->
           [%log info] "Received new snark work" ;
@@ -615,7 +618,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_invalid_zkapp ~logger node parties_insufficient_fee
            "at least one user command had an insufficient fee" )
     in
-    (*Won't be accepted until the previous transactions are applied*)
+    (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
       section_hard "Send a zkApp transaction to update all fields"
         (send_zkapp ~logger node parties_update_all)
@@ -678,7 +681,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to transfer tokens"
-        (wait_for_zkapp parties_token_transfer)
+        (long_wait_for_zkapp parties_token_transfer)
     in
     let%bind () =
       section_hard "Verify zkApp transaction updates in ledger"
