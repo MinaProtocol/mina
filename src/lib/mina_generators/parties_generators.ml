@@ -645,8 +645,8 @@ end
    The type `c` is associated with the `token_id` field, which is `unit` for the
    fee payer, and `Token_id.t` for other parties.
 *)
-let gen_party_body_components (type a b c d) ?(update = None) ?account_id
-    ~account_state_tbl ?vk ?failure ?(new_account = false)
+let gen_party_body_components (type a b c d) ?(limited = false) ?(update = None)
+    ?account_id ~account_state_tbl ?vk ?failure ?(new_account = false)
     ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
     ?permissions_auth ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option) ?protocol_state_view
@@ -765,15 +765,22 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     else
       match account_id with
       | None ->
-          (* choose an account from the ledger *)
-          let%map index =
-            Int.gen_uniform_incl 0 (Ledger.num_accounts ledger - 1)
-          in
-          let account = Ledger.get_at_index_exn ledger index in
-          (*get the latest state of this account*)
-          let (account : Account.t) =
-            Account_id.Table.find_exn account_state_tbl
-              (Account.identifier account)
+          let%map (account : Account.t) =
+            if limited then
+              let accts = Account_id.Table.data account_state_tbl in
+              let%map acct_idx =
+                Int.gen_uniform_incl 0 (List.length accts - 1)
+              in
+              List.nth_exn accts acct_idx
+            else
+              (* choose an account from the ledger *)
+              let%map index =
+                Int.gen_uniform_incl 0 (Ledger.num_accounts ledger - 1)
+              in
+              let account = Ledger.get_at_index_exn ledger index in
+              (*get the latest state of this account*)
+              Account_id.Table.find_exn account_state_tbl
+                (Account.identifier account)
           in
           if zkapp_account && Option.is_none account.zkapp then
             failwith "gen_party_body: chosen account has no snapp field" ;
@@ -986,9 +993,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   ; caller
   }
 
-let gen_party_from ?(update = None) ?failure ?(new_account = false)
-    ?(zkapp_account = false) ?account_id ?permissions_auth
-    ?required_balance_change ?required_balance ~authorization
+let gen_party_from ?(limited = false) ?(update = None) ?failure
+    ?(new_account = false) ?(zkapp_account = false) ?account_id
+    ?permissions_auth ?required_balance_change ?required_balance ~authorization
     ~available_public_keys ~ledger ~account_state_tbl ?vk () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
@@ -1006,7 +1013,8 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
         false
   in
   let%bind body_components =
-    gen_party_body_components ~update ?failure ~new_account ~zkapp_account
+    gen_party_body_components ~limited ~update ?failure ~new_account
+      ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?vk ~available_public_keys
       ?required_balance_change ?required_balance ~ledger ~account_state_tbl
@@ -1071,11 +1079,9 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
 *)
 let max_other_parties = 2
 
-let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
-    ~(keymap :
-       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?prover () =
-  let open Quickcheck.Let_syntax in
+let setup_fee_payer_and_available_keys_and_account_state_tbl
+    ~(fee_payer_keypair : Signature_lib.Keypair.t) ~keymap ?account_state_tbl
+    ~ledger =
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
@@ -1121,12 +1127,22 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:() ) ;
     tbl
   in
+  (fee_payer_account_id, available_public_keys, account_state_tbl)
+
+let gen_parties_base ?(limited = false) ?failure ~fee_payer_account_id
+    ~(fee_payer_keypair : Signature_lib.Keypair.t) ~available_public_keys
+    ~account_state_tbl
+    ~(keymap :
+       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
+    ~ledger ?protocol_state_view ?vk ?prover () =
+  let open Quickcheck.Let_syntax in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
       ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ?vk
       ~account_state_tbl ()
   in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
+    let open Quickcheck.Let_syntax in
     let rec go acc n =
       let open Zkapp_basic in
       let open Permissions in
@@ -1220,7 +1236,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           (* Signature authorization to start *)
           let authorization = Control.Signature Signature.dummy in
           let required_balance_change = Currency.Amount.Signed.zero in
-          gen_party_from ~update ?failure ~authorization
+          gen_party_from ~limited ~update ?failure ~authorization
             ~new_account:new_parties ~permissions_auth ~zkapp_account
             ~available_public_keys ~required_balance_change ~ledger
             ~account_state_tbl ?vk ()
@@ -1293,7 +1309,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           in
           (* if we use this account again, it will have a Signature authorization *)
           let permissions_auth = Control.Tag.Signature in
-          gen_party_from ~update ?failure ~account_id ~authorization
+          gen_party_from ~limited ~update ?failure ~account_id ~authorization
             ~permissions_auth ~zkapp_account ~available_public_keys ~ledger
             ~account_state_tbl ?vk ()
         in
@@ -1342,7 +1358,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           None
     in
     let authorization = Control.Signature Signature.dummy in
-    gen_party_from ?failure ~authorization ~new_account:true
+    gen_party_from ~limited ?failure ~authorization ~new_account:true
       ~available_public_keys ~ledger ~required_balance_change ?required_balance
       ~account_state_tbl ?vk ()
   in
@@ -1354,7 +1370,8 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   (* add fee payer keys to keymap, if not present *)
   let keymap =
     match
-      Signature_lib.Public_key.Compressed.Map.add keymap ~key:fee_payer_pk
+      Signature_lib.Public_key.Compressed.Map.add keymap
+        ~key:(Signature_lib.Public_key.compress fee_payer_keypair.public_key)
         ~data:fee_payer_keypair.private_key
     with
     | `Duplicate ->
@@ -1365,3 +1382,67 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   return
   @@ Parties_builder.replace_authorizations ?prover ~keymap
        parties_dummy_signatures
+
+let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
+    ~(keymap :
+       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
+    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?prover () =
+  let fee_payer_account_id, available_public_keys, account_state_tbl =
+    setup_fee_payer_and_available_keys_and_account_state_tbl ~fee_payer_keypair
+      ~keymap ?account_state_tbl ~ledger
+  in
+  gen_parties_base ?failure ~fee_payer_account_id ~fee_payer_keypair
+    ~available_public_keys ~account_state_tbl ~keymap ~ledger
+    ?protocol_state_view ?vk ?prover ()
+
+let setup_fee_payer_and_available_keys_and_account_state_tbl_limited
+    ~(keymap :
+       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
+    ?account_state_tbl ~ledger =
+  let open Quickcheck.Let_syntax in
+  let account_state_tbl =
+    Option.value account_state_tbl ~default:(Account_id.Table.create ())
+  in
+  let available_public_keys =
+    Signature_lib.Public_key.Compressed.Table.create ()
+  in
+  Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
+      let acct_id = Account_id.create pk Token_id.default in
+      match Ledger.location_of_account ledger acct_id with
+      | None ->
+          Signature_lib.Public_key.Compressed.Table.add_exn
+            available_public_keys ~key:pk ~data:()
+      | Some location ->
+          let account = Option.value_exn (Ledger.get ledger location) in
+          Account_id.Table.change account_state_tbl acct_id ~f:(function
+            | Some account' ->
+                Some account'
+            | None ->
+                Some account ) ) ;
+
+  let acct_ids = Account_id.Table.keys account_state_tbl in
+  let%map fee_payer_index = Int.gen_incl 0 (List.length acct_ids) in
+  let fee_payer_acct_id = List.nth_exn acct_ids fee_payer_index in
+  let fee_payer_pk = Account_id.public_key fee_payer_acct_id in
+  let fee_payer_keypair =
+    Signature_lib.Keypair.of_private_key_exn
+    @@ Signature_lib.Public_key.Compressed.Map.find_exn keymap fee_payer_pk
+  in
+  ( fee_payer_acct_id
+  , fee_payer_keypair
+  , available_public_keys
+  , account_state_tbl )
+
+let gen_parties_with_limited_keys ?failure ~keymap ?account_state_tbl ~ledger
+    ?protocol_state_view ?vk ?prover () =
+  let open Quickcheck.Let_syntax in
+  let%bind ( fee_payer_account_id
+           , fee_payer_keypair
+           , available_public_keys
+           , account_state_tbl ) =
+    setup_fee_payer_and_available_keys_and_account_state_tbl_limited ~keymap
+      ?account_state_tbl ~ledger
+  in
+  gen_parties_base ~limited:true ?failure ~fee_payer_account_id
+    ~fee_payer_keypair ~available_public_keys ~account_state_tbl ~keymap ~ledger
+    ?protocol_state_view ?vk ?prover ()
