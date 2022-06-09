@@ -5,14 +5,8 @@ open Mina_transaction
 open Mina_numbers
 open Signature_lib
 
-(* Fee increase required to replace a transaction. This represents the cost to
-   the network as a whole of checking, gossiping, and storing a transaction
-   until it is included in a block. I did some napkin math and came up with
-   $0.00007. Ideally we'd fetch an exchange rate and convert that into an amount
-   of currency, but a made up number will do for the testnets at least. See
-   issue #2385.
-*)
-let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5_000_000_000
+(* Fee increase required to replace a transaction. *)
+let replace_fee : Currency.Fee.t = Currency.Fee.of_int 1
 
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
