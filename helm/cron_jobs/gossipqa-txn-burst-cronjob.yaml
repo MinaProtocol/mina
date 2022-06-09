@@ -23,20 +23,18 @@ RETURNER_ACCT_KEY=/keys/whale-2-key/whale-2-key;
 echo "origin acct: $ORIGIN_ACCT_KEY";
 echo "returner acct: $RETURNER_ACCT_KEY";
 
-printf "/dns4/seed-1.gossip-data.o1test.net/tcp/10000/p2p/12D3KooWLsKcaX7TYaurdkYB8WmoUXNKqNUo94w6H4LhzqEYAGc5\n/dns4/seed-2.gossip-data.o1test.net/tcp/10001/p2p/12D3KooW9rebvJT88ZX8mUjCJpKNqyMVTvknri4xqv2d2FwU5DDj\n/dns4/seed-3.gossip-data.o1test.net/tcp/10002/p2p/12D3KooWNsBZvge1nGMxrdGRKgnXctdHAQ4SJDFhNEkHELhJzCSf" > /gossipqa_seed_list.txt;
+printf "/ip4/34.152.17.2/tcp/10000/p2p/12D3KooWLsKcaX7TYaurdkYB8WmoUXNKqNUo94w6H4LhzqEYAGc5\n/ip4/34.95.14.84/tcp/10001/p2p/12D3KooW9rebvJT88ZX8mUjCJpKNqyMVTvknri4xqv2d2FwU5DDj\n/ip4/34.95.27.69/tcp/10002/p2p/12D3KooWNsBZvge1nGMxrdGRKgnXctdHAQ4SJDFhNEkHELhJzCSf\n" > /gossipqa_seed_list.txt;
 
 curl https://raw.githubusercontent.com/MinaProtocol/mina/135a81a3c7836bd101afa23ddc846c55ea5919ed/automation/terraform/testnets/gossipqa/genesis_ledger.json > /gossipqa-genesis_ledger.json;
 
-sleep 60;
-
 echo "booting mina daemon";
+
 mina daemon --config-file /gossipqa-genesis_ledger.json --peer-list-file /gossipqa_seed_list.txt &
 
 echo "sleeping";
 sleep 480;
 echo "done sleeping";
 while true; do
-  tail -n 5 /.mina-config/mina.log;
   DAEMON_STATUS=$(mina client status);
   echo "Daemon Status: $DAEMON_STATUS";
   STATUS=$(mina client status | grep "Sync status");
@@ -71,7 +69,7 @@ echo "ran batch txns";
               value: ""
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:7e352faaa3bf54eb9e22582f1c205fa8c4d424a0b6521572144bf77af4e837c6
+            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:815a5dafc70fb994dfe8e5af46dd6a9287a2e6634e50bc9229576d76fb7a2ce7
             imagePullPolicy: IfNotPresent
             name: gossipqa-txn-burst-cronjob
             resources:

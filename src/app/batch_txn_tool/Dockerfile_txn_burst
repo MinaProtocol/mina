@@ -11,9 +11,9 @@ USER opam
 #install mina
 RUN sudo apt-get -y update && sudo apt-get -y install man
 RUN sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
-RUN sudo echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/mina.list \
+RUN sudo echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) unstable" | sudo tee /etc/apt/sources.list.d/mina.list \
   && sudo apt-get update\
-  && sudo apt-get install -y curl unzip mina-mainnet=1.3.0-9b0369c
+  && sudo apt-get install -y --allow-downgrades mina-devnet=1.3.1beta1-metrics-gossip-data-collection-92db0c6
 
 # compile txn burst tool
 COPY ./batch_txn_tool.ml /home/opam
@@ -33,8 +33,6 @@ RUN eval $(opam config env) \
 USER root
 # prepare the key directories
 RUN mkdir /keys && chmod 700 /keys
-  # && mkdir /keys/whale-key/ && chmod 700 /keys/whale-key/ \
-  # && mkdir /keys/fish-key/ && chmod 700 /keys/fish-key/
 ENV MINA_PRIVKEY_PASS ""
 
 ENTRYPOINT ["./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe"]
