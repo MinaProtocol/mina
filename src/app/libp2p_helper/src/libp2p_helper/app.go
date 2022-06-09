@@ -368,15 +368,13 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 }
 
 func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
-	mdns := mdns.NewMdnsService(app.P2p.Host, "_coda-discovery._udp.local")
-	app.P2p.Mdns = mdns
 	l := &mdnsListener{
 		FoundPeer: foundPeerCh,
 		app:       app,
 	}
-	mdns.RegisterNotifee(l)
-
-	return nil
+	mdns := mdns.NewMdnsService(app.P2p.Host, "_coda-discovery._udp.local", l)
+	app.P2p.Mdns = mdns
+	return mdns.Start()
 }
 
 func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
