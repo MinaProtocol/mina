@@ -71,7 +71,7 @@ echo "ran batch txns";
               value: ""
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:8c4a7e0c092dcdbe0f5d8bebefb374181012dfb08e7cd60f99ee88969f1b26e8
+            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:7e352faaa3bf54eb9e22582f1c205fa8c4d424a0b6521572144bf77af4e837c6
             imagePullPolicy: IfNotPresent
             name: gossipqa-txn-burst-cronjob
             resources:
