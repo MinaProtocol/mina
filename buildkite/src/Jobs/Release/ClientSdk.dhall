@@ -28,7 +28,7 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = RunInToolchain.runInToolchainBuster (["NPM_TOKEN"]) "./buildkite/scripts/client-sdk-tool.sh 'publish --non-interactive'"
+          commands = RunInToolchain.runInToolchain (["NPM_TOKEN"]) "./buildkite/scripts/client-sdk-tool.sh 'publish --non-interactive'"
           , label = "Publish client SDK to npm"
           , key = "publish-client-sdk"
           , target = Size.Medium

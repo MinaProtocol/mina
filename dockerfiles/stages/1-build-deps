@@ -28,8 +28,9 @@ ARG ROCKSDB_VERSION=v5.18.4
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-  && apt-get install --yes \
+RUN apt-get update --quiet \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --no-install-recommends --quiet --yes \
     libboost-dev \
     libboost-program-options-dev \
     libbz2-dev \
@@ -44,6 +45,7 @@ RUN apt-get update \
     libsodium-dev \
     libssl-dev \
     build-essential \
+    ca-certificates \
     capnproto \
     cmake \
     curl \
@@ -55,7 +57,8 @@ RUN apt-get update \
     rsync \
     sudo \
     unzip \
-    zlib1g-dev
+    zlib1g-dev \
+  && rm -rf /var/lib/apt/lists/*
 
 # Symlink image-specific lld version to a single lld executable
 RUN if command -v ld.lld-10 &> /dev/null; then ln -sf $(which ld.lld-10) /usr/bin/ld.lld; fi
@@ -69,6 +72,9 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
   && chmod 440 /etc/sudoers.d/opam \
   && chown root:root /etc/sudoers.d/opam \
   && chmod 777 /tmp
+
+# --- Quiet git warnings about detatched head states, which are used frequently in later stages
+RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
@@ -96,12 +102,13 @@ USER root
 # The build command below checks for the g++ major version and removes CXXFLAGS if its less than 9
 ENV CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess'
 # This builds and installs just the rocksdb static lib for us, and cleans up after itself
+# Send error output to /dev/null as its noisy with compiler warnings
 RUN git clone https://github.com/facebook/rocksdb \
   --depth 1 --shallow-submodules \
   -b "${ROCKSDB_VERSION}" /rocksdb \
   && test $(g++ -dumpversion | cut -c 1 -) -lt 9 \
-    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
-    || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
+    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
+    || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
   && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
   && rm -rf /rocksdb \
   && strip -S /usr/local/lib/librocksdb_coda.a

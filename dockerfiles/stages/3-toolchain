@@ -31,13 +31,18 @@ ENV OPAMREUSEBUILDDIR=false
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+USER root
+
 # OS package dependencies
-RUN sudo apt-get update -y \
-  && sudo apt-get install -y \
+# afaict this is the last python dependency of any kind in CI
+RUN apt-get update --yes \
+  && apt-get install --yes \
     apt-transport-https \
     apt-utils \
     awscli \
     cmake \
+    fakeroot \
+    gnupg2 \
     jq \
     libboost-dev \
     libboost-program-options-dev \
@@ -61,20 +66,17 @@ RUN sudo apt-get update -y \
     perl \
     pkg-config \
     rubygems \
-    zlib1g-dev
+    zlib1g-dev \
+  && rm -rf /var/lib/apt/lists/*
 
-# -- Debian Buster python dependencies (largely installed above from apt)
-# Buster images are used in our migrated integration tests which reqiure python2 jinja2
-# Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
-RUN test "$deb_codename" = "buster" \
-      && sudo apt-get install -y \
-          python \
-          python-pip \
-          python-jinja2 \
-          python-flake8 \
-          python-sexpdata \
+# -- Debian Bullseye python dependencies (largely installed above from apt)
+# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
+# but debian stretch does not have this package, so only install in bullseye
+RUN test "$deb_codename" = "bullseye" \
+      && apt-get update --yes \
+      && apt-get install --yes --no-install-recommends \
           python3-sexpdata \
-      && sudo pip install readchar \
+      && rm -rf /var/lib/apt/lists/* \
       || exit 0
 
 # --- deb-s3 tool
@@ -86,42 +88,47 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
 # --- Docker Daemon
 RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
     && tar -xz -C /tmp -f /tmp/docker-${DOCKER_VERSION}.tgz \
-    && sudo mv /tmp/docker/* /usr/bin
+    && mv /tmp/docker/* /usr/bin
 
 # --- Terraform tools
 RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
     && unzip terraform.zip \
-    && sudo mv terraform /usr/bin \
-    && sudo ln -s /usr/bin/terraform /usr/local/bin/terraform
+    && mv terraform /usr/bin \
+    && ln -s /usr/bin/terraform /usr/local/bin/terraform
 
 # --- Google Cloud tools
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
-    && sudo apt-get update -y \
-    && sudo apt-get install -y google-cloud-sdk kubectl
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
+    && apt-get update --yes \
+    && apt-get install --yes google-cloud-sdk kubectl \
+    && rm -rf /var/lib/apt/lists/*
 
 # --- Helm tools
-RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
-    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list \
-    && sudo apt-get update -y \
-    && sudo apt-get install -y helm
+RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
+    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && apt-get update --yes \
+    && apt-get install --yes --no-install-recommends helm \
+    && rm -rf /var/lib/apt/lists/*
 
-# --- yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
-    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
-    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
-    && sudo apt update \
-    && sudo apt install -y nodejs yarn
+# Get yarn + nodejs
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && apt update \
+    && apt install --yes --no-install-recommends nodejs yarn \
+    && rm -rf /var/lib/apt/lists/*
 
 # Dhall
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \
-    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-x86_64-linux.tar.bz2 \
-    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
-    | sudo tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
 
 # --- extra Rust toolchain and wasm-pack for Wasm builds
 RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
     && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}"
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+USER opam

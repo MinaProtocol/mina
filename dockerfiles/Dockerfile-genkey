@@ -2,31 +2,31 @@
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-FROM debian:stretch-slim AS production
+FROM debian:bullseye-slim AS production
 
 ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
-# stretch-slim configures apt to not store any cache, so no need to rm it
-# TODO: make sure this is the minimum runtime deps
-RUN apt-get -y update \
-  && apt -y install \
+RUN apt-get update --quiet --yes \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     dnsutils \
     dumb-init \
-    libffi6 \
+    libffi7 \
     libgmp10 \
     libgomp1 \
-    libprocps6 \
-    libjemalloc-dev \
+    libprocps8 \
+    libjemalloc2 \
     libssl1.1 \
-    tzdata
+    tzdata \
+  && rm -rf /var/lib/apt/lists/*
 
 # mina keypair package
-RUN echo "deb [trusted=yes] http://packages.o1test.net stretch stable" > /etc/apt/sources.list.d/o1.list \
-   && apt-get update \
-   && apt-get install -y "mina-generate-keypair=1.2.1beta1-45440dc"
+RUN echo "deb [trusted=yes] http://packages.o1test.net bullseye stable" > /etc/apt/sources.list.d/o1.list \
+   && apt-get update --quiet --yes \
+   && apt-get install --quiet --yes "mina-generate-keypair"
 
 WORKDIR /
 

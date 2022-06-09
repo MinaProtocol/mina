@@ -11,7 +11,7 @@ let Base = ./Base.dhall
 
 let Size = ./Size.dhall
 
-let dockerImage = (../Constants/ContainerImages.dhall).minaToolchainBuster
+let dockerImage = (../Constants/ContainerImages.dhall).minaToolchainBullseye
 
 let fixPermissionsScript = "sudo chown -R opam ."
 
