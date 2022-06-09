@@ -1,6 +1,7 @@
 package codanet
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ipfs/go-cid"
@@ -19,11 +20,11 @@ const (
 )
 
 type BitswapStorage interface {
-	GetStatus(key [32]byte) (RootBlockStatus, error)
-	SetStatus(key [32]byte, value RootBlockStatus) error
-	DeleteStatus(key [32]byte) error
-	DeleteBlocks(keys [][32]byte) error
-	ViewBlock(key [32]byte, callback func([]byte) error) error
+	GetStatus(ctx context.Context, key [32]byte) (RootBlockStatus, error)
+	SetStatus(ctx context.Context, key [32]byte, value RootBlockStatus) error
+	DeleteStatus(ctx context.Context, key [32]byte) error
+	DeleteBlocks(ctx context.Context, keys [][32]byte) error
+	ViewBlock(ctx context.Context, key [32]byte, callback func([]byte) error) error
 }
 
 type BitswapStorageLmdb struct {
@@ -67,12 +68,12 @@ func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
 	return
 }
 
-func (bs *BitswapStorageLmdb) ViewBlock(key [32]byte, callback func([]byte) error) error {
-	return bs.blockstore.View(BlockHashToCid(key), callback)
+func (bs *BitswapStorageLmdb) ViewBlock(ctx context.Context, key [32]byte, callback func([]byte) error) error {
+	return bs.blockstore.View(ctx, BlockHashToCid(key), callback)
 }
 
-func (bs *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err error) {
-	r, err := bs.blockstore.GetData(bs.statusDB, key[:])
+func (bs *BitswapStorageLmdb) GetStatus(ctx context.Context, key [32]byte) (res RootBlockStatus, err error) {
+	r, err := bs.blockstore.GetData(ctx, bs.statusDB, key[:])
 	if err != nil {
 		return
 	}
@@ -80,8 +81,8 @@ func (bs *BitswapStorageLmdb) GetStatus(key [32]byte) (res RootBlockStatus, err 
 	return
 }
 
-func (bs *BitswapStorageLmdb) DeleteStatus(key [32]byte) error {
-	return bs.blockstore.PutData(bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
+func (bs *BitswapStorageLmdb) DeleteStatus(ctx context.Context, key [32]byte) error {
+	return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		prev, err := UnmarshalRootBlockStatus(prevVal)
 		if err != nil {
 			return nil, false, err
@@ -100,8 +101,8 @@ func isStatusTransitionAllowed(exists bool, prev RootBlockStatus, newStatus Root
 	return allowed
 }
 
-func (bs *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus) error {
-	return bs.blockstore.PutData(bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
+func (bs *BitswapStorageLmdb) SetStatus(ctx context.Context, key [32]byte, newStatus RootBlockStatus) error {
+	return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		var prev RootBlockStatus
 		if exists {
 			var err error
@@ -116,12 +117,12 @@ func (bs *BitswapStorageLmdb) SetStatus(key [32]byte, newStatus RootBlockStatus)
 		return []byte{byte(newStatus)}, true, nil
 	})
 }
-func (bs *BitswapStorageLmdb) DeleteBlocks(keys [][32]byte) error {
+func (bs *BitswapStorageLmdb) DeleteBlocks(ctx context.Context, keys [][32]byte) error {
 	cids := make([]cid.Cid, len(keys))
 	for i, key := range keys {
 		cids[i] = BlockHashToCid(key)
 	}
-	return bs.blockstore.DeleteMany(cids)
+	return bs.blockstore.DeleteMany(ctx, cids)
 }
 
 const (
@@ -139,23 +140,26 @@ func cidToKeyMapper(id cid.Cid) []byte {
 	return nil
 }
 
-// BlockHashToCidSuffix is a function useful for debug output
-func BlockHashToCidSuffix(h [32]byte) string {
-	s := BlockHashToCid(h).String()
-	return s[len(s)-6:]
+func keyToCidMapperDo(key []byte) cid.Cid {
+	mh, _ := multihash.Encode(key, MULTI_HASH_CODE)
+	return cid.NewCidV1(cid.Raw, mh)
 }
 
 func BlockHashToCid(h [32]byte) cid.Cid {
-	mh, _ := multihash.Encode(h[:], MULTI_HASH_CODE)
-	return cid.NewCidV1(cid.Raw, mh)
+	return keyToCidMapperDo(h[:])
 }
 
 func keyToCidMapper(key []byte) (id cid.Cid) {
 	if len(key) == 32 {
-		mh, _ := multihash.Encode(key, MULTI_HASH_CODE)
-		id = cid.NewCidV1(cid.Raw, mh)
+		id = keyToCidMapperDo(key)
 	}
 	return
+}
+
+// BlockHashToCidSuffix is a function useful for debug output
+func BlockHashToCidSuffix(h [32]byte) string {
+	s := BlockHashToCid(h).String()
+	return s[len(s)-6:]
 }
 
 func (b *BitswapStorageLmdb) Close() {
