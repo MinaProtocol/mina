@@ -467,7 +467,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
     let with_timeout = make_timeout 4 in
-    let with_long_timeout = make_timeout 10 in
+    let with_long_timeout = make_timeout 12 in
     let make_wait_for_zkapp timeout parties =
       let%map () =
         wait_for t @@ timeout
