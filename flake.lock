@@ -137,11 +137,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1654078001,
-        "narHash": "sha256-IL0cgwlmxWTj3URp2jl8rsATrUpFrxK/OT9B7PUCi5k=",
+        "lastModified": 1654786772,
+        "narHash": "sha256-Qul9GG6EJ1IFfgnZ440KAxTEPfFpbnmf54EVFM9+iZA=",
         "owner": "serokell",
         "repo": "nix-npm-buildpackage",
-        "rev": "cf2505a293e34ec7b73006e9b0066c4883ab778e",
+        "rev": "ca922a16839ae62a568bcb0771e78e080b4d6059",
         "type": "github"
       },
       "original": {
