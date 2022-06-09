@@ -15,6 +15,8 @@ module Tag = Tag
 module Step_verifier = Step_verifier
 module Common = Common
 
+exception Return_digest of Md5.t
+
 module type Statement_intf = sig
   type field
 
@@ -236,6 +238,7 @@ val compile_promise :
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
+  -> ?return_early_digest_exception:bool
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t

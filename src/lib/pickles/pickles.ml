@@ -31,6 +31,8 @@ module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
 module Step_verifier = Step_verifier
 
+exception Return_digest of Md5.t
+
 let profile_constraints = false
 
 let verify_promise = Verify.verify
@@ -402,6 +404,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
+      -> ?return_early_digest_exception:bool
       -> branches:(module Nat.Intf with type n = branches)
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -420,7 +423,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ~branches:(module Branches)
+   fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
+       ~branches:(module Branches)
        ~max_proofs_verified:(module Max_proofs_verified) ~name
        ~constraint_constants ~typ ~choices ->
     let snark_keys_header kind constraint_system_hash =
@@ -549,6 +553,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               in
               let () = if true then log_step main typ name b.index in
               let open Impls.Step in
+              (* HACK: TODO docs *)
+              if return_early_digest_exception then
+                raise
+                  (Return_digest
+                     ( constraint_system ~exposing:[] ~return_typ:typ main
+                     |> R1CS_constraint_system.digest ) ) ;
+
               let k_p =
                 lazy
                   (let cs =
@@ -895,6 +906,7 @@ let compile_promise :
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
+    -> ?return_early_digest_exception:bool
     -> (module Statement_var_intf with type t = a_var)
     -> (module Statement_value_intf with type t = a_value)
     -> typ:(a_var, a_value) Impls.Step.Typ.t
@@ -923,8 +935,9 @@ let compile_promise :
          , a_value
          , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
          H3_2.T(Prover).t =
- fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices ->
+ fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
+     (module A_var) (module A_value) ~typ ~branches ~max_proofs_verified ~name
+     ~constraint_constants ~choices ->
   let self =
     match self with
     | None ->
@@ -943,8 +956,9 @@ let compile_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~self ~cache ?disk_keys ~branches ~max_proofs_verified ~name ~typ
-      ~constraint_constants ~choices:(fun ~self -> conv_irs (choices ~self))
+    M.compile ~return_early_digest_exception ~self ~cache ?disk_keys ~branches
+      ~max_proofs_verified ~name ~typ ~constraint_constants
+      ~choices:(fun ~self -> conv_irs (choices ~self))
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in

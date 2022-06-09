@@ -1729,7 +1729,30 @@ let nat_modules_list : (module Pickles_types.Nat.Intf) list =
 let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
   List.nth_exn nat_modules_list i
 
-let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
+let pickles_digest' ~constraint_constants ~name
+    (choices : pickles_rule_js Js.js_array Js.t) =
+  let choices = choices |> Js.to_array |> Array.to_list in
+  let branches = List.length choices in
+  let choices ~self:_ = List.map choices ~f:create_pickles_rule in
+  let (module Branches) = nat_module branches in
+  (* TODO get rid of Obj.magic for choices *)
+  try
+    let _ =
+      Pickles.compile_promise ~choices:(Obj.magic choices)
+        ~return_early_digest_exception:true
+        (module Zkapp_statement)
+        (module Zkapp_statement.Constant)
+        ~typ:zkapp_statement_typ
+        ~branches:(module Branches)
+        ~max_proofs_verified:(module Pickles_types.Nat.N0)
+          (* ^ TODO make max_branching configurable -- needs refactor in party types *)
+        ~name ~constraint_constants
+    in
+    failwith "Unexpected: The exception will always fire"
+  with Pickles.Return_digest md5 -> Md5.to_hex md5 |> Js.string
+
+let pickles_compile' ~constraint_constants ~name
+    (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let branches = List.length choices in
   let choices ~self:_ = List.map choices ~f:create_pickles_rule in
@@ -1743,20 +1766,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
       ~branches:(module Branches)
       ~max_proofs_verified:(module Pickles_types.Nat.N0)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
-      ~name:"smart-contract"
-      ~constraint_constants:
-        (* TODO these are dummy values *)
-        { sub_windows_per_window = 0
-        ; ledger_depth = 0
-        ; work_delay = 0
-        ; block_window_duration_ms = 0
-        ; transaction_capacity = Log_2 0
-        ; pending_coinbase_depth = 0
-        ; coinbase_amount = Unsigned.UInt64.of_int 0
-        ; supercharged_coinbase_factor = 0
-        ; account_creation_fee = Unsigned.UInt64.of_int 0
-        ; fork = None
-        }
+      ~name ~constraint_constants
   in
   let module Proof = (val p) in
   let to_js_prover prover =
@@ -1809,12 +1819,33 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
           (Pickles.Verification_key.index key)
   end
 
+let pickles_digest, pickles_compile =
+  let constraint_constants =
+    (* TODO these are dummy values *)
+    { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
+    ; ledger_depth = 0
+    ; work_delay = 0
+    ; block_window_duration_ms = 0
+    ; transaction_capacity = Log_2 0
+    ; pending_coinbase_depth = 0
+    ; coinbase_amount = Unsigned.UInt64.of_int 0
+    ; supercharged_coinbase_factor = 0
+    ; account_creation_fee = Unsigned.UInt64.of_int 0
+    ; fork = None
+    }
+  in
+  let name = "smart-contract" in
+  ( pickles_digest' ~constraint_constants ~name
+  , pickles_compile' ~constraint_constants ~name )
+
 let proof_to_string proof =
   proof |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
 
 let pickles =
   object%js
     val compile = pickles_compile
+
+    val circuit_digest = pickles_digest
 
     val proofToString = proof_to_string
   end
