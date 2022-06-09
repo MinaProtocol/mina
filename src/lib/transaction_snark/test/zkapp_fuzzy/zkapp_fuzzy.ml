@@ -63,14 +63,13 @@ let generate_parties_and_apply_them_consecutively () =
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers ()
   in
+  let account_state_table = Account_id.Table.create () in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
-             ~protocol_state_view:U.genesis_state_view
-             ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
+          (Mina_generators.Parties_generators.gen_parties_with_limited_keys
+             ~protocol_state_view:U.genesis_state_view ~keymap ~ledger ~vk
+             ~prover ~account_state_table () ) ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
                   ~metadata:
@@ -102,11 +101,9 @@ let generate_parties_and_apply_them_freshly () =
           mk_ledgers_and_fee_payers ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
-             ~protocol_state_view:U.genesis_state_view
-             ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
+          (Mina_generators.Parties_generators.gen_parties_with_limited_keys
+             ~protocol_state_view:U.genesis_state_view ~keymap ~ledger ~vk
+             ~prover () ) ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 U.check_parties_with_merges_exn ledger [ parties ] ) )
       in
@@ -122,11 +119,9 @@ let mk_invalid_test ~num_of_fee_payers ~trials ~type_of_failure
           mk_ledgers_and_fee_payers ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
+          (Mina_generators.Parties_generators.gen_parties_with_limited_keys
              ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
-             ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
+             ~keymap ~ledger ~vk ~prover () ) ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
                   ~metadata:[ ("parties", Parties.to_yojson parties) ]
