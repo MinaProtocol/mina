@@ -27,7 +27,7 @@ module Digest = struct
       let to_latest = Fn.id
 
       include
-        Binable.Of_binable
+        Binable.Of_binable_without_uuid
           (Core_kernel.String.Stable.V1)
           (struct
             type nonrec t = t

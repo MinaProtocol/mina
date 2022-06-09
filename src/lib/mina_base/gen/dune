@@ -11,6 +11,7 @@
    digestif
    ppxlib
    ppxlib.ast
+   ppxlib.astlib
    ocaml-migrate-parsetree
    stdio
    ocaml-compiler-libs.common

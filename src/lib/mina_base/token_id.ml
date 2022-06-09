@@ -49,7 +49,7 @@ module Stable = struct
     type t = T.Stable.V1.t [@@deriving sexp, equal, compare, hash, yojson]
 
     include
-      Binable.Of_binable
+      Binable.Of_binable_without_uuid
         (T.Stable.V1)
         (struct
           type nonrec t = t
