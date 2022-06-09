@@ -63,6 +63,7 @@
           commonExtraStepConfig = {
             agents = [ "nix" ];
             soft_fail = "true";
+            env.BUILDKITE_REPO = "";
           };
         } self;
       };
