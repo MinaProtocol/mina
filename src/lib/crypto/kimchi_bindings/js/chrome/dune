@@ -20,7 +20,7 @@
   (source_tree ../../wasm/.cargo/config)
   (source_tree ../../../../../external/wasm-bindgen-rayon)
   (source_tree ../../../proof-systems) )
- (locks /cargo-kimchi-wasm-lock)
+ (locks /cargo-lock) ; lock for rustup
  (action
   (progn
    (run chmod -R +w ../../wasm .)

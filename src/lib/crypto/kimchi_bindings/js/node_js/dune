@@ -21,7 +21,7 @@
   (source_tree ../../stubs)
   ../../../Cargo.toml
   (source_tree ../../../proof-systems) )
- (locks /cargo-kimchi-wasm-lock)
+ (locks /cargo-lock) ; lock for rustup
  (action
   (progn
    (run chmod -R +w ../../wasm .)

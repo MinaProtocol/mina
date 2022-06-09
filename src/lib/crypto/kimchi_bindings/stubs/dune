@@ -24,6 +24,7 @@
   (source_tree ../../../../external/wasm-bindgen-rayon)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
+ (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
    (setenv CARGO_TARGET_DIR
@@ -98,6 +99,7 @@
   (source_tree binding_generation)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
+ (locks /cargo-lock) ;; lock for rustup
  (action
   (chdir
    binding_generation
