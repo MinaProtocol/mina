@@ -138,8 +138,11 @@ module Make (Engine : Intf.Engine.S) () :
     in
     match result with
     | `Hard_timeout ->
-        Malleable_error.hard_error_format "hit a hard timeout waiting for %s"
-          condition.description
+        let exit_code =
+          match condition.id with Nodes_to_initialize -> Some 20 | _ -> None
+        in
+        Malleable_error.hard_error_format ?exit_code
+          "hit a hard timeout waiting for %s" condition.description
     | `Failure error ->
         Malleable_error.hard_error
           (Error.of_list
