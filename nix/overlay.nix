@@ -175,7 +175,8 @@ in {
     '';
   };
 
-  kimchi-rust-wasm = (rustChannelFromToolchainFileOf ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml).rust.override {
+  kimchi-rust = rustChannelFromToolchainFileOf ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
+  kimchi-rust-wasm = pkgs.kimchi-rust.rust.override {
     targets = [ "wasm32-unknown-unknown" ];
     # rust-src is needed for -Zbuild-std
     extensions = [ "rust-src" ];
@@ -184,7 +185,7 @@ in {
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
   kimchi-rust-std-deps = pkgs.rustPlatform.importCargoLock {
     lockFile = pkgs.runCommand "cargo.lock" { } ''
-      cp ${pkgs.kimchi-rust-wasm}/lib/rustlib/src/rust/Cargo.lock $out
+      cp ${pkgs.kimchi-rust.rust-src}/lib/rustlib/src/rust/Cargo.lock $out
     '';
   };
 
