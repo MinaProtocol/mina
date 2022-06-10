@@ -31,8 +31,8 @@ let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
   ; caller
   }
 
-let mk_parties_transaction ~fee ~fee_payer_pk ~fee_payer_nonce other_parties :
-    Parties.t =
+let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
+    other_parties : Parties.t =
   let fee_payer : Party.Fee_payer.t =
     { body =
         { update = Party.Update.noop
@@ -46,8 +46,12 @@ let mk_parties_transaction ~fee ~fee_payer_pk ~fee_payer_nonce other_parties :
     ; authorization = Signature.dummy
     }
   in
+  let memo =
+    Option.value_map memo ~default:Signed_command_memo.dummy
+      ~f:Signed_command_memo.create_from_string_exn
+  in
   { fee_payer
-  ; memo = Signed_command_memo.dummy
+  ; memo
   ; other_parties =
       other_parties
       |> Parties.Call_forest.map
