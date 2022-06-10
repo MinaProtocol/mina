@@ -674,7 +674,7 @@ let%test_module "ZkApps test transaction" =
       go path expected got ; !success
 
     let hit_server (parties : Parties.t) query =
-      let typ = Mina_graphql.Types.Input.send_zkapp in
+      let typ = Mina_graphql.Types.Input.SendZkappInput.arg_typ.arg_typ in
       let query_top_level =
         Graphql_async.Schema.(
           io_field "sendZkapp" ~typ:(non_null string)
