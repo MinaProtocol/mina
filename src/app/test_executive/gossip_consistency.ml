@@ -75,7 +75,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     [%log info] "gossip_consistency test: starting..." ;
     let%bind () =
-      wait_for ~exit_code:13 t
+      wait_for t
         (Wait_condition.nodes_to_initialize (Network.all_nodes network))
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;

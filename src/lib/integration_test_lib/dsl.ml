@@ -106,7 +106,7 @@ module Make (Engine : Intf.Engine.S) () :
     |> Event_router.await_with_timeout event_router
          ~timeout_duration:hard_timeout ~timeout_cancellation:`Hard_timeout
 
-  let wait_for ?exit_code t condition =
+  let wait_for t condition =
     let open Wait_condition in
     let constants = Engine.Network.constants t.network in
     let soft_timeout =
@@ -140,10 +140,13 @@ module Make (Engine : Intf.Engine.S) () :
     in
     match result with
     | `Hard_timeout ->
+        let exit_code =
+          match condition.id with Nodes_to_initialize -> Some 20 | _ -> None
+        in
         Malleable_error.hard_error_format ?exit_code
           "hit a hard timeout waiting for %s" condition.description
     | `Failure error ->
-        Malleable_error.hard_error ?exit_code
+        Malleable_error.hard_error
           (Error.of_list
              [ Error.createf "wait_for hit an error waiting for %s"
                  condition.description
