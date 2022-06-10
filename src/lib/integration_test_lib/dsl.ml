@@ -139,7 +139,7 @@ module Make (Engine : Intf.Engine.S) () :
     match result with
     | `Hard_timeout ->
         let exit_code =
-          match condition.id with Nodes_to_initialize -> Some 13 | _ -> None
+          match condition.id with Nodes_to_initialize -> Some 20 | _ -> None
         in
         Malleable_error.hard_error_format ?exit_code
           "hit a hard timeout waiting for %s" condition.description
