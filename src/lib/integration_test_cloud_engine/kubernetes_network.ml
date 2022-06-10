@@ -40,7 +40,7 @@ module Node = struct
       Option.value container_id ~default:info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:6 cwd "kubectl"
+    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
   let run_in_container ?(exit_code = 10) ?container_id ~cmd t =
