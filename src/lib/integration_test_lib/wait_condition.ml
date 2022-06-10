@@ -37,6 +37,7 @@ struct
     | Nodes_to_synchronize
     | Signed_command_to_be_included_in_frontier
     | Ledger_proofs_emitted_since_genesis
+    | Zkapp_to_be_included_in_frontier
 
   type t =
     { id : wait_condition_id
@@ -52,11 +53,12 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  let network_state ~description ~(f : Network_state.t -> bool) : t =
+  let network_state ~id ~description ~(f : Network_state.t -> bool) : t =
     let check () (state : Network_state.t) =
       if f state then Predicate_passed else Predicate_continuation ()
     in
-    { description
+    { id
+    ; description
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Literal (Time.Span.of_hr 1.0)
     ; hard_timeout = Literal (Time.Span.of_hr 2.0)
@@ -66,19 +68,7 @@ struct
 
   let nodes_to_initialize nodes =
     let open Network_state in
-    let check () (state : Network_state.t) =
-      if f state then Predicate_passed else Predicate_continuation ()
-    in
-    { id = Nodes_to_initialize
-    ; description
-    ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Literal (Time.Span.of_hr 1.0)
-    ; hard_timeout = Literal (Time.Span.of_hr 2.0)
-    }
-
-  let nodes_to_initialize nodes =
-    let open Network_state in
-    network_state
+    network_state ~id:Nodes_to_initialize
       ~description:
         ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
         |> Printf.sprintf "[%s] to initialize" )
@@ -234,7 +224,8 @@ struct
     in
     let soft_timeout_in_slots = 8 in
     let is_first = ref true in
-    { description =
+    { id = Zkapp_to_be_included_in_frontier
+    ; description =
         sprintf "zkApp with fee payer %s and other parties (%s), memo: %s"
           (Signature_lib.Public_key.Compressed.to_base58_check
              parties.fee_payer.body.public_key )

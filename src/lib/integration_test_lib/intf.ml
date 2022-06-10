@@ -357,6 +357,7 @@ module Dsl = struct
       | Nodes_to_synchronize
       | Signed_command_to_be_included_in_frontier
       | Ledger_proofs_emitted_since_genesis
+      | Zkapp_to_be_included_in_frontier
 
     val wait_condition_id : t -> wait_condition_id
 
