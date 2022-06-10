@@ -409,7 +409,8 @@ module Dsl = struct
 
     val network_state : t -> Network_state.t
 
-    val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
+    val wait_for :
+      ?exit_code:int -> t -> Wait_condition.t -> unit Malleable_error.t
 
     (* TODO: move this functionality to a more suitable location *)
     val create :
