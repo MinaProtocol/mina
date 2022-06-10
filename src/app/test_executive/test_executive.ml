@@ -350,8 +350,7 @@ let main inputs =
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
         let%bind () =
-          Dsl.wait_for ~exit_code:13 dsl
-            (Dsl.Wait_condition.nodes_to_initialize seed_nodes)
+          Dsl.wait_for dsl (Dsl.Wait_condition.nodes_to_initialize seed_nodes)
         in
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;

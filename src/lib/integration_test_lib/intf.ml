@@ -320,6 +320,15 @@ module Dsl = struct
 
     type t
 
+    type wait_condition_id =
+      | Nodes_to_initialize
+      | Blocks_to_be_produced
+      | Nodes_to_synchronize
+      | Signed_command_to_be_included_in_frontier
+      | Ledger_proofs_emitted_since_genesis
+
+    val wait_condition_id : t -> wait_condition_id
+
     val with_timeouts :
          ?soft_timeout:Network_time_span.t
       -> ?hard_timeout:Network_time_span.t
@@ -409,8 +418,7 @@ module Dsl = struct
 
     val network_state : t -> Network_state.t
 
-    val wait_for :
-      ?exit_code:int -> t -> Wait_condition.t -> unit Malleable_error.t
+    val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 
     (* TODO: move this functionality to a more suitable location *)
     val create :

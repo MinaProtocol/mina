@@ -36,9 +36,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ~metadata:
         [ ("peers", `List (List.map all_nodes ~f:(fun n -> `String (Node.id n))))
         ] ;
-    let%bind () =
-      wait_for ~exit_code:13 t (Wait_condition.nodes_to_initialize all_nodes)
-    in
+    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
     let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
