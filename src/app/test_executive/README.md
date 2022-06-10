@@ -155,3 +155,4 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
 - Exit code `10` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a command in a container.  This exit code is the general case of such errors, there are subsequent exit codes which are preferred in more specific cases
 - Exit code `11` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `start.sh` script in a container
 - Exit code `12` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `stop.sh` script in a container
+- Exit code `13` will be returned if integration test nodes failed to initialize

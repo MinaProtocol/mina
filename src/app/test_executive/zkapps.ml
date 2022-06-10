@@ -74,7 +74,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* TODO: capture snark worker processes' failures *)
     let%bind () =
       section_hard "Wait for nodes to initialize"
-        (wait_for t
+        (wait_for ~exit_code:13 t
            (Wait_condition.nodes_to_initialize
               ( Network.seeds network @ block_producer_nodes
               @ Network.snark_coordinators network ) ) )
