@@ -2,9 +2,9 @@
   description = "Mina, a cryptocurrency with a lightweight, constant-size blockchain";
   nixConfig = {
     allow-import-from-derivation = "true";
-    extra-substituters = [ "https://mina-demo.cachix.org" ];
+    extra-substituters = [ "https://storage.googleapis.com/mina-nix-cache" ];
     extra-trusted-public-keys =
-      [ "mina-demo.cachix.org-1:PpQXDRNR3QkXI0487WY3TDTk5+7bsOImKj5+A79aMg8=" ];
+      [ "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c=" ];
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
@@ -57,11 +57,13 @@
         ];
       };
       pipeline = with flake-buildkite-pipeline.lib; {
-        steps = flakeStepsCachix {
-          pushToBinaryCaches = [ "mina-demo" ];
+        steps = flakeSteps {
+          pushToBinaryCaches = [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
+          signWithKeys = [ "/var/secrets/nix-cache-key.sec" ];
           commonExtraStepConfig = {
             agents = [ "nix" ];
             soft_fail = "true";
+            env.BUILDKITE_REPO = "";
           };
         } self;
       };
