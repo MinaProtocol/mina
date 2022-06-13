@@ -50,9 +50,6 @@ RUN test "$deb_codename" = "buster" \
 # --- Debian 9 "Stretch" Dependencies
 RUN test "$deb_codename" = "stretch" \
      && apt-get update -y \
-     || sleep 10s && apt-get update -y \
-     || sleep 10s && apt-get update -y \
-     || sleep 10s && apt-get update -y \
      && apt-get install -y \
          libjemalloc1 \
          libprocps6 \
@@ -62,9 +59,6 @@ RUN test "$deb_codename" = "stretch" \
 # --- Ubuntu 20.04 "Focal Fossa" Dependencies
 RUN test "$deb_codename" = "focal" \
      && apt-get update -y \
-     || sleep 10s && apt-get update -y \
-     || sleep 10s && apt-get update -y \
-     || sleep 10s && apt-get update -y \
      && apt-get install -y \
          libjemalloc2 \
          libprocps8 \

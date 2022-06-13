@@ -14,9 +14,6 @@ RUN chmod +x /entrypoint.sh
 
 # Dependencies
 RUN apt-get -y update \
-    || sleep 10s && apt-get -y update \
-    || sleep 10s && apt-get -y update \
-    || sleep 10s && apt-get -y update \
     && apt-get -y upgrade \
     && apt-get -y install \
         procps \

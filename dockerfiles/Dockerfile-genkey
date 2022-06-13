@@ -10,9 +10,6 @@ ENV DEBIAN_FRONTEND noninteractive
 # stretch-slim configures apt to not store any cache, so no need to rm it
 # TODO: make sure this is the minimum runtime deps
 RUN apt-get -y update \
-  || sleep 10s && apt-get -y update \
-  || sleep 10s && apt-get -y update \
-  || sleep 10s && apt-get -y update \
   && apt -y install \
     apt-transport-https \
     ca-certificates \
