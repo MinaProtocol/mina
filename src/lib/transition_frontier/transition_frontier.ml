@@ -105,7 +105,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
           Error (`Failure msg) )
   in
   let%bind full_frontier, extensions =
-    O1trace.sync_thread "persistent_frontier_read_from_disk" (fun () ->
+    O1trace.thread "persistent_frontier_read_from_disk" (fun () ->
         let open Deferred.Let_syntax in
         match%map
           Persistent_frontier.Instance.load_full_frontier
