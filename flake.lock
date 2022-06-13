@@ -5,11 +5,11 @@
         "nixpkgs-lib": "nixpkgs-lib"
       },
       "locked": {
-        "lastModified": 1650549377,
-        "narHash": "sha256-if2xXtEnJTtc3olurH4LKlAt70dpGGxJhkctCCIqgyQ=",
+        "lastModified": 1654768881,
+        "narHash": "sha256-XuSUp870TDDETi5rs+R7VklxMm29u8BUVnM6lfbQq7w=",
         "owner": "tweag",
         "repo": "flake-buildkite-pipeline",
-        "rev": "0b5f41b562cf2f5be0cf07b9980a87bcebfadb68",
+        "rev": "d420396096b405c8eae22801b3723a30a8ff48f4",
         "type": "github"
       },
       "original": {
@@ -221,11 +221,11 @@
         "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1653642631,
-        "narHash": "sha256-M3VgKtAxvlrMi3zForcArHAsbaOrZ8c8FDa3lH64q6g=",
+        "lastModified": 1654615390,
+        "narHash": "sha256-63C0HLSYtRuaEL6k9RRt12UUkXfVhxdr+cB8JV3HIic=",
         "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "632439776ea0a92befec0764eef0f70727c65fa8",
+        "rev": "23c55a8fc0b0448ace7c8be4e1552358a3ffa14c",
         "type": "github"
       },
       "original": {
