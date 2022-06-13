@@ -44,7 +44,7 @@ let step_main :
            Types.Pairing_based.Statement.t
         -> unit )
        Staged.t =
- fun (module Req) (module Max_branching) ~self_branches ~local_signature
+ fun (module Req) max_branching ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length ~branching
      ~lte ~basic ~self rule ->
   let module T (F : T4) = struct
@@ -120,6 +120,9 @@ let step_main :
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
+        let module Max_branching = ( val max_branching : Nat.Add.Intf
+                                       with type n = max_branching )
+        in
         let T = Max_branching.eq in
         let dlog_plonk_index =
           exists
@@ -157,7 +160,7 @@ let step_main :
               Types_map.For_step.t =
             { branches = self_branches
             ; branchings = Vector.map basic.branchings ~f:Field.of_int
-            ; max_branching = (module Max_branching)
+            ; max_branching
             ; max_width = None
             ; typ = basic.typ
             ; var_to_field_elements = basic.var_to_field_elements
