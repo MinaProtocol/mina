@@ -29,6 +29,9 @@ ARG ROCKSDB_VERSION=v5.18.4
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
+  || sleep 10s && apt-get update \
+  || sleep 10s && apt-get update \
+  || sleep 10s && apt-get update \
   && apt-get install --yes \
     libboost-dev \
     libboost-program-options-dev \

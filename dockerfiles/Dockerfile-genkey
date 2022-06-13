@@ -10,6 +10,9 @@ ENV DEBIAN_FRONTEND noninteractive
 # stretch-slim configures apt to not store any cache, so no need to rm it
 # TODO: make sure this is the minimum runtime deps
 RUN apt-get -y update \
+  || sleep 10s && apt-get -y update \
+  || sleep 10s && apt-get -y update \
+  || sleep 10s && apt-get -y update \
   && apt -y install \
     apt-transport-https \
     ca-certificates \
@@ -26,6 +29,9 @@ RUN apt-get -y update \
 # mina keypair package
 RUN echo "deb [trusted=yes] http://packages.o1test.net stretch stable" > /etc/apt/sources.list.d/o1.list \
    && apt-get update \
+   || sleep 10s && apt-get update \
+   || sleep 10s && apt-get update \
+   || sleep 10s && apt-get update \
    && apt-get install -y "mina-generate-keypair=1.2.1beta1-45440dc"
 
 WORKDIR /
