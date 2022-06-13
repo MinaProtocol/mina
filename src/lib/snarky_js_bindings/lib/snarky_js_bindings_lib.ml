@@ -266,6 +266,11 @@ let of_js_field (x : field_class Js.t) : Field.t = x##.value
 let to_js_field_unchecked x : field_class Js.t =
   x |> Field.constant |> to_js_field
 
+let to_unchecked (x : Field.t) =
+  match x with Constant y -> y | y -> Impl.As_prover.read_var y
+
+let of_js_field_unchecked (x : field_class Js.t) = to_unchecked @@ of_js_field x
+
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
@@ -1086,9 +1091,6 @@ type sponge =
   | Checked of Poseidon_sponge_checked.t
   | Unchecked of Poseidon_sponge.t
 
-let to_unchecked (x : Field.t) =
-  match x with Constant y -> y | y -> Impl.As_prover.read_var y
-
 let poseidon =
   object%js
     method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
@@ -1590,35 +1592,22 @@ let () =
 
 (* helpers for pickles_compile *)
 
-type 'a zkapp_statement = { transaction : 'a; at_party : 'a }
+type 'a zkapp_statement = 'a array
 
-let zkapp_statement_to_fields { transaction; at_party } =
-  [| transaction; at_party |]
-
-type zkapp_statement_js =
-  < transaction : field_class Js.t Js.readonly_prop
-  ; atParty : field_class Js.t Js.readonly_prop >
-  Js.t
+type zkapp_statement_js = field_class Js.t Js.js_array Js.t
 
 module Zkapp_statement = struct
   type t = Field.t zkapp_statement
 
-  let to_field_elements = zkapp_statement_to_fields
+  let to_field_elements (t : t) : Field.t array = t
 
-  let to_constant ({ transaction; at_party } : t) =
-    { transaction = to_unchecked transaction; at_party = to_unchecked at_party }
+  let to_constant (t : t) = Array.map ~f:to_unchecked t
 
-  let to_js ({ transaction; at_party } : t) =
-    object%js
-      val transaction = to_js_field transaction
+  let to_js (t : t) : zkapp_statement_js =
+    Array.map ~f:to_js_field t |> Js.array
 
-      val atParty = to_js_field at_party
-    end
-
-  let of_js (statement : zkapp_statement_js) : t =
-    { transaction = of_js_field statement##.transaction
-    ; at_party = of_js_field statement##.atParty
-    }
+  let of_js (a : zkapp_statement_js) : t =
+    Js.to_array a |> Array.map ~f:of_js_field
 
   let list_to_js (statements : t list) =
     List.map ~f:to_js statements |> Array.of_list |> Js.array
@@ -1626,28 +1615,17 @@ module Zkapp_statement = struct
   module Constant = struct
     type t = Field.Constant.t zkapp_statement
 
-    let to_field_elements = zkapp_statement_to_fields
+    let to_field_elements (t : t) : Field.Constant.t array = t
 
-    let to_js ({ transaction; at_party } : t) =
-      to_js
-        { transaction = Field.constant transaction
-        ; at_party = Field.constant at_party
-        }
+    let to_js (t : t) : zkapp_statement_js =
+      Array.map ~f:to_js_field_unchecked t |> Js.array
 
-    let of_js (statement : zkapp_statement_js) : t =
-      { transaction = of_js_field statement##.transaction |> to_unchecked
-      ; at_party = of_js_field statement##.atParty |> to_unchecked
-      }
+    let of_js (a : zkapp_statement_js) : t =
+      Js.to_array a |> Array.map ~f:of_js_field_unchecked
   end
 end
 
-let zkapp_statement_typ =
-  let to_hlist { transaction; at_party } = H_list.[ transaction; at_party ] in
-  let of_hlist ([ transaction; at_party ] : (unit, _) H_list.t) =
-    { transaction; at_party }
-  in
-  Typ.of_hlistable [ Field.typ; Field.typ ] ~var_to_hlist:to_hlist
-    ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+let zkapp_statement_typ (i : int) = Typ.array ~length:i Field.typ
 
 let dummy_constraints =
   let module Inner_curve = Kimchi_pasta.Pasta.Pallas in
@@ -1794,7 +1772,8 @@ let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
 let nat_add_module (i : int) : (module Pickles_types.Nat.Add.Intf) =
   List.nth_exn nat_add_modules_list i
 
-let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
+let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
+    (statement_size : int) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let branches = List.length choices in
   let max_proofs =
@@ -1810,7 +1789,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     Pickles.compile_promise ~choices:(Obj.magic choices)
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
-      ~typ:zkapp_statement_typ
+      ~typ:(zkapp_statement_typ statement_size)
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
@@ -2233,7 +2212,7 @@ module Ledger = struct
       (Parties.Call_forest.hash ps :> Impl.field)
     in
     let transaction = transaction_commitment tx (Other_party party_index) in
-    Zkapp_statement.Constant.to_js { transaction; at_party }
+    Zkapp_statement.Constant.to_js [| transaction; at_party |]
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
     Signature_lib.Schnorr.Chunked.sign (private_key key)
