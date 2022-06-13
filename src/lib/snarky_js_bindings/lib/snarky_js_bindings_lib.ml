@@ -1764,18 +1764,20 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
       (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
       let prevs = Obj.magic [] in
       let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
-      prover ?handler:None prevs statement
-      |> Promise.map ~f:Pickles.Side_loaded.Proof.of_proof
-      |> Promise_js_helpers.to_js
+      prover ?handler:None prevs statement |> Promise_js_helpers.to_js
     in
     prove
   in
   let rec to_js_provers :
       type a b c.
-         (a, b, c, Zkapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
-      -> (   zkapp_statement_js
-          -> Pickles.Side_loaded.Proof.t Promise_js_helpers.js_promise )
-         list = function
+         ( a
+         , b
+         , c
+         , Zkapp_statement.Constant.t
+         , Proof.t Promise.t )
+         Pickles.Provers.t
+      -> (zkapp_statement_js -> Proof.t Promise_js_helpers.js_promise) list =
+    function
     | [] ->
         []
     | p :: ps ->
@@ -1809,8 +1811,9 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
           (Pickles.Verification_key.index key)
   end
 
-let proof_to_string proof =
-  proof |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
+let proof_to_string (proof : proof) =
+  proof |> Pickles.Side_loaded.Proof.of_proof
+  |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
 
 let pickles =
   object%js
