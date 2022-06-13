@@ -109,7 +109,6 @@ end
 
 module Validation_callback = Validation_callback
 module Sink = Sink
-module Block_storage = Block_storage
 
 module For_tests : sig
   module Helper = Libp2p_helper
