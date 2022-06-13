@@ -1620,6 +1620,9 @@ module Zkapp_statement = struct
     ; at_party = of_js_field statement##.atParty
     }
 
+  let list_to_js (statements : t list) =
+    List.map ~f:to_js statements |> Array.of_list |> Js.array
+
   module Constant = struct
     type t = Field.Constant.t zkapp_statement
 
@@ -1681,19 +1684,49 @@ type ('a_var, 'a_value, 'a_weird) pickles_rule =
 
 type pickles_rule_js =
   < identifier : Js.js_string Js.t Js.prop
-  ; main : (zkapp_statement_js -> unit) Js.prop
-  ; proofsVerified : int Js.prop >
+  ; main :
+      (   zkapp_statement_js
+       -> zkapp_statement_js Js.js_array Js.t
+       -> bool Js.t
+       -> bool_class Js.t Js.js_array Js.t )
+      Js.prop
+  ; proofsToVerify :
+      < isSelf : bool Js.t Js.prop ; tag : Js.Unsafe.any Js.t Js.prop > Js.t
+      Js.js_array
+      Js.t
+      Js.prop >
   Js.t
 
-let create_pickles_rule (rule : pickles_rule_js) =
+let create_pickles_rule ~self (rule : pickles_rule_js) =
+  let to_tag tag : _ Pickles.Tag.t =
+    if Js.to_bool tag##.isSelf then self else Obj.magic tag##.tag
+  in
+  let prevs =
+    rule##.proofsToVerify |> Js.to_array |> Array.to_list |> List.map ~f:to_tag
+  in
   { identifier = Js.to_string rule##.identifier
-  ; prevs = []
+  ; prevs
   ; main =
-      (fun _ statement ->
+      (fun prev_statements statement ->
         dummy_constraints () ;
-        rule##.main (Zkapp_statement.to_js statement) ;
-        [] )
-  ; main_value = (fun _ _ -> [])
+        let should_verifys =
+          rule##.main
+            (Zkapp_statement.to_js statement)
+            (Zkapp_statement.list_to_js prev_statements)
+            (Js.bool false)
+        in
+        Js.to_array should_verifys |> Array.to_list
+        |> List.map ~f:(fun b -> b##.value) )
+  ; main_value =
+      (fun prev_statements statement ->
+        let should_verifys =
+          rule##.main
+            (Zkapp_statement.to_js statement)
+            (Zkapp_statement.list_to_js prev_statements)
+            (Js.bool true)
+        in
+        Js.to_array should_verifys |> Array.to_list
+        |> List.map ~f:(fun b -> b##toBoolean |> Js.to_bool) )
   }
 
 let other_verification_key_constr :
@@ -1765,10 +1798,11 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let branches = List.length choices in
   let max_proofs =
-    List.map choices ~f:(fun c -> c##.proofsVerified)
+    List.map choices ~f:(fun c ->
+        c##.proofsToVerify |> Js.to_array |> Array.length )
     |> List.max_elt ~compare |> Option.value ~default:0
   in
-  let choices ~self:_ = List.map choices ~f:create_pickles_rule in
+  let choices ~self = List.map choices ~f:(create_pickles_rule ~self) in
   let (module Branches) = nat_module branches in
   let (module Max_proofs_verified) = nat_add_module max_proofs in
   (* TODO get rid of Obj.magic for choices *)
@@ -1826,10 +1860,11 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
   in
   object%js
-    (* there's no point in being type-safe here, because JS doesn't see these types anyway *)
     val provers = Obj.magic provers
 
     val verify = Obj.magic verify
+
+    val tag = Obj.magic tag
 
     val getVerificationKeyArtifact =
       fun () ->
