@@ -14,7 +14,8 @@ type failure =
       | `Verification_key
       | `Zkapp_uri
       | `Token_symbol
-      | `Balance ]
+      | `Send
+      | `Receive ]
 
 let gen_account_precondition_from_account ?failure account =
   let open Quickcheck.Let_syntax in
@@ -229,17 +230,21 @@ let gen_fee (account : Account.t) =
 let fee_to_amt fee =
   Currency.Amount.(Signed.of_unsigned (of_fee fee) |> Signed.negate)
 
-let gen_balance_change ?permissions_auth (account : Account.t) =
+let gen_balance_change ?permissions_auth ?failure (account : Account.t) =
   let open Quickcheck.Let_syntax in
   let%bind sgn =
-    match permissions_auth with
-    | Some auth -> (
+    match (failure, permissions_auth) with
+    | Some (Update_not_permitted `Send), _ ->
+        return Sgn.Neg
+    | Some (Update_not_permitted `Receive), _ ->
+        return Sgn.Pos
+    | _, Some auth -> (
         match auth with
         | Control.Tag.None_given ->
             return Sgn.Pos
         | _ ->
             Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] )
-    | None ->
+    | _, None ->
         Quickcheck.Generator.of_list [ Sgn.Pos; Neg ]
   in
   (* if negative, magnitude constrained to balance in account
@@ -255,7 +260,7 @@ let gen_balance_change ?permissions_auth (account : Account.t) =
     else Balance.of_formatted_string "0.000001"
   in
   let%map (magnitude : Currency.Amount.t) =
-    Currency.Amount.gen_incl Currency.Amount.zero
+    Currency.Amount.gen_incl (Currency.Amount.of_int 1)
       (Currency.Balance.to_amount small_balance_change)
   in
   match sgn with
@@ -1012,7 +1017,7 @@ let gen_party_from ?(limited = false) ?(update = None) ?failure
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?vk ~available_public_keys
       ?required_balance_change ?required_balance ~ledger ~account_state_tbl
-      ~gen_balance_change:(gen_balance_change ?permissions_auth)
+      ~gen_balance_change:(gen_balance_change ?permissions_auth ?failure)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_predcondition:(gen_account_precondition_from_account ?failure)
       ~f_party_account_precondition:Fn.id
@@ -1207,11 +1212,17 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
                             set_voting_for = Auth_required.from ~auth_tag
                           }
                     }
-                | `Balance ->
+                | `Send ->
                     { Party.Update.dummy with
                       permissions =
                         Set_or_keep.Set
                           { perm with send = Auth_required.from ~auth_tag }
+                    }
+                | `Receive ->
+                    { Party.Update.dummy with
+                      permissions =
+                        Set_or_keep.Set
+                          { perm with receive = Auth_required.from ~auth_tag }
                     }
               in
               (auth_tag, Some update)
@@ -1287,7 +1298,7 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
                       let%map field = Snark_params.Tick.Field.gen in
                       let voting_for = Set_or_keep.Set field in
                       { Party.Update.dummy with voting_for }
-                  | `Balance ->
+                  | `Send | `Receive ->
                       return Party.Update.dummy
                 in
                 let%map new_perm =
@@ -1321,7 +1332,7 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
   in
   let%bind new_parties =
     if no_new_account then
-      gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
+      gen_parties_with_dynamic_balance ~new_parties:false num_new_accounts
     else gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
   in
   let other_parties0 = old_parties @ new_parties in
