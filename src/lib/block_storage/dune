@@ -1,6 +1,6 @@
 (library
- (name mina_net2)
- (public_name mina_net2)
+ (name block_storage)
+ (public_name block_storage)
  (libraries
    ;; opam libraries
    async
@@ -21,6 +21,7 @@
    base.caml
    base.base_internalhash_types
    splittable_random
+   lmdb
    integers
    ;; local libraries
    blake2
@@ -35,6 +36,12 @@
    o1trace
    staged_ledger_diff
    consensus
+   mina_net2
+   ;; test deps
+   inline_test_quiet_logs
+   transition_frontier_base
+   mina_block
+   transition_frontier_full_frontier
    )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

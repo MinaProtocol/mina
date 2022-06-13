@@ -20,7 +20,6 @@
    genesis_constants
    logger
    mina_block
-   signature_lib
    transition_frontier_persistent_root
    inline_test_quiet_logs
    mina_base
