@@ -53,6 +53,7 @@
    consensus
    merkle_ledger
    pickles
+   pickles_types
    snark_params
    with_hash
    mina_generators

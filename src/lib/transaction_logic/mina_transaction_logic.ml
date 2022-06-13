@@ -2017,7 +2017,7 @@ module For_tests = struct
       }
     |> Signed_command.forget_check
 
-  let party_send ?(use_full_commitment = true)
+  let party_send ?(use_full_commitment = true) ?(double_sender_nonce = true)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       { Transaction_spec.fee
       ; sender = sender, sender_nonce
@@ -2036,9 +2036,11 @@ module For_tests = struct
          This would also allow us to prevent replays of snapp proofs, by
          allowing them to bump their nonce.
       *)
-      sender_nonce |> Account.Nonce.to_uint32
-      |> Unsigned.UInt32.(mul (of_int 2))
-      |> Account.Nonce.to_uint32
+      if double_sender_nonce then
+        sender_nonce |> Account.Nonce.to_uint32
+        |> Unsigned.UInt32.(mul (of_int 2))
+        |> Account.Nonce.to_uint32
+      else sender_nonce
     in
     let parties : Parties.Simple.t =
       { fee_payer =
