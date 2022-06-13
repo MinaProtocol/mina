@@ -274,7 +274,7 @@ let%test_module "Transaction union tests" =
             , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
       in
       let sok_signer =
-        match to_preunion (txn :> Transaction.t) with
+        match to_preunion (Transaction.forget txn) with
         | `Transaction t ->
             (Transaction_union.of_transaction t).signer |> Public_key.compress
         | `Parties c ->
@@ -286,7 +286,7 @@ let%test_module "Transaction union tests" =
       let _applied =
         Or_error.ok_exn
         @@ Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
-             (txn :> Transaction.t)
+             (Transaction.forget txn)
       in
       let target = Ledger.merkle_root ledger in
       let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in

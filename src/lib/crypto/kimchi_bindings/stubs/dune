@@ -15,7 +15,7 @@
 
 (rule
  (enabled_if (= %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libwires_15_stubs.a dllwires_15_stubs.so)
+ (targets libwires_15_stubs.a)
  (deps
   Cargo.toml
   (source_tree src)
@@ -27,8 +27,7 @@
     RUSTFLAGS
     "-C target-feature=+bmi2,+adx"
     (run cargo build --release))
-   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .)
-   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.so dllwires_15_stubs.so))))
+   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .))))
 
 ;; copy from $MARLIN_PLONK_STUBS if this exists
 (copy_files

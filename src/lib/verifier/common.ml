@@ -40,7 +40,7 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Parties { fee_payer; other_parties; memo } ->
+  | Parties ({ fee_payer; other_parties; memo } as parties_with_vk) ->
       with_return (fun { return } ->
           let other_parties_hash = Parties.Call_forest.hash other_parties in
           let tx_commitment =
@@ -92,21 +92,20 @@ let check :
                         return
                           (`Missing_verification_key
                             [ Account_id.public_key @@ Party.account_id p ] )
-                    | Some vk ->
+                    | Some (vk : _ With_hash.t) ->
                         let stmt =
                           { Zkapp_statement.Poly.transaction = commitment
                           ; at_party = (at_party :> Snark_params.Tick.Field.t)
                           }
                         in
-                        Some (vk, stmt, pi) ) )
+                        Some (vk.data, stmt, pi) ) )
           in
           let v : User_command.Valid.t =
-            User_command.Poly.Parties
-              { Parties.fee_payer
-              ; other_parties =
-                  Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
-              ; memo
-              }
+            (*Verification keys should be present if it reaches here*)
+            let parties =
+              Option.value_exn (Parties.Valid.of_verifiable parties_with_vk)
+            in
+            User_command.Poly.Parties parties
           in
           match valid_assuming with
           | [] ->
