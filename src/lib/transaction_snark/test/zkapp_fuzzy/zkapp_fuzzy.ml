@@ -7,7 +7,7 @@ let logger = Logger.create ()
 
 let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let fee_payer_keypairs =
-    Array.init num_of_fee_payers ~f:(fun _ -> Keypair.create ())
+    Array.init (num_of_fee_payers * 2) ~f:(fun _ -> Keypair.create ())
   in
   let fee_payer_pks =
     Array.map fee_payer_keypairs ~f:(fun fee_payer_keypair ->
@@ -48,7 +48,7 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let keys = List.init 1000 ~f:(fun _ -> Keypair.create ()) in
   let keymap =
     List.map
-      (Array.to_list fee_payer_keypairs @ keys)
+      (List.drop (Array.to_list fee_payer_keypairs) num_of_fee_payers @ keys)
       ~f:(fun { public_key; private_key } ->
         (Public_key.compress public_key, private_key) )
     |> Public_key.Compressed.Map.of_alist_exn
@@ -60,16 +60,16 @@ let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 let generate_parties_and_apply_them_consecutively () =
   let num_of_fee_payers = 5 in
   let trials = 6 in
-  let ledger, fee_payer_keypairs, keymap =
+  let ledger, _fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers ()
   in
-  let account_state_table = Account_id.Table.create () in
+  let account_state_tbl = Account_id.Table.create () in
   Test_util.with_randomness 123456789 (fun () ->
-      let test i =
+      let test _i =
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_with_limited_keys
              ~protocol_state_view:U.genesis_state_view ~keymap ~ledger ~vk
-             ~prover ~account_state_table () ) ~f:(fun parties ->
+             ~prover ~account_state_tbl () ) ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
                   ~metadata:
@@ -96,8 +96,8 @@ let generate_parties_and_apply_them_freshly () =
   let num_of_fee_payers = 5 in
   let trials = 6 in
   Test_util.with_randomness 123456789 (fun () ->
-      let test i =
-        let ledger, fee_payer_keypairs, keymap =
+      let test _i =
+        let ledger, _fee_payer_keypairs, keymap =
           mk_ledgers_and_fee_payers ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
@@ -114,8 +114,8 @@ let generate_parties_and_apply_them_freshly () =
 let mk_invalid_test ~num_of_fee_payers ~trials ~type_of_failure
     ~expected_failure_status =
   Test_util.with_randomness 123456789 (fun () ->
-      let test i =
-        let ledger, fee_payer_keypairs, keymap =
+      let test _i =
+        let ledger, _fee_payer_keypairs, keymap =
           mk_ledgers_and_fee_payers ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
@@ -138,16 +138,14 @@ let test_timed_account () =
   let num_of_fee_payers = 5 in
   let trials = 1 in
   Test_util.with_randomness 123456789 (fun () ->
-      let test i =
-        let ledger, fee_payer_keypairs, keymap =
+      let test _i =
+        let ledger, _fee_payer_keypairs, keymap =
           mk_ledgers_and_fee_payers ~is_timed:true ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
-          (Mina_generators.Parties_generators.gen_parties_from
-             ~protocol_state_view:U.genesis_state_view
-             ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
+          (Mina_generators.Parties_generators.gen_parties_with_limited_keys
+             ~protocol_state_view:U.genesis_state_view ~keymap ~ledger ~vk
+             ~prover () ) ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
                   ~metadata:[ ("parties", Parties.to_yojson parties) ]

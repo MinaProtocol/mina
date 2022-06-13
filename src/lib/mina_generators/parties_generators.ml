@@ -671,12 +671,6 @@ let gen_party_body_components (type a b c d) ?(limited = false) ?(update = None)
   let new_account =
     new_account || (zkapp_account && Option.is_none account_id)
   in
-  (* a required balance is associated with a new account *)
-  ( match (required_balance, new_account) with
-  | Some _, false ->
-      failwith "Required balance, but not new account"
-  | _ ->
-      () ) ;
   let%bind update =
     match update with
     | None ->
@@ -1129,9 +1123,9 @@ let setup_fee_payer_and_available_keys_and_account_state_tbl
   in
   (fee_payer_account_id, available_public_keys, account_state_tbl)
 
-let gen_parties_base ?(limited = false) ?failure ~fee_payer_account_id
-    ~(fee_payer_keypair : Signature_lib.Keypair.t) ~available_public_keys
-    ~account_state_tbl
+let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
+    ~fee_payer_account_id ~(fee_payer_keypair : Signature_lib.Keypair.t)
+    ~available_public_keys ~account_state_tbl
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ~ledger ?protocol_state_view ?vk ?prover () =
@@ -1326,7 +1320,9 @@ let gen_parties_base ?(limited = false) ?failure ~fee_payer_account_id
     gen_parties_with_dynamic_balance ~new_parties:false num_old_parties
   in
   let%bind new_parties =
-    gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
+    if no_new_account then
+      gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
+    else gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
   in
   let other_parties0 = old_parties @ new_parties in
   let balance_change_sum =
@@ -1358,9 +1354,10 @@ let gen_parties_base ?(limited = false) ?failure ~fee_payer_account_id
           None
     in
     let authorization = Control.Signature Signature.dummy in
-    gen_party_from ~limited ?failure ~authorization ~new_account:true
-      ~available_public_keys ~ledger ~required_balance_change ?required_balance
-      ~account_state_tbl ?vk ()
+    gen_party_from ~limited ~update:(Some Party.Update.dummy) ?failure
+      ~authorization ~account_id:fee_payer_account_id ~available_public_keys
+      ~ledger ~required_balance_change ?required_balance ~account_state_tbl ?vk
+      ()
   in
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
@@ -1443,6 +1440,6 @@ let gen_parties_with_limited_keys ?failure ~keymap ?account_state_tbl ~ledger
     setup_fee_payer_and_available_keys_and_account_state_tbl_limited ~keymap
       ?account_state_tbl ~ledger
   in
-  gen_parties_base ~limited:true ?failure ~fee_payer_account_id
-    ~fee_payer_keypair ~available_public_keys ~account_state_tbl ~keymap ~ledger
-    ?protocol_state_view ?vk ?prover ()
+  gen_parties_base ~no_new_account:true ~limited:true ?failure
+    ~fee_payer_account_id ~fee_payer_keypair ~available_public_keys
+    ~account_state_tbl ~keymap ~ledger ?protocol_state_view ?vk ?prover ()
