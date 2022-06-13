@@ -1679,15 +1679,19 @@ type ('a_var, 'a_value, 'a_weird) pickles_rule =
   ; main_value : 'a_value list -> 'a_value -> bool list
   }
 
-type pickles_rule_js = Js.js_string Js.t * (zkapp_statement_js -> unit)
+type pickles_rule_js =
+  < identifier : Js.js_string Js.t Js.prop
+  ; main : (zkapp_statement_js -> unit) Js.prop
+  ; proofsVerified : int Js.prop >
+  Js.t
 
-let create_pickles_rule ((identifier, main) : pickles_rule_js) =
-  { identifier = Js.to_string identifier
+let create_pickles_rule (rule : pickles_rule_js) =
+  { identifier = Js.to_string rule##.identifier
   ; prevs = []
   ; main =
       (fun _ statement ->
         dummy_constraints () ;
-        main (Zkapp_statement.to_js statement) ;
+        rule##.main (Zkapp_statement.to_js statement) ;
         [] )
   ; main_value = (fun _ _ -> [])
   }
@@ -1726,14 +1730,47 @@ let nat_modules_list : (module Pickles_types.Nat.Intf) list =
   ; (module N20)
   ]
 
+let nat_add_modules_list : (module Pickles_types.Nat.Add.Intf) list =
+  let open Pickles_types.Nat in
+  [ (module N0)
+  ; (module N1)
+  ; (module N2)
+  ; (module N3)
+  ; (module N4)
+  ; (module N5)
+  ; (module N6)
+  ; (module N7)
+  ; (module N8)
+  ; (module N9)
+  ; (module N10)
+  ; (module N11)
+  ; (module N12)
+  ; (module N13)
+  ; (module N14)
+  ; (module N15)
+  ; (module N16)
+  ; (module N17)
+  ; (module N18)
+  ; (module N19)
+  ; (module N20)
+  ]
+
 let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
   List.nth_exn nat_modules_list i
+
+let nat_add_module (i : int) : (module Pickles_types.Nat.Add.Intf) =
+  List.nth_exn nat_add_modules_list i
 
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let branches = List.length choices in
+  let max_proofs =
+    List.map choices ~f:(fun c -> c##.proofsVerified)
+    |> List.max_elt ~compare |> Option.value ~default:0
+  in
   let choices ~self:_ = List.map choices ~f:create_pickles_rule in
   let (module Branches) = nat_module branches in
+  let (module Max_proofs_verified) = nat_add_module max_proofs in
   (* TODO get rid of Obj.magic for choices *)
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices:(Obj.magic choices)
@@ -1741,7 +1778,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
       (module Zkapp_statement.Constant)
       ~typ:zkapp_statement_typ
       ~branches:(module Branches)
-      ~max_proofs_verified:(module Pickles_types.Nat.N0)
+      ~max_proofs_verified:(module Max_proofs_verified)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
       ~name:"smart-contract"
       ~constraint_constants:
@@ -1783,14 +1820,16 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     | p :: ps ->
         to_js_prover p :: to_js_provers ps
   in
-  let verify (statement_js : zkapp_statement_js) (proof : proof) =
+  let provers = provers |> to_js_provers |> Array.of_list |> Js.array in
+  let verify (statement_js : zkapp_statement_js) (proof : _ Pickles.Proof.t) =
     let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
     Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
   in
   object%js
-    val provers = provers |> to_js_provers |> Array.of_list |> Js.array
+    (* there's no point in being type-safe here, because JS doesn't see these types anyway *)
+    val provers = Obj.magic provers
 
-    val verify = verify
+    val verify = Obj.magic verify
 
     val getVerificationKeyArtifact =
       fun () ->
