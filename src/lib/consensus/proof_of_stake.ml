@@ -2906,14 +2906,37 @@ module Hooks = struct
     in
     match requested_syncs with
     | One required_sync ->
-        sync required_sync
+        let open Async.Deferred.Let_syntax in
+        let start = Core.Time.now () in
+        let%map result = sync required_sync in
+        let { snapshot_id; _ } = required_sync in
+        ( match snapshot_id with
+        | Staking_epoch_snapshot ->
+            Mina_metrics.(
+              Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
+                Core.Time.(diff (now ()) start |> Span.to_ms))
+        | Next_epoch_snapshot ->
+            Mina_metrics.(
+              Counter.inc Bootstrap.next_epoch_ledger_sync_ms
+                Core.Time.(diff (now ()) start |> Span.to_ms)) ) ;
+        result
     | Both { staking; next } ->
         (*Sync staking ledger before syncing the next ledger*)
         let open Deferred.Or_error.Let_syntax in
+        let start = Core.Time.now () in
         let%bind () =
           sync { snapshot_id = Staking_epoch_snapshot; expected_root = staking }
         in
-        sync { snapshot_id = Next_epoch_snapshot; expected_root = next }
+        Mina_metrics.(
+          Counter.inc Bootstrap.staking_epoch_ledger_sync_ms
+            Core.Time.(diff (now ()) start |> Span.to_ms)) ;
+        let start = Core.Time.now () in
+        let%map () =
+          sync { snapshot_id = Next_epoch_snapshot; expected_root = next }
+        in
+        Mina_metrics.(
+          Counter.inc Bootstrap.next_epoch_ledger_sync_ms
+            Core.Time.(diff (now ()) start |> Span.to_ms))
 
   let received_within_window ~constants (epoch, slot) ~time_received =
     let open Int64 in

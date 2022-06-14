@@ -9,7 +9,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let send_zkapp ~logger node parties =
     [%log info] "Sending zkApp"
-      ~metadata:[ ("parties", Mina_base.Parties.to_yojson parties) ] ;
+      ~metadata:
+        [ ("parties", Mina_base.Parties.to_yojson parties)
+        ; ( "memo"
+          , `String (Mina_base.Signed_command_memo.to_string_hum parties.memo)
+          )
+        ] ;
     match%bind.Deferred Network.Node.send_zkapp ~logger node ~parties with
     | Ok _zkapp_id ->
         [%log info] "ZkApp transaction sent" ;

@@ -722,6 +722,7 @@ let%test_module "ZkApps test transaction" =
         ~f:(fun (user_cmd, _, _, _) ->
           match user_cmd with
           | Parties p ->
+              let p = Parties.Valid.forget p in
               let q = graphql_zkapp_command p in
               Async.Thread_safe.block_on_async_exn (fun () ->
                   match%map hit_server p q with
