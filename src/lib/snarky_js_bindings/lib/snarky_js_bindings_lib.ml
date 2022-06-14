@@ -1765,14 +1765,20 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
       let prevs = Obj.magic [] in
       let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement
-      |> Promise.map ~f:Pickles.Side_loaded.Proof.of_proof
+      |> Promise.map ~f:(fun ((), proof) ->
+             Pickles.Side_loaded.Proof.of_proof proof )
       |> Promise_js_helpers.to_js
     in
     prove
   in
   let rec to_js_provers :
       type a b c.
-         (a, b, c, Zkapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
+         ( a
+         , b
+         , c
+         , Zkapp_statement.Constant.t
+         , (unit * proof) Promise.t )
+         Pickles.Provers.t
       -> (   zkapp_statement_js
           -> Pickles.Side_loaded.Proof.t Promise_js_helpers.js_promise )
          list = function

@@ -92,7 +92,7 @@ let%test_module "Initialize state test" =
       let party_body =
         Zkapps_initialize_state.generate_initialize_party pk_compressed
 
-      let party_proof =
+      let (), party_proof =
         Async.Thread_safe.block_on_async_exn (fun () ->
             initialize_prover []
               { transaction = Party.Body.digest party_body
@@ -111,7 +111,7 @@ let%test_module "Initialize state test" =
         Zkapps_initialize_state.generate_update_state_party pk_compressed
           new_state
 
-      let party_proof =
+      let (), party_proof =
         Async.Thread_safe.block_on_async_exn (fun () ->
             update_state_prover
               ~handler:(Zkapps_initialize_state.update_state_handler new_state)

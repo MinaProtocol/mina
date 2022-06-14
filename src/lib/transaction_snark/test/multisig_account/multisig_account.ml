@@ -391,7 +391,7 @@ let%test_module "multisig_account" =
                 | _ ->
                     respond Unhandled
               in
-              let pi : Pickles.Side_loaded.Proof.t =
+              let (), (pi : Pickles.Side_loaded.Proof.t) =
                 (fun () -> multisig_prover ~handler [] tx_statement)
                 |> Async.Thread_safe.block_on_async_exn
               in

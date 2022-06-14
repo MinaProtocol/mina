@@ -452,7 +452,8 @@ struct
          , widthss
          , heightss
          , A_value.t
-         , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
+         , (Ret_value.t * (max_proofs_verified, max_proofs_verified) Proof.t)
+           Promise.t )
          H3_2.T(Prover).t
          * _
          * _
@@ -752,7 +753,9 @@ struct
              , local_heights )
              H3.T(Statement_with_proof).t
           -> A_value.t
-          -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t =
+          -> ( Ret_value.t
+             * (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t )
+             Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
         let _, prev_vars_length = b.proofs_verified in
@@ -783,7 +786,7 @@ struct
             in
             go prevs
           in
-          let%bind.Promise proof =
+          let%bind.Promise proof, return_value =
             step handler ~maxes:(module Maxes) app_states prevs next_state
           in
           let proof =
@@ -806,14 +809,15 @@ struct
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in
-          Proof.T
-            { proof with
-              statement =
-                { proof.statement with
-                  pass_through =
-                    { proof.statement.pass_through with app_state = () }
-                }
-            }
+          ( return_value
+          , Proof.T
+              { proof with
+                statement =
+                  { proof.statement with
+                    pass_through =
+                      { proof.statement.pass_through with app_state = () }
+                  }
+              } )
         in
         wrap
       in
@@ -825,7 +829,8 @@ struct
              , xs5
              , xs6
              , A_value.t
-             , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
+             , (Ret_value.t * (max_proofs_verified, max_proofs_verified) Proof.t)
+               Promise.t )
              H3_2.T(Prover).t =
        fun bs ks ->
         match (bs, ks) with
@@ -992,7 +997,8 @@ let compile_promise :
          , widthss
          , heightss
          , a_value
-         , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
+         , (ret_value * (max_proofs_verified, max_proofs_verified) Proof.t)
+           Promise.t )
          H3_2.T(Prover).t =
  fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
      ~return_typ ~branches ~max_proofs_verified ~name ~constraint_constants
@@ -1205,7 +1211,7 @@ let%test_module "test no side-loaded" =
       module Proof = (val p)
 
       let example =
-        let b0 =
+        let (), b0 =
           Common.time "b0" (fun () ->
               Promise.block_on_async_exn (fun () -> step [] Field.Constant.zero) )
         in
@@ -1260,7 +1266,7 @@ let%test_module "test no side-loaded" =
         let b_neg_one : (Nat.N1.n, Nat.N1.n) Proof0.t =
           Proof0.dummy Nat.N1.n Nat.N1.n Nat.N1.n ~domain_log2:14
         in
-        let b0 =
+        let (), b0 =
           Common.time "b0" (fun () ->
               Promise.block_on_async_exn (fun () ->
                   step [ (s_neg_one, b_neg_one) ] Field.Constant.zero ) )
@@ -1268,7 +1274,7 @@ let%test_module "test no side-loaded" =
         assert (
           Promise.block_on_async_exn (fun () ->
               Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
-        let b1 =
+        let (), b1 =
           Common.time "b1" (fun () ->
               Promise.block_on_async_exn (fun () ->
                   step [ (Field.Constant.zero, b0) ] Field.Constant.one ) )
@@ -1322,7 +1328,7 @@ let%test_module "test no side-loaded" =
         let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
           Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
         in
-        let b0 =
+        let (), b0 =
           Common.time "tree b0" (fun () ->
               Promise.block_on_async_exn (fun () ->
                   step
@@ -1332,7 +1338,7 @@ let%test_module "test no side-loaded" =
         assert (
           Promise.block_on_async_exn (fun () ->
               Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
-        let b1 =
+        let (), b1 =
           Common.time "tree b1" (fun () ->
               Promise.block_on_async_exn (fun () ->
                   step

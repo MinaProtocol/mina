@@ -4115,14 +4115,14 @@ struct
                 statement )
     in
     let open Async in
-    let%map proof = res in
+    let%map (), proof = res in
     Base.Parties_snark.witness := None ;
     { proof; statement }
 
   let of_transaction_union ~statement ~init_stack transaction state_body handler
       =
     let open Async in
-    let%map proof =
+    let%map (), proof =
       base []
         ~handler:
           (Base.transaction_union_handler handler transaction state_body
@@ -4173,7 +4173,7 @@ struct
     let%bind s = Async.return (Statement.merge t12 t23) in
     let s = { s with sok_digest } in
     let open Async in
-    let%map proof =
+    let%map (), proof =
       merge [ (x12.statement, x12.proof); (x23.statement, x23.proof) ] s
     in
     Ok { statement = s; proof }
@@ -4583,7 +4583,7 @@ module For_tests = struct
                     in
                     p
               in
-              let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
+              let%map.Async.Deferred (), (pi : Pickles.Side_loaded.Proof.t) =
                 prover ~handler [] tx_statement
               in
               ( { body = snapp_party.body; authorization = Proof pi }
@@ -4776,7 +4776,7 @@ module For_tests = struct
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
-    let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
+    let%map.Async.Deferred (), (pi : Pickles.Side_loaded.Proof.t) =
       trivial_prover ~handler [] tx_statement
     in
     let fee_payer_signature_auth =

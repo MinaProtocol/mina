@@ -67,7 +67,8 @@ val trivial_zkapp :
        , unit
        , unit
        , Zkapp_statement.t
-       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+       , ( unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t ] )
   Lazy.t
@@ -86,7 +87,8 @@ val test_snapp_update :
        , unit
        , unit
        , Zkapp_statement.t
-       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+       , ( unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Spec.t

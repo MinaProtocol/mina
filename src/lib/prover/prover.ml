@@ -115,7 +115,7 @@ module Worker_state = struct
                  let%map.Async.Deferred res =
                    Deferred.Or_error.try_with ~here:[%here] (fun () ->
                        let t = ledger_proof_opt chain next_state t in
-                       let%map.Async.Deferred proof =
+                       let%map.Async.Deferred (), proof =
                          B.step
                            ~handler:
                              (Consensus.Data.Prover_state.handler

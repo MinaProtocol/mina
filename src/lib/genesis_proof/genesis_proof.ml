@@ -221,7 +221,7 @@ let blockchain_snark_state (inputs : Inputs.t) :
   ((module T), (module B))
 
 let create_values txn b (t : Inputs.t) =
-  let%map.Async.Deferred genesis_proof = base_proof b t in
+  let%map.Async.Deferred (), genesis_proof = base_proof b t in
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level

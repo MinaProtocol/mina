@@ -67,13 +67,14 @@ struct
       ~self_dlog_plonk_index pk self_dlog_vk
       (prev_values : prev_values H1.T(Id).t)
       (prev_proofs : (local_widths, local_widths) H2.T(P).t) :
-      ( A_value.t
-      , (_, Max_proofs_verified.n) Vector.t
-      , (_, prevs_length) Vector.t
-      , (_, prevs_length) Vector.t
-      , _
-      , (_, Max_proofs_verified.n) Vector.t )
-      P.Base.Step.t
+      ( ( A_value.t
+        , (_, Max_proofs_verified.n) Vector.t
+        , (_, prevs_length) Vector.t
+        , (_, prevs_length) Vector.t
+        , _
+        , (_, Max_proofs_verified.n) Vector.t )
+        P.Base.Step.t
+      * ret_value )
       Promise.t =
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
@@ -435,6 +436,7 @@ struct
     let statements_with_hashes = ref None in
     let x_hats = ref None in
     let witnesses = ref None in
+    let return_value = ref None in
     let compute_prev_proof_parts inners_must_verify =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
@@ -592,6 +594,9 @@ struct
           k self_dlog_plonk_index
       | Req.App_state ->
           k next_state
+      | Req.Return_value res ->
+          return_value := Some res ;
+          k ()
       | Req.Unfinalized_proofs ->
           k (Lazy.force unfinalized_proofs_extended)
       | Req.Pass_through ->
@@ -677,19 +682,22 @@ struct
       ; pass_through
       }
     in
-    { P.Base.Step.proof = next_proof
-    ; statement = next_statement
-    ; index = branch_data.index
-    ; prev_evals =
-        Vector.extend
-          (Vector.map2 prev_evals (Option.value_exn !x_hats)
-             ~f:(fun (es, ft_eval1) x_hat ->
-               Plonk_types.All_evals.
-                 { ft_eval1
-                 ; evals =
-                     Double.map2 es x_hat ~f:(fun es x_hat ->
-                         { With_public_input.evals = es; public_input = x_hat } )
-                 } ) )
-          lte Max_proofs_verified.n Dummy.evals
-    }
+    ( { P.Base.Step.proof = next_proof
+      ; statement = next_statement
+      ; index = branch_data.index
+      ; prev_evals =
+          Vector.extend
+            (Vector.map2 prev_evals (Option.value_exn !x_hats)
+               ~f:(fun (es, ft_eval1) x_hat ->
+                 Plonk_types.All_evals.
+                   { ft_eval1
+                   ; evals =
+                       Double.map2 es x_hat ~f:(fun es x_hat ->
+                           { With_public_input.evals = es
+                           ; public_input = x_hat
+                           } )
+                   } ) )
+            lte Max_proofs_verified.n Dummy.evals
+      }
+    , Option.value_exn !return_value )
 end

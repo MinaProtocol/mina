@@ -287,10 +287,15 @@ let step_main :
           go prev_statements prev_return_values
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
-        let proofs_should_verify, _ret_var =
+        let proofs_should_verify, ret_var =
           (* Run the application logic of the rule on the predecessor statements *)
           with_label "rule_main" (fun () ->
               rule.main prev_statements app_state )
+        in
+        let () =
+          exists Typ.unit ~request:(fun () ->
+              let ret_value = As_prover.read basic.return_typ ret_var in
+              Req.Return_value ret_value )
         in
         (* Compute proof parts outside of the prover before requesting values.
         *)

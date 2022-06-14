@@ -298,7 +298,8 @@ val compile_promise :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_proofs_verified, 'max_proofs_verified) Proof.t Promise.t )
+       , ('ret_value * ('max_proofs_verified, 'max_proofs_verified) Proof.t)
+         Promise.t )
        H3_2.T(Prover).t
 
 (** This compiles a series of inductive rules defining a set into a proof
@@ -360,5 +361,6 @@ val compile :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_proofs_verified, 'max_proofs_verified) Proof.t Deferred.t )
+       , ('ret_value * ('max_proofs_verified, 'max_proofs_verified) Proof.t)
+         Deferred.t )
        H3_2.T(Prover).t
