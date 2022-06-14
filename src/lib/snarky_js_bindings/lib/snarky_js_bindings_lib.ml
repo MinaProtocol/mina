@@ -539,7 +539,8 @@ let () =
   let from f x = new%js field_constr (As_field.of_field (f x)) in
   static_method "fromNumber" (from As_field.of_number_exn) ;
   static_method "fromString" (from As_field.of_string_exn) ;
-  static_method "fromBigInt" (from As_field.of_bigint_exn)
+  static_method "fromBigInt" (from As_field.of_bigint_exn) ;
+  static_method "check" (fun _x -> ())
 
 let () =
   let handle_constants2 f f_constant (x : Boolean.var) (y : Boolean.var) =
@@ -863,6 +864,7 @@ let () =
      The only one of these whose behavior depends on the bit values of the input scalars
      is Group.scale, and that function boolean constrains the scalar input itself.
   *)
+  static_method "check" (fun _x -> ()) ;
   constant_op1 "neg" Other_backend.Field.negate ;
   constant_op2 "add" Other_backend.Field.add ;
   constant_op2 "mul" Other_backend.Field.mul ;
@@ -1410,7 +1412,9 @@ module Circuit = struct
       Impl.exists (typ_ typ) ~compute:(fun () : a -> Js.Unsafe.fun_call f [||])
     in
     if Js.Optdef.test (Js.Unsafe.coerce typ)##.check then
-      (Js.Unsafe.coerce typ)##check a ;
+      let () = (Js.Unsafe.coerce typ)##check a in
+      ()
+    else failwith "Circuit.witness: input does not have a `check` method" ;
     a
 
   module Circuit_main = struct
@@ -1457,37 +1461,6 @@ module Circuit = struct
   let circuit = Js.Unsafe.eval_string {js|(function() { return this })|js}
 
   let () =
-    let array (type a) (typ : a as_field_elements Js.t) (length : int) :
-        a Js.js_array Js.t as_field_elements Js.t =
-      let elt_len = typ##sizeInFields in
-      let len = length * elt_len in
-      object%js
-        method sizeInFields = len
-
-        method toFields (xs : a Js.js_array Js.t) =
-          let res = new%js Js.array_empty in
-          for i = 0 to xs##.length - 1 do
-            let x = typ##toFields (array_get_exn xs i) in
-            for j = 0 to x##.length - 1 do
-              res##push (array_get_exn x j) |> ignore
-            done
-          done ;
-          res
-
-        method ofFields (xs : field_class Js.t Js.js_array Js.t) =
-          let res = new%js Js.array_empty in
-          for i = 0 to length - 1 do
-            let a = new%js Js.array_empty in
-            let offset = i * elt_len in
-            for j = 0 to elt_len - 1 do
-              a##push (array_get_exn xs (offset + j)) |> ignore
-            done ;
-            res##push (typ##ofFields a) |> ignore
-          done ;
-          res
-      end
-    in
-
     circuit##.runAndCheck :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
           Impl.run_and_check (fun () -> f) |> Or_error.ok_exn ) ;
@@ -1496,7 +1469,6 @@ module Circuit = struct
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
     circuit##.witness := Js.wrap_callback witness ;
-    circuit##.array := Js.wrap_callback array ;
     circuit##.generateKeypair :=
       Js.wrap_meth_callback
         (fun (this : _ Circuit_main.t) : keypair_class Js.t ->
