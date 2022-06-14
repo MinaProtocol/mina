@@ -11,11 +11,12 @@ type inner_curve_var =
   * Tick.Field.t Snarky_backendless.Cvar.t
 
 module Basic = struct
-  type ('var, 'value, 'n1, 'n2) t =
+  type ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) t =
     { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
     ; value_to_field_elements : 'value -> Impls.Step.Field.Constant.t array
     ; var_to_field_elements : 'var -> Impls.Step.Field.t array
     ; typ : ('var, 'value) Impls.Step.Typ.t
+    ; return_typ : ('ret_var, 'ret_value) Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
     ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
@@ -36,24 +37,25 @@ module Side_loaded = struct
   end
 
   module Permanent = struct
-    type ('var, 'value, 'n1, 'n2) t =
+    type ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; value_to_field_elements : 'value -> Impls.Step.Field.Constant.t array
       ; var_to_field_elements : 'var -> Impls.Step.Field.t array
       ; typ : ('var, 'value) Impls.Step.Typ.t
+      ; return_typ : ('ret_var, 'ret_value) Impls.Step.Typ.t
       ; branches : 'n2 Nat.t
       }
   end
 
-  type ('var, 'value, 'n1, 'n2) t =
+  type ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) t =
     { ephemeral : Ephemeral.t option
-    ; permanent : ('var, 'value, 'n1, 'n2) Permanent.t
+    ; permanent : ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) Permanent.t
     }
 
   type packed =
     | T :
         ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) Tag.tag
-        * ('var, 'value, 'n1, 'n2) t
+        * ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) t
         -> packed
 
   let to_basic
@@ -62,6 +64,7 @@ module Side_loaded = struct
           ; value_to_field_elements
           ; var_to_field_elements
           ; typ
+          ; return_typ
           ; branches
           }
       ; ephemeral
@@ -80,6 +83,7 @@ module Side_loaded = struct
     ; value_to_field_elements
     ; var_to_field_elements
     ; typ
+    ; return_typ
     ; branches
     ; wrap_domains = Common.wrap_domains ~proofs_verified
     ; wrap_key
@@ -109,13 +113,20 @@ module Compiled = struct
   (* This is the data associated to an inductive proof system with statement type
      ['a_var], which has ['branches] many "variants" each of which depends on at most
      ['max_proofs_verified] many previous statements. *)
-  type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
+  type ( 'a_var
+       , 'a_value
+       , 'ret_var
+       , 'ret_value
+       , 'max_proofs_verified
+       , 'branches )
+       t =
     { branches : 'branches Nat.t
     ; max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
+    ; return_typ : ('ret_var, 'ret_value) Impls.Step.Typ.t
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
     ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
@@ -127,7 +138,7 @@ module Compiled = struct
   type packed =
     | T :
         ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) Tag.tag
-        * ('var, 'value, 'n1, 'n2) t
+        * ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) t
         -> packed
 
   let to_basic
@@ -135,6 +146,7 @@ module Compiled = struct
       ; max_proofs_verified
       ; proofs_verifieds
       ; typ
+      ; return_typ
       ; value_to_field_elements
       ; var_to_field_elements
       ; wrap_vk
@@ -147,6 +159,7 @@ module Compiled = struct
     ; value_to_field_elements
     ; var_to_field_elements
     ; typ
+    ; return_typ
     ; branches = Vector.length step_domains
     ; wrap_key = Lazy.force wrap_key
     ; wrap_vk = Lazy.force wrap_vk
@@ -167,6 +180,7 @@ module For_step = struct
     ; proofs_verifieds :
         [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
     ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
+    ; return_typ : ('ret_var, 'ret_value) Impls.Step.Typ.t
     ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
     ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
@@ -183,11 +197,12 @@ module For_step = struct
            { branches
            ; max_proofs_verified
            ; typ
+           ; return_typ
            ; value_to_field_elements
            ; var_to_field_elements
            }
        } :
-        (a, b, c, d) Side_loaded.t ) : (a, b, e, f, c, d) t =
+        (a, b, c, d, e, f) Side_loaded.t ) : (a, b, c, d, e, f) t =
     let index =
       match ephemeral with
       | Some { index = `In_circuit i | `In_both (_, i) } ->
@@ -200,6 +215,7 @@ module For_step = struct
     ; max_proofs_verified
     ; proofs_verifieds = `Side_loaded
     ; typ
+    ; return_typ
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key = index.wrap_index
@@ -212,6 +228,7 @@ module For_step = struct
        ; max_proofs_verified
        ; proofs_verifieds
        ; typ
+       ; return_typ
        ; value_to_field_elements
        ; var_to_field_elements
        ; wrap_key
@@ -224,6 +241,7 @@ module For_step = struct
     ; proofs_verifieds =
         `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
     ; typ
+    ; return_typ
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key =
@@ -250,7 +268,7 @@ let find t k =
 let lookup_compiled :
     type var value ret_var ret_value n m.
        (var, value, ret_var, ret_value, n, m) Tag.tag
-    -> (var, value, n, m) Compiled.t =
+    -> (var, value, ret_var, ret_value, n, m) Compiled.t =
  fun t ->
   let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
@@ -259,7 +277,7 @@ let lookup_compiled :
 let lookup_side_loaded :
     type var value ret_var ret_value n m.
        (var, value, ret_var, ret_value, n, m) Tag.tag
-    -> (var, value, n, m) Side_loaded.t =
+    -> (var, value, ret_var, ret_value, n, m) Side_loaded.t =
  fun t ->
   let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
@@ -267,7 +285,8 @@ let lookup_side_loaded :
 
 let lookup_basic :
     type var value ret_var ret_value n m.
-    (var, value, ret_var, ret_value, n, m) Tag.t -> (var, value, n, m) Basic.t =
+       (var, value, ret_var, ret_value, n, m) Tag.t
+    -> (var, value, ret_var, ret_value, n, m) Basic.t =
  fun t ->
   match t.kind with
   | Compiled ->
@@ -307,8 +326,9 @@ let value_to_field_elements :
 let lookup_map (type var value ret_var ret_value c d)
     (t : (var, value, ret_var, ret_value, c, d) Tag.t) ~self ~default
     ~(f :
-          [ `Compiled of (var, value, c, d) Compiled.t
-          | `Side_loaded of (var, value, c, d) Side_loaded.t ]
+          [ `Compiled of (var, value, ret_var, ret_value, c, d) Compiled.t
+          | `Side_loaded of (var, value, ret_var, ret_value, c, d) Side_loaded.t
+          ]
        -> _ ) =
   match Type_equal.Id.same_witness t.id self with
   | Some _ ->
@@ -355,6 +375,6 @@ let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
 
 let add_exn (type var value ret_var ret_value c d)
     (tag : (var, value, ret_var, ret_value, c, d) Tag.t)
-    (data : (var, value, c, d) Compiled.t) =
+    (data : (var, value, ret_var, ret_value, c, d) Compiled.t) =
   Hashtbl.add_exn univ.compiled ~key:(Type_equal.Id.uid tag.id)
     ~data:(Compiled.T (tag.id, data))

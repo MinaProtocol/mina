@@ -203,6 +203,7 @@ module Side_loaded : sig
     -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
     -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
+    -> return_typ:('ret_var, 'ret_value) Impls.Step.Typ.t
     -> ( 'var
        , 'value
        , 'ret_var

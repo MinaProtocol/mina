@@ -387,6 +387,7 @@ let step_main :
                           (Vector.map basic.proofs_verifieds ~f:Field.of_int)
                     ; max_proofs_verified = (module Max_proofs_verified)
                     ; typ = basic.typ
+                    ; return_typ = basic.return_typ
                     ; var_to_field_elements = basic.var_to_field_elements
                     ; value_to_field_elements = basic.value_to_field_elements
                     ; wrap_domain = `Known basic.wrap_domains.h

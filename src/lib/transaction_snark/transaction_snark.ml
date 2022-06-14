@@ -907,7 +907,8 @@ module Base = struct
       (module Int)
       (fun i ->
         let open Zkapp_statement in
-        Pickles.Side_loaded.create ~typ ~name:(sprintf "zkapp_%d" i)
+        Pickles.Side_loaded.create ~typ ~return_typ:Typ.unit
+          ~name:(sprintf "zkapp_%d" i)
           ~max_proofs_verified:
             (module Pickles.Side_loaded.Verification_key.Max_width)
           ~value_to_field_elements:to_field_elements

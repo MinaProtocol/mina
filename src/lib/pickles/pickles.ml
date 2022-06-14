@@ -842,6 +842,7 @@ struct
       ; proofs_verifieds
       ; max_proofs_verified = (module Max_proofs_verified)
       ; typ
+      ; return_typ
       ; value_to_field_elements = A_value.to_field_elements
       ; var_to_field_elements = A.to_field_elements
       ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
@@ -880,12 +881,13 @@ module Side_loaded = struct
   let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
   let create ~name ~max_proofs_verified ~value_to_field_elements
-      ~var_to_field_elements ~typ =
+      ~var_to_field_elements ~typ ~return_typ =
     Types_map.add_side_loaded ~name
       { max_proofs_verified
       ; value_to_field_elements
       ; var_to_field_elements
       ; typ
+      ; return_typ
       ; branches = Verification_key.Max_branches.n
       }
 
