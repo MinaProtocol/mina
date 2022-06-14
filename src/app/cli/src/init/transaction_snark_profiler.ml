@@ -109,7 +109,7 @@ let create_ledger_and_zkapps num_transactions :
   in
   let max_other_parties =
     let min_max = Mina_generators.Parties_generators.max_other_parties in
-    Quickcheck.random_value (Int.gen_incl min_max 8)
+    Quickcheck.random_value (Int.gen_incl min_max 20)
   in
   let cmd_infos, ledger =
     Quickcheck.random_value
@@ -255,18 +255,28 @@ let profile_zkapps ledger partiess =
   let%map () =
     let num_partiess = List.length partiess in
     Async.Deferred.List.iteri partiess ~f:(fun ndx parties ->
-        match%map
-          Async_kernel.Monitor.try_with (fun () ->
-              Transaction_snark_tests.Util.check_parties_with_merges_exn ledger
-                [ parties ] )
-        with
-        | Ok () ->
-            ()
-        | Error _exn ->
-            (* workaround for SNARK failures *)
-            printf "zkApp %d of %d failed, continuing ...\n" (ndx + 1)
-              num_partiess ;
-            () )
+        printf "Processing zkApp %d of %d, other_parties length: %d\n" (ndx + 1)
+          num_partiess
+          (List.length @@ Parties.other_parties_list parties) ;
+        let tm_zkapp0 = Core.Unix.gettimeofday () in
+        let%map () =
+          match%map
+            Async_kernel.Monitor.try_with (fun () ->
+                Transaction_snark_tests.Util.check_parties_with_merges_exn
+                  ledger [ parties ] )
+          with
+          | Ok () ->
+              ()
+          | Error _exn ->
+              (* workaround for SNARK failures *)
+              printf "zkApp failed, continuing ...\n" ;
+              ()
+        in
+        let tm_zkapp1 = Core.Unix.gettimeofday () in
+        let zkapp_span = Time.Span.of_sec (tm_zkapp1 -. tm_zkapp0) in
+        printf
+          !"Time for zkApp %d: %{Time.Span.to_string_hum}\n"
+          (ndx + 1) zkapp_span )
   in
   let tm1 = Core.Unix.gettimeofday () in
   let total_time = Time.Span.of_sec (tm1 -. tm0) in
