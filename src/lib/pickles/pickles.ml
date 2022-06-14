@@ -1258,6 +1258,62 @@ let%test_module "test no side-loaded" =
         ((Field.Constant.zero, ()), b0)
     end
 
+    module No_recursion_return = struct
+      module Statement = struct
+        type t = unit
+
+        let to_field_elements () = [||]
+
+        module Constant = struct
+          type t = unit [@@deriving bin_io]
+
+          let to_field_elements () = [||]
+        end
+      end
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~typ:Typ.unit ~return_typ:Field.typ
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = []
+                  ; main = (fun [] () -> dummy_constraints () ; ([], Field.zero))
+                  }
+                ] ) )
+
+      module Proof = (val p)
+
+      let example =
+        let res, b0 =
+          Common.time "b0" (fun () ->
+              Promise.block_on_async_exn (fun () -> step [] ()) )
+        in
+        assert (Field.Constant.(equal zero) res) ;
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (((), res), b0) ] ) ) ;
+        (((), res), b0)
+    end
+
     module Simple_chain = struct
       module Statement = Statement
 
@@ -1389,6 +1445,95 @@ let%test_module "test no side-loaded" =
       assert (
         Promise.block_on_async_exn (fun () ->
             Tree_proof.Proof.verify_promise Tree_proof.example ) )
+
+    module Tree_proof_return = struct
+      module Statement = No_recursion_return.Statement
+
+      type _ Snarky_backendless.Request.t +=
+        | Is_base_case : bool Snarky_backendless.Request.t
+
+      let handler (is_base_case : bool)
+          (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | Is_base_case ->
+            respond (Provide is_base_case)
+        | _ ->
+            respond Unhandled
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~typ:Typ.unit ~return_typ:Field.typ
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N2)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = [ No_recursion_return.tag; self ]
+                  ; main =
+                      (fun [ _; ((), prev) ] () ->
+                        let is_base_case =
+                          exists Boolean.typ ~request:(fun () -> Is_base_case)
+                        in
+                        let proof_must_verify = Boolean.not is_base_case in
+                        let self =
+                          Field.(
+                            if_ is_base_case ~then_:zero ~else_:(one + prev))
+                        in
+                        ([ Boolean.true_; proof_must_verify ], self) )
+                  }
+                ] ) )
+
+      module Proof = (val p)
+
+      let example =
+        let s_neg_one = Field.Constant.(negate one) in
+        let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
+          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+        in
+        let s0, b0 =
+          Common.time "tree b0" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step ~handler:(handler true)
+                    [ No_recursion_return.example
+                    ; (((), s_neg_one), b_neg_one)
+                    ]
+                    () ) )
+        in
+        assert (Field.Constant.(equal zero) s0) ;
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (((), s0), b0) ] ) ) ;
+        let s1, b1 =
+          Common.time "tree b1" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step ~handler:(handler false)
+                    [ No_recursion_return.example; (((), s0), b0) ]
+                    () ) )
+        in
+        assert (Field.Constant.(equal one) s1) ;
+        [ (((), s0), b0); (((), s1), b1) ]
+    end
+
+    let%test_unit "verify" =
+      assert (
+        Promise.block_on_async_exn (fun () ->
+            Tree_proof_return.Proof.verify_promise Tree_proof_return.example ) )
   end )
 
 (*
