@@ -171,7 +171,7 @@ let of_block ~logger
     optional fields and handle them appropriately.
 *)
 (* But if you really need to update it, see output of CLI command:
-   `PRINT_BLOCKS=1 dune runtest src/lib/transition_frontier/tests/ 2> block.txt` *)
+   `dune exec dump_blocks 2> block.txt` *)
 let%test_unit "Sexp serialization is stable" =
   let serialized_block = Sample_precomputed_block.sample_block_sexp in
   ignore @@ t_of_sexp @@ Sexp.of_string serialized_block
@@ -187,7 +187,7 @@ let%test_unit "Sexp serialization roundtrips" =
     optional fields and handle them appropriately.
 *)
 (* But if you really need to update it, see output of CLI command:
-   `PRINT_BLOCKS=1 dune runtest src/lib/transition_frontier/tests/ 2> block.txt` *)
+   `dune exec dump_blocks 2> block.txt` *)
 let%test_unit "JSON serialization is stable" =
   let serialized_block = Sample_precomputed_block.sample_block_json in
   match of_yojson @@ Yojson.Safe.from_string serialized_block with

@@ -60,4 +60,26 @@ module For_tests : sig
 
   val find_protocol_state_exn :
     t -> State_hash.t -> Mina_state.Protocol_state.value
+
+  val gen_breadcrumb :
+       verifier:Verifier.t
+    -> ?send_to_random_pk:unit
+    -> (   Frontier_base.Breadcrumb.t
+        -> Frontier_base.Breadcrumb.t Async_kernel.Deferred.t )
+       Base_quickcheck.Generator.t
+
+  val gen_breadcrumb_seq :
+       verifier:Verifier.t
+    -> int
+    -> (   Frontier_base.Breadcrumb.t
+        -> Frontier_base.Breadcrumb.t list Async_kernel.Deferred.t )
+       Base_quickcheck.Generator.t
+
+  val create_frontier : unit -> t
+
+  val clean_up_persistent_root : frontier:t -> unit
+
+  val verifier : unit -> Verifier.t
+
+  val max_length : int
 end
