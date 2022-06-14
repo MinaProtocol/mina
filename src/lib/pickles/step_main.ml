@@ -98,12 +98,13 @@ let finalize_previous_and_verify = ()
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
-    type proofs_verified self_branches prev_vars prev_values a_var a_value max_proofs_verified local_branches local_signature.
+    type proofs_verified self_branches prev_vars prev_values prev_ret_vars prev_ret_values a_var a_value ret_var ret_value max_proofs_verified local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
            and type statement = a_value
            and type prev_values = prev_values
+           and type prev_ret_values = prev_ret_values
            and type max_proofs_verified = max_proofs_verified )
     -> (module Nat.Add.Intf with type n = max_proofs_verified)
     -> self_branches:self_branches Nat.t
@@ -124,9 +125,18 @@ let step_main :
          , max_proofs_verified
          , self_branches )
          Types_map.Compiled.basic
-    -> self:(a_var, a_value, max_proofs_verified, self_branches) Tag.t
+    -> self:
+         ( a_var
+         , a_value
+         , ret_var
+         , ret_value
+         , max_proofs_verified
+         , self_branches )
+         Tag.t
     -> ( prev_vars
        , prev_values
+       , prev_ret_vars
+       , prev_ret_values
        , local_signature
        , local_branches
        , a_var
@@ -147,12 +157,20 @@ let step_main :
       | Self : (a_var, a_value, max_proofs_verified, self_branches) t
   end in
   let module Typ_with_max_proofs_verified = struct
-    type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
+    type ( 'var
+         , 'value
+         , 'ret_var
+         , 'ret_value
+         , 'local_max_proofs_verified
+         , 'local_branches )
+         t =
       ( ( 'var
+        , 'ret_var
         , 'local_max_proofs_verified
         , 'local_branches )
         Per_proof_witness.No_app_state.t
       , ( 'value
+        , 'ret_value
         , 'local_max_proofs_verified
         , 'local_branches )
         Per_proof_witness.Constant.No_app_state.t )
@@ -160,14 +178,15 @@ let step_main :
   end in
   let prev_values_typs =
     let rec join :
-        type pvars pvals ns1 ns2.
-        (pvars, pvals, ns1, ns2) H4.T(Tag).t -> (pvars, pvals) H2.T(Typ).t =
-      function
+        type pvars pvals prev_ret_vars prev_ret_values ns1 ns2.
+           (pvars, pvals, prev_ret_vars, prev_ret_values, ns1, ns2) H6.T(Tag).t
+        -> (pvars, pvals) H2.T(Typ).t = function
       | [] ->
           []
       | d :: ds ->
           let typ =
-            (fun (type var value n m) (d : (var, value, n, m) Tag.t) ->
+            (fun (type var value ret_var ret_value n m)
+                 (d : (var, value, ret_var, ret_value, n, m) Tag.t) ->
               let typ : (var, value) Typ.t =
                 match Type_equal.Id.same_witness self.id d.id with
                 | Some T ->
@@ -185,14 +204,20 @@ let step_main :
   in
   let prev_proof_typs =
     let rec join :
-        type e pvars pvals ns1 ns2 br.
-           (pvars, pvals, ns1, ns2) H4.T(Tag).t
+        type e pvars pvals prev_ret_vars prev_ret_values ns1 ns2 br.
+           (pvars, pvals, prev_ret_vars, prev_ret_values, ns1, ns2) H6.T(Tag).t
         -> ns1 H1.T(Nat).t
         -> ns2 H1.T(Nat).t
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
-        -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
+        -> ( pvars
+           , pvals
+           , prev_ret_vars
+           , prev_ret_values
+           , ns1
+           , ns2 )
+           H6.T(Typ_with_max_proofs_verified).t =
      fun ds ns1 ns2 ld ln1 ln2 ->
       match (ds, ns1, ns2, ld, ln1, ln2) with
       | [], [], [], Z, Z, Z ->
@@ -209,7 +234,7 @@ let step_main :
       local_signature_length local_branches_length
   in
   let module Prev_typ =
-    H4.Typ (Impls.Step) (Typ_with_max_proofs_verified)
+    H6.Typ (Impls.Step) (Typ_with_max_proofs_verified)
       (Per_proof_witness.No_app_state)
       (Per_proof_witness.Constant.No_app_state)
       (struct
@@ -235,9 +260,15 @@ let step_main :
         exists Typ.unit ~request:(fun () ->
             let inners_must_verify =
               let rec go :
-                  type prev_vars prev_values ns1 ns2.
+                  type prev_vars prev_values prev_ret_vars prev_ret_values ns1 ns2.
                      prev_vars H1.T(E01(B)).t
-                  -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
+                  -> ( prev_vars
+                     , prev_values
+                     , prev_ret_vars
+                     , prev_ret_values
+                     , ns1
+                     , ns2 )
+                     H6.T(Tag).t
                   -> prev_values H1.T(E01(Bool)).t =
                fun bs tags ->
                 match (bs, tags) with
@@ -269,8 +300,12 @@ let step_main :
         let prevs =
           (* Inject the app-state values into the per-proof witnesses. *)
           let rec go :
-              type vars vals ns1 ns2.
-                 (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
+              type vars ret_vars ns1 ns2.
+                 ( vars
+                 , ret_vars
+                 , ns1
+                 , ns2 )
+                 H4.T(Per_proof_witness.No_app_state).t
               -> vars H1.T(Id).t
               -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
            fun proofs app_states ->
@@ -285,9 +320,15 @@ let step_main :
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
-                  type vars vals ns1 ns2 n.
+                  type vars vals prev_vars prev_vals ns1 ns2 n.
                      (vars, ns1, ns2) H3.T(Per_proof_witness).t
-                  -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
+                  -> ( vars
+                     , vals
+                     , prev_vars
+                     , prev_vals
+                     , ns1
+                     , ns2 )
+                     H6.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t
                   -> vars H1.T(E01(Unfinalized)).t
                   -> vars H1.T(E01(B)).t
@@ -331,6 +372,8 @@ let step_main :
                   let self_data :
                       ( a_var
                       , a_value
+                      , ret_var
+                      , ret_value
                       , max_proofs_verified
                       , self_branches )
                       Types_map.For_step.t =
@@ -348,12 +391,12 @@ let step_main :
                     }
                   in
                   let module M =
-                    H4.Map (Tag) (Types_map.For_step)
+                    H6.Map (Tag) (Types_map.For_step)
                       (struct
                         let f :
-                            type a b n m.
-                               (a, b, n, m) Tag.t
-                            -> (a, b, n, m) Types_map.For_step.t =
+                            type a1 a2 a3 a4 n m.
+                               (a1, a2, a3, a4, n, m) Tag.t
+                            -> (a1, a2, a3, a4, n, m) Types_map.For_step.t =
                          fun tag ->
                           match Type_equal.Id.same_witness self.id tag.id with
                           | Some T ->

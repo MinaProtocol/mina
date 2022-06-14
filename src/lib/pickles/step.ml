@@ -43,7 +43,8 @@ struct
                a rule in proof system i. max_local_max_proof_verifieds is the max of the N_i.
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
-      local_widths local_heights prevs_length ) ?handler
+      prev_ret_vars prev_ret_values local_widths local_heights prevs_length )
+      ?handler
       (T branch_data :
         ( A.t
         , A_value.t
@@ -51,6 +52,8 @@ struct
         , self_branches
         , prev_vars
         , prev_values
+        , prev_ret_vars
+        , prev_ret_values
         , local_widths
         , local_heights )
         Step_branch_data.t ) (next_state : A_value.t)
@@ -77,7 +80,7 @@ struct
       Hlist.Length.contr (snd branch_data.proofs_verified) prev_vars_length
     in
     let prev_values_length =
-      let module L12 = H4.Length_1_to_2 (Tag) in
+      let module L12 = H6.Length_1_to_2 (Tag) in
       L12.f branch_data.rule.prevs prev_vars_length
     in
     let lte = branch_data.lte in
@@ -102,18 +105,19 @@ struct
       Tock.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
     in
     let expand_proof :
-        type var value local_max_proofs_verified m.
+        type var value ret_var ret_value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
         -> 'a
         -> value
         -> (local_max_proofs_verified, local_max_proofs_verified) P.t
-        -> (var, value, local_max_proofs_verified, m) Tag.t
+        -> (var, value, ret_var, ret_value, local_max_proofs_verified, m) Tag.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
            * Unfinalized.Constant.t
            * Statement_with_hashes.t
            * X_hat.t
            * ( value
+             , ret_value
              , local_max_proofs_verified
              , m )
              Per_proof_witness.Constant.No_app_state.t =
@@ -435,10 +439,10 @@ struct
           , x_hats'
           , witnesses' ) =
         let rec go :
-            type vars values ns ms k.
+            type vars values ret_vars ret_values ns ms k.
                values H1.T(Id).t
             -> (ns, ns) H2.T(Proof).t
-            -> (vars, values, ns, ms) H4.T(Tag).t
+            -> (vars, values, ret_vars, ret_values, ns, ms) H6.T(Tag).t
             -> values H1.T(E01(Bool)).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
@@ -446,9 +450,10 @@ struct
                * (Statement_with_hashes.t, k) Vector.t
                * (X_hat.t, k) Vector.t
                * ( values
+                 , ret_values
                  , ns
                  , ms )
-                 H3.T(Per_proof_witness.Constant.No_app_state).t =
+                 H4.T(Per_proof_witness.Constant.No_app_state).t =
          fun app_states ps ts must_verifys l ->
           match (app_states, ps, ts, must_verifys, l) with
           | [], [], [], [], Z ->
@@ -500,9 +505,9 @@ struct
     let extract_from_proofs (type res)
         (module Extract : Extract.S with type res = res) =
       let rec go :
-          type vars values ns ms len.
+          type vars values ret_vars ret_values ns ms len.
              (ns, ns) H2.T(P).t
-          -> (values, vars, ns, ms) H4.T(Tag).t
+          -> (values, vars, ret_vars, ret_values, ns, ms) H6.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
        fun prevs tags len ->

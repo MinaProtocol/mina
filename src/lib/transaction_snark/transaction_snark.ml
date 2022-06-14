@@ -458,17 +458,20 @@ module Parties_segment = struct
       | Proved ->
           [ { auth_type = Proof; is_start = `No } ]
 
-    type (_, _, _, _) t_typed =
-      | Opt_signed_opt_signed : (unit, unit, unit, unit) t_typed
-      | Opt_signed : (unit, unit, unit, unit) t_typed
+    type (_, _, _, _, _, _) t_typed =
+      | Opt_signed_opt_signed : (unit, unit, unit, unit, unit, unit) t_typed
+      | Opt_signed : (unit, unit, unit, unit, unit, unit) t_typed
       | Proved
           : ( Zkapp_statement.Checked.t * unit
             , Zkapp_statement.t * unit
+            , unit * unit
+            , unit * unit
             , Nat.N2.n * unit
             , N.n * unit )
             t_typed
 
-    let spec : type a b c d. (a, b, c, d) t_typed -> Spec.single list =
+    let spec : type a b c d e f. (a, b, c, d, e, f) t_typed -> Spec.single list
+        =
      fun t ->
       match t with
       | Opt_signed_opt_signed ->
@@ -2224,18 +2227,20 @@ module Base = struct
     (* Horrible hack :( *)
     let witness : Witness.t option ref = ref None
 
-    let rule (type a b c d) ~constraint_constants ~proof_level
-        (t : (a, b, c, d) Basic.t_typed) :
+    let rule (type a b c d e f) ~constraint_constants ~proof_level
+        (t : (a, b, c, d, e, f) Basic.t_typed) :
         ( a
         , b
         , c
         , d
+        , e
+        , f
         , Statement.With_sok.var
         , Statement.With_sok.t )
         Pickles.Inductive_rule.t =
       let open Hlist in
       let open Basic in
-      let module M = H4.T (Pickles.Tag) in
+      let module M = H6.T (Pickles.Tag) in
       let s = Basic.spec t in
       let prev_should_verify =
         match proof_level with
@@ -3175,6 +3180,8 @@ open Pickles_types
 type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
+  , unit
+  , unit
   , Nat.N2.n
   , Nat.N5.n )
   Pickles.Tag.t

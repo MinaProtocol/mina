@@ -8,11 +8,14 @@ open Hlist
 module Make (A : T0) (A_value : T0) = struct
   module I = Inductive_rule.T (A) (A_value)
 
-  let prev (type xs ys ws hs) ~self ~(choices : (xs, ys, ws, hs) H4.T(I).t) =
+  let prev (type a1 a2 a3 a4 ws hs) ~self
+      ~(choices : (a1, a2, a3, a4, ws, hs) H6.T(I).t) =
     let module M_inner =
-      H4.Map (Tag) (E04 (Domains))
+      H6.Map (Tag) (E06 (Domains))
         (struct
-          let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
+          let f :
+              type a1 a2 a3 a4 a5 a6.
+              (a1, a2, a3, a4, a5, a6) Tag.t -> Domains.t =
            fun t ->
             Types_map.lookup_map t ~self:self.Tag.id
               ~default:(fun () -> assert false)
@@ -29,12 +32,18 @@ module Make (A : T0) (A_value : T0) = struct
         end)
     in
     let module M =
-      H4.Map (I) (H4.T (E04 (Domains)))
+      H6.Map (I) (H6.T (E06 (Domains)))
         (struct
           let f :
-              type vars values env widths heights.
-                 (vars, values, widths, heights) I.t
-              -> (vars, values, widths, heights) H4.T(E04(Domains)).t =
+              type vars values ret_vars ret_values env widths heights.
+                 (vars, values, ret_vars, ret_values, widths, heights) I.t
+              -> ( vars
+                 , values
+                 , ret_vars
+                 , ret_values
+                 , widths
+                 , heights )
+                 H6.T(E06(Domains)).t =
            fun rule -> M_inner.f rule.prevs
         end)
     in

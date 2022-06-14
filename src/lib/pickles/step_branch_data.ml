@@ -11,6 +11,8 @@ type ( 'a_var
      , 'branches
      , 'prev_vars
      , 'prev_values
+     , 'prev_ret_vars
+     , 'prev_ret_values
      , 'local_widths
      , 'local_heights )
      t =
@@ -23,6 +25,8 @@ type ( 'a_var
       ; rule :
           ( 'prev_vars
           , 'prev_values
+          , 'prev_ret_vars
+          , 'prev_ret_values
           , 'local_widths
           , 'local_heights
           , 'a_avar
@@ -40,6 +44,7 @@ type ( 'a_var
              with type statement = 'a_value
               and type max_proofs_verified = 'max_proofs_verified
               and type prev_values = 'prev_values
+              and type prev_ret_values = 'prev_ret_values
               and type local_signature = 'local_widths
               and type local_branches = 'local_heights )
       }
@@ -49,6 +54,8 @@ type ( 'a_var
          , 'branches
          , 'prev_vars
          , 'prev_values
+         , 'prev_ret_vars
+         , 'prev_ret_values
          , 'local_widths
          , 'local_heights )
          t
@@ -56,18 +63,19 @@ type ( 'a_var
 (* Compile an inductive rule. *)
 let create
     (type branches max_proofs_verified local_signature local_branches a_var
-    a_value prev_vars prev_values ) ~index
-    ~(self : (a_var, a_value, max_proofs_verified, branches) Tag.t)
-    ~wrap_domains ~(max_proofs_verified : max_proofs_verified Nat.t)
+    a_value ret_var ret_value prev_vars prev_values ) ~index
+    ~(self :
+       (a_var, a_value, ret_var, ret_value, max_proofs_verified, branches) Tag.t
+       ) ~wrap_domains ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~typ var_to_field_elements value_to_field_elements
     (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
-  let module HT = H4.T (Tag) in
+  let module HT = H6.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in
   let rec extract_lengths :
-      type a b n m k.
-         (a, b, n, m) HT.t
+      type a b c d n m k.
+         (a, b, c, d, n, m) HT.t
       -> (a, k) Length.t
       -> n H1.T(Nat).t * m H1.T(Nat).t * (n, k) Length.t * (m, k) Length.t =
    fun ts len ->

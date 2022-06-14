@@ -52,7 +52,8 @@ module Side_loaded = struct
 
   type packed =
     | T :
-        ('var, 'value, 'n1, 'n2) Tag.tag * ('var, 'value, 'n1, 'n2) t
+        ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) Tag.tag
+        * ('var, 'value, 'n1, 'n2) t
         -> packed
 
   let to_basic
@@ -118,7 +119,8 @@ module Compiled = struct
 
   type packed =
     | T :
-        ('var, 'value, 'n1, 'n2) Tag.tag * ('var, 'value, 'n1, 'n2) t
+        ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) Tag.tag
+        * ('var, 'value, 'n1, 'n2) t
         -> packed
 
   let to_basic
@@ -145,7 +147,13 @@ module Compiled = struct
 end
 
 module For_step = struct
-  type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
+  type ( 'a_var
+       , 'a_value
+       , 'ret_var
+       , 'ret_value
+       , 'max_proofs_verified
+       , 'branches )
+       t =
     { branches : 'branches Nat.t
     ; max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
@@ -162,7 +170,7 @@ module For_step = struct
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     }
 
-  let of_side_loaded (type a b c d)
+  let of_side_loaded (type a b c d e f)
       ({ ephemeral
        ; permanent =
            { branches
@@ -172,7 +180,7 @@ module For_step = struct
            ; var_to_field_elements
            }
        } :
-        (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
+        (a, b, c, d) Side_loaded.t ) : (a, b, e, f, c, d) t =
     let index =
       match ephemeral with
       | Some { index = `In_circuit i | `In_both (_, i) } ->
@@ -233,20 +241,26 @@ let find t k =
   match Hashtbl.find t k with None -> failwith "key not found" | Some x -> x
 
 let lookup_compiled :
-    type a b n m. (a, b, n, m) Tag.tag -> (a, b, n, m) Compiled.t =
+    type var value ret_var ret_value n m.
+       (var, value, ret_var, ret_value, n, m) Tag.tag
+    -> (var, value, n, m) Compiled.t =
  fun t ->
   let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
 let lookup_side_loaded :
-    type a b n m. (a, b, n, m) Tag.tag -> (a, b, n, m) Side_loaded.t =
+    type var value ret_var ret_value n m.
+       (var, value, ret_var, ret_value, n, m) Tag.tag
+    -> (var, value, n, m) Side_loaded.t =
  fun t ->
   let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
-let lookup_basic : type a b n m. (a, b, n, m) Tag.t -> (a, b, n, m) Basic.t =
+let lookup_basic :
+    type var value ret_var ret_value n m.
+    (var, value, ret_var, ret_value, n, m) Tag.t -> (var, value, n, m) Basic.t =
  fun t ->
   match t.kind with
   | Compiled ->
@@ -255,7 +269,8 @@ let lookup_basic : type a b n m. (a, b, n, m) Tag.t -> (a, b, n, m) Basic.t =
       Side_loaded.to_basic (lookup_side_loaded t.id)
 
 let max_proofs_verified :
-    type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
+    type n1. (_, _, _, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1)
+    =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -264,7 +279,8 @@ let max_proofs_verified :
       (lookup_side_loaded tag.id).permanent.max_proofs_verified
 
 let typ :
-    type var value. (var, value, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =
+    type var value.
+    (var, value, _, _, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =
  fun tag ->
   match tag.kind with
   | Compiled ->
@@ -273,7 +289,7 @@ let typ :
       (lookup_side_loaded tag.id).permanent.typ
 
 let value_to_field_elements :
-    type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
+    type a. (_, a, _, _, _, _) Tag.t -> a -> Tick.Field.t array =
  fun t ->
   match t.kind with
   | Compiled ->
@@ -281,10 +297,11 @@ let value_to_field_elements :
   | Side_loaded ->
       (lookup_side_loaded t.id).permanent.value_to_field_elements
 
-let lookup_map (type a b c d) (t : (a, b, c, d) Tag.t) ~self ~default
+let lookup_map (type var value ret_var ret_value c d)
+    (t : (var, value, ret_var, ret_value, c, d) Tag.t) ~self ~default
     ~(f :
-          [ `Compiled of (a, b, c, d) Compiled.t
-          | `Side_loaded of (a, b, c, d) Side_loaded.t ]
+          [ `Compiled of (var, value, c, d) Compiled.t
+          | `Side_loaded of (var, value, c, d) Side_loaded.t ]
        -> _ ) =
   match Type_equal.Id.same_witness t.id self with
   | Some _ ->
@@ -329,7 +346,8 @@ let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
         in
         T (id, { d with ephemeral }) )
 
-let add_exn (type a b c d) (tag : (a, b, c, d) Tag.t)
-    (data : (a, b, c, d) Compiled.t) =
+let add_exn (type var value ret_var ret_value c d)
+    (tag : (var, value, ret_var, ret_value, c, d) Tag.t)
+    (data : (var, value, c, d) Compiled.t) =
   Hashtbl.add_exn univ.compiled ~key:(Type_equal.Id.uid tag.id)
     ~data:(Compiled.T (tag.id, data))

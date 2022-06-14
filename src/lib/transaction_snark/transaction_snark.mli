@@ -218,6 +218,8 @@ open Pickles_types
 type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
+  , unit
+  , unit
   , Nat.N2.n
   , Nat.N5.n )
   Pickles.Tag.t

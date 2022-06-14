@@ -333,7 +333,13 @@ let typ =
     ~back:(fun _ -> failwith "cannot unhash")
 
 type tag =
-  (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
+  ( State_hash.var
+  , Protocol_state.value
+  , unit
+  , unit
+  , Nat.N2.n
+  , Nat.N1.n )
+  Pickles.Tag.t
 
 module type S = sig
   module Proof :

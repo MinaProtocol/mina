@@ -275,6 +275,8 @@ end
 module Proof_system = struct
   type ( 'a_var
        , 'a_value
+       , 'ret_var
+       , 'ret_value
        , 'max_proofs_verified
        , 'branches
        , 'prev_valuess
@@ -282,7 +284,13 @@ module Proof_system = struct
        , 'heightss )
        t =
     | T :
-        ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+        ( 'a_var
+        , 'a_value
+        , 'ret_var
+        , 'ret_value
+        , 'max_proofs_verified
+        , 'branches )
+        Tag.t
         * (module Proof_intf with type t = 'proof and type statement = 'a_value)
         * ( 'prev_valuess
           , 'widthss
@@ -292,6 +300,8 @@ module Proof_system = struct
           H3_2.T(Prover).t
         -> ( 'a_var
            , 'a_value
+           , 'ret_var
+           , 'ret_value
            , 'max_proofs_verified
            , 'branches
            , 'prev_valuess
@@ -302,7 +312,7 @@ end
 
 module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module IR = Inductive_rule.T (A) (A_value)
-  module HIR = H4.T (IR)
+  module HIR = H6.T (IR)
 
   let max_local_max_proofs_verifieds ~self (type n)
       (module Max_proofs_verified : Nat.Intf with type n = n) branches choices =
@@ -310,15 +320,15 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       type t = (int, Max_proofs_verified.n) Vector.t
     end in
     let module M =
-      H4.Map (IR) (E04 (Local_max_proofs_verifieds))
+      H6.Map (IR) (E06 (Local_max_proofs_verifieds))
         (struct
-          module V = H4.To_vector (Int)
-          module HT = H4.T (Tag)
+          module V = H6.To_vector (Int)
+          module HT = H6.T (Tag)
 
           module M =
-            H4.Map (Tag) (E04 (Int))
+            H6.Map (Tag) (E06 (Int))
               (struct
-                let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
+                let f (type a b c d e f) (t : (a, b, c, d, e, f) Tag.t) : int =
                   if Type_equal.Id.same t.id self then
                     Nat.to_int Max_proofs_verified.n
                   else
@@ -327,13 +337,14 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               end)
 
           let f :
-              type a b c d. (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
+              type a b c d e f.
+              (a, b, c, d, e, f) IR.t -> Local_max_proofs_verifieds.t =
            fun rule ->
             let (T (_, l)) = HT.length rule.prevs in
             Vector.extend_exn (V.f l (M.f rule.prevs)) Max_proofs_verified.n 0
         end)
     in
-    let module V = H4.To_vector (Local_max_proofs_verifieds) in
+    let module V = H6.To_vector (Local_max_proofs_verifieds) in
     let padded = V.f branches (M.f choices) |> Vector.transpose in
     (padded, Maxes.m padded)
 
@@ -396,8 +407,15 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         log
 
   let compile :
-      type prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-         self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
+      type ret_var ret_value prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
+         self:
+           ( A.t
+           , A_value.t
+           , ret_var
+           , ret_value
+           , max_proofs_verified
+           , branches )
+           Tag.t
       -> cache:Key_cache.Spec.t list
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
@@ -409,8 +427,21 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       -> constraint_constants:Snark_keys_header.Constraint_constants.t
       -> typ:(A.t, A_value.t) Impls.Step.Typ.t
       -> choices:
-           (   self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
-            -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+           (   self:
+                 ( A.t
+                 , A_value.t
+                 , ret_var
+                 , ret_value
+                 , max_proofs_verified
+                 , branches )
+                 Tag.t
+            -> ( prev_varss
+               , prev_valuess
+               , prev_ret_varss
+               , prev_ret_valuess
+               , widthss
+               , heightss )
+               H6.T(IR).t )
       -> ( prev_valuess
          , widthss
          , heightss
@@ -454,7 +485,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let wrap_domains =
       let module M = Wrap_domains.Make (A) (A_value) in
       let rec f :
-          type a b c d. (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t =
+          type a b c d e f.
+          (a, b, c, d, e, f) H6.T(IR).t -> (a, b, c, d, e, f) H6.T(M.I).t =
         function
         | [] ->
             []
@@ -467,40 +499,43 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     in
     Timer.clock __LOC__ ;
     let module Branch_data = struct
-      type ('vars, 'vals, 'n, 'm) t =
+      type ('vars, 'vals, 'prev_ret_vars, 'prev_ret_values, 'n, 'm) t =
         ( A.t
         , A_value.t
         , Max_proofs_verified.n
         , Branches.n
         , 'vars
         , 'vals
+        , 'prev_ret_vars
+        , 'prev_ret_values
         , 'n
         , 'm )
         Step_branch_data.t
     end in
     let proofs_verifieds =
       let module M =
-        H4.Map (IR) (E04 (Int))
+        H6.Map (IR) (E06 (Int))
           (struct
-            module M = H4.T (Tag)
+            module M = H6.T (Tag)
 
-            let f : type a b c d. (a, b, c, d) IR.t -> int =
+            let f : type a b c d e f. (a, b, c, d, e, f) IR.t -> int =
              fun r ->
               let (T (n, _)) = M.length r.prevs in
               Nat.to_int n
           end)
       in
-      let module V = H4.To_vector (Int) in
+      let module V = H6.To_vector (Int) in
       V.f prev_varss_length (M.f choices)
     in
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
       let module M =
-        H4.Map (IR) (Branch_data)
+        H6.Map (IR) (Branch_data)
           (struct
             let f :
-                type a b c d. (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t =
+                type a b c d e f.
+                (a, b, c, d, e, f) IR.t -> (a, b, c, d, e, f) Branch_data.t =
              fun rule ->
               Timer.clock __LOC__ ;
               let res =
@@ -519,12 +554,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     Timer.clock __LOC__ ;
     let step_domains =
       let module M =
-        H4.Map (Branch_data) (E04 (Domains))
+        H6.Map (Branch_data) (E06 (Domains))
           (struct
             let f (T b : _ Branch_data.t) = b.domains
           end)
       in
-      let module V = H4.To_vector (Domains) in
+      let module V = H6.To_vector (Domains) in
       V.f prev_varss_length (M.f step_data)
     in
     let cache_handle = ref (Lazy.return `Cache_hit) in
@@ -535,7 +570,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         Option.map disk_keys ~f:(fun (xs, _) -> Vector.to_array xs)
       in
       let module M =
-        H4.Map (Branch_data) (E04 (Lazy_keys))
+        H6.Map (Branch_data) (E06 (Lazy_keys))
           (struct
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
@@ -597,7 +632,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     in
     Timer.clock __LOC__ ;
     let step_vks =
-      let module V = H4.To_vector (Lazy_keys) in
+      let module V = H6.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
              Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
@@ -607,17 +642,18 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       Timer.clock __LOC__ ;
       let prev_wrap_domains =
         let module M =
-          H4.Map (IR) (H4.T (E04 (Domains)))
+          H6.Map (IR) (H6.T (E06 (Domains)))
             (struct
               let f :
-                  type a b c d.
-                  (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
+                  type a b c d e f.
+                     (a, b, c, d, e, f) IR.t
+                  -> (a, b, c, d, e, f) H6.T(E06(Domains)).t =
                fun rule ->
                 let module M =
-                  H4.Map (Tag) (E04 (Domains))
+                  H6.Map (Tag) (E06 (Domains))
                     (struct
-                      let f (type a b c d) (t : (a, b, c, d) Tag.t) : Domains.t
-                          =
+                      let f (type a b c d e f) (t : (a, b, c, d, e, f) Tag.t) :
+                          Domains.t =
                         Types_map.lookup_map t ~self:self.id
                           ~default:wrap_domains ~f:(function
                           | `Compiled d ->
@@ -689,10 +725,16 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
     let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
     let provers =
-      let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
+      let module Z = H6.Zip (Branch_data) (E06 (Impls.Step.Keypair)) in
       let f :
-          type prev_vars prev_values local_widths local_heights.
-             (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
+          type prev_vars prev_values prev_ret_vars prev_ret_values local_widths local_heights.
+             ( prev_vars
+             , prev_values
+             , prev_ret_vars
+             , prev_ret_values
+             , local_widths
+             , local_heights )
+             Branch_data.t
           -> Lazy_keys.t
           -> ?handler:
                (   Snarky_backendless.Request.request
@@ -768,12 +810,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         wrap
       in
       let rec go :
-          type xs1 xs2 xs3 xs4.
-             (xs1, xs2, xs3, xs4) H4.T(Branch_data).t
-          -> (xs1, xs2, xs3, xs4) H4.T(E04(Lazy_keys)).t
+          type xs1 xs2 xs3 xs4 xs5 xs6.
+             (xs1, xs2, xs3, xs4, xs5, xs6) H6.T(Branch_data).t
+          -> (xs1, xs2, xs3, xs4, xs5, xs6) H6.T(E06(Lazy_keys)).t
           -> ( xs2
-             , xs3
-             , xs4
+             , xs5
+             , xs6
              , A_value.t
              , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
              H3_2.T(Prover).t =
@@ -889,8 +931,15 @@ module Side_loaded = struct
 end
 
 let compile_promise :
-    type a_var a_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-       ?self:(a_var, a_value, max_proofs_verified, branches) Tag.t
+    type a_var a_value ret_var ret_value prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
+       ?self:
+         ( a_var
+         , a_value
+         , ret_var
+         , ret_value
+         , max_proofs_verified
+         , branches )
+         Tag.t
     -> ?cache:Key_cache.Spec.t list
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
@@ -904,15 +953,24 @@ let compile_promise :
     -> name:string
     -> constraint_constants:Snark_keys_header.Constraint_constants.t
     -> choices:
-         (   self:(a_var, a_value, max_proofs_verified, branches) Tag.t
+         (   self:
+               ( a_var
+               , a_value
+               , ret_var
+               , ret_value
+               , max_proofs_verified
+               , branches )
+               Tag.t
           -> ( prev_varss
              , prev_valuess
+             , prev_ret_varss
+             , prev_ret_valuess
              , widthss
              , heightss
              , a_var
              , a_value )
-             H4_2.T(Inductive_rule).t )
-    -> (a_var, a_value, max_proofs_verified, branches) Tag.t
+             H6_2.T(Inductive_rule).t )
+    -> (a_var, a_value, ret_var, ret_value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
        * (module Proof_intf
             with type t = (max_proofs_verified, max_proofs_verified) Proof.t
@@ -934,9 +992,17 @@ let compile_promise :
   in
   let module M = Make (A_var) (A_value) in
   let rec conv_irs :
-      type v1ss v2ss wss hss.
-         (v1ss, v2ss, wss, hss, a_var, a_value) H4_2.T(Inductive_rule).t
-      -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
+      type v1ss v2ss v3ss v4ss wss hss.
+         ( v1ss
+         , v2ss
+         , v3ss
+         , v4ss
+         , wss
+         , hss
+         , a_var
+         , a_value )
+         H6_2.T(Inductive_rule).t
+      -> (v1ss, v2ss, v3ss, v4ss, wss, hss) H6.T(M.IR).t = function
     | [] ->
         []
     | r :: rs ->

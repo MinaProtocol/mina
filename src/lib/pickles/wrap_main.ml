@@ -42,28 +42,30 @@ let pad_domains (type prev_varss prev_valuess branches max_proofs_verified)
     (module Max_proofs_verified : Nat.Intf with type n = max_proofs_verified)
     (pi_branches : (prev_varss, branches) Length.t)
     (prev_wrap_domains :
-      (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t ) :
+      (prev_varss, prev_valuess, _, _, _, _) H6.T(H6.T(E06(Domains))).t ) :
     ((Domains.t, branches) Vector.t, max_proofs_verified) Vector.t =
   let module Ds = struct
     type t = (Domains.t, Max_proofs_verified.n) Vector.t
   end in
-  let ds : (prev_varss, prev_valuess, _, _) H4.T(E04(Ds)).t =
+  let ds : (prev_varss, prev_valuess, _, _, _, _) H6.T(E06(Ds)).t =
     let dummy_domains =
       (* TODO: The dummy should really be equal to one of the already present domains. *)
       let d = Domain.Pow_2_roots_of_unity 1 in
       { Domains.h = d }
     in
     let module M =
-      H4.Map
-        (H4.T
-           (E04 (Domains))) (E04 (Ds))
+      H6.Map
+        (H6.T
+           (E06 (Domains))) (E06 (Ds))
            (struct
-             module H = H4.T (E04 (Domains))
+             module H = H6.T (E06 (Domains))
 
-             let f : type a b c d. (a, b, c, d) H4.T(E04(Domains)).t -> Ds.t =
+             let f :
+                 type a b c d e f.
+                 (a, b, c, d, e, f) H6.T(E06(Domains)).t -> Ds.t =
               fun domains ->
                let (T (len, pi)) = H.length domains in
-               let module V = H4.To_vector (Domains) in
+               let module V = H6.To_vector (Domains) in
                Vector.extend_exn (V.f pi domains) Max_proofs_verified.n
                  dummy_domains
            end)
@@ -71,7 +73,7 @@ let pad_domains (type prev_varss prev_valuess branches max_proofs_verified)
     M.f prev_wrap_domains
   in
   let ds =
-    let module V = H4.To_vector (Ds) in
+    let module V = H6.To_vector (Ds) in
     V.f pi_branches ds
   in
   Vector.transpose ds
@@ -143,7 +145,7 @@ let wrap_main
       ) (step_widths : (int, branches) Vector.t)
     (step_domains : (Domains.t, branches) Vector.t)
     (prev_wrap_domains :
-      (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t )
+      (prev_varss, prev_valuess, _, _, _, _) H6.T(H6.T(E06(Domains))).t )
     (module Max_proofs_verified : Nat.Add.Intf with type n = max_proofs_verified)
     :
     (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t

@@ -86,7 +86,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
 [@@deriving hlist]
 
 module No_app_state = struct
-  type nonrec (_, 'max_proofs_verified, 'num_branches) t =
+  type nonrec (_, _, 'max_proofs_verified, 'num_branches) t =
     (unit, 'max_proofs_verified, 'num_branches) t
 end
 
@@ -117,7 +117,7 @@ module Constant = struct
   [@@deriving hlist]
 
   module No_app_state = struct
-    type nonrec (_, 'max_proofs_verified, 'num_branches) t =
+    type nonrec (_, _, 'max_proofs_verified, 'num_branches) t =
       (unit, 'max_proofs_verified, 'num_branches) t
   end
 end
