@@ -3384,8 +3384,9 @@ let verify (ts : (t * _) list) ~key =
     Pickles.verify
       (module Nat.N2)
       (module Statement.With_sok)
-      key
-      (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
+      Typ.unit key
+      (List.map ts ~f:(fun ({ statement; proof }, _) ->
+           ((statement, ()), proof) ) )
   else Async.return false
 
 let constraint_system_digests ~constraint_constants () =
@@ -4040,7 +4041,7 @@ struct
   let verification_key = Proof.verification_key
 
   let verify_against_digest { statement; proof } =
-    Proof.verify [ (statement, proof) ]
+    Proof.verify [ ((statement, ()), proof) ]
 
   let verify ts =
     if
@@ -4048,7 +4049,8 @@ struct
           Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest )
     then
       Proof.verify
-        (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
+        (List.map ts ~f:(fun ({ statement; proof }, _) ->
+             ((statement, ()), proof) ) )
     else Async.return false
 
   let first_party (witness : Transaction_witness.Parties_segment_witness.t) =
@@ -4111,7 +4113,7 @@ struct
               (* TODO: We should not have to pass the statement in here. *)
               proved
                 ( Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
-                  [ (s, p) ] )
+                  [ ((s, ()), p) ] )
                 statement )
     in
     let open Async in
@@ -4174,7 +4176,9 @@ struct
     let s = { s with sok_digest } in
     let open Async in
     let%map (), proof =
-      merge [ (x12.statement, x12.proof); (x23.statement, x23.proof) ] s
+      merge
+        [ ((x12.statement, ()), x12.proof); ((x23.statement, ()), x23.proof) ]
+        s
     in
     Ok { statement = s; proof }
 

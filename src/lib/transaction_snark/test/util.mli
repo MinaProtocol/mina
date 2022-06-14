@@ -66,6 +66,7 @@ val trivial_zkapp :
        ( unit
        , unit
        , unit
+       , unit
        , Zkapp_statement.t
        , ( unit
          * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
@@ -84,6 +85,7 @@ val test_snapp_update :
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
   -> snapp_prover:
        ( unit
+       , unit
        , unit
        , unit
        , Zkapp_statement.t

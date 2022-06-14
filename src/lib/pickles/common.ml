@@ -30,13 +30,14 @@ let wrap_domains ~proofs_verified =
   in
   { Domains.h = Pow_2_roots_of_unity h }
 
-let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
+let hash_step_me_only ~app_state ~return_value
+    (t : _ Types.Step.Proof_state.Me_only.t) =
   let g (x, y) = [ x; y ] in
   let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
     (Types.Step.Proof_state.Me_only.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
-       ~app_state )
+       ~app_state ~return_value )
 
 let dlog_pcs_batch (type proofs_verified total)
     ((without_degree_bound, _pi) :

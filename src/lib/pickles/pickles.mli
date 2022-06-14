@@ -61,13 +61,15 @@ module type Proof_intf = sig
 
   type t
 
+  type return_type
+
   val verification_key : Verification_key.t Lazy.t
 
   val id : Verification_key.Id.t Lazy.t
 
-  val verify : (statement * t) list -> bool Deferred.t
+  val verify : ((statement * return_type) * t) list -> bool Deferred.t
 
-  val verify_promise : (statement * t) list -> bool Promise.t
+  val verify_promise : ((statement * return_type) * t) list -> bool Promise.t
 end
 
 module Proof : sig
@@ -95,37 +97,47 @@ module Proof : sig
 end
 
 module Statement_with_proof : sig
-  type ('s, 'max_width, _) t = 's * ('max_width, 'max_width) Proof.t
+  type ('s, 'return_type, 'max_width, _) t =
+    ('s * 'return_type) * ('max_width, 'max_width) Proof.t
 end
 
 val verify_promise :
      (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
+  -> ('ret_var, 'ret_value) Impls.Step.Typ.t
   -> Verification_key.t
-  -> ('a * ('n, 'n) Proof.t) list
+  -> (('a * 'ret_value) * ('n, 'n) Proof.t) list
   -> bool Promise.t
 
 val verify :
      (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
+  -> ('ret_var, 'ret_value) Impls.Step.Typ.t
   -> Verification_key.t
-  -> ('a * ('n, 'n) Proof.t) list
+  -> (('a * 'ret_value) * ('n, 'n) Proof.t) list
   -> bool Deferred.t
 
 module Prover : sig
-  type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
+  type ( 'prev_values
+       , 'prev_ret_values
+       , 'local_widths
+       , 'local_heights
+       , 'a_value
+       , 'proof )
+       t =
        ?handler:
          (   Snarky_backendless.Request.request
           -> Snarky_backendless.Request.response )
     -> ( 'prev_values
+       , 'prev_ret_values
        , 'local_widths
        , 'local_heights )
-       H3.T(Statement_with_proof).t
+       H4.T(Statement_with_proof).t
     -> 'a_value
     -> 'proof
 end
 
-module Provers : module type of H3_2.T (Prover)
+module Provers : module type of H4_2.T (Prover)
 
 module Dirty : sig
   type t = [ `Cache_hit | `Generated_something | `Locally_generated ]
@@ -214,12 +226,14 @@ module Side_loaded : sig
 
   val verify_promise :
        value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
-    -> (Verification_key.t * 'value * Proof.t) list
+    -> return_typ:('return_var, 'return_value) Impls.Step.Typ.t
+    -> (Verification_key.t * ('value * 'return_value) * Proof.t) list
     -> bool Promise.t
 
   val verify :
        value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
-    -> (Verification_key.t * 'value * Proof.t) list
+    -> return_typ:('return_var, 'return_value) Impls.Step.Typ.t
+    -> (Verification_key.t * ('value * 'return_value) * Proof.t) list
     -> bool Deferred.t
 
   (* Must be called in the inductive rule snarky function defining a
@@ -293,14 +307,16 @@ val compile_promise :
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
-           and type statement = 'a_value )
+           and type statement = 'a_value
+           and type return_type = 'ret_value )
      * ( 'prev_valuess
+       , 'prev_ret_valuess
        , 'widthss
        , 'heightss
        , 'a_value
        , ('ret_value * ('max_proofs_verified, 'max_proofs_verified) Proof.t)
          Promise.t )
-       H3_2.T(Prover).t
+       H4_2.T(Prover).t
 
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
@@ -356,11 +372,13 @@ val compile :
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
-           and type statement = 'a_value )
+           and type statement = 'a_value
+           and type return_type = 'ret_value )
      * ( 'prev_valuess
+       , 'prev_ret_valuess
        , 'widthss
        , 'heightss
        , 'a_value
        , ('ret_value * ('max_proofs_verified, 'max_proofs_verified) Proof.t)
          Deferred.t )
-       H3_2.T(Prover).t
+       H4_2.T(Prover).t

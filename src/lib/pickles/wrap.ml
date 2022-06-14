@@ -90,10 +90,12 @@ let wrap
     (( module
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
-    ~dlog_plonk_index wrap_main to_field_elements ~step_vk ~wrap_domains
+    ~dlog_plonk_index wrap_main to_field_elements
+    ~(return_typ : _ Impls.Step.Typ.t) ~step_vk ~wrap_domains
     ~step_plonk_indices pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
+      , _
       , _
       , (_, actual_proofs_verified) Vector.t
       , (_, actual_proofs_verified) Vector.t
@@ -115,12 +117,17 @@ let wrap
     { proof_state =
         { prev_statement.proof_state with
           me_only =
-            (* TODO: Careful here... the length of
-               old_buletproof_challenges inside the me_only
-               might not be correct *)
-            Common.hash_step_me_only ~app_state:to_field_elements
-              (P.Base.Me_only.Step.prepare ~dlog_plonk_index
-                 prev_statement.proof_state.me_only )
+            (let return_value_to_field_elements =
+               let (Typ typ) = return_typ in
+               fun x -> fst (typ.value_to_fields x)
+             in
+             (* TODO: Careful here... the length of
+                old_buletproof_challenges inside the me_only
+                might not be correct *)
+             Common.hash_step_me_only ~app_state:to_field_elements
+               ~return_value:return_value_to_field_elements
+               (P.Base.Me_only.Step.prepare ~dlog_plonk_index
+                  prev_statement.proof_state.me_only ) )
         }
     ; pass_through =
         (let module M =

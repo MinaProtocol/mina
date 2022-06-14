@@ -11,6 +11,7 @@ module Base = struct
 
   module Step = struct
     type ( 's
+         , 'return_value
          , 'unfinalized_proofs
          , 'sgs
          , 'bp_chals
@@ -19,7 +20,7 @@ module Base = struct
          t =
       { statement :
           ( 'unfinalized_proofs
-          , ('s, 'sgs, 'bp_chals) Me_only.Step.t
+          , ('s, 'return_value, 'sgs, 'bp_chals) Me_only.Step.t
           , 'dlog_me_onlys )
           Types.Step.Statement.t
       ; index : int
@@ -93,10 +94,11 @@ module Base = struct
   end
 end
 
-type ('s, 'mlmb, _) with_data =
+type ('s, 'return_value, 'mlmb, _) with_data =
   | T :
       ( 'mlmb Base.Me_only.Wrap.t
       , ( 's
+        , 'return_value
         , (Tock.Curve.Affine.t, 'most_recent_width) Vector.t
         , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             Bulletproof_challenge.t
@@ -105,13 +107,14 @@ type ('s, 'mlmb, _) with_data =
           Vector.t )
         Base.Me_only.Step.t )
       Base.Wrap.t
-      -> ('s, 'mlmb, _) with_data
+      -> ('s, 'return_value, 'mlmb, _) with_data
 
 module With_data = struct
-  type ('s, 'mlmb, 'w) t = ('s, 'mlmb, 'w) with_data
+  type ('s, 'return_value, 'mlmb, 'w) t =
+    ('s, 'return_value, 'mlmb, 'w) with_data
 end
 
-type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
+type ('max_width, 'mlmb) t = (unit, unit, 'mlmb, 'max_width) With_data.t
 
 let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
     (most_recent_width : r Nat.t) ~domain_log2 : (w, h) t =
@@ -159,6 +162,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             }
         ; pass_through =
             { app_state = ()
+            ; return_value = ()
             ; old_bulletproof_challenges =
                 (* Not sure if this should be w or h honestly ...*)
                 Vector.init most_recent_width ~f:(fun _ ->
@@ -213,6 +217,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         , Reduced_me_only.Wrap.Challenges_vector.t MLMB_vec.t )
         Types.Wrap.Proof_state.Me_only.t
       , ( unit
+        , unit
         , Tock.Curve.Affine.t Max_proofs_verified_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
@@ -329,13 +334,14 @@ module Proofs_verified_2 = struct
               Vector.Vector_2.Stable.V1.t )
             Types.Wrap.Proof_state.Me_only.Stable.V1.t
           , ( unit
+            , unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
               Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               At_most.At_most_2.Stable.V1.t )
-            Base.Me_only.Step.Stable.V1.t )
+            Base.Me_only.Step.Stable.V2.t )
           Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
@@ -398,6 +404,7 @@ module Proofs_verified_max = struct
               Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
             Types.Wrap.Proof_state.Me_only.Stable.V1.t
           , ( unit
+            , unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
@@ -405,7 +412,7 @@ module Proofs_verified_max = struct
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
-            Base.Me_only.Step.Stable.V1.t )
+            Base.Me_only.Step.Stable.V2.t )
           Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 

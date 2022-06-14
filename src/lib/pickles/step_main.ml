@@ -25,6 +25,7 @@ let one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
 
 let verify_one
     ({ app_state
+     ; return_value
      ; wrap_proof
      ; proof_state
      ; prev_proof_evals
@@ -53,8 +54,14 @@ let verify_one
     let prev_me_only =
       with_label __LOC__ (fun () ->
           let hash =
+            let return_value_to_field_elements =
+              let (Typ typ) = d.return_typ in
+              fun x -> fst (typ.var_to_fields x)
+            in
             (* TODO: Don't rehash when it's not necessary *)
-            unstage (hash_me_only_opt ~index:d.wrap_key d.var_to_field_elements)
+            unstage
+              (hash_me_only_opt ~index:d.wrap_key d.var_to_field_elements
+                 return_value_to_field_elements )
           in
           hash ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
@@ -65,6 +72,7 @@ let verify_one
                     Nat.N2.n ) )
             (* Use opt sponge for cutting off the bulletproof challenges early *)
             { app_state
+            ; return_value
             ; dlog_plonk_index = d.wrap_key
             ; challenge_polynomial_commitments =
                 prev_challenge_polynomial_commitments
@@ -478,12 +486,17 @@ let step_main :
           in
           with_label "hash_me_only" (fun () ->
               let hash_me_only =
+                let return_value_to_field_elements =
+                  let (Typ typ) = basic.return_typ in
+                  fun x -> fst (typ.var_to_fields x)
+                in
                 unstage
                   (hash_me_only ~index:dlog_plonk_index
-                     basic.var_to_field_elements )
+                     basic.var_to_field_elements return_value_to_field_elements )
               in
               hash_me_only
                 { app_state
+                ; return_value = ret_var
                 ; dlog_plonk_index
                 ; challenge_polynomial_commitments
                 ; old_bulletproof_challenges =

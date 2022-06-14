@@ -987,8 +987,9 @@ struct
         ]
     , bulletproof_challenges )
 
-  let hash_me_only (type s) ~index (state_to_field_elements : s -> Field.t array)
-      =
+  let hash_me_only (type s return_value) ~index
+      (state_to_field_elements : s -> Field.t array)
+      (return_value_to_field_elements : return_value -> Field.t array) =
     let open Types.Step.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
@@ -1005,11 +1006,13 @@ struct
         Array.iter
           ~f:(fun x -> Sponge.absorb sponge (`Field x))
           (to_field_elements_without_index t ~app_state:state_to_field_elements
+             ~return_value:return_value_to_field_elements
              ~g:Inner_curve.to_field_elements ) ;
         Sponge.squeeze_field sponge )
 
-  let hash_me_only_opt (type s) ~index
-      (state_to_field_elements : s -> Field.t array) =
+  let hash_me_only_opt (type s return_value) ~index
+      (state_to_field_elements : s -> Field.t array)
+      (return_value_to_field_elements : return_value -> Field.t array) =
     let open Types.Step.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
@@ -1038,6 +1041,8 @@ struct
           to_field_elements_without_index t
             ~app_state:
               (Fn.compose (Array.map ~f:not_opt) state_to_field_elements)
+            ~return_value:
+              (Fn.compose (Array.map ~f:not_opt) return_value_to_field_elements)
             ~g:(fun (b, g) ->
               List.map
                 ~f:(fun x -> `Opt (b, x))

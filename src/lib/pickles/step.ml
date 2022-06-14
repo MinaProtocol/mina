@@ -66,8 +66,10 @@ struct
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
       ~self_dlog_plonk_index pk self_dlog_vk
       (prev_values : prev_values H1.T(Id).t)
+      (prev_return_values : prev_ret_values H1.T(Id).t)
       (prev_proofs : (local_widths, local_widths) H2.T(P).t) :
       ( ( A_value.t
+        , ret_value
         , (_, Max_proofs_verified.n) Vector.t
         , (_, prevs_length) Vector.t
         , (_, prevs_length) Vector.t
@@ -112,6 +114,7 @@ struct
            Impls.Wrap.Verification_key.t
         -> 'a
         -> value
+        -> ret_value
         -> (local_max_proofs_verified, local_max_proofs_verified) P.t
         -> (var, value, ret_var, ret_value, local_max_proofs_verified, m) Tag.t
         -> must_verify:bool
@@ -124,12 +127,13 @@ struct
              , local_max_proofs_verified
              , m )
              Per_proof_witness.Constant.No_app_state.t =
-     fun dlog_vk dlog_index app_state (T t) tag ~must_verify ->
+     fun dlog_vk dlog_index app_state return_value (T t) tag ~must_verify ->
       let t =
         { t with
           statement =
             { t.statement with
-              pass_through = { t.statement.pass_through with app_state }
+              pass_through =
+                { t.statement.pass_through with app_state; return_value }
             }
         }
       in
@@ -204,11 +208,16 @@ struct
           , _ )
           Wrap.Statement.In_circuit.t =
         { pass_through =
-            (* TODO: Only do this hashing when necessary *)
-            Common.hash_step_me_only
-              (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
-                 statement.pass_through )
-              ~app_state:data.value_to_field_elements
+            (let return_value_to_field_elements =
+               let (Typ typ) = data.return_typ in
+               fun x -> fst (typ.value_to_fields x)
+             in
+             (* TODO: Only do this hashing when necessary *)
+             Common.hash_step_me_only
+               (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
+                  statement.pass_through )
+               ~app_state:data.value_to_field_elements
+               ~return_value:return_value_to_field_elements )
         ; proof_state =
             { statement.proof_state with
               deferred_values =
@@ -446,6 +455,7 @@ struct
         let rec go :
             type vars values ret_vars ret_values ns ms k.
                values H1.T(Id).t
+            -> ret_values H1.T(Id).t
             -> (ns, ns) H2.T(Proof).t
             -> (vars, values, ret_vars, ret_values, ns, ms) H6.T(Tag).t
             -> values H1.T(E01(Bool)).t
@@ -459,11 +469,12 @@ struct
                  , ns
                  , ms )
                  H4.T(Per_proof_witness.Constant.No_app_state).t =
-         fun app_states ps ts must_verifys l ->
-          match (app_states, ps, ts, must_verifys, l) with
-          | [], [], [], [], Z ->
+         fun app_states return_values ps ts must_verifys l ->
+          match (app_states, return_values, ps, ts, must_verifys, l) with
+          | [], [], [], [], [], Z ->
               ([], [], [], [], [])
           | ( app_state :: app_states
+            , return_value :: return_values
             , p :: ps
             , t :: ts
             , must_verify :: must_verifys
@@ -476,16 +487,23 @@ struct
                   (d.wrap_vk, d.wrap_key)
               in
               let `Sg sg, u, s, x, w =
-                expand_proof dlog_vk dlog_index app_state p t ~must_verify
-              and sgs, us, ss, xs, ws = go app_states ps ts must_verifys l in
+                expand_proof dlog_vk dlog_index app_state return_value p t
+                  ~must_verify
+              and sgs, us, ss, xs, ws =
+                go app_states return_values ps ts must_verifys l
+              in
               (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
-          | _ :: _, [], _, _, _ ->
+          | _ :: _, _, [], _, _, _ ->
               .
-          | [], _ :: _, _, _, _ ->
+          | [], _, _ :: _, _, _, _ ->
+              .
+          | _, _ :: _, [], _, _, _ ->
+              .
+          | _, [], _ :: _, _, _, _ ->
               .
         in
-        go prev_values prev_proofs branch_data.rule.prevs inners_must_verify
-          prev_vars_length
+        go prev_values prev_return_values prev_proofs branch_data.rule.prevs
+          inners_must_verify prev_vars_length
       in
       challenge_polynomial_commitments := Some challenge_polynomial_commitments' ;
       unfinalized_proofs := Some unfinalized_proofs' ;
@@ -539,6 +557,7 @@ struct
          in
          (* Have the sg be available in the opening proof and verify it. *)
          { app_state = next_state
+         ; return_value = Option.value_exn !return_value
          ; challenge_polynomial_commitments =
              Option.value_exn !challenge_polynomial_commitments
          ; old_bulletproof_challenges
@@ -588,6 +607,8 @@ struct
           k ()
       | Req.Prev_inputs ->
           k prev_values
+      | Req.Prev_outputs ->
+          k prev_return_values
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->

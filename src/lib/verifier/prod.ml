@@ -75,7 +75,7 @@ module Worker_state = struct
                    | `Valid _ ->
                        []
                    | `Valid_assuming (_, xs) ->
-                       xs
+                       List.map xs ~f:(fun (x, y, z) -> (x, (y, ()), z))
                    | `Invalid_keys _
                    | `Invalid_signature _
                    | `Invalid_proof
@@ -85,7 +85,7 @@ module Worker_state = struct
                let%map all_verified =
                  Pickles.Side_loaded.verify
                    ~value_to_field_elements:Zkapp_statement.to_field_elements
-                   to_verify
+                   ~return_typ:Snark_params.Tick.Typ.unit to_verify
                in
                List.map cs ~f:(function
                  | `Valid c ->
@@ -101,7 +101,8 @@ module Worker_state = struct
                  | `Missing_verification_key keys ->
                      `Missing_verification_key keys )
 
-             let verify_blockchain_snarks = B.Proof.verify
+             let verify_blockchain_snarks xs =
+               B.Proof.verify (List.map xs ~f:(fun (x, y) -> ((x, ()), y)))
 
              let verify_transaction_snarks ts =
                match Or_error.try_with (fun () -> T.verify ts) with

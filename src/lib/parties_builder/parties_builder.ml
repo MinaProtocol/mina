@@ -144,8 +144,9 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
                           ( []
                             : ( unit
                               , unit
+                              , unit
                               , unit )
-                              Pickles_types.Hlist.H3.T
+                              Pickles_types.Hlist.H4.T
                                 (Pickles.Statement_with_proof)
                               .t )
                           txn_stmt )

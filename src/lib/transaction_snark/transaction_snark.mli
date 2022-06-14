@@ -532,6 +532,7 @@ module For_tests : sig
          ( unit
          , unit
          , unit
+         , unit
          , Zkapp_statement.t
          , (unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t) Async.Deferred.t )
          Pickles.Prover.t
@@ -566,6 +567,7 @@ module For_tests : sig
     -> [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
        * [> `Prover of
             ( unit
+            , unit
             , unit
             , unit
             , Zkapp_statement.t
