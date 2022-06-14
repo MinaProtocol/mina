@@ -33,7 +33,9 @@ type ( 'prev_vars
       , 'heights )
       H6.T(Tag).t
   ; main :
-      'prev_vars H1.T(Id).t -> 'a_var -> 'prev_vars H1.T(E01(B)).t * 'ret_var
+         ('prev_vars, 'prev_return_vars) H2.T(H2.Tuple2(H2.Arg1)(H2.Arg2)).t
+      -> 'a_var
+      -> 'prev_vars H1.T(E01(B)).t * 'ret_var
   }
 
 module T

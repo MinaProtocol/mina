@@ -400,7 +400,7 @@ let dummy_constraints () =
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
-let party_circuit f ([] : _ H1.T(Id).t)
+let party_circuit f ([] : _ H2.T(H2.Tuple2(H2.Arg1)(H2.Arg2)).t)
     ({ transaction; at_party } : Zkapp_statement.Checked.t) :
     _ H1.T(E01(Pickles.Inductive_rule.B)).t * unit =
   dummy_constraints () ;

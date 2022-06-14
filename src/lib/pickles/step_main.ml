@@ -180,15 +180,16 @@ let step_main :
         Per_proof_witness.Constant.No_app_state.t )
       Typ.t
   end in
-  let prev_values_typs =
+  let prev_values_typs, prev_return_values_typs =
     let rec join :
         type pvars pvals prev_ret_vars prev_ret_values ns1 ns2.
            (pvars, pvals, prev_ret_vars, prev_ret_values, ns1, ns2) H6.T(Tag).t
-        -> (pvars, pvals) H2.T(Typ).t = function
+        -> (pvars, pvals) H2.T(Typ).t
+           * (prev_ret_vars, prev_ret_values) H2.T(Typ).t = function
       | [] ->
-          []
+          ([], [])
       | d :: ds ->
-          let typ =
+          let typ, return_typ =
             (fun (type var value ret_var ret_value n m)
                  (d : (var, value, ret_var, ret_value, n, m) Tag.t) ->
               let typ : (var, value) Typ.t =
@@ -198,13 +199,22 @@ let step_main :
                 | None ->
                     Types_map.typ d
               in
-              typ )
+              let return_typ : (ret_var, ret_value) Typ.t =
+                match Type_equal.Id.same_witness self.id d.id with
+                | Some T ->
+                    basic.return_typ
+                | None ->
+                    Types_map.return_typ d
+              in
+              (typ, return_typ) )
               d
           in
-          typ :: join ds
+          let typs_tl, return_typs_tl = join ds in
+          (typ :: typs_tl, return_typ :: return_typs_tl)
     in
     let module Mk_typ = H2.Typ (Impls.Step) in
-    Mk_typ.f (join rule.prevs)
+    let typs, return_typs = join rule.prevs in
+    (Mk_typ.f typs, Mk_typ.f return_typs)
   in
   let prev_proof_typs =
     let rec join :
@@ -227,7 +237,7 @@ let step_main :
       | [], [], [], Z, Z, Z ->
           []
       | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->
-          let t = Per_proof_witness.typ Typ.unit n1 n2 in
+          let t = Per_proof_witness.typ Typ.unit Typ.unit n1 n2 in
           t :: join ds ns1 ns2 ld ln1 ln2
       | [], _, _, _, _, _ ->
           .
@@ -252,6 +262,28 @@ let step_main :
         let T = Max_proofs_verified.eq in
         let prev_statements =
           exists prev_values_typs ~request:(fun () -> Req.Prev_inputs)
+        in
+        let prev_return_values =
+          exists prev_return_values_typs ~request:(fun () -> Req.Prev_outputs)
+        in
+        let prev_statements =
+          let rec go :
+              type prev_vars prev_ret_vars.
+                 prev_vars H1.T(Id).t
+              -> prev_ret_vars H1.T(Id).t
+              -> (prev_vars, prev_ret_vars) H2.T(H2.Tuple2(H2.Arg1)(H2.Arg2)).t
+              =
+           fun prev_vars prev_ret_vars ->
+            match (prev_vars, prev_ret_vars) with
+            | [], [] ->
+                []
+            | prev_var :: prev_vars, prev_ret_var :: prev_ret_vars ->
+                let tl = go prev_vars prev_ret_vars in
+                (prev_var, prev_ret_var) :: tl
+            | _ ->
+                assert false
+          in
+          go prev_statements prev_return_values
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         let proofs_should_verify, _ret_var =
@@ -310,14 +342,14 @@ let step_main :
                  , ns1
                  , ns2 )
                  H4.T(Per_proof_witness.No_app_state).t
-              -> vars H1.T(Id).t
-              -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
+              -> (vars, ret_vars) H2.T(H2.Tuple2(H2.Arg1)(H2.Arg2)).t
+              -> (vars, ret_vars, ns1, ns2) H4.T(Per_proof_witness).t =
            fun proofs app_states ->
             match (proofs, app_states) with
             | [], [] ->
                 []
-            | proof :: proofs, app_state :: app_states ->
-                { proof with app_state } :: go proofs app_states
+            | proof :: proofs, (app_state, return_value) :: app_states ->
+                { proof with app_state; return_value } :: go proofs app_states
           in
           go prevs prev_statements
         in
@@ -325,7 +357,7 @@ let step_main :
           with_label "prevs_verified" (fun () ->
               let rec go :
                   type vars vals prev_vars prev_vals ns1 ns2 n.
-                     (vars, ns1, ns2) H3.T(Per_proof_witness).t
+                     (vars, prev_vars, ns1, ns2) H4.T(Per_proof_witness).t
                   -> ( vars
                      , vals
                      , prev_vars
@@ -426,16 +458,16 @@ let step_main :
         let me_only =
           let challenge_polynomial_commitments =
             let module M =
-              H3.Map (Per_proof_witness) (E03 (Inner_curve))
+              H4.Map (Per_proof_witness) (E04 (Inner_curve))
                 (struct
                   let f :
-                      type a b c. (a, b, c) Per_proof_witness.t -> Inner_curve.t
-                      =
+                      type a b c d.
+                      (a, b, c, d) Per_proof_witness.t -> Inner_curve.t =
                    fun acc ->
                     acc.wrap_proof.opening.challenge_polynomial_commitment
                 end)
             in
-            let module V = H3.To_vector (Inner_curve) in
+            let module V = H4.To_vector (Inner_curve) in
             V.f proofs_verified (M.f prevs)
           in
           with_label "hash_me_only" (fun () ->

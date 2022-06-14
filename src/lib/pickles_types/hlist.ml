@@ -197,6 +197,10 @@ module H2 = struct
     type ('a, _) t = 'a
   end
 
+  module Arg2 = struct
+    type (_, 'a) t = 'a
+  end
+
   module Tuple2 (F : T2) (G : T2) = struct
     type ('a, 'b) t = ('a, 'b) F.t * ('a, 'b) G.t
   end

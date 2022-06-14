@@ -313,6 +313,7 @@ struct
       in
       let witness : _ Per_proof_witness.Constant.No_app_state.t =
         { app_state = ()
+        ; return_value = ()
         ; proof_state =
             { prev_statement_with_hashes.proof_state with me_only = () }
         ; prev_proof_evals = t.prev_evals

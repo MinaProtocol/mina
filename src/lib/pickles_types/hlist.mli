@@ -374,6 +374,12 @@ module H2 : sig
     type ('a, _) t = 'a
   end
 
+  (** Simple type function, see {!Arg2}. Can be used to use a [H2] like a
+      {!Hlist0.HlistId}. *)
+  module Arg2 : sig
+    type (_, 'a) t = 'a
+  end
+
   (** See {!H1.Tuple2}. *)
   module Tuple2 : functor (A : T2) (B : T2) -> sig
     type ('a, 'b) t = ('a, 'b) A.t * ('a, 'b) B.t

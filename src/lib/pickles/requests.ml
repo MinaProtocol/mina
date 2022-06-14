@@ -117,6 +117,7 @@ module Step = struct
     type _ t +=
       | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
       | Prev_inputs : prev_values H1.T(Id).t t
+      | Prev_outputs : prev_ret_values H1.T(Id).t t
       | Proof_with_datas :
           ( prev_values
           , prev_ret_values
@@ -158,6 +159,7 @@ module Step = struct
       type _ t +=
         | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
         | Prev_inputs : prev_values H1.T(Id).t t
+        | Prev_outputs : prev_ret_values H1.T(Id).t t
         | Proof_with_datas :
             ( prev_values
             , prev_ret_values

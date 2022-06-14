@@ -314,6 +314,17 @@ let typ :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.typ
 
+let return_typ :
+    type ret_var ret_value.
+       (_, _, ret_var, ret_value, _, _) Tag.t
+    -> (ret_var, ret_value) Impls.Step.Typ.t =
+ fun tag ->
+  match tag.kind with
+  | Compiled ->
+      (lookup_compiled tag.id).return_typ
+  | Side_loaded ->
+      (lookup_side_loaded tag.id).permanent.return_typ
+
 let value_to_field_elements :
     type a. (_, a, _, _, _, _) Tag.t -> a -> Tick.Field.t array =
  fun t ->

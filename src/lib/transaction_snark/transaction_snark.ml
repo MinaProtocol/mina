@@ -2258,7 +2258,7 @@ module Base = struct
           { identifier = "proved"
           ; prevs = M.[ side_loaded 0 ]
           ; main =
-              (fun [ snapp_statement ] stmt ->
+              (fun [ (snapp_statement, ()) ] stmt ->
                 main ?witness:!witness s ~constraint_constants
                   (List.mapi [ snapp_statement ] ~f:(fun i x -> (i, x)))
                   stmt ;
@@ -3172,8 +3172,8 @@ module Merge = struct
     { identifier = "merge"
     ; prevs = [ self; self ]
     ; main =
-        (fun ps x ->
-          Run.run_checked (main ps x) ;
+        (fun [ (s1, ()); (s2, ()) ] x ->
+          Run.run_checked (main [ s1; s2 ] x) ;
           ([ b; b ], ()) )
     }
 end

@@ -1244,7 +1244,7 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ self ]
                   ; main =
-                      (fun [ prev ] self ->
+                      (fun [ (prev, ()) ] self ->
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
@@ -1306,7 +1306,7 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ No_recursion.tag; self ]
                   ; main =
-                      (fun [ _; prev ] self ->
+                      (fun [ _; (prev, ()) ] self ->
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
