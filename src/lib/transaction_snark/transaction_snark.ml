@@ -2261,7 +2261,7 @@ module Base = struct
                 main ?witness:!witness s ~constraint_constants
                   (List.mapi [ snapp_statement ] ~f:(fun i x -> (i, x)))
                   stmt ;
-                [ b ] )
+                ([ b ], ()) )
           }
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
@@ -2269,7 +2269,7 @@ module Base = struct
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                [] )
+                ([], ()) )
           }
       | Opt_signed ->
           { identifier = "opt_signed"
@@ -2277,7 +2277,7 @@ module Base = struct
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                [] )
+                ([], ()) )
           }
   end
 
@@ -3076,7 +3076,7 @@ module Base = struct
     ; main =
         (fun [] x ->
           Run.run_checked (main ~constraint_constants x) ;
-          [] )
+          ([], ()) )
     }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3173,7 +3173,7 @@ module Merge = struct
     ; main =
         (fun ps x ->
           Run.run_checked (main ps x) ;
-          [ b; b ] )
+          ([ b; b ], ()) )
     }
 end
 
@@ -4220,11 +4220,12 @@ module For_tests = struct
             (fun [] x ->
               trivial_main x |> Run.run_checked
               |> fun _ :
-                     unit
-                     Pickles_types.Hlist0.H1
-                       (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                     .t ->
-              [] )
+                     (unit
+                      Pickles_types.Hlist0.H1
+                        (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
+                      .t
+                     * unit) ->
+              ([], ()) )
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
@@ -4251,12 +4252,13 @@ module For_tests = struct
                   |> fun s ->
                   Run.Field.(Assert.equal s (s + one))
                   |> fun () :
-                         ( Zkapp_statement.Checked.t
-                         * (Zkapp_statement.Checked.t * unit) )
-                         Pickles_types.Hlist0.H1
-                           (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                         .t ->
-                  [ Boolean.true_; Boolean.true_ ] )
+                         (( Zkapp_statement.Checked.t
+                          * (Zkapp_statement.Checked.t * unit) )
+                          Pickles_types.Hlist0.H1
+                            (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
+                          .t
+                         * unit) ->
+                  ([ Boolean.true_; Boolean.true_ ], ()) )
             }
           ] )
     in

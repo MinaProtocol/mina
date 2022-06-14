@@ -311,7 +311,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
                [ x1; x2 ] x )
         in
-        [ b1; b2 ] )
+        ([ b1; b2 ], ()) )
   }
 
 module Statement = struct

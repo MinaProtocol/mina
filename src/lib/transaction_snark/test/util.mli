@@ -42,9 +42,9 @@ val dummy_rule :
      , 'c * ('c * unit)
      , 'd * ('d * unit)
      , 'e * ('e * unit)
-     , 'f
-     , 'g
-     , 'h
+     , Zkapp_statement.Checked.t
+     , Zkapp_statement.t
+     , unit
      , 'i )
      Pickles.Inductive_rule.t
 

@@ -1192,7 +1192,7 @@ let%test_module "test no side-loaded" =
                       (fun [] self ->
                         dummy_constraints () ;
                         Field.Assert.equal self Field.zero ;
-                        [] )
+                        ([], ()) )
                   }
                 ] ) )
 
@@ -1243,7 +1243,7 @@ let%test_module "test no side-loaded" =
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ proof_must_verify ] )
+                        ([ proof_must_verify ], ()) )
                   }
                 ] ) )
 
@@ -1305,7 +1305,7 @@ let%test_module "test no side-loaded" =
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ Boolean.true_; proof_must_verify ] )
+                        ([ Boolean.true_; proof_must_verify ], ()) )
                   }
                 ] ) )
 

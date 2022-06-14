@@ -32,7 +32,8 @@ type ( 'prev_vars
       , 'widths
       , 'heights )
       H6.T(Tag).t
-  ; main : 'prev_vars H1.T(Id).t -> 'a_var -> 'prev_vars H1.T(E01(B)).t
+  ; main :
+      'prev_vars H1.T(Id).t -> 'a_var -> 'prev_vars H1.T(E01(B)).t * 'ret_var
   }
 
 module T

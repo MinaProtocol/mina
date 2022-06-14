@@ -242,18 +242,13 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   ; main =
       (fun [ _; _ ] _ ->
         Transaction_snark.dummy_constraints ()
-        |> Snark_params.Tick.Run.run_checked
-        |> fun () ->
+        |> Snark_params.Tick.Run.run_checked ;
         (* Unsatisfiable. *)
-        Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
-        |> fun s ->
-        Run.Field.(Assert.equal s (s + one))
-        |> fun () :
-               (Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit))
-               Pickles_types.Hlist0.H1
-                 (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-               .t ->
-        [ Boolean.true_; Boolean.true_ ] )
+        let s =
+          Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
+        in
+        Run.Field.(Assert.equal s (s + one)) ;
+        ([ Boolean.true_; Boolean.true_ ], ()) )
   }
 
 let gen_snapp_ledger =

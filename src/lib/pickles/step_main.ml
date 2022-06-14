@@ -252,7 +252,7 @@ let step_main :
           exists prev_values_typs ~request:(fun () -> Req.Prev_inputs)
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
-        let proofs_should_verify =
+        let proofs_should_verify, _ret_var =
           (* Run the application logic of the rule on the predecessor statements *)
           with_label "rule_main" (fun () ->
               rule.main prev_statements app_state )
