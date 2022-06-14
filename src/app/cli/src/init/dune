@@ -58,6 +58,7 @@
    o1trace_webkit_event
    generated_graphql_queries
    mina_transaction
+   mina_generators
    mina_user_error
    mina_ledger
    mina_block
@@ -78,6 +79,7 @@
    precomputed_values
    with_hash
    transaction_snark
+   transaction_snark_tests
    transaction_protocol_state
    test_util
    file_system

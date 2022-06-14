@@ -1059,7 +1059,7 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
   let authorization = Signature.dummy in
   ({ body; authorization } : Party.Fee_payer.t)
 
-(* keep max_other_parties small, so snapp integration tests don't need lots
+(* keep max_other_parties small, so zkApp integration tests don't need lots
    of block producers
 
    because the other parties are split into a permissions-setter
@@ -1071,7 +1071,8 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
 *)
 let max_other_parties = 2
 
-let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
+let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
+    ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?prover () =
