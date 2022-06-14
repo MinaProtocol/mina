@@ -400,7 +400,7 @@ end) : S = struct
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)
-      ~typ
+      ~typ ~return_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

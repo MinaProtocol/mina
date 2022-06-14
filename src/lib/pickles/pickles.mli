@@ -257,6 +257,7 @@ val compile_promise :
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> return_typ:('ret_var, 'ret_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
@@ -318,6 +319,7 @@ val compile :
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> return_typ:('ret_var, 'ret_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string

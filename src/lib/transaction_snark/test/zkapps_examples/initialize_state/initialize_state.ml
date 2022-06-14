@@ -28,7 +28,7 @@ let%test_module "Initialize state test" =
       Pickles.compile ~cache:Cache_dir.cache
         (module Zkapp_statement.Checked)
         (module Zkapp_statement)
-        ~typ:Zkapp_statement.typ
+        ~typ:Zkapp_statement.typ ~return_typ:Snark_params.Tick.Typ.unit
         ~branches:(module Nat.N3)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"empty_update"

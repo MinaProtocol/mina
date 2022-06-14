@@ -122,6 +122,8 @@ let step_main :
     -> basic:
          ( a_var
          , a_value
+         , ret_var
+         , ret_value
          , max_proofs_verified
          , self_branches )
          Types_map.Compiled.basic

@@ -1739,7 +1739,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     Pickles.compile_promise ~choices:(Obj.magic choices)
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
-      ~typ:zkapp_statement_typ
+      ~typ:zkapp_statement_typ ~return_typ:Snark_params.Tick.Typ.unit
       ~branches:(module Branches)
       ~max_proofs_verified:(module Pickles_types.Nat.N0)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)

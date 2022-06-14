@@ -431,6 +431,7 @@ struct
       -> name:string
       -> constraint_constants:Snark_keys_header.Constraint_constants.t
       -> typ:(A.t, A_value.t) Impls.Step.Typ.t
+      -> return_typ:(Ret_var.t, Ret_value.t) Impls.Step.Typ.t
       -> choices:
            (   self:
                  ( A.t
@@ -458,7 +459,7 @@ struct
          * _ =
    fun ~self ~cache ?disk_keys ~branches:(module Branches)
        ~max_proofs_verified:(module Max_proofs_verified) ~name
-       ~constraint_constants ~typ ~choices ->
+       ~constraint_constants ~typ ~return_typ ~choices ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -549,9 +550,9 @@ struct
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i
                       ~max_proofs_verified:Max_proofs_verified.n
-                      ~branches:Branches.n ~self ~typ A.to_field_elements
-                      A_value.to_field_elements rule ~wrap_domains
-                      ~proofs_verifieds )
+                      ~branches:Branches.n ~self ~typ ~return_typ
+                      A.to_field_elements A_value.to_field_elements rule
+                      ~wrap_domains ~proofs_verifieds )
               in
               Timer.clock __LOC__ ; incr i ; res
           end)
@@ -954,6 +955,7 @@ let compile_promise :
     -> (module Statement_var_intf with type t = a_var)
     -> (module Statement_value_intf with type t = a_value)
     -> typ:(a_var, a_value) Impls.Step.Typ.t
+    -> return_typ:(ret_var, ret_value) Impls.Step.Typ.t
     -> branches:(module Nat.Intf with type n = branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -991,7 +993,8 @@ let compile_promise :
          , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
          H3_2.T(Prover).t =
  fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices ->
+     ~return_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+     ~choices ->
   let self =
     match self with
     | None ->
@@ -1027,7 +1030,8 @@ let compile_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~cache ?disk_keys ~branches ~max_proofs_verified ~name ~typ
-      ~constraint_constants ~choices:(fun ~self -> conv_irs (choices ~self))
+      ~return_typ ~constraint_constants ~choices:(fun ~self ->
+        conv_irs (choices ~self) )
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
@@ -1055,11 +1059,11 @@ let compile_promise :
   end in
   (self, cache_handle, (module P), provers)
 
-let compile ?self ?cache ?disk_keys a_var a_value ~typ ~branches
+let compile ?self ?cache ?disk_keys a_var a_value ~typ ~return_typ ~branches
     ~max_proofs_verified ~name ~constraint_constants ~choices =
   let self, cache_handle, proof_module, provers =
-    compile_promise ?self ?cache ?disk_keys a_var a_value ~typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices
+    compile_promise ?self ?cache ?disk_keys a_var a_value ~typ ~return_typ
+      ~branches ~max_proofs_verified ~name ~constraint_constants ~choices
   in
   let rec adjust_provers :
       type a1 a2 a3 s1 s2_inner.
@@ -1168,7 +1172,7 @@ let%test_module "test no side-loaded" =
             compile_promise
               (module Statement)
               (module Statement.Constant)
-              ~typ:Field.typ
+              ~typ:Field.typ ~return_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
               ~name:"blockchain-snark"
@@ -1217,7 +1221,7 @@ let%test_module "test no side-loaded" =
             compile_promise
               (module Statement)
               (module Statement.Constant)
-              ~typ:Field.typ
+              ~typ:Field.typ ~return_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N1)
               ~name:"blockchain-snark"
@@ -1279,7 +1283,7 @@ let%test_module "test no side-loaded" =
             compile_promise
               (module Statement)
               (module Statement.Constant)
-              ~typ:Field.typ
+              ~typ:Field.typ ~return_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"blockchain-snark"
@@ -1391,6 +1395,7 @@ let%test_module "test" =
             (module Statement)
             (module Statement.Constant)
             ~typ:Field.typ
+            ~return_typ:Typ.unit
             ~branches:(module Nat.N2) (* Should be able to set to 1 *)
             ~max_proofs_verified:
               (module Nat.N2) (* TODO: Should be able to set this to 0 *)
@@ -1440,6 +1445,7 @@ let%test_module "test" =
           (module Statement)
           (module Statement.Constant)
           ~typ:Field.typ
+          ~return_typ:Typ.unit
           ~branches:(module Nat.N3)
           ~max_proofs_verified:(module Nat.N2)
           ~name:"txn-snark"
@@ -1541,6 +1547,7 @@ let%test_module "test" =
               (module Statement)
               (module Statement.Constant)
               ~typ:Field.typ
+              ~return_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"blockchain-snark"

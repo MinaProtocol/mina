@@ -89,8 +89,15 @@ end
 module Compiled = struct
   type f = Impls.Wrap.field
 
-  type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
+  type ( 'a_var
+       , 'a_value
+       , 'ret_var
+       , 'ret_value
+       , 'max_proofs_verified
+       , 'branches )
+       basic =
     { typ : ('a_var, 'a_value) Impls.Step.Typ.t
+    ; return_typ : ('ret_var, 'ret_value) Impls.Step.Typ.t
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array

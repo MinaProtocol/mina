@@ -74,7 +74,7 @@ let create
        (a_var, a_value, ret_var, ret_value, max_proofs_verified, branches) Tag.t
        ) ~wrap_domains ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
-    ~typ var_to_field_elements value_to_field_elements
+    ~typ ~return_typ var_to_field_elements value_to_field_elements
     (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H6.T (Tag) in
@@ -119,6 +119,7 @@ let create
       rule
       ~basic:
         { typ
+        ; return_typ
         ; proofs_verifieds
         ; var_to_field_elements
         ; value_to_field_elements
