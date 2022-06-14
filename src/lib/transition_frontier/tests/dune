@@ -15,6 +15,7 @@
    mina_state
    staged_ledger
    with_hash
+   mina_ledger
    child_processes
    genesis_constants
    logger

@@ -1,13 +1,81 @@
 open Core_kernel
 open Pickles_types
 open Import
-open Zexe_backend.Pasta
+open Kimchi_pasta.Pasta
+
+module Verifier_index_json = struct
+  module Lookup = struct
+    type lookups_used = Kimchi_types.VerifierIndex.Lookup.lookups_used =
+      | Single
+      | Joint
+    [@@deriving yojson]
+
+    type 't lookup_selectors =
+          't Kimchi_types.VerifierIndex.Lookup.lookup_selectors =
+      { lookup_gate : 't option }
+    [@@deriving yojson]
+
+    type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
+      { lookup_used : lookups_used
+      ; lookup_table : 'polyComm array
+      ; lookup_selectors : 'polyComm lookup_selectors
+      ; table_ids : 'polyComm option
+      ; max_joint_size : int
+      ; runtime_tables_selector : 'polyComm option
+      }
+    [@@deriving yojson]
+  end
+
+  type 'fr domain = 'fr Kimchi_types.VerifierIndex.domain =
+    { log_size_of_group : int; group_gen : 'fr }
+  [@@deriving yojson]
+
+  type 'polyComm verification_evals =
+        'polyComm Kimchi_types.VerifierIndex.verification_evals =
+    { sigma_comm : 'polyComm array
+    ; coefficients_comm : 'polyComm array
+    ; generic_comm : 'polyComm
+    ; psm_comm : 'polyComm
+    ; complete_add_comm : 'polyComm
+    ; mul_comm : 'polyComm
+    ; emul_comm : 'polyComm
+    ; endomul_scalar_comm : 'polyComm
+    ; chacha_comm : 'polyComm array option
+    }
+  [@@deriving yojson]
+
+  type ('fr, 'sRS, 'polyComm) verifier_index =
+        ('fr, 'sRS, 'polyComm) Kimchi_types.VerifierIndex.verifier_index =
+    { domain : 'fr domain
+    ; max_poly_size : int
+    ; max_quot_size : int
+    ; srs : 'sRS
+    ; evals : 'polyComm verification_evals
+    ; shifts : 'fr array
+    ; lookup_index : 'polyComm Lookup.t option
+    }
+  [@@deriving yojson]
+
+  type 'f or_infinity = 'f Kimchi_types.or_infinity =
+    | Infinity
+    | Finite of ('f * 'f)
+  [@@deriving yojson]
+
+  type 'g polycomm = 'g Kimchi_types.poly_comm =
+    { unshifted : 'g array; shifted : 'g option }
+  [@@deriving yojson]
+
+  let to_yojson fp fq =
+    verifier_index_to_yojson fp
+      (fun _ -> `Null)
+      (polycomm_to_yojson (or_infinity_to_yojson fq))
+end
 
 module Data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = { constraints : int }
+      type t = { constraints : int } [@@deriving yojson]
 
       let to_latest = Fn.id
     end
@@ -17,14 +85,14 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         { commitments :
-            Backend.Tock.Curve.Affine.Stable.V1.t array
-            Plonk_verification_key_evals.Stable.V1.t
-        ; step_domains : Domains.Stable.V1.t array
+            Backend.Tock.Curve.Affine.Stable.V1.t
+            Plonk_verification_key_evals.Stable.V2.t
         ; data : Data.Stable.V1.t
         }
+      [@@deriving to_yojson]
 
       let to_latest = Fn.id
     end
@@ -33,19 +101,21 @@ end
 
 [%%versioned_binable
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      { commitments :
-          Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
-      ; step_domains : Domains.t array
-      ; index : Impls.Wrap.Verification_key.t
+      { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+      ; index :
+          (Impls.Wrap.Verification_key.t
+          [@to_yojson
+            Verifier_index_json.to_yojson Backend.Tock.Field.to_yojson
+              Backend.Tick.Field.to_yojson] )
       ; data : Data.t
       }
-    [@@deriving fields]
+    [@@deriving fields, to_yojson]
 
     let to_latest = Fn.id
 
-    let of_repr urs { Repr.commitments = c; step_domains; data = d } =
+    let of_repr srs { Repr.commitments = c; data = d } =
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
         let d = Domain.Pow_2_roots_of_unity log2_size in
@@ -56,65 +126,62 @@ module Stable = struct
             }
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
         ; max_quot_size
-        ; urs
+        ; srs
         ; evals =
-            Plonk_verification_key_evals.map c ~f:(fun unshifted ->
-                { Marlin_plonk_bindings.Types.Poly_comm.shifted = None
-                ; unshifted =
-                    Array.map unshifted ~f:(fun x -> Or_infinity.Finite x)
-                } )
+            (let g (x, y) =
+               { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
+               ; shifted = None
+               }
+             in
+             { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
+             ; coefficients_comm =
+                 Array.map ~f:g (Vector.to_array c.coefficients_comm)
+             ; generic_comm = g c.generic_comm
+             ; mul_comm = g c.mul_comm
+             ; psm_comm = g c.psm_comm
+             ; emul_comm = g c.emul_comm
+             ; complete_add_comm = g c.complete_add_comm
+             ; endomul_scalar_comm = g c.endomul_scalar_comm
+             ; chacha_comm = None
+             } )
         ; shifts = Common.tock_shifts ~log2_size
+        ; lookup_index = None
         }
       in
-      { commitments = c; step_domains; data = d; index = t }
+      { commitments = c; data = d; index = t }
 
     include
       Binable.Of_binable
-        (Repr.Stable.V1)
+        (Repr.Stable.V2)
         (struct
           type nonrec t = t
 
-          let to_binable { commitments; step_domains; data; index = _ } =
-            { Repr.commitments; data; step_domains }
+          let to_binable { commitments; data; index = _ } =
+            { Repr.commitments; data }
 
           let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
         end)
   end
 end]
 
+let to_yojson = Stable.Latest.to_yojson
+
 let dummy_commitments g =
-  { Plonk_verification_key_evals.sigma_comm_0 = g
-  ; sigma_comm_1 = g
-  ; sigma_comm_2 = g
-  ; ql_comm = g
-  ; qr_comm = g
-  ; qo_comm = g
-  ; qm_comm = g
-  ; qc_comm = g
-  ; rcm_comm_0 = g
-  ; rcm_comm_1 = g
-  ; rcm_comm_2 = g
+  let open Plonk_types in
+  { Plonk_verification_key_evals.sigma_comm =
+      Vector.init Permuts.n ~f:(fun _ -> g)
+  ; coefficients_comm = Vector.init Columns.n ~f:(fun _ -> g)
+  ; generic_comm = g
   ; psm_comm = g
-  ; add_comm = g
-  ; mul1_comm = g
-  ; mul2_comm = g
-  ; emul1_comm = g
-  ; emul2_comm = g
-  ; emul3_comm = g
+  ; complete_add_comm = g
+  ; mul_comm = g
+  ; emul_comm = g
+  ; endomul_scalar_comm = g
   }
 
 let dummy =
   lazy
-    (let rows = Domain.size Common.wrap_domains.h in
-     let g =
-       let len =
-         let max_degree = Common.Max_degree.wrap in
-         Int.round_up rows ~to_multiple_of:max_degree / max_degree
-       in
-       Array.create ~len Backend.Tock.Curve.(to_affine_exn one)
-     in
-     { Repr.commitments = dummy_commitments g
-     ; step_domains = [||]
-     ; data = { constraints = rows }
-     }
-     |> Stable.Latest.of_repr (Marlin_plonk_bindings.Pasta_fq_urs.create 1) )
+    (let rows = Domain.size (Common.wrap_domains ~proofs_verified:2).h in
+     let g = Backend.Tock.Curve.(to_affine_exn one) in
+     { Repr.commitments = dummy_commitments g; data = { constraints = rows } }
+     |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1) )

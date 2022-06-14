@@ -6,13 +6,15 @@
    core_kernel
    base
    ;; local libraries
+   key_gen
    mina_base
    signature_lib
    currency
    mina_numbers
    genesis_constants
    data_hash_lib
- )
+   mina_ledger
+   mina_base.import)
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_let)))

@@ -14,6 +14,8 @@
    core
    async_unix
    ;; local libraries
+   kimchi_backend
+   logger.file_system
    error_json
    transaction_snark
    random_oracle_input
@@ -31,9 +33,9 @@
    pickles.backend
    random_oracle
    o1trace
-   zexe_backend
-   pasta
-)
+   mina_base.import
+   kimchi_backend.pasta
+   with_hash)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_compare ppx_hash ppx_coda ppx_version ppx_here ppx_bin_prot ppx_let
+ (preprocess (pps ppx_custom_printf ppx_version ppx_compare ppx_hash ppx_coda ppx_version ppx_here ppx_bin_prot ppx_let
                   ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv)))

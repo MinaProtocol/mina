@@ -73,7 +73,7 @@ let%test_module "transaction logic consistency" =
 
     (* Helpers for applying transactions *)
 
-    module Sparse_txn_logic = Transaction_logic.Make (Sparse_ledger.L)
+    module Sparse_txn_logic = Mina_transaction_logic.Make (Sparse_ledger.L)
 
     let sparse_ledger ledger t =
       Or_error.try_with ~backtrace:true (fun () ->
@@ -109,7 +109,7 @@ let%test_module "transaction logic consistency" =
               (Sparse_ledger.next_available_token source)
             ~next_available_token_after:
               (Sparse_ledger.next_available_token target)
-            ~snapp_account1:None ~snapp_account2:None
+            ~zkapp_account1:None ~zkapp_account2:None
             { transaction; block_data }
             (unstage (Sparse_ledger.handler source)) )
 

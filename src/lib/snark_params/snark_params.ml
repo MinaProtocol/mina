@@ -17,19 +17,19 @@ module Make_snarkable (Impl : Snarky_backendless.Snark_intf.S) = struct
     module type Lossy =
       Bits_intf.Snarkable.Lossy
         with type ('a, 'b) typ := ('a, 'b) Typ.t
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type 'a checked := 'a Checked.t
          and type boolean_var := Boolean.var
 
     module type Faithful =
       Bits_intf.Snarkable.Faithful
         with type ('a, 'b) typ := ('a, 'b) Typ.t
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type 'a checked := 'a Checked.t
          and type boolean_var := Boolean.var
 
     module type Small =
       Bits_intf.Snarkable.Small
         with type ('a, 'b) typ := ('a, 'b) Typ.t
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type 'a checked := 'a Checked.t
          and type boolean_var := Boolean.var
          and type comparison_result := Field.Checked.comparison_result
          and type field_var := Field.Var.t
@@ -50,16 +50,14 @@ let%test_unit "group-map test" =
   let params = Crypto_params.Tock.group_map_params () in
   let module M = Crypto_params.Tick.Run in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
-      let (), checked_output =
-        M.run_and_check
-          (fun () ->
+      let checked_output =
+        M.run_and_check (fun () ->
             let x, y =
               Snarky_group_map.Checked.to_group
                 (module M)
                 ~params (M.Field.constant t)
             in
             fun () -> M.As_prover.(read_var x, read_var y) )
-          ()
         |> Or_error.ok_exn
       in
       let ((x, y) as actual) =
@@ -113,7 +111,7 @@ struct
     let to_bits = Fn.id
 
     module Assert = struct
-      let equal : var -> var -> (unit, _) Checked.t =
+      let equal : var -> var -> unit Checked.t =
        fun a b ->
         Bitstring_checked.Assert.equal
           (Bitstring.Lsb_first.to_list a)
@@ -217,11 +215,8 @@ module Tick = struct
             let add =
               Some
                 (fun p1 p2 ->
-                  let c =
-                    Run.make_checked (fun () ->
-                        Pickles.Step_main_inputs.Ops.add_fast p1 p2 )
-                  in
-                  Tick0.with_state (As_prover.return ()) c )
+                  Run.make_checked (fun () ->
+                      Pickles.Step_main_inputs.Ops.add_fast p1 p2 ) )
           end)
 
       let add_known_unsafe t x = add_unsafe t (constant x)
@@ -234,7 +229,7 @@ module Tick = struct
 
   let m : Run.field Snarky_backendless.Snark.m = (module Run)
 
-  let make_checked c = with_state (As_prover.return ()) (Run.make_checked c)
+  let make_checked c = Run.make_checked c
 end
 
 (* Let n = Tick.Field.size_in_bits.

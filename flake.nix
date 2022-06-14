@@ -2,9 +2,9 @@
   description = "Mina, a cryptocurrency with a lightweight, constant-size blockchain";
   nixConfig = {
     allow-import-from-derivation = "true";
-    extra-substituters = [ "https://mina-demo.cachix.org" ];
+    extra-substituters = [ "https://storage.googleapis.com/mina-nix-cache" ];
     extra-trusted-public-keys =
-      [ "mina-demo.cachix.org-1:PpQXDRNR3QkXI0487WY3TDTk5+7bsOImKj5+A79aMg8=" ];
+      [ "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c=" ];
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
@@ -30,10 +30,43 @@
 
   inputs.nix-filter.url = "github:numtide/nix-filter";
 
+  inputs.flake-buildkite-pipeline.url = "github:tweag/flake-buildkite-pipeline";
+
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
-    , opam-nix, opam-repository, nixpkgs-mozilla, ... }:
+    , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
+    }:
     {
       overlay = import ./nix/overlay.nix;
+      nixosModules.mina = import ./nix/modules/mina.nix inputs;
+      nixosConfigurations.container = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          self.nixosModules.mina
+          {
+            boot.isContainer = true;
+            networking.useDHCP = false;
+            networking.firewall.enable = false;
+
+            services.mina = {
+              enable = true;
+              waitForRpc = false;
+              external-ip = "0.0.0.0";
+              extraArgs = [ "--seed" ];
+            };
+          }
+        ];
+      };
+      pipeline = with flake-buildkite-pipeline.lib; {
+        steps = flakeSteps {
+          pushToBinaryCaches = [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
+          signWithKeys = [ "/var/secrets/nix-cache-key.sec" ];
+          commonExtraStepConfig = {
+            agents = [ "nix" ];
+            soft_fail = "true";
+            env.BUILDKITE_REPO = "";
+          };
+        } self;
+      };
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
@@ -169,12 +202,10 @@
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-        packages.mina_static = ocamlPackages_static.mina;
-        packages.marlin_plonk_bindings_stubs = pkgs.marlin_plonk_bindings_stubs;
+        # packages.mina_static = ocamlPackages_static.mina;
+        packages.kimchi_bindings_stubs = pkgs.kimchi_bindings_stubs;
         packages.go-capnproto2 = pkgs.go-capnproto2;
         packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.marlin_plonk_bindings_stubs_static =
-          pkgs.pkgsMusl.marlin_plonk_bindings_stubs;
         packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
@@ -185,8 +216,9 @@
 
         devShell = ocamlPackages.mina-dev;
         devShells.default = ocamlPackages.mina-dev;
-
-        packages.impure-shell = import ./nix/impure-shell.nix pkgs;
+        # TODO: think about rust toolchain in the dev shell
+        packages.impure-shell =
+          (import ./nix/impure-shell.nix pkgs).inputDerivation;
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 
         inherit checks;
