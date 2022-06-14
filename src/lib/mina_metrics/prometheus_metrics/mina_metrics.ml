@@ -321,6 +321,24 @@ module Bootstrap = struct
   let bootstrap_time_ms =
     let help = "time elapsed while bootstrapping" in
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
+
+  let staking_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync staking epoch ledger in ms" in
+    Counter.v "staking_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let next_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync next epoch ledger in ms" in
+    Counter.v "next_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let root_snarked_ledger_sync_ms =
+    let help = "time elapsed when sync root snarked ledger in ms" in
+    Counter.v "root_snarked_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let num_of_root_snarked_ledger_retargeted =
+    let help =
+      "number of times root_snarked_ledger retargeted during bootstrap"
+    in
+    Gauge.v "num_of_root_snarked_ledger_retargeted" ~help ~namespace ~subsystem
 end
 
 module Transaction_pool = struct
@@ -431,6 +449,36 @@ module Network = struct
             "average time, in ms, for blocks to be validated and rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average time, in ms, for blocks to be accepted after the OCaml \
+             process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for blocks to be rejected after the OCaml \
+             process receives it"
+        end)
+        ()
   end
 
   module Snark_work = struct
@@ -466,6 +514,36 @@ module Network = struct
              rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for snark work to be accepted after the \
+             OCaml process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for snark work to be rejected after the \
+             OCaml process receives it"
+        end)
+        ()
   end
 
   module Transaction = struct
@@ -499,6 +577,36 @@ module Network = struct
           let help =
             "average delay, in ms, for transactions to be validated and \
              rebroadcasted"
+        end)
+        ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for transactions to be accepted after the \
+             OCaml process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for transactions to be rejected after the \
+             OCaml process receives it"
         end)
         ()
   end
