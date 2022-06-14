@@ -1657,7 +1657,6 @@ type ('a_var, 'a_value, 'a_weird) pickles_rule =
   { identifier : string
   ; prevs : 'a_weird list
   ; main : 'a_var list -> 'a_var -> Boolean.var list
-  ; main_value : 'a_value list -> 'a_value -> bool list
   }
 
 type pickles_rule_js =
@@ -1695,16 +1694,6 @@ let create_pickles_rule ~self (rule : pickles_rule_js) =
         in
         Js.to_array should_verifys |> Array.to_list
         |> List.map ~f:(fun b -> b##.value) )
-  ; main_value =
-      (fun prev_statements statement ->
-        let should_verifys =
-          rule##.main
-            (Zkapp_statement.to_js statement)
-            (Zkapp_statement.list_to_js prev_statements)
-            (Js.bool true)
-        in
-        Js.to_array should_verifys |> Array.to_list
-        |> List.map ~f:(fun b -> b##toBoolean |> Js.to_bool) )
   }
 
 let other_verification_key_constr :
