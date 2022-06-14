@@ -9,6 +9,14 @@ let List/concatMap =
 let Optional/map =
       https://raw.githubusercontent.com/dhall-lang/dhall-lang/master/Prelude/Optional/map
 
+let Text/concatSep =
+      https://raw.githubusercontent.com/dhall-lang/dhall-lang/master/Prelude/Text/concatSep
+
+let List/map =
+      https://raw.githubusercontent.com/dhall-lang/dhall-lang/master/Prelude/List/map
+
+let escapeShellArg = λ(arg : Text) → "'" ++ Text/replace "'" "\\'" arg ++ "'"
+
 let DebCodename =
       < bionic
       | focal
@@ -52,7 +60,7 @@ let debInfo
                         , bookworm = "debian"
                         }
                         codename
-                  ++ ":${text}"
+                  ++  ":${text}"
               }
 
 let debInfo_ =
@@ -77,6 +85,7 @@ let ServiceDescription =
           , debCodename : Optional DebCodename
           , debRelease : Optional Text
           , debVersion : Optional Text
+          , logsBucket : Optional Text
           , extraArgs : List Text
           }
       , default =
@@ -87,6 +96,7 @@ let ServiceDescription =
         , debCodename = None DebCodename
         , debRelease = None Text
         , debVersion = None Text
+        , logsBucket = None Text
         , extraArgs = [] : List Text
         }
       }
@@ -134,9 +144,29 @@ let mkArgs
             { Some =
                 λ(ctx : Text) →
                   dockerfilePathsArgs desc.dockerfilePaths # [ ctx ]
-            , None = desc.dockerfilePaths
+            , None = [ "-" ]
             }
             desc.dockerContext
+
+let mkScript
+    : Text → DockerfileDescription.Type → ServiceDescription.Type → Text
+    = λ(tag : Text) →
+      λ(desc : DockerfileDescription.Type) →
+      λ(serviceDesc : ServiceDescription.Type) →
+            merge
+              { Some = λ(ctx : Text) → ""
+              , None =
+                  "cat " ++ Text/concatSep " " desc.dockerfilePaths ++ " | "
+              }
+              desc.dockerContext
+        ++  Text/concatSep
+              " "
+              ( List/map
+                  Text
+                  Text
+                  escapeShellArg
+                  ([ "docker" ] # mkArgs tag desc serviceDesc)
+              )
 
 let cloudBuild
     : DockerfileDescription.Type →
@@ -146,27 +176,29 @@ let cloudBuild
       λ(serviceDesc : ServiceDescription.Type) →
         let tag = "gcr.io/\${PROJECT_ID}/${desc.service}:${serviceDesc.version}"
 
-        let args = mkArgs tag desc serviceDesc
+        let script = mkScript tag desc serviceDesc
 
         in  Schema.Cloudbuild::{
             , steps =
               [ Schema.Step::{
                 , name = "gcr.io/cloud-builders/docker"
-                , args = Some args
+                , entrypoint = Some "bash"
+                , args = Some ["-c", script]
                 }
               ]
             , images = Some [ tag ]
+            , logsBucket = serviceDesc.logsBucket
             }
 
 let dockerBuild
-    : DockerfileDescription.Type → ServiceDescription.Type → List Text
+    : DockerfileDescription.Type → ServiceDescription.Type → Text
     = λ(desc : DockerfileDescription.Type) →
       λ(serviceDesc : ServiceDescription.Type) →
         let tag = "${desc.service}:${serviceDesc.version}"
 
-        let args = mkArgs tag desc serviceDesc
+        let script = mkScript tag desc serviceDesc
 
-        in  args
+        in  script
 
 let services =
       { mina-archive =
