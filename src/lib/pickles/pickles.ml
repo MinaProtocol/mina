@@ -310,8 +310,13 @@ module Proof_system = struct
            t
 end
 
-module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
-  module IR = Inductive_rule.T (A) (A_value)
+module Make
+    (A : Statement_var_intf)
+    (A_value : Statement_value_intf)
+    (Ret_var : T0)
+    (Ret_value : T0) =
+struct
+  module IR = Inductive_rule.T (A) (A_value) (Ret_var) (Ret_value)
   module HIR = H6.T (IR)
 
   let max_local_max_proofs_verifieds ~self (type n)
@@ -407,12 +412,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         log
 
   let compile :
-      type ret_var ret_value prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
+      type prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
          self:
            ( A.t
            , A_value.t
-           , ret_var
-           , ret_value
+           , Ret_var.t
+           , Ret_value.t
            , max_proofs_verified
            , branches )
            Tag.t
@@ -430,8 +435,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
            (   self:
                  ( A.t
                  , A_value.t
-                 , ret_var
-                 , ret_value
+                 , Ret_var.t
+                 , Ret_value.t
                  , max_proofs_verified
                  , branches )
                  Tag.t
@@ -483,7 +488,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
     Timer.clock __LOC__ ;
     let wrap_domains =
-      let module M = Wrap_domains.Make (A) (A_value) in
+      let module M = Wrap_domains.Make (A) (A_value) (Ret_var) (Ret_value) in
       let rec f :
           type a b c d e f.
           (a, b, c, d, e, f) H6.T(IR).t -> (a, b, c, d, e, f) H6.T(M.I).t =
@@ -502,6 +507,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       type ('vars, 'vals, 'prev_ret_vars, 'prev_ret_values, 'n, 'm) t =
         ( A.t
         , A_value.t
+        , Ret_var.t
+        , Ret_value.t
         , Max_proofs_verified.n
         , Branches.n
         , 'vars
@@ -968,8 +975,10 @@ let compile_promise :
              , widthss
              , heightss
              , a_var
-             , a_value )
-             H6_2.T(Inductive_rule).t )
+             , a_value
+             , ret_var
+             , ret_value )
+             H6_4.T(Inductive_rule).t )
     -> (a_var, a_value, ret_var, ret_value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
        * (module Proof_intf
@@ -990,7 +999,13 @@ let compile_promise :
     | Some self ->
         self
   in
-  let module M = Make (A_var) (A_value) in
+  let module Ret_var = struct
+    type t = ret_var
+  end in
+  let module Ret_value = struct
+    type t = ret_value
+  end in
+  let module M = Make (A_var) (A_value) (Ret_var) (Ret_value) in
   let rec conv_irs :
       type v1ss v2ss v3ss v4ss wss hss.
          ( v1ss
@@ -1000,8 +1015,10 @@ let compile_promise :
          , wss
          , hss
          , a_var
-         , a_value )
-         H6_2.T(Inductive_rule).t
+         , a_value
+         , ret_var
+         , ret_value )
+         H6_4.T(Inductive_rule).t
       -> (v1ss, v2ss, v3ss, v4ss, wss, hss) H6.T(M.IR).t = function
     | [] ->
         []

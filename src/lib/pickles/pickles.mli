@@ -277,8 +277,10 @@ val compile_promise :
            , 'widthss
            , 'heightss
            , 'a_var
-           , 'a_value )
-           H6_2.T(Inductive_rule).t )
+           , 'a_value
+           , 'ret_var
+           , 'ret_value )
+           H6_4.T(Inductive_rule).t )
   -> ( 'a_var
      , 'a_value
      , 'ret_var
@@ -336,8 +338,10 @@ val compile :
            , 'widthss
            , 'heightss
            , 'a_var
-           , 'a_value )
-           H6_2.T(Inductive_rule).t )
+           , 'a_value
+           , 'ret_var
+           , 'ret_value )
+           H6_4.T(Inductive_rule).t )
   -> ( 'a_var
      , 'a_value
      , 'ret_var

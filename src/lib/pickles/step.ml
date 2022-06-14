@@ -43,11 +43,13 @@ struct
                a rule in proof system i. max_local_max_proof_verifieds is the max of the N_i.
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
-      prev_ret_vars prev_ret_values local_widths local_heights prevs_length )
-      ?handler
+      prev_ret_vars prev_ret_values local_widths local_heights prevs_length
+      ret_var ret_value ) ?handler
       (T branch_data :
         ( A.t
         , A_value.t
+        , ret_var
+        , ret_value
         , Max_proofs_verified.n
         , self_branches
         , prev_vars

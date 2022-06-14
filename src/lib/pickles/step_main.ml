@@ -140,7 +140,9 @@ let step_main :
        , local_signature
        , local_branches
        , a_var
-       , a_value )
+       , a_value
+       , ret_var
+       , ret_value )
        Inductive_rule.t
     -> (   unit
         -> ( (Unfinalized.t, max_proofs_verified) Vector.t

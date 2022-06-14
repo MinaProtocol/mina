@@ -5,8 +5,8 @@ open Poly_types
 open Hlist
 
 (* Compute the domains corresponding to wrap_main *)
-module Make (A : T0) (A_value : T0) = struct
-  module I = Inductive_rule.T (A) (A_value)
+module Make (A : T0) (A_value : T0) (Ret_var : T0) (Ret_value : T0) = struct
+  module I = Inductive_rule.T (A) (A_value) (Ret_var) (Ret_value)
 
   let prev (type a1 a2 a3 a4 ws hs) ~self
       ~(choices : (a1, a2, a3, a4, ws, hs) H6.T(I).t) =

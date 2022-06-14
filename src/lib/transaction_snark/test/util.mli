@@ -43,7 +43,9 @@ val dummy_rule :
      , 'd * ('d * unit)
      , 'e * ('e * unit)
      , 'f
-     , 'g )
+     , 'g
+     , 'h
+     , 'i )
      Pickles.Inductive_rule.t
 
 (** Generates base and merge snarks of all the party segments

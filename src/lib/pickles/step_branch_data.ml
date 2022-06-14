@@ -7,6 +7,8 @@ open Import
 (* The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
      , 'a_value
+     , 'ret_var
+     , 'ret_value
      , 'max_proofs_verified
      , 'branches
      , 'prev_vars
@@ -29,8 +31,10 @@ type ( 'a_var
           , 'prev_ret_values
           , 'local_widths
           , 'local_heights
-          , 'a_avar
-          , 'a_value )
+          , 'a_var
+          , 'a_value
+          , 'ret_var
+          , 'ret_value )
           Inductive_rule.t
       ; main :
              step_domains:(Domains.t, 'branches) Vector.t
@@ -50,6 +54,8 @@ type ( 'a_var
       }
       -> ( 'a_var
          , 'a_value
+         , 'ret_var
+         , 'ret_value
          , 'max_proofs_verified
          , 'branches
          , 'prev_vars
