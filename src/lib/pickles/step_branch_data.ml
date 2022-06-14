@@ -50,7 +50,8 @@ type ( 'a_var
               and type prev_values = 'prev_values
               and type prev_ret_values = 'prev_ret_values
               and type local_signature = 'local_widths
-              and type local_branches = 'local_heights )
+              and type local_branches = 'local_heights
+              and type return_value = 'ret_value )
       }
       -> ( 'a_var
          , 'a_value

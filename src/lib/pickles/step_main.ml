@@ -105,7 +105,8 @@ let step_main :
            and type statement = a_value
            and type prev_values = prev_values
            and type prev_ret_values = prev_ret_values
-           and type max_proofs_verified = max_proofs_verified )
+           and type max_proofs_verified = max_proofs_verified
+           and type return_value = ret_value )
     -> (module Nat.Add.Intf with type n = max_proofs_verified)
     -> self_branches:self_branches Nat.t
          (* How many branches does this proof system have *)
