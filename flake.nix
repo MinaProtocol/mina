@@ -63,7 +63,7 @@
           commonExtraStepConfig = {
             agents = [ "nix" ];
             soft_fail = "true";
-            env.BUILDKITE_REPO = "";
+            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
           };
         } self;
       };
