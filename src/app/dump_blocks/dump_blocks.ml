@@ -19,7 +19,7 @@ let constraint_constants = precomputed_values.constraint_constants
    * include all types of transactions
    * etc.
 *)
-let f make_breadcrumb = 
+let f make_breadcrumb =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let frontier = create_frontier () in
       let root = Full_frontier.root frontier in
@@ -39,15 +39,14 @@ let f make_breadcrumb =
           ~staged_ledger ~scheduled_time
           (Breadcrumb.block_with_hash breadcrumb)
       in
-      Core_kernel.eprintf !"Randomly generated block, sexp:\n\
-          %{sexp:Mina_block.Precomputed.t}\n"
+      Core_kernel.eprintf
+        !"Randomly generated block, sexp:\n%{sexp:Mina_block.Precomputed.t}\n"
         precomputed ;
       Core_kernel.eprintf
         !"Randomly generated block, json:\n%{Yojson.Safe}\n"
         (Mina_block.Precomputed.to_yojson precomputed) ;
-      clean_up_persistent_root ~frontier ) 
+      clean_up_persistent_root ~frontier )
 
 let () =
   let verifier = verifier () in
-  Core_kernel.Quickcheck.test (gen_breadcrumb ~verifier ~send_to_random_pk:()) ~trials:1 ~f
-
+  Core_kernel.Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1 ~f

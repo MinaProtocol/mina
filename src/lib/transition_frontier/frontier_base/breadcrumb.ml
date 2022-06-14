@@ -236,7 +236,7 @@ module For_tests = struct
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they have at least one coin*)
-  let gen_payments ?send_to_random_pk staged_ledger accounts_with_secret_keys :
+  let gen_payments ~send_to_random_pk staged_ledger accounts_with_secret_keys :
       Signed_command.With_valid_signature.t Sequence.t =
     let account_ids =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
@@ -245,12 +245,9 @@ module For_tests = struct
     (* One transaction is sent to a random address to make sure generated block
        contains a transaction to new account, not only to existing *)
     let random_pk =
-      ref
-        (let%bind.Option () = send_to_random_pk in
-         try
-           Private_key.create () |> Public_key.of_private_key_exn
-           |> Public_key.compress |> Some
-         with _ -> None )
+      lazy
+        ( Private_key.create () |> Public_key.of_private_key_exn
+        |> Public_key.compress )
     in
     Sequence.filter_map (accounts_with_secret_keys |> Sequence.of_list)
       ~f:(fun (sender_sk, sender_account) ->
@@ -260,15 +257,13 @@ module For_tests = struct
         let token = sender_account.token_id in
         (* Send some transactions to the new accounts *)
         let%bind receiver_pk =
-          Option.value_map !random_pk
-            ~f:(fun a ->
-              random_pk := None ;
-              Some a )
-            ~default:
-              ( account_ids
-              |> List.filter
-                   ~f:(Fn.compose (Token_id.equal token) Account_id.token_id)
-              |> List.random_element >>| Account_id.public_key )
+          if send_to_random_pk && not (Lazy.is_val random_pk) then
+            Some (Lazy.force random_pk)
+          else
+            account_ids
+            |> List.filter
+                 ~f:(Fn.compose (Token_id.equal token) Account_id.token_id)
+            |> List.random_element >>| Account_id.public_key
         in
         let nonce =
           let ledger = Staged_ledger.ledger staged_ledger in
@@ -297,9 +292,9 @@ module For_tests = struct
         in
         Signed_command.sign sender_keypair payload )
 
-  let gen ?(logger = Logger.null ()) ?send_to_random_pk
+  let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier
-      ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
+      ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys () :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let gen_slot_advancement = Int.gen_incl 1 10 in
@@ -314,7 +309,7 @@ module For_tests = struct
       let open Deferred.Let_syntax in
       let parent_staged_ledger = staged_ledger parent_breadcrumb in
       let transactions =
-        gen_payments ?send_to_random_pk parent_staged_ledger
+        gen_payments ~send_to_random_pk parent_staged_ledger
           accounts_with_secret_keys
         |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
       in
@@ -473,8 +468,8 @@ module For_tests = struct
       ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?send_to_random_pk:None ?logger ~verifier ~precomputed_values
-        ?trust_system ~accounts_with_secret_keys
+      gen ?logger ~verifier ~precomputed_values ?trust_system
+        ~accounts_with_secret_keys ()
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
@@ -483,8 +478,8 @@ module For_tests = struct
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?send_to_random_pk:None ?logger ~precomputed_values ~verifier
-           ?trust_system ~accounts_with_secret_keys )
+        (gen ?logger ~precomputed_values ~verifier ?trust_system
+           ~accounts_with_secret_keys () )
     in
     let%map breadcrumbs_constructors = gen_list in
     fun root ->

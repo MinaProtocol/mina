@@ -63,7 +63,8 @@ module For_tests : sig
 
   val gen_breadcrumb :
        verifier:Verifier.t
-    -> ?send_to_random_pk:unit
+    -> ?send_to_random_pk:bool
+    -> unit
     -> (   Frontier_base.Breadcrumb.t
         -> Frontier_base.Breadcrumb.t Async_kernel.Deferred.t )
        Base_quickcheck.Generator.t

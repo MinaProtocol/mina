@@ -1,4 +1,4 @@
-(** This module defines how a block header refers to the body of its block.
+(* This module defines how a block header refers to the body of its block.
     At the moment, this is merely a hash of the body. But in an upcoming
     hard fork, we will be updating this to reference to point to the root
     "Bitswap block" CID along with a signature attesting to ownership over

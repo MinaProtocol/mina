@@ -330,7 +330,7 @@ let%test_module "bitswap blocks" =
     let with_libp2p_helper f =
       let logger = Logger.null () in
       let pids = Pid.Table.create () in
-      let handle_push_message _ = failwith "ama istimiyorum" in
+      let handle_push_message _ = assert false in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind conf_dir = Async.Unix.mkdtemp "bitswap_block_test" in
           let%bind helper =

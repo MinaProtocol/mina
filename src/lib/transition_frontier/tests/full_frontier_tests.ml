@@ -13,13 +13,7 @@ let%test_module "Full_frontier tests" =
       Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true
 
-    let logger = Logger.create ()
-
     let verifier = verifier ()
-
-    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
-
-    let constraint_constants = precomputed_values.constraint_constants
 
     let add_breadcrumb frontier breadcrumb =
       let diffs = Full_frontier.calculate_diffs frontier breadcrumb in
@@ -32,8 +26,8 @@ let%test_module "Full_frontier tests" =
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
-      Quickcheck.test (gen_breadcrumb ~verifier ?send_to_random_pk:None)
-        ~trials:4 ~f:(fun make_breadcrumb ->
+      Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:4
+        ~f:(fun make_breadcrumb ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let frontier = create_frontier () in
               let root = Full_frontier.root frontier in
