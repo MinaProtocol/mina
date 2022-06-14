@@ -23,17 +23,6 @@ type ('var, 'value, 'input_var, 'input_value, 'ret_var, 'ret_value) public_input
          , 'ret_value )
          public_input
 
-type ('var, 'value) packed_public_input =
-  | Packed_public_input :
-      ( 'var
-      , 'value
-      , 'input_var
-      , 'input_value
-      , 'ret_var
-      , 'ret_value )
-      public_input
-      -> ('var, 'value) packed_public_input
-
 (* This type models an "inductive rule". It includes
    - the list of previous statements which this one assumes
    - the snarky main function
