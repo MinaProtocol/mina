@@ -70,12 +70,12 @@ let check :
           check_signature fee_payer.authorization fee_payer.body.public_key
             full_tx_commitment ;
           let parties_with_hashes_list =
-            Parties.Call_forest.With_hashes.to_parties_with_hashes_list
-              other_parties
+            other_parties |> Zkapp_statement.zkapp_statements_of_forest
+            |> Parties.Call_forest.With_hashes.to_parties_with_hashes_list
           in
           let valid_assuming =
             List.filter_map parties_with_hashes_list
-              ~f:(fun ((p, vk_opt), at_party) ->
+              ~f:(fun ((p, (vk_opt, stmt)), _at_party) ->
                 let commitment =
                   if p.body.use_full_commitment then full_tx_commitment
                   else tx_commitment
@@ -93,11 +93,6 @@ let check :
                           (`Missing_verification_key
                             [ Account_id.public_key @@ Party.account_id p ] )
                     | Some (vk : _ With_hash.t) ->
-                        let stmt =
-                          { Zkapp_statement.Poly.transaction = commitment
-                          ; at_party = (at_party :> Snark_params.Tick.Field.t)
-                          }
-                        in
                         Some (vk.data, stmt, pi) ) )
           in
           let v : User_command.Valid.t =

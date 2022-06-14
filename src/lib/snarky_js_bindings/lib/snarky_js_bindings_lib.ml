@@ -1590,14 +1590,13 @@ let () =
 
 (* helpers for pickles_compile *)
 
-type 'a zkapp_statement = { transaction : 'a; at_party : 'a }
+type 'a zkapp_statement = { party : 'a; calls : 'a }
 
-let zkapp_statement_to_fields { transaction; at_party } =
-  [| transaction; at_party |]
+let zkapp_statement_to_fields { party; calls } = [| party; calls |]
 
 type zkapp_statement_js =
-  < transaction : field_class Js.t Js.readonly_prop
-  ; atParty : field_class Js.t Js.readonly_prop >
+  < party : field_class Js.t Js.readonly_prop
+  ; calls : field_class Js.t Js.readonly_prop >
   Js.t
 
 module Zkapp_statement = struct
@@ -1605,19 +1604,19 @@ module Zkapp_statement = struct
 
   let to_field_elements = zkapp_statement_to_fields
 
-  let to_constant ({ transaction; at_party } : t) =
-    { transaction = to_unchecked transaction; at_party = to_unchecked at_party }
+  let to_constant ({ party; calls } : t) =
+    { party = to_unchecked party; calls = to_unchecked calls }
 
-  let to_js ({ transaction; at_party } : t) =
+  let to_js ({ party; calls } : t) =
     object%js
-      val transaction = to_js_field transaction
+      val party = to_js_field party
 
-      val atParty = to_js_field at_party
+      val calls = to_js_field calls
     end
 
   let of_js (statement : zkapp_statement_js) : t =
-    { transaction = of_js_field statement##.transaction
-    ; at_party = of_js_field statement##.atParty
+    { party = of_js_field statement##.party
+    ; calls = of_js_field statement##.calls
     }
 
   module Constant = struct
@@ -1625,24 +1624,19 @@ module Zkapp_statement = struct
 
     let to_field_elements = zkapp_statement_to_fields
 
-    let to_js ({ transaction; at_party } : t) =
-      to_js
-        { transaction = Field.constant transaction
-        ; at_party = Field.constant at_party
-        }
+    let to_js ({ party; calls } : t) =
+      to_js { party = Field.constant party; calls = Field.constant calls }
 
     let of_js (statement : zkapp_statement_js) : t =
-      { transaction = of_js_field statement##.transaction |> to_unchecked
-      ; at_party = of_js_field statement##.atParty |> to_unchecked
+      { party = of_js_field statement##.party |> to_unchecked
+      ; calls = of_js_field statement##.calls |> to_unchecked
       }
   end
 end
 
 let zkapp_statement_typ =
-  let to_hlist { transaction; at_party } = H_list.[ transaction; at_party ] in
-  let of_hlist ([ transaction; at_party ] : (unit, _) H_list.t) =
-    { transaction; at_party }
-  in
+  let to_hlist { party; calls } = H_list.[ party; calls ] in
+  let of_hlist ([ party; calls ] : (unit, _) H_list.t) = { party; calls } in
   Typ.of_hlistable [ Field.typ; Field.typ ] ~var_to_hlist:to_hlist
     ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
@@ -2157,12 +2151,11 @@ module Ledger = struct
     let tx =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    let at_party =
-      let ps = List.drop tx.other_parties party_index in
-      (Parties.Call_forest.hash ps :> Impl.field)
-    in
-    let transaction = transaction_commitment tx (Other_party party_index) in
-    Zkapp_statement.Constant.to_js { transaction; at_party }
+    let party = List.nth_exn tx.other_parties party_index in
+    Zkapp_statement.Constant.to_js
+      { party = (party.elt.party_digest :> Impl.field)
+      ; calls = (Parties.Digest.Forest.empty :> Impl.field)
+      }
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
     Signature_lib.Schnorr.Chunked.sign (private_key key)
