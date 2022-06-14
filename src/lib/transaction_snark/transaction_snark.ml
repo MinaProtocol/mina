@@ -458,20 +458,17 @@ module Parties_segment = struct
       | Proved ->
           [ { auth_type = Proof; is_start = `No } ]
 
-    type (_, _, _, _, _, _) t_typed =
-      | Opt_signed_opt_signed : (unit, unit, unit, unit, unit, unit) t_typed
-      | Opt_signed : (unit, unit, unit, unit, unit, unit) t_typed
+    type (_, _, _, _) t_typed =
+      | Opt_signed_opt_signed : (unit, unit, unit, unit) t_typed
+      | Opt_signed : (unit, unit, unit, unit) t_typed
       | Proved
           : ( Zkapp_statement.Checked.t * unit
             , Zkapp_statement.t * unit
-            , unit * unit
-            , unit * unit
             , Nat.N2.n * unit
             , N.n * unit )
             t_typed
 
-    let spec : type a b c d e f. (a, b, c, d, e, f) t_typed -> Spec.single list
-        =
+    let spec : type a b c d. (a, b, c, d) t_typed -> Spec.single list =
      fun t ->
       match t with
       | Opt_signed_opt_signed ->
@@ -907,12 +904,9 @@ module Base = struct
       (module Int)
       (fun i ->
         let open Zkapp_statement in
-        Pickles.Side_loaded.create ~typ ~return_typ:Typ.unit
-          ~name:(sprintf "zkapp_%d" i)
+        Pickles.Side_loaded.create ~typ ~name:(sprintf "zkapp_%d" i)
           ~max_proofs_verified:
-            (module Pickles.Side_loaded.Verification_key.Max_width)
-          ~value_to_field_elements:to_field_elements
-          ~var_to_field_elements:Checked.to_field_elements )
+            (module Pickles.Side_loaded.Verification_key.Max_width) )
 
   let signature_verifies ~shifted ~payload_digest signature pk =
     let%bind pk =
@@ -2228,14 +2222,12 @@ module Base = struct
     (* Horrible hack :( *)
     let witness : Witness.t option ref = ref None
 
-    let rule (type a b c d e f) ~constraint_constants ~proof_level
-        (t : (a, b, c, d, e, f) Basic.t_typed) :
+    let rule (type a b c d) ~constraint_constants ~proof_level
+        (t : (a, b, c, d) Basic.t_typed) :
         ( a
         , b
         , c
         , d
-        , e
-        , f
         , Statement.With_sok.var
         , Statement.With_sok.t
         , unit
@@ -2243,7 +2235,7 @@ module Base = struct
         Pickles.Inductive_rule.t =
       let open Hlist in
       let open Basic in
-      let module M = H6.T (Pickles.Tag) in
+      let module M = H4.T (Pickles.Tag) in
       let s = Basic.spec t in
       let prev_should_verify =
         match proof_level with
@@ -2258,7 +2250,7 @@ module Base = struct
           { identifier = "proved"
           ; prevs = M.[ side_loaded 0 ]
           ; main =
-              (fun [ (snapp_statement, ()) ] stmt ->
+              (fun [ snapp_statement ] stmt ->
                 main ?witness:!witness s ~constraint_constants
                   (List.mapi [ snapp_statement ] ~f:(fun i x -> (i, x)))
                   stmt ;
@@ -3172,7 +3164,7 @@ module Merge = struct
     { identifier = "merge"
     ; prevs = [ self; self ]
     ; main =
-        (fun [ (s1, ()); (s2, ()) ] x ->
+        (fun [ s1; s2 ] x ->
           Run.run_checked (main [ s1; s2 ] x) ;
           ([ b; b ], ()) )
     }
@@ -3183,8 +3175,6 @@ open Pickles_types
 type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
-  , unit
-  , unit
   , Nat.N2.n
   , Nat.N5.n )
   Pickles.Tag.t
@@ -3201,7 +3191,7 @@ let system ~proof_level ~constraint_constants =
       Pickles.compile ~cache:Cache_dir.cache
         (module Statement.With_sok.Checked)
         (module Statement.With_sok)
-        ~typ:Statement.With_sok.typ ~return_typ:Typ.unit
+        ~public_input:(Input Statement.With_sok.typ)
         ~branches:(module Nat.N5)
         ~max_proofs_verified:(module Nat.N2)
         ~name:"transaction-snark"
@@ -3384,9 +3374,8 @@ let verify (ts : (t * _) list) ~key =
     Pickles.verify
       (module Nat.N2)
       (module Statement.With_sok)
-      Typ.unit key
-      (List.map ts ~f:(fun ({ statement; proof }, _) ->
-           ((statement, ()), proof) ) )
+      key
+      (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
   else Async.return false
 
 let constraint_system_digests ~constraint_constants () =
@@ -4041,7 +4030,7 @@ struct
   let verification_key = Proof.verification_key
 
   let verify_against_digest { statement; proof } =
-    Proof.verify [ ((statement, ()), proof) ]
+    Proof.verify [ (statement, proof) ]
 
   let verify ts =
     if
@@ -4049,8 +4038,7 @@ struct
           Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest )
     then
       Proof.verify
-        (List.map ts ~f:(fun ({ statement; proof }, _) ->
-             ((statement, ()), proof) ) )
+        (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
     else Async.return false
 
   let first_party (witness : Transaction_witness.Parties_segment_witness.t) =
@@ -4113,7 +4101,7 @@ struct
               (* TODO: We should not have to pass the statement in here. *)
               proved
                 ( Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
-                  [ ((s, ()), p) ] )
+                  [ (s, p) ] )
                 statement )
     in
     let open Async in
@@ -4176,9 +4164,7 @@ struct
     let s = { s with sok_digest } in
     let open Async in
     let%map (), proof =
-      merge
-        [ ((x12.statement, ()), x12.proof); ((x23.statement, ()), x23.proof) ]
-        s
+      merge [ (x12.statement, x12.proof); (x23.statement, x23.proof) ] s
     in
     Ok { statement = s; proof }
 
@@ -4236,7 +4222,7 @@ module For_tests = struct
       Pickles.compile ~cache:Cache_dir.cache
         (module Zkapp_statement.Checked)
         (module Zkapp_statement)
-        ~typ:Zkapp_statement.typ ~return_typ:Typ.unit
+        ~public_input:(Input Zkapp_statement.typ)
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"trivial"

@@ -127,9 +127,9 @@ module Worker_state = struct
                            ; prev_state =
                                Blockchain_snark.Blockchain.state chain
                            }
-                           [ ( (Blockchain_snark.Blockchain.state chain, ())
+                           [ ( Blockchain_snark.Blockchain.state chain
                              , Blockchain_snark.Blockchain.proof chain )
-                           ; ((txn_snark_state, ()), txn_snark_proof)
+                           ; (txn_snark_state, txn_snark_proof)
                            ]
                            next_state
                        in
@@ -142,7 +142,7 @@ module Worker_state = struct
                        "Prover threw an error while extending block: $error" ) ;
                  res
 
-               let verify state proof = B.Proof.verify [ ((state, ()), proof) ]
+               let verify state proof = B.Proof.verify [ (state, proof) ]
              end : S )
          | Check ->
              ( module struct

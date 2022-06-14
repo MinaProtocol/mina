@@ -11,16 +11,10 @@ module Witness : sig
 end
 
 type tag =
-  ( State_hash.var
-  , Protocol_state.value
-  , unit
-  , unit
-  , Nat.N2.n
-  , Nat.N1.n )
-  Pickles.Tag.t
+  (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
 
 val verify :
-     ((Protocol_state.Value.t * unit) * Proof.t) list
+     (Protocol_state.Value.t * Proof.t) list
   -> key:Pickles.Verification_key.t
   -> bool Async.Deferred.t
 
@@ -40,7 +34,6 @@ module type S = sig
     Pickles.Proof_intf
       with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
        and type statement = Protocol_state.Value.t
-       and type return_type = unit
 
   val tag : tag
 
@@ -51,7 +44,6 @@ module type S = sig
   val step :
        Witness.t
     -> ( Protocol_state.Value.t * (Transaction_snark.Statement.With_sok.t * unit)
-       , unit * (unit * unit)
        , N2.n * (N2.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t

@@ -13,9 +13,8 @@ module Step = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('s, 'return_value, 'challenge_polynomial_commitments, 'bpcs) t =
+      type ('s, 'challenge_polynomial_commitments, 'bpcs) t =
         { app_state : 's
-        ; return_value : 'return_value
         ; challenge_polynomial_commitments : 'challenge_polynomial_commitments
         ; old_bulletproof_challenges : 'bpcs
         }
@@ -25,12 +24,10 @@ module Step = struct
 
   let prepare ~dlog_plonk_index
       { app_state
-      ; return_value
       ; challenge_polynomial_commitments
       ; old_bulletproof_challenges
       } =
     { Types.Step.Proof_state.Me_only.app_state
-    ; return_value
     ; challenge_polynomial_commitments
     ; dlog_plonk_index
     ; old_bulletproof_challenges =

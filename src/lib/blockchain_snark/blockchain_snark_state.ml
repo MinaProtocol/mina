@@ -305,7 +305,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
   { identifier = "step"
   ; prevs = [ self; transaction_snark ]
   ; main =
-      (fun [ (x1, ()); (x2, ()) ] x ->
+      (fun [ x1; x2 ] x ->
         let b1, b2 =
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
@@ -333,20 +333,13 @@ let typ =
     ~back:(fun _ -> failwith "cannot unhash")
 
 type tag =
-  ( State_hash.var
-  , Protocol_state.value
-  , unit
-  , unit
-  , Nat.N2.n
-  , Nat.N1.n )
-  Pickles.Tag.t
+  (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
 
 module type S = sig
   module Proof :
     Pickles.Proof_intf
       with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
        and type statement = Protocol_state.Value.t
-       and type return_type = unit
 
   val tag : tag
 
@@ -357,7 +350,6 @@ module type S = sig
   val step :
        Witness.t
     -> ( Protocol_state.Value.t * (Transaction_snark.Statement.With_sok.t * unit)
-       , unit * (unit * unit)
        , N2.n * (N2.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
@@ -367,8 +359,7 @@ module type S = sig
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
 end
 
-let verify ts ~key =
-  Pickles.verify (module Nat.N2) (module Statement) Typ.unit key ts
+let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
@@ -403,7 +394,7 @@ end) : S = struct
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)
-      ~typ ~return_typ:Typ.unit
+      ~public_input:(Input typ)
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

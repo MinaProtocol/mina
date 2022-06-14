@@ -13,8 +13,6 @@ type ( 'a_var
      , 'branches
      , 'prev_vars
      , 'prev_values
-     , 'prev_ret_vars
-     , 'prev_ret_values
      , 'local_widths
      , 'local_heights )
      t =
@@ -27,8 +25,6 @@ type ( 'a_var
       ; rule :
           ( 'prev_vars
           , 'prev_values
-          , 'prev_ret_vars
-          , 'prev_ret_values
           , 'local_widths
           , 'local_heights
           , 'a_var
@@ -48,7 +44,6 @@ type ( 'a_var
              with type statement = 'a_value
               and type max_proofs_verified = 'max_proofs_verified
               and type prev_values = 'prev_values
-              and type prev_ret_values = 'prev_ret_values
               and type local_signature = 'local_widths
               and type local_branches = 'local_heights
               and type return_value = 'ret_value )
@@ -61,28 +56,32 @@ type ( 'a_var
          , 'branches
          , 'prev_vars
          , 'prev_values
-         , 'prev_ret_vars
-         , 'prev_ret_values
          , 'local_widths
          , 'local_heights )
          t
 
 (* Compile an inductive rule. *)
 let create
-    (type branches max_proofs_verified local_signature local_branches a_var
-    a_value ret_var ret_value prev_vars prev_values ) ~index
-    ~(self :
-       (a_var, a_value, ret_var, ret_value, max_proofs_verified, branches) Tag.t
-       ) ~wrap_domains ~(max_proofs_verified : max_proofs_verified Nat.t)
+    (type branches max_proofs_verified local_signature local_branches var value
+    a_var a_value ret_var ret_value prev_vars prev_values ) ~index
+    ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
+    ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
-    ~typ ~return_typ var_to_field_elements value_to_field_elements
-    (rule : _ Inductive_rule.t) =
+    ~(public_input :
+       ( var
+       , value
+       , a_var
+       , a_value
+       , ret_var
+       , ret_value )
+       Inductive_rule.public_input ) var_to_field_elements
+    value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
-  let module HT = H6.T (Tag) in
+  let module HT = H4.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in
   let rec extract_lengths :
-      type a b c d n m k.
-         (a, b, c, d, n, m) HT.t
+      type a b n m k.
+         (a, b, n, m) HT.t
       -> (a, k) Length.t
       -> n H1.T(Nat).t * m H1.T(Nat).t * (n, k) Length.t * (m, k) Length.t =
    fun ts len ->
@@ -113,23 +112,25 @@ let create
   in
   let lte = Nat.lte_exn self_width max_proofs_verified in
   let requests = Requests.Step.create () in
+  let (typ : (var, value) Impls.Step.Typ.t) =
+    match public_input with
+    | Input typ ->
+        typ
+    | Output typ ->
+        typ
+    | Input_and_output (input_typ, output_typ) ->
+        Impls.Step.Typ.(input_typ * output_typ)
+  in
   Timer.clock __LOC__ ;
   let step ~step_domains =
     Step_main.step_main requests
       (Nat.Add.create max_proofs_verified)
       rule
       ~basic:
-        { typ
-        ; return_typ
-        ; proofs_verifieds
-        ; var_to_field_elements
-        ; value_to_field_elements
-        ; wrap_domains
-        ; step_domains
-        }
-      ~self_branches:branches ~proofs_verified ~local_signature:widths
-      ~local_signature_length ~local_branches:heights ~local_branches_length
-      ~lte ~self
+        { public_input = typ; proofs_verifieds; wrap_domains; step_domains }
+      ~public_input ~self_branches:branches ~proofs_verified
+      ~local_signature:widths ~local_signature_length ~local_branches:heights
+      ~local_branches_length ~lte ~self
     |> unstage
   in
   Timer.clock __LOC__ ;

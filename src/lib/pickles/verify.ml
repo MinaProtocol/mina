@@ -12,10 +12,8 @@ module Instance = struct
     | T :
         (module Nat.Intf with type n = 'n)
         * (module Intf.Statement_value with type t = 'a)
-        * (_, 'return_value) Impls.Step.Typ.t
         * Verification_key.t
         * 'a
-        * 'return_value
         * ('n, 'n) Proof.t
         -> t
 end
@@ -52,10 +50,8 @@ let verify_heterogenous (ts : Instance.t list) =
            (T
              ( _max_proofs_verified
              , _statement
-             , _return_typ
              , key
              , app_state
-             , return_value
              , T
                  { statement
                    (* TODO
@@ -210,7 +206,7 @@ let verify_heterogenous (ts : Instance.t list) =
   let open Promise.Let_syntax in
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
-      (List.map ts ~f:(fun (T (_, _, _, _, _, _, T t)) ->
+      (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
            ( t.statement.proof_state.me_only.challenge_polynomial_commitment
            , Ipa.Step.compute_challenges
                t.statement.proof_state.deferred_values.bulletproof_challenges ) )
@@ -225,25 +221,17 @@ let verify_heterogenous (ts : Instance.t list) =
               (T
                 ( (module Max_proofs_verified)
                 , (module A_value)
-                , return_typ
                 , key
                 , app_state
-                , return_value
                 , T t ) )
               plonk
             ->
            let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
              { pass_through =
-                 (let return_value_to_field_elements =
-                    let (Typ typ) = return_typ in
-                    fun x -> fst (typ.value_to_fields x)
-                  in
-                  Common.hash_step_me_only ~app_state:A_value.to_field_elements
-                    ~return_value:return_value_to_field_elements
-                    (Reduced_me_only.Step.prepare
-                       ~dlog_plonk_index:key.commitments
-                       { t.statement.pass_through with app_state; return_value } )
-                 )
+                 Common.hash_step_me_only ~app_state:A_value.to_field_elements
+                   (Reduced_me_only.Step.prepare
+                      ~dlog_plonk_index:key.commitments
+                      { t.statement.pass_through with app_state } )
              ; proof_state =
                  { t.statement.proof_state with
                    deferred_values =
@@ -287,10 +275,8 @@ let verify_heterogenous (ts : Instance.t list) =
 
 let verify (type a return_typ n)
     (max_proofs_verified : (module Nat.Intf with type n = n))
-    (a_value : (module Intf.Statement_value with type t = a)) return_typ
-    (key : Verification_key.t) (ts : ((a * return_typ) * (n, n) Proof.t) list) =
+    (a_value : (module Intf.Statement_value with type t = a))
+    (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
-    (List.map ts ~f:(fun ((x, return_value), p) ->
-         Instance.T
-           (max_proofs_verified, a_value, return_typ, key, x, return_value, p) )
-    )
+    (List.map ts ~f:(fun (x, p) ->
+         Instance.T (max_proofs_verified, a_value, key, x, p) ) )

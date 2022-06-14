@@ -45,9 +45,8 @@ module One_hot_vector = One_hot_vector.Make (Impl)
     To have some notation, the proof S itself comes from a circuit that verified
     up to 'max_proofs_verified many wrap proofs W_0, ..., W_max_proofs_verified.
 *)
-type ('app_state, 'return_value, 'max_proofs_verified, 'num_branches) t =
+type ('app_state, 'max_proofs_verified, 'num_branches) t =
   { app_state : 'app_state
-  ; return_value : 'return_value
         (** The user-level statement corresponding to this proof. *)
   ; wrap_proof : Wrap_proof.Checked.t
         (** The polynomial commitments, polynomial evaluations, and opening proof corresponding to
@@ -87,16 +86,15 @@ type ('app_state, 'return_value, 'max_proofs_verified, 'num_branches) t =
 [@@deriving hlist]
 
 module No_app_state = struct
-  type nonrec (_, _, 'max_proofs_verified, 'num_branches) t =
-    (unit, unit, 'max_proofs_verified, 'num_branches) t
+  type nonrec (_, 'max_proofs_verified, 'num_branches) t =
+    (unit, 'max_proofs_verified, 'num_branches) t
 end
 
 module Constant = struct
   open Kimchi_backend
 
-  type ('statement, 'return_value, 'max_proofs_verified, _) t =
+  type ('statement, 'max_proofs_verified, _) t =
     { app_state : 'statement
-    ; return_value : 'return_value
     ; wrap_proof : Wrap_proof.Constant.t
     ; proof_state :
         ( Challenge.Constant.t
@@ -119,20 +117,16 @@ module Constant = struct
   [@@deriving hlist]
 
   module No_app_state = struct
-    type nonrec (_, _, 'max_proofs_verified, 'num_branches) t =
-      (unit, unit, 'max_proofs_verified, 'num_branches) t
+    type nonrec (_, 'max_proofs_verified, 'num_branches) t =
+      (unit, 'max_proofs_verified, 'num_branches) t
   end
 end
 
 open Core_kernel
 
-let typ (type n avar aval ret_var ret_value m)
-    (statement : (avar, aval) Impls.Step.Typ.t)
-    (return_value : (ret_var, ret_value) Impls.Step.Typ.t)
+let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
-    ( (avar, ret_var, n, m) t
-    , (aval, ret_value, n, m) Constant.t )
-    Impls.Step.Typ.t =
+    ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
   let open Impls.Step in
   let open Step_main_inputs in
   let open Step_verifier in
@@ -140,7 +134,6 @@ let typ (type n avar aval ret_var ret_value m)
     ~var_of_hlist:of_hlist ~value_to_hlist:Constant.to_hlist
     ~value_of_hlist:Constant.of_hlist
     [ statement
-    ; return_value
     ; Wrap_proof.typ
     ; Types.Wrap.Proof_state.In_circuit.typ ~challenge:Challenge.typ
         ~scalar_challenge:Challenge.typ

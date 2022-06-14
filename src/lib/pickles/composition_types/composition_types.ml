@@ -382,16 +382,10 @@ module Wrap = struct
   (** The component of the proof accumulation state that is only computed on by the
       "stepping" proof system, and that can be handled opaquely by any "wrap" circuits. *)
   module Pass_through = struct
-    type ( 'g
-         , 's
-         , 'return_value
-         , 'challenge_polynomial_commitments
-         , 'bulletproof_challenges )
-         t =
+    type ('g, 's, 'challenge_polynomial_commitments, 'bulletproof_challenges) t =
       { app_state : 's
             (** The actual application-level state (e.g., for Mina, this is the protocol state which contains the
     merkle root of the ledger, state related to consensus, etc.) *)
-      ; return_value : 'return_value
       ; dlog_plonk_index : 'g Plonk_verification_key_evals.t
             (** The verification key corresponding to the wrap-circuit for this recursive proof system.
           It gets threaded through all the circuits so that the step circuits can verify proofs against
@@ -404,16 +398,13 @@ module Wrap = struct
 
     let to_field_elements (type g f)
         { app_state
-        ; return_value
         ; dlog_plonk_index
         ; challenge_polynomial_commitments
         ; old_bulletproof_challenges
-        } ~app_state:app_state_to_field_elements
-        ~return_value:return_value_to_field_elements ~comm ~(g : g -> f list) =
+        } ~app_state:app_state_to_field_elements ~comm ~(g : g -> f list) =
       Array.concat
         [ index_to_field_elements ~g:comm dlog_plonk_index
         ; app_state_to_field_elements app_state
-        ; return_value_to_field_elements return_value
         ; Vector.map2 challenge_polynomial_commitments
             old_bulletproof_challenges ~f:(fun comm chals ->
               Array.append (Array.of_list (g comm)) (Vector.to_array chals) )
@@ -422,15 +413,12 @@ module Wrap = struct
 
     let to_field_elements_without_index (type g f)
         { app_state
-        ; return_value
         ; dlog_plonk_index = _
         ; challenge_polynomial_commitments
         ; old_bulletproof_challenges
-        } ~app_state:app_state_to_field_elements
-        ~return_value:return_value_to_field_elements ~(g : g -> f list) =
+        } ~app_state:app_state_to_field_elements ~(g : g -> f list) =
       Array.concat
         [ app_state_to_field_elements app_state
-        ; return_value_to_field_elements return_value
         ; Vector.map2 challenge_polynomial_commitments
             old_bulletproof_challenges ~f:(fun comm chals ->
               Array.append (Array.of_list (g comm)) (Vector.to_array chals) )
@@ -441,13 +429,11 @@ module Wrap = struct
 
     let to_hlist
         { app_state
-        ; return_value
         ; dlog_plonk_index
         ; challenge_polynomial_commitments
         ; old_bulletproof_challenges
         } =
       [ app_state
-      ; return_value
       ; dlog_plonk_index
       ; challenge_polynomial_commitments
       ; old_bulletproof_challenges
@@ -455,23 +441,20 @@ module Wrap = struct
 
     let of_hlist
         ([ app_state
-         ; return_value
          ; dlog_plonk_index
          ; challenge_polynomial_commitments
          ; old_bulletproof_challenges
          ] :
           (unit, _) t ) =
       { app_state
-      ; return_value
       ; dlog_plonk_index
       ; challenge_polynomial_commitments
       ; old_bulletproof_challenges
       }
 
-    let typ comm g s return_value chal proofs_verified =
+    let typ comm g s chal proofs_verified =
       Snarky_backendless.Typ.of_hlistable
         [ s
-        ; return_value
         ; Plonk_verification_key_evals.typ comm
         ; Vector.typ g proofs_verified
         ; chal

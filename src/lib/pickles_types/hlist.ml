@@ -885,6 +885,29 @@ module H4_2 = struct
   end
 end
 
+module H4_4 = struct
+  module T (F : sig
+    type (_, _, _, _, _, _, _, _) t
+  end) =
+  struct
+    type (_, _, _, _, 's1, 's2, 's3, 's4) t =
+      | [] : (unit, unit, unit, unit, _, _, _, _) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 's1, 's2, 's3, 's4) F.t
+          * ('b1, 'b2, 'b3, 'b4, 's1, 's2, 's3, 's4) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 'a4 * 'b4, 's1, 's2, 's3, 's4) t
+
+    let rec length :
+        type t1 t2 t3 t4 e1 e2 e3 e4.
+        (t1, t2, t3, t4, e1, e2, e3, e4) t -> t1 Length.n = function
+      | [] ->
+          T (Z, Z)
+      | _ :: xs ->
+          let (T (n, p)) = length xs in
+          T (S n, S p)
+  end
+end
+
 module H6_2 = struct
   module T (F : sig
     type (_, _, _, _, _, _, _, _) t

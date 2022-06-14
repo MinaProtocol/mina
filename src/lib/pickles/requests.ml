@@ -107,8 +107,6 @@ module Step = struct
 
     type prev_values
 
-    type prev_ret_values
-
     (* TODO: As an optimization this can be the local proofs-verified size *)
     type max_proofs_verified
 
@@ -119,13 +117,11 @@ module Step = struct
     type _ t +=
       | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
       | Prev_inputs : prev_values H1.T(Id).t t
-      | Prev_outputs : prev_ret_values H1.T(Id).t t
       | Proof_with_datas :
           ( prev_values
-          , prev_ret_values
           , local_signature
           , local_branches )
-          H4.T(Per_proof_witness.Constant.No_app_state).t
+          H3.T(Per_proof_witness.Constant.No_app_state).t
           t
       | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
       | App_state : statement t
@@ -144,7 +140,6 @@ module Step = struct
              and type statement = statement
              and type return_value = return_value
              and type prev_values = prev_values
-             and type prev_ret_values = prev_ret_values
              and type max_proofs_verified = max_proofs_verified ) =
    fun () ->
     let module R = struct
@@ -156,8 +151,6 @@ module Step = struct
 
       type nonrec prev_values = prev_values
 
-      type nonrec prev_ret_values = prev_ret_values
-
       type nonrec local_signature = local_signature
 
       type nonrec local_branches = local_branches
@@ -165,13 +158,11 @@ module Step = struct
       type _ t +=
         | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
         | Prev_inputs : prev_values H1.T(Id).t t
-        | Prev_outputs : prev_ret_values H1.T(Id).t t
         | Proof_with_datas :
             ( prev_values
-            , prev_ret_values
             , local_signature
             , local_branches )
-            H4.T(Per_proof_witness.Constant.No_app_state).t
+            H3.T(Per_proof_witness.Constant.No_app_state).t
             t
         | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
         | App_state : statement t

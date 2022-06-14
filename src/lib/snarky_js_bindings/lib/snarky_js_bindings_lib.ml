@@ -1699,7 +1699,7 @@ let other_verification_key_constr :
 type proof = (Pickles_types.Nat.N0.n, Pickles_types.Nat.N0.n) Pickles.Proof.t
 
 module Statement_with_proof =
-  Pickles_types.Hlist.H4.T (Pickles.Statement_with_proof)
+  Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
 
 let nat_modules_list : (module Pickles_types.Nat.Intf) list =
   let open Pickles_types.Nat in
@@ -1739,7 +1739,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     Pickles.compile_promise ~choices:(Obj.magic choices)
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
-      ~typ:zkapp_statement_typ ~return_typ:Snark_params.Tick.Typ.unit
+      ~public_input:(Input zkapp_statement_typ)
       ~branches:(module Branches)
       ~max_proofs_verified:(module Pickles_types.Nat.N0)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
@@ -1772,11 +1772,10 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     prove
   in
   let rec to_js_provers :
-      type a b c d.
+      type a b c.
          ( a
          , b
          , c
-         , d
          , Zkapp_statement.Constant.t
          , (unit * proof) Promise.t )
          Pickles.Provers.t
@@ -1790,8 +1789,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
   in
   let verify (statement_js : zkapp_statement_js) (proof : proof) =
     let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
-    Proof.verify_promise [ ((statement, ()), proof) ]
-    |> Promise_js_helpers.to_js
+    Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
   in
   object%js
     val provers = provers |> to_js_provers |> Array.of_list |> Js.array
@@ -2252,10 +2250,8 @@ module Ledger = struct
     let vk =
       Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
     in
-    Pickles.Side_loaded.verify_promise
-      [ (vk, (statement, ()), proof) ]
-      ~value_to_field_elements:Zkapp_statement.Constant.to_field_elements
-      ~return_typ:Snark_params.Tick.Typ.unit
+    Pickles.Side_loaded.verify_promise ~typ:zkapp_statement_typ
+      [ (vk, statement, proof) ]
     |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =

@@ -994,6 +994,27 @@ module H4_2 : sig
 end
 
 (** Data type of heterogeneous lists whose content type varies over four type
+    parameters, but also varies homogeneously over four other type parameters.
+    It supports no operations. See {!Hlist0.H1_1}.
+*)
+module H4_4 : sig
+  module T : functor
+    (A : sig
+       type (_, _, _, _, _, _, _, _) t
+     end)
+    -> sig
+    type (_, _, _, _, 's1, 's2, 's3, 's4) t =
+      | [] : (unit, unit, unit, unit, 's1, 's2, 's3, 's4) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 's1, 's2, 's3, 's4) A.t
+          * ('b1, 'b2, 'b3, 'b4, 's1, 's2, 's3, 's4) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 'a4 * 'b4, 's1, 's2, 's3, 's4) t
+
+    val length : ('t1, 't2, 't3, 't4, 'e1, 'e2, 'e3, 'e4) t -> 't1 Length.n
+  end
+end
+
+(** Data type of heterogeneous lists whose content type varies over four type
     parameters, but also varies homogeneously over two other type parameters.
     It supports no operations. See {!Hlist0.H1_1}.
 *)

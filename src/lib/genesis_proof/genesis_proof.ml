@@ -193,7 +193,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
           ~genesis_ledger
     ; prev_state
     }
-    [ ((prev_state, ()), blockchain_dummy); ((dummy_txn_stmt, ()), txn_dummy) ]
+    [ (prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy) ]
     t.protocol_state_with_hashes.data
 
 let digests (module T : Transaction_snark.S)

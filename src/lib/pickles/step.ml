@@ -16,8 +16,6 @@ open Common
 module Make
     (A : T0) (A_value : sig
       type t
-
-      val to_field_elements : t -> Tick.Field.t array
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
@@ -43,8 +41,8 @@ struct
                a rule in proof system i. max_local_max_proof_verifieds is the max of the N_i.
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
-      prev_ret_vars prev_ret_values local_widths local_heights prevs_length
-      ret_var ret_value ) ?handler
+      local_widths local_heights prevs_length var value ret_var ret_value )
+      ?handler
       (T branch_data :
         ( A.t
         , A_value.t
@@ -54,8 +52,6 @@ struct
         , self_branches
         , prev_vars
         , prev_values
-        , prev_ret_vars
-        , prev_ret_values
         , local_widths
         , local_heights )
         Step_branch_data.t ) (next_state : A_value.t)
@@ -64,12 +60,18 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~self_dlog_plonk_index pk self_dlog_vk
+      ~self_dlog_plonk_index
+      ~(public_input :
+         ( var
+         , value
+         , A.t
+         , A_value.t
+         , ret_var
+         , ret_value )
+         Inductive_rule.public_input ) pk self_dlog_vk
       (prev_values : prev_values H1.T(Id).t)
-      (prev_return_values : prev_ret_values H1.T(Id).t)
       (prev_proofs : (local_widths, local_widths) H2.T(P).t) :
-      ( ( A_value.t
-        , ret_value
+      ( ( value
         , (_, Max_proofs_verified.n) Vector.t
         , (_, prevs_length) Vector.t
         , (_, prevs_length) Vector.t
@@ -85,7 +87,7 @@ struct
       Hlist.Length.contr (snd branch_data.proofs_verified) prev_vars_length
     in
     let prev_values_length =
-      let module L12 = H6.Length_1_to_2 (Tag) in
+      let module L12 = H4.Length_1_to_2 (Tag) in
       L12.f branch_data.rule.prevs prev_vars_length
     in
     let lte = branch_data.lte in
@@ -110,30 +112,27 @@ struct
       Tock.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
     in
     let expand_proof :
-        type var value ret_var ret_value local_max_proofs_verified m.
+        type var value local_max_proofs_verified m.
            Impls.Wrap.Verification_key.t
         -> 'a
         -> value
-        -> ret_value
         -> (local_max_proofs_verified, local_max_proofs_verified) P.t
-        -> (var, value, ret_var, ret_value, local_max_proofs_verified, m) Tag.t
+        -> (var, value, local_max_proofs_verified, m) Tag.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
            * Unfinalized.Constant.t
            * Statement_with_hashes.t
            * X_hat.t
            * ( value
-             , ret_value
              , local_max_proofs_verified
              , m )
              Per_proof_witness.Constant.No_app_state.t =
-     fun dlog_vk dlog_index app_state return_value (T t) tag ~must_verify ->
+     fun dlog_vk dlog_index app_state (T t) tag ~must_verify ->
       let t =
         { t with
           statement =
             { t.statement with
-              pass_through =
-                { t.statement.pass_through with app_state; return_value }
+              pass_through = { t.statement.pass_through with app_state }
             }
         }
       in
@@ -208,16 +207,15 @@ struct
           , _ )
           Wrap.Statement.In_circuit.t =
         { pass_through =
-            (let return_value_to_field_elements =
-               let (Typ typ) = data.return_typ in
+            (let to_field_elements =
+               let (Typ typ) = data.public_input in
                fun x -> fst (typ.value_to_fields x)
              in
              (* TODO: Only do this hashing when necessary *)
              Common.hash_step_me_only
                (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
                   statement.pass_through )
-               ~app_state:data.value_to_field_elements
-               ~return_value:return_value_to_field_elements )
+               ~app_state:to_field_elements )
         ; proof_state =
             { statement.proof_state with
               deferred_values =
@@ -323,7 +321,6 @@ struct
       in
       let witness : _ Per_proof_witness.Constant.No_app_state.t =
         { app_state = ()
-        ; return_value = ()
         ; proof_state =
             { prev_statement_with_hashes.proof_state with me_only = () }
         ; prev_proof_evals = t.prev_evals
@@ -453,11 +450,10 @@ struct
           , x_hats'
           , witnesses' ) =
         let rec go :
-            type vars values ret_vars ret_values ns ms k.
+            type vars values ns ms k.
                values H1.T(Id).t
-            -> ret_values H1.T(Id).t
             -> (ns, ns) H2.T(Proof).t
-            -> (vars, values, ret_vars, ret_values, ns, ms) H6.T(Tag).t
+            -> (vars, values, ns, ms) H4.T(Tag).t
             -> values H1.T(E01(Bool)).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
@@ -465,16 +461,14 @@ struct
                * (Statement_with_hashes.t, k) Vector.t
                * (X_hat.t, k) Vector.t
                * ( values
-                 , ret_values
                  , ns
                  , ms )
-                 H4.T(Per_proof_witness.Constant.No_app_state).t =
-         fun app_states return_values ps ts must_verifys l ->
-          match (app_states, return_values, ps, ts, must_verifys, l) with
-          | [], [], [], [], [], Z ->
+                 H3.T(Per_proof_witness.Constant.No_app_state).t =
+         fun app_states ps ts must_verifys l ->
+          match (app_states, ps, ts, must_verifys, l) with
+          | [], [], [], [], Z ->
               ([], [], [], [], [])
           | ( app_state :: app_states
-            , return_value :: return_values
             , p :: ps
             , t :: ts
             , must_verify :: must_verifys
@@ -487,23 +481,16 @@ struct
                   (d.wrap_vk, d.wrap_key)
               in
               let `Sg sg, u, s, x, w =
-                expand_proof dlog_vk dlog_index app_state return_value p t
-                  ~must_verify
-              and sgs, us, ss, xs, ws =
-                go app_states return_values ps ts must_verifys l
-              in
+                expand_proof dlog_vk dlog_index app_state p t ~must_verify
+              and sgs, us, ss, xs, ws = go app_states ps ts must_verifys l in
               (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
-          | _ :: _, _, [], _, _, _ ->
+          | _ :: _, [], _, _, _ ->
               .
-          | [], _, _ :: _, _, _, _ ->
-              .
-          | _, _ :: _, [], _, _, _ ->
-              .
-          | _, [], _ :: _, _, _, _ ->
+          | [], _ :: _, _, _, _ ->
               .
         in
-        go prev_values prev_return_values prev_proofs branch_data.rule.prevs
-          inners_must_verify prev_vars_length
+        go prev_values prev_proofs branch_data.rule.prevs inners_must_verify
+          prev_vars_length
       in
       challenge_polynomial_commitments := Some challenge_polynomial_commitments' ;
       unfinalized_proofs := Some unfinalized_proofs' ;
@@ -528,9 +515,9 @@ struct
     let extract_from_proofs (type res)
         (module Extract : Extract.S with type res = res) =
       let rec go :
-          type vars values ret_vars ret_values ns ms len.
+          type vars values ns ms len.
              (ns, ns) H2.T(P).t
-          -> (values, vars, ret_vars, ret_values, ns, ms) H6.T(Tag).t
+          -> (values, vars, ns, ms) H4.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
        fun prevs tags len ->
@@ -555,9 +542,18 @@ struct
                  t.statement.proof_state.deferred_values.bulletproof_challenges
              end )
          in
+         let (return_value : ret_value) = Option.value_exn !return_value in
+         let (app_state : value) =
+           match public_input with
+           | Input _ ->
+               next_state
+           | Output _ ->
+               return_value
+           | Input_and_output _ ->
+               (next_state, return_value)
+         in
          (* Have the sg be available in the opening proof and verify it. *)
-         { app_state = next_state
-         ; return_value = Option.value_exn !return_value
+         { app_state
          ; challenge_polynomial_commitments =
              Option.value_exn !challenge_polynomial_commitments
          ; old_bulletproof_challenges
@@ -607,8 +603,6 @@ struct
           k ()
       | Req.Prev_inputs ->
           k prev_values
-      | Req.Prev_outputs ->
-          k prev_return_values
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
