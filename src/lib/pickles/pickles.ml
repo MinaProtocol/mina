@@ -1441,6 +1441,66 @@ let%test_module "test no side-loaded" =
       assert (
         Promise.block_on_async_exn (fun () ->
             Tree_proof_return.Proof.verify_promise Tree_proof_return.example ) )
+
+    module Add_one_return = struct
+      module Statement = struct
+        type t = Field.t
+
+        let to_field_elements x = [| x |]
+
+        module Constant = struct
+          type t = Field.Constant.t [@@deriving bin_io]
+
+          let to_field_elements x = [| x |]
+        end
+      end
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~public_input:(Input_and_output (Field.typ, Field.typ))
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = []
+                  ; main =
+                      (fun [] x ->
+                        dummy_constraints () ;
+                        ([], Field.(add one) x) )
+                  }
+                ] ) )
+
+      module Proof = (val p)
+
+      let example =
+        let input = Field.Constant.of_int 42 in
+        let res, b0 =
+          Common.time "b0" (fun () ->
+              Promise.block_on_async_exn (fun () -> step [] input) )
+        in
+        assert (Field.Constant.(equal (of_int 43)) res) ;
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ ((input, res), b0) ] ) ) ;
+        ((input, res), b0)
+    end
   end )
 
 (*
