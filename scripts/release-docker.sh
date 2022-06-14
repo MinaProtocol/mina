@@ -74,6 +74,7 @@ function usage() {
 }
 
 FUNCTION=cloudBuild
+LOGS_BUCKET=",logsBucket = Some \"gs://mina-cloudbuild-logs\""
 
 extraArgs=()
 
@@ -86,6 +87,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-codename) DEB_CODENAME=", debCodename = Some cb.DebCodename.$2"; shift;;
   --deb-release) DEB_RELEASE=", debRelease = Some \"$2\""; shift;;
   --deb-version) DEB_VERSION=", debVersion = Some \"$2\""; shift;;
+  --logs-bucket) LOGS_BUCKET=", logsBucket = Some \"$2\""; shift;;
   --local) FUNCTION=dockerBuild ;;
   --extra-arg) extraArgs+=("\"$2\""); shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -117,6 +119,7 @@ dhall="
        $DEB_CODENAME
        $DEB_RELEASE
        $DEB_VERSION
+       $LOGS_BUCKET
        $EXTRA
        }
 "

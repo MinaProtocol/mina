@@ -77,6 +77,7 @@ let ServiceDescription =
           , debCodename : Optional DebCodename
           , debRelease : Optional Text
           , debVersion : Optional Text
+          , logsBucket : Optional Text
           , extraArgs : List Text
           }
       , default =
@@ -87,6 +88,7 @@ let ServiceDescription =
         , debCodename = None DebCodename
         , debRelease = None Text
         , debVersion = None Text
+        , logsBucket = None Text
         , extraArgs = [] : List Text
         }
       }
@@ -156,6 +158,7 @@ let cloudBuild
                 }
               ]
             , images = Some [ tag ]
+            , logsBucket = serviceDesc.logsBucket
             }
 
 let dockerBuild
