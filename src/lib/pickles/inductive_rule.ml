@@ -6,6 +6,10 @@ module B = struct
   type t = Impls.Step.Boolean.var
 end
 
+(** This type relates the types of the input and output types of an inductive
+    rule's [main] function to the type of the public input to the resulting
+    circuit.
+*)
 type ('var, 'value, 'input_var, 'input_value, 'ret_var, 'ret_value) public_input =
   | Input :
       ('var, 'value) Impls.Step.Typ.t
