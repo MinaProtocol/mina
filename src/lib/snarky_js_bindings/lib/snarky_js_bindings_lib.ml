@@ -1636,7 +1636,6 @@ type pickles_rule_js =
   ; main :
       (   zkapp_statement_js
        -> zkapp_statement_js Js.js_array Js.t
-       -> bool Js.t
        -> bool_class Js.t Js.js_array Js.t )
       Js.prop
   ; proofsToVerify :
@@ -1662,7 +1661,6 @@ let create_pickles_rule ~self (rule : pickles_rule_js) =
           rule##.main
             (Zkapp_statement.to_js statement)
             (Zkapp_statement.list_to_js prev_statements)
-            (Js.bool false)
         in
         Js.to_array should_verifys |> Array.to_list
         |> List.map ~f:(fun b -> b##.value) )
