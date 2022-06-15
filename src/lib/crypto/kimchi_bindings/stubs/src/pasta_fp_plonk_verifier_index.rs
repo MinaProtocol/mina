@@ -33,8 +33,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
 
             public_input_size: vi.public_input_size as isize,
 
-            recursive_proofs: vi.recursive_proofs as isize,
-            recursive_log2_domain: vi.recursive_log2_domain as isize,
+            recursive_proofs: vi.recursive_proofs.into_iter().map(Into::into).collect(),
 
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
@@ -103,8 +102,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
 
             public_input_size: index.public_input_size as usize,
 
-            recursive_proofs: index.recursive_proofs as usize,
-            recursive_log2_domain: index.recursive_log2_domain as usize,
+            recursive_proofs: index.recursive_proofs,
 
             sigma_comm,
             coefficients_comm,
@@ -245,8 +243,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
 
         public_input_size: 0,
 
-        recursive_proofs: 0,
-        recursive_log2_domain: 0,
+        recursive_proofs: vec![],
 
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),
