@@ -1014,7 +1014,7 @@ module H4_4 : sig
   end
 end
 
-(** Data type of heterogeneous lists whose content type varies over four type
+(** Data type of heterogeneous lists whose content type varies over six type
     parameters, but also varies homogeneously over two other type parameters.
     It supports no operations. See {!Hlist0.H1_1}.
 *)
@@ -1043,7 +1043,7 @@ module H6_2 : sig
   end
 end
 
-(** Data type of heterogeneous lists whose content type varies over four type
+(** Data type of heterogeneous lists whose content type varies over six type
     parameters, but also varies homogeneously over four other type parameters.
     It supports no operations. See {!Hlist0.H1_1}.
 *)
