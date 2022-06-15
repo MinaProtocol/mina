@@ -28,32 +28,23 @@ module Stable = struct
 
     [%%endif]
   end
-
-  module Tests = struct
-    (* these tests check not only whether the serialization of the version-asserted type has changed,
-       but also whether the serializations for the consensus and nonconsensus code are identical
-    *)
-
-    [%%if curve_size = 255]
-
-    let%test "private key serialization v1" =
-      let pk =
-        Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
-          V1.gen
-      in
-      let known_good_digest = "86b85ec8a4a965c25cab59c5cb1f44ed" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module V1)
-        pk known_good_digest
-
-    [%%else]
-
-    let%test "private key serialization v1" =
-      failwith "No test for this curve size"
-
-    [%%endif]
-  end
 end]
+
+[%%if curve_size = 255]
+
+let%test "private key serialization v1" =
+  let pk =
+    Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
+      Stable.V1.gen
+  in
+  let known_good_digest = "86b85ec8a4a965c25cab59c5cb1f44ed" in
+  Test_util.check_serialization (module Stable.V1) pk known_good_digest
+
+[%%else]
+
+let%test "private key serialization v1" = failwith "No test for this curve size"
+
+[%%endif]
 
 [%%define_locally Stable.Latest.(gen)]
 

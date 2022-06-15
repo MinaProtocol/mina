@@ -8,7 +8,6 @@
    base.caml
    result
    base
-   ppx_version.runtime
    core_kernel
    integers
    sexplib0

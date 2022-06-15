@@ -8,7 +8,6 @@
    core
    ppx_inline_test.config
    base.caml
-   ppx_version.runtime
    async_kernel
    core_kernel
    bin_prot.shape
