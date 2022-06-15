@@ -44,15 +44,17 @@ module Verifier_index_json = struct
     }
   [@@deriving yojson]
 
-  type ('fr, 'sRS, 'polyComm) verifier_index =
-        ('fr, 'sRS, 'polyComm) Kimchi_types.VerifierIndex.verifier_index =
+  type ('fr, 'srs, 'poly_comm) verifier_index =
+        ('fr, 'srs, 'poly_comm) Kimchi_types.VerifierIndex.verifier_index =
     { domain : 'fr domain
     ; max_poly_size : int
     ; max_quot_size : int
-    ; srs : 'sRS
-    ; evals : 'polyComm verification_evals
+    ; srs : 'srs
+    ; public_input_size : int
+    ; recursive_proofs : int array
+    ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array
-    ; lookup_index : 'polyComm Lookup.t option
+    ; lookup_index : 'poly_comm Lookup.t option
     }
   [@@deriving yojson]
 
@@ -75,7 +77,9 @@ module Data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = { constraints : int } [@@deriving yojson]
+      type t =
+        { constraints : int; public_inputs : int; recursive_proofs : int array }
+      [@@deriving yojson]
 
       let to_latest = Fn.id
     end
@@ -118,6 +122,8 @@ module Stable = struct
     let of_repr srs { Repr.commitments = c; data = d } =
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
+        let public_input_size = d.public_inputs in
+        let recursive_proofs = d.recursive_proofs in
         let d = Domain.Pow_2_roots_of_unity log2_size in
         let max_quot_size = Common.max_quot_size_int (Domain.size d) in
         { domain =
@@ -146,6 +152,8 @@ module Stable = struct
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
+        ; public_input_size
+        ; recursive_proofs
         }
       in
       { commitments = c; data = d; index = t }
@@ -183,5 +191,7 @@ let dummy =
   lazy
     (let rows = Domain.size (Common.wrap_domains ~proofs_verified:2).h in
      let g = Backend.Tock.Curve.(to_affine_exn one) in
-     { Repr.commitments = dummy_commitments g; data = { constraints = rows } }
+     { Repr.commitments = dummy_commitments g
+     ; data = { constraints = rows; public_inputs = 0; recursive_proofs = [||] }
+     }
      |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1) )

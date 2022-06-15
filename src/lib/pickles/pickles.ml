@@ -862,17 +862,22 @@ module Side_loaded = struct
     in
     with_return (fun { return } ->
         List.map ts ~f:(fun (vk, x, p) ->
+            let index =
+              match vk.wrap_vk with
+              | None ->
+                  return (Promise.return false)
+              | Some x ->
+                  x
+            in
             let vk : V.t =
               { commitments = vk.wrap_index
-              ; index =
-                  ( match vk.wrap_vk with
-                  | None ->
-                      return (Promise.return false)
-                  | Some x ->
-                      x )
+              ; index
               ; data =
                   (* This isn't used in verify_heterogeneous, so we can leave this dummy *)
-                  { constraints = 0 }
+                  { constraints = 0
+                  ; public_inputs = index.public_input_size
+                  ; recursive_proofs = index.recursive_proofs
+                  }
               }
             in
             Verify.Instance.T (max_proofs_verified, m, vk, x, p) )

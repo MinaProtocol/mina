@@ -30,6 +30,23 @@ let wrap_domains ~proofs_verified =
   in
   { Domains.h = Pow_2_roots_of_unity h }
 
+let max_wrap_domain =
+  match
+    (wrap_domains ~proofs_verified:(Pickles_base.Proofs_verified.to_int N2)).h
+  with
+  | Pow_2_roots_of_unity domain_size ->
+      domain_size
+
+let domains_for_proofs_verified
+    (max_proofs_verified : Pickles_base.Proofs_verified.t) =
+  match max_proofs_verified with
+  | N0 ->
+      [||]
+  | N1 ->
+      [| max_wrap_domain |]
+  | N2 ->
+      [| max_wrap_domain; max_wrap_domain |]
+
 let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
   let g (x, y) = [ x; y ] in
   let open Backend in

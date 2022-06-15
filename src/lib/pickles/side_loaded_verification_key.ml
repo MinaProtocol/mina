@@ -203,6 +203,13 @@ module Stable = struct
                (Pickles_base.Proofs_verified.to_int max_proofs_verified) )
             .h
         in
+        let public_input_size =
+          let (T (Typ input, _conv, _conv_inv)) = Impls.Wrap.input () in
+          input.size_in_field_elements
+        in
+        let recursive_proofs =
+          Common.domains_for_proofs_verified max_proofs_verified
+        in
         let log2_size = Import.Domain.log2_size d in
         let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
         (* we only compute the wrap_vk if the srs can be loaded *)
@@ -237,6 +244,8 @@ module Stable = struct
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
+              ; public_input_size
+              ; recursive_proofs
               } )
         in
         { Poly.max_proofs_verified; wrap_index = c; wrap_vk }
