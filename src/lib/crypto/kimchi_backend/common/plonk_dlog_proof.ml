@@ -337,10 +337,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; prev_challenges =
         Array.of_list_map chal_polys
           ~f:(fun { Challenge_polynomial.commitment = x, y; challenges } ->
-            ( challenges
-            , { Kimchi_types.shifted = None
-              ; unshifted = [| Kimchi_types.Finite (x, y) |]
-              } ) )
+            { Kimchi_types.chals = challenges
+            ; comm =
+                { Kimchi_types.shifted = None
+                ; unshifted = [| Kimchi_types.Finite (x, y) |]
+                }
+            } )
     }
 
   let to_backend chal_polys primary_input t =

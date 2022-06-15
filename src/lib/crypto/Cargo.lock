@@ -233,6 +233,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_with",
+ "thiserror",
 ]
 
 [[package]]
