@@ -101,6 +101,5 @@ let preprocess_impl str =
   str
 
 let () =
-  Ppx_version.Dummy_derivers.register_dummies () ;
   Ppxlib.Driver.register_transformation name ~preprocess_impl ;
   Ppxlib.Driver.standalone ()

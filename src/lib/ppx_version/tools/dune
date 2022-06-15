@@ -1,35 +1,51 @@
 (executable
  (name print_versioned_types)
  (modules print_versioned_types)
- (libraries ppx_version
-            ; every deriver we might encounter
-            ppx_bin_prot
-            lens.ppx_deriving
-            ppx_deriving.std
-            ppx_sexp_conv
-            ppx_compare
-            ppx_enumerate
-            ppx_fields_conv
-            ppx_hash
-            ppx_variants_conv
-            ppx_deriving_yojson
-            base_quickcheck.ppx_quickcheck)
+ (libraries
+   ;; opam libraries
+   base
+   core_kernel
+   ppxlib
+   ppxlib.astlib
+   ;; every deriver we might encounter
+   ppx_bin_prot
+   lens.ppx_deriving
+   ppx_deriving.std
+   ppx_sexp_conv
+   ppx_compare
+   ppx_enumerate
+   ppx_fields_conv
+   ppx_hash
+   ppx_variants_conv
+   ppx_deriving_yojson
+   base_quickcheck.ppx_quickcheck
+   ;; local library
+   ppx_version
+ )
  (preprocess (pps ppxlib.metaquot)))
 
 (executable
  (name print_binable_functors)
  (modules print_binable_functors)
- (libraries ppx_version
-            ; every deriver we might encounter
-            ppx_bin_prot
-            lens.ppx_deriving
-            ppx_deriving.std
-            ppx_sexp_conv
-            ppx_compare
-            ppx_enumerate
-            ppx_fields_conv
-            ppx_hash
-            ppx_variants_conv
-            ppx_deriving_yojson
-            base_quickcheck.ppx_quickcheck)
+ (libraries
+   ;; opam libraries
+   base
+   core_kernel
+   ppxlib
+   ppxlib.astlib
+   ;; every deriver we might encounter
+   ppx_bin_prot
+   lens.ppx_deriving
+   ppx_deriving.std
+   ppx_sexp_conv
+   ppx_compare
+   ppx_enumerate
+   ppx_fields_conv
+   ppx_hash
+   ppx_variants_conv
+   ppx_deriving_yojson
+   base_quickcheck.ppx_quickcheck
+   ;; local library
+   ppx_version
+ )
  (preprocess (pps ppxlib.metaquot)))
