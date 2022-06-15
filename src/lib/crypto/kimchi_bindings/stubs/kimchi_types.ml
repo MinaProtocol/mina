@@ -57,6 +57,9 @@ type nonrec 'caml_f proof_evaluations =
 type nonrec 'caml_g poly_comm =
   { unshifted : 'caml_g array; shifted : 'caml_g option }
 
+type nonrec ('caml_g, 'caml_f) recursion_challenge =
+  { chals : 'caml_f array; comm : 'caml_g poly_comm }
+
 type nonrec ('g, 'f) opening_proof =
   { lr : ('g * 'g) array; delta : 'g; z1 : 'f; z2 : 'f; sg : 'g }
 
@@ -87,7 +90,7 @@ type nonrec ('caml_g, 'caml_f) prover_proof =
   ; evals : 'caml_f proof_evaluations * 'caml_f proof_evaluations
   ; ft_eval1 : 'caml_f
   ; public : 'caml_f array
-  ; prev_challenges : ('caml_f array * 'caml_g poly_comm) array
+  ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
   }
 
 type nonrec wire = { row : int; col : int }
@@ -162,6 +165,8 @@ module VerifierIndex = struct
     ; max_poly_size : int
     ; max_quot_size : int
     ; srs : 'srs
+    ; public_input_size : int
+    ; recursive_proofs : int array
     ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm Lookup.t option

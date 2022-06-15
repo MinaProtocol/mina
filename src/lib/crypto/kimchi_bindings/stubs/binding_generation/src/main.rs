@@ -88,12 +88,12 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_fake_generic!(T3, 2);
 
     decl_type!(w, env, CamlGroupAffine<T1> => "or_infinity");
-    decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlScalarChallenge::<T1> => "scalar_challenge");
     decl_type!(w, env, CamlRandomOracles::<T1> => "random_oracles");
     decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
     decl_type!(w, env, CamlProofEvaluations::<T1> => "proof_evaluations");
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
+    decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
