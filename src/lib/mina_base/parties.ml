@@ -1,4 +1,5 @@
 open Core_kernel
+open Signature_lib
 
 let add_caller (p : Party.Wire.t) caller : Party.t =
   let add_caller_body (p : Party.Body.Wire.t) caller : Party.Body.t =
@@ -1065,11 +1066,21 @@ let target_nonce_on_success (t : t) : Account.Nonce.t =
   let fee_payer_pubkey = t.fee_payer.body.public_key in
   let fee_payer_party_increments =
     List.count (Call_forest.to_list t.other_parties) ~f:(fun p ->
-        Signature_lib.Public_key.Compressed.equal p.body.public_key
-          fee_payer_pubkey
+        Public_key.Compressed.equal p.body.public_key fee_payer_pubkey
         && p.body.increment_nonce )
   in
   Account.Nonce.add base_nonce (Account.Nonce.of_int fee_payer_party_increments)
+
+let nonce_increments (t : t) : int Public_key.Compressed.Map.t =
+  let base_increments =
+    Public_key.Compressed.Map.of_alist_exn [ (t.fee_payer.body.public_key, 1) ]
+  in
+  List.fold_left (Call_forest.to_list t.other_parties) ~init:base_increments
+    ~f:(fun incr_map party ->
+      if party.body.increment_nonce then
+        Map.update incr_map party.body.public_key
+          ~f:(Option.value_map ~default:1 ~f:(( + ) 1))
+      else incr_map )
 
 let fee_token (_t : t) = Token_id.default
 
@@ -1095,6 +1106,18 @@ let accounts_accessed (t : t) =
   |> List.rev |> List.stable_dedup
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
+
+(*
+type account_mutations =
+  { nonce_increase : int
+  ; balance_delta : Currency.Amount.Signed.t }
+
+let account_mutations (t : t) : (Account_id.t * [`Nonce_increase | `Balance_increase | `Balance_decrease]) Account_id.Map.t =
+  let mutations =
+    let fee_payer_account_id = (t.fee_payer.body.public_key, fee_token t) in
+    Account_id.Map.of_alist_exn [(t.fee_payer.body.public_key, {nonce_increase = 1; balance_delta = Currency.Amount.Signed.zero})]
+  in
+*)
 
 let value_if b ~then_ ~else_ = if b then then_ else else_
 
