@@ -1769,9 +1769,14 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   in
   let module Proof = (val p) in
   let to_js_prover prover =
-    let prove (statement_js : zkapp_statement_js) =
+    let prove (statement_js : zkapp_statement_js)
+        (prevs_js : zkapp_statement_js Js.js_array Js.t) =
       (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
-      let prevs = Obj.magic [] in
+      let prevs =
+        prevs_js |> Js.to_array |> Array.to_list
+        |> List.map ~f:(fun s -> Zkapp_statement.Constant.(of_js s))
+      in
+      let prevs : (_, _, _) Statement_with_proof.t = Obj.magic prevs in
       let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement |> Promise_js_helpers.to_js
     in
@@ -1785,8 +1790,10 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
          , Zkapp_statement.Constant.t
          , Proof.t Promise.t )
          Pickles.Provers.t
-      -> (zkapp_statement_js -> Proof.t Promise_js_helpers.js_promise) list =
-    function
+      -> (   zkapp_statement_js
+          -> zkapp_statement_js Js.js_array Js.t
+          -> Proof.t Promise_js_helpers.js_promise )
+         list = function
     | [] ->
         []
     | p :: ps ->
