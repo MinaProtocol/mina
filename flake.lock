@@ -1,5 +1,23 @@
 {
   "nodes": {
+    "flake-buildkite-pipeline": {
+      "inputs": {
+        "nixpkgs-lib": "nixpkgs-lib"
+      },
+      "locked": {
+        "lastModified": 1654768881,
+        "narHash": "sha256-XuSUp870TDDETi5rs+R7VklxMm29u8BUVnM6lfbQq7w=",
+        "owner": "tweag",
+        "repo": "flake-buildkite-pipeline",
+        "rev": "d420396096b405c8eae22801b3723a30a8ff48f4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "tweag",
+        "repo": "flake-buildkite-pipeline",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -143,6 +161,21 @@
         "type": "github"
       }
     },
+    "nixpkgs-lib": {
+      "locked": {
+        "lastModified": 1649551420,
+        "narHash": "sha256-J/Pn38rBZTszdtTHhhxroQaHADhd5TgbJ53F9j1WTIE=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "3a16841c57b0d3025b21b869cc921a119ce73033",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
     "nixpkgs-mozilla": {
       "flake": false,
       "locked": {
@@ -237,6 +270,7 @@
     },
     "root": {
       "inputs": {
+        "flake-buildkite-pipeline": "flake-buildkite-pipeline",
         "flake-compat": "flake-compat",
         "gitignore-nix": "gitignore-nix",
         "mix-to-nix": "mix-to-nix",
