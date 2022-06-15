@@ -21,7 +21,6 @@
   (source_tree src)
   (source_tree binding_generation)
   (source_tree ../wasm)
-  (source_tree ../../../../external/wasm-bindgen-rayon)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
@@ -92,7 +91,6 @@
   Cargo.toml
   ../../../../.ocamlformat
   ../../Cargo.toml
-  (source_tree ../../../../external/wasm-bindgen-rayon)
   (source_tree ../../stubs)
   (source_tree ../wasm)
   (source_tree src)
