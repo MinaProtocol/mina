@@ -899,9 +899,9 @@ let add_full_transactions t user_command =
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
-let add_snapp_transactions t (snapp_txns : Parties.t list) =
+let add_zkapp_transactions t (zkapp_txns : Parties.t list) =
   let result_ivar = Ivar.create () in
-  let cmd_inputs = Snapp_command_inputs snapp_txns in
+  let cmd_inputs = Snapp_command_inputs zkapp_txns in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
     (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;

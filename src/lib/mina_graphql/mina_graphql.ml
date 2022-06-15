@@ -3028,7 +3028,7 @@ module Mutations = struct
         return (Error "Daemon is bootstrapping")
 
   let send_zkapp_command mina parties =
-    match Mina_commands.setup_and_submit_snapp_command mina parties with
+    match Mina_commands.setup_and_submit_zkapp_command mina parties with
     | `Active f -> (
         match%map f with
         | Ok parties ->

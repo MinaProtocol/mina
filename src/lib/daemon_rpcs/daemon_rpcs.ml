@@ -30,6 +30,32 @@ module Send_user_commands = struct
       ~bin_response
 end
 
+module Send_zkapp_commands = struct
+  type query = Parties.Stable.Latest.t list [@@deriving bin_io_unversioned]
+
+  type response =
+    ( Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t
+    * Network_pool.Transaction_pool.Diff_versioned.Rejected.Stable.Latest.t )
+    Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Send_zkapp_commands" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Generate_random_zkapps = struct
+  type query = Signature_lib.Keypair.Stable.Latest.t list * int * int option
+  [@@deriving bin_io_unversioned]
+
+  type response = Parties.Stable.Latest.t list Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Generate_random_zkapps" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Get_ledger = struct
   type query = State_hash.Stable.Latest.t option [@@deriving bin_io_unversioned]
 

@@ -9,7 +9,9 @@
    async
    async_unix
    sexplib0
+   splittable_random
    ;; local libraries
+   mina_generators
    pickles.backend
    mina_base.import
    kimchi_backend

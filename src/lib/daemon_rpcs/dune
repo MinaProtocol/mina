@@ -18,6 +18,7 @@
    async_rpc_kernel
    async_kernel
    ;; local libraries
+   signature_lib
    network_peer
    genesis_constants
    currency

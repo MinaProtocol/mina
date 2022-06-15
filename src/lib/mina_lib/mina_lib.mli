@@ -103,7 +103,7 @@ val add_full_transactions :
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
-val add_snapp_transactions :
+val add_zkapp_transactions :
      t
   -> Parties.t list
   -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t

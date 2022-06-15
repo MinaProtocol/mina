@@ -1133,7 +1133,7 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
     ~available_public_keys ~account_state_tbl
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ~ledger ?protocol_state_view ?vk ?prover () =
+    ~ledger ?protocol_state_view ?vk ?prover ?parties_size () =
   let open Quickcheck.Let_syntax in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
@@ -1323,6 +1323,9 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
     in
     go [] num_parties
   in
+  let max_other_parties =
+    Option.value parties_size ~default:max_other_parties
+  in
   (* at least 1 party *)
   let%bind num_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
@@ -1442,7 +1445,7 @@ let setup_fee_payer_and_available_keys_and_account_state_tbl_limited
   , account_state_tbl )
 
 let gen_parties_with_limited_keys ?failure ~keymap ?account_state_tbl ~ledger
-    ?protocol_state_view ?vk ?prover () =
+    ?protocol_state_view ?vk ?prover ?parties_size () =
   let open Quickcheck.Let_syntax in
   let%bind ( fee_payer_account_id
            , fee_payer_keypair
@@ -1453,4 +1456,5 @@ let gen_parties_with_limited_keys ?failure ~keymap ?account_state_tbl ~ledger
   in
   gen_parties_base ~no_new_account:true ~limited:true ?failure
     ~fee_payer_account_id ~fee_payer_keypair ~available_public_keys
-    ~account_state_tbl ~keymap ~ledger ?protocol_state_view ?vk ?prover ()
+    ~account_state_tbl ~keymap ~ledger ?protocol_state_view ?vk ?prover
+    ?parties_size ()

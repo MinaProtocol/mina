@@ -7,6 +7,34 @@ open Mina_base
 (** For status *)
 let txn_count = ref 0
 
+let generate_random_zkapps t
+    ((kps, num_of_parties, parties_size) : Keypair.t list * int * int option) =
+  let open Participating_state.Let_syntax in
+  let%bind ledger = Mina_lib.best_ledger t in
+  let%map protocol_state = Mina_lib.best_protocol_state t in
+  let protocol_state_view =
+    Mina_state.Protocol_state.Body.view protocol_state.body
+  in
+  let keymap =
+    List.map kps ~f:(fun { public_key; private_key } ->
+        (Public_key.compress public_key, private_key) )
+    |> Public_key.Compressed.Map.of_alist_exn
+  in
+
+  let account_state_tbl = Account_id.Table.create () in
+  let rec go n acc : Parties.t list Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    if n > 0 then
+      let%bind parties =
+        Mina_generators.Parties_generators.gen_parties_with_limited_keys ~keymap
+          ~ledger ~protocol_state_view ~account_state_tbl ?parties_size ()
+      in
+      go (n - 1) (parties :: acc)
+    else return (List.rev acc)
+  in
+  Quickcheck.Generator.generate (go num_of_parties []) ~size:num_of_parties
+    ~random:(Splittable_random.State.create Random.State.default)
+
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
@@ -110,12 +138,17 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
-let setup_and_submit_snapp_command t (snapp_parties : Parties.t) =
+let setup_and_submit_zkapp_commands t (parties_list : Parties.t list) =
+  let open Participating_state.Let_syntax in
+  let%map _is_active = Mina_lib.active_or_bootstrapping t in
+  Mina_lib.add_zkapp_transactions t parties_list
+
+let setup_and_submit_zkapp_command t (snapp_parties : Parties.t) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
   let open Deferred.Let_syntax in
-  let%map result = Mina_lib.add_snapp_transactions t [ snapp_parties ] in
+  let%map result = Mina_lib.add_zkapp_transactions t [ snapp_parties ] in
   txn_count := !txn_count + 1 ;
   match result with
   | Ok ([], [ failed_txn ]) ->

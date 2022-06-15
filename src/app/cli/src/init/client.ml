@@ -437,6 +437,43 @@ let get_nonce_exn ~rpc public_key port =
 
 let unwrap_user_command (`UserCommand x) = x
 
+let batch_test_zkapps =
+  let keypair_path = Command.Param.(anon @@ ("keypair-path" %: string)) in
+  let num_of_zkapps = Command.Param.(anon @@ ("num-of-zkapps" %: int)) in
+  let parties_size =
+    Command.Param.(
+      flag "--parties-size" ~aliases:[ "parties-size" ]
+        ~doc:"NUM maximum number of parties in 1 zkapp commands" (optional int))
+  in
+  Command.async ~summary:"Generate multiple zkapps and send them"
+    (Cli_lib.Background_daemon.rpc_init
+       (Args.zip3 keypair_path num_of_zkapps parties_size)
+       ~f:(fun port (keypair_path, num_of_zkapps, parties_size) ->
+         let%bind keypair_files = Sys.readdir keypair_path >>| Array.to_list in
+         let%bind keypairs =
+           Deferred.List.map keypair_files ~f:(fun keypair_file ->
+               Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
+                 keypair_file )
+         in
+         match%bind
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Generate_random_zkapps.rpc
+             (keypairs, num_of_zkapps, parties_size)
+             port
+           |> Deferred.map ~f:Or_error.join
+         with
+         | Ok parties_list ->
+             Daemon_rpcs.Client.dispatch_with_message
+               Daemon_rpcs.Send_zkapp_commands.rpc parties_list port
+               ~success:(fun _ ->
+                 "Successfully generated and enqueued zkapp commands in pool" )
+               ~error:(fun e ->
+                 sprintf "Failed to send zkapp commands %s"
+                   (Error.to_string_hum e) )
+               ~join_error:Or_error.join
+         | Error e ->
+             eprintf "Failed to generate zkapps %s" (Error.to_string_hum e) ;
+             exit 1 ) )
+
 let batch_send_payments =
   let module Payment_info = struct
     type t =
@@ -2297,6 +2334,7 @@ let advanced =
     ; ("get-public-keys", get_public_keys)
     ; ("reset-trust-status", reset_trust_status)
     ; ("batch-send-payments", batch_send_payments)
+    ; ("batch-test-zkapps", batch_test_zkapps)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
