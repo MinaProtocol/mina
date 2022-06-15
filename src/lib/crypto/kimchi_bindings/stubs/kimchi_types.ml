@@ -63,6 +63,12 @@ type nonrec ('caml_g, 'caml_f) recursion_challenge =
 type nonrec ('g, 'f) opening_proof =
   { lr : ('g * 'g) array; delta : 'g; z1 : 'f; z2 : 'f; sg : 'g }
 
+type nonrec 'caml_g lookup_commitments =
+  { sorted : 'caml_g poly_comm array
+  ; aggreg : 'caml_g poly_comm
+  ; runtime : 'caml_g poly_comm option
+  }
+
 type nonrec 'caml_g prover_commitments =
   { w_comm :
       'caml_g poly_comm
@@ -82,6 +88,7 @@ type nonrec 'caml_g prover_commitments =
       * 'caml_g poly_comm
   ; z_comm : 'caml_g poly_comm
   ; t_comm : 'caml_g poly_comm
+  ; lookup : 'caml_g lookup_commitments option
   }
 
 type nonrec ('caml_g, 'caml_f) prover_proof =
