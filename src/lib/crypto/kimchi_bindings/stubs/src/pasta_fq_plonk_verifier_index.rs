@@ -33,7 +33,11 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
 
             public_input_size: vi.public_input_size as isize,
 
-            recursive_proofs: vi.recursive_proofs.iter().map(Into::into).collect(),
+            recursive_proofs: vi
+                .recursive_proofs
+                .iter()
+                .map(|x| *x as ocaml::Int)
+                .collect(),
 
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
@@ -102,7 +106,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
 
             public_input_size: index.public_input_size as usize,
 
-            recursive_proofs: index.recursive_proofs.iter().map(Into::into).collect(),
+            recursive_proofs: index.recursive_proofs.iter().map(|x| *x as usize).collect(),
 
             sigma_comm,
             coefficients_comm,
