@@ -3,7 +3,6 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_block
 open Pipe_lib
 open Signature_lib
 
@@ -192,12 +191,9 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
     breadcrumb |> Transition_frontier.Breadcrumb.block
-    |> External_transition.compose
   in
   let block_string =
-    Binable.to_string
-      (module External_transition.Raw.Stable.Latest)
-      external_transition
+    Binable.to_string (module Mina_block.Stable.Latest) external_transition
   in
   (* raises only on errors from invalid optional arguments *)
   Base64.encode_exn block_string

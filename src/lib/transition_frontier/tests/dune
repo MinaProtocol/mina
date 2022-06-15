@@ -35,6 +35,7 @@
    frontier_base
    transition_frontier
    protocol_version
+   yojson
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

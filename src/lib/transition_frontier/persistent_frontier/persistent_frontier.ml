@@ -232,7 +232,7 @@ module Instance = struct
       Full_frontier.create ~logger:t.factory.logger
         ~time_controller:t.factory.time_controller
         ~root_data:
-          { transition = External_transition.Validated.lift root_transition
+          { transition = root_transition
           ; staged_ledger = root_staged_ledger
           ; protocol_states =
               List.map protocol_states
@@ -339,8 +339,7 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-          @@ Mina_block.Validated.state_hash
-               (External_transition.Validated.lower root_transition) )
+          @@ Mina_block.Validated.state_hash root_transition )
       ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in

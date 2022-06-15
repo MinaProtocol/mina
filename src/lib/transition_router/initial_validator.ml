@@ -288,10 +288,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                             ~time_received )
                     >>= defer
                           (validate_genesis_protocol_state ~genesis_state_hash)
-                    >>= (fun x ->
-                          Interruptible.uninterruptible
-                            (validate_proofs ~verifier ~genesis_state_hash [ x ])
-                          >>| List.hd_exn )
+                    >>= Fn.compose Interruptible.uninterruptible
+                          (validate_single_proof ~verifier ~genesis_state_hash)
                     >>= defer validate_delta_block_chain
                     >>= defer validate_protocol_versions)
                 with
