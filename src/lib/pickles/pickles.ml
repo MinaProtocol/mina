@@ -403,6 +403,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       -> choices:
            (   self:(A.t, A_value.t, max_branching, branches) Tag.t
             -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+      -> unit
       -> ( prev_valuess
          , widthss
          , heightss
@@ -413,7 +414,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          * _
          * _ =
    fun ~self ~cache ?disk_keys ~branches:(module Branches) ~max_branching ~name
-       ~constraint_constants ~typ ~choices ->
+       ~constraint_constants ~typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -933,7 +934,9 @@ let compile :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~cache ?disk_keys ~branches ~max_branching ~name ~typ
-      ~constraint_constants ~choices:(fun ~self -> conv_irs (choices ~self))
+      ~constraint_constants
+      ~choices:(fun ~self -> conv_irs (choices ~self))
+      ()
   in
   let (module Max_branching) = max_branching in
   let T = Max_branching.eq in
