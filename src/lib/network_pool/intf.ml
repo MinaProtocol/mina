@@ -346,9 +346,7 @@ module type Transaction_resource_pool_intf = sig
   val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
-       logger:Logger.t
-    -> t
-    -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
+    t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
   val all_from_account :
        t

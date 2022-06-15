@@ -18,6 +18,7 @@
    base.caml
    bin_prot.shape
    ppx_inline_test.config
+   integers
    ;; local libraries
    mina_compile_config
    mina_generators
@@ -42,6 +43,7 @@
    quickcheck_lib
    mina_base
    mina_transaction
+   mina_state
    transaction_snark
    consensus
    network_peer
@@ -52,6 +54,7 @@
    signature_lib
    inline_test_quiet_logs
    pickles
+   pickles.backend
    error_json
    mina_metrics
    interruptible
@@ -61,6 +64,12 @@
    mina_ledger
    mina_base.import
    snark_params
+   random_oracle
+   random_oracle_input
+   kimchi_backend
+   kimchi_backend_common
+   kimchi_backend.pasta
+   genesis_ledger
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
