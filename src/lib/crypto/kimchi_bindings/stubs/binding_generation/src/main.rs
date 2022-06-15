@@ -1,6 +1,7 @@
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
+use kimchi::proof::CamlRecursionChallenge;
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
@@ -87,6 +88,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_fake_generic!(T3, 2);
 
     decl_type!(w, env, CamlGroupAffine<T1> => "or_infinity");
+    decl_type!(w, env, CamlRecursionChallenge::<T1> => "recursion_challenge");
     decl_type!(w, env, CamlScalarChallenge::<T1> => "scalar_challenge");
     decl_type!(w, env, CamlRandomOracles::<T1> => "random_oracles");
     decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
