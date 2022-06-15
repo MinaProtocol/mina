@@ -8,13 +8,13 @@ module Snark_tables = struct
   module Serializable = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
-          ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+          ( Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
             Priced_proof.Stable.V1.t
           * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
             | `Not_rebroadcastable ] )
-          Transaction_snark_work.Statement.Stable.V1.Table.t
+          Transaction_snark_work.Statement.Stable.V2.Table.t
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -103,6 +103,7 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
+    -> expiry_ns:Time_ns.Span.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
     -> log_gossip_heard:bool
@@ -382,7 +383,8 @@ struct
         Deferred.don't_wait_for tf_deferred
 
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
-          ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+          ~expiry_ns:_ ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer
+          =
         let t =
           { snark_tables =
               { all = Statement_table.create ()
@@ -645,7 +647,7 @@ struct
   let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
+      ~time_controller ~expiry_ns ~frontier_broadcast_pipe ~log_gossip_heard
       ~on_remote_push =
     if !loaded then
       failwith
@@ -674,8 +676,8 @@ struct
           res
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
-            ~on_remote_push
+            ~time_controller ~expiry_ns ~frontier_broadcast_pipe
+            ~log_gossip_heard ~on_remote_push
     in
     store_periodically (resource_pool pool) ;
     (pool, r_sink, l_sink)
@@ -683,7 +685,7 @@ end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include
-  Make (Mina_base.Ledger) (Staged_ledger)
+  Make (Mina_ledger.Ledger) (Staged_ledger)
     (struct
       include Transition_frontier
 
@@ -701,11 +703,11 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = Resource_pool.Diff.t =
         | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
-            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V2.t
+            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving compare, sexp, to_yojson, hash]
@@ -748,6 +750,10 @@ let%test_module "random set test" =
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
+
+    let expiry_ns =
+      Time_ns.Span.of_hr
+        (Float.of_int precomputed_values.genesis_constants.transaction_expiry_hr)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -798,7 +804,7 @@ let%test_module "random set test" =
       let open Deferred.Let_syntax in
       let mock_pool, _r_sink, _l_sink =
         Mock_snark_pool.create ~config ~logger ~constraint_constants
-          ~consensus_constants ~time_controller
+          ~consensus_constants ~time_controller ~expiry_ns
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
         (* |>  *)
@@ -975,7 +981,7 @@ let%test_module "random set test" =
           in
           let network_pool, _, _ =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~consensus_constants ~time_controller ~logger
+              ~consensus_constants ~time_controller ~expiry_ns ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
@@ -1046,7 +1052,7 @@ let%test_module "random set test" =
             in
             let network_pool, remote_sink, local_sink =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~time_controller
+                ~consensus_constants ~time_controller ~expiry_ns
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
             in
@@ -1131,7 +1137,7 @@ let%test_module "random set test" =
           let network_pool, _, _ =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~expiry_ns ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in

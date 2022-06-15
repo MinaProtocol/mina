@@ -17,7 +17,8 @@ pkgs.mkShell {
     zlib.dev
     bzip2.dev
     ncurses
-    cargo
+    rustup
+    wasm-pack
   ];
   OPAMSWITCH = "mina";
   shellHook = ''
@@ -29,7 +30,8 @@ pkgs.mkShell {
       echo
       tput bold
       printf 'opam init --bare\n'
-      printf 'opam switch import src/opam.export\n'
+      printf 'opam update\n'
+      printf 'opam switch import src/opam.export --strict\n'
       printf 'eval $(opam env)\n'
       printf './scripts/pin-external-packages.sh\n'
       tput sgr0

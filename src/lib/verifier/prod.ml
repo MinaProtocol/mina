@@ -6,6 +6,10 @@ open Mina_base
 open Mina_state
 open Blockchain_snark
 
+type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
+
+let invalid_to_string = Common.invalid_to_string
+
 type ledger_proof = Ledger_proof.Prod.t
 
 module Worker_state = struct
@@ -16,17 +20,19 @@ module Worker_state = struct
     val verify_commands :
          Mina_base.User_command.Verifiable.t list
       -> [ `Valid of Mina_base.User_command.Valid.t
-         | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Mina_base.Snapp_statement.t
+           * Mina_base.Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
-           list ]
+           list
+         | invalid ]
          list
          Deferred.t
 
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> bool Deferred.t
+
+    val get_blockchain_verification_key : unit -> Pickles.Verification_key.t
   end
 
   (* bin_io required by rpc_parallel *)
@@ -44,6 +50,7 @@ module Worker_state = struct
     Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
+        Pickles.Side_loaded.srs_precomputation () ;
         Deferred.return
           (let module M = struct
              module T = Transaction_snark.Make (struct
@@ -67,23 +74,32 @@ module Worker_state = struct
                  List.concat_map cs ~f:(function
                    | `Valid _ ->
                        []
-                   | `Invalid ->
-                       []
                    | `Valid_assuming (_, xs) ->
-                       xs )
+                       xs
+                   | `Invalid_keys _
+                   | `Invalid_signature _
+                   | `Invalid_proof
+                   | `Missing_verification_key _ ->
+                       [] )
                in
                let%map all_verified =
                  Pickles.Side_loaded.verify
-                   ~value_to_field_elements:Snapp_statement.to_field_elements
+                   ~value_to_field_elements:Zkapp_statement.to_field_elements
                    to_verify
                in
                List.map cs ~f:(function
                  | `Valid c ->
                      `Valid c
-                 | `Invalid ->
-                     `Invalid
                  | `Valid_assuming (c, xs) ->
-                     if all_verified then `Valid c else `Valid_assuming xs )
+                     if all_verified then `Valid c else `Valid_assuming xs
+                 | `Invalid_keys keys ->
+                     `Invalid_keys keys
+                 | `Invalid_signature keys ->
+                     `Invalid_signature keys
+                 | `Invalid_proof ->
+                     `Invalid_proof
+                 | `Missing_verification_key keys ->
+                     `Missing_verification_key keys )
 
              let verify_blockchain_snarks = B.Proof.verify
 
@@ -97,6 +113,9 @@ module Worker_state = struct
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
+
+             let get_blockchain_verification_key () =
+               Lazy.force B.Proof.verification_key
            end in
           (module M : S) )
     | Check | None ->
@@ -107,15 +126,39 @@ module Worker_state = struct
                    match Common.check c with
                    | `Valid c ->
                        `Valid c
-                   | `Invalid ->
-                       `Invalid
                    | `Valid_assuming (c, _) ->
-                       `Valid c )
+                       `Valid c
+                   | `Invalid_keys keys ->
+                       `Invalid_keys keys
+                   | `Invalid_signature keys ->
+                       `Invalid_signature keys
+                   | `Invalid_proof ->
+                       `Invalid_proof
+                   | `Missing_verification_key keys ->
+                       `Missing_verification_key keys )
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return true
 
              let verify_transaction_snarks _ = Deferred.return true
+
+             let vk =
+               lazy
+                 (let module T = Transaction_snark.Make (struct
+                    let constraint_constants = constraint_constants
+
+                    let proof_level = proof_level
+                  end) in
+                 let module B = Blockchain_snark_state.Make (struct
+                   let tag = T.tag
+
+                   let constraint_constants = constraint_constants
+
+                   let proof_level = proof_level
+                 end) in
+                 Lazy.force B.Proof.verification_key )
+
+             let get_blockchain_verification_key () = Lazy.force vk
            end : S )
 
   let get = Fn.id
@@ -133,14 +176,16 @@ module Worker = struct
           ( 'w
           , User_command.Verifiable.t list
           , [ `Valid of User_command.Valid.t
-            | `Invalid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
-              * Mina_base.Snapp_statement.t
+              * Mina_base.Zkapp_statement.t
               * Pickles.Side_loaded.Proof.t )
-              list ]
+              list
+            | invalid ]
             list )
           F.t
+      ; get_blockchain_verification_key :
+          ('w, unit, Pickles.Verification_key.t) F.t
       }
 
     module Worker_state = Worker_state
@@ -172,6 +217,10 @@ module Worker = struct
         let (module M) = Worker_state.get w in
         M.verify_commands ts
 
+      let get_blockchain_verification_key (w : Worker_state.t) () =
+        let (module M) = Worker_state.get w in
+        Deferred.return (M.get_blockchain_verification_key ())
+
       let functions =
         let f (i, o, f) =
           C.create_rpc
@@ -196,14 +245,19 @@ module Worker = struct
               ( [%bin_type_class: User_command.Verifiable.Stable.Latest.t list]
               , [%bin_type_class:
                   [ `Valid of User_command.Valid.Stable.Latest.t
-                  | `Invalid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
-                    * Mina_base.Snapp_statement.Stable.Latest.t
+                    * Mina_base.Zkapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
-                    list ]
+                    list
+                  | invalid ]
                   list]
               , verify_commands )
+        ; get_blockchain_verification_key =
+            f
+              ( [%bin_type_class: unit]
+              , [%bin_type_class: Pickles.Verification_key.Stable.Latest.t]
+              , get_blockchain_verification_key )
         }
 
       let init_worker_state
@@ -214,7 +268,7 @@ module Worker = struct
           Logger.Consumer_registry.register ~id:"default"
             ~processor:(Logger.Processor.raw ())
             ~transport:
-              (Logger.Transport.File_system.dumb_logrotate
+              (Logger_file_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate ) ) ;
         [%log info] "Verifier started" ;
@@ -463,4 +517,12 @@ let verify_commands { worker; logger } ts =
           let%bind { connection; _ } = Ivar.read !worker in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:ts
+          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
+
+let get_blockchain_verification_key { worker; logger } =
+  O1trace.thread "dispatch_blockchain_verification_key" (fun () ->
+      with_retry ~logger (fun () ->
+          let%bind { connection; _ } = Ivar.read !worker in
+          Worker.Connection.run connection
+            ~f:Worker.functions.get_blockchain_verification_key ~arg:()
           |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )

@@ -15,6 +15,10 @@ end
 
 include T
 
+let hd (type a n) (t : (a, n s) t) : a = match t with x :: _ -> x
+
+let unsingleton (type a) ([ x ] : (a, z s) t) : a = x
+
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
  fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
 
@@ -378,6 +382,31 @@ let rec append :
   | x :: t1, S adds ->
       x :: append t1 t2 adds
 
+(* TODO: Make more efficient *)
+let rev (type a n) (xs : (a, n) t) : (a, n) t =
+  of_list_and_length_exn
+    (fold ~init:[] ~f:(fun acc x -> List.cons x acc) xs)
+    (length xs)
+
+let rec last : type a n. (a, n s) t -> a = function
+  | [ x ] ->
+      x
+  | _ :: (_ :: _ as xs) ->
+      last xs
+
+let rec split :
+    type n m n_m a. (a, n_m) t -> (n, m, n_m) Nat.Adds.t -> (a, n) t * (a, m) t
+    =
+ fun t adds ->
+  match (t, adds) with
+  | [], Z ->
+      ([], [])
+  | _ :: _, Z ->
+      ([], t)
+  | x :: t1, S adds ->
+      let xs, ys = split t1 adds in
+      (x :: xs, ys)
+
 let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
  fun xss ->
   match xss with
@@ -492,6 +521,93 @@ module Vector_4 = struct
     ()
 end
 
+module Vector_5 = struct
+  module T = With_length (Nat.N5)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N5.n) vec
+
+      include Make.Binable (Nat.N5)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_6 = struct
+  module T = With_length (Nat.N6)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N6.n) vec
+
+      include Make.Binable (Nat.N6)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_7 = struct
+  module T = With_length (Nat.N7)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N7.n) vec
+
+      include Make.Binable (Nat.N7)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
 module Vector_8 = struct
   module T = With_length (Nat.N8)
 
@@ -503,6 +619,64 @@ module Vector_8 = struct
       type 'a t = ('a, Nat.N8.n) vec
 
       include Make.Binable (Nat.N8)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_15 = struct
+  module T = With_length (Nat.N15)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N15.n) vec
+
+      include Make.Binable (Nat.N15)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let () =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_16 = struct
+  module T = With_length (Nat.N16)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N16.n) vec
+
+      include Make.Binable (Nat.N16)
 
       include (T : module type of T with type 'a t := 'a t)
 
