@@ -30,6 +30,12 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
             srs: CamlFqSrs(vi.srs.get().expect("have an srs").clone()),
+
+            public_input_size: vi.public_input_size as isize,
+
+            recursive_proofs: vi.recursive_proofs as isize,
+            recursive_log2_domain: vi.recursive_log2_domain as isize,
+
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
                 coefficients_comm: vi
@@ -94,6 +100,11 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
                 res.set(index.srs.0).unwrap();
                 res
             },
+
+            public_input_size: index.public_input_size as usize,
+
+            recursive_proofs: index.recursive_proofs as usize,
+            recursive_log2_domain: index.recursive_log2_domain as usize,
 
             sigma_comm,
             coefficients_comm,
@@ -231,6 +242,12 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
         max_poly_size: 0,
         max_quot_size: 0,
         srs: CamlFqSrs::new(SRS::create(0)),
+
+        public_input_size: 0,
+
+        recursive_proofs: 0,
+        recursive_log2_domain: 0,
+
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),
             coefficients_comm: vec_comm(COLUMNS),

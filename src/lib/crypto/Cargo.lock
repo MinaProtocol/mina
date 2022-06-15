@@ -233,6 +233,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_with",
+ "thiserror",
 ]
 
 [[package]]
@@ -519,7 +520,7 @@ dependencies = [
  "rand",
  "rand_core",
  "rayon",
- "rmp-serde 1.1.0",
+ "rmp-serde",
  "serde",
  "serde_with",
  "strum",
@@ -887,17 +888,6 @@ dependencies = [
 
 [[package]]
 name = "rmp-serde"
-version = "0.15.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "723ecff9ad04f4ad92fe1c8ca6c20d2196d9286e9c60727c4cb5511629260e9d"
-dependencies = [
- "byteorder",
- "rmp",
- "serde",
-]
-
-[[package]]
-name = "rmp-serde"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25786b0d276110195fa3d6f3f31299900cf71dfbd6c28450f3f58a0e7f7a347e"
@@ -1168,7 +1158,7 @@ dependencies = [
  "paste",
  "rand",
  "rayon",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "sprs",
 ]

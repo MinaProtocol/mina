@@ -145,6 +145,11 @@ pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub max_poly_size: ocaml::Int,
     pub max_quot_size: ocaml::Int,
     pub srs: SRS,
+
+    pub public_input_size: ocaml::Int,
+    pub recursive_proofs: ocaml::Int,
+    pub recursive_log2_domain: ocaml::Int,
+
     pub evals: CamlPlonkVerificationEvals<PolyComm>,
     pub shifts: Vec<Fr>,
     pub lookup_index: Option<CamlLookupVerifierIndex<PolyComm>>,
