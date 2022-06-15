@@ -23,11 +23,35 @@ type ('var, 'value, 'input_var, 'input_value, 'ret_var, 'ret_value) public_input
          , 'ret_value )
          public_input
 
-(* This type models an "inductive rule". It includes
-   - the list of previous statements which this one assumes
-   - the snarky main function
-   - an unchecked version of the main function which computes the "should verify" flags that
-     allow predecessor proofs to conditionally fail to verify
+(** This type models an "inductive rule". It includes
+    - the list of previous statements which this one assumes
+    - the snarky main function
+
+    The types parameters are:
+    - ['prev_vars] the tuple-list of public input circuit types to the previous
+      proofs.
+      - For example, [Boolean.var * (Boolean.var * unit)] represents 2 previous
+        proofs whose public inputs are booleans
+    - ['prev_values] the tuple-list of public input non-circuit types to the
+      previous proofs.
+      - For example, [bool * (bool * unit)] represents 2 previous proofs whose
+        public inputs are booleans.
+    - ['widths] is a tuple list of the maximum number of previous proofs each
+      previous proof itself had.
+      - For example, [Nat.z Nat.s * (Nat.z * unit)] represents 2 previous
+        proofs where the first has at most 1 previous proof and the second had
+        zero previous proofs.
+    - ['heights] is a tuple list of the number of inductive rules in each of
+      the previous proofs
+      - For example, [Nat.z Nat.s Nat.s * (Nat.z Nat.s * unit)] represents 2
+        previous proofs where the first had 2 inductive rules and the second
+        had 1.
+    - ['a_var] is the in-circuit type of the [main] function's public input.
+    - ['a_value] is the out-of-circuit type of the [main] function's public
+      input.
+    - ['ret_var] is the in-circuit type of the [main] function's public output.
+    - ['ret_value] is the out-of-circuit type of the [main] function's public
+      output.
 *)
 type ( 'prev_vars
      , 'prev_values
