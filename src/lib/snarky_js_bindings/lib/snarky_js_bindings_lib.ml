@@ -1568,6 +1568,9 @@ type 'a zkapp_statement = 'a array
 
 type zkapp_statement_js = field_class Js.t Js.js_array Js.t
 
+type 'proof zkapp_statement_with_proof_js =
+  < statement : zkapp_statement_js Js.prop ; proof : 'proof Js.prop > Js.t
+
 module Zkapp_statement = struct
   type t = Field.t zkapp_statement
 
@@ -1672,7 +1675,7 @@ let other_verification_key_constr :
 
 type proof = (Pickles_types.Nat.N0.n, Pickles_types.Nat.N0.n) Pickles.Proof.t
 
-module Statement_with_proof =
+module Statements_with_proofs =
   Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
 
 let nat_modules_list : (module Pickles_types.Nat.Intf) list =
@@ -1770,13 +1773,14 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let module Proof = (val p) in
   let to_js_prover prover =
     let prove (statement_js : zkapp_statement_js)
-        (prevs_js : zkapp_statement_js Js.js_array Js.t) =
-      (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
-      let prevs =
-        prevs_js |> Js.to_array |> Array.to_list
-        |> List.map ~f:(fun s -> Zkapp_statement.Constant.(of_js s))
+        (prevs_js : Proof.t zkapp_statement_with_proof_js Js.js_array Js.t) =
+      let to_prev (previous : Proof.t zkapp_statement_with_proof_js) =
+        (Zkapp_statement.Constant.of_js previous##.statement, previous##.proof)
       in
-      let prevs : (_, _, _) Statement_with_proof.t = Obj.magic prevs in
+      let prevs : (Field.Constant.t zkapp_statement * Proof.t) list =
+        prevs_js |> Js.to_array |> Array.to_list |> List.map ~f:to_prev
+      in
+      let prevs : (_, _, _) Statements_with_proofs.t = Obj.magic prevs in
       let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement |> Promise_js_helpers.to_js
     in
@@ -1791,7 +1795,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
          , Proof.t Promise.t )
          Pickles.Provers.t
       -> (   zkapp_statement_js
-          -> zkapp_statement_js Js.js_array Js.t
+          -> Proof.t zkapp_statement_with_proof_js Js.js_array Js.t
           -> Proof.t Promise_js_helpers.js_promise )
          list = function
     | [] ->
