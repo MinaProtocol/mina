@@ -64,9 +64,9 @@ variable "plain_node_count" {
 }
 
 locals {
-  testnet_name = "gossipqa"
-  mina_image = "minaprotocol/mina-daemon:1.3.1beta1-metrics-gossip-data-collection-92db0c6-focal-devnet"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.1beta1-metrics-gossip-data-collection-92db0c6-focal"
+  testnet_name = "gossipqa_TEST"
+  mina_image = "minaprotocol/mina-daemon:1.3.2alpha1-develop-665edf8-bullseye-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.2alpha1-develop-665edf8-bullseye"
   seed_region = "us-central1"
   seed_zone = "us-central1-c"
 
