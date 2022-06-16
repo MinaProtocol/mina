@@ -23,6 +23,7 @@
    key_value_database
    network_peer
    run_in_thread
+   test_util
  )
  (inline_tests)
  (preprocess

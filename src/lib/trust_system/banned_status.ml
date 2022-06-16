@@ -27,4 +27,10 @@ module Stable = struct
   end
 end]
 
+let%test "banned status serialization v1" =
+  let tm = Time.of_string "2019-10-08 17:51:23.050849Z" in
+  let status = Stable.V1.Banned_until tm in
+  let known_good_digest = "99a12fdb97c62ceba0c4d4f5879b0cdc" in
+  Test_util.check_serialization (module Stable.V1) status known_good_digest
+
 [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
