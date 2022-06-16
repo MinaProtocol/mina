@@ -2099,7 +2099,7 @@ module Block_and_signed_command = struct
                  sequence_no,
                  status,
                  failure_reason)
-               VALUES (?, ?, ?, ?::user_command_status, ?)
+               VALUES (?, ?, ?, ?::transaction_status, ?)
          |sql} )
       { block_id; user_command_id; sequence_no; status; failure_reason }
 
@@ -2233,7 +2233,7 @@ module Block_and_zkapp_command = struct
         , typ )
       ~tannot:(function
         | "status" ->
-            Some "user_command_status"
+            Some "transaction_status"
         | "failure_reasons_ids" ->
             Some "int[]"
         | _ ->

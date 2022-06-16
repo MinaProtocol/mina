@@ -64,7 +64,7 @@ CREATE TABLE snarked_ledger_hashes
 
 CREATE TYPE user_command_type AS ENUM ('payment', 'delegation');
 
-CREATE TYPE user_command_status AS ENUM ('applied', 'failed');
+CREATE TYPE transaction_status AS ENUM ('applied', 'failed');
 
 CREATE TABLE user_commands
 ( id             serial              PRIMARY KEY
@@ -193,7 +193,7 @@ CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
 , sequence_no     int NOT NULL
-, status          user_command_status NOT NULL
+, status          transaction_status NOT NULL
 , failure_reason  text
 , PRIMARY KEY (block_id, user_command_id, sequence_no)
 );
@@ -235,7 +235,7 @@ CREATE TABLE blocks_zkapp_commands
 ( block_id                        int                 NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , zkapp_command_id                int                 NOT NULL REFERENCES zkapp_commands(id) ON DELETE CASCADE
 , sequence_no                     int                 NOT NULL
-, status                          user_command_status NOT NULL
+, status                          transaction_status NOT NULL
 , failure_reasons_ids             int[]
 , PRIMARY KEY (block_id, zkapp_command_id, sequence_no)
 );

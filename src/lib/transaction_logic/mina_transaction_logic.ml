@@ -156,7 +156,7 @@ module Transaction_applied = struct
     | Coinbase c ->
         With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-  let user_command_status : t -> Transaction_status.t =
+  let transaction_status : t -> Transaction_status.t =
    fun { varying; _ } ->
     match varying with
     | Command
@@ -243,7 +243,7 @@ module type S = sig
 
     val transaction : t -> Transaction.t With_status.t
 
-    val user_command_status : t -> Transaction_status.t
+    val transaction_status : t -> Transaction_status.t
   end
 
   module Global_state : sig
@@ -559,7 +559,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Coinbase c ->
           With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-    let user_command_status : t -> Transaction_status.t =
+    let transaction_status : t -> Transaction_status.t =
      fun { varying; _ } ->
       match varying with
       | Command

@@ -69,10 +69,10 @@ CREATE TYPE public.internal_command_type AS ENUM (
 
 
 --
--- Name: user_command_status; Type: TYPE; Schema: public; Owner: -
+-- Name: transaction_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.user_command_status AS ENUM (
+CREATE TYPE public.transaction_status AS ENUM (
     'applied',
     'failed'
 );
@@ -255,7 +255,7 @@ CREATE TABLE public.blocks_user_commands (
     block_id integer NOT NULL,
     user_command_id integer NOT NULL,
     sequence_no integer NOT NULL,
-    status public.user_command_status NOT NULL,
+    status public.transaction_status NOT NULL,
     failure_reason text
 );
 
@@ -268,7 +268,7 @@ CREATE TABLE public.blocks_zkapp_commands (
     block_id integer NOT NULL,
     zkapp_command_id integer NOT NULL,
     sequence_no integer NOT NULL,
-    status public.user_command_status NOT NULL,
+    status public.transaction_status NOT NULL,
     failure_reasons_ids integer[]
 );
 
