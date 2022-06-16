@@ -128,8 +128,7 @@ if [[ $FUNCTION == cloudBuild ]]; then
     dhall-to-yaml <<< "$dhall" | tee /dev/stderr > cloudbuild.yaml
     gcloud builds submit
 elif [[ $FUNCTION == dockerBuild ]]; then
-    eval "$(dhall-to-bash --declare args <<< "$dhall")"
-    set -x; docker "${args[@]}"; set +x
+    eval eval "$(dhall-to-bash <<< "$dhall")"
 else
     echo "Unknown function: $FUNCTION" > /dev/stderr
     exit 1
