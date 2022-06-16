@@ -273,12 +273,12 @@ module Prover = struct
 end
 
 module Make
-    (A : Statement_var_intf)
-    (A_value : Statement_value_intf)
+    (Arg_var : Statement_var_intf)
+    (Arg_value : Statement_value_intf)
     (Ret_var : T0)
     (Ret_value : T0) =
 struct
-  module IR = Inductive_rule.T (A) (A_value) (Ret_var) (Ret_value)
+  module IR = Inductive_rule.T (Arg_var) (Arg_value) (Ret_var) (Ret_value)
   module HIR = H4.T (IR)
 
   let max_local_max_proofs_verifieds ~self (type n)
@@ -387,8 +387,8 @@ struct
       -> public_input:
            ( var
            , value
-           , A.t
-           , A_value.t
+           , Arg_var.t
+           , Arg_value.t
            , Ret_var.t
            , Ret_value.t )
            Inductive_rule.public_input
@@ -398,7 +398,7 @@ struct
       -> ( prev_valuess
          , widthss
          , heightss
-         , A_value.t
+         , Arg_value.t
          , (Ret_value.t * (max_proofs_verified, max_proofs_verified) Proof.t)
            Promise.t )
          H3_2.T(Prover).t
@@ -437,7 +437,9 @@ struct
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
     Timer.clock __LOC__ ;
     let wrap_domains =
-      let module M = Wrap_domains.Make (A) (A_value) (Ret_var) (Ret_value) in
+      let module M =
+        Wrap_domains.Make (Arg_var) (Arg_value) (Ret_var) (Ret_value)
+      in
       let rec f :
           type a b c d. (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t =
         function
@@ -453,8 +455,8 @@ struct
     Timer.clock __LOC__ ;
     let module Branch_data = struct
       type ('vars, 'vals, 'n, 'm) t =
-        ( A.t
-        , A_value.t
+        ( Arg_var.t
+        , Arg_value.t
         , Ret_var.t
         , Ret_value.t
         , Max_proofs_verified.n
@@ -495,7 +497,7 @@ struct
                     Step_branch_data.create ~index:!i
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input
-                      A.to_field_elements A_value.to_field_elements rule
+                      Arg_var.to_field_elements Arg_value.to_field_elements rule
                       ~wrap_domains ~proofs_verifieds )
               in
               Timer.clock __LOC__ ; incr i ; res
@@ -674,7 +676,7 @@ struct
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
-    let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
+    let module S = Step.Make (Arg_var) (Arg_value) (Max_proofs_verified) in
     let (typ : (var, value) Impls.Step.Typ.t) =
       match public_input with
       | Input typ ->
@@ -697,7 +699,7 @@ struct
              , local_widths
              , local_heights )
              H3.T(Statement_with_proof).t
-          -> A_value.t
+          -> Arg_value.t
           -> ( Ret_value.t
              * (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t )
              Promise.t =
@@ -773,7 +775,7 @@ struct
           -> ( xs2
              , xs3
              , xs4
-             , A_value.t
+             , Arg_value.t
              , (Ret_value.t * (max_proofs_verified, max_proofs_verified) Proof.t)
                Promise.t )
              H3_2.T(Prover).t =

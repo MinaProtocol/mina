@@ -335,7 +335,7 @@ module Proofs_verified_2 = struct
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               At_most.At_most_2.Stable.V1.t )
-            Base.Me_only.Step.Stable.V2.t )
+            Base.Me_only.Step.Stable.V1.t )
           Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
@@ -405,7 +405,7 @@ module Proofs_verified_max = struct
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
-            Base.Me_only.Step.Stable.V2.t )
+            Base.Me_only.Step.Stable.V1.t )
           Base.Wrap.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 

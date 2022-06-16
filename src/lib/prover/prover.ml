@@ -114,7 +114,7 @@ module Worker_state = struct
                    state_for_handler pending_coinbase =
                  let%map.Async.Deferred res =
                    Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                       let txn_snark_state, txn_snark_proof =
+                       let txn_snark_statement, txn_snark_proof =
                          ledger_proof_opt chain next_state t
                        in
                        let%map.Async.Deferred (), proof =
@@ -129,7 +129,7 @@ module Worker_state = struct
                            }
                            [ ( Blockchain_snark.Blockchain.state chain
                              , Blockchain_snark.Blockchain.proof chain )
-                           ; (txn_snark_state, txn_snark_proof)
+                           ; (txn_snark_statement, txn_snark_proof)
                            ]
                            next_state
                        in
