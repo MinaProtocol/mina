@@ -56,6 +56,12 @@ type ('var, 'value, 'input_var, 'input_value, 'ret_var, 'ret_value) public_input
     - ['ret_var] is the in-circuit type of the [main] function's public output.
     - ['ret_value] is the out-of-circuit type of the [main] function's public
       output.
+    - ['auxiliary_var] is the in-circuit type of the [main] function's
+      auxiliary data, to be returned to the prover but not exposed in the
+      public input.
+    - ['auxiliary_value] is the out-of-circuit type of the [main] function's
+      auxiliary data, to be returned to the prover but not exposed in the
+      public input.
 *)
 type ( 'prev_vars
      , 'prev_values
@@ -64,19 +70,25 @@ type ( 'prev_vars
      , 'a_var
      , 'a_value
      , 'ret_var
-     , 'ret_value )
+     , 'ret_value
+     , 'auxiliary_var
+     , 'auxiliary_value )
      t =
   { identifier : string
   ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
   ; main :
-      'prev_vars H1.T(Id).t -> 'a_var -> 'prev_vars H1.T(E01(B)).t * 'ret_var
+         'prev_vars H1.T(Id).t
+      -> 'a_var
+      -> 'prev_vars H1.T(E01(B)).t * 'ret_var * 'auxiliary_var
   }
 
 module T
     (Statement : T0)
     (Statement_value : T0)
     (Return_var : T0)
-    (Return_value : T0) =
+    (Return_value : T0)
+    (Auxiliary_var : T0)
+    (Auxiliary_value : T0) =
 struct
   type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
     ( 'prev_vars
@@ -86,6 +98,8 @@ struct
     , Statement.t
     , Statement_value.t
     , Return_var.t
-    , Return_value.t )
+    , Return_value.t
+    , Auxiliary_var.t
+    , Auxiliary_value.t )
     t
 end

@@ -311,7 +311,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
                [ x1; x2 ] x )
         in
-        ([ b1; b2 ], ()) )
+        ([ b1; b2 ], (), ()) )
   }
 
 module Statement = struct
@@ -353,7 +353,7 @@ module type S = sig
        , N2.n * (N2.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
-       , (unit * Proof.t) Async.Deferred.t )
+       , (unit * unit * Proof.t) Async.Deferred.t )
        Pickles.Prover.t
 
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
@@ -394,7 +394,7 @@ end) : S = struct
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)
-      ~public_input:(Input typ)
+      ~public_input:(Input typ) ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

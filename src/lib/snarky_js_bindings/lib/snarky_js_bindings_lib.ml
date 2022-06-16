@@ -1739,7 +1739,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
     Pickles.compile_promise ~choices:(Obj.magic choices)
       (module Zkapp_statement)
       (module Zkapp_statement.Constant)
-      ~public_input:(Input zkapp_statement_typ)
+      ~public_input:(Input zkapp_statement_typ) ~auxiliary_typ:Typ.unit
       ~branches:(module Branches)
       ~max_proofs_verified:(module Pickles_types.Nat.N0)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
@@ -1765,7 +1765,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
       let prevs = Obj.magic [] in
       let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
       prover ?handler:None prevs statement
-      |> Promise.map ~f:(fun ((), proof) ->
+      |> Promise.map ~f:(fun ((), (), proof) ->
              Pickles.Side_loaded.Proof.of_proof proof )
       |> Promise_js_helpers.to_js
     in
@@ -1777,7 +1777,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
          , b
          , c
          , Zkapp_statement.Constant.t
-         , (unit * proof) Promise.t )
+         , (unit * unit * proof) Promise.t )
          Pickles.Provers.t
       -> (   zkapp_statement_js
           -> Pickles.Side_loaded.Proof.t Promise_js_helpers.js_promise )

@@ -249,7 +249,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
           Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
         in
         Run.Field.(Assert.equal s (s + one)) ;
-        ([ Boolean.true_; Boolean.true_ ], ()) )
+        ([ Boolean.true_; Boolean.true_ ], (), ()) )
   }
 
 let gen_snapp_ledger =
