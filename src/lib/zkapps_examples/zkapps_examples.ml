@@ -402,7 +402,7 @@ let dummy_constraints () =
 *)
 let party_circuit f ([] : _ H1.T(Id).t)
     ({ transaction; at_party } : Zkapp_statement.Checked.t) :
-    _ H1.T(E01(Pickles.Inductive_rule.B)).t =
+    _ H1.T(E01(Pickles.Inductive_rule.B)).t * unit =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
@@ -415,4 +415,4 @@ let party_circuit f ([] : _ H1.T(Id).t)
   in
   Run.Field.Assert.equal returned_transaction transaction ;
   Run.Field.Assert.equal returned_at_party at_party ;
-  []
+  ([], ())
