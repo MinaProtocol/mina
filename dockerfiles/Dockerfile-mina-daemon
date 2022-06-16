@@ -19,16 +19,15 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libffi7
 #    libprocps7
 #    libjemalloc2
-# Focal-only Deps:
+# Bullseye/Focal-only Deps:
 #    libffi7
 #    libprocps8
 #    libjemalloc2
 
-
 # Dependencies
-RUN apt-get -y update && \
-  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
-  DEBIAN_FRONTEND=noninteractive apt-get -y install \
+RUN apt-get update --quiet --yes \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -43,24 +42,26 @@ RUN apt-get -y update && \
     libpq-dev \
     procps \
     python3 \
-    tzdata && \
-  rm -rf /var/lib/apt/lists/*
+    tzdata \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install google-cloud-sdk for GCLOUD_UPLOAD feature
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
   && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
-  && apt-get update \
-  && apt-get install -y google-cloud-sdk kubectl
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl \
+  && rm -rf /var/lib/apt/lists/*
 
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-  && apt-get update \
-  || sleep 10s && apt-get update \
-  || sleep 10s && apt-get update \
-  || sleep 10s && apt-get update \
-  && apt-get install -y --allow-downgrades "mina-$network=$deb_version"
+  && apt-get update --quiet --yes \
+  || sleep 10s && apt-get update --quiet --yes \
+  || sleep 10s && apt-get update --quiet --yes \
+  || sleep 10s && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" \
+  && rm -rf /var/lib/apt/lists/*
 
 
 # Move to a non-root UID in the future (specifically 50000, as it is memorable and safely within the bounds of most systems)
