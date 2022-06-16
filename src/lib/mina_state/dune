@@ -45,5 +45,6 @@
    mina_ledger
    unsigned_extended
    sgn
+   blake2
    )
 )

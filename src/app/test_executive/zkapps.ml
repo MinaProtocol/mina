@@ -701,7 +701,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       let padding_payments =
         (* for work_delay=1 and transaction_capacity=4 per block*)
-        let needed = 12 in
+        let needed = 36 in
         if !transactions_sent >= needed then 0 else needed - !transactions_sent
       in
       let fee = Currency.Fee.of_int 1_000_000 in
