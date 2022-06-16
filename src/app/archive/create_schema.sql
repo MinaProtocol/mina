@@ -212,6 +212,8 @@ CREATE TABLE blocks_internal_commands
 , internal_command_id   int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
 , sequence_no           int NOT NULL
 , secondary_sequence_no int NOT NULL
+, status                transaction_status NOT NULL
+, failure_reason        text
 , PRIMARY KEY (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 );
 

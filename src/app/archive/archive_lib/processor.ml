@@ -2025,22 +2025,41 @@ module Block_and_internal_command = struct
     ; internal_command_id : int
     ; sequence_no : int
     ; secondary_sequence_no : int
+    ; status : string
+    ; failure_reason : string option
     }
   [@@deriving hlist]
 
+  let table_name = "blocks_internal_commands"
+
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int ]
+      Caqti_type.[ int; int; int; int; string; option string ]
 
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id ~sequence_no
-      ~secondary_sequence_no =
+      ~secondary_sequence_no ~status
+      ~(failure_reason : Transaction_status.Failure.t option) =
+    let failure_reason =
+      Option.map ~f:Transaction_status.Failure.to_string failure_reason
+    in
     Conn.exec
       (Caqti_request.exec typ
          {sql| INSERT INTO blocks_internal_commands
-                (block_id, internal_command_id, sequence_no, secondary_sequence_no)
-                VALUES (?, ?, ?, ?)
+                 (block_id,
+                 internal_command_id,
+                 sequence_no,
+                 secondary_sequence_no
+                 status,
+                 failure_reason)
+               VALUES (?, ?, ?, ?::transaction_status, ?)
          |sql} )
-      { block_id; internal_command_id; sequence_no; secondary_sequence_no }
+      { block_id
+      ; internal_command_id
+      ; sequence_no
+      ; secondary_sequence_no
+      ; status
+      ; failure_reason
+      }
 
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
@@ -2057,7 +2076,8 @@ module Block_and_internal_command = struct
       (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
-      ~internal_command_id ~sequence_no ~secondary_sequence_no =
+      ~internal_command_id ~sequence_no ~secondary_sequence_no ~status
+      ~failure_reason =
     let open Deferred.Result.Let_syntax in
     match%bind
       find
@@ -2070,6 +2090,7 @@ module Block_and_internal_command = struct
         add
           (module Conn)
           ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+          ~status ~failure_reason
 end
 
 module Block_and_signed_command = struct
@@ -2680,6 +2701,17 @@ module Block = struct
             ; chain_status
             }
         in
+        let applied_status = (applied_str, None) in
+        let failure_reasons status =
+          match status with
+          | Transaction_status.Applied ->
+              applied_status
+          | Failed failures ->
+              let display =
+                Transaction_status.Failure.Collection.to_display failures
+              in
+              (failed_str, Some display)
+        in
         let%bind _seq_no =
           Mina_caqti.deferred_result_list_fold transactions ~init:0
             ~f:(fun sequence_no -> function
@@ -2704,15 +2736,7 @@ module Block = struct
                       >>| ignore
                   | Parties _ ->
                       let status, failure_reasons =
-                        match user_command.status with
-                        | Applied ->
-                            (applied_str, None)
-                        | Failed failures ->
-                            let display =
-                              Transaction_status.Failure.Collection.to_display
-                                failures
-                            in
-                            (failed_str, Some display)
+                        failure_reasons user_command.status
                       in
                       Block_and_zkapp_command.add_if_doesn't_exist
                         (module Conn)
@@ -2721,7 +2745,7 @@ module Block = struct
                       >>| ignore
                 in
                 sequence_no + 1
-            | { data = Fee_transfer fee_transfer_bundled; _ } ->
+            | { data = Fee_transfer fee_transfer_bundled; status } ->
                 let fee_transfers =
                   Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
@@ -2746,10 +2770,38 @@ module Block = struct
                 let fee_transfer_infos_with_balances =
                   match fee_transfer_infos with
                   | [ id ] ->
-                      [ id ]
-                  | [ id2; id1 ] ->
+                      let status =
+                        match status with
+                        | Applied ->
+                            (applied_str, None)
+                        | Failed failures ->
+                            (* for a single fee transfer, there's exactly one failure *)
+                            ( failed_str
+                            , Some (List.concat failures |> List.hd_exn) )
+                      in
+                      [ (id, status) ]
+                  | [ id2; id1 ] -> (
                       (* the fold reverses the order of the infos from the fee transfers *)
-                      [ id1; id2 ]
+                      match status with
+                      | Applied ->
+                          [ (id1, applied_status); (id2, applied_status) ]
+                      | Failed failures -> (
+                          (* at most two failures for a fee transfer *)
+                          match failures with
+                          | [ [ failure1 ]; [ failure2 ] ] ->
+                              [ (id1, (failed_str, Some failure1))
+                              ; (id2, (failed_str, Some failure2))
+                              ]
+                          | [ [ failure1 ]; [] ] ->
+                              [ (id1, (failed_str, Some failure1))
+                              ; (id2, applied_status)
+                              ]
+                          | [ []; [ failure2 ] ] ->
+                              [ (id1, applied_status)
+                              ; (id2, (failed_str, Some failure2))
+                              ]
+                          | _ ->
+                              failwith "Invalid failures for fee transfer" ) )
                   | _ ->
                       failwith
                         "Unexpected number of single fee transfers in a fee \
@@ -2758,15 +2810,20 @@ module Block = struct
                 let%map () =
                   Mina_caqti.deferred_result_list_fold
                     fee_transfer_infos_with_balances ~init:()
-                    ~f:(fun () (fee_transfer_id, secondary_sequence_no, _, _) ->
+                    ~f:(fun
+                         ()
+                         ( (fee_transfer_id, secondary_sequence_no, _, _)
+                         , (status, failure_reason) )
+                       ->
                       Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
-                        ~sequence_no ~secondary_sequence_no
+                        ~sequence_no ~secondary_sequence_no ~status
+                        ~failure_reason
                       >>| ignore )
                 in
                 sequence_no + 1
-            | { data = Coinbase coinbase; _ } ->
+            | { data = Coinbase coinbase; status } ->
                 let%bind () =
                   match Mina_base.Coinbase.fee_transfer coinbase with
                   | None ->
@@ -2781,19 +2838,51 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Via_coinbase
                       in
+                      let status, failure_reason =
+                        match status with
+                        | Applied ->
+                            (applied_str, None)
+                        | Failed failures -> (
+                            (* at most two failures in a coinbase transaction First one for the fee transfer and the second for reward transfer*)
+                            match failures with
+                            | [ []; _ ] ->
+                                applied_status
+                            | [ [ failure1 ]; _ ] ->
+                                (failed_str, Some failure1)
+                            | _ ->
+                                failwith
+                                  "Invalid failure status for fee transfer in \
+                                   a coinbase transaction" )
+                      in
                       Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:id ~sequence_no
-                        ~secondary_sequence_no:0
+                        ~secondary_sequence_no:0 ~status ~failure_reason
                 in
                 let%bind id =
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
+                in
+                let status, failure_reason =
+                  match status with
+                  | Applied ->
+                      (applied_str, None)
+                  | Failed failures -> (
+                      (* at most two failures in a coinbase transaction First one for the fee transfer and the second for reward transfer*)
+                      match failures with
+                      | [ _; [] ] ->
+                          applied_status
+                      | [ _; [ failure2 ] ] ->
+                          (failed_str, Some failure2)
+                      | _ ->
+                          failwith
+                            "Invalid failure status for reward transfer in \
+                             coinbase transaction" )
                 in
                 let%map () =
                   Block_and_internal_command.add
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0
+                    ~secondary_sequence_no:0 ~status ~failure_reason
                   >>| ignore
                 in
                 sequence_no + 1 )
@@ -2926,12 +3015,14 @@ module Block = struct
         ~init:()
         ~f:(fun
              ()
-             ( (_internal_command, internal_command_id)
+             ( (internal_command, internal_command_id)
              , (sequence_no, secondary_sequence_no) )
            ->
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
-            ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no )
+            ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+            ~status:internal_command.status
+            ~failure_reason:internal_command.failure_reason )
     in
     (* add zkApp commands *)
     let%bind zkapp_cmds_ids_and_seq_nos =

@@ -1747,8 +1747,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             let%map _action1, a1, l1 = get_or_create t account_id1 in
             let emptys1 = previous_empty_accounts action1 account_id1 in
             set t l1 { a1 with balance; timing } ;
-            (emptys1, no_failures) )
-          else Ok ([], single_failure)
+            (emptys1, no_failures @ no_failures) )
+          else
+            (*failure for each fee transfer single*)
+            Ok ([], single_failure @ single_failure)
         else
           let a2, action2, `Has_permission_to_receive can_receive2 =
             has_permission_to_receive ~ledger:t account_id2
@@ -1761,7 +1763,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           let%bind balance2 =
             modify_balance action2 account_id2 a2.balance ft2.fee
           in
-          let%bind emptys1, failures =
+          let%bind emptys1, failure1 =
             if can_receive1 then (
               let%map _action1, a1, l1 = get_or_create t account_id1 in
               let emptys1 = previous_empty_accounts action1 account_id1 in
@@ -1769,15 +1771,15 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               (emptys1, no_failures) )
             else Ok ([], single_failure)
           in
-          let%map emptys2, failures' =
+          let%map emptys2, failure2 =
             if can_receive2 then (
               let%map _action2, a2, l2 = get_or_create t account_id2 in
               let emptys2 = previous_empty_accounts action2 account_id2 in
               set t l2 { a2 with balance = balance2; timing = timing2 } ;
-              (emptys2, failures) )
-            else Ok ([], single_failure @ failures)
+              (emptys2, no_failures) )
+            else Ok ([], single_failure)
           in
-          (emptys1 @ emptys2, failures')
+          (emptys1 @ emptys2, failure1 @ failure2)
 
   let apply_fee_transfer ~constraint_constants ~txn_global_slot t transfer =
     let open Or_error.Let_syntax in
@@ -1809,7 +1811,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
              , emptys1
              , transferee_update
              , transferee_timing_prev
-             , failures1 ) =
+             , failure1 ) =
       match fee_transfer with
       | None ->
           return (coinbase_amount, [], None, None, no_failures)
@@ -1870,7 +1872,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       in
       add_amount receiver_account.balance amount
     in
-    let%map failures =
+    let%map failure2 =
       if can_receive then (
         let%map _action2, receiver_account, receiver_location =
           get_or_create t receiver_id
@@ -1880,9 +1882,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             balance = receiver_balance
           ; timing = coinbase_receiver_timing
           } ;
-        failures1 )
-      else return (single_failure @ failures1)
+        no_failures )
+      else return single_failure
     in
+    let failures = failure1 @ failure2 in
     Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
     if Transaction_status.Failure.Collection.is_empty failures then
       Transaction_applied.Coinbase_applied.
