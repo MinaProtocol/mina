@@ -400,19 +400,15 @@ let dummy_constraints () =
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
-let party_circuit f ([] : _ H1.T(Id).t)
-    ({ party = party_digest; calls } : Zkapp_statement.Checked.t) :
-    _ H1.T(E01(Pickles.Inductive_rule.B)).t * unit =
+let party_circuit f ([] : _ H1.T(Id).t) () :
+    _ H1.T(E01(Pickles.Inductive_rule.B)).t * Zkapp_statement.Checked.t =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
-  let returned_transaction = Party.Checked.digest party in
-  let returned_calls =
+  let calls =
     (* TODO: This should be returned from
              [Party_under_construction.In_circuit.to_party].
     *)
     Field.constant Parties.Call_forest.empty
   in
-  Run.Field.Assert.equal returned_transaction party_digest ;
-  Run.Field.Assert.equal returned_calls calls ;
-  ([], ())
+  ([], { party = Party.Checked.digest party; calls })
