@@ -131,5 +131,5 @@ let apply_transaction' ~constraint_constants ~txn_state_view l t =
       apply_transaction ~constraint_constants ~txn_state_view l t )
 
 let apply_transaction ~constraint_constants ~txn_state_view l txn =
-  Result.map ~f:Transaction_applied.transaction_status
+  Result.map ~f:Transaction_applied.user_command_status
     (apply_transaction' l ~constraint_constants ~txn_state_view txn)

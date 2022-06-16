@@ -338,7 +338,7 @@ module T = struct
               snarked_ledger tx.data
           in
           let computed_status =
-            Ledger.Transaction_applied.transaction_status txn_with_info
+            Ledger.Transaction_applied.user_command_status txn_with_info
           in
           if Transaction_status.equal tx.status computed_status then Ok ()
           else
@@ -579,7 +579,7 @@ module T = struct
       | Some status ->
           (* Validate that command status matches. *)
           let got_status =
-            Ledger.Transaction_applied.transaction_status applied_txn
+            Ledger.Transaction_applied.user_command_status applied_txn
           in
           if Transaction_status.equal status got_status then return ()
           else

@@ -495,7 +495,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     with
     | Ok res ->
         ( if Option.is_some expected_failure then
-          match Ledger.Transaction_applied.transaction_status res with
+          match Ledger.Transaction_applied.user_command_status res with
           | Applied ->
               failwith
                 (sprintf "Expected Ledger.apply_transaction to fail with %s"
