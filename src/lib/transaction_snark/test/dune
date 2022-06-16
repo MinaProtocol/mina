@@ -43,6 +43,7 @@
    sexplib0
    test_util
    transaction_witness
+   staged_ledger_diff
    )
   (library_flags -linkall)
   (inline_tests)

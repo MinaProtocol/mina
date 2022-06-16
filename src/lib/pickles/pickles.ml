@@ -1042,7 +1042,8 @@ let%test_module "test no side-loaded" =
 
     let () = Tick.Keypair.set_urs_info []
 
-    (*let%test_unit "test deserialization and verification for side-loaded keys" =
+    (*
+    let%test_unit "test deserialization and verification for side-loaded keys" =
       Side_loaded.srs_precomputation () ;
       let pi =
         match

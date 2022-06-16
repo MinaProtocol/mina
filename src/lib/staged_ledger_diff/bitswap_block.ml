@@ -209,6 +209,18 @@ let data_of_blocks blocks root_hash =
       : int ) ;
   data
 
+module For_tests = struct
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind max_block_size = Int.gen_uniform_incl 256 1024 in
+    let%bind data_length = Int.gen_log_uniform_incl 1 (Int.pow 1024 2) in
+    let%map data =
+      String.gen_with_length data_length Char.quickcheck_generator
+      >>| Bigstring.of_string
+    in
+    (max_block_size, data)
+end
+
 let%test_module "bitswap blocks" =
   ( module struct
     let schema_of_blocks ~max_block_size blocks root_hash =
@@ -248,18 +260,9 @@ let%test_module "bitswap blocks" =
       ; max_links_per_block
       }
 
-    let gen =
-      let open Quickcheck.Generator.Let_syntax in
-      let%bind max_block_size = Int.gen_uniform_incl 256 1024 in
-      let%bind data_length = Int.gen_log_uniform_incl 1 (Int.pow 1024 2) in
-      let%map data =
-        String.gen_with_length data_length Char.quickcheck_generator
-        >>| Bigstring.of_string
-      in
-      (max_block_size, data)
-
     let%test_unit "forall x: data_of_blocks (blocks_of_data x) = x" =
-      Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
+      Quickcheck.test For_tests.gen ~trials:100
+        ~f:(fun (max_block_size, data) ->
           let blocks, root_block_hash = blocks_of_data ~max_block_size data in
           let result =
             Or_error.ok_exn (data_of_blocks blocks root_block_hash)
@@ -268,7 +271,8 @@ let%test_module "bitswap blocks" =
 
     let%test_unit "forall x: schema_of_blocks (blocks_of_data x) = \
                    create_schema x" =
-      Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
+      Quickcheck.test For_tests.gen ~trials:100
+        ~f:(fun (max_block_size, data) ->
           let schema = create_schema ~max_block_size (Bigstring.length data) in
           let blocks, root_block_hash = blocks_of_data ~max_block_size data in
           [%test_eq: schema] schema
@@ -289,83 +293,4 @@ let%test_module "bitswap blocks" =
       let result = Or_error.ok_exn (data_of_blocks blocks root_block_hash) in
       Out_channel.flush Out_channel.stdout ;
       [%test_eq: Bigstring.t] data result
-
-    let with_libp2p_helper f =
-      let open Async in
-      let logger = Logger.null () in
-      let pids = Pid.Table.create () in
-      let handle_push_message _ = failwith "ama istimiyorum" in
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind conf_dir = Unix.mkdtemp "bitswap_block_test" in
-          let%bind helper =
-            Libp2p_helper.spawn ~logger ~pids ~conf_dir ~handle_push_message
-            >>| Or_error.ok_exn
-          in
-          Monitor.protect
-            (fun () -> f helper)
-            ~finally:(fun () ->
-              let%bind () = Libp2p_helper.shutdown helper in
-              File_system.remove_dir conf_dir ) )
-
-    let%test_unit "forall x: libp2p_helper#decode (daemon#encode x) = x" =
-      Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
-          let blocks, root_block_hash = blocks_of_data ~max_block_size data in
-          let result =
-            with_libp2p_helper (fun helper ->
-                let open Libp2p_ipc.Rpcs in
-                let request =
-                  TestDecodeBitswapBlocks.create_request
-                    ~blocks:
-                      (blocks |> Map.map ~f:Bigstring.to_string |> Map.to_alist)
-                    ~root_block_hash
-                in
-                Libp2p_helper.do_rpc helper
-                  (module TestDecodeBitswapBlocks)
-                  request )
-            |> Or_error.ok_exn
-            |> Libp2p_ipc.Reader.Libp2pHelperInterface.TestDecodeBitswapBlocks
-               .Response
-               .decoded_data_get |> Bigstring.of_string
-          in
-          [%test_eq: Bigstring.t] data result )
-
-    let%test_unit "forall x: daemon#decode (libp2p_helper#encode x) = x" =
-      Quickcheck.test gen ~trials:100 ~f:(fun (max_block_size, data) ->
-          let blocks, root_block_hash =
-            let resp =
-              with_libp2p_helper (fun helper ->
-                  let open Libp2p_ipc.Rpcs in
-                  let request =
-                    TestEncodeBitswapBlocks.create_request ~max_block_size
-                      ~data:(Bigstring.to_string data)
-                  in
-                  Libp2p_helper.do_rpc helper
-                    (module TestEncodeBitswapBlocks)
-                    request )
-              |> Or_error.ok_exn
-            in
-            let open Libp2p_ipc.Reader in
-            let open Libp2pHelperInterface.TestEncodeBitswapBlocks in
-            let blocks =
-              Capnp.Array.map_list (Response.blocks_get resp)
-                ~f:(fun block_with_id ->
-                  let hash =
-                    Blake2.of_raw_string
-                    @@ BlockWithId.blake2b_hash_get block_with_id
-                  in
-                  let block =
-                    Bigstring.of_string @@ BlockWithId.block_get block_with_id
-                  in
-                  (hash, block) )
-            in
-            let root_block_hash =
-              Blake2.of_raw_string @@ RootBlockId.blake2b_hash_get
-              @@ Response.root_block_id_get resp
-            in
-            (Blake2.Map.of_alist_exn blocks, root_block_hash)
-          in
-          let result =
-            Or_error.ok_exn (data_of_blocks blocks root_block_hash)
-          in
-          [%test_eq: Bigstring.t] data result )
   end )
