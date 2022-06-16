@@ -86,6 +86,7 @@ let ServiceDescription =
           , debRelease : Optional Text
           , debVersion : Optional Text
           , logsBucket : Optional Text
+          , timeout : Optional Text
           , extraArgs : List Text
           }
       , default =
@@ -97,6 +98,7 @@ let ServiceDescription =
         , debRelease = None Text
         , debVersion = None Text
         , logsBucket = None Text
+        , timeout = Some "3600s"
         , extraArgs = [] : List Text
         }
       }
@@ -184,9 +186,11 @@ let cloudBuild
                 , name = "gcr.io/cloud-builders/docker"
                 , entrypoint = Some "bash"
                 , args = Some ["-c", script]
+                , timeout = serviceDesc.timeout
                 }
               ]
             , images = Some [ tag ]
+            , timeout = serviceDesc.timeout
             , logsBucket = serviceDesc.logsBucket
             }
 
