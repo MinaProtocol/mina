@@ -2,7 +2,6 @@ open Async_kernel
 open Core
 open Mina_base
 open Mina_state
-open Mina_block
 open Pipe_lib
 open Signature_lib
 module Archive_client = Archive_client
@@ -137,8 +136,7 @@ val initial_peers : t -> Mina_net2.Multiaddr.t list
 
 val client_port : t -> int
 
-val validated_transitions :
-  t -> External_transition.Validated.t Strict_pipe.Reader.t
+val validated_transitions : t -> Mina_block.Validated.t Strict_pipe.Reader.t
 
 module Root_diff : sig
   [%%versioned:

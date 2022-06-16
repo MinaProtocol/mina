@@ -1,7 +1,6 @@
 open Core
 open Mina_base
 open Mina_state
-open Mina_block
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -19,8 +18,7 @@ module Make (Inputs : Inputs_intf) :
       get_extension (Transition_frontier.extensions frontier) Root_history
     in
     let%map root_data = Root_history.lookup root_history state_hash in
-    External_transition.Validated.lower
-    @@ Frontier_base.Root_data.Historical.transition root_data
+    Frontier_base.Root_data.Historical.transition root_data
 
   module Merkle_list = Merkle_list_prover.Make_ident (struct
     type value = Mina_block.Validated.t
