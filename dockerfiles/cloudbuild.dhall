@@ -106,8 +106,9 @@ let DockerfileDescription =
           { service : Text
           , dockerfilePaths : List Text
           , dockerContext : Optional Text
+          , timeout : Optional Text
           }
-      , default.dockerContext = None Text
+      , default = { dockerContext = None Text, timeout = Some "10800s" }
       }
 
 let optionalBuildArg
@@ -183,10 +184,12 @@ let cloudBuild
               [ Schema.Step::{
                 , name = "gcr.io/cloud-builders/docker"
                 , entrypoint = Some "bash"
-                , args = Some ["-c", script]
+                , args = Some [ "-c", script ]
+                , timeout = desc.timeout
                 }
               ]
             , images = Some [ tag ]
+            , timeout = desc.timeout
             , logsBucket = serviceDesc.logsBucket
             }
 
@@ -201,55 +204,56 @@ let dockerBuild
         in  script
 
 let services =
-      { mina-archive =
-        { service = "mina-archive"
+      { mina-archive = DockerfileDescription::{
+        , service = "mina-archive"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-archive" ]
         , dockerContext = Some "dockerfiles"
         }
-      , bot =
-        { service = "bot"
+      , bot = DockerfileDescription::{
+        , service = "bot"
         , dockerfilePaths = [ "frontend/bot/Dockerfile" ]
         , dockerContext = Some "frontend/bot"
         }
-      , mina-daemon =
-        { service = "mina-daemon"
+      , mina-daemon = DockerfileDescription::{
+        , service = "mina-daemon"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-mina-daemon" ]
         , dockerContext = Some "dockerfiles/"
+        , timeout = Some "3600s"
         }
-      , mina-toolchain =
-        { service = "mina-toolchain"
+      , mina-toolchain = DockerfileDescription::{
+        , service = "mina-toolchain"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
           , "dockerfiles/stages/3-toolchain"
           ]
-        , dockerContext = None Text
+        , timeout = Some "10800s"
         }
-      , mina-rosetta =
-        { service = "mina-rosetta"
+      , mina-rosetta = DockerfileDescription::{
+        , service = "mina-rosetta"
         , dockerfilePaths =
           [ "dockerfiles/stages/1-build-deps"
           , "dockerfiles/stages/2-opam-deps"
           , "dockerfiles/stages/3-builder"
           , "dockerfiles/stages/4-production"
           ]
-        , dockerContext = None Text
         }
-      , leaderboard =
-        { service = "leaderboard"
+      , leaderboard = DockerfileDescription::{
+        , service = "leaderboard"
         , dockerfilePaths = [ "frontend/leaderboard/Dockerfile" ]
         , dockerContext = Some "frontend/leaderboard"
         }
-      , delegation-backend =
-        { service = "delegation-backend"
+      , delegation-backend = DockerfileDescription::{
+        , service = "delegation-backend"
         , dockerfilePaths = [ "dockerfiles/Dockerfile-delegation-backend" ]
         , dockerContext = Some "src/app/delegation_backend"
         }
-      , delegation-backend-toolchain =
-        { service = "delegation-backend"
+      , delegation-backend-toolchain = DockerfileDescription::{
+        , service = "delegation-backend"
         , dockerfilePaths =
           [ "dockerfiles/Dockerfile-delegation-backend-toolchain" ]
         , dockerContext = Some "src/app/delegation_backend"
+        , timeout = Some "10800s"
         }
       }
 
