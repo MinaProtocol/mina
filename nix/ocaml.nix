@@ -130,6 +130,10 @@ let
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+
+        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+
         configurePhase = ''
           export MINA_ROOT="$PWD"
           export -f patchShebangs stopNest isScript
@@ -222,11 +226,14 @@ let
 
         outputs = [ "out" ];
 
-        checkInputs = [ pkgs.nodejs ];
+        checkInputs = [ pkgs.nodejs-16_x ];
 
         buildPhase = ''
-          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$opam__zarith__lib/zarith"
-          dune build --display=short src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
+          dune build --display=short \
+            src/lib/crypto/kimchi_bindings/js/node_js \
+            src/app/client_sdk/client_sdk.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_node.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
         '';
 
         doCheck = true;
@@ -243,8 +250,9 @@ let
         '';
 
         installPhase = ''
-          mkdir -p $out/share/client_sdk
+          mkdir -p $out/share/client_sdk $out/share/snarkyjs_bindings
           mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
+          mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
         '';
       });
 

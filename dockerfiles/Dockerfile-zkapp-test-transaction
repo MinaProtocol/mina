@@ -28,4 +28,7 @@ RUN apt-get -y update \
 # Snapp test transaction package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
+  || sleep 10s && apt-get -y update \
+  || sleep 10s && apt-get -y update \
+  || sleep 10s && apt-get -y update \
   && apt-get install -y "mina-zkapp-test-transaction=$deb_version"

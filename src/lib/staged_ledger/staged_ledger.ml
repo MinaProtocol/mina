@@ -2117,11 +2117,12 @@ let%test_module "staged ledger tests" =
             ~protocol_constants:genesis_constants.protocol
         in
         let compile_time_genesis =
+          let open Staged_ledger_diff in
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
           Mina_state.Genesis_protocol_state.t
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-            ~constraint_constants ~consensus_constants
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
         in
         compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
