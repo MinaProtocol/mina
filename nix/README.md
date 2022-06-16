@@ -4,7 +4,7 @@ Nix is a declarative package manager for Linux, macOS and other
 UNIX-like systems. You can read more about Nix on its [official
 website](https://nixos.org).
 
-Mina can be built using Nix, in multiple ways.
+Mina can be built using Nix, in multiple ways. Follow the steps below to get started and read the [troubleshooting section](#troubleshooting) if you encounter any problem.
 
 ## 1. Install Nix
 
@@ -19,7 +19,7 @@ You may also install Nix from your distribution's official repository;
 Note however that it is preferrable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
-## 2. Enable Flakes
+## 2. Enable Flakes (optional but recommended)
 
 Mina is packaged using [Nix Flakes](https://nixos.wiki/wiki/Flakes),
 which are an experimental feature of Nix. However, compatibility with
@@ -40,13 +40,13 @@ metadata github:nixos/nixpkgs` for example.
 
 ## 3. Add a nix registry entry
 
-If you're using flakes, **you have to run the `./nix/pin.sh` script** to
+If you're using flakes (see previous section), **you have to run the `./nix/pin.sh` script** to
 get the `mina` registry entry, since that's the easiest way to enable
 submodules to be available to the build.
 
 ## 4. Use it
 
-### IDE with LSP support (vscode, emacs, neovim, ...)
+### IDE with LSP support (vscode, emacs, (neo)vim, ...)
 
 Just run
 
@@ -54,7 +54,7 @@ Just run
 nix develop mina#with-lsp -c $EDITOR .
 ```
 
-If you have your `$EDITOR` variable set correctly. Otherwise, replace it with
+if you have your `$EDITOR` variable set correctly. Otherwise, replace it with
 the editor you want to edit Mina with.
 
 This command will try to `dune build @check` in `src/app/cli`, in order to get
@@ -63,7 +63,7 @@ will only happen once. After it's done, you will be dropped in your favourite ed
 
 ### "Pure" build
 
-You can also use Nix to fetch all the dependencies, and then only use
+You can use Nix to fetch all the dependencies, and then only use
 `dune` as a build system to build Mina itself.
 
 This way, you can build the entirety of Mina inside the Nix sandbox
@@ -76,11 +76,10 @@ you're using flakes). This will drop you in a shell with all
 dependencies, including OCaml, Rust and Go ones available, so the only
 thing you have to do is run `dune build src/app/cli/src/mina.exe`. You
 can also just run `eval "$buildPhase"` to run the same command as
-would be run inside the nix sandbox.
-
+would be run inside the nix sandbox. Note that `opam` will **not** be available in that shell, since Nix takes over the job of computing and installing dependencies. If you need to modify the opam switch, use the impure build (next section).
 ### "Impure" build
 
-You can use Nix to only fetch the "system" (native) dependencies of
+You can also use Nix to only fetch the "system" (native) dependencies of
 Mina, and let `opam`, `cargo` and `go` figure out the relevant
 language-specific dependencies. To do so, run `nix-shell` (or `nix
 develop mina#impure` if you have flakes).
