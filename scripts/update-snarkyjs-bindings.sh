@@ -16,9 +16,13 @@ sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw 
 sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$SNARKY_JS_PATH"/src/node_bindings/snarky_js_node.bc.js
 sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$SNARKY_JS_PATH"/src/node_bindings/snarky_js_node.bc.js
 
+# optimize wasm / minify JS (we don't do this with jsoo to not break the error message fix above)
 pushd "$SNARKY_JS_PATH"/src/node_bindings
   wasm-opt --detect-features --enable-mutable-globals -O4 plonk_wasm_bg.wasm -o plonk_wasm_bg.wasm.opt
   mv plonk_wasm_bg.wasm.opt plonk_wasm_bg.wasm
+  npx esbuild --minify --log-level=error snarky_js_node.bc.js > snarky_js_node.bc.min.js
+  mv snarky_js_node.bc.min.js snarky_js_node.bc.js
+  rm snarky_js_node.bc.runtime.js
 popd
 
 npm run build --prefix="$SNARKY_JS_PATH"
@@ -35,9 +39,13 @@ sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw 
 sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
 sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
 
+# optimize wasm / minify JS (we don't do this with jsoo to not break the error message fix above)
 pushd "$SNARKY_JS_PATH"/src/chrome_bindings
   wasm-opt --detect-features --enable-mutable-globals -O4 plonk_wasm_bg.wasm -o plonk_wasm_bg.wasm.opt
   mv plonk_wasm_bg.wasm.opt plonk_wasm_bg.wasm
+  npx esbuild --minify --log-level=error snarky_js_chrome.bc.js > snarky_js_chrome.bc.min.js
+  mv snarky_js_chrome.bc.min.js snarky_js_chrome.bc.js
+  rm snarky_js_chrome.bc.runtime.js
 popd
 
 npm run build:web --prefix="$SNARKY_JS_PATH"
