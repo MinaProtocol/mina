@@ -45,18 +45,18 @@ variable "whale_count" {
   type = number
 
   description = "Number of unique online whales for the network to run"
-  default     = 18
+  default     = 3
 }
 
 variable "fish_count" {
   type = number
 
   description = "Number of unique online fish for the network to run"
-  default     = 72
+  default     = 3
 }
 
 variable "seed_count" {
-  default     = 6
+  default     = 1
 }
 
 variable "plain_node_count" {
@@ -64,7 +64,7 @@ variable "plain_node_count" {
 }
 
 locals {
-  testnet_name = "gossipqa_TEST"
+  testnet_name = "gossipqajiawei"
   mina_image = "minaprotocol/mina-daemon:1.3.2alpha1-develop-665edf8-bullseye-devnet"
   mina_archive_image = "minaprotocol/mina-archive:1.3.2alpha1-develop-665edf8-bullseye"
   seed_region = "us-central1"

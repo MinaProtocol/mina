@@ -59,18 +59,18 @@ export MINA_LIBP2P_PASS="${PRIVKEY_PASS}"
 
 echo "generating whale keys"
 for i in $(seq 1 $WHALES); do
-    mina advanced generate-keypair --privkey-path "${KEYSDIR}/whale-${i}" 2>/dev/null
+    ~/repos/mina/_build/default/src/app/cli/src/mina.exe advanced generate-keypair --privkey-path "${KEYSDIR}/whale-${i}" 2>/dev/null
 done
 
 echo "generating fish keys"
 for i in $(seq 1 $FISH); do
-    mina advanced generate-keypair --privkey-path "${KEYSDIR}/fish-${i}" 2>/dev/null
+    ~/repos/mina/_build/default/src/app/cli/src/mina.exe advanced generate-keypair --privkey-path "${KEYSDIR}/fish-${i}" 2>/dev/null
 done
 
 echo "generating seeds' libp2p keys"
 mkdir "${KEYSDIR}/libp2p-keys"
 for i in $(seq 1 $SEEDS); do
-    mina advanced generate-libp2p-keypair --privkey-path "${KEYSDIR}/libp2p-keys/seed-${i}" 2>/dev/null
+    ~/repos/mina/_build/default/src/app/cli/src/mina.exe advanced generate-libp2p-keypair --privkey-path "${KEYSDIR}/libp2p-keys/seed-${i}" 2>/dev/null
 done
 
 
