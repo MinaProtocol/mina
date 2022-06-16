@@ -41,7 +41,7 @@ RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_releas
   || sleep 10s && apt-get --quiet --yes update \
   || sleep 10s && apt-get --quiet --yes update \
   || sleep 10s && apt-get --quiet --yes update \
-  && apt-get install --quiet --yes "mina-archive=$deb_version"
+  && apt-get install --quiet --yes "mina-archive=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
