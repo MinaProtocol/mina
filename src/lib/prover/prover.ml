@@ -433,9 +433,10 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
   let constraint_constants = genesis_inputs.constraint_constants in
   let consensus_constants = genesis_inputs.consensus_constants in
   let prev_state =
+    let open Staged_ledger_diff in
     Protocol_state.negative_one ~genesis_ledger
       ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let genesis_epoch_ledger =
     match genesis_inputs.genesis_epoch_data with
@@ -449,8 +450,9 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
     Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
   in
   let snark_transition =
+    let open Staged_ledger_diff in
     Snark_transition.genesis ~constraint_constants ~consensus_constants
-      ~genesis_ledger
+      ~genesis_ledger ~genesis_body_reference
   in
   let pending_coinbase =
     { Mina_base.Pending_coinbase_witness.pending_coinbases =

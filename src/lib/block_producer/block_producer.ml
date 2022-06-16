@@ -260,6 +260,10 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   (Ledger_proof.statement proof).supply_increase )
                 ~default:Currency.Amount.zero
             in
+            let body_reference =
+              Staged_ledger_diff.Body.compute_reference
+                (Body.create @@ Staged_ledger_diff.forget diff)
+            in
             let blockchain_state =
               (* We use the time of the beginning of the slot because if things
                  are slower than expected, we may have entered the next slot and
@@ -271,7 +275,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
                 ~registers:next_registers ~genesis_ledger_hash
-                ~staged_ledger_hash:next_staged_ledger_hash
+                ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
             in
             let current_time =
               Block_time.now time_controller
@@ -585,7 +589,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (scheduled_time, block_data, winner_pk) =
+      let produce ivar (scheduled_time, block_data, winner_pubkey) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -667,7 +671,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
-                ~winner_pk ~block_reward_threshold
+                ~winner_pk:winner_pubkey ~block_reward_threshold
             in
             match next_state_opt with
             | None ->
@@ -748,10 +752,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                             (let body = Body.create staged_ledger_diff in
                              Mina_block.create ~body
                                ~header:
-                                 (Header.create
-                                    ~body_reference:
-                                      (Body_reference.of_body body)
-                                    ~protocol_state ~protocol_state_proof
+                                 (Header.create ~protocol_state
+                                    ~protocol_state_proof
                                     ~delta_block_chain_proof () ) )
                         }
                       |> Validation.skip_time_received_validation
@@ -1238,9 +1240,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   (let body = Body.create staged_ledger_diff in
                    Mina_block.create ~body
                      ~header:
-                       (Header.create
-                          ~body_reference:(Body_reference.of_body body)
-                          ~protocol_state ~protocol_state_proof
+                       (Header.create ~protocol_state ~protocol_state_proof
                           ~delta_block_chain_proof () ) )
               }
             |> Validation.skip_time_received_validation

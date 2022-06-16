@@ -34,18 +34,21 @@ let tick_rounds = Nat.to_int Tick.Rounds.n
 
 let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     ~actual_proofs_verified:
-      (module AB : Nat.Add.Intf with type n = actual_proofs_verified) (e1, e2)
+      (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
+    (e : _ Plonk_types.All_evals.With_public_input.t)
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
-    ~plonk ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2) =
+    ~plonk ~xi ~zeta ~zetaw =
   let combined_evals =
     Plonk_checks.evals_of_split_evals ~zeta ~zetaw
       (module Tick.Field)
-      ~rounds:tick_rounds (e1, e2)
+      ~rounds:tick_rounds e.evals
   in
   let ft_eval0 : Tick.Field.t =
     Plonk_checks.Type1.ft_eval0
       (module Tick.Field)
-      ~env ~domain plonk combined_evals x_hat_1
+      ~env ~domain plonk
+      (Plonk_types.Evals.to_in_circuit combined_evals)
+      (fst e.public_input)
   in
   let T = AB.eq in
   let challenge_polys =
@@ -53,29 +56,23 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       ~f:(fun chals -> unstage (challenge_polynomial (Vector.to_array chals)))
       old_bulletproof_challenges
   in
-  let pi = AB.add Nat.N26.n in
-  let combine ~ft (x_hat : Tick.Field.t) pt e =
-    let a, b = Plonk_types.Evals.(to_vectors (e : _ array t)) in
-    let v : (Tick.Field.t array, _) Vector.t =
-      Vector.append
-        (Vector.map challenge_polys ~f:(fun f -> [| f pt |]))
-        ([| x_hat |] :: [| ft |] :: a)
-        (snd pi)
+  let a = Plonk_types.Evals.to_list e.evals in
+  let combine ~which_eval ~ft pt =
+    let f (x, y) = match which_eval with `Fst -> x | `Snd -> y in
+    let a = List.map ~f a in
+    let v : Tick.Field.t array list =
+      List.append
+        (List.map (Vector.to_list challenge_polys) ~f:(fun f -> [| f pt |]))
+        ([| f e.public_input |] :: [| ft |] :: a)
     in
     let open Tick.Field in
-    Pcs_batch.combine_split_evaluations
-      (Common.dlog_pcs_batch (AB.add Nat.N26.n))
-      ~xi ~init:Fn.id ~mul
+    Pcs_batch.combine_split_evaluations ~xi ~init:Fn.id
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
-      ~last:Array.last ~evaluation_point:pt
-      ~shifted_pow:(fun deg x ->
-        Pcs_batch.pow ~one ~mul x
-          Int.(Max_degree.step - (deg mod Max_degree.step)) )
-      v b
+      v
   in
   let open Tick.Field in
-  combine ~ft:ft_eval0 x_hat_1 zeta e1
-  + (r * combine ~ft:ft_eval1 x_hat_2 zetaw e2)
+  combine ~which_eval:`Fst ~ft:ft_eval0 zeta
+  + (r * combine ~which_eval:`Snd ~ft:ft_eval1 zetaw)
 
 module Step_acc = Tock.Inner_curve.Affine
 
@@ -262,6 +259,9 @@ let wrap
         domain ~shifts:Common.tick_shifts
         ~domain_generator:Backend.Tick.Field.domain_generator
     in
+    let tick_combined_evals =
+      Plonk_types.Evals.to_in_circuit tick_combined_evals
+    in
     let tick_env =
       Plonk_checks.scalars_env
         (module Tick.Field)
@@ -276,9 +276,9 @@ let wrap
       let open As_field in
       combined_inner_product (* Note: We do not pad here. *)
         ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-        proof.openings.evals ~x_hat ~r ~xi ~zeta ~zetaw
-        ~old_bulletproof_challenges:prev_challenges ~env:tick_env
-        ~domain:tick_domain ~ft_eval1:proof.openings.ft_eval1
+        { evals = proof.openings.evals; public_input = x_hat }
+        ~r ~xi ~zeta ~zetaw ~old_bulletproof_challenges:prev_challenges
+        ~env:tick_env ~domain:tick_domain ~ft_eval1:proof.openings.ft_eval1
         ~plonk:tick_plonk_minimal
     in
     let me_only : _ P.Base.Me_only.Wrap.t =
@@ -396,10 +396,7 @@ let wrap
     ; statement = Types.Wrap.Statement.to_minimal next_statement
     ; prev_evals =
         { Plonk_types.All_evals.evals =
-            Double.map2 x_hat proof.openings.evals ~f:(fun p e ->
-                { Plonk_types.All_evals.With_public_input.public_input = p
-                ; evals = e
-                } )
+            { public_input = x_hat; evals = proof.openings.evals }
         ; ft_eval1 = proof.openings.ft_eval1
         }
     }

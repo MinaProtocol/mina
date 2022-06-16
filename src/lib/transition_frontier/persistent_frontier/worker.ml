@@ -71,7 +71,6 @@ module Worker = struct
     in
     match diff with
     | New_node (Lite transition) -> (
-        let transition = External_transition.Validated.lower transition in
         let r =
           ( Database.add t.db ~transition
             :> (mutant, apply_diff_error_internal) Result.t )
