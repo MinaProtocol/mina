@@ -523,11 +523,9 @@ module Base = struct
       ; source_insufficient_balance : 'bool (* Payment only *)
       ; source_minimum_balance_violation : 'bool (* Payment only *)
       ; source_bad_timing : 'bool (* Payment only *)
-      ; source_balance_update_not_permitted : 'bool (*Payment only*)
-      ; receiver_balance_update_not_permitted : 'bool (*Payment only*)
       }
 
-    let num_fields = 10
+    let num_fields = 8
 
     let to_list
         { predicate_failed
@@ -538,8 +536,6 @@ module Base = struct
         ; source_insufficient_balance
         ; source_minimum_balance_violation
         ; source_bad_timing
-        ; source_balance_update_not_permitted
-        ; receiver_balance_update_not_permitted
         } =
       [ predicate_failed
       ; source_not_present
@@ -549,8 +545,6 @@ module Base = struct
       ; source_insufficient_balance
       ; source_minimum_balance_violation
       ; source_bad_timing
-      ; source_balance_update_not_permitted
-      ; receiver_balance_update_not_permitted
       ]
 
     let of_list = function
@@ -562,8 +556,6 @@ module Base = struct
         ; source_insufficient_balance
         ; source_minimum_balance_violation
         ; source_bad_timing
-        ; source_balance_update_not_permitted
-        ; receiver_balance_update_not_permitted
         ] ->
           { predicate_failed
           ; source_not_present
@@ -573,8 +565,6 @@ module Base = struct
           ; source_insufficient_balance
           ; source_minimum_balance_violation
           ; source_bad_timing
-          ; source_balance_update_not_permitted
-          ; receiver_balance_update_not_permitted
           }
       | _ ->
           failwith
@@ -674,16 +664,11 @@ module Base = struct
               ; source_insufficient_balance = false
               ; source_minimum_balance_violation = false
               ; source_bad_timing = false
-              ; source_balance_update_not_permitted = false
-              ; receiver_balance_update_not_permitted = false
               }
           | Payment ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
                 else receiver_account
-              in
-              let _receiver_balance_update_not_permitted =
-                not (Account.has_permission ~to_:`Receive receiver_account)
               in
               let receiver_needs_creating =
                 let id = Account.identifier receiver_account in
@@ -707,9 +692,6 @@ module Base = struct
               let source_account =
                 if fee_payer_is_source then fee_payer_account
                 else source_account
-              in
-              let _source_balance_update_not_permitted =
-                not (Account.has_permission ~to_:`Send source_account)
               in
               let source_not_present =
                 let id = Account.identifier source_account in
@@ -764,12 +746,6 @@ module Base = struct
               ; source_insufficient_balance
               ; source_minimum_balance_violation
               ; source_bad_timing
-              ; source_balance_update_not_permitted = false
-              ; receiver_balance_update_not_permitted =
-                  false
-                  (*; fee_receiver1_balance_update_not_permitted = false
-                    ; fee_receiver2_balance_update_not_permitted = false
-                    ; coinbase_receiver_balance_update_not_permitted = false*)
               }
           | Mint_tokens | Create_account ->
               assert false )
@@ -2768,19 +2744,6 @@ module Base = struct
                  (Boolean.Assert.( = ) is_empty_failure
                     user_command_failure.receiver_not_present )
              in
-             (*let%bind () =
-                 [%with_label "Valid balance update permission for receiver"]
-                   (let%bind receiver_permission_computed_correctly =
-                      Boolean.(
-                        equal receiver_balance_update_permitted
-                          permitted_to_receive)
-                    in
-                    Boolean.(
-                      Assert.any
-                        [ not payment_or_internal_command
-                        ; receiver_permission_computed_correctly
-                        ]) )
-               in*)
              let%bind is_empty_and_writeable =
                Boolean.(all [ is_empty_and_writeable; not is_empty_failure ])
              in
@@ -2871,12 +2834,6 @@ module Base = struct
                Boolean.(!receiver_overflow ||| user_command_fails)
              in
              let%bind is_empty_and_writeable =
-               (*let%bind ok_for_user_command =
-                   Boolean.any
-                     [ Boolean.not is_user_command
-                     ; Boolean.not user_command_fails
-                     ]
-                 in*)
                (* Do not create a new account if the user command will fail or if receiving is not permitted *)
                Boolean.all
                  [ is_empty_and_writeable
@@ -3041,19 +2998,6 @@ module Base = struct
                  ; fee_receiver_update_permitted
                  ]
              in
-             (*let%bind () =
-                 [%with_label "Valid balance update permission for source"]
-                   (let%bind payment_permission_computed_correctly =
-                      Boolean.(
-                        equal
-                          user_command_failure.source_balance_update_not_permitted
-                          (not update_permitted))
-                    in
-                    Boolean.(
-                      Assert.any
-                        [ not is_payment; payment_permission_computed_correctly ])
-                   )
-               in*)
              let%bind amount =
                (* Only payments should affect the balance at this stage. *)
                if_ payment_permitted ~typ:Amount.typ ~then_:payload.body.amount
