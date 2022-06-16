@@ -263,7 +263,7 @@ let spawn ~logger ~pids ~conf_dir ~handle_push_message =
                        ~metadata:[ ("error", `String error) ]
                  | None ->
                      Core.print_endline line ) ;
-                 Deferred.unit)) ;
+                 Deferred.unit ) ) ;
       O1trace.background_thread "handle_libp2p_ipc_incoming" (fun () ->
           Child_processes.stdout process
           |> Libp2p_ipc.read_incoming_messages
