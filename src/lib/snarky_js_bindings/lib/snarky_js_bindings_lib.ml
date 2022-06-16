@@ -1564,43 +1564,42 @@ let () =
 
 (* helpers for pickles_compile *)
 
-type 'a zkapp_statement = 'a array
+type 'a public_input = 'a array
 
-type zkapp_statement_js = field_class Js.t Js.js_array Js.t
+type public_input_js = field_class Js.t Js.js_array Js.t
 
-type 'proof zkapp_statement_with_proof_js =
-  < statement : zkapp_statement_js Js.prop ; proof : 'proof Js.prop > Js.t
+type 'proof public_input_with_proof_js =
+  < publicInput : public_input_js Js.prop ; proof : 'proof Js.prop > Js.t
 
-module Zkapp_statement = struct
-  type t = Field.t zkapp_statement
+module Public_input = struct
+  type t = Field.t public_input
 
   let to_field_elements (t : t) : Field.t array = t
 
   let to_constant (t : t) = Array.map ~f:to_unchecked t
 
-  let to_js (t : t) : zkapp_statement_js =
-    Array.map ~f:to_js_field t |> Js.array
+  let to_js (t : t) : public_input_js = Array.map ~f:to_js_field t |> Js.array
 
-  let of_js (a : zkapp_statement_js) : t =
+  let of_js (a : public_input_js) : t =
     Js.to_array a |> Array.map ~f:of_js_field
 
-  let list_to_js (statements : t list) =
-    List.map ~f:to_js statements |> Array.of_list |> Js.array
+  let list_to_js (public_inputs : t list) =
+    List.map ~f:to_js public_inputs |> Array.of_list |> Js.array
 
   module Constant = struct
-    type t = Field.Constant.t zkapp_statement
+    type t = Field.Constant.t public_input
 
     let to_field_elements (t : t) : Field.Constant.t array = t
 
-    let to_js (t : t) : zkapp_statement_js =
+    let to_js (t : t) : public_input_js =
       Array.map ~f:to_js_field_unchecked t |> Js.array
 
-    let of_js (a : zkapp_statement_js) : t =
+    let of_js (a : public_input_js) : t =
       Js.to_array a |> Array.map ~f:of_js_field_unchecked
   end
 end
 
-let zkapp_statement_typ (i : int) = Typ.array ~length:i Field.typ
+let public_input_typ (i : int) = Typ.array ~length:i Field.typ
 
 let dummy_constraints =
   let module Inner_curve = Kimchi_pasta.Pasta.Pallas in
@@ -1637,8 +1636,8 @@ type ('a_var, 'a_value, 'a_weird) pickles_rule =
 type pickles_rule_js =
   < identifier : Js.js_string Js.t Js.prop
   ; main :
-      (   zkapp_statement_js
-       -> zkapp_statement_js Js.js_array Js.t
+      (   public_input_js
+       -> public_input_js Js.js_array Js.t
        -> bool_class Js.t Js.js_array Js.t )
       Js.prop
   ; proofsToVerify :
@@ -1658,12 +1657,12 @@ let create_pickles_rule ~self (rule : pickles_rule_js) =
   { identifier = Js.to_string rule##.identifier
   ; prevs
   ; main =
-      (fun prev_statements statement ->
+      (fun prev_inputs public_input ->
         dummy_constraints () ;
         let should_verifys =
           rule##.main
-            (Zkapp_statement.to_js statement)
-            (Zkapp_statement.list_to_js prev_statements)
+            (Public_input.to_js public_input)
+            (Public_input.list_to_js prev_inputs)
         in
         Js.to_array should_verifys |> Array.to_list
         |> List.map ~f:(fun b -> b##.value) )
@@ -1675,7 +1674,7 @@ let other_verification_key_constr :
 
 type proof = (Pickles_types.Nat.N0.n, Pickles_types.Nat.N0.n) Pickles.Proof.t
 
-module Statements_with_proofs =
+module Public_inputs_with_proofs =
   Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
 
 let nat_modules_list : (module Pickles_types.Nat.Intf) list =
@@ -1735,7 +1734,7 @@ let nat_add_module (i : int) : (module Pickles_types.Nat.Add.Intf) =
   List.nth_exn nat_add_modules_list i
 
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
-    (statement_size : int) =
+    (public_input_size : int) =
   let choices = choices |> Js.to_array |> Array.to_list in
   let branches = List.length choices in
   let max_proofs =
@@ -1749,9 +1748,9 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   (* TODO get rid of Obj.magic for choices *)
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices:(Obj.magic choices)
-      (module Zkapp_statement)
-      (module Zkapp_statement.Constant)
-      ~typ:(zkapp_statement_typ statement_size)
+      (module Public_input)
+      (module Public_input.Constant)
+      ~typ:(public_input_typ public_input_size)
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
@@ -1772,30 +1771,27 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   in
   let module Proof = (val p) in
   let to_js_prover prover =
-    let prove (statement_js : zkapp_statement_js)
-        (prevs_js : Proof.t zkapp_statement_with_proof_js Js.js_array Js.t) =
-      let to_prev (previous : Proof.t zkapp_statement_with_proof_js) =
-        (Zkapp_statement.Constant.of_js previous##.statement, previous##.proof)
+    let prove (public_input_js : public_input_js)
+        (prevs_js : Proof.t public_input_with_proof_js Js.js_array Js.t) =
+      let to_prev (previous : Proof.t public_input_with_proof_js) =
+        (Public_input.Constant.of_js previous##.publicInput, previous##.proof)
       in
-      let prevs : (Field.Constant.t zkapp_statement * Proof.t) list =
+      let prevs : (Field.Constant.t public_input * Proof.t) list =
         prevs_js |> Js.to_array |> Array.to_list |> List.map ~f:to_prev
       in
-      let prevs : (_, _, _) Statements_with_proofs.t = Obj.magic prevs in
-      let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
-      prover ?handler:None prevs statement |> Promise_js_helpers.to_js
+      let prevs : (_, _, _) Public_inputs_with_proofs.t = Obj.magic prevs in
+      let public_input =
+        Public_input.(public_input_js |> of_js |> to_constant)
+      in
+      prover ?handler:None prevs public_input |> Promise_js_helpers.to_js
     in
     prove
   in
   let rec to_js_provers :
       type a b c.
-         ( a
-         , b
-         , c
-         , Zkapp_statement.Constant.t
-         , Proof.t Promise.t )
-         Pickles.Provers.t
-      -> (   zkapp_statement_js
-          -> Proof.t zkapp_statement_with_proof_js Js.js_array Js.t
+         (a, b, c, Public_input.Constant.t, Proof.t Promise.t) Pickles.Provers.t
+      -> (   public_input_js
+          -> Proof.t public_input_with_proof_js Js.js_array Js.t
           -> Proof.t Promise_js_helpers.js_promise )
          list = function
     | [] ->
@@ -1804,9 +1800,9 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
         to_js_prover p :: to_js_provers ps
   in
   let provers = provers |> to_js_provers |> Array.of_list |> Js.array in
-  let verify (statement_js : zkapp_statement_js) (proof : _ Pickles.Proof.t) =
-    let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
-    Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
+  let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
+    let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
+    Proof.verify_promise [ (public_input, proof) ] |> Promise_js_helpers.to_js
   in
   object%js
     val provers = Obj.magic provers
@@ -2173,7 +2169,7 @@ module Ledger = struct
       val fullCommitment = to_js_field_unchecked full_commitment
     end
 
-  let transaction_statement (tx_json : Js.js_string Js.t) (party_index : int) =
+  let zkapp_public_input (tx_json : Js.js_string Js.t) (party_index : int) =
     let tx =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
@@ -2182,7 +2178,7 @@ module Ledger = struct
       (Parties.Call_forest.hash ps :> Impl.field)
     in
     let transaction = transaction_commitment tx (Other_party party_index) in
-    Zkapp_statement.Constant.to_js [| transaction; at_party |]
+    Public_input.Constant.to_js [| transaction; at_party |]
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
     Signature_lib.Schnorr.Chunked.sign (private_key key)
@@ -2260,9 +2256,9 @@ module Ledger = struct
         | Proof _ | None_given ->
             () )
 
-  let verify_party_proof (statement : zkapp_statement_js)
+  let verify_party_proof (public_input : public_input_js)
       (proof : Js.js_string Js.t) (vk : Js.js_string Js.t) =
-    let statement = Zkapp_statement.Constant.of_js statement in
+    let public_input = Public_input.Constant.of_js public_input in
     let proof =
       Result.ok_or_failwith
         (Pickles.Side_loaded.Proof.of_base64 (Js.to_string proof))
@@ -2271,8 +2267,8 @@ module Ledger = struct
       Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
     in
     Pickles.Side_loaded.verify_promise
-      [ (vk, statement, proof) ]
-      ~value_to_field_elements:Zkapp_statement.Constant.to_field_elements
+      [ (vk, public_input, proof) ]
+      ~value_to_field_elements:Public_input.Constant.to_field_elements
     |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =
@@ -2409,7 +2405,7 @@ module Ledger = struct
     static_method "hashTransactionChecked" hash_transaction_checked ;
 
     static_method "transactionCommitments" transaction_commitments ;
-    static_method "transactionStatement" transaction_statement ;
+    static_method "zkappPublicInput" zkapp_public_input ;
     static_method "signFieldElement" sign_field_element ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;

@@ -36,12 +36,12 @@ async function picklesProof() {
 
   console.log("prove (first rule)...");
   start = Date.now();
-  let { statement, proof } = await prove(provers[0], witnesses[0]);
+  let { publicInput, proof } = await prove(provers[0], witnesses[0]);
   time = Date.now() - start;
   console.log(`created recursive proof in ${(time / 1000).toFixed(2)} sec`);
 
   console.log("verify...");
-  let ok = await verify(statement, proof);
+  let ok = await verify(publicInput, proof);
 
   console.log("ok?", ok === 1);
   if (!ok) throw Error(`${name} failed`);
@@ -61,14 +61,14 @@ async function prove(prover, args) {
   mainContext = {
     witnesses: args,
   };
-  let statement = [Field.one];
-  let proof = await prover(statement, []);
+  let publicInput = [Field.one];
+  let proof = await prover(publicInput, []);
   mainContext = undefined;
-  return { proof, statement };
+  return { proof, publicInput };
 }
 
 function createDummyRule(name, func, witnessTypes) {
-  function main([statement]) {
+  function main([publicInput]) {
     // get the private inputs from current context and call the function with them
     let { witnesses } = mainContext;
     witnesses = witnessTypes.map(
@@ -77,7 +77,7 @@ function createDummyRule(name, func, witnessTypes) {
         : emptyWitness
     );
     func(...witnesses);
-    statement.assertEquals(1);
+    publicInput.assertEquals(1);
     return [];
   }
   return { identifier: name, main, proofsToVerify: [] };

@@ -114,9 +114,9 @@ if (command === "update") {
   );
   parties = JSON.parse(data.parties);
   let proof = parties.otherParties[0].authorization.proof;
-  let statement = Ledger.transactionStatement(data.parties, 0);
+  let publicInput = Ledger.zkappPublicInput(data.parties, 0);
   let ok = await Ledger.verifyPartyProof(
-    statement,
+    publicInput,
     proof,
     verificationKey.data
   );
