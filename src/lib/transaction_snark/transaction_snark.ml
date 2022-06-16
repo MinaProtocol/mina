@@ -515,7 +515,7 @@ module Base = struct
         to the fee-payer if executing the user command will later fail.
     *)
     type 'bool t =
-      { predicate_failed : 'bool (* All user commands *)
+      { predicate_failed : 'bool (* User commands *)
       ; source_not_present : 'bool (* User commands *)
       ; receiver_not_present : 'bool (* Delegate, Mint_tokens *)
       ; amount_insufficient_to_create : 'bool (* Payment only *)
@@ -682,7 +682,7 @@ module Base = struct
                 if Account_id.equal receiver fee_payer then fee_payer_account
                 else receiver_account
               in
-              let receiver_balance_update_not_permitted =
+              let _receiver_balance_update_not_permitted =
                 not (Account.has_permission ~to_:`Receive receiver_account)
               in
               let receiver_needs_creating =
@@ -708,7 +708,7 @@ module Base = struct
                 if fee_payer_is_source then fee_payer_account
                 else source_account
               in
-              let source_balance_update_not_permitted =
+              let _source_balance_update_not_permitted =
                 not (Account.has_permission ~to_:`Send source_account)
               in
               let source_not_present =
@@ -764,8 +764,12 @@ module Base = struct
               ; source_insufficient_balance
               ; source_minimum_balance_violation
               ; source_bad_timing
-              ; source_balance_update_not_permitted
-              ; receiver_balance_update_not_permitted
+              ; source_balance_update_not_permitted = false
+              ; receiver_balance_update_not_permitted =
+                  false
+                  (*; fee_receiver1_balance_update_not_permitted = false
+                    ; fee_receiver2_balance_update_not_permitted = false
+                    ; coinbase_receiver_balance_update_not_permitted = false*)
               }
           | Mint_tokens | Create_account ->
               assert false )
@@ -2563,22 +2567,33 @@ module Base = struct
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
              in
-             let update_permitted =
+             let permitted_to_send =
                Account.Checked.has_permission ~to_:`Send account
+             in
+             let permitted_to_receive =
+               Account.Checked.has_permission ~to_:`Receive account
              in
              let%bind () =
                [%with_label
                  "Fee payer balance update should be permitted for all commands"]
-                 (Boolean.Assert.is_true update_permitted)
+                 (Boolean.Assert.any
+                    [ Boolean.not is_user_command; permitted_to_send ] )
+             in
+             (*second fee receiver of a fee transfer and fee receiver of a coinbase transaction remain unchanged if
+                1. These accounts are not permitted to receive tokens and,
+                2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
+             let%bind update_account =
+               let%bind receiving_allowed =
+                 Boolean.all
+                   [ is_coinbase_or_fee_transfer; permitted_to_receive ]
+               in
+               Boolean.any [ is_user_command; receiving_allowed ]
              in
              let%bind is_empty_and_writeable =
-               (* 1. If this is a coinbase with zero fee, do not create the
+               (* If this is a coinbase with zero fee, do not create the
                   account, since the fee amount won't be enough to pay for it.
-                  2. Don't update or create if account's send/receive permission doesn't allow
                *)
-               Boolean.(
-                 all
-                   [ is_empty_and_writeable; not is_zero_fee; update_permitted ])
+               Boolean.(all [ is_empty_and_writeable; not is_zero_fee ])
              in
              let%bind should_pay_to_create =
                (* Coinbases and fee transfers may create, or we may be creating
@@ -2633,7 +2648,7 @@ module Base = struct
                     check_timing ~balance_check ~timed_balance_check ~account
                       ~txn_amount:(Some txn_amount) ~txn_global_slot
                   in
-                  Account_timing.if_ update_permitted ~then_:timing
+                  Account_timing.if_ update_account ~then_:timing
                     ~else_:account.timing )
              in
              let%bind balance =
@@ -2641,10 +2656,10 @@ module Base = struct
                  (let%bind updated_balance =
                     Balance.Checked.add_signed_amount account.balance amount
                   in
-                  Balance.Checked.if_ update_permitted ~then_:updated_balance
+                  Balance.Checked.if_ update_account ~then_:updated_balance
                     ~else_:account.balance )
              in
-             let%map public_key =
+             let%bind public_key =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
                  ~then_:(Account_id.Checked.public_key fee_payer)
                  ~else_:account.public_key
@@ -2658,20 +2673,35 @@ module Base = struct
                  ~then_:(Account_id.Checked.public_key fee_payer)
                  ~else_:account.delegate
              in
-             { Account.Poly.balance
-             ; public_key
-             ; token_id
-             ; token_permissions = account.token_permissions
-             ; token_symbol = account.token_symbol
-             ; nonce = next_nonce
-             ; receipt_chain_hash
-             ; delegate
-             ; voting_for = account.voting_for
-             ; timing
-             ; permissions = account.permissions
-             ; zkapp = account.zkapp
-             ; zkapp_uri = account.zkapp_uri
-             } ) )
+             let a =
+               { Account.Poly.balance
+               ; public_key
+               ; token_id
+               ; token_permissions = account.token_permissions
+               ; token_symbol = account.token_symbol
+               ; nonce = next_nonce
+               ; receipt_chain_hash
+               ; delegate
+               ; voting_for = account.voting_for
+               ; timing
+               ; permissions = account.permissions
+               ; zkapp = account.zkapp
+               ; zkapp_uri = account.zkapp_uri
+               }
+             in
+             let%map () =
+               as_prover
+                 Impl.As_prover.(
+                   fun _ ->
+                     let acc = read Account.typ a in
+                     let acc_before = read Account.typ account in
+                     Core.printf
+                       !"Fee payer account before %{sexp: Account.t } after \
+                         %{sexp: Account.t } \n\
+                         %!"
+                       acc_before acc)
+             in
+             a ) )
     in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
@@ -2699,6 +2729,7 @@ module Base = struct
          Amount.Checked.sub base_amount coinbase_receiver_fee )
     in
     let receiver_overflow = ref Boolean.false_ in
+    let receiver_balance_update_permitted = ref Boolean.true_ in
     let%bind root_after_receiver_update =
       [%with_label "Update receiver"]
         (Frozen_ledger_hash.modify_account_recv
@@ -2712,10 +2743,20 @@ module Base = struct
                 - the receiver for a coinbase
                 - the first receiver for a fee transfer
              *)
-             let%bind update_permitted =
-               Boolean.if_ is_stake_delegation ~then_:Boolean.true_
-                 ~else_:(Account.Checked.has_permission ~to_:`Receive account)
+             let permitted_to_receive =
+               Account.Checked.has_permission ~to_:`Receive account
              in
+             (*Account remains unchanged if balance update is not permitted for payments, fee_transfers and coinbase transactions*)
+             let%bind payment_or_internal_command =
+               Boolean.any [ is_payment; is_coinbase_or_fee_transfer ]
+             in
+             let%bind update_account =
+               Boolean.any
+                 [ Boolean.not payment_or_internal_command
+                 ; permitted_to_receive
+                 ]
+             in
+             receiver_balance_update_permitted := permitted_to_receive ;
              let%bind is_empty_failure =
                let%bind must_not_be_empty =
                  Boolean.(is_stake_delegation ||| is_mint_tokens)
@@ -2727,33 +2768,21 @@ module Base = struct
                  (Boolean.Assert.( = ) is_empty_failure
                     user_command_failure.receiver_not_present )
              in
-             let%bind () =
-               [%with_label
-                 "Receiver update should be permitted for fee transfer and \
-                  coinbase"]
-                 (Boolean.Assert.any [ is_user_command; update_permitted ])
-             in
-             let%bind () =
-               [%with_label "Valid balance update permission for receiver"]
-                 (let%bind payment_permission_computed_correctly =
+             (*let%bind () =
+                 [%with_label "Valid balance update permission for receiver"]
+                   (let%bind receiver_permission_computed_correctly =
+                      Boolean.(
+                        equal receiver_balance_update_permitted
+                          permitted_to_receive)
+                    in
                     Boolean.(
-                      equal
-                        user_command_failure
-                          .receiver_balance_update_not_permitted
-                        (not update_permitted))
-                  in
-                  Boolean.(
-                    Assert.any
-                      [ not is_payment; payment_permission_computed_correctly ])
-                 )
-             in
+                      Assert.any
+                        [ not payment_or_internal_command
+                        ; receiver_permission_computed_correctly
+                        ]) )
+               in*)
              let%bind is_empty_and_writeable =
-               Boolean.(
-                 all
-                   [ is_empty_and_writeable
-                   ; not is_empty_failure
-                   ; update_permitted
-                   ])
+               Boolean.(all [ is_empty_and_writeable; not is_empty_failure ])
              in
              let%bind should_pay_to_create =
                Boolean.(is_empty_and_writeable &&& not is_create_account)
@@ -2842,14 +2871,45 @@ module Base = struct
                Boolean.(!receiver_overflow ||| user_command_fails)
              in
              let%bind is_empty_and_writeable =
-               (* Do not create a new account if the user command will fail. *)
-               Boolean.(is_empty_and_writeable &&& not user_command_fails)
+               (*let%bind ok_for_user_command =
+                   Boolean.any
+                     [ Boolean.not is_user_command
+                     ; Boolean.not user_command_fails
+                     ]
+                 in*)
+               (* Do not create a new account if the user command will fail or if receiving is not permitted *)
+               Boolean.all
+                 [ is_empty_and_writeable
+                 ; Boolean.not user_command_fails
+                 ; update_account
+                 ]
+             in
+             let%bind () =
+               as_prover
+                 Impl.As_prover.(
+                   fun _ ->
+                     let is_empty_writeable =
+                       read Boolean.typ is_empty_and_writeable
+                     in
+                     let user_command_fails =
+                       read Boolean.typ user_command_fails
+                     in
+                     let update_account = read Boolean.typ update_account in
+                     Core.printf
+                       !"is_empty_writeable %b user_command_fails %b \
+                         update_account %b\n\
+                         %!"
+                       is_empty_writeable user_command_fails update_account)
+             in
+             let%bind balance =
+               Balance.Checked.if_ update_account ~then_:balance
+                 ~else_:account.balance
              in
              let%bind may_delegate =
                (* Only default tokens may participate in delegation. *)
                Boolean.(is_empty_and_writeable &&& token_default)
              in
-             let%map delegate =
+             let%bind delegate =
                Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
                  ~else_:account.delegate
@@ -2870,21 +2930,36 @@ module Base = struct
                  ~then_:payload.body.token_locked
                  ~else_:account.token_permissions.token_locked
              in
-             { Account.Poly.balance
-             ; public_key
-             ; token_id
-             ; token_permissions =
-                 { Token_permissions.token_owner; token_locked }
-             ; token_symbol = account.token_symbol
-             ; nonce = account.nonce
-             ; receipt_chain_hash = account.receipt_chain_hash
-             ; delegate
-             ; voting_for = account.voting_for
-             ; timing = account.timing
-             ; permissions = account.permissions
-             ; zkapp = account.zkapp
-             ; zkapp_uri = account.zkapp_uri
-             } ) )
+             let a =
+               { Account.Poly.balance
+               ; public_key
+               ; token_id
+               ; token_permissions =
+                   { Token_permissions.token_owner; token_locked }
+               ; token_symbol = account.token_symbol
+               ; nonce = account.nonce
+               ; receipt_chain_hash = account.receipt_chain_hash
+               ; delegate
+               ; voting_for = account.voting_for
+               ; timing = account.timing
+               ; permissions = account.permissions
+               ; zkapp = account.zkapp
+               ; zkapp_uri = account.zkapp_uri
+               }
+             in
+             let%map () =
+               as_prover
+                 Impl.As_prover.(
+                   fun _ ->
+                     let acc = read Account.typ a in
+                     let acc_before = read Account.typ account in
+                     Core.printf
+                       !"Receiver account before %{sexp: Account.t } after \
+                         %{sexp: Account.t } \n\
+                         %!"
+                       acc_before acc)
+             in
+             a ) )
     in
     let%bind user_command_fails =
       Boolean.(!receiver_overflow ||| user_command_fails)
@@ -2934,38 +3009,54 @@ module Base = struct
                     (assert_r1cs not_fee_payer_is_source num_failures
                        num_failures ) )
              in
-             let%bind update_permitted =
-               Boolean.if_ is_stake_delegation
-                 ~then_:
-                   (Account.Checked.has_permission ~to_:`Set_delegate account)
-                 ~else_:(Account.Checked.has_permission ~to_:`Send account)
+             let permitted_to_update_delegate =
+               Account.Checked.has_permission ~to_:`Set_delegate account
              in
-             let%bind () =
-               [%with_label
-                 "Source update should be permitted for fee transfer and \
-                  coinbase"]
-                 (Boolean.Assert.any [ is_user_command; update_permitted ])
+             let permitted_to_send =
+               Account.Checked.has_permission ~to_:`Send account
              in
-             let%bind () =
-               [%with_label "Valid balance update permission for source"]
-                 (let%bind payment_permission_computed_correctly =
-                    Boolean.(
-                      equal
-                        user_command_failure.source_balance_update_not_permitted
-                        (not update_permitted))
-                  in
-                  Boolean.(
-                    Assert.any
-                      [ not is_payment; payment_permission_computed_correctly ])
-                 )
+             let permitted_to_receive =
+               Account.Checked.has_permission ~to_:`Receive account
              in
-             let%bind amount =
-               (* Only payments should affect the balance at this stage if
-                  there is no failure*)
-               let%bind affect_balance =
-                 Boolean.(all [ not user_command_fails; is_payment ])
+             (*Account remains unchanged if not permitted to send, receive, or set delegate*)
+             let%bind payment_permitted =
+               Boolean.all
+                 [ is_payment
+                 ; permitted_to_send
+                 ; !receiver_balance_update_permitted
+                 ]
+             in
+             let%bind update_account =
+               let%bind delegation_permitted =
+                 Boolean.all
+                   [ is_stake_delegation; permitted_to_update_delegate ]
                in
-               if_ affect_balance ~typ:Amount.typ ~then_:payload.body.amount
+               let%bind fee_receiver_update_permitted =
+                 Boolean.all
+                   [ is_coinbase_or_fee_transfer; permitted_to_receive ]
+               in
+               Boolean.any
+                 [ payment_permitted
+                 ; delegation_permitted
+                 ; fee_receiver_update_permitted
+                 ]
+             in
+             (*let%bind () =
+                 [%with_label "Valid balance update permission for source"]
+                   (let%bind payment_permission_computed_correctly =
+                      Boolean.(
+                        equal
+                          user_command_failure.source_balance_update_not_permitted
+                          (not update_permitted))
+                    in
+                    Boolean.(
+                      Assert.any
+                        [ not is_payment; payment_permission_computed_correctly ])
+                   )
+               in*)
+             let%bind amount =
+               (* Only payments should affect the balance at this stage. *)
+               if_ payment_permitted ~typ:Amount.typ ~then_:payload.body.amount
                  ~else_:Amount.(var_of_t zero)
              in
              let txn_global_slot = current_global_slot in
@@ -2995,7 +3086,7 @@ module Base = struct
                     check_timing ~balance_check ~timed_balance_check ~account
                       ~txn_amount:(Some amount) ~txn_global_slot
                   in
-                  Account_timing.if_ update_permitted ~then_:timing
+                  Account_timing.if_ update_account ~then_:timing
                     ~else_:account.timing )
              in
              let%bind balance, `Underflow underflow =
@@ -3009,11 +3100,11 @@ module Base = struct
                  (Boolean.Assert.( = ) underflow
                     user_command_failure.source_insufficient_balance )
              in
-             let%map delegate =
-               let%bind update_delegate =
-                 Boolean.(all [ is_stake_delegation; update_permitted ])
+             let%bind delegate =
+               let%bind may_delegate =
+                 Boolean.all [ is_stake_delegation; update_account ]
                in
-               Public_key.Compressed.Checked.if_ update_delegate
+               Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
                  ~else_:account.delegate
              in
@@ -3021,20 +3112,35 @@ module Base = struct
                 of [user_command_fails], but we throw the resulting hash away
                 in [final_root] below, so it shouldn't matter.
              *)
-             { Account.Poly.balance
-             ; public_key = account.public_key
-             ; token_id = account.token_id
-             ; token_permissions = account.token_permissions
-             ; token_symbol = account.token_symbol
-             ; nonce = account.nonce
-             ; receipt_chain_hash = account.receipt_chain_hash
-             ; delegate
-             ; voting_for = account.voting_for
-             ; timing
-             ; permissions = account.permissions
-             ; zkapp = account.zkapp
-             ; zkapp_uri = account.zkapp_uri
-             } ) )
+             let a =
+               { Account.Poly.balance
+               ; public_key = account.public_key
+               ; token_id = account.token_id
+               ; token_permissions = account.token_permissions
+               ; token_symbol = account.token_symbol
+               ; nonce = account.nonce
+               ; receipt_chain_hash = account.receipt_chain_hash
+               ; delegate
+               ; voting_for = account.voting_for
+               ; timing
+               ; permissions = account.permissions
+               ; zkapp = account.zkapp
+               ; zkapp_uri = account.zkapp_uri
+               }
+             in
+             let%map () =
+               as_prover
+                 Impl.As_prover.(
+                   fun _ ->
+                     let acc = read Account.typ a in
+                     let acc_before = read Account.typ account in
+                     Core.printf
+                       !"Source account before %{sexp: Account.t } after \
+                         %{sexp: Account.t } \n\
+                         %!"
+                       acc_before acc)
+             in
+             a ) )
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee

@@ -89,7 +89,7 @@ module Transaction_applied = struct
     module Stable = struct
       module V2 = struct
         type t =
-          { fee_transfer : Fee_transfer.Stable.V2.t
+          { fee_transfer : Fee_transfer.Stable.V2.t With_status.Stable.V2.t
           ; previous_empty_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp]
@@ -104,7 +104,7 @@ module Transaction_applied = struct
     module Stable = struct
       module V2 = struct
         type t =
-          { coinbase : Coinbase.Stable.V1.t
+          { coinbase : Coinbase.Stable.V1.t With_status.Stable.V2.t
           ; previous_empty_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp]
@@ -152,11 +152,11 @@ module Transaction_applied = struct
         With_status.map s.command ~f:(fun c ->
             Transaction.Command (User_command.Parties c) )
     | Fee_transfer f ->
-        { data = Fee_transfer f.fee_transfer; status = Applied }
+        With_status.map f.fee_transfer ~f:(fun f -> Transaction.Fee_transfer f)
     | Coinbase c ->
-        { data = Coinbase c.coinbase; status = Applied }
+        With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-  let user_command_status : t -> Transaction_status.t =
+  let transaction_status : t -> Transaction_status.t =
    fun { varying; _ } ->
     match varying with
     | Command
@@ -164,10 +164,10 @@ module Transaction_applied = struct
         status
     | Command (Parties c) ->
         c.command.status
-    | Fee_transfer _ ->
-        Applied
-    | Coinbase _ ->
-        Applied
+    | Fee_transfer f ->
+        f.fee_transfer.status
+    | Coinbase c ->
+        c.coinbase.status
 end
 
 module type S = sig
@@ -215,7 +215,7 @@ module type S = sig
 
     module Fee_transfer_applied : sig
       type t = Transaction_applied.Fee_transfer_applied.t =
-        { fee_transfer : Fee_transfer.t
+        { fee_transfer : Fee_transfer.t With_status.t
         ; previous_empty_accounts : Account_id.t list
         }
       [@@deriving sexp]
@@ -223,7 +223,9 @@ module type S = sig
 
     module Coinbase_applied : sig
       type t = Transaction_applied.Coinbase_applied.t =
-        { coinbase : Coinbase.t; previous_empty_accounts : Account_id.t list }
+        { coinbase : Coinbase.t With_status.t
+        ; previous_empty_accounts : Account_id.t list
+        }
       [@@deriving sexp]
     end
 
@@ -241,7 +243,7 @@ module type S = sig
 
     val transaction : t -> Transaction.t With_status.t
 
-    val user_command_status : t -> Transaction_status.t
+    val transaction_status : t -> Transaction_status.t
   end
 
   module Global_state : sig
@@ -552,11 +554,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           With_status.map s.command ~f:(fun c ->
               Transaction.Command (User_command.Parties c) )
       | Fee_transfer f ->
-          { data = Fee_transfer f.fee_transfer; status = Applied }
+          With_status.map f.fee_transfer ~f:(fun f ->
+              Transaction.Fee_transfer f )
       | Coinbase c ->
-          { data = Coinbase c.coinbase; status = Applied }
+          With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-    let user_command_status : t -> Transaction_status.t =
+    let transaction_status : t -> Transaction_status.t =
      fun { varying; _ } ->
       match varying with
       | Command
@@ -565,10 +568,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           status
       | Command (Parties c) ->
           c.command.status
-      | Fee_transfer _ ->
-          Applied
-      | Coinbase _ ->
-          Applied
+      | Fee_transfer f ->
+          f.fee_transfer.status
+      | Coinbase c ->
+          c.coinbase.status
   end
 
   let previous_empty_accounts action pk =
@@ -1671,12 +1674,36 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   let update_timing_when_no_deduction ~txn_global_slot account =
     validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
 
-  let check_permission_to_receive receiver_account =
-    if Account.has_permission ~to_:`Receive receiver_account then Ok ()
-    else
-      Or_error.error_string
-        Transaction_status.Failure.(
-          describe Transaction_status.Failure.Update_not_permitted_balance)
+  let has_permission_to_receive ~ledger receiver_account_id :
+      Account.t
+      * Ledger_intf.account_state
+      * [> `Has_permission_to_receive of bool ] =
+    let init_account = Account.initialize receiver_account_id in
+    match location_of_account ledger receiver_account_id with
+    | None ->
+        (*new account, check that default permissions allow receiving *)
+        ( init_account
+        , `Added
+        , `Has_permission_to_receive
+            (Account.has_permission ~to_:`Receive init_account) )
+    | Some loc -> (
+        match get ledger loc with
+        | None ->
+            ( init_account
+            , `Added
+            , `Has_permission_to_receive
+                (Account.has_permission ~to_:`Receive init_account) )
+        | Some receiver_account ->
+            ( receiver_account
+            , `Existed
+            , `Has_permission_to_receive
+                (Account.has_permission ~to_:`Receive receiver_account) ) )
+
+  let no_failures = Transaction_status.Failure.Collection.empty
+
+  let single_failure =
+    Transaction_status.Failure.Collection.of_single_failure
+      Update_not_permitted_balance
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance
       ~modify_timing =
@@ -1693,56 +1720,72 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     match Fee_transfer.to_singles transfer with
     | `One ft ->
         let account_id = Fee_transfer.Single.receiver ft in
-        (* TODO(#4496): Do not use get_or_create here; we should not create a
-           new account before we know that the transaction will go through and
-           thus the creation fee has been paid.
-        *)
-        let%bind action, a, loc = get_or_create t account_id in
-        let%bind () = check_permission_to_receive a in
-        let emptys = previous_empty_accounts action account_id in
+        let a, action, `Has_permission_to_receive can_receive =
+          has_permission_to_receive ~ledger:t account_id
+        in
         let%bind timing = modify_timing a in
-        let%map balance = modify_balance action account_id a.balance ft.fee in
-        set t loc { a with balance; timing } ;
-        emptys
+        let%bind balance = modify_balance action account_id a.balance ft.fee in
+        if can_receive then (
+          let%map _action, a, loc = get_or_create t account_id in
+          let emptys = previous_empty_accounts action account_id in
+          set t loc { a with balance; timing } ;
+          (emptys, no_failures) )
+        else Ok ([], single_failure)
     | `Two (ft1, ft2) ->
         let account_id1 = Fee_transfer.Single.receiver ft1 in
-        (* TODO(#4496): Do not use get_or_create here; we should not create a
-           new account before we know that the transaction will go through and
-           thus the creation fee has been paid.
-        *)
-        let%bind action1, a1, l1 = get_or_create t account_id1 in
-        let%bind () = check_permission_to_receive a1 in
-        let emptys1 = previous_empty_accounts action1 account_id1 in
+        let a1, action1, `Has_permission_to_receive can_receive1 =
+          has_permission_to_receive ~ledger:t account_id1
+        in
         let account_id2 = Fee_transfer.Single.receiver ft2 in
-        if Account_id.equal account_id1 account_id2 then (
+        if Account_id.equal account_id1 account_id2 then
           let%bind fee = error_opt "overflow" (Fee.add ft1.fee ft2.fee) in
           let%bind timing = modify_timing a1 in
-          let%map balance = modify_balance action1 account_id1 a1.balance fee in
-          set t l1 { a1 with balance; timing } ;
-          emptys1 )
+          let%bind balance =
+            modify_balance action1 account_id1 a1.balance fee
+          in
+          if can_receive1 then (
+            let%map _action1, a1, l1 = get_or_create t account_id1 in
+            let emptys1 = previous_empty_accounts action1 account_id1 in
+            set t l1 { a1 with balance; timing } ;
+            (emptys1, no_failures) )
+          else Ok ([], single_failure)
         else
           (* TODO(#4496): Do not use get_or_create here; we should not create a
              new account before we know that the transaction will go through
              and thus the creation fee has been paid.
           *)
-          let%bind action2, a2, l2 = get_or_create t account_id2 in
-          let%bind () = check_permission_to_receive a2 in
-          let emptys2 = previous_empty_accounts action2 account_id2 in
+          let a2, action2, `Has_permission_to_receive can_receive2 =
+            has_permission_to_receive ~ledger:t account_id2
+          in
           let%bind balance1 =
             modify_balance action1 account_id1 a1.balance ft1.fee
           in
           (*Note: Not updating the timing field of a1 to avoid additional check in transactions snark (check_timing for "receiver"). This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account. (#5973)*)
           let%bind timing2 = modify_timing a2 in
-          let%map balance2 =
+          let%bind balance2 =
             modify_balance action2 account_id2 a2.balance ft2.fee
           in
-          set t l1 { a1 with balance = balance1 } ;
-          set t l2 { a2 with balance = balance2; timing = timing2 } ;
-          emptys1 @ emptys2
+          let%bind emptys1, failures =
+            if can_receive1 then (
+              let%map _action1, a1, l1 = get_or_create t account_id1 in
+              let emptys1 = previous_empty_accounts action1 account_id1 in
+              set t l1 { a1 with balance = balance1 } ;
+              (emptys1, no_failures) )
+            else Ok ([], single_failure)
+          in
+          let%map emptys2, failures' =
+            if can_receive2 then (
+              let%map _action2, a2, l2 = get_or_create t account_id2 in
+              let emptys2 = previous_empty_accounts action2 account_id2 in
+              set t l2 { a2 with balance = balance2; timing = timing2 } ;
+              (emptys2, failures) )
+            else Ok ([], single_failure @ failures)
+          in
+          (emptys1 @ emptys2, failures')
 
   let apply_fee_transfer ~constraint_constants ~txn_global_slot t transfer =
     let open Or_error.Let_syntax in
-    let%map previous_empty_accounts =
+    let%map previous_empty_accounts, failures =
       process_fee_transfer t transfer
         ~modify_balance:(fun action _ b f ->
           let%bind amount =
@@ -1753,19 +1796,27 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ~modify_timing:(fun acc ->
           update_timing_when_no_deduction ~txn_global_slot acc )
     in
+    let ft_with_status =
+      if Transaction_status.Failure.Collection.is_empty failures then
+        { With_status.data = transfer; status = Applied }
+      else { data = transfer; status = Failed failures }
+    in
     Transaction_applied.Fee_transfer_applied.
-      { fee_transfer = transfer; previous_empty_accounts }
+      { fee_transfer = ft_with_status; previous_empty_accounts }
 
   let apply_coinbase ~constraint_constants ~txn_global_slot t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
         ({ receiver; fee_transfer; amount = coinbase_amount } as cb : Coinbase.t)
       =
     let open Or_error.Let_syntax in
-    let%bind receiver_reward, emptys1, transferee_update, transferee_timing_prev
-        =
+    let%bind ( receiver_reward
+             , emptys1
+             , transferee_update
+             , transferee_timing_prev
+             , failures1 ) =
       match fee_transfer with
       | None ->
-          return (coinbase_amount, [], None, None)
+          return (coinbase_amount, [], None, None, no_failures)
       | Some ({ receiver_pk = transferee; fee } as ft) ->
           assert (not @@ Public_key.Compressed.equal transferee receiver) ;
           let transferee_id = Coinbase.Fee_transfer.receiver ft in
@@ -1774,39 +1825,41 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             error_opt "Coinbase fee transfer too large"
               (Amount.sub coinbase_amount fee)
           in
-          let%bind action, transferee_account, transferee_location =
-            (* TODO(#4496): Do not use get_or_create here; we should not create
-               a new account before we know that the transaction will go
-               through and thus the creation fee has been paid.
-            *)
-            get_or_create t transferee_id
+          let transferee_account, action, `Has_permission_to_receive can_receive
+              =
+            has_permission_to_receive ~ledger:t transferee_id
           in
-          let%bind () = check_permission_to_receive transferee_account in
           let emptys = previous_empty_accounts action transferee_id in
           let%bind timing =
             update_timing_when_no_deduction ~txn_global_slot transferee_account
           in
-          let%map balance =
+          let%bind balance =
             let%bind amount =
               sub_account_creation_fee ~constraint_constants action fee
             in
             add_amount transferee_account.balance amount
           in
-          ( receiver_reward
-          , emptys
-          , Some
-              (transferee_location, { transferee_account with balance; timing })
-          , Some transferee_account.timing )
+          if can_receive then
+            let%map _action, transferee_account, transferee_location =
+              (* TODO(#4496): Do not use get_or_create here; we should not create
+                 a new account before we know that the transaction will go
+                 through and thus the creation fee has been paid.
+              *)
+              get_or_create t transferee_id
+            in
+            ( receiver_reward
+            , emptys
+            , Some
+                ( transferee_location
+                , { transferee_account with balance; timing } )
+            , Some transferee_account.timing
+            , no_failures )
+          else return (receiver_reward, [], None, None, single_failure)
     in
     let receiver_id = Account_id.create receiver Token_id.default in
-    let%bind action2, receiver_account, receiver_location =
-      (* TODO(#4496): Do not use get_or_create here; we should not create a new
-         account before we know that the transaction will go through and thus
-         the creation fee has been paid.
-      *)
-      get_or_create t receiver_id
+    let receiver_account, action2, `Has_permission_to_receive can_receive =
+      has_permission_to_receive ~ledger:t receiver_id
     in
-    let%bind () = check_permission_to_receive receiver_account in
     let emptys2 = previous_empty_accounts action2 receiver_id in
     (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
     let%bind coinbase_receiver_timing =
@@ -1819,20 +1872,40 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Some _timing ->
           Ok receiver_account.timing
     in
-    let%map receiver_balance =
+    let%bind receiver_balance =
       let%bind amount =
         sub_account_creation_fee ~constraint_constants action2 receiver_reward
       in
       add_amount receiver_account.balance amount
     in
-    set t receiver_location
-      { receiver_account with
-        balance = receiver_balance
-      ; timing = coinbase_receiver_timing
-      } ;
+    let%map failures =
+      if can_receive then (
+        let%map _action2, receiver_account, receiver_location =
+          (* TODO(#4496): Do not use get_or_create here; we should not create a new
+             account before we know that the transaction will go through and thus
+             the creation fee has been paid.
+          *)
+          get_or_create t receiver_id
+        in
+        set t receiver_location
+          { receiver_account with
+            balance = receiver_balance
+          ; timing = coinbase_receiver_timing
+          } ;
+        failures1 )
+      else return (single_failure @ failures1)
+    in
     Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
-    Transaction_applied.Coinbase_applied.
-      { coinbase = cb; previous_empty_accounts = emptys1 @ emptys2 }
+    if Transaction_status.Failure.Collection.is_empty failures then
+      Transaction_applied.Coinbase_applied.
+        { coinbase = { With_status.data = cb; status = Applied }
+        ; previous_empty_accounts = emptys1 @ emptys2
+        }
+    else
+      Transaction_applied.Coinbase_applied.
+        { coinbase = { With_status.data = cb; status = Failed failures }
+        ; previous_empty_accounts = emptys1 @ emptys2
+        }
 
   let apply_transaction ~constraint_constants
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
