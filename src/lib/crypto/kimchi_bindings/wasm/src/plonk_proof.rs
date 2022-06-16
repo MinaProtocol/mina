@@ -649,7 +649,7 @@ macro_rules! impl_proof {
                 let maybe_proof = ProverProof::create_recursive::<
                     DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                >(&group_map, witness, &[], index, prev);
+                >(&group_map, witness, &[], index, prev, None);
                 return match maybe_proof {
                     Ok(proof) => proof.into(),
                     Err(err) => {
@@ -722,11 +722,11 @@ macro_rules! impl_proof {
                     }
                 }
 
-                let prev_challenges = vec![
-                    (vec![$F::one(), $F::one()], comm()),
-                    (vec![$F::one(), $F::one()], comm()),
-                    (vec![$F::one(), $F::one()], comm()),
-                ];
+                let prev = RecursionChallenge {
+                    chals: vec![Fq::one(), Fq::one()],
+                    comm: comm(),
+                };
+                let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
 
                 let g = $G::prime_subgroup_generator();
                 let proof = OpeningProof {
