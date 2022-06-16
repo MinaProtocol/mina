@@ -9,7 +9,8 @@
  (modes js)
  (link_flags (-noautolink))
  (js_of_ocaml
-  (flags +toplevel.js +dynlink.js --pretty))
+  (flags +toplevel.js +dynlink.js --pretty)
+  (javascript_files overrides.js))
  (libraries snarky_js_bindings_lib node_backend)
  (link_deps
   ../crypto/kimchi_bindings/js/node_js/plonk_wasm.js
@@ -26,7 +27,8 @@
  (modes js)
  (link_flags (-noautolink))
  (js_of_ocaml
-  (flags +toplevel.js +dynlink.js --pretty))
+  (flags +toplevel.js +dynlink.js --pretty)
+  (javascript_files overrides.js))
  (libraries snarky_js_bindings_lib chrome_backend)
  (link_deps
   ../crypto/kimchi_bindings/js/chrome/plonk_wasm.js
