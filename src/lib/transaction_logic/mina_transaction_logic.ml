@@ -1750,10 +1750,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (emptys1, no_failures) )
           else Ok ([], single_failure)
         else
-          (* TODO(#4496): Do not use get_or_create here; we should not create a
-             new account before we know that the transaction will go through
-             and thus the creation fee has been paid.
-          *)
           let a2, action2, `Has_permission_to_receive can_receive2 =
             has_permission_to_receive ~ledger:t account_id2
           in
@@ -1841,10 +1837,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           if can_receive then
             let%map _action, transferee_account, transferee_location =
-              (* TODO(#4496): Do not use get_or_create here; we should not create
-                 a new account before we know that the transaction will go
-                 through and thus the creation fee has been paid.
-              *)
               get_or_create t transferee_id
             in
             ( receiver_reward
@@ -1881,10 +1873,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let%map failures =
       if can_receive then (
         let%map _action2, receiver_account, receiver_location =
-          (* TODO(#4496): Do not use get_or_create here; we should not create a new
-             account before we know that the transaction will go through and thus
-             the creation fee has been paid.
-          *)
           get_or_create t receiver_id
         in
         set t receiver_location
