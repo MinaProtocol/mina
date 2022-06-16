@@ -182,7 +182,8 @@ let cloudBuild
             , steps =
               [ Schema.Step::{
                 , name = "gcr.io/cloud-builders/docker"
-                , script = Some script
+                , entrypoint = Some "bash"
+                , args = Some ["-c", script]
                 }
               ]
             , images = Some [ tag ]
