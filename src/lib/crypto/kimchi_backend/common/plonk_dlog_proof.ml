@@ -231,17 +231,22 @@ module Make (Inputs : Inputs_intf) = struct
 
   let of_backend (t : Backend.t) : t =
     let proof = opening_proof_of_backend_exn t.proof in
+    let e1, e2 = t.evals in
     let evals =
-      (fst t.evals, snd t.evals)
-      |> Tuple_lib.Double.map ~f:(fun e ->
-             let open Evaluations_backend in
-             Pickles_types.Plonk_types.Evals.
-               { w = tuple15_to_vec e.w
-               ; z = e.z
-               ; s = tuple6_to_vec e.s
-               ; generic_selector = e.generic_selector
-               ; poseidon_selector = e.poseidon_selector
-               } )
+      let open Pickles_types.Plonk_types.Evals in
+      { w = Vector.zip (tuple15_to_vec e1.w) (tuple15_to_vec e2.w)
+      ; s = Vector.zip (tuple6_to_vec e1.s) (tuple6_to_vec e2.s)
+      ; z = (e1.z, e2.z)
+      ; generic_selector = (e1.generic_selector, e2.generic_selector)
+      ; poseidon_selector = (e1.poseidon_selector, e2.poseidon_selector)
+      ; lookup =
+          Option.map2 e1.lookup e2.lookup ~f:(fun l1 l2 ->
+              { Lookup.aggreg = (l1.aggreg, l2.aggreg)
+              ; table = (l1.table, l2.table)
+              ; sorted = Array.map2_exn l1.sorted l2.sorted ~f:Tuple2.create
+              ; runtime = Option.map2 l1.runtime l2.runtime ~f:Tuple2.create
+              } )
+      }
     in
     let wo x : Inputs.Curve.Affine.t array =
       match Poly_comm.of_backend_without_degree_bound x with
@@ -258,8 +263,20 @@ module Make (Inputs : Inputs_intf) = struct
         { w_comm
         ; z_comm = wo t.commitments.z_comm
         ; t_comm = wo t.commitments.t_comm
+        ; lookup =
+            Option.map t.commitments.lookup
+              ~f:(fun l : _ Pickles_types.Plonk_types.Messages.Lookup.t ->
+                { sorted = Array.map ~f:wo l.sorted
+                ; aggreg = wo l.aggreg
+                ; runtime = Option.map ~f:wo l.runtime
+                } )
         }
       ~openings:{ proof; evals; ft_eval1 = t.ft_eval1 }
+
+  let lookup_eval_to_backend
+      { Pickles_types.Plonk_types.Evals.Lookup.sorted; aggreg; table; runtime }
+      : 'f Kimchi_types.lookup_evaluations =
+    { sorted; aggreg; table; runtime }
 
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
@@ -267,13 +284,14 @@ module Make (Inputs : Inputs_intf) = struct
       ; s
       ; generic_selector
       ; poseidon_selector
+      ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
     ; z
     ; s = tuple6_of_vec s
     ; generic_selector
     ; poseidon_selector
-    ; lookup = None
+    ; lookup = Option.map ~f:lookup_eval_to_backend lookup
     }
 
   let vec_to_array (type t elt)
@@ -282,10 +300,10 @@ module Make (Inputs : Inputs_intf) = struct
     Array.init (V.length v) ~f:(V.get v)
 
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
-      ({ messages = { w_comm; z_comm; t_comm }
+      ({ messages = { w_comm; z_comm; t_comm; lookup }
        ; openings =
            { proof = { lr; z_1; z_2; delta; challenge_polynomial_commitment }
-           ; evals = evals0, evals1
+           ; evals
            ; ft_eval1
            }
        } :
@@ -297,6 +315,12 @@ module Make (Inputs : Inputs_intf) = struct
         { w_comm = tuple15_of_vec (Pickles_types.Vector.map ~f:pcwo w_comm)
         ; z_comm = pcwo z_comm
         ; t_comm = pcwo t_comm
+        ; lookup =
+            Option.map lookup ~f:(fun t : _ Kimchi_types.lookup_commitments ->
+                { sorted = Array.map ~f:pcwo t.sorted
+                ; aggreg = pcwo t.aggreg
+                ; runtime = Option.map ~f:pcwo t.runtime
+                } )
         }
     ; proof =
         { lr
@@ -305,16 +329,20 @@ module Make (Inputs : Inputs_intf) = struct
         ; z2 = z_2
         ; sg = g challenge_polynomial_commitment
         }
-    ; evals = (eval_to_backend evals0, eval_to_backend evals1)
+    ; evals =
+        ( eval_to_backend (Plonk_types.Evals.map ~f:fst evals)
+        , eval_to_backend (Plonk_types.Evals.map ~f:snd evals) )
     ; ft_eval1
     ; public = primary_input
     ; prev_challenges =
         Array.of_list_map chal_polys
           ~f:(fun { Challenge_polynomial.commitment = x, y; challenges } ->
-            ( challenges
-            , { Kimchi_types.shifted = None
-              ; unshifted = [| Kimchi_types.Finite (x, y) |]
-              } ) )
+            { Kimchi_types.chals = challenges
+            ; comm =
+                { Kimchi_types.shifted = None
+                ; unshifted = [| Kimchi_types.Finite (x, y) |]
+                }
+            } )
     }
 
   let to_backend chal_polys primary_input t =

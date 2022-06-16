@@ -18,7 +18,6 @@
   ../../wasm/Cargo.toml
   (source_tree ../../wasm/src)
   (source_tree ../../wasm/.cargo/config)
-  (source_tree ../../../../../external/wasm-bindgen-rayon)
   (source_tree ../../../proof-systems) )
  (locks /cargo-lock) ; lock for rustup
  (action
