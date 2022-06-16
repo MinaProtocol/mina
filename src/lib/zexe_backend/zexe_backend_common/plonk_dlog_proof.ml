@@ -226,7 +226,7 @@ module Make (Inputs : Inputs_intf) = struct
              ; f = e.f
              ; sigma1 = e.sigma1
              ; sigma2 = e.sigma2
-             })
+             } )
     in
     let wo x =
       match Poly_comm.of_backend_without_degree_bound x with
@@ -267,7 +267,7 @@ module Make (Inputs : Inputs_intf) = struct
        ; openings =
            { proof = { lr; z_1; z_2; delta; sg }; evals = evals0, evals1 }
        } :
-        t) : Backend.t =
+        t ) : Backend.t =
     let g x = G.Affine.to_backend (Or_infinity.Finite x) in
     let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
@@ -288,7 +288,7 @@ module Make (Inputs : Inputs_intf) = struct
             ( challenges
             , { Marlin_plonk_bindings.Types.Poly_comm.shifted = None
               ; unshifted = [| Or_infinity.Finite commitment |]
-              } ))
+              } ) )
     }
 
   let to_backend chal_polys primary_input t =
@@ -300,13 +300,13 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let challenges =
       List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges)
+          challenges )
       |> Array.concat
     in
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
-          G.Affine.to_backend (Finite commitment))
+          G.Affine.to_backend (Finite commitment) )
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
     of_backend res
@@ -317,13 +317,13 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let challenges =
       List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges)
+          challenges )
       |> Array.concat
     in
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
-          G.Affine.to_backend (Finite commitment))
+          G.Affine.to_backend (Finite commitment) )
     in
     let%map.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
@@ -335,7 +335,7 @@ module Make (Inputs : Inputs_intf) = struct
     let vks_and_v =
       Array.of_list_map ts ~f:(fun (vk, t, xs, m) ->
           let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
-          (vk, p))
+          (vk, p) )
     in
     Backend.batch_verify
       (Array.map ~f:fst vks_and_v)
@@ -348,5 +348,5 @@ module Make (Inputs : Inputs_intf) = struct
       (to_backend'
          (Option.value ~default:[] message)
          (vec_to_array (module Scalar_field.Vector) xs)
-         t)
+         t )
 end

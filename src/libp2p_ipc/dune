@@ -18,7 +18,9 @@
    ppx_hash.runtime-lib
    async_kernel
    ppx_inline_test.config
+   sexplib0
    ;; local libraries
+   blake2
    pipe_lib
    network_peer
    o1trace

@@ -30,3 +30,5 @@ let nonce json =
 
 let token json =
   Yojson.Basic.Util.to_string json |> Mina_base.Token_id.of_string
+
+let int64 json = Yojson.Basic.Util.to_string json |> Int64.of_string

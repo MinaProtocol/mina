@@ -1,5 +1,6 @@
 (executable
  (name gen_values)
+ (flags -w -32)
  (libraries
    ;; opam libraries
    stdio
@@ -8,6 +9,7 @@
    core_kernel
    ppxlib
    ppxlib.ast
+   ppxlib.astlib
    async
    core
    ocaml-migrate-parsetree
@@ -15,6 +17,7 @@
    ocaml-compiler-libs.common
    async_unix
    base.caml
+   sexplib0
    ;; local libraries
    coda_runtime_config
    consensus

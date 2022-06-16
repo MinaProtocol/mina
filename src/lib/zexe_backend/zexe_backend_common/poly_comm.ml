@@ -56,13 +56,13 @@ module Make (Inputs : Inputs_intf) = struct
   let with_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t) Or_infinity.t
-        Dlog_plonk_types.Poly_comm.With_degree_bound.t) : Backend.t =
+        Dlog_plonk_types.Poly_comm.With_degree_bound.t ) : Backend.t =
     { shifted = Some commitment.shifted; unshifted = commitment.unshifted }
 
   let without_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t)
-        Dlog_plonk_types.Poly_comm.Without_degree_bound.t) : Backend.t =
+        Dlog_plonk_types.Poly_comm.Without_degree_bound.t ) : Backend.t =
     { shifted = None
     ; unshifted = Array.map ~f:(fun x -> Or_infinity.Finite x) commitment
     }
@@ -98,7 +98,7 @@ module Make (Inputs : Inputs_intf) = struct
             | Infinity ->
                 assert false
             | Finite g ->
-                g))
+                g ) )
     | _ ->
         assert false
 end

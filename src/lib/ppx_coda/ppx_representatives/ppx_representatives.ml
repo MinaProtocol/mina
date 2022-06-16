@@ -40,7 +40,7 @@ let mk_builtin ~loc name =
     (Loc.make ~loc
        (Ldot
           ( Lident "Ppx_representatives_runtime"
-          , mangle ~suffix:deriver_name name )))
+          , mangle ~suffix:deriver_name name ) ) )
 
 (* The way that we expand representatives below makes it extremely easy to blow
    the stack if we're not tail-recursive. All generated list iterators should
@@ -71,8 +71,7 @@ let rec core_type ~loc (typ : core_type) : expression =
                         (Stdlib.Format.asprintf
                            "%s: Illegal call to dummy functional value defined \
                             by %a"
-                           deriver_name Ocaml_common.Location.print_loc
-                           typ.ptyp_loc)]]]
+                           deriver_name Location.print typ.ptyp_loc )]]]
           ]]
   | Ptyp_tuple typs ->
       let exprs = List.map ~f:(core_type ~loc) typs in
@@ -97,7 +96,7 @@ let rec core_type ~loc (typ : core_type) : expression =
                   Ppx_representatives_runtime.Util.rev_concat
                     (Stdlib.List.rev_map
                        (fun [%p pvar ~loc (mk_name i)] -> [%e expr])
-                       (Stdlib.Lazy.force [%e arg]))])]]
+                       (Stdlib.Lazy.force [%e arg]) )] )]]
   | Ptyp_constr ({ txt = Lident name; _ }, []) when is_builtin name ->
       mk_builtin ~loc name
   | Ptyp_constr ({ txt = Lident name; _ }, [ _ ]) when is_builtin_with_arg name
@@ -138,7 +137,8 @@ let rec core_type ~loc (typ : core_type) : expression =
                           [%expr
                             Stdlib.List.rev_map
                               (fun e ->
-                                [%e pexp_variant ~loc name.txt (Some [%expr e])])
+                                [%e pexp_variant ~loc name.txt (Some [%expr e])]
+                                )
                               (Stdlib.Lazy.force [%e core_type ~loc typ])]
                       | Rtag _ ->
                           Location.raise_errorf ~loc:typ.ptyp_loc
@@ -153,7 +153,7 @@ let rec core_type ~loc (typ : core_type) : expression =
                                     strict subtype.
                                  *)
                                  ( [%e core_type ~loc typ']
-                                   :> [%t typ] list lazy_t ))]))])]
+                                   :> [%t typ] list lazy_t ) )] ) )] )]
   | Ptyp_poly (vars, typ) ->
       (* Inject dummy representatives into the environment so that they can
          resolve.
@@ -166,7 +166,7 @@ let rec core_type ~loc (typ : core_type) : expression =
                   let [%p pvar ~loc var.txt] =
                     Stdlib.Lazy.from_fun (fun () -> failwith "Unknown type")
                   in
-                  [%e expr]])]]
+                  [%e expr]] )]]
   | Ptyp_package _ ->
       Location.raise_errorf ~loc:typ.ptyp_loc
         "Cannot derive %s for packaged modules" deriver_name
@@ -185,13 +185,14 @@ let record_decl ~loc (fields : label_declaration list) : expression =
               Ppx_representatives_runtime.Util.rev_concat
                 (Stdlib.List.rev_map
                    (fun [%p pvar ~loc field.pld_name.txt] -> [%e expr])
-                   (Lazy.force [%e core_type ~loc field.pld_type]))])
+                   (Lazy.force [%e core_type ~loc field.pld_type]) )] )
           ~init:
             [%expr
               [ [%e
                   pexp_record ~loc
                     (List.map fields ~f:(fun field ->
-                         (mk_lid field.pld_name, evar ~loc field.pld_name.txt)))
+                         (mk_lid field.pld_name, evar ~loc field.pld_name.txt) )
+                    )
                     None]
               ]]]]
 
@@ -203,8 +204,8 @@ let str_decl ~loc (decl : type_declaration) : structure_item =
             [%t
               List.fold_right decl.ptype_params
                 ~f:(fun (param, _) typ ->
-                  [%type: [%t param] list lazy_t -> [%t typ]])
-                ~init:[%type: [%t constr_of_decl ~loc decl] list lazy_t]]) =
+                  [%type: [%t param] list lazy_t -> [%t typ]] )
+                ~init:[%type: [%t constr_of_decl ~loc decl] list lazy_t]] ) =
         [%e
           List.fold_right decl.ptype_params ~init:expr
             ~f:(fun (param, _) expr ->
@@ -218,7 +219,7 @@ let str_decl ~loc (decl : type_declaration) : structure_item =
                     Location.raise_errorf ~loc:param.ptyp_loc
                       "Expected a type variable or _"
               in
-              [%expr fun [%p pat] -> [%e expr]])]]
+              [%expr fun [%p pat] -> [%e expr]] )]]
   in
   match decl with
   | { ptype_kind = Ptype_variant constrs; _ } ->
@@ -253,8 +254,8 @@ let str_decl ~loc (decl : type_declaration) : structure_item =
                                 (fun x ->
                                   [%e
                                     pexp_construct ~loc (mk_lid constr.pcd_name)
-                                      (Some [%expr x])])
-                                (Stdlib.Lazy.force [%e arg])]))])]
+                                      (Some [%expr x])] )
+                                (Stdlib.Lazy.force [%e arg])] ) )] )]
   | { ptype_kind = Ptype_abstract; ptype_manifest = Some typ; _ } ->
       binding (core_type ~loc typ)
   | { ptype_kind = Ptype_record fields; _ } ->
@@ -270,8 +271,8 @@ let sig_decl ~loc (decl : type_declaration) : signature_item =
        ~type_:
          (List.fold_right decl.ptype_params
             ~f:(fun (param, _) typ ->
-              [%type: [%t param] list lazy_t -> [%t typ]])
-            ~init:[%type: [%t constr_of_decl ~loc decl] list lazy_t])
+              [%type: [%t param] list lazy_t -> [%t typ]] )
+            ~init:[%type: [%t constr_of_decl ~loc decl] list lazy_t] )
 
 let str_type_decl ~loc ~path:_ (_rec_flag, decls) : structure =
   List.map ~f:(str_decl ~loc) decls

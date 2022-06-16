@@ -51,8 +51,7 @@ module type Inputs_intf = sig
     val all_work_pairs :
          t
       -> get_state:
-           (   Mina_base.State_hash.t
-            -> Mina_state.Protocol_state.value Or_error.t)
+           (Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
       -> ( Transaction.t
          , Transaction_witness.t
          , Ledger_proof.t )
@@ -195,10 +194,10 @@ module type Make_selection_method_intf = functor
   Selection_method_intf
     with type staged_ledger := Inputs.Staged_ledger.t
      and type work :=
-          ( Inputs.Transaction.t
-          , Inputs.Transaction_witness.t
-          , Inputs.Ledger_proof.t )
-          Snark_work_lib.Work.Single.Spec.t
+      ( Inputs.Transaction.t
+      , Inputs.Transaction_witness.t
+      , Inputs.Ledger_proof.t )
+      Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Inputs.Snark_pool.t
      and type transition_frontier := Inputs.Transition_frontier.t
      and module State := Lib.State

@@ -147,25 +147,27 @@ module Make (F : Input_intf) :
     module V1 = struct
       type t = F.t [@@deriving version { asserted }]
 
-      include Binable.Of_binable
-                (Bigint)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Bigint)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_bigint
+            let to_binable = to_bigint
 
-                  let of_binable = of_bigint
-                end)
+            let of_binable = of_bigint
+          end)
 
-      include Sexpable.Of_sexpable
-                (Bigint)
-                (struct
-                  type nonrec t = t
+      include
+        Sexpable.Of_sexpable
+          (Bigint)
+          (struct
+            type nonrec t = t
 
-                  let to_sexpable = to_bigint
+            let to_sexpable = to_bigint
 
-                  let of_sexpable = of_bigint
-                end)
+            let of_sexpable = of_bigint
+          end)
 
       let to_bignum_bigint n =
         let rec go i two_to_the_i acc =
@@ -224,7 +226,7 @@ module Make (F : Input_intf) :
   let of_bits bs =
     List.fold (List.rev bs) ~init:zero ~f:(fun acc b ->
         let acc = add acc acc in
-        if b then add acc one else acc)
+        if b then add acc one else acc )
 
   let%test_unit "sexp round trip" =
     let t = random () in
@@ -235,7 +237,7 @@ module Make (F : Input_intf) :
     [%test_eq: Stable.Latest.t] t
       (Binable.of_string
          (module Stable.Latest)
-         (Binable.to_string (module Stable.Latest) t))
+         (Binable.to_string (module Stable.Latest) t) )
 
   let ( + ) = add
 
@@ -273,7 +275,7 @@ module Make (F : Input_intf) :
     Quickcheck.test
       (Quickcheck.Generator.list_with_length
          Int.(size_in_bits - 1)
-         Bool.quickcheck_generator)
+         Bool.quickcheck_generator )
       ~f:(fun bs ->
-        [%test_eq: bool list] (bs @ [ false ]) (to_bits (of_bits bs)))
+        [%test_eq: bool list] (bs @ [ false ]) (to_bits (of_bits bs)) )
 end

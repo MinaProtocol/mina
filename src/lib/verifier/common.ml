@@ -24,8 +24,8 @@ let check :
               not
                 (Signature_lib.Schnorr.verify s
                    (Backend.Tick.Inner_curve.of_affine
-                      (Signature_lib.Public_key.decompress_exn pk))
-                   (Random_oracle_input.field (Lazy.force payload)))
+                      (Signature_lib.Public_key.decompress_exn pk) )
+                   (Random_oracle_input.field (Lazy.force payload)) )
             then return `Invalid
             else ()
           in
@@ -67,7 +67,7 @@ let check :
                   let two =
                     Option.value_map r.two
                       ~default:Snapp_command.Party.Body.dummy ~f:(fun two ->
-                        two.data.body)
+                        two.data.body )
                   in
                   [ (vk1, r.one, two) ]
               | Signed_signed r, `Zero ->
@@ -87,4 +87,4 @@ let check :
           | [] ->
               `Valid v
           | _ :: _ ->
-              `Valid_assuming (v, statements_to_check))
+              `Valid_assuming (v, statements_to_check) )

@@ -116,12 +116,12 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
           let%bind () = mix 1 6 11 12 10 11 in
           let%bind () = mix 2 7 8 13 12 13 in
           let%bind () = mix 3 4 9 14 14 15 in
-          return ())
+          return () )
     in
     let%bind () =
       for_ 8 ~f:(fun i ->
           let%bind () = (h, i) := xor h.(i) v.(i) in
-          (h, i) := xor h.(i) v.(Int.(i + 8)))
+          (h, i) := xor h.(i) v.(Int.(i + 8)) )
     in
     return ()
 
@@ -136,12 +136,12 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
       Array.append bs
         (Array.create
            ~len:(block_size_in_bits - (n mod block_size_in_bits))
-           Boolean.false_)
+           Boolean.false_ )
 
   let concat_int32s (ts : UInt32.t array) =
     let n = Array.length ts in
     Array.init (n * UInt32.length_in_bits) ~f:(fun i ->
-        ts.(i / UInt32.length_in_bits).(i mod UInt32.length_in_bits))
+        ts.(i / UInt32.length_in_bits).(i mod UInt32.length_in_bits) )
 
   let default_personalization = String.init 8 ~f:(fun _ -> '\000')
 
@@ -185,7 +185,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
                 Array.init UInt32.length_in_bits ~f:(fun k ->
                     padded.((block_size_in_bits * i)
                             + (UInt32.length_in_bits * j)
-                            + k))))
+                            + k) ) ) )
     in
     let%bind () =
       for_
@@ -193,7 +193,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
         ~f:(fun i ->
           compression h blocks.(i)
             Unsigned.UInt64.(Infix.((of_int i + one) * of_int 64))
-            false)
+            false )
     in
     let input_length_in_bytes = (Array.length input + 7) / 8 in
     let%bind () =

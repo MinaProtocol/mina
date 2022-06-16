@@ -30,7 +30,7 @@
    mina_state
    mina_intf
    mina_base
-   mina_transition
+   mina_block
    consensus
    interruptible
    o1trace

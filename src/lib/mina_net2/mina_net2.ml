@@ -2,6 +2,7 @@ open Core
 open Async
 open Async_unix
 open Network_peer
+module Bitswap_block = Bitswap_block
 module Keypair = Keypair
 module Libp2p_stream = Libp2p_stream
 module Multiaddr = Multiaddr
@@ -43,7 +44,7 @@ let gating_config_to_helper_format (config : connection_gating) =
       ~f:(fun p ->
         let p = Unix.Inet_addr.to_string p.host in
         (* Trusted peers cannot be banned. *)
-        if Set.mem trusted p then None else Some p)
+        if Set.mem trusted p then None else Some p )
       config.banned_peers
   in
   let banned_peers =
@@ -105,7 +106,7 @@ module Pubsub = struct
     let topic_subscription_already_exists =
       Hashtbl.data t.subscriptions
       |> List.exists ~f:(fun (Subscription.E sub') ->
-             String.equal (Subscription.topic sub') topic)
+             String.equal (Subscription.topic sub') topic )
     in
     if topic_subscription_already_exists then
       Deferred.Or_error.errorf "already subscribed to topic %s" topic
@@ -124,11 +125,11 @@ module Pubsub = struct
       ~decode:(fun msg_str ->
         let b = Bigstring.of_string msg_str in
         Bigstring.read_bin_prot b bin_prot.Bin_prot.Type_class.reader
-        |> Or_error.map ~f:fst)
+        |> Or_error.map ~f:fst )
       ~encode:(fun msg ->
         Bin_prot.Utils.bin_dump ~header:true bin_prot.Bin_prot.Type_class.writer
           msg
-        |> Bigstring.to_string)
+        |> Bigstring.to_string )
       ~handle_and_validate_incoming_message ~on_decode_failure t topic
 
   let subscribe =
@@ -184,7 +185,7 @@ let bandwidth_info t =
       let input_bandwidth = input_bandwidth_get response
       and output_bandwidth = output_bandwidth_get response
       and cpu_usage = cpu_usage_get response in
-      (`Input input_bandwidth, `Output output_bandwidth, `Cpu_usage cpu_usage))
+      (`Input input_bandwidth, `Output output_bandwidth, `Cpu_usage cpu_usage) )
   @@ Libp2p_helper.do_rpc t.helper
        (module Libp2p_ipc.Rpcs.BandwidthInfo)
        (Libp2p_ipc.Rpcs.BandwidthInfo.create_request ())
@@ -229,7 +230,7 @@ let listen_on t iface =
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.Listen)
       (Libp2p_ipc.Rpcs.Listen.create_request
-         ~iface:(Multiaddr.to_libp2p_ipc iface))
+         ~iface:(Multiaddr.to_libp2p_ipc iface) )
   in
   let open Libp2p_ipc.Reader.Libp2pHelperInterface.Listen.Response in
   result_get_list response |> List.map ~f:Multiaddr.of_libp2p_ipc
@@ -278,7 +279,7 @@ let close_protocol ?(reset_existing_streams = false) t ~protocol =
                 [%log' error t.logger]
                   "failed to reset stream while closing protocol: $error"
                   ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
-          false )) ;
+          false ) ) ;
   match result with
   | Ok _ ->
       Hashtbl.remove t.protocol_handlers protocol
@@ -325,7 +326,7 @@ let set_connection_gating_config t config =
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.SetGatingConfig)
       (Libp2p_ipc.Rpcs.SetGatingConfig.create_request
-         ~gating_config:(gating_config_to_helper_format config))
+         ~gating_config:(gating_config_to_helper_format config) )
   with
   | Ok _ ->
       t.connection_gating <- config ;
@@ -346,13 +347,13 @@ let handle_push_message t push_message =
           let peer_id =
             Libp2p_ipc.unsafe_parse_peer_id (PeerConnected.peer_id_get m)
           in
-          t.peer_connected_callback peer_id)
+          t.peer_connected_callback peer_id )
   | PeerDisconnected m ->
       handle "handle_libp2p_helper_subprocess_push_peer_disconnected" (fun () ->
           let peer_id =
             Libp2p_ipc.unsafe_parse_peer_id (PeerDisconnected.peer_id_get m)
           in
-          t.peer_disconnected_callback peer_id)
+          t.peer_disconnected_callback peer_id )
   | GossipReceived m ->
       handle "handle_libp2p_helper_subprocess_push_gossip_received" (fun () ->
           let open GossipReceived in
@@ -368,7 +369,7 @@ let handle_push_message t push_message =
               upon
                 (O1trace.thread "validate_libp2p_gossip" (fun () ->
                      Subscription.handle_and_validate sub ~validation_expiration
-                       ~sender ~data))
+                       ~sender ~data ) )
                 (function
                   | `Validation_timeout ->
                       [%log' warn t.logger]
@@ -388,7 +389,7 @@ let handle_push_message t push_message =
                         ~validation_result:ValidationResult.Reject
                   | `Validation_result validation_result ->
                       Libp2p_helper.send_validation t.helper ~validation_id
-                        ~validation_result)
+                        ~validation_result )
           | None ->
               [%log' error t.logger]
                 "asked to validate message for unregistered subscription id \
@@ -396,7 +397,7 @@ let handle_push_message t push_message =
                 ~metadata:
                   [ ( "subscription_id"
                     , `String (Subscription.Id.to_string subscription_id) )
-                  ])
+                  ] )
   (* A new inbound stream was opened *)
   | IncomingStream m ->
       handle "handle_libp2p_helper_subprocess_push_incoming_stream" (fun () ->
@@ -411,7 +412,7 @@ let handle_push_message t push_message =
               t.all_peers_seen <- Some all_peers_seen ;
               Mina_metrics.(
                 Gauge.set Network.all_peers
-                  (Set.length all_peers_seen |> Int.to_float))) ;
+                  (Set.length all_peers_seen |> Int.to_float)) ) ;
           let stream =
             Libp2p_stream.create_from_existing ~logger:t.logger ~helper:t.helper
               ~stream_id ~protocol ~peer ~release_stream:(release_stream t)
@@ -451,11 +452,11 @@ let handle_push_message t push_message =
                                Libp2p_helper.do_rpc t.helper
                                  (module Libp2p_ipc.Rpcs.RemoveStreamHandler)
                                  (Libp2p_ipc.Rpcs.RemoveStreamHandler
-                                  .create_request ~protocol)
+                                  .create_request ~protocol )
                              in
                              if Or_error.is_ok result then
-                               Hashtbl.remove t.protocol_handlers protocol) ;
-                          raise handler_exn )) )
+                               Hashtbl.remove t.protocol_handlers protocol ) ;
+                          raise handler_exn ) ) )
               else
                 (* silently ignore new streams for closed protocol handlers.
                     these are buffered stream open RPCs that were enqueued before
@@ -467,7 +468,7 @@ let handle_push_message t push_message =
           | None ->
               (* TODO: punish *)
               [%log' error t.logger]
-                "incoming stream for protocol we don't know about?")
+                "incoming stream for protocol we don't know about?" )
   (* Received a message on some stream *)
   | StreamMessageReceived m ->
       handle "handle_libp2p_helper_subprocess_push_stream_message_received"
@@ -484,7 +485,7 @@ let handle_push_message t push_message =
               Libp2p_stream.data_received stream data
           | None ->
               [%log' error t.logger]
-                "incoming stream message for stream we don't know about?")
+                "incoming stream message for stream we don't know about?" )
   (* Stream was reset, either by the remote peer or an error on our end. *)
   | StreamLost m ->
       handle "handle_libp2p_helper_subprocess_push_stream_lost" (fun () ->
@@ -506,7 +507,7 @@ let handle_push_message t push_message =
             ~metadata:
               [ ("error", `String reason)
               ; ("id", `String (Libp2p_ipc.stream_id_to_string stream_id))
-              ])
+              ] )
   (* The remote peer closed its write end of one of our streams *)
   | StreamComplete m ->
       handle "handle_libp2p_helper_subprocess_push_stream_complete" (fun () ->
@@ -523,7 +524,7 @@ let handle_push_message t push_message =
           | None ->
               [%log' error t.logger]
                 "streamReadComplete for stream we don't know about $stream_id"
-                ~metadata:[ ("stream_id", `String stream_id_str) ])
+                ~metadata:[ ("stream_id", `String stream_id_str) ] )
   | ResourceUpdated _ ->
       [%log' error t.logger] "resourceUpdated upcall not supported yet"
   | Undefined n ->
@@ -535,13 +536,13 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
   let push_message_handler =
     ref (fun _msg ->
         [%log error]
-          "received push message from libp2p_helper before handler was attached")
+          "received push message from libp2p_helper before handler was attached" )
   in
   let%bind helper =
     O1trace.thread "manage_libp2p_helper_subprocess" (fun () ->
         Libp2p_helper.spawn ~logger ~pids ~conf_dir
           ~handle_push_message:(fun _helper msg ->
-            Deferred.return (!push_message_handler msg)))
+            Deferred.return (!push_message_handler msg) ) )
   in
   let t =
     { helper
@@ -573,7 +574,7 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
                 ~f:(fun peer (num_batches, num_in_batch, batches, batch) ->
                   if num_in_batch >= log_message_batch_size then
                     (num_batches + 1, 1, batch :: batches, [ peer ])
-                  else (num_batches, num_in_batch + 1, batches, peer :: batch))
+                  else (num_batches, num_in_batch + 1, batches, peer :: batch) )
             in
             let num_batches, batches =
               if num_in_batch > 0 then (num_batches + 1, batch :: batches)
@@ -587,5 +588,5 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
                     ; ("num_batches", `Int num_batches)
                     ; ( "peers"
                       , `List (List.map ~f:Peer_without_id.to_yojson batch) )
-                    ]))) ) ;
+                    ] ) ) ) ) ;
   Deferred.Or_error.return t

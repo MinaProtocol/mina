@@ -2,7 +2,7 @@
 
 # update and pin packages, used by CI
 
-PACKAGES="ocaml-sodium capnp-ocaml rpc_parallel ocaml-extlib async_kernel async_unix coda_base58 graphql_ppx ppx_deriving_yojson"
+PACKAGES="ocaml-sodium capnp-ocaml rpc_parallel async_kernel coda_base58"
 
 git submodule sync && git submodule update --init --recursive
 

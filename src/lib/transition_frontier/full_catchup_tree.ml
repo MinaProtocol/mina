@@ -2,7 +2,6 @@ open Core
 open Async
 open Cache_lib
 open Mina_base
-open Mina_transition
 open Network_peer
 open Mina_numbers
 
@@ -30,7 +29,7 @@ module Downloader_job = struct
   type t =
     ( State_hash.t * Length.t
     , Attempt_history.Attempt.t
-    , External_transition.t )
+    , Mina_block.t )
     Downloader.Job.t
 
   let to_yojson (t : t) : Yojson.Safe.t =
@@ -49,20 +48,20 @@ module Node = struct
       | Finished
       | Failed
       | To_download of Downloader_job.t
-      | To_initial_validate of External_transition.t Envelope.Incoming.t
+      | To_initial_validate of Mina_block.t Envelope.Incoming.t
       | To_verify of
-          ( External_transition.Initial_validated.t Envelope.Incoming.t
+          (( Mina_block.initial_valid_block Envelope.Incoming.t
           , State_hash.t )
-          Cached.t
+          Cached.t * Mina_net2.Validation_callback.t option)
       | Wait_for_parent of
-          ( External_transition.Almost_validated.t Envelope.Incoming.t
+          (( Mina_block.almost_valid_block Envelope.Incoming.t
           , State_hash.t )
-          Cached.t
+          Cached.t * Mina_net2.Validation_callback.t option)
       | To_build_breadcrumb of
           ( [`Parent of State_hash.t]
-          * ( External_transition.Almost_validated.t Envelope.Incoming.t
+          * ( Mina_block.almost_valid_block Envelope.Incoming.t
             , State_hash.t )
-            Cached.t )
+          Cached.t * Mina_net2.Validation_callback.t option)
       (* TODO: Name this to Initial_root *)
       | Root of Breadcrumb.t Ivar.t
 
@@ -253,7 +252,7 @@ let create_node_full t b : unit =
   let node : Node.t =
     { state= Finished
     ; state_hash= h
-    ; blockchain_length= Breadcrumb.blockchain_length b
+    ; blockchain_length= Consensus.Data.Consensus_state.blockchain_length @@ Breadcrumb.consensus_state b
     ; attempts= Attempt_history.empty
     ; parent= Breadcrumb.parent_hash b
     ; result= Ivar.create_full (Ok `Added_to_frontier) }
@@ -294,14 +293,16 @@ let remove_node' t (node : Node.t) =
       ()
   | To_initial_validate _ ->
       ()
-  | To_verify c ->
+  | To_verify (c, vc) ->
+      Option.value_map ~default:ignore ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore;
       ignore
         ( Cached.invalidate_with_failure c
-          : External_transition.Initial_validated.t Envelope.Incoming.t )
-  | To_build_breadcrumb (_parent, c) ->
+          : Mina_block.initial_valid_block Envelope.Incoming.t )
+  | To_build_breadcrumb (_parent, c, vc) ->
+      Option.value_map ~default:ignore ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore;
       ignore
         ( Cached.invalidate_with_failure c
-          : External_transition.Almost_validated.t Envelope.Incoming.t )
+          : Mina_block.almost_valid_block Envelope.Incoming.t )
 
 let remove_node t h =
   match Hashtbl.find t.nodes h with

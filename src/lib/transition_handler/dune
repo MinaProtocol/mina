@@ -30,7 +30,7 @@
    transition_frontier
    perf_histograms
    mina_metrics
-   mina_transition
+   mina_block
    network_peer
    with_hash
    logger
@@ -44,6 +44,7 @@
    network_pool
    mina_net2
    result
+   mina_numbers
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane)))

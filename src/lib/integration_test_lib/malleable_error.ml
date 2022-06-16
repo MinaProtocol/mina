@@ -17,6 +17,7 @@ module Hard_fail = struct
     { (* Most of the time, there is only one hard error, but we can have multiple when joining lists of monads (concurrency) *)
       hard_errors : Test_error.internal_error Error_accumulator.t
     ; soft_errors : Test_error.internal_error Error_accumulator.t
+    ; exit_code : int option
     }
   [@@deriving equal, sexp_of, compare]
 
@@ -24,21 +25,23 @@ module Hard_fail = struct
   let check_invariants { hard_errors; _ } =
     Error_accumulator.error_count hard_errors > 0
 
-  let add_soft_errors { hard_errors; soft_errors } new_soft_errors =
+  let add_soft_errors { hard_errors; soft_errors; exit_code } new_soft_errors =
     { hard_errors
     ; soft_errors = Error_accumulator.merge soft_errors new_soft_errors
+    ; exit_code
     }
 
-  let of_hard_errors hard_errors =
-    { hard_errors; soft_errors = Error_accumulator.empty }
+  let of_hard_errors ?exit_code hard_errors =
+    { hard_errors; soft_errors = Error_accumulator.empty; exit_code }
 
-  let contextualize context { hard_errors; soft_errors } =
+  let contextualize context { hard_errors; soft_errors; exit_code } =
     { hard_errors =
         Error_accumulator.contextualize' context hard_errors
           ~time_of_error:Test_error.occurrence_time
     ; soft_errors =
         Error_accumulator.contextualize' context soft_errors
           ~time_of_error:Test_error.occurrence_time
+    ; exit_code
     }
 end
 
@@ -104,9 +107,10 @@ let soft_error ~value error =
   |> Result_accumulator.create value
   |> Result.return |> Deferred.return
 
-let hard_error error =
+let hard_error ?exit_code error =
   error |> Test_error.internal_error |> Error_accumulator.singleton
-  |> Hard_fail.of_hard_errors |> Result.fail |> Deferred.return
+  |> Hard_fail.of_hard_errors ?exit_code
+  |> Result.fail |> Deferred.return
 
 let contextualize context m =
   let open Deferred.Let_syntax in
@@ -121,10 +125,10 @@ let soften_error m =
   match%map m with
   | Ok acc ->
       Ok acc
-  | Error { Hard_fail.soft_errors; hard_errors } ->
+  | Error { Hard_fail.soft_errors; hard_errors; exit_code = _ } ->
       Ok
         (Result_accumulator.create ()
-           (Error_accumulator.merge soft_errors hard_errors))
+           (Error_accumulator.merge soft_errors hard_errors) )
 
 let is_ok = function Ok acc -> Result_accumulator.is_ok acc | _ -> false
 
@@ -151,12 +155,18 @@ let soft_error_string ~value = Fn.compose (soft_error ~value) Error.of_string
 let soft_error_format ~value format =
   Printf.ksprintf (soft_error_string ~value) format
 
-let or_hard_error or_error =
-  match or_error with Ok x -> return x | Error error -> hard_error error
+let or_hard_error ?exit_code or_error =
+  match or_error with
+  | Ok x ->
+      return x
+  | Error error ->
+      hard_error ?exit_code error
 
-let hard_error_string = Fn.compose hard_error Error.of_string
+let hard_error_string ?exit_code =
+  Fn.compose (hard_error ?exit_code) Error.of_string
 
-let hard_error_format format = Printf.ksprintf hard_error_string format
+let hard_error_format ?exit_code format =
+  Printf.ksprintf (hard_error_string ?exit_code) format
 
 let combine_errors (malleable_errors : 'a t list) : 'a list t =
   let open T.Let_syntax in
@@ -164,7 +174,7 @@ let combine_errors (malleable_errors : 'a t list) : 'a list t =
     List.fold_left malleable_errors ~init:(return []) ~f:(fun acc el ->
         let%bind t = acc in
         let%map h = el in
-        h :: t)
+        h :: t )
   in
   List.rev values
 
@@ -173,14 +183,14 @@ let lift_error_set (type a) (m : a t) :
     , Test_error.internal_error Test_error.Set.t )
     Deferred.Result.t =
   let open Deferred.Let_syntax in
-  let error_set hard_errors soft_errors =
-    { Test_error.Set.hard_errors; soft_errors }
+  let error_set ?exit_code hard_errors soft_errors =
+    { Test_error.Set.hard_errors; soft_errors; exit_code }
   in
   match%map m with
   | Ok { computation_result; soft_errors } ->
       Ok (computation_result, error_set Error_accumulator.empty soft_errors)
-  | Error { hard_errors; soft_errors } ->
-      Error (error_set hard_errors soft_errors)
+  | Error { hard_errors; soft_errors; exit_code } ->
+      Error (error_set ?exit_code hard_errors soft_errors)
 
 let lift_error_set_unit (m : unit t) :
     Test_error.internal_error Test_error.Set.t Deferred.t =
@@ -237,7 +247,7 @@ module List = struct
     let%map _ =
       fold ls ~init:0 ~f:(fun i x ->
           let%map () = f i x in
-          i + 1)
+          i + 1 )
     in
     ()
 end
@@ -283,7 +293,7 @@ let%test_module "malleable error unit tests" =
             f (f (f (f (f (return 0)))))
           in
           let%map expected = T.return 5 in
-          [%test_eq: int inner] ~equal:(equal_inner Int.equal) actual expected)
+          [%test_eq: int inner] ~equal:(equal_inner Int.equal) actual expected )
 
     let%test_unit "malleable error test 2: completes string computation when \
                    no errors" =
@@ -296,7 +306,7 @@ let%test_module "malleable error unit tests" =
           in
           let%map expected = T.return "123" in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
 
     let%test_unit "malleable error test 3: ok result that accumulates soft \
                    errors" =
@@ -319,7 +329,7 @@ let%test_module "malleable error unit tests" =
               }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
 
     let%test_unit "malleable error test 4: do a basic hard error" =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -335,10 +345,11 @@ let%test_module "malleable error unit tests" =
                   Error_accumulator.singleton
                     (Test_error.internal_error (Error.of_string "xyz"))
               ; soft_errors = Error_accumulator.empty
+              ; exit_code = None
               }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
 
     let%test_unit "malleable error test 5: hard error that accumulates a soft \
                    error" =
@@ -358,10 +369,11 @@ let%test_module "malleable error unit tests" =
               ; soft_errors =
                   Error_accumulator.singleton
                     (Test_error.internal_error (Error.of_string "a"))
+              ; exit_code = None
               }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
 
     let%test_unit "malleable error test 6: hard error with multiple soft \
                    errors accumulating" =
@@ -385,8 +397,9 @@ let%test_module "malleable error unit tests" =
                       ; Test_error.internal_error (Error.of_string "a")
                       ]
                   }
+              ; exit_code = None
               }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
-            expected)
+            expected )
   end )

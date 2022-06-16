@@ -18,12 +18,12 @@ module Stable = struct
         ; ( "current_protocol_version"
           , `String
               (Protocol_version.to_string
-                 (Header.current_protocol_version t.header)) )
+                 (Header.current_protocol_version t.header) ) )
         ; ( "proposed_protocol_version"
           , `String
               (Option.value_map
                  (Header.proposed_protocol_version_opt t.header)
-                 ~default:"<None>" ~f:Protocol_version.to_string) )
+                 ~default:"<None>" ~f:Protocol_version.to_string ) )
         ]
 
     let to_latest = Fn.id
@@ -60,7 +60,7 @@ module Stable = struct
   end
 end]
 
-type with_hash = t State_hash.With_state_hashes.t
+type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
 
 [%%define_locally
 Stable.Latest.(create, compare, header, body, t_of_sexp, sexp_of_t, to_yojson)]
@@ -99,10 +99,10 @@ let payments block =
          } ->
            Some { With_status.data = c; status }
        | _ ->
-           None)
+           None )
 
 let equal =
   Comparable.lift Consensus.Data.Consensus_state.Value.equal
     ~f:
       (Fn.compose Mina_state.Protocol_state.consensus_state
-         (Fn.compose Header.protocol_state header))
+         (Fn.compose Header.protocol_state header) )

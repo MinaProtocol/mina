@@ -24,6 +24,6 @@ let domains (type field a)
                                            , field )
                                            Zexe_backend_common
                                            .Plonk_constraint_system
-                                           .t) (Spec.ETyp.T (typ, conv)) main =
+                                           .t ) (Spec.ETyp.T (typ, conv)) main =
   let main x () : unit = main (conv x) in
   domains (Impl.constraint_system ~exposing:[ typ ] main)

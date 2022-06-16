@@ -141,7 +141,7 @@ let%test_unit "tick triggers timeouts and fast-forwards to event time" =
       [%test_result: Bool.t] ~message:"We ticked" ~expect:true !fired ;
       [%test_result: Bool.t] ~message:"Time fast-forwads to at least event time"
         ~expect:true
-        Int64.(diff (now ctrl) start >= Int64.of_int 5000))
+        Int64.(diff (now ctrl) start >= Int64.of_int 5000) )
 
 let%test_unit "tick triggers timeouts and adjusts to system time" =
   let ctrl = Controller.create () in
@@ -164,7 +164,7 @@ let%test_unit "tick triggers timeouts and adjusts to system time" =
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
         ~expect:true
-        (Int64.( >= ) (diff (now ctrl) start) (Int64.of_int 5)))
+        (Int64.( >= ) (diff (now ctrl) start) (Int64.of_int 5)) )
 
 let%test_unit "tick handles multiple timeouts if necessary" =
   let ctrl = Controller.create () in
@@ -192,7 +192,7 @@ let%test_unit "tick handles multiple timeouts if necessary" =
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
         ~expect:true
-        Int64.(diff (now ctrl) start >= Int64.of_int 7))
+        Int64.(diff (now ctrl) start >= Int64.of_int 7) )
 
 let%test_unit "cancelling a timeout means it won't fire" =
   let ctrl = Controller.create () in
@@ -210,4 +210,4 @@ let%test_unit "cancelling a timeout means it won't fire" =
       let%map () = Controller.tick ctrl in
       [%test_result: String.t]
         ~message:"We only triggered the events that we didn't cancel"
-        ~expect:"ac" !message)
+        ~expect:"ac" !message )

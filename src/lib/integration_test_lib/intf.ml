@@ -210,11 +210,11 @@ module Engine = struct
 
     type t
 
-    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Malleable_error.t
 
-    val deploy : t -> Network.t Deferred.t
+    val deploy : t -> Network.t Malleable_error.t
 
-    val destroy : t -> unit Deferred.t
+    val destroy : t -> unit Malleable_error.t
 
     val cleanup : t -> unit Deferred.t
   end
@@ -320,6 +320,15 @@ module Dsl = struct
 
     type t
 
+    type wait_condition_id =
+      | Nodes_to_initialize
+      | Blocks_to_be_produced
+      | Nodes_to_synchronize
+      | Signed_command_to_be_included_in_frontier
+      | Ledger_proofs_emitted_since_genesis
+
+    val wait_condition_id : t -> wait_condition_id
+
     val with_timeouts :
          ?soft_timeout:Network_time_span.t
       -> ?hard_timeout:Network_time_span.t
@@ -338,6 +347,8 @@ module Dsl = struct
          txn_hash:Transaction_hash.t
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
+
+    val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
   end
 
   module type Util_intf = sig
@@ -426,7 +437,9 @@ module Dsl = struct
       -> log_error_accumulator
 
     val lift_accumulated_log_errors :
-      log_error_accumulator -> Test_error.remote_error Test_error.Set.t
+         ?exit_code:int
+      -> log_error_accumulator
+      -> Test_error.remote_error Test_error.Set.t
   end
 end
 

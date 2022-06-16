@@ -32,7 +32,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
       let pow = Field.(Pcs_batch.pow ~one ~mul) in
       choose t ~f:(fun deg ->
           let d = deg mod crs_max_degree in
-          pow x (crs_max_degree - d))
+          pow x (crs_max_degree - d) )
   end
 
   module Domain = struct
@@ -57,7 +57,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
       let max_log2 =
         let _, ds = t in
         List.fold (Vector.to_list ds) ~init:0 ~f:(fun acc d ->
-            Int.max acc (Domain.log2_size d))
+            Int.max acc (Domain.log2_size d) )
       in
       object
         method size = size

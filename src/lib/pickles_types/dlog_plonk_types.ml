@@ -7,7 +7,7 @@ let padded_array_typ ~length ~dummy elt =
       (fun a ->
         let n = Array.length a in
         if n > length then failwithf "Expected %d <= %d" n length () ;
-        typ.store (Array.append a (Array.create ~len:(length - n) dummy)))
+        typ.store (Array.append a (Array.create ~len:(length - n) dummy)) )
   }
 
 module Pc_array = struct
@@ -82,8 +82,9 @@ module Evals = struct
               (fun arr ->
                 t.store
                   (Array.append arr
-                     (Array.create ~len:(length - Array.length arr) default)))
-          })
+                     (Array.create ~len:(length - Array.length arr) default) )
+                )
+          } )
     in
     let t =
       let l1, l2 = to_vectors lengths in
@@ -166,12 +167,13 @@ module Poly_comm = struct
             let n = Array.length a in
             if n > length then failwithf "Expected %d <= %d" n length () ;
             typ.store
-              (Array.append a (Array.create ~len:(length - n) (false, dummy))))
+              (Array.append a (Array.create ~len:(length - n) (false, dummy)))
+            )
       ; read =
           (fun a ->
             let open Snarky_backendless.Typ_monads.Read.Let_syntax in
             let%map a = typ.read a in
-            Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None))
+            Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None) )
       }
 
     let typ (type f g g_var bool_var)
@@ -186,7 +188,7 @@ module Poly_comm = struct
             | Or_infinity.Infinity ->
                 (false, dummy_group_element)
             | Finite x ->
-                (true, x))
+                (true, x) )
           ~back:(fun (b, x) -> if b then Infinity else Finite x)
       in
       let arr = padded_array_typ0 ~length ~dummy:Or_infinity.Infinity g_inf in

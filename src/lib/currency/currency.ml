@@ -231,7 +231,7 @@ end = struct
     let gen =
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
           if Unsigned.(equal zero magnitude) then zero
-          else create ~magnitude ~sgn)
+          else create ~magnitude ~sgn )
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
@@ -381,7 +381,7 @@ end = struct
           | true, false ->
               cond
           | false, true ->
-              Boolean.not cond)
+              Boolean.not cond )
 
     (* Unpacking protects against underflow *)
     let sub (x : Unpacked.var) (y : Unpacked.var) =
@@ -469,7 +469,7 @@ end = struct
                   if Unsigned.equal i Unsigned.zero then None
                   else
                     let n = Unsigned.div i (Unsigned.of_int 10) in
-                    Some (n, n)))
+                    Some (n, n) ) )
 
         (* TODO: When we do something to make snarks run fast for tests, increase the trials *)
         let qc_test_fast = Quickcheck.test ~trials:100
@@ -484,7 +484,7 @@ end = struct
           qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_success
                 (sprintf !"subtraction: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-                (var_of_t lo - var_of_t hi))
+                (var_of_t lo - var_of_t hi) )
 
         let%test_unit "subtraction_soundness" =
           let generator =
@@ -496,7 +496,7 @@ end = struct
           qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_failure
                 (sprintf !"underflow: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-                (var_of_t lo - var_of_t hi))
+                (var_of_t lo - var_of_t hi) )
 
         let%test_unit "addition_completeness" =
           let generator =
@@ -508,7 +508,7 @@ end = struct
           qc_test_fast generator ~f:(fun (x, y) ->
               expect_success
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-                (var_of_t x + var_of_t y))
+                (var_of_t x + var_of_t y) )
 
         let%test_unit "addition_soundness" =
           let generator =
@@ -522,7 +522,7 @@ end = struct
           qc_test_fast generator ~f:(fun (x, y) ->
               expect_failure
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-                (var_of_t x + var_of_t y))
+                (var_of_t x + var_of_t y) )
 
         let%test_unit "formatting_roundtrip" =
           let generator = gen_incl Unsigned.zero Unsigned.max_int in
@@ -537,14 +537,14 @@ end = struct
                            (sprintf
                               !"formatting: num=%{Unsigned} middle=%{String} \
                                 after=%{Unsigned}"
-                              num (to_formatted_string num) after_format)))
+                              num (to_formatted_string num) after_format ) ))
               | exception e ->
                   let err = Error.of_exn e in
                   Error.(
                     raise
                       (tag
                          ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
-                         err)))
+                         err )) )
 
         let%test_unit "formatting_trailing_zeros" =
           let generator = gen_incl Unsigned.zero Unsigned.max_int in
@@ -558,7 +558,7 @@ end = struct
                     (of_string
                        (sprintf
                           !"formatting: num=%{Unsigned} formatted=%{String}"
-                          num (to_formatted_string num)))))
+                          num (to_formatted_string num) ) )) )
       end )
   end
 
@@ -760,7 +760,7 @@ let%test_module "sub_flagged module" =
           let m, u = sub_flagged_unchecked p in
           let m_checked, u_checked = sub_flagged_checked p in
           assert (Bool.equal u u_checked) ;
-          if not u then [%test_eq: M.magnitude] m m_checked)
+          if not u then [%test_eq: M.magnitude] m m_checked )
 
     let%test_unit "fee sub_flagged" = run_test (module Fee)
 

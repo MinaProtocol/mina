@@ -218,13 +218,6 @@ check-snarky-submodule:
 macos-setup-download:
 	./scripts/macos-setup-brew.sh
 
-setup-opam:
-	eval $$(opam config env) && ./scripts/setup-opam.sh
-
-macos-setup:
-	./scripts/macos-setup-brew.sh
-	./scripts/setup-opam.sh
-
 ########################################
 ## Artifacts
 

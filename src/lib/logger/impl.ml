@@ -49,17 +49,18 @@ module Metadata = struct
         | _ ->
             Error "Unexpected object"
 
-      include Binable.Of_binable
-                (Core_kernel.String.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable_without_uuid
+          (Core_kernel.String.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let to_binable t = to_yojson t |> Yojson.Safe.to_string
+            let to_binable t = to_yojson t |> Yojson.Safe.to_string
 
-                  let of_binable (t : string) : t =
-                    Yojson.Safe.from_string t |> of_yojson |> Result.ok
-                    |> Option.value_exn
-                end)
+            let of_binable (t : string) : t =
+              Yojson.Safe.from_string t |> of_yojson |> Result.ok
+              |> Option.value_exn
+          end)
     end
   end]
 
@@ -75,7 +76,7 @@ module Metadata = struct
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
-        String.Map.set acc ~key ~data)
+        String.Map.set acc ~key ~data )
 
   let merge (a : t) (b : t) = extend a (String.Map.to_alist b)
 end
@@ -106,7 +107,7 @@ module Message = struct
           | `Interpolate item ->
               Metadata.mem t.metadata item
           | `Raw _ ->
-              true)
+              true )
 end
 
 module Processor = struct
@@ -133,7 +134,7 @@ module Processor = struct
           if Level.compare msg.level Level.Spam = 0 then
             `Assoc
               (List.filter msg_json_fields ~f:(fun (k, _) ->
-                   not (String.equal k "source")))
+                   not (String.equal k "source") ) )
           else `Assoc msg_json_fields
         in
         Some (Yojson.Safe.to_string json)
@@ -154,7 +155,7 @@ module Processor = struct
         | Error err ->
             Option.iter msg.source ~f:(fun source ->
                 Core.printf "logproc interpolation error in %s: %s\n"
-                  source.location err) ;
+                  source.location err ) ;
             None
         | Ok (str, extra) ->
             let formatted_extra =
@@ -321,7 +322,7 @@ module Consumer_registry = struct
               |> Transport.transport transport ;
               broadcast_log_message ~id:"oversized_logs" msg
         | None ->
-            ())
+            () )
 end
 
 [%%versioned
@@ -394,7 +395,7 @@ let raw ({ id; _ } as t) msg =
 let add_tags_to_metadata metadata tags =
   Option.value_map tags ~default:metadata ~f:(fun tags ->
       let tags_item = ("tags", `List (List.map tags ~f:Tags.to_yojson)) in
-      tags_item :: metadata)
+      tags_item :: metadata )
 
 let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
   let metadata = add_tags_to_metadata metadata tags in

@@ -52,7 +52,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "network can't be paritioned if 2 nodes are hypothetically taken \
          offline"
         (Util.assert_peers_cant_be_partitioned ~max_disconnections:2
-           initial_connectivity_data)
+           initial_connectivity_data )
     in
     let%bind _ =
       section "blocks are produced"
@@ -74,12 +74,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Wait_condition.with_timeouts
                 ~hard_timeout:
                   (Network_time_span.Literal
-                     (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
+                     (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
     in
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
          Util.fetch_connectivity_data ~logger all_nodes
        in
-       Util.assert_peers_completely_connected final_connectivity_data)
+       Util.assert_peers_completely_connected final_connectivity_data )
 end

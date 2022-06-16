@@ -1,7 +1,4 @@
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core_kernel
 open Signature_lib
 
@@ -20,7 +17,7 @@ let keypairs =
     (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
     (Keypair.of_private_key_exn
        (Private_key.of_base58_check_exn
-          "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw"))
+          "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw" ) )
     generated_keypairs
 
 let expr ~loc =
@@ -35,12 +32,12 @@ let expr ~loc =
              [ estring
                  (Binable.to_string
                     (module Public_key.Compressed.Stable.Latest)
-                    (Public_key.compress public_key))
+                    (Public_key.compress public_key) )
              ; estring
                  (Binable.to_string
                     (module Private_key.Stable.Latest)
-                    private_key)
-             ]))
+                    private_key )
+             ] ) )
   in
   let%expr conv (pk, sk) =
     ( Core_kernel.Binable.of_string
@@ -69,14 +66,14 @@ let json =
                    Compressed.to_base58_check (compress kp.public_key)) )
            ; ( "private_key"
              , `String (Private_key.to_base58_check kp.private_key) )
-           ]))
+           ] ) )
 
 let main () =
   Out_channel.with_file "sample_keypairs.ml" ~f:(fun ml_file ->
       let fmt = Format.formatter_of_out_channel ml_file in
-      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))) ;
+      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none)) ) ;
   Out_channel.with_file "sample_keypairs.json" ~f:(fun json_file ->
-      Yojson.pretty_to_channel json_file json) ;
+      Yojson.pretty_to_channel json_file json ) ;
   exit 0
 
 let () = main ()

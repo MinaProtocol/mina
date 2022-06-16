@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Signature_lib
 open Pipe_lib
 open Init
@@ -368,7 +368,7 @@ module T = struct
         Option.value_map trace_dir
           ~f:(fun d ->
             let%bind () = Async.Unix.mkdir ~p:() d in
-            Coda_tracing.start d)
+            Coda_tracing.start d )
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
@@ -387,12 +387,12 @@ module T = struct
           let block_production_keypair =
             Option.map block_production_key ~f:(fun i ->
                 List.nth_exn (Lazy.force Genesis_ledger.accounts) i
-                |> Genesis_ledger.keypair_of_account_record_exn)
+                |> Genesis_ledger.keypair_of_account_record_exn )
           in
           let block_production_keypairs =
             block_production_keypair
             |> Option.map ~f:(fun kp ->
-                   (kp, Public_key.compress kp.Keypair.public_key))
+                   (kp, Public_key.compress kp.Keypair.public_key) )
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
           let block_production_pubkeys =
@@ -474,7 +474,7 @@ module T = struct
                  ~proposed_protocol_version_opt:None
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
-                      work_selection_method)
+                      work_selection_method )
                  ~snark_worker_config:
                    Mina_lib.Config.Snark_worker_config.
                      { initial_snark_worker_key = snark_worker_key
@@ -493,8 +493,8 @@ module T = struct
                  ~archive_process_location:
                    (Option.map archive_process_location ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
-                          { name = "dummy"; value = host_and_port }))
-                 ~log_precomputed_blocks:false ~stop_time:48 ())
+                          { name = "dummy"; value = host_and_port } ) )
+                 ~log_precomputed_blocks:false ~stop_time:48 () )
           in
           let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
@@ -507,7 +507,7 @@ module T = struct
                 coda_ref := Some coda ;
                 [%log info] "Setting up snark worker " ;
                 Coda_run.setup_local_server coda ;
-                coda)
+                coda )
               ()
           in
           [%log info] "Worker finish setting up coda" ;
@@ -541,10 +541,10 @@ module T = struct
                      ; receiver_pk
                      ; token_id = Token_id.default
                      ; amount
-                     })
+                     } )
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
-                     (Keypair.of_private_key_exn sender_sk))
+                     (Keypair.of_private_key_exn sender_sk) )
                 ()
             in
             let payment_input = build_user_command_input amount sk pk fee in
@@ -581,11 +581,17 @@ module T = struct
                  ~f:(fun t ->
                    Pipe.write_without_pushback_if_open
                      validated_transitions_keyswaptest_writer t ;
+                   let block_with_hash =
+                     External_transition.Validated.lower t
+                     |> Mina_block.Validated.forget
+                   in
                    let prev_state_hash =
-                     External_transition.Validated.parent_hash t
+                     With_hash.data block_with_hash
+                     |> Mina_block.header |> Header.protocol_state
+                     |> Mina_state.Protocol_state.previous_state_hash
                    in
                    let state_hash =
-                     (External_transition.Validated.state_hashes t).state_hash
+                     State_hash.With_state_hashes.state_hash block_with_hash
                    in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
@@ -595,7 +601,7 @@ module T = struct
                         reader end? dropping this write..." ;
                    Linear_pipe.write_without_pushback_if_open w
                      (prev_state_hash, state_hash) ;
-                   Deferred.unit)) ;
+                   Deferred.unit ) ) ;
             return r.pipe
           in
           let coda_validated_transitions_keyswaptest () =
@@ -609,7 +615,7 @@ module T = struct
                      [%log error]
                        "[coda_root_diff] why is this w pipe closed? did \
                         someone close the reader end? dropping this write..." ;
-                   Linear_pipe.write_if_open w diff)) ;
+                   Linear_pipe.write_if_open w diff ) ) ;
             return r.pipe
           in
           let coda_initialization_finish_signal () =
@@ -650,7 +656,7 @@ module T = struct
                       | Error json ->
                           failwith
                             (sprintf "Receiving sync status error: %s"
-                               (Yojson.Basic.to_string json)))
+                               (Yojson.Basic.to_string json) ) )
                 | _ ->
                     failwith "Expected to get a stream of sync updates" )
             | Error e ->
@@ -683,7 +689,7 @@ module T = struct
           ; coda_replace_snark_worker_key =
               with_monitor coda_replace_snark_worker_key
           ; coda_stop_snark_worker = with_monitor coda_stop_snark_worker
-          })
+          } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

@@ -89,10 +89,9 @@ let () =
     | Received_undefined_union (ctx, n) ->
         Some
           (Printf.sprintf
-             "Received an undefined union for %s over the libp2p IPC: %n " ctx
-             n)
+             "Received an undefined union for %s over the libp2p IPC: %n " ctx n )
     | _ ->
-        None)
+        None )
 
 let compression = `None
 
@@ -224,6 +223,10 @@ let rpc_request_body_set req body =
       ignore @@ set_node_status_set_builder req b
   | GetPeerNodeStatus b ->
       ignore @@ get_peer_node_status_set_builder req b
+  | TestDecodeBitswapBlocks b ->
+      ignore @@ test_decode_bitswap_blocks_set_builder req b
+  | TestEncodeBitswapBlocks b ->
+      ignore @@ test_encode_bitswap_blocks_set_builder req b
   | Undefined _ ->
       failwith "cannot set undefined rpc request body"
 
@@ -271,7 +274,7 @@ let create_push_message ~validation_id ~validation_result =
               (module Builder.Libp2pHelperInterface.Validation)
               Builder.Libp2pHelperInterface.Validation.(
                 reader_op validation_id_set_reader validation_id
-                *> op result_set validation_result)))
+                *> op result_set validation_result) ))
 
 let read_and_decode_message =
   let open Incremental_parsing in
@@ -284,7 +287,7 @@ let read_and_decode_message =
   let%map segments =
     parse
       (polymorphic_list
-         (List.map segment_sizes ~f:(fun n -> bytes (Uint32.to_int n * 8))))
+         (List.map segment_sizes ~f:(fun n -> bytes (Uint32.to_int n * 8))) )
   in
   Capnp.BytesMessage.Message.of_storage segments
 
@@ -300,11 +303,11 @@ let read_incoming_messages reader =
   let r, w = Strict_pipe.create Strict_pipe.Synchronous in
   let fragment_stream = Incremental_parsing.Fragment_stream.create () in
   O1trace.background_thread "stream_libp2p_ipc_messages" (fun () ->
-      stream_messages fragment_stream w) ;
+      stream_messages fragment_stream w ) ;
   O1trace.background_thread "accumulate_libp2p_ipc_message_fragments" (fun () ->
       Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
           Incremental_parsing.Fragment_stream.add_fragment fragment_stream
-            (Stdlib.Bytes.unsafe_of_string fragment))) ;
+            (Stdlib.Bytes.unsafe_of_string fragment) ) ) ;
   r
 
 let write_outgoing_message writer msg =

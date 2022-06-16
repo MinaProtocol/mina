@@ -164,10 +164,10 @@ module Make (Inputs : Inputs_intf) :
     let locations_accounts_bin =
       List.filter all_keys_values ~f:(fun (loc, _v) ->
           let ch = Bigstring.get_uint8 loc ~pos:0 in
-          Int.equal ch account_location_prefix)
+          Int.equal ch account_location_prefix )
     in
     List.map locations_accounts_bin ~f:(fun (_location_bin, account_bin) ->
-        account_bin_read account_bin ~pos_ref:(ref 0))
+        account_bin_read account_bin ~pos_ref:(ref 0) )
 
   let to_list mdb = account_list_bin mdb Account.bin_read_t
 
@@ -229,7 +229,7 @@ module Make (Inputs : Inputs_intf) :
            ^ Format.sprintf
                !"%{sexp: Key.t}!%{sexp: Token_id.t}"
                (Account_id.public_key account_id)
-               (Account_id.token_id account_id) ))
+               (Account_id.token_id account_id) ) )
 
     let serialize_kv ~ledger_depth (aid, location) =
       ( Location.serialize ~ledger_depth @@ build_location aid
@@ -299,12 +299,12 @@ module Make (Inputs : Inputs_intf) :
               |> Result.map ~f:(fun next_account_location ->
                      set_raw mdb location
                        (Location.serialize ~ledger_depth next_account_location) ;
-                     next_account_location) )
+                     next_account_location ) )
 
     let allocate mdb key =
       let location_result = increment_last_account_location mdb in
       Result.map location_result ~f:(fun location ->
-          set mdb key location ; location)
+          set mdb key location ; location )
 
     let last_location_address mdb =
       match
@@ -335,7 +335,7 @@ module Make (Inputs : Inputs_intf) :
   module Tokens = struct
     let next_available_key =
       Memo.unit (fun () ->
-          Location.build_generic (Bigstring.of_string "next_available_token"))
+          Location.build_generic (Bigstring.of_string "next_available_token") )
 
     let next_available mdb =
       Option.value
@@ -361,7 +361,7 @@ module Make (Inputs : Inputs_intf) :
       let build_location token_id =
         Location.build_generic
           (Bigstring.of_string
-             (Format.sprintf !"$tid!%{sexp: Token_id.t}" token_id))
+             (Format.sprintf !"$tid!%{sexp: Token_id.t}" token_id) )
 
       let serialize_kv ~ledger_depth (tid, pk) =
         let pk_buf =
@@ -438,13 +438,13 @@ module Make (Inputs : Inputs_intf) :
 
     let update mdb pk ~f =
       change_opt mdb pk ~f:(fun x ->
-          to_opt @@ f (Option.value ~default:Token_id.Set.empty x))
+          to_opt @@ f (Option.value ~default:Token_id.Set.empty x) )
 
     let add mdb pk tid = update mdb pk ~f:(fun tids -> Set.add tids tid)
 
     let _add_several mdb pk new_tids =
       update mdb pk ~f:(fun tids ->
-          Set.union tids (Token_id.Set.of_list new_tids))
+          Set.union tids (Token_id.Set.of_list new_tids) )
 
     let add_account mdb aid account =
       let token = Account_id.token_id aid in
@@ -457,7 +457,7 @@ module Make (Inputs : Inputs_intf) :
 
     let _remove_several mdb pk rem_tids =
       update mdb pk ~f:(fun tids ->
-          Set.diff tids (Token_id.Set.of_list rem_tids))
+          Set.diff tids (Token_id.Set.of_list rem_tids) )
 
     let remove_account mdb aid =
       let token = Account_id.token_id aid in
@@ -470,7 +470,7 @@ module Make (Inputs : Inputs_intf) :
     let add_batch_create mdb pks_to_tokens =
       let pks_to_all_tokens =
         Map.filter_mapi pks_to_tokens ~f:(fun ~key:pk ~data:tokens_to_add ->
-            to_opt (Set.union (get mdb pk) tokens_to_add))
+            to_opt (Set.union (get mdb pk) tokens_to_add) )
       in
       Map.to_alist pks_to_all_tokens
       |> List.map ~f:(serialize_kv ~ledger_depth:mdb.depth)
@@ -547,12 +547,12 @@ module Make (Inputs : Inputs_intf) :
                 | Some set ->
                     Set.add set (Account_id.token_id aid)
                 | None ->
-                    Token_id.Set.singleton (Account_id.token_id aid))
+                    Token_id.Set.singleton (Account_id.token_id aid) )
             , (* If the token is present in an account, it is no longer
                  available.
               *)
               Token_id.max next_available_token
-                (Token_id.next (Account_id.token_id aid)) ))
+                (Token_id.next (Account_id.token_id aid)) ) )
       in
       let next_available_token_change =
         if Token_id.(new_next_available_token > next_available_token) then
@@ -581,8 +581,8 @@ module Make (Inputs : Inputs_intf) :
               let aid = Account.identifier account in
               Some
                 (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
-                   (Account_id.token_id aid, Account_id.public_key aid))
-            else None)
+                   (Account_id.token_id aid, Account_id.public_key aid) )
+            else None )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
         ~key_data_pairs:token_owner_changes
@@ -668,7 +668,7 @@ module Make (Inputs : Inputs_intf) :
         let ignored_indices =
           Int.Set.map ignored_accounts ~f:(fun account_id ->
               try index_of_account_exn t account_id with _ -> -1
-              (* dummy index for accounts not in database *))
+              (* dummy index for accounts not in database *) )
         in
         let last = Addr.to_int last_addr in
         Sequence.range ~stop:`inclusive 0 last
@@ -724,7 +724,7 @@ module Make (Inputs : Inputs_intf) :
     (* recalculate hashes for each removed account *)
     List.iter locations ~f:(fun loc ->
         let hash_loc = Location.Hash (Location.to_path_exn loc) in
-        set_hash t hash_loc Hash.empty_account)
+        set_hash t hash_loc Hash.empty_account )
 
   let merkle_path mdb location =
     let location =

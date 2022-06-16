@@ -1,18 +1,18 @@
 open Async
 open Core_kernel
-open Mina_transition
+open Mina_block
 open Network_pool
 open Network_peer
 
 module Master = struct
   module T = struct
     type msg =
-      | New_state of External_transition.t
+      | New_state of Mina_block.t
       | Snark_pool_diff of Snark_pool.Resource_pool.Diff.t
       | Transaction_pool_diff of Transaction_pool.Resource_pool.Diff.t
     [@@deriving sexp, to_yojson]
 
-    type state_msg = Block.t
+    type state_msg = Mina_block.t
 
     type snark_pool_diff_msg = Snark_pool.Resource_pool.Diff.t
 
@@ -104,6 +104,6 @@ type ('sink_block, 'sink_tx, 'sink_snark) sinks_impl =
   (module Sinks_intf
      with type Block_sink.t = 'sink_block
       and type Snark_sink.t = 'sink_snark
-      and type Tx_sink.t = 'sink_tx)
+      and type Tx_sink.t = 'sink_tx )
 
 type sinks = Any_sinks : ('a, 'b, 'c) sinks_impl * ('a * 'b * 'c) -> sinks

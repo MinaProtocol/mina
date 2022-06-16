@@ -1,18 +1,4 @@
-open Core_kernel
-open Async
-open Rosetta_lib
-
-(* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
-module Mina_currency = Currency
-open Rosetta_models
-module Signature = Mina_base.Signature
-module Transaction = Rosetta_lib.Transaction
-module Public_key = Signature_lib.Public_key
-module Signed_command_payload = Mina_base.Signed_command_payload
-module User_command = Mina_base.User_command
-module Signed_command = Mina_base.Signed_command
-module Transaction_hash = Mina_base.Transaction_hash
-
+module Serializing = Graphql_lib.Serializing
 module Get_options_metadata =
 [%graphql
 {|
@@ -20,7 +6,7 @@ module Get_options_metadata =
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
-            fee @bsDecoder(fn: "Decoders.uint64")
+            fee @ppxCustom(module: "Serializing.UInt64")
           }
         }
       }
@@ -31,7 +17,7 @@ module Get_options_metadata =
 
       account(publicKey: $sender, token: $token_id) {
         balance {
-          blockHeight @bsDecoder(fn: "Decoders.uint32")
+          blockHeight @ppxCustom(module: "Serializing.UInt32")
           stateHash
         }
         nonce
@@ -46,8 +32,12 @@ module Get_options_metadata =
 module Send_payment =
 [%graphql
 {|
-  mutation send($from: PublicKey!, $to_: PublicKey!, $token: UInt64, $amount: UInt64, $fee: UInt64, $validUntil: UInt64, $memo: String, $nonce: UInt32!, $signature: String!) {
-    sendPayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, token:$token, amount:$amount, fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
+  mutation send($from: PublicKey!, $to_: PublicKey!, $token: UInt64,
+                $amount: UInt64!, $fee: UInt64!, $validUntil: UInt64,
+                $memo: String, $nonce: UInt32!, $signature: String!) {
+    sendPayment(signature: {rawSignature: $signature}, input:
+                  {from: $from, to:$to_, token:$token, amount:$amount,
+                  fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
       payment {
         hash
       }
@@ -72,63 +62,21 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
-module Send_create_token =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $receiver: PublicKey!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String,
-          $signature: String!) {
-  createToken(signature: {rawSignature: $signature}, input:
-    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewToken {
-      hash
-    }
-  }
-}
-|}]
+(* Avoid shadowing graphql_ppx functions *)
+open Core_kernel
+open Async
+open Rosetta_lib
 
-module Send_create_token_account =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $tokenOwner: PublicKey!,
-          $receiver: PublicKey!,
-          $token: TokenId!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String,
-          $signature: String!) {
-  createTokenAccount(signature: {rawSignature: $signature}, input:
-    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewTokenAccount {
-      hash
-    }
-  }
-}
-|}]
-
-module Send_mint_tokens =
-[%graphql
-{|
-mutation ($sender: PublicKey!,
-          $receiver: PublicKey,
-          $token: TokenId!,
-          $amount: UInt64!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String,
-          $signature: String!) {
-  mintTokens(signature: {rawSignature: $signature}, input:
-    {tokenOwner: $sender, receiver: $receiver, token: $token, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
-    mintTokens {
-      hash
-    }
-  }
-}
-|}]
+(* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
+module Mina_currency = Currency
+open Rosetta_models
+module Signature = Mina_base.Signature
+module Transaction = Rosetta_lib.Transaction
+module Public_key = Signature_lib.Public_key
+module Signed_command_payload = Mina_base.Signed_command_payload
+module User_command = Mina_base.User_command
+module Signed_command = Mina_base.Signed_command
+module Transaction_hash = Mina_base.Transaction_hash
 
 module Options = struct
   type t =
@@ -289,7 +237,7 @@ module Metadata = struct
       { gql =
           (fun ?token_id:_ ~address ~receiver () ->
             Graphql.query
-              (Get_options_metadata.make
+              Get_options_metadata.(make @@ makeVariables
                  ~sender:
                    (`String (Public_key.Compressed.to_base58_check address))
                    (* for now, nonce is based on the fee payer's account using the default token,
@@ -366,7 +314,7 @@ module Metadata = struct
           ~graphql_uri
       in
       let%bind account =
-        match res#account with
+        match res.Get_options_metadata.account with
         | None ->
             M.fail
               (Errors.create
@@ -378,7 +326,7 @@ module Metadata = struct
       let nonce =
         Option.map
           ~f:(fun nonce -> Unsigned.UInt32.of_string nonce)
-          account#nonce
+          account.nonce
         |> Option.value ~default:Unsigned.UInt32.zero
       in
       (* suggested fee *)
@@ -386,12 +334,12 @@ module Metadata = struct
        * the interquartile range *)
       let%map suggested_fee =
         let%map fees =
-          match res#bestChain with
+          match res.bestChain with
           | Some chain ->
               let a =
                 Array.fold chain ~init:[] ~f:(fun fees block ->
-                    Array.fold block#transactions#userCommands ~init:fees
-                      ~f:(fun fees (`UserCommand cmd) -> cmd#fee :: fees))
+                    Array.fold block.transactions.userCommands ~init:fees
+                      ~f:(fun fees cmd -> cmd.fee :: fees))
                 |> Array.of_list
               in
               Array.sort a ~compare:Unsigned_extended.UInt64.compare ;
@@ -418,7 +366,7 @@ module Metadata = struct
           ]
       in
       let receiver_exists =
-        Option.is_some res#receiver
+        Option.is_some res.receiver
       in
       let constraint_constants =
         Genesis_constants.Constraint_constants.compiled
@@ -944,22 +892,6 @@ module Submit = struct
             -> signature:string
             -> unit
             -> ('gql_delegation, Errors.t) M.t
-        ; gql_create_token :
-               create_token:Transaction.Unsigned.Rendered.Create_token.t
-            -> signature:string
-            -> unit
-            -> ('gql_create_token, Errors.t) M.t
-        ; gql_create_token_account :
-               create_token_account:
-                 Transaction.Unsigned.Rendered.Create_token_account.t
-            -> signature:string
-            -> unit
-            -> ('gql_create_token_account, Errors.t) M.t
-        ; gql_mint_tokens :
-               mint_tokens:Transaction.Unsigned.Rendered.Mint_tokens.t
-            -> signature:string
-            -> unit
-            -> ('gql_mint_tokens, Errors.t) M.t
         ; db_transaction_exists:
                nonce:Unsigned_extended.UInt32.t
             -> source:string
@@ -985,12 +917,11 @@ module Submit = struct
            Real.t =
       let uint64 x = `String (Unsigned.UInt64.to_string x) in
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
-      let token_id x = `String (Mina_base.Token_id.to_string x) in
       fun ~db ~graphql_uri ->
         { gql_payment =
             (fun ~payment ~signature () ->
               Graphql.query_and_catch
-                (Send_payment.make ~from:(`String payment.from)
+                Send_payment.(make @@ makeVariables ~from:(`String payment.from)
                    ~to_:(`String payment.to_) ~token:(uint64 payment.token)
                    ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
                    ?validUntil:(Option.map ~f:uint32 payment.valid_until)
@@ -1000,7 +931,7 @@ module Submit = struct
         ; gql_delegation =
             (fun ~delegation ~signature () ->
               Graphql.query
-                (Send_delegation.make ~sender:(`String delegation.delegator)
+                Send_delegation.(make @@ makeVariables ~sender:(`String delegation.delegator)
                    ~receiver:(`String delegation.new_delegate)
                    ~fee:
                      (uint64 delegation.fee)
@@ -1008,40 +939,6 @@ module Submit = struct
                    (* ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
                    ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
                    ~signature ())
-                graphql_uri)
-        ; gql_create_token =
-            (fun ~create_token ~signature () ->
-              Graphql.query
-                (Send_create_token.make
-                   ~receiver:(`String create_token.receiver)
-                   (* ?validUntil:(Option.map ~f:uint32 create_token.valid_until) *)
-                   ~fee:(uint64 create_token.fee) ?memo:create_token.memo
-                   ~nonce:(uint32 create_token.nonce)
-                   ~signature ())
-                graphql_uri)
-        ; gql_create_token_account =
-            (fun ~create_token_account ~signature () ->
-              Graphql.query
-                (Send_create_token_account.make
-                   ~tokenOwner:(`String create_token_account.token_owner)
-                   (* ?validUntil:(Option.map ~f:uint32 create_token_account.valid_until) *)
-                   ~receiver:(`String create_token_account.receiver)
-                   ~token:(token_id create_token_account.token)
-                   ~fee:(uint64 create_token_account.fee)
-                   ?memo:create_token_account.memo
-                   ~nonce:(uint32 create_token_account.nonce)
-                   ~signature ())
-                graphql_uri)
-        ; gql_mint_tokens =
-            (fun ~mint_tokens ~signature () ->
-              Graphql.query
-                (Send_mint_tokens.make ~sender:(`String mint_tokens.token_owner)
-                   (* ?validUntil:(Option.map ~f:uint32 mint_tokens.valid_until) *)
-                   ~receiver:(`String mint_tokens.receiver)
-                   ~token:(token_id mint_tokens.token)
-                   ~amount:(uint64 mint_tokens.amount)
-                   ~fee:(uint64 mint_tokens.fee) ?memo:mint_tokens.memo
-                   ~nonce:(uint32 mint_tokens.nonce) ~signature ())
                 graphql_uri)
         ; db_transaction_exists = (fun ~nonce ~source ~receiver ~amount ~fee ->
           Sql.Transaction_exists.run db ~nonce ~source ~receiver ~amount ~fee |> Errors.Lift.sql )
@@ -1119,8 +1016,7 @@ module Submit = struct
             | `Successful res ->
                let cache = Lazy.force submitted_cache in
                Cache.add cache txn;
-               let (`UserCommand payment) = res#sendPayment#payment in
-               M.return payment#hash
+               M.return res.Send_payment.sendPayment.payment.hash
             | `Failed e ->
                let cache = Lazy.force submitted_cache in
                if
@@ -1150,32 +1046,12 @@ module Submit = struct
               env.gql_delegation ~delegation
                 ~signature:signed_transaction.signature ()
             in
-            let (`UserCommand delegation) = res#sendDelegation#delegation in
-            delegation#hash
-        | None, None, Some create_token, None, None ->
-            let%map res =
-              env.gql_create_token ~create_token
-                ~signature:signed_transaction.signature ()
-            in
-            res#createToken#createNewToken#hash
-        | None, None, None, Some create_token_account, None ->
-            let%map res =
-              env.gql_create_token_account ~create_token_account
-                ~signature:signed_transaction.signature ()
-            in
-            res#createTokenAccount#createNewTokenAccount#hash
-        | None, None, None, None, Some mint_tokens ->
-            let%map res =
-              env.gql_mint_tokens ~mint_tokens
-                ~signature:signed_transaction.signature ()
-            in
-            res#mintTokens#mintTokens#hash
+            res.Send_delegation.sendDelegation.delegation.hash
         | _ ->
             M.fail
               (Errors.create
                  ~context:
-                   "Must have one of payment, stakeDelegation, createToken, \
-                    createTokenAccount, or mintTokens"
+                   "Must have one of payment, stakeDelegation"
                  (`Json_parse None))
       in
       Transaction_identifier_response.create

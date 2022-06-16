@@ -8,7 +8,7 @@ let%test_module "merkle_tree" =
 
     let hash =
       Option.value_map ~default:Free_hash.Hash_empty ~f:(fun x ->
-          Free_hash.Hash_value x)
+          Free_hash.Hash_value x )
 
     let create_tree n =
       let tree = create ~hash ~merge 0 in

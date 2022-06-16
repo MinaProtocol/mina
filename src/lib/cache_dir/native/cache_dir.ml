@@ -83,5 +83,5 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
          in
          Deferred.List.map ~f:each_uri
            (List.zip_exn s3_bucket_prefix s3_install_path)
-         |> Deferred.map ~f:Result.all_unit)
+         |> Deferred.map ~f:Result.all_unit )
   |> Deferred.Result.map_error ~f:Error.of_exn

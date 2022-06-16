@@ -119,9 +119,9 @@ module Make (Inputs : Inputs_intf) = struct
                     | None ->
                         Or_error.errorf
                           "Could not read the URS from disk; its format did \
-                           not match the expected format"))
+                           not match the expected format" ) )
               (fun _ urs path ->
-                Or_error.try_with (fun () -> Urs.write urs path))
+                Or_error.try_with (fun () -> Urs.write urs path) )
           in
           let u =
             match Key_cache.Sync.read specs store () with
@@ -135,7 +135,7 @@ module Make (Inputs : Inputs_intf) = struct
                       | On_disk _ ->
                           true
                       | S3 _ ->
-                          false))
+                          false ) )
                     store () urs
                 in
                 urs
@@ -157,7 +157,7 @@ module Make (Inputs : Inputs_intf) = struct
           let t = List.last_exn x in
           Gate_vector.wrap gates
             { row = conv t.row; col = t.col }
-            { row = conv h.row; col = h.col }) ;
+            { row = conv h.row; col = h.col } ) ;
     let index =
       Index.create gates
         (Set_once.get_exn cs.public_input_size [%here])

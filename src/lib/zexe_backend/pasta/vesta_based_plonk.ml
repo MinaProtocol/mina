@@ -36,7 +36,7 @@ module R1CS_constraint_system =
       let params =
         Sponge.Params.(
           map pasta_p ~f:(fun x ->
-              Field.of_bigint (Bigint256.of_decimal_string x)))
+              Field.of_bigint (Bigint256.of_decimal_string x) ))
     end)
 
 module Var = Var
@@ -51,7 +51,7 @@ let lagrange : int -> Marlin_plonk_bindings.Pasta_fp_urs.Poly_comm.t array =
           { Poly_comm.unshifted =
               Array.map unshifted ~f:(fun c -> Or_infinity.Finite c)
           ; shifted = None
-          }))
+          } ) )
 
 let with_lagrange f (vk : Verification_key.t) =
   f (lagrange vk.domain.log_size_of_group) vk
@@ -96,7 +96,7 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let batch_verify =
       with_lagranges (fun lgrs vks ts ->
-          Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts))
+          Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts) )
 
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =
@@ -124,7 +124,7 @@ module Proof = Plonk_dlog_proof.Make (struct
         ~f:(fun pk ~primary_input ~auxiliary_input ~prev_challenges ~prev_sgs ->
           Run_in_thread.run_in_thread (fun () ->
               create pk ~primary_input ~auxiliary_input ~prev_challenges
-                ~prev_sgs))
+                ~prev_sgs ) )
 
     let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms ~f:create
@@ -152,15 +152,16 @@ end)
 module Proving_key = struct
   type t = Keypair.t
 
-  include Core_kernel.Binable.Of_binable
-            (Core_kernel.Unit)
-            (struct
-              type nonrec t = t
+  include
+    Core_kernel.Binable.Of_binable
+      (Core_kernel.Unit)
+      (struct
+        type nonrec t = t
 
-              let to_binable _ = ()
+        let to_binable _ = ()
 
-              let of_binable () = failwith "TODO"
-            end)
+        let of_binable () = failwith "TODO"
+      end)
 
   let is_initialized _ = `Yes
 

@@ -44,7 +44,7 @@ let valid_commands_with_statuses :
         List.map cmds
           ~f:
             (Mina_base.With_status.of_yojson
-               Mina_base.User_command.Valid.of_yojson)
+               Mina_base.User_command.Valid.of_yojson )
       in
       List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
           match (accum, cmd_or_err) with
@@ -58,7 +58,7 @@ let valid_commands_with_statuses :
                 "valid_commands_with_statuses: unable to parse JSON for user \
                  command"
           | cmds, Ok cmd ->
-              cmd :: cmds)
+              cmd :: cmds )
   | _ ->
       failwith "valid_commands_with_statuses: expected `List"
 
@@ -78,7 +78,7 @@ let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list) :
               "failed to find path using key '%s' in json object { %s }" key
               (String.concat ~sep:", "
                  (List.map assoc ~f:(fun (s, json) ->
-                      sprintf "\"%s\":%s" s (Yojson.Safe.to_string json))))
+                      sprintf "\"%s\":%s" s (Yojson.Safe.to_string json) ) ) )
       in
       find parser entry path'
   | _ ->

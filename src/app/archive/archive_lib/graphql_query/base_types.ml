@@ -3,7 +3,7 @@ open Core
 
 open Mina_base
 
-module Make_numeric (Input : sig
+module type Num_input = sig
   type t
 
   val of_string : string -> t
@@ -11,20 +11,24 @@ module Make_numeric (Input : sig
   val to_string : t -> string
 
   val of_int : int -> t
-end) : sig
-  type t = Input.t
+end
+
+module type Numeric = sig
+  type t
 
   val serialize : t -> Yojson.Basic.t
 
-  val deserialize : Yojson.Basic.t -> t
-end = struct
+  val parse : Yojson.Basic.t -> t
+end
+
+module Make_numeric (Input : Num_input) : Numeric with type t = Input.t = struct
   open Input
 
   type nonrec t = t
 
   let serialize (t : t) = `String (to_string t)
 
-  let deserialize = function
+  let parse = function
     | `String (value : string) ->
         of_string value
     | `Int (value : int) ->
@@ -34,15 +38,15 @@ end = struct
 end
 
 module User_command_type = struct
-  type t = [`Payment | `Delegation]
+  type t = [ `Payment | `Delegation ]
 
-  let encode = function
+  let serialize = function
     | `Payment ->
         `String "payment"
     | `Delegation ->
         `String "delegation"
 
-  let decode = function
+  let parse = function
     | `String "payment" ->
         `Payment
     | `String "delegation" ->
@@ -66,4 +70,4 @@ module Block_time = Make_numeric (struct
   let of_int = Fn.compose Block_time.of_int64 Int64.of_int
 end)
 
-let deserialize_optional_block_time = Option.map ~f:Block_time.deserialize
+module Optional_block_time = Graphql_lib.Serializing.Optional (Block_time)

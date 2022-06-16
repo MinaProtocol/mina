@@ -3,7 +3,7 @@ open Mina_base
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-      List.equal equal [ h ] (List.find_all_dups ~compare ls))
+      List.equal equal [ h ] (List.find_all_dups ~compare ls) )
 
 module Make
     (Engine : Intf.Engine.S)
@@ -30,8 +30,16 @@ struct
         'b Event_type.t * 'a * ('a -> Node.t -> 'b -> 'a predicate_result)
         -> predicate
 
+  type wait_condition_id =
+    | Nodes_to_initialize
+    | Blocks_to_be_produced
+    | Nodes_to_synchronize
+    | Signed_command_to_be_included_in_frontier
+    | Ledger_proofs_emitted_since_genesis
+
   type t =
-    { description : string
+    { id : wait_condition_id
+    ; description : string
     ; predicate : predicate
     ; soft_timeout : Network_time_span.t
     ; hard_timeout : Network_time_span.t
@@ -43,13 +51,15 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
+  let wait_condition_id t = t.id
+
   let nodes_to_initialize nodes =
     let open Network_state in
     let check () (state : Network_state.t) =
       if
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false)
+            |> Option.value ~default:false )
       then Predicate_passed
       else Predicate_continuation ()
     in
@@ -57,7 +67,8 @@ struct
       nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
       |> Printf.sprintf "[%s] to initialize"
     in
-    { description
+    { id = Nodes_to_initialize
+    ; description
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Literal (Time.Span.of_min 10.0)
     ; hard_timeout = Literal (Time.Span.of_min 15.0)
@@ -82,7 +93,8 @@ struct
       *)
       (2 * n) + 1
     in
-    { description = Printf.sprintf "%d blocks to be produced" n
+    { id = Blocks_to_be_produced
+    ; description = Printf.sprintf "%d blocks to be produced" n
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -96,7 +108,7 @@ struct
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find state.best_tips_by_node (Node.id node))
+            String.Map.find state.best_tips_by_node (Node.id node) )
       in
       if
         List.for_all best_tips ~f:Option.is_some
@@ -110,7 +122,8 @@ struct
       |> List.map ~f:(fun node -> "\"" ^ Node.id node ^ "\"")
       |> String.concat ~sep:", "
     in
-    { description = Printf.sprintf "%s to synchronize" formatted_nodes
+    { id = Nodes_to_synchronize
+    ; description = Printf.sprintf "%s to synchronize" formatted_nodes
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -143,11 +156,29 @@ struct
     in
 
     let soft_timeout_in_slots = 8 in
-    { description =
+    { id = Signed_command_to_be_included_in_frontier
+    ; description =
         Printf.sprintf "signed command with hash %s"
           (Transaction_hash.to_base58_check txn_hash)
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let ledger_proofs_emitted_since_genesis ~num_proofs =
+    let open Network_state in
+    let check () (state : Network_state.t) =
+      if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let description =
+      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
+        num_proofs
+    in
+    { id = Ledger_proofs_emitted_since_genesis
+    ; description
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = Slots 15
+    ; hard_timeout = Slots 20
     }
 end

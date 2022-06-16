@@ -4,6 +4,24 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2022/04/20: Add `MINA_ROSETTA_TERMINATE_ON_SERVER_ERROR` environment
+  variable.  If that variable is set to any value, the process will
+  terminate with exit code 1 if the server encounters an internal
+  error.
+
+2022/03/24:
+
+- Fix: When a transaction is received in the same block that a transaction is
+  sent, the nonce returned by the account-balance lookup returns an older nonce.
+  There was also another edge case that hasn't occurred yet where nonces could
+  be off-by-one, this is also now fixed.
+- Release of rosetta-v18-beta2 with above changes
+
+2022/03/18:
+
+- Ensured memo is returned in user commands from /block endpoint
+- Release of rosetta-v18 with above changes
+
 2022/02/18:
 
 - Added nonces to the balance table with all relevant schema migration changes and archive node changes to support it
@@ -349,4 +367,3 @@ In the generated files, the type `deriving` clauses will need to have `eq` added
 Any record types with a field named `_type` will need annotate that field with `[@key "type"]`.
 In `lib/network.ml`, update the two instances of the version number.
 Check the diff after regeneration and be sure to add `[@default None]` and `[@default []]` to all relevant fields of the models
-

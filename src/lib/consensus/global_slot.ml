@@ -144,7 +144,7 @@ module Checked = struct
             (Length.Checked.to_integer t.slots_per_epoch)
         in
         ( Epoch.Checked.Unsafe.of_integer epoch
-        , Slot.Checked.Unsafe.of_integer slot ))
+        , Slot.Checked.Unsafe.of_integer slot ) )
 
   let sub (t : t) (t' : t) = T.Checked.sub t.slot_number t'.slot_number
 end

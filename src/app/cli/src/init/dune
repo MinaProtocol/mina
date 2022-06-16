@@ -21,6 +21,7 @@
    uri
    core_kernel
    core
+   base
    async
    cohttp
    graphql_parser
@@ -56,7 +57,7 @@
    node_status
    o1trace_webkit_event
    mina_user_error
-   mina_transition
+   mina_block
    mina_lib
    mina_base
    cli_lib
@@ -94,4 +95,15 @@
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh ../../../../../graphql_schema.json)
- (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
+ (preprocess (pps ppx_deriving_yojson ppx_coda ppx_version
+                  ; ppx_jane except ppx_optcomp
+                  ppx_base ppx_assert ppx_bench ppx_bin_prot ppx_custom_printf
+                  ppx_fields_conv ppx_fixed_literal ppx_here ppx_inline_test ppx_let
+                  ppx_module_timer ppx_optional ppx_pipebang ppx_sexp_message
+                  ppx_sexp_value ppx_string ppx_typerep_conv ppx_variants_conv
+                  ; GraphQL with config
+                  graphql_ppx --
+                  -extend-query Graphql_lib.Serializing.ExtendQuery
+                  -extend-mutation Graphql_lib.Serializing.ExtendQuery
+                  -future-added-value false
+                  )))

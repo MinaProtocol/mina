@@ -9,18 +9,18 @@ let () = Plugins.enable_plugin (module Execution_timer)
 
 let on_job_enter' (fiber : Thread.Fiber.t) =
   Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
-      Plugin.on_job_enter fiber)
+      Plugin.on_job_enter fiber )
 
 let on_job_exit' fiber elapsed_time =
   Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
-      Plugin.on_job_exit fiber elapsed_time)
+      Plugin.on_job_exit fiber elapsed_time )
 
 let on_job_enter ctx =
   Option.iter (Thread.Fiber.of_context ctx) ~f:on_job_enter'
 
 let on_job_exit ctx elapsed_time =
   Option.iter (Thread.Fiber.of_context ctx) ~f:(fun thread ->
-      on_job_exit' thread elapsed_time)
+      on_job_exit' thread elapsed_time )
 
 let current_sync_fiber = ref None
 
@@ -55,7 +55,7 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
   let result =
     if
       Option.value_map parent ~default:false ~f:(fun p ->
-          String.equal p.thread.name name)
+          String.equal p.thread.name name )
     then exec_same_thread ()
     else
       let fiber =
@@ -80,7 +80,7 @@ let thread name f =
             "timing task `%s` failed, exception reported to parent monitor" name
             ()
       | Ok x ->
-          x)
+          x )
 
 let background_thread name f = don't_wait_for (thread name f)
 
@@ -93,7 +93,7 @@ let sync_thread name f =
       let result = f () in
       let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
       on_job_exit' fiber elapsed_time ;
-      result)
+      result )
 
 let () = Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }
 
@@ -126,7 +126,7 @@ let%test_module "thread tests" =
           let s = Ivar.create () in
           f (Ivar.fill s) ;
           let%bind () = Ivar.read s in
-          Writer.(flushed (Lazy.force stdout)))
+          Writer.(flushed (Lazy.force stdout)) )
 
     let test f = test' (fun s -> don't_wait_for (f s))
 
@@ -138,7 +138,7 @@ let%test_module "thread tests" =
                   thread "c" (fun () ->
                       assert (child_of "b") ;
                       stop () ;
-                      Deferred.unit))))
+                      Deferred.unit ) ) ) )
 
     let%test_unit "thread > background_thread > thread" =
       test (fun stop ->
@@ -148,23 +148,23 @@ let%test_module "thread tests" =
                   thread "c" (fun () ->
                       assert (child_of "b") ;
                       stop () ;
-                      Deferred.unit)) ;
-              Deferred.unit))
+                      Deferred.unit ) ) ;
+              Deferred.unit ) )
 
     let%test_unit "thread > sync_thread" =
       test (fun stop ->
           thread "a" (fun () ->
               sync_thread "b" (fun () ->
                   assert (child_of "a") ;
-                  stop ()) ;
-              Deferred.unit))
+                  stop () ) ;
+              Deferred.unit ) )
 
     let%test_unit "sync_thread > sync_thread" =
       test' (fun stop ->
           sync_thread "a" (fun () ->
               sync_thread "b" (fun () ->
                   assert (child_of "a") ;
-                  stop ())))
+                  stop () ) ) )
 
     let%test_unit "sync_thread > background_thread" =
       test (fun stop ->
@@ -172,8 +172,8 @@ let%test_module "thread tests" =
               background_thread "b" (fun () ->
                   assert (child_of "a") ;
                   stop () ;
-                  Deferred.unit)) ;
-          Deferred.unit)
+                  Deferred.unit ) ) ;
+          Deferred.unit )
 
     let%test_unit "sync_thread > background_thread" =
       test' (fun stop ->
@@ -181,7 +181,7 @@ let%test_module "thread tests" =
               background_thread "b" (fun () ->
                   assert (child_of "a") ;
                   stop () ;
-                  Deferred.unit)))
+                  Deferred.unit ) ) )
 
     let%test_unit "sync_thread > background_thread > sync_thread > thread" =
       test' (fun stop ->
@@ -194,8 +194,8 @@ let%test_module "thread tests" =
                         (thread "d" (fun () ->
                              assert (child_of "c") ;
                              stop () ;
-                             Deferred.unit))) ;
-                  Deferred.unit)))
+                             Deferred.unit ) ) ) ;
+                  Deferred.unit ) ) )
 
     (* TODO: recursion tests *)
   end )

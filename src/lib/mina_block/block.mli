@@ -11,7 +11,7 @@ end]
 
 type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
 
-type with_hash = t State_hash.With_state_hashes.t
+type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
 
 (* TODO: interface for both unchecked and checked construction of blocks *)
 (* check version needs to run following checks:
