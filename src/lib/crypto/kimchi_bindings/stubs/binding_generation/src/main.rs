@@ -1,3 +1,4 @@
+use kimchi::proof::caml::CamlRecursionChallenge;
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
@@ -14,12 +15,13 @@ use wires_15_stubs::{
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
     plonk_verifier_index::{
-        CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain, CamlPlonkVerificationEvals,
-        CamlPlonkVerifierIndex,
+        CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain,
+        CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
     projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
     CamlCircuitGate,
+    CamlLookupCommitments,
     CamlLookupEvaluations,
     CamlOpeningProof,
     CamlPolyComm,
@@ -92,7 +94,9 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
     decl_type!(w, env, CamlProofEvaluations::<T1> => "proof_evaluations");
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
+    decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
+    decl_type!(w, env, CamlLookupCommitments::<T1> => "lookup_commitments");
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
 

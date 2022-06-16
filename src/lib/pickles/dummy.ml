@@ -8,14 +8,17 @@ let wrap_domains = Common.wrap_domains
 
 let evals =
   let open Plonk_types in
-  let e () =
+  let e =
     Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
-        Array.create n (Ro.tock ()) )
+        let a () = Array.create n (Ro.tock ()) in
+        (a (), a ()) )
   in
-  let ex () =
-    { All_evals.With_public_input.evals = e (); public_input = Ro.tock () }
+  let ex =
+    { All_evals.With_public_input.evals = e
+    ; public_input = (Ro.tock (), Ro.tock ())
+    }
   in
-  { All_evals.ft_eval1 = Ro.tock (); evals = (ex (), ex ()) }
+  { All_evals.ft_eval1 = Ro.tock (); evals = ex }
 
 let evals_combined =
   Plonk_types.All_evals.map evals ~f1:Fn.id
