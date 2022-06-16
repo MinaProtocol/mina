@@ -19,7 +19,7 @@ use commitment_dlog::{
     evaluation_proof::OpeningProof,
 };
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof};
+use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
 use kimchi::prover_index::ProverIndex;
 use kimchi::verifier::batch_verify;
 use oracle::{
@@ -444,7 +444,13 @@ macro_rules! impl_proof {
 
             impl From<&ProverProof<$G>> for WasmProverProof {
                 fn from(x: &ProverProof<$G>) -> Self {
-                    let (scalars, comms) = x.prev_challenges.iter().map(|(x, y)| (x.clone().into(), y.into())).unzip();
+                    let (scalars, comms) =
+                        x.prev_challenges
+                            .iter()
+                            .map(|RecursionChallenge { chals, comm }| {
+                                    (chals.clone().into(), comm.into())
+                                })
+                            .unzip();
                     WasmProverProof {
                         commitments: x.commitments.clone().into(),
                         proof: x.proof.clone().into(),
@@ -461,7 +467,11 @@ macro_rules! impl_proof {
             impl From<ProverProof<$G>> for WasmProverProof {
                 fn from(x: ProverProof<$G>) -> Self {
                     let ProverProof {ft_eval1, commitments, proof, evals: [evals0, evals1], public, prev_challenges} = x;
-                    let (scalars, comms) = prev_challenges.into_iter().map(|(x, y)| (x.into(), y.into())).unzip();
+                    let (scalars, comms) =
+                        prev_challenges
+                            .into_iter()
+                            .map(|RecursionChallenge { chals, comm }| (chals.into(), comm.into()))
+                            .unzip();
                     WasmProverProof {
                         commitments: commitments.into(),
                         proof: proof.into(),
@@ -482,7 +492,17 @@ macro_rules! impl_proof {
                         proof: x.proof.clone().into(),
                         evals: [x.evals0.clone().into(), x.evals1.clone().into()],
                         public: x.public.clone().into_iter().map(Into::into).collect(),
-                        prev_challenges: (&x.prev_challenges_scalars).into_iter().zip((&x.prev_challenges_comms).into_iter()).map(|(x, y)| { (x.clone().into(), y.into()) }).collect(),
+                        prev_challenges:
+                            (&x.prev_challenges_scalars)
+                                .into_iter()
+                                .zip((&x.prev_challenges_comms).into_iter())
+                                .map(|(chals, comm)| {
+                                    RecursionChallenge {
+                                        chals: chals.clone(),
+                                        comm: comm.into(),
+                                    }
+                                })
+                                .collect(),
                         ft_eval1: x.ft_eval1.clone().into()
                     }
                 }
@@ -495,7 +515,17 @@ macro_rules! impl_proof {
                         proof: x.proof.into(),
                         evals: [x.evals0.into(), x.evals1.into()],
                         public: x.public.into_iter().map(Into::into).collect(),
-                        prev_challenges: (x.prev_challenges_scalars).into_iter().zip((x.prev_challenges_comms).into_iter()).map(|(x, y)| { (x.into(), y.into()) }).collect(),
+                        prev_challenges:
+                            (x.prev_challenges_scalars)
+                                .into_iter()
+                                .zip((x.prev_challenges_comms).into_iter())
+                                .map(|(chals, comm)| {
+                                    RecursionChallenge {
+                                        chals: chals.into(),
+                                        comm: comm.into(),
+                                    }
+                                })
+                                .collect(),
                         ft_eval1: x.ft_eval1.into()
                     }
                 }
@@ -596,7 +626,7 @@ macro_rules! impl_proof {
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
                     ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
                 }
-                let prev: Vec<(Vec<$F>, PolyComm<GAffine>)> = {
+                let prev: Vec<RecursionChallenge<GAffine>> = {
                     if prev_challenges.is_empty() {
                         Vec::new()
                     } else {
@@ -606,16 +636,16 @@ macro_rules! impl_proof {
                             .map(Into::<GAffine>::into)
                             .enumerate()
                             .map(|(i, sg)| {
-                                (
+                                let chals =
                                     prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
                                         .iter()
                                         .map(|a| a.clone().into())
-                                        .collect(),
-                                    PolyComm::<GAffine> {
-                                        unshifted: vec![sg],
-                                        shifted: None,
-                                    },
-                                )
+                                        .collect();
+                                let comm = PolyComm::<GAffine> {
+                                    unshifted: vec![sg],
+                                    shifted: None,
+                                };
+                                RecursionChallenge { chals, comm }
                             })
                             .collect()
                     }
@@ -723,7 +753,7 @@ macro_rules! impl_proof {
                 }
 
                 let prev = RecursionChallenge {
-                    chals: vec![Fq::one(), Fq::one()],
+                    chals: vec![$F::one(), $F::one()],
                     comm: comm(),
                 };
                 let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];

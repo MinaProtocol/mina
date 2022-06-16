@@ -162,6 +162,7 @@ dependencies = [
 name = "binding_generation"
 version = "0.1.0"
 dependencies = [
+ "kimchi",
  "ocaml-gen",
  "wires_15_stubs",
 ]
