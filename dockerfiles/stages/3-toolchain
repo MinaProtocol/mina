@@ -126,9 +126,9 @@ RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHAL
 RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
     | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
 
+USER opam
+
 # --- extra Rust toolchain and wasm-pack for Wasm builds
 RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
     && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}"
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | bash
-
-USER opam
