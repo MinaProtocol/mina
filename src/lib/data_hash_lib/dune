@@ -27,6 +27,7 @@
    random_oracle
    base58_check
    snarky.intf
+   test_util
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

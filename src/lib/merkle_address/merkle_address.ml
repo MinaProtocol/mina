@@ -268,9 +268,7 @@ let%test "Bitstring bin_io serialization does not change" =
   in
   let bitstring = Bitstring.bitstring_of_string text in
   let known_good_digest = "c4c7ade09ba305b69ffac494a6eab60e" in
-  Ppx_version_runtime.Serialization.check_serialization
-    (module Stable.V1)
-    bitstring known_good_digest
+  Test_util.check_serialization (module Stable.V1) bitstring known_good_digest
 
 module Make_test (Input : sig
   val depth : int

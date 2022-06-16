@@ -161,7 +161,7 @@ end
 (* check that serializations don't change *)
 let%test_module "Unsigned serializations" =
   ( module struct
-    open Ppx_version_runtime.Serialization
+    open Test_util
 
     let%test "UInt32 V1 serialization" =
       let uint32 = UInt32.of_int 9775 in

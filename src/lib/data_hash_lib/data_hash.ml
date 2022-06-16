@@ -113,8 +113,6 @@ module T0 = struct
 
       let to_latest = Fn.id
     end
-
-    module Tests = struct end
   end]
 
   module Tests = struct
@@ -131,9 +129,7 @@ module T0 = struct
 
     let%test "Binable from stringable V1" =
       let known_good_digest = "fa43c8180f9f3cef1cf5767592e964c1" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module Stable.V1)
-        field known_good_digest
+      Test_util.check_serialization (module Stable.V1) field known_good_digest
 
     [%%else]
 

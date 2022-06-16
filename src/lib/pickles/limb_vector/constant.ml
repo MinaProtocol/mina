@@ -62,12 +62,6 @@ module Hex64 = struct
 
       let to_latest = Fn.id
     end
-
-    module Tests = struct
-      (* TODO: Add serialization tests here to make sure that Core doesn't
-         change it out from under us between versions.
-      *)
-    end
   end]
 end
 

@@ -80,9 +80,7 @@ include Make ()
 let%test "serialization test V1" =
   let blake2s = T0.digest_string "serialization test V1" in
   let known_good_digest = "562733d10582c5832e541fb60e38e7c8" in
-  Ppx_version_runtime.Serialization.check_serialization
-    (module Stable.V1)
-    blake2s known_good_digest
+  Test_util.check_serialization (module Stable.V1) blake2s known_good_digest
 
 let%test_unit "bits_to_string" =
   [%test_eq: string]
