@@ -596,16 +596,7 @@ module Fee = struct
 end
 
 module Amount = struct
-  (* The basic type t of this module is defined in Mina_wire_types but is
-     abstract. Here we want to redefine t such that it is considered equal to
-     the original one by the type system. We leverage the Make functors of the
-     library to that end, for which we need to define:
-     - Make_sig: a functor that defines the signature of the module given the
-       original type
-     - Make_str: a functor that defines the structure of the module, ensuring
-       the concrete type is equal
-       We then include the result of the main functor
-  *)
+  (* See documentation for {!module:Mina_wire_types} *)
   module Make_sig (A : sig
     type t
   end) =
@@ -621,12 +612,20 @@ module Amount = struct
         end
       end]
 
+      [%%ifdef consensus_mechanism]
+
       (* Give a definition to var, it will be hidden at the interface level *)
       include
         Basic
           with type t := Stable.Latest.t
            and type var =
             field Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list
+
+      [%%else]
+
+      include Basic with type t := Stable.Latest.t
+
+      [%%endif]
 
       include Arithmetic_intf with type t := t
 
