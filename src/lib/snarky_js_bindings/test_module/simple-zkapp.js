@@ -96,7 +96,8 @@ if (command === "update") {
   let transaction = await Mina.transaction(() => {
     new SimpleZkapp(zkappAddress).update(Field(2));
   });
-  let partiesJson = (await transaction.prove()).toJSON();
+  await transaction.prove();
+  let partiesJson = transaction.toJSON();
 
   // mina-signer part
   let client = new Client({ network: "testnet" });
