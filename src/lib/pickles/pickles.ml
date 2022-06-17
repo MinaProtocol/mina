@@ -1538,6 +1538,82 @@ let%test_module "test no side-loaded" =
               Proof.verify_promise [ ((input, res), b0) ] ) ) ;
         ((input, res), b0)
     end
+
+    module Auxiliary_return = struct
+      module Statement = struct
+        type t = Field.t
+
+        let to_field_elements x = [| x |]
+
+        module Constant = struct
+          type t = Field.Constant.t [@@deriving bin_io]
+
+          let to_field_elements x = [| x |]
+        end
+      end
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~public_input:(Input_and_output (Field.typ, Field.typ))
+              ~auxiliary_typ:Field.typ
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = []
+                  ; main =
+                      (fun [] input ->
+                        dummy_constraints () ;
+                        let sponge =
+                          Step_main_inputs.Sponge.create
+                            Step_main_inputs.sponge_params
+                        in
+                        let blinding_value =
+                          exists Field.typ ~compute:Field.Constant.random
+                        in
+                        Step_main_inputs.Sponge.absorb sponge (`Field input) ;
+                        Step_main_inputs.Sponge.absorb sponge
+                          (`Field blinding_value) ;
+                        let result = Step_main_inputs.Sponge.squeeze sponge in
+                        ([], result, blinding_value) )
+                  }
+                ] ) )
+
+      module Proof = (val p)
+
+      let example =
+        let input = Field.Constant.of_int 42 in
+        let result, blinding_value, b0 =
+          Common.time "b0" (fun () ->
+              Promise.block_on_async_exn (fun () -> step [] input) )
+        in
+        let sponge = Tick_field_sponge.Field.create Tick_field_sponge.params in
+        Tick_field_sponge.Field.absorb sponge input ;
+        Tick_field_sponge.Field.absorb sponge blinding_value ;
+        let result' = Tick_field_sponge.Field.squeeze sponge in
+        assert (Field.Constant.equal result result') ;
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ ((input, result), b0) ] ) ) ;
+        ((input, result), b0)
+    end
   end )
 
 (*
