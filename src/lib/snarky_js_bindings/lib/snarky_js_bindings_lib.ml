@@ -1911,7 +1911,6 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let (module Branches) = nat_module branches in
   let (module Max_proofs_verified) = nat_add_module max_proofs in
   let (Choices choices) = Choices.of_js choices in
-  (* TODO get rid of Obj.magic for choices *)
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices
       (module Public_input)
