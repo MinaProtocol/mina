@@ -19,6 +19,7 @@
    bignum_bigint
    ppx_dhall_type
    snark_params_nonconsensus
+   test_util_nonconsensus
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

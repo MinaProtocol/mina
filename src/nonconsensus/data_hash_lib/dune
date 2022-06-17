@@ -21,6 +21,7 @@
    outside_hash_image_nonconsensus
    snark_params_nonconsensus
    random_oracle_nonconsensus
+   test_util_nonconsensus
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

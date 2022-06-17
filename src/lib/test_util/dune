@@ -14,7 +14,8 @@
    pickles
    crypto_params
    )
+ (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_jane ppx_compare))
+  (pps ppx_version ppx_compare ppx_optcomp))
  (instrumentation (backend bisect_ppx))
  (synopsis "test utils"))

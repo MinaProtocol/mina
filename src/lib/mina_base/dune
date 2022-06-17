@@ -83,7 +83,7 @@
        ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
  ))
  (instrumentation (backend bisect_ppx))
- (synopsis "Snarks and friends necessary for keypair generation"))
+ (synopsis "Mina base library"))
 
 (rule
  (targets sample_keypairs.ml sample_keypairs.json)

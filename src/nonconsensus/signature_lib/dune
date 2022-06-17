@@ -16,16 +16,17 @@
    result
    ;;local libraries
    base58_check
-   blake2
    mina_signature_kind
    random_oracle_input
    fold_lib
    snarkette
    codable
+   blake2_nonconsensus
    snark_params_nonconsensus
    random_oracle_nonconsensus
    hash_prefix_states_nonconsensus
    non_zero_curve_point_nonconsensus
+   test_util_nonconsensus
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

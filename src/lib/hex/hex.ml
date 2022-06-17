@@ -235,7 +235,6 @@ module Safe = struct
         let expected = s in
         if String.equal actual expected then ()
         else
-          failwithf
-            !"expected: %s ; hexified: %s ; actual: %s"
-            expected hexified actual () )
+          failwithf "expected: %s ; hexified: %s ; actual: %s" expected hexified
+            actual () )
 end

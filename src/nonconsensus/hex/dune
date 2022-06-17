@@ -3,5 +3,5 @@
  (public_name hex_nonconsensus)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version ppx_inline_test))
- (libraries core_kernel ppx_inline_test.config))
+ (preprocess (pps ppx_sexp_conv ppx_optcomp ppx_version ppx_inline_test))
+ (libraries base base.caml core_kernel ppx_inline_test.config))
