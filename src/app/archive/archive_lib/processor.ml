@@ -2780,28 +2780,26 @@ module Block = struct
                             , Some (List.concat failures |> List.hd_exn) )
                       in
                       [ (id, status) ]
-                  | [ id2; id1 ] -> (
+                  | [ id2; id1 ] ->
                       (* the fold reverses the order of the infos from the fee transfers *)
-                      match status with
-                      | Applied ->
-                          [ (id1, applied_status); (id2, applied_status) ]
-                      | Failed failures -> (
-                          (* at most two failures for a fee transfer *)
-                          match failures with
-                          | [ [ failure1 ]; [ failure2 ] ] ->
-                              [ (id1, (failed_str, Some failure1))
-                              ; (id2, (failed_str, Some failure2))
-                              ]
-                          | [ [ failure1 ]; [] ] ->
-                              [ (id1, (failed_str, Some failure1))
-                              ; (id2, applied_status)
-                              ]
-                          | [ []; [ failure2 ] ] ->
-                              [ (id1, applied_status)
-                              ; (id2, (failed_str, Some failure2))
-                              ]
-                          | _ ->
-                              failwith "Invalid failures for fee transfer" ) )
+                      let status1, status2 =
+                        match status with
+                        | Applied ->
+                            (applied_status, applied_status)
+                        | Failed failures -> (
+                            (* at most two failures for a fee transfer *)
+                            match failures with
+                            | [ [ failure1 ]; [ failure2 ] ] ->
+                                ( (failed_str, Some failure1)
+                                , (failed_str, Some failure2) )
+                            | [ [ failure1 ]; [] ] ->
+                                ((failed_str, Some failure1), applied_status)
+                            | [ []; [ failure2 ] ] ->
+                                (applied_status, (failed_str, Some failure2))
+                            | _ ->
+                                failwith "Invalid failures for fee transfer" )
+                      in
+                      [ (id1, status1); (id2, status2) ]
                   | _ ->
                       failwith
                         "Unexpected number of single fee transfers in a fee \
