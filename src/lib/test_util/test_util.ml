@@ -4,8 +4,6 @@ open Core_kernel
 
 [%%ifdef consensus_mechanism]
 
-[%%error "foobar"]
-
 open Fold_lib
 open Snark_params.Tick
 
