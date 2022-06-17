@@ -82,19 +82,28 @@ module Call_forest = struct
     let iter2_exn ts1 ts2 ~f =
       fold2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
 
-    let rec mapi' ~i (t : _ t) ~f =
-      let l, calls = mapi_forest' ~i:(i + 1) t.calls ~f in
-      (l, { calls; party = f i t.party; party_digest = t.party_digest })
+    let rec mapi_with_trees' ~i (t : _ t) ~f =
+      let l, calls = mapi_forest_with_trees' ~i:(i + 1) t.calls ~f in
+      (l, { calls; party = f i t.party t; party_digest = t.party_digest })
 
-    and mapi_forest' ~i x ~f =
+    and mapi_forest_with_trees' ~i x ~f =
       let rec go i acc = function
         | [] ->
             (i, List.rev acc)
         | t :: ts ->
-            let l, elt' = mapi' ~i ~f (With_stack_hash.elt t) in
+            let l, elt' = mapi_with_trees' ~i ~f (With_stack_hash.elt t) in
             go l (With_stack_hash.map t ~f:(fun _ -> elt') :: acc) ts
       in
       go i [] x
+
+    let mapi_with_trees t ~f = mapi_with_trees' ~i:0 t ~f |> snd
+
+    let mapi_forest_with_trees t ~f = mapi_forest_with_trees' ~i:0 t ~f |> snd
+
+    let mapi' ~i t ~f = mapi_with_trees' ~i t ~f:(fun i party _ -> f i party)
+
+    let mapi_forest' ~i t ~f =
+      mapi_forest_with_trees' ~i t ~f:(fun i party _ -> f i party)
 
     let map_forest ~f t = mapi_forest' ~i:0 ~f:(fun _ x -> f x) t |> snd
 
@@ -351,6 +360,8 @@ module Call_forest = struct
   let map = Tree.map_forest
 
   let mapi = Tree.mapi_forest
+
+  let mapi_with_trees = Tree.mapi_forest_with_trees
 
   let%test_unit "Party_or_stack.of_parties_list" =
     let parties_list_1 = [ 0; 0; 0; 0 ] in

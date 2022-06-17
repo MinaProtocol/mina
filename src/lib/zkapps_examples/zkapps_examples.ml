@@ -401,18 +401,18 @@ let dummy_constraints () =
          Modify snarky to do this.
 *)
 let party_circuit f ([] : _ H1.T(Id).t)
-    ({ transaction; at_party } : Zkapp_statement.Checked.t) :
+    ({ party = party_digest; calls } : Zkapp_statement.Checked.t) :
     _ H1.T(E01(Pickles.Inductive_rule.B)).t * unit * unit =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
   let returned_transaction = Party.Checked.digest party in
-  let returned_at_party =
+  let returned_calls =
     (* TODO: This should be returned from
              [Party_under_construction.In_circuit.to_party].
     *)
     Field.constant Parties.Call_forest.empty
   in
-  Run.Field.Assert.equal returned_transaction transaction ;
-  Run.Field.Assert.equal returned_at_party at_party ;
+  Run.Field.Assert.equal returned_transaction party_digest ;
+  Run.Field.Assert.equal returned_calls calls ;
   ([], (), ())

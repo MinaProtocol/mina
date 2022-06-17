@@ -21,8 +21,7 @@ let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
   Pickles.compile ~cache:Cache_dir.cache
     (module Zkapp_statement.Checked)
     (module Zkapp_statement)
-    ~public_input:(Input Zkapp_statement.typ)
-    ~auxiliary_typ:Impl.Typ.unit
+    ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
     ~branches:(module Nat.N2)
     ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
     ~name:"empty_update"
@@ -42,8 +41,8 @@ let party_body = Zkapps_empty_update.generate_party pk_compressed
 let (), (), party_proof =
   Async.Thread_safe.block_on_async_exn (fun () ->
       prover []
-        { transaction = Party.Body.digest party_body
-        ; at_party = Parties.Call_forest.empty
+        { party = Party.Body.digest party_body
+        ; calls = Parties.Call_forest.empty
         } )
 
 let party : Party.Graphql_repr.t =
