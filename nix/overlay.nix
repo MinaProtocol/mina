@@ -43,6 +43,7 @@ let
       value = (fetchGit {
         rev = last (split "#" x.source);
         url = last (split "\\+" (head (split "\\?" x.source)));
+        allRefs = true;
       }).narHash;
     }) package;
 in {
@@ -135,6 +136,7 @@ in {
         # FIXME: tests fail
         doCheck = false;
         cargoLock.lockFile = ../src/lib/crypto/Cargo.lock;
+        cargoLock.outputHashes = cargoHashes;
       };
 
   go-capnproto2 = pkgs.buildGoModule rec {
