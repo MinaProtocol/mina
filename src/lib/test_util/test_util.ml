@@ -14,7 +14,6 @@ let triple_string trips =
          to_string b1 ^ to_string b2 ^ to_string b3 ) )
 
 let checked_to_unchecked typ1 typ2 checked input =
-  let open Impl in
   let (), checked_result =
     run_and_check
       (let%bind input = exists typ1 ~compute:(As_prover.return input) in
@@ -26,7 +25,6 @@ let checked_to_unchecked typ1 typ2 checked input =
   checked_result
 
 let test_to_triples typ fold var_to_triples input =
-  let open Impl in
   let (), checked =
     run_and_check
       (let%bind input = exists typ ~compute:(As_prover.return input) in
@@ -40,10 +38,8 @@ let test_to_triples typ fold var_to_triples input =
   in
   let unchecked = Fold.to_list (fold input) in
   if not ([%equal: (bool * bool * bool) list] checked unchecked) then
-    failwithf
-      !"Got %s (%d)\nexpected %s (%d)"
-      (triple_string checked) (List.length checked) (triple_string unchecked)
-      (List.length unchecked) ()
+    failwithf "Got %s (%d)\nexpected %s (%d)" (triple_string checked)
+      (List.length checked) (triple_string unchecked) (List.length unchecked) ()
 
 let test_equal ?(equal = Poly.( = )) typ1 typ2 checked unchecked input =
   let checked_result = checked_to_unchecked typ1 typ2 checked input in

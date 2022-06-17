@@ -6,6 +6,7 @@
  (libraries
    ;; opam libraries
    core_kernel
+   base
    base.caml
    ;; local libraries
    snark_params
@@ -16,6 +17,6 @@
    )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_compare ppx_optcomp))
+  (pps ppx_version ppx_compare ppx_let ppx_optcomp))
  (instrumentation (backend bisect_ppx))
  (synopsis "test utils"))
