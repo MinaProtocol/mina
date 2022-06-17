@@ -205,20 +205,14 @@ let%test_module "multisig_account" =
                   ; prevs = []
                   ; main =
                       (fun [] x ->
-                        multisig_main x |> Run.run_checked
-                        |> fun _ :
-                               unit
-                               Pickles_types.Hlist0.H1
-                                 (Pickles_types.Hlist.E01
-                                    (Pickles.Inductive_rule.B))
-                               .t ->
-                        [] )
+                        multisig_main x |> Run.run_checked ;
+                        ([], ()) )
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
                   (module Zkapp_statement.Checked)
                   (module Zkapp_statement)
-                  ~typ:Zkapp_statement.typ
+                  ~public_input:(Input Zkapp_statement.typ)
                   ~branches:(module Nat.N2)
                   ~max_proofs_verified:(module Nat.N2)
                     (* You have to put 2 here... *)
@@ -233,21 +227,14 @@ let%test_module "multisig_account" =
                       ; main =
                           (fun [ _; _ ] _ ->
                             Impl.run_checked
-                              (Transaction_snark.dummy_constraints ())
-                            |> fun () ->
+                              (Transaction_snark.dummy_constraints ()) ;
                             (* Unsatisfiable. *)
-                            Run.exists Field.typ ~compute:(fun () ->
-                                Run.Field.Constant.zero )
-                            |> fun s ->
-                            Run.Field.(Assert.equal s (s + one))
-                            |> fun () :
-                                   ( Zkapp_statement.Checked.t
-                                   * (Zkapp_statement.Checked.t * unit) )
-                                   Pickles_types.Hlist0.H1
-                                     (Pickles_types.Hlist.E01
-                                        (Pickles.Inductive_rule.B))
-                                   .t ->
-                            [ Boolean.true_; Boolean.true_ ] )
+                            let s =
+                              Run.exists Field.typ ~compute:(fun () ->
+                                  Run.Field.Constant.zero )
+                            in
+                            Run.Field.(Assert.equal s (s + one)) ;
+                            ([ Boolean.true_; Boolean.true_ ], ()) )
                       }
                     ] )
               in
@@ -404,7 +391,7 @@ let%test_module "multisig_account" =
                 | _ ->
                     respond Unhandled
               in
-              let pi : Pickles.Side_loaded.Proof.t =
+              let (), (pi : Pickles.Side_loaded.Proof.t) =
                 (fun () -> multisig_prover ~handler [] tx_statement)
                 |> Async.Thread_safe.block_on_async_exn
               in

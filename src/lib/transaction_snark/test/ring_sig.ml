@@ -51,13 +51,8 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   ; prevs = []
   ; main =
       (fun [] x ->
-        ring_sig_main x |> Run.run_checked
-        |> fun _ :
-               unit
-               Pickles_types.Hlist0.H1
-                 (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-               .t ->
-        [] )
+        ring_sig_main x |> Run.run_checked ;
+        ([], ()) )
   }
 
 let%test_unit "1-of-1" =
@@ -126,7 +121,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             Pickles.compile ~cache:Cache_dir.cache
               (module Zkapp_statement.Checked)
               (module Zkapp_statement)
-              ~typ:Zkapp_statement.typ
+              ~public_input:(Input Zkapp_statement.typ)
               ~branches:(module Nat.N2)
               ~max_proofs_verified:(module Nat.N2)
                 (* You have to put 2 here... *)
@@ -265,7 +260,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             | _ ->
                 respond Unhandled
           in
-          let pi : Pickles.Side_loaded.Proof.t =
+          let (), (pi : Pickles.Side_loaded.Proof.t) =
             (fun () -> ringsig_prover ~handler [] tx_statement)
             |> Async.Thread_safe.block_on_async_exn
           in
