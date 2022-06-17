@@ -810,8 +810,7 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
                     , Consensus.Hooks.local_state_sync_to_yojson jobs )
                   ; ( "local_state"
                     , Consensus.Data.Local_state.to_yojson
-                        t.consensus_local_state )
-                  ; ("tf_viz", `String (visualize_to_string t)) ] ;
+                        t.consensus_local_state ) ] ;
               failwith
                 "local state desynced after applying diffs to full frontier" )
         | None ->
