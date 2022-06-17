@@ -2,7 +2,6 @@
  (name test_util)
  (public_name test_util)
  (library_flags -linkall)
- (inline_tests)
  (libraries
    ;; opam libraries
    core_kernel
