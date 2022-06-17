@@ -19,6 +19,7 @@
    bignum_bigint
    snark_params
    ppx_dhall_type
+   test_util
 )
  (preprocessor_deps ../../config.mlh)
  (preprocess
