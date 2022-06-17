@@ -1,0 +1,16 @@
+(library
+ (name test_util)
+ (public_name test_util_nonconsensus)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   base
+   base.caml
+   core_kernel
+   ;; local libraries
+   )
+ (preprocess
+  (pps ppx_version ppx_optcomp))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "test utils, nonconsensus"))
