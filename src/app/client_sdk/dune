@@ -16,7 +16,6 @@
    string_sign_nonconsensus
    mina_signature_kind
    rosetta_coding_nonconsensus
-   test_util_nonconsensus
    ppx_deriving.runtime
    result
    ppx_deriving_yojson.runtime
