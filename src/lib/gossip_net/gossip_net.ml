@@ -4,7 +4,7 @@ module Libp2p = Libp2p
 module Fake = Fake
 
 module type S = sig
-  module Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf
+  module Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf
 
   include module type of Intf
 
@@ -17,7 +17,7 @@ module type S = sig
   module Fake : Fake.S with module Rpc_intf := Rpc_intf
 end
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   include Intf
   module Message = Message

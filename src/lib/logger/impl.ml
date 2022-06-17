@@ -1,5 +1,6 @@
-open Core
-open Async
+open Core_kernel
+
+let max_log_line_length = 1 lsl 20
 
 module Level = struct
   type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
@@ -22,6 +23,32 @@ module Time = struct
 
   let of_yojson json =
     json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
+
+  let pretty_to_string timestamp =
+    (* This used to be
+       [Core.Time.format timestamp "%Y-%m-%d %H:%M:%S UTC"
+        ~zone:Time.Zone.utc]
+       which uses the Unix string formatting under the hood, but we
+       don't want to load that just for the pretty printing. Instead,
+       we simulate it here.
+    *)
+    let zone = Time.Zone.utc in
+    let date, time = Time.to_date_ofday ~zone timestamp in
+    let time_parts = Time.Ofday.to_parts time in
+    let fmt_2_chars () i =
+      let s = string_of_int i in
+      if Int.(i < 10) then "0" ^ s else s
+    in
+    Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date) fmt_2_chars
+      (Date.month date |> Month.to_int)
+      fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr fmt_2_chars
+      time_parts.min fmt_2_chars time_parts.sec
+
+  let pretty_to_string_ref = ref pretty_to_string
+
+  let set_pretty_to_string x = pretty_to_string_ref := x
+
+  let pretty_to_string x = !pretty_to_string_ref x
 end
 
 module Source = struct
@@ -97,7 +124,7 @@ module Message = struct
   [@@deriving yojson]
 
   let check_invariants (t : t) =
-    match Logproc_lib.Interpolator.parse t.message with
+    match Interpolator_lib.Interpolator.parse t.message with
     | Error _ ->
         false
     | Ok items ->
@@ -139,7 +166,8 @@ module Processor = struct
   end
 
   module Pretty = struct
-    type t = { log_level : Level.t; config : Logproc_lib.Interpolator.config }
+    type t =
+      { log_level : Level.t; config : Interpolator_lib.Interpolator.config }
 
     let create ~log_level ~config = { log_level; config }
 
@@ -148,12 +176,13 @@ module Processor = struct
       if Level.compare msg.level log_level < 0 then None
       else
         match
-          Logproc_lib.Interpolator.interpolate config msg.message msg.metadata
+          Interpolator_lib.Interpolator.interpolate config msg.message
+            msg.metadata
         with
         | Error err ->
             Option.iter msg.source ~f:(fun source ->
-                Core.printf "logproc interpolation error in %s: %s\n"
-                  source.location err ) ;
+                printf "logproc interpolation error in %s: %s\n" source.location
+                  err ) ;
             None
         | Ok (str, extra) ->
             let formatted_extra =
@@ -161,10 +190,7 @@ module Processor = struct
               |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
               |> String.concat ~sep:""
             in
-            let time =
-              Core.Time.format msg.timestamp "%Y-%m-%d %H:%M:%S UTC"
-                ~zone:Time.Zone.utc
-            in
+            let time = Time.pretty_to_string msg.timestamp in
             Some
               (time ^ " [" ^ Level.show msg.level ^ "] " ^ str ^ formatted_extra)
   end
@@ -184,92 +210,24 @@ module Transport = struct
 
   type t = T : (module S with type t = 't) * 't -> t
 
+  let create m t = T (m, t)
+
   module Stdout = struct
     type t = unit
 
     let create () = ()
 
-    let transport () = Core.print_endline
+    let transport () = print_endline
   end
 
   let stdout () = T ((module Stdout), Stdout.create ())
-
-  module File_system = struct
-    module Dumb_logrotate = struct
-      open Core.Unix
-
-      let log_perm = 0o644
-
-      type t =
-        { directory : string
-        ; log_filename : string
-        ; max_size : int
-        ; num_rotate : int
-        ; mutable curr_index : int
-        ; mutable primary_log : File_descr.t
-        ; mutable primary_log_size : int
-        }
-
-      let create ~directory ~max_size ~log_filename ~num_rotate =
-        if not (Result.is_ok (access directory [ `Exists ])) then
-          mkdir_p ~perm:0o755 directory ;
-        if not (Result.is_ok (access directory [ `Exists; `Read; `Write ])) then
-          failwithf
-            "cannot create log files: read/write permissions required on %s"
-            directory () ;
-        let primary_log_loc = Filename.concat directory log_filename in
-        let primary_log_size, mode =
-          if Result.is_ok (access primary_log_loc [ `Exists; `Read; `Write ])
-          then
-            let log_stats = stat primary_log_loc in
-            (Int64.to_int_exn log_stats.st_size, [ O_RDWR; O_APPEND ])
-          else (0, [ O_RDWR; O_CREAT ])
-        in
-        let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
-        { directory
-        ; log_filename
-        ; max_size
-        ; primary_log
-        ; primary_log_size
-        ; num_rotate
-        ; curr_index = 0
-        }
-
-      let rotate t =
-        let primary_log_loc = Filename.concat t.directory t.log_filename in
-        let secondary_log_filename =
-          t.log_filename ^ "." ^ string_of_int t.curr_index
-        in
-        if t.curr_index < t.num_rotate then t.curr_index <- t.curr_index + 1
-        else t.curr_index <- 0 ;
-        let secondary_log_loc =
-          Filename.concat t.directory secondary_log_filename
-        in
-        close t.primary_log ;
-        rename ~src:primary_log_loc ~dst:secondary_log_loc ;
-        t.primary_log <-
-          openfile ~perm:log_perm ~mode:[ O_RDWR; O_CREAT ] primary_log_loc ;
-        t.primary_log_size <- 0
-
-      let transport t str =
-        if t.primary_log_size > t.max_size then rotate t ;
-        let str = str ^ "\n" in
-        let len = String.length str in
-        if write t.primary_log ~buf:(Bytes.of_string str) ~len <> len then
-          printf "unexpected error writing to persistent log" ;
-        t.primary_log_size <- t.primary_log_size + len
-    end
-
-    let dumb_logrotate ~directory ~log_filename ~max_size ~num_rotate =
-      T
-        ( (module Dumb_logrotate)
-        , Dumb_logrotate.create ~directory ~log_filename ~max_size ~num_rotate
-        )
-  end
 end
 
 module Consumer_registry = struct
   type consumer = { processor : Processor.t; transport : Transport.t }
+
+  let default_consumer =
+    lazy { processor = Processor.raw (); transport = Transport.stdout () }
 
   module Consumer_tbl = Hashtbl.Make (String)
 
@@ -282,28 +240,40 @@ module Consumer_registry = struct
   let register ~(id : id) ~processor ~transport =
     Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport }
 
-  let broadcast_log_message ~id msg =
-    Hashtbl.find_and_call t id
-      ~if_found:(fun consumers ->
-        List.iter consumers
-          ~f:(fun
-               { processor = Processor.T ((module Processor), processor)
-               ; transport = Transport.T ((module Transport), transport)
-               }
-             ->
-            match Processor.process processor msg with
-            | Some str ->
-                Transport.transport transport str
-            | None ->
-                () ) )
-      ~if_not_found:(fun _ ->
-        let (Processor.T ((module Processor), processor)) = Processor.raw () in
-        let (Transport.T ((module Transport), transport)) =
-          Transport.stdout ()
+  let rec broadcast_log_message ~id msg =
+    let consumers =
+      match Hashtbl.find t id with
+      | Some consumers ->
+          consumers
+      | None ->
+          [ Lazy.force default_consumer ]
+    in
+    List.iter consumers ~f:(fun consumer ->
+        let { processor = Processor.T ((module Processor), processor)
+            ; transport = Transport.T ((module Transport), transport)
+            } =
+          consumer
         in
         match Processor.process processor msg with
         | Some str ->
-            Transport.transport transport str
+            if
+              String.equal id "oversized_logs"
+              || String.length str < max_log_line_length
+            then Transport.transport transport str
+            else
+              let max_log_line_error =
+                { msg with
+                  message =
+                    "<log message elided as it exceeded the max log line \
+                     length; see oversized logs for full log>"
+                ; metadata = Metadata.empty
+                }
+              in
+              Processor.process processor max_log_line_error
+              |> Option.value
+                   ~default:"failed to process max log line error message"
+              |> Transport.transport transport ;
+              broadcast_log_message ~id:"oversized_logs" msg
         | None ->
             () )
 end
@@ -320,9 +290,7 @@ end]
 let metadata t = t.metadata
 
 let create ?(metadata = []) ?(id = "default") () =
-  let pid = lazy (Unix.getpid () |> Pid.to_int) in
-  let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
-  { null = false; metadata = Metadata.extend Metadata.empty metadata'; id }
+  { null = false; metadata = Metadata.extend Metadata.empty metadata; id }
 
 let null () = { null = true; metadata = Metadata.empty; id = "default" }
 
