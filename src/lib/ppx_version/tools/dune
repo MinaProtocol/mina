@@ -19,9 +19,10 @@
    ppx_variants_conv
    ppx_deriving_yojson
    base_quickcheck.ppx_quickcheck
-   ;; local libraries
+   ;; local derivers
    ppx_coda
    h_list.ppx
+   ppx_dhall_type
    ppx_version
  )
  (preprocess (pps ppxlib.metaquot)))
@@ -47,9 +48,10 @@
    ppx_variants_conv
    ppx_deriving_yojson
    base_quickcheck.ppx_quickcheck
-   ;; local libraries
+   ;; local derivers
    ppx_coda
    h_list.ppx
+   ppx_dhall_type
    ppx_version
  )
  (preprocess (pps ppxlib.metaquot)))
