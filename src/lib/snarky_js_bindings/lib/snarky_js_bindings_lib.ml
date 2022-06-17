@@ -1627,12 +1627,6 @@ let dummy_constraints =
           (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t )
 
-type ('a_var, 'a_value, 'a_weird) pickles_rule =
-  { identifier : string
-  ; prevs : 'a_weird list
-  ; main : 'a_var list -> 'a_var -> Boolean.var list * unit
-  }
-
 type pickles_rule_js =
   < identifier : Js.js_string Js.t Js.prop
   ; main :
@@ -1646,28 +1640,6 @@ type pickles_rule_js =
       Js.t
       Js.prop >
   Js.t
-
-let create_pickles_rule ~self (rule : pickles_rule_js) =
-  let to_tag tag : _ Pickles.Tag.t =
-    if Js.to_bool tag##.isSelf then self else Obj.magic tag##.tag
-  in
-  let prevs =
-    rule##.proofsToVerify |> Js.to_array |> Array.to_list |> List.map ~f:to_tag
-  in
-  { identifier = Js.to_string rule##.identifier
-  ; prevs
-  ; main =
-      (fun prev_inputs public_input ->
-        dummy_constraints () ;
-        let should_verifys =
-          rule##.main
-            (Public_input.to_js public_input)
-            (Public_input.list_to_js prev_inputs)
-          |> Js.to_array |> Array.to_list
-          |> List.map ~f:(fun b -> b##.value)
-        in
-        (should_verifys, ()) )
-  }
 
 module Choices = struct
   open Pickles_types
@@ -1728,9 +1700,7 @@ module Choices = struct
          , 'arg_var
          , 'arg_value
          , 'ret_var
-         , 'ret_value
-         , 'auxiliary_var
-         , 'auxiliary_value )
+         , 'ret_value )
          t =
       | Rule :
           (   self:('var, 'value, 'width, 'height) Pickles.Tag.t
@@ -1741,9 +1711,7 @@ module Choices = struct
               , 'arg_var
               , 'arg_value
               , 'ret_var
-              , 'ret_value
-              , 'auxiliary_var
-              , 'auxiliary_value )
+              , 'ret_value )
               Pickles.Inductive_rule.t )
           -> ( 'var
              , 'value
@@ -1752,9 +1720,7 @@ module Choices = struct
              , 'arg_var
              , 'arg_value
              , 'ret_var
-             , 'ret_value
-             , 'auxiliary_var
-             , 'auxiliary_value )
+             , 'ret_value )
              t
 
     let rec should_verifys :
@@ -1798,17 +1764,7 @@ module Choices = struct
           input :: inputs
 
     let create (rule : pickles_rule_js) :
-        ( _
-        , _
-        , _
-        , _
-        , Public_input.t
-        , Public_input.Constant.t
-        , unit
-        , unit
-        , unit
-        , unit )
-        t =
+        (_, _, _, _, Public_input.t, Public_input.Constant.t, unit, unit) t =
       let (Prevs prevs) = Prevs.of_rule rule in
       Rule
         (fun ~self ->
@@ -1825,7 +1781,7 @@ module Choices = struct
                        (vars_to_public_input prevs prev_inputs) )
                   |> should_verifys prevs
                 in
-                (should_verifys, (), ()) )
+                (should_verifys, ()) )
           } )
   end
 
@@ -1836,9 +1792,7 @@ module Choices = struct
        , 'arg_var
        , 'arg_value
        , 'ret_var
-       , 'ret_value
-       , 'auxiliary_var
-       , 'auxiliary_value )
+       , 'ret_value )
        t =
     | Choices :
         (   self:('var, 'value, 'width, 'height) Pickles.Tag.t
@@ -1849,10 +1803,8 @@ module Choices = struct
             , 'arg_var
             , 'arg_value
             , 'ret_var
-            , 'ret_value
-            , 'auxiliary_var
-            , 'auxiliary_value )
-            H4_6.T(Pickles.Inductive_rule).t )
+            , 'ret_value )
+            H4_4.T(Pickles.Inductive_rule).t )
         -> ( 'var
            , 'value
            , 'width
@@ -1860,24 +1812,12 @@ module Choices = struct
            , 'arg_var
            , 'arg_value
            , 'ret_var
-           , 'ret_value
-           , 'auxiliary_var
-           , 'auxiliary_value )
+           , 'ret_value )
            t
 
   let of_js js_rules =
     let rec get_rules (Choices rules) index :
-        ( _
-        , _
-        , _
-        , _
-        , Public_input.t
-        , Public_input.Constant.t
-        , unit
-        , unit
-        , unit
-        , unit )
-        t =
+        (_, _, _, _, Public_input.t, Public_input.Constant.t, unit, unit) t =
       if index < 0 then Choices rules
       else
         let js_rule =
@@ -1886,7 +1826,7 @@ module Choices = struct
                 "Rules array is sparse; the entry at index %i is missing" index )
         in
         let (Rule rule) = Inductive_rule.create js_rule in
-        let rules ~self : _ H4_6.T(Pickles.Inductive_rule).t =
+        let rules ~self : _ H4_4.T(Pickles.Inductive_rule).t =
           rule ~self :: rules ~self
         in
         get_rules (Choices rules) (index - 1)
