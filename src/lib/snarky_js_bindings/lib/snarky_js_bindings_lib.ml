@@ -1750,7 +1750,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
     Pickles.compile_promise ~choices:(Obj.magic choices)
       (module Public_input)
       (module Public_input.Constant)
-      ~typ:(public_input_typ public_input_size)
+      ~public_input:(Input (public_input_typ public_input_size))
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
@@ -1783,13 +1783,20 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
       let public_input =
         Public_input.(public_input_js |> of_js |> to_constant)
       in
-      prover ?handler:None prevs public_input |> Promise_js_helpers.to_js
+      prover ?handler:None prevs public_input
+      |> Promise.map ~f:(fun ((), proof) -> proof)
+      |> Promise_js_helpers.to_js
     in
     prove
   in
   let rec to_js_provers :
       type a b c.
-         (a, b, c, Public_input.Constant.t, Proof.t Promise.t) Pickles.Provers.t
+         ( a
+         , b
+         , c
+         , Public_input.Constant.t
+         , (unit * Proof.t) Promise.t )
+         Pickles.Provers.t
       -> (   public_input_js
           -> Proof.t public_input_with_proof_js Js.js_array Js.t
           -> Proof.t Promise_js_helpers.js_promise )
@@ -2266,9 +2273,8 @@ module Ledger = struct
     let vk =
       Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
     in
-    Pickles.Side_loaded.verify_promise
+    Pickles.Side_loaded.verify_promise ~typ:(public_input_typ 2)
       [ (vk, public_input, proof) ]
-      ~value_to_field_elements:Public_input.Constant.to_field_elements
     |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =

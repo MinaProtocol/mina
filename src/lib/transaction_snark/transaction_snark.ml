@@ -906,9 +906,7 @@ module Base = struct
         let open Zkapp_statement in
         Pickles.Side_loaded.create ~typ ~name:(sprintf "zkapp_%d" i)
           ~max_proofs_verified:
-            (module Pickles.Side_loaded.Verification_key.Max_width)
-          ~value_to_field_elements:to_field_elements
-          ~var_to_field_elements:Checked.to_field_elements )
+            (module Pickles.Side_loaded.Verification_key.Max_width) )
 
   let signature_verifies ~shifted ~payload_digest signature pk =
     let%bind pk =
@@ -2231,7 +2229,9 @@ module Base = struct
         , c
         , d
         , Statement.With_sok.var
-        , Statement.With_sok.t )
+        , Statement.With_sok.t
+        , unit
+        , unit )
         Pickles.Inductive_rule.t =
       let open Hlist in
       let open Basic in
@@ -2254,7 +2254,7 @@ module Base = struct
                 main ?witness:!witness s ~constraint_constants
                   (List.mapi [ snapp_statement ] ~f:(fun i x -> (i, x)))
                   stmt ;
-                [ b ] )
+                ([ b ], ()) )
           }
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
@@ -2262,7 +2262,7 @@ module Base = struct
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                [] )
+                ([], ()) )
           }
       | Opt_signed ->
           { identifier = "opt_signed"
@@ -2270,7 +2270,7 @@ module Base = struct
           ; main =
               (fun [] stmt ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                [] )
+                ([], ()) )
           }
   end
 
@@ -3069,7 +3069,7 @@ module Base = struct
     ; main =
         (fun [] x ->
           Run.run_checked (main ~constraint_constants x) ;
-          [] )
+          ([], ()) )
     }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3164,9 +3164,9 @@ module Merge = struct
     { identifier = "merge"
     ; prevs = [ self; self ]
     ; main =
-        (fun ps x ->
-          Run.run_checked (main ps x) ;
-          [ b; b ] )
+        (fun [ s1; s2 ] x ->
+          Run.run_checked (main [ s1; s2 ] x) ;
+          ([ b; b ], ()) )
     }
 end
 
@@ -3191,7 +3191,7 @@ let system ~proof_level ~constraint_constants =
       Pickles.compile ~cache:Cache_dir.cache
         (module Statement.With_sok.Checked)
         (module Statement.With_sok)
-        ~typ:Statement.With_sok.typ
+        ~public_input:(Input Statement.With_sok.typ)
         ~branches:(module Nat.N5)
         ~max_proofs_verified:(module Nat.N2)
         ~name:"transaction-snark"
@@ -4105,14 +4105,14 @@ struct
                 statement )
     in
     let open Async in
-    let%map proof = res in
+    let%map (), proof = res in
     Base.Parties_snark.witness := None ;
     { proof; statement }
 
   let of_transaction_union ~statement ~init_stack transaction state_body handler
       =
     let open Async in
-    let%map proof =
+    let%map (), proof =
       base []
         ~handler:
           (Base.transaction_union_handler handler transaction state_body
@@ -4163,7 +4163,7 @@ struct
     let%bind s = Async.return (Statement.merge t12 t23) in
     let s = { s with sok_digest } in
     let open Async in
-    let%map proof =
+    let%map (), proof =
       merge [ (x12.statement, x12.proof); (x23.statement, x23.proof) ] s
     in
     Ok { statement = s; proof }
@@ -4211,17 +4211,18 @@ module For_tests = struct
             (fun [] x ->
               trivial_main x |> Run.run_checked
               |> fun _ :
-                     unit
-                     Pickles_types.Hlist0.H1
-                       (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                     .t ->
-              [] )
+                     (unit
+                      Pickles_types.Hlist0.H1
+                        (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
+                      .t
+                     * unit) ->
+              ([], ()) )
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
         (module Zkapp_statement.Checked)
         (module Zkapp_statement)
-        ~typ:Zkapp_statement.typ
+        ~public_input:(Input Zkapp_statement.typ)
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"trivial"
@@ -4242,12 +4243,13 @@ module For_tests = struct
                   |> fun s ->
                   Run.Field.(Assert.equal s (s + one))
                   |> fun () :
-                         ( Zkapp_statement.Checked.t
-                         * (Zkapp_statement.Checked.t * unit) )
-                         Pickles_types.Hlist0.H1
-                           (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                         .t ->
-                  [ Boolean.true_; Boolean.true_ ] )
+                         (( Zkapp_statement.Checked.t
+                          * (Zkapp_statement.Checked.t * unit) )
+                          Pickles_types.Hlist0.H1
+                            (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
+                          .t
+                         * unit) ->
+                  ([ Boolean.true_; Boolean.true_ ], ()) )
             }
           ] )
     in
@@ -4571,7 +4573,7 @@ module For_tests = struct
                     in
                     p
               in
-              let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
+              let%map.Async.Deferred (), (pi : Pickles.Side_loaded.Proof.t) =
                 prover ~handler [] tx_statement
               in
               ( { body = snapp_party.body; authorization = Proof pi }
@@ -4764,7 +4766,7 @@ module For_tests = struct
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
-    let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
+    let%map.Async.Deferred (), (pi : Pickles.Side_loaded.Proof.t) =
       trivial_prover ~handler [] tx_statement
     in
     let fee_payer_signature_auth =

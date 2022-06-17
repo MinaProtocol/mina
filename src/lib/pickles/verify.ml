@@ -268,7 +268,8 @@ let verify_heterogenous (ts : Instance.t list) =
       eprintf !"bad verify: %s\n%!" e ;
       false
 
-let verify (type a n) (max_proofs_verified : (module Nat.Intf with type n = n))
+let verify (type a return_typ n)
+    (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
