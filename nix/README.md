@@ -103,7 +103,7 @@ mina:<tag> mina.exe <args>`.
 ## Miscellaneous
 ### Contributing to Nix expressions
 
-You probably want to [enable flakes](#note-about-flakes) if you plan
+You probably want to [enable flakes](#2-enable-flakes-optional-but-recommended) if you plan
 to contribute to the Nix expressions here.
 
 Most Nix things (including this README ☺) are located inside the
