@@ -1630,7 +1630,7 @@ let dummy_constraints =
 type ('a_var, 'a_value, 'a_weird) pickles_rule =
   { identifier : string
   ; prevs : 'a_weird list
-  ; main : 'a_var list -> 'a_var -> Boolean.var list
+  ; main : 'a_var list -> 'a_var -> Boolean.var list * unit
   }
 
 type pickles_rule_js =
@@ -1663,9 +1663,10 @@ let create_pickles_rule ~self (rule : pickles_rule_js) =
           rule##.main
             (Public_input.to_js public_input)
             (Public_input.list_to_js prev_inputs)
+          |> Js.to_array |> Array.to_list
+          |> List.map ~f:(fun b -> b##.value)
         in
-        Js.to_array should_verifys |> Array.to_list
-        |> List.map ~f:(fun b -> b##.value) )
+        (should_verifys, ()) )
   }
 
 let other_verification_key_constr :
