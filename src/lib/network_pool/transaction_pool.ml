@@ -2124,7 +2124,7 @@ let%test_module _ =
         [ (* sufficient fee *)
           mk_payment 0 16_000_000_000 0 1 440_000_000_000
         ; (* insufficient fee *)
-          mk_payment 1 4_000_000_000 0 1 788_000_000_000
+          mk_payment 1 1_000_000_000 0 1 788_000_000_000
         ; (* sufficient *)
           mk_payment 2 20_000_000_000 1 4 721_000_000_000
         ; (* insufficient *)
