@@ -83,6 +83,7 @@ module Pre_diff_two = struct
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_two.Stable.V1.t
+        ; internal_command_statuses : Transaction_status.Stable.V2.t list
         }
       [@@deriving compare, sexp, yojson]
     end
@@ -92,6 +93,7 @@ module Pre_diff_two = struct
     { completed_works : 'a list
     ; commands : 'b list
     ; coinbase : Ft.t At_most_two.t
+    ; internal_command_statuses : Transaction_status.t list
     }
   [@@deriving compare, sexp, yojson]
 
@@ -99,6 +101,7 @@ module Pre_diff_two = struct
     { completed_works = List.map t.completed_works ~f:f1
     ; commands = List.map t.commands ~f:f2
     ; coinbase = t.coinbase
+    ; internal_command_statuses = t.internal_command_statuses
     }
 end
 
@@ -112,6 +115,7 @@ module Pre_diff_one = struct
         { completed_works : 'a list
         ; commands : 'b list
         ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
+        ; internal_command_statuses : Transaction_status.Stable.V2.t list
         }
       [@@deriving compare, sexp, yojson]
     end
@@ -121,6 +125,7 @@ module Pre_diff_one = struct
     { completed_works : 'a list
     ; commands : 'b list
     ; coinbase : Ft.t At_most_one.t
+    ; internal_command_statuses : Transaction_status.t list
     }
   [@@deriving compare, sexp, yojson]
 
@@ -128,6 +133,7 @@ module Pre_diff_one = struct
     { completed_works = List.map t.completed_works ~f:f1
     ; commands = List.map t.commands ~f:f2
     ; coinbase = t.coinbase
+    ; internal_command_statuses = t.internal_command_statuses
     }
 end
 
@@ -223,7 +229,11 @@ module With_valid_signatures_and_proofs = struct
 
   let empty_diff : t =
     { diff =
-        ( { completed_works = []; commands = []; coinbase = At_most_two.Zero }
+        ( { completed_works = []
+          ; commands = []
+          ; coinbase = At_most_two.Zero
+          ; internal_command_statuses = []
+          }
         , None )
     }
 
@@ -321,6 +331,7 @@ let validate_commands (t : t)
         { completed_works = d1.completed_works
         ; commands = commands1
         ; coinbase = d1.coinbase
+        ; internal_command_statuses = d1.internal_command_statuses
         }
       in
       let p2 =
@@ -329,6 +340,7 @@ let validate_commands (t : t)
               { Pre_diff_one.completed_works = d2.completed_works
               ; commands = commands2
               ; coinbase = d2.coinbase
+              ; internal_command_statuses = d2.internal_command_statuses
               } )
       in
       ({ diff = (p1, p2) } : With_valid_signatures.t) )
@@ -340,6 +352,7 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
     { completed_works = forget_cw d1.completed_works
     ; commands = d1.commands
     ; coinbase = d1.coinbase
+    ; internal_command_statuses = d1.internal_command_statuses
     }
   in
   let p2 =
@@ -348,6 +361,7 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
         { completed_works = forget_cw d2.completed_works
         ; commands = d2.commands
         ; coinbase = d2.coinbase
+        ; internal_command_statuses = d2.internal_command_statuses
         } )
   in
   { diff = (p1, p2) }
@@ -359,6 +373,7 @@ let forget_pre_diff_with_at_most_two
   { completed_works = forget_cw pre_diff.completed_works
   ; commands = (pre_diff.commands :> User_command.t With_status.t list)
   ; coinbase = pre_diff.coinbase
+  ; internal_command_statuses = pre_diff.internal_command_statuses
   }
 
 let forget_pre_diff_with_at_most_one
@@ -367,6 +382,7 @@ let forget_pre_diff_with_at_most_one
   { Pre_diff_one.completed_works = forget_cw pre_diff.completed_works
   ; commands = (pre_diff.commands :> User_command.t With_status.t list)
   ; coinbase = pre_diff.coinbase
+  ; internal_command_statuses = pre_diff.internal_command_statuses
   }
 
 let forget (t : With_valid_signatures_and_proofs.t) =
@@ -406,6 +422,10 @@ let net_return
 
 let empty_diff : t =
   { diff =
-      ( { completed_works = []; commands = []; coinbase = At_most_two.Zero }
+      ( { completed_works = []
+        ; commands = []
+        ; coinbase = At_most_two.Zero
+        ; internal_command_statuses = []
+        }
       , None )
   }

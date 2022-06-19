@@ -227,7 +227,8 @@ let%snarkydef step ~(logger : Logger.t)
       Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
     in
     let%bind () =
-      Boolean.Assert.any [ txn_snark_input_correct; nothing_changed ]
+      with_label __LOC__
+        (Boolean.Assert.any [ txn_snark_input_correct; nothing_changed ])
     in
     let transaction_snark_should_verifiy = Boolean.not nothing_changed in
     let%bind result =
@@ -279,7 +280,9 @@ let%snarkydef step ~(logger : Logger.t)
     | Full ->
         Boolean.not is_base_case
   in
-  let%map () = Boolean.Assert.any [ is_base_case; success ] in
+  let%map () =
+    with_label __LOC__ (Boolean.Assert.any [ is_base_case; success ])
+  in
   (prev_should_verify, txn_snark_should_verify)
 
 let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash

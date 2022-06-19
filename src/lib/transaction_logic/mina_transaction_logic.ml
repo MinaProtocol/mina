@@ -1699,11 +1699,20 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             , `Has_permission_to_receive
                 (Account.has_permission ~to_:`Receive receiver_account) ) )
 
-  let no_failures = Transaction_status.Failure.Collection.empty
+  let no_failure = []
+
+  let update_failed =
+    [ Transaction_status.Failure.Update_not_permitted_balance ]
+
+  let empty = Transaction_status.Failure.Collection.empty
 
   let single_failure =
     Transaction_status.Failure.Collection.of_single_failure
       Update_not_permitted_balance
+
+  let append_entry f (s : Transaction_status.Failure.Collection.t) :
+      Transaction_status.Failure.Collection.t =
+    match s with [] -> [ f ] | h :: t -> h :: f :: t
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance
       ~modify_timing =
@@ -1729,7 +1738,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           let%map _action, a, loc = get_or_create t account_id in
           let emptys = previous_empty_accounts action account_id in
           set t loc { a with balance; timing } ;
-          (emptys, no_failures) )
+          (emptys, empty) )
         else Ok ([], single_failure)
     | `Two (ft1, ft2) ->
         let account_id1 = Fee_transfer.Single.receiver ft1 in
@@ -1747,8 +1756,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             let%map _action1, a1, l1 = get_or_create t account_id1 in
             let emptys1 = previous_empty_accounts action1 account_id1 in
             set t l1 { a1 with balance; timing } ;
-            (emptys1, no_failures) )
-          else Ok ([], single_failure)
+            (emptys1, empty) )
+          else
+            (*failure for each fee transfer single*)
+            Ok ([], append_entry update_failed single_failure)
         else
           let a2, action2, `Has_permission_to_receive can_receive2 =
             has_permission_to_receive ~ledger:t account_id2
@@ -1766,7 +1777,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let%map _action1, a1, l1 = get_or_create t account_id1 in
               let emptys1 = previous_empty_accounts action1 account_id1 in
               set t l1 { a1 with balance = balance1 } ;
-              (emptys1, no_failures) )
+              (emptys1, append_entry no_failure empty) )
             else Ok ([], single_failure)
           in
           let%map emptys2, failures' =
@@ -1774,8 +1785,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let%map _action2, a2, l2 = get_or_create t account_id2 in
               let emptys2 = previous_empty_accounts action2 account_id2 in
               set t l2 { a2 with balance = balance2; timing = timing2 } ;
-              (emptys2, failures) )
-            else Ok ([], single_failure @ failures)
+              (emptys2, append_entry no_failure failures) )
+            else Ok ([], append_entry update_failed failures)
           in
           (emptys1 @ emptys2, failures')
 
@@ -1812,7 +1823,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
              , failures1 ) =
       match fee_transfer with
       | None ->
-          return (coinbase_amount, [], None, None, no_failures)
+          return (coinbase_amount, [], None, None, empty)
       | Some ({ receiver_pk = transferee; fee } as ft) ->
           assert (not @@ Public_key.Compressed.equal transferee receiver) ;
           let transferee_id = Coinbase.Fee_transfer.receiver ft in
@@ -1845,7 +1856,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                 ( transferee_location
                 , { transferee_account with balance; timing } )
             , Some transferee_account.timing
-            , no_failures )
+            , append_entry no_failure empty )
           else return (receiver_reward, [], None, None, single_failure)
     in
     let receiver_id = Account_id.create receiver Token_id.default in
@@ -1880,8 +1891,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             balance = receiver_balance
           ; timing = coinbase_receiver_timing
           } ;
-        failures1 )
-      else return (single_failure @ failures1)
+        append_entry no_failure failures1 )
+      else return (append_entry update_failed failures1)
     in
     Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
     if Transaction_status.Failure.Collection.is_empty failures then
