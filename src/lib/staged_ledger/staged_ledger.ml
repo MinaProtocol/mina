@@ -1650,6 +1650,8 @@ module T = struct
               Sequence.to_list_rev res.commands_rev
           ; completed_works = Sequence.to_list_rev res.completed_work_rev
           ; coinbase = to_at_most_one res.coinbase
+          ; internal_command_statuses =
+              [] (*updated later based on application result*)
           } )
     in
     let pre_diff_with_two (res : Resources.t) :
@@ -1659,6 +1661,8 @@ module T = struct
       { commands = Sequence.to_list_rev res.commands_rev
       ; completed_works = Sequence.to_list_rev res.completed_work_rev
       ; coinbase = res.coinbase
+      ; internal_command_statuses =
+          [] (*updated later based on application result*)
       }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
@@ -2679,6 +2683,7 @@ let%test_module "staged ledger tests" =
                 @@ ( { completed_works = List.take completed_works job_count1
                      ; commands = List.take txns slots
                      ; coinbase = Zero
+                     ; internal_command_statuses = []
                      }
                    , None )
             }
@@ -2688,6 +2693,7 @@ let%test_module "staged ledger tests" =
               ( { completed_works = List.take completed_works job_count1
                 ; commands = List.take txns slots
                 ; coinbase = Zero
+                ; internal_command_statuses = []
                 }
               , Some
                   { completed_works =
@@ -2695,19 +2701,12 @@ let%test_module "staged ledger tests" =
                       else List.drop completed_works job_count1 )
                   ; commands = txns_in_second_diff
                   ; coinbase = Zero
+                  ; internal_command_statuses = []
                   } )
             in
             { diff = compute_statuses ~ledger ~coinbase_amount diff }
       in
-      let empty_diff : Staged_ledger_diff.t =
-        { diff =
-            ( { completed_works = []
-              ; commands = []
-              ; coinbase = Staged_ledger_diff.At_most_two.Zero
-              }
-            , None )
-        }
-      in
+      let empty_diff = Staged_ledger_diff.empty_diff in
       Quickcheck.test gen_at_capacity
         ~sexp_of:
           [%sexp_of:
