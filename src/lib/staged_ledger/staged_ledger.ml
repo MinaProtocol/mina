@@ -518,7 +518,17 @@ module T = struct
     in
     let empty_local_state = Mina_state.Local_state.empty () in
     let%map applied_txn =
-      Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
+      ( match
+          Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
+            s
+        with
+      | Error e ->
+          Or_error.error_string
+            (sprintf
+               !"Error when applying transaction %{sexp: Transaction.t}: %s"
+               s (Error.to_string_hum e) )
+      | res ->
+          res )
       |> to_staged_ledger_or_error
     in
     let target_merkle_root =
