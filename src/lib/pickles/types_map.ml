@@ -13,9 +13,7 @@ type inner_curve_var =
 module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
     { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
-    ; value_to_field_elements : 'value -> Impls.Step.Field.Constant.t array
-    ; var_to_field_elements : 'var -> Impls.Step.Field.t array
-    ; typ : ('var, 'value) Impls.Step.Typ.t
+    ; public_input : ('var, 'value) Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
     ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
@@ -38,9 +36,7 @@ module Side_loaded = struct
   module Permanent = struct
     type ('var, 'value, 'n1, 'n2) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
-      ; value_to_field_elements : 'value -> Impls.Step.Field.Constant.t array
-      ; var_to_field_elements : 'var -> Impls.Step.Field.t array
-      ; typ : ('var, 'value) Impls.Step.Typ.t
+      ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; branches : 'n2 Nat.t
       }
   end
@@ -56,15 +52,8 @@ module Side_loaded = struct
         -> packed
 
   let to_basic
-      { permanent =
-          { max_proofs_verified
-          ; value_to_field_elements
-          ; var_to_field_elements
-          ; typ
-          ; branches
-          }
-      ; ephemeral
-      } =
+      { permanent = { max_proofs_verified; public_input; branches }; ephemeral }
+      =
     let wrap_key, wrap_vk =
       match ephemeral with
       | Some { index = `In_prover i | `In_both (i, _) } ->
@@ -76,9 +65,7 @@ module Side_loaded = struct
     let wrap_vk = Option.value_exn ~here:[%here] wrap_vk in
     { Basic.max_proofs_verified
     ; wrap_vk
-    ; value_to_field_elements
-    ; var_to_field_elements
-    ; typ
+    ; public_input
     ; branches
     ; wrap_domains = Common.wrap_domains ~proofs_verified
     ; wrap_key
@@ -89,11 +76,9 @@ module Compiled = struct
   type f = Impls.Wrap.field
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
-    { typ : ('a_var, 'a_value) Impls.Step.Typ.t
+    { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
-    ; value_to_field_elements : 'a_value -> Tick.Field.t array
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     }
@@ -107,9 +92,7 @@ module Compiled = struct
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
-    ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; value_to_field_elements : 'a_value -> Tick.Field.t array
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
+    ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
@@ -125,9 +108,7 @@ module Compiled = struct
       { branches
       ; max_proofs_verified
       ; proofs_verifieds
-      ; typ
-      ; value_to_field_elements
-      ; var_to_field_elements
+      ; public_input
       ; wrap_vk
       ; wrap_domains
       ; step_domains
@@ -135,9 +116,7 @@ module Compiled = struct
       } =
     { Basic.max_proofs_verified
     ; wrap_domains
-    ; value_to_field_elements
-    ; var_to_field_elements
-    ; typ
+    ; public_input
     ; branches = Vector.length step_domains
     ; wrap_key = Lazy.force wrap_key
     ; wrap_vk = Lazy.force wrap_vk
@@ -151,9 +130,7 @@ module For_step = struct
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
     ; proofs_verifieds :
         [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
-    ; typ : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; value_to_field_elements : 'a_value -> Tick.Field.t array
-    ; var_to_field_elements : 'a_var -> Impls.Step.Field.t array
+    ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Domain.t
@@ -162,15 +139,9 @@ module For_step = struct
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     }
 
-  let of_side_loaded (type a b c d)
+  let of_side_loaded (type a b c d e f)
       ({ ephemeral
-       ; permanent =
-           { branches
-           ; max_proofs_verified
-           ; typ
-           ; value_to_field_elements
-           ; var_to_field_elements
-           }
+       ; permanent = { branches; max_proofs_verified; public_input }
        } :
         (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
     let index =
@@ -183,10 +154,8 @@ module For_step = struct
     let T = Nat.eq_exn branches Side_loaded_verification_key.Max_branches.n in
     { branches
     ; max_proofs_verified
+    ; public_input
     ; proofs_verifieds = `Side_loaded
-    ; typ
-    ; value_to_field_elements
-    ; var_to_field_elements
     ; wrap_key = index.wrap_index
     ; wrap_domain = `Side_loaded index.max_proofs_verified
     ; step_domains = `Side_loaded
@@ -196,9 +165,7 @@ module For_step = struct
       ({ branches
        ; max_proofs_verified
        ; proofs_verifieds
-       ; typ
-       ; value_to_field_elements
-       ; var_to_field_elements
+       ; public_input
        ; wrap_key
        ; wrap_domains
        ; step_domains
@@ -208,9 +175,7 @@ module For_step = struct
     ; max_proofs_verified
     ; proofs_verifieds =
         `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
-    ; typ
-    ; value_to_field_elements
-    ; var_to_field_elements
+    ; public_input
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
           ~f:Step_main_inputs.Inner_curve.constant
@@ -233,20 +198,23 @@ let find t k =
   match Hashtbl.find t k with None -> failwith "key not found" | Some x -> x
 
 let lookup_compiled :
-    type a b n m. (a, b, n, m) Tag.tag -> (a, b, n, m) Compiled.t =
+    type var value n m.
+    (var, value, n, m) Tag.tag -> (var, value, n, m) Compiled.t =
  fun t ->
   let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
 let lookup_side_loaded :
-    type a b n m. (a, b, n, m) Tag.tag -> (a, b, n, m) Side_loaded.t =
+    type var value n m.
+    (var, value, n, m) Tag.tag -> (var, value, n, m) Side_loaded.t =
  fun t ->
   let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
-let lookup_basic : type a b n m. (a, b, n, m) Tag.t -> (a, b, n, m) Basic.t =
+let lookup_basic :
+    type var value n m. (var, value, n, m) Tag.t -> (var, value, n, m) Basic.t =
  fun t ->
   match t.kind with
   | Compiled ->
@@ -263,28 +231,26 @@ let max_proofs_verified :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.max_proofs_verified
 
-let typ :
+let public_input :
     type var value. (var, value, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =
  fun tag ->
   match tag.kind with
   | Compiled ->
-      (lookup_compiled tag.id).typ
+      (lookup_compiled tag.id).public_input
   | Side_loaded ->
-      (lookup_side_loaded tag.id).permanent.typ
+      (lookup_side_loaded tag.id).permanent.public_input
 
 let value_to_field_elements :
     type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
  fun t ->
-  match t.kind with
-  | Compiled ->
-      (lookup_compiled t.id).value_to_field_elements
-  | Side_loaded ->
-      (lookup_side_loaded t.id).permanent.value_to_field_elements
+  let (Typ typ) = public_input t in
+  fun x -> fst (typ.value_to_fields x)
 
-let lookup_map (type a b c d) (t : (a, b, c, d) Tag.t) ~self ~default
+let lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
+    ~default
     ~(f :
-          [ `Compiled of (a, b, c, d) Compiled.t
-          | `Side_loaded of (a, b, c, d) Side_loaded.t ]
+          [ `Compiled of (var, value, c, d) Compiled.t
+          | `Side_loaded of (var, value, c, d) Side_loaded.t ]
        -> _ ) =
   match Type_equal.Id.same_witness t.id self with
   | Some _ ->
@@ -329,7 +295,7 @@ let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
         in
         T (id, { d with ephemeral }) )
 
-let add_exn (type a b c d) (tag : (a, b, c, d) Tag.t)
-    (data : (a, b, c, d) Compiled.t) =
+let add_exn (type var value c d) (tag : (var, value, c, d) Tag.t)
+    (data : (var, value, c, d) Compiled.t) =
   Hashtbl.add_exn univ.compiled ~key:(Type_equal.Id.uid tag.id)
     ~data:(Compiled.T (tag.id, data))

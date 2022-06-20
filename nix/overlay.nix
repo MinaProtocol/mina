@@ -13,6 +13,7 @@ let
     # copy this line with the correct toolchain name
     "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
+  cargoHashes = narHashesFromCargoLock ../src/lib/crypto/Cargo.lock;
   rustChannelFromToolchainFileOf = file: with pkgs.lib; let
     inherit (pkgs.lib) hasPrefix removePrefix readFile warn;
     toolchain = (builtins.fromTOML (readFile file)).toolchain;
@@ -24,6 +25,27 @@ let
       sha256 = toolchainHashes.${toolchain.channel} or
         (warn ''Please add the rust toolchain hash (see error message below) for "${toolchain.channel}" at ${placeholderPos.file}:${toString placeholderPos.line}'' toolchainHashes.placeholder);
     };
+
+  # mapFilterListToAttrs :: (x -> {name: str, value: b}) -> (x -> bool) -> [x] -> {b}
+  mapFilterListToAttrs = f: m: l:
+    builtins.listToAttrs (map m (builtins.filter f l));
+
+  # extract git rev & urls from cargo lockfile, feed them to fetchgit to acquire
+  # the sha256 hash that's used at build time
+  # narHashesfromcargolock :: path -> {pkgname: hash}
+  narHashesFromCargoLock = file:
+    let
+      inherit (pkgs.lib) hasPrefix last head;
+      inherit (builtins) split readFile;
+      package = (fromTOML (readFile file)).package;
+    in mapFilterListToAttrs (x: x ? source && hasPrefix "git+" x.source) (x: {
+      name = "${x.name}-${x.version}";
+      value = (fetchGit {
+        rev = last (split "#" x.source);
+        url = last (split "\\+" (head (split "\\?" x.source)));
+        allRefs = true;
+      }).narHash;
+    }) package;
 in {
   # nixpkgs + musl problems
   postgresql =
@@ -114,6 +136,7 @@ in {
         # FIXME: tests fail
         doCheck = false;
         cargoLock.lockFile = ../src/lib/crypto/Cargo.lock;
+        cargoLock.outputHashes = cargoHashes;
       };
 
   go-capnproto2 = pkgs.buildGoModule rec {
@@ -206,10 +229,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-f3XRVuK892TE6xP7eq3aKpl9d3fnOFxLh+/K59iWPAg=";
+        sha256 = "sha256-DUcY22b9+PD6RD53CwcoB+ynGulYTEYjkkonDNeLbGM=";
       };
 
-      cargoSha256 = "sha256-WJ5hPw2mzZB+GMoqo3orhl4fCFYKWXOWqaFj1EMrb2Q=";
+      cargoSha256 = "sha256-mfVQ6rSzCgwYrN9WwydEpkm6k0E3302Kfs/LaGzRSHE=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -228,11 +251,11 @@ in {
       "^lib/crypto/Cargo\.(lock|toml)$"
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
-      "^external(/wasm-bindgen-rayon(/.*)?)?"
     ];
     sourceRoot = "source/lib/crypto";
     nativeBuildInputs = [ pkgs.wasm-pack wasm-bindgen-cli ];
     cargoLock.lockFile = lock;
+    cargoLock.outputHashes = cargoHashes;
 
     # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
     # Want to run after cargoSetupPostUnpackHook

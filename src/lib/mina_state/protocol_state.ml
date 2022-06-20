@@ -291,7 +291,7 @@ let hash s =
 [%%endif]
 
 let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
-    ~consensus_constants =
+    ~consensus_constants ~genesis_body_reference =
   { Poly.Stable.Latest.previous_state_hash =
       State_hash.of_hash Outside_hash_image.t
   ; body =
@@ -300,6 +300,7 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
             ~consensus_constants
             ~genesis_ledger_hash:
               (Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger))
+            ~genesis_body_reference
       ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
       ; consensus_state =
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger
