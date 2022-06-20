@@ -211,17 +211,6 @@ module For_tests = struct
           Transaction_hash.User_command_with_valid_signature.command applicable
         in
         check_consistent applicable ;
-        (*
-        Printf.printf !"fee_per_wu = %{Sexp}\n" (Currency.Fee_rate.sexp_of_t @@ User_command.fee_per_wu applicable_unchecked) ;
-        Printf.printf !"applicable_by_fee = [%s]\n" (
-          Map.to_alist applicable_by_fee
-          |> List.map ~f:(fun (fee, applicable) ->
-              Sexp.to_string @@
-                Sexp.List
-                  [ Currency.Fee_rate.sexp_of_t fee
-                  ; Int.sexp_of_t @@ Set.length applicable (* Set.sexp_of_m__t (module Transaction_hash.User_command_with_valid_signature) applicable *) ])
-          |> String.concat ~sep:", " ) ;
-        *)
         assert (
           Set.mem
             (Map.find_exn applicable_by_fee
@@ -598,24 +587,6 @@ let transactions t =
               (applicable_by_fee', Map.remove all_by_sender sender)
         in
         Some (txn, (applicable_by_fee'', all_by_sender')) )
-
-(*
-  Sequence.unfold ~init:t.all_by_fee ~f:(fun all_by_fee ->
-    if Map.is_empty all_by_fee then
-      None
-    else
-      let fee, set = Map.max_elt_exn all_by_fee in
-      assert (Set.length set > 0) ;
-      let txn = Set.min_elt_exn set in
-      let set' = Set.remove set txn in
-      let all_by_fee' =
-        if Set.is_empty set' then
-          Map.remove all_by_fee fee
-        else
-          Map.set all_by_fee ~key:fee ~data:set'
-      in
-      Some (txn, all_by_fee'))
-  *)
 
 let run :
     type a e.
@@ -1978,11 +1949,6 @@ let%test_module _ =
       [%test_eq: Transaction_hash.t list]
         (lower (Sequence.to_list dropped))
         (lower expected_drops) ;
-      (*
-      [%test_eq:
-        Transaction_hash.User_command_with_valid_signature.t list]
-        (Sequence.to_list dropped) (cmd :: expected_drops) ;
-      *)
       assert_invariants pool ;
       pool
 
