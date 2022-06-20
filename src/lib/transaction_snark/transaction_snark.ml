@@ -4293,13 +4293,14 @@ module For_tests = struct
       in
       { body =
           { public_key
-          ; update = Party.Update.noop
           ; fee
-          ; events = []
-          ; sequence_events = []
-          ; protocol_state_precondition =
-              Option.map preconditions ~f:(fun { network; _ } -> network)
-              |> Option.value ~default:Zkapp_precondition.Protocol_state.accept
+          ; valid_until =
+              Option.bind preconditions ~f:(fun { network; _ } ->
+                  match network.global_slot_since_genesis with
+                  | Ignore ->
+                      None
+                  | Check { upper; _ } ->
+                      Some upper )
           ; nonce
           }
       ; authorization = Signature.dummy
@@ -4309,7 +4310,9 @@ module For_tests = struct
       Option.value preconditions
         ~default:
           { Party.Preconditions.network =
-              fee_payer.body.protocol_state_precondition
+              Option.value_map preconditions
+                ~f:(fun { network; _ } -> network)
+                ~default:Zkapp_precondition.Protocol_state.accept
           ; account =
               ( if Option.is_none fee_payer_opt then
                 Nonce (Account.Nonce.succ sender_nonce)
@@ -4687,11 +4690,8 @@ module For_tests = struct
     let fee_payer : Party.Fee_payer.t =
       { body =
           { public_key = sender_pk
-          ; update = Party.Update.noop
           ; fee
-          ; events = []
-          ; sequence_events = []
-          ; protocol_state_precondition = protocol_state_predicate
+          ; valid_until = None
           ; nonce = sender_nonce
           }
           (* Real signature added in below *)

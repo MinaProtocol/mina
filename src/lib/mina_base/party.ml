@@ -968,13 +968,8 @@ module Body = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; update : Update.Stable.V1.t
           ; fee : Fee.Stable.V1.t
-          ; events : Events'.Stable.V1.t
-          ; sequence_events : Events'.Stable.V1.t
-          ; protocol_state_precondition :
-              Zkapp_precondition.Protocol_state.Stable.V1.t
-                [@name "networkPrecondition"]
+          ; valid_until : Global_slot.Stable.V1.t option [@name "validUntil"]
           ; nonce : Account_nonce.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
@@ -986,28 +981,15 @@ module Body = struct
     let gen : t Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%map public_key = Public_key.Compressed.gen
-      and update = Update.gen ()
       and fee = Currency.Fee.gen
-      and nonce = Account.Nonce.gen
-      and events = return []
-      and sequence_events = return []
-      and protocol_state_precondition = Zkapp_precondition.Protocol_state.gen in
-      { public_key
-      ; update
-      ; fee
-      ; events
-      ; sequence_events
-      ; protocol_state_precondition
-      ; nonce
-      }
+      and valid_until = Option.quickcheck_generator Global_slot.gen
+      and nonce = Account.Nonce.gen in
+      { public_key; fee; valid_until; nonce }
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
-      ; update = Update.dummy
       ; fee = Fee.zero
-      ; events = []
-      ; sequence_events = []
-      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+      ; valid_until = None
       ; nonce = Account_nonce.zero
       }
 
@@ -1018,9 +1000,10 @@ module Body = struct
           ~of_string:Fee.of_string
       in
       let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
-      Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-        ~fee:!.fee ~events:!.Events.deriver ~sequence_events:!.Events.deriver
-        ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
+      Fields.make_creator obj ~public_key:!.public_key ~fee:!.fee
+        ~valid_until:
+          !.Fields_derivers_zkapps.Derivers.(
+              option ~js_type:`Implicit @@ uint32 @@ o ())
         ~nonce:!.uint32
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
@@ -1034,15 +1017,22 @@ module Body = struct
   let of_fee_payer (t : Fee_payer.t) : t =
     { public_key = t.public_key
     ; token_id = Token_id.default
-    ; update = t.update
+    ; update = Update.noop
     ; balance_change =
         { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
     ; increment_nonce = true
-    ; events = t.events
-    ; sequence_events = t.sequence_events
+    ; events = []
+    ; sequence_events = []
     ; call_data = Field.zero
     ; preconditions =
-        { Preconditions.network = t.protocol_state_precondition
+        { Preconditions.network =
+            (let valid_until =
+               Option.value ~default:Global_slot.max_value t.valid_until
+             in
+             { Zkapp_precondition.Protocol_state.accept with
+               global_slot_since_genesis =
+                 Check { lower = Global_slot.zero; upper = valid_until }
+             } )
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
@@ -1052,11 +1042,11 @@ module Body = struct
   let to_fee_payer_exn (t : t) : Fee_payer.t =
     let { public_key
         ; token_id = _
-        ; update
+        ; update = _
         ; balance_change
         ; increment_nonce = _
-        ; events
-        ; sequence_events
+        ; events = _
+        ; sequence_events = _
         ; call_data = _
         ; preconditions
         ; use_full_commitment = _
@@ -1075,14 +1065,14 @@ module Body = struct
       | Full _ | Accept ->
           failwith "Expected a nonce for fee payer account precondition"
     in
-    { public_key
-    ; update
-    ; fee
-    ; events
-    ; sequence_events
-    ; protocol_state_precondition = preconditions.network
-    ; nonce
-    }
+    let valid_until =
+      match preconditions.network.global_slot_since_genesis with
+      | Ignore ->
+          None
+      | Check { upper; _ } ->
+          Some upper
+    in
+    { public_key; fee; valid_until; nonce }
 
   module Checked = struct
     module Type_of_var (V : sig

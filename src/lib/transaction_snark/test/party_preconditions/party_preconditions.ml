@@ -249,11 +249,8 @@ let%test_module "Protocol state precondition tests" =
                   let fee_payer =
                     { Party.Fee_payer.body =
                         { public_key = sender_pk
-                        ; update = Party.Update.noop
                         ; fee
-                        ; events = []
-                        ; sequence_events = []
-                        ; protocol_state_precondition = network_precondition
+                        ; valid_until = None
                         ; nonce = sender_nonce
                         }
                         (*To be updated later*)
@@ -650,12 +647,8 @@ let%test_module "Account precondition tests" =
               let fee_payer =
                 { Party.Fee_payer.body =
                     { public_key = sender_pk
-                    ; update = Party.Update.noop
                     ; fee
-                    ; events = []
-                    ; sequence_events = []
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
+                    ; valid_until = None
                     ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
                     }
                     (*To be updated later*)

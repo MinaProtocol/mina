@@ -611,11 +611,17 @@ module Party_body_components = struct
 
   let to_fee_payer t : Party.Body.Fee_payer.t =
     { public_key = t.public_key
-    ; update = t.update
     ; fee = t.balance_change
-    ; events = t.events
-    ; sequence_events = t.sequence_events
-    ; protocol_state_precondition = t.protocol_state_precondition
+    ; valid_until =
+        ( match
+            t.protocol_state_precondition
+              .Zkapp_precondition.Protocol_state.Poly.global_slot_since_genesis
+          with
+        | Zkapp_basic.Or_ignore.Ignore ->
+            None
+        | Zkapp_basic.Or_ignore.Check
+            { Zkapp_precondition.Closed_interval.upper; _ } ->
+            Some upper )
     ; nonce = t.account_precondition
     }
 
