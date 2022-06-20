@@ -1,35 +1,38 @@
 open Core_kernel
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Mina_state
-open Mina_block
 open Frontier_base
 
 module Node = struct
   type t =
-    {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
+    { breadcrumb : Breadcrumb.t
+    ; successor_hashes : State_hash.t list
+    ; length : int
+    }
   [@@deriving sexp, fields]
 
   type display =
-    { length: int
-    ; state_hash: string
-    ; blockchain_state: Blockchain_state.display
-    ; consensus_state: Consensus.Data.Consensus_state.display }
+    { length : int
+    ; state_hash : string
+    ; blockchain_state : Blockchain_state.display
+    ; consensus_state : Consensus.Data.Consensus_state.display
+    }
   [@@deriving yojson]
 
   let equal node1 node2 = Breadcrumb.equal node1.breadcrumb node2.breadcrumb
 
   let hash node = Breadcrumb.hash node.breadcrumb
 
-  let compare node1 node2 =
-    Breadcrumb.compare node1.breadcrumb node2.breadcrumb
+  let compare node1 node2 = Breadcrumb.compare node1.breadcrumb node2.breadcrumb
 
   let name t = Breadcrumb.name t.breadcrumb
 
   let display t =
-    let {Breadcrumb.state_hash; consensus_state; blockchain_state; _} =
+    let { Breadcrumb.state_hash; consensus_state; blockchain_state; _ } =
       Breadcrumb.display t.breadcrumb
     in
-    {state_hash; blockchain_state; length= t.length; consensus_state}
+    { state_hash; blockchain_state; length = t.length; consensus_state }
 end
 
 module Protocol_states_for_root_scan_state = struct
@@ -44,36 +47,39 @@ module Protocol_states_for_root_scan_state = struct
     in
     let protocol_state_map =
       (*Note: Protocol states for the next root should all be in this map
-      assuming roots transition to their successors and do not skip any node in
-      between*)
-      State_hash.Map.set protocol_states_for_old_root ~key:(State_hash.With_state_hashes.state_hash old_root_state)
+        assuming roots transition to their successors and do not skip any node in
+        between*)
+      State_hash.Map.set protocol_states_for_old_root
+        ~key:(State_hash.With_state_hashes.state_hash old_root_state)
         ~data:old_root_state
     in
-    List.map required_state_hashes ~f:(State_hash.Map.find_exn protocol_state_map)
+    List.map required_state_hashes
+      ~f:(State_hash.Map.find_exn protocol_state_map)
 end
 
 (* Invariant: The path from the root to the tip inclusively, will be max_length *)
 type t =
-  { root_ledger: Ledger.Any_ledger.witness
-  ; mutable root: State_hash.t
-  ; mutable best_tip: State_hash.t
-  ; logger: Logger.t
-  ; table: Node.t State_hash.Table.t
-  ; mutable protocol_states_for_root_scan_state:
+  { root_ledger : Ledger.Any_ledger.witness
+  ; mutable root : State_hash.t
+  ; mutable best_tip : State_hash.t
+  ; logger : Logger.t
+  ; table : Node.t State_hash.Table.t
+  ; mutable protocol_states_for_root_scan_state :
       Protocol_states_for_root_scan_state.t
-  ; consensus_local_state: Consensus.Data.Local_state.t
-  ; max_length: int
-  ; precomputed_values: Precomputed_values.t
-  ; time_controller: Block_time.Controller.t
-  ; persistent_root_instance: Persistent_root.Instance.t }
+  ; consensus_local_state : Consensus.Data.Local_state.t
+  ; max_length : int
+  ; precomputed_values : Precomputed_values.t
+  ; time_controller : Block_time.Controller.t
+  ; persistent_root_instance : Persistent_root.Instance.t
+  }
 
-let persistent_root_instance {persistent_root_instance; _} =
+let persistent_root_instance { persistent_root_instance; _ } =
   persistent_root_instance
 
-let consensus_local_state {consensus_local_state; _} = consensus_local_state
+let consensus_local_state { consensus_local_state; _ } = consensus_local_state
 
 let all_breadcrumbs t =
-  List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
+  List.map (Hashtbl.data t.table) ~f:(fun { breadcrumb; _ } -> breadcrumb)
 
 let find t hash =
   let open Option.Let_syntax in
@@ -87,14 +93,14 @@ let find_exn t hash =
 let find_protocol_state (t : t) hash =
   match find t hash with
   | None ->
-      let%map.Option s = State_hash.Map.find t.protocol_states_for_root_scan_state hash in
+      let%map.Option s =
+        State_hash.Map.find t.protocol_states_for_root_scan_state hash
+      in
       With_hash.data s
   | Some breadcrumb ->
       Some
-      ( breadcrumb
-      |> Breadcrumb.block
-      |> Mina_block.header
-      |> Mina_block.Header.protocol_state )
+        ( breadcrumb |> Breadcrumb.block |> Mina_block.header
+        |> Mina_block.Header.protocol_state )
 
 let root t = find_exn t t.root
 
@@ -114,7 +120,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ~precomputed_values ~persistent_root_instance ~time_controller =
   let open Root_data in
   let transition_receipt_time = None in
-  let validated_transition = External_transition.Validated.lower root_data.transition in
+  let validated_transition = root_data.transition in
   let root_hash = Mina_block.Validated.state_hash validated_transition in
   let protocol_states_for_root_scan_state =
     root_data.protocol_states
@@ -122,11 +128,8 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     |> State_hash.Map.of_alist_exn
   in
   let root_protocol_state =
-    validated_transition
-    |> Mina_block.Validated.forget
-    |> With_hash.data
-    |> Mina_block.header
-    |> Mina_block.Header.protocol_state
+    validated_transition |> Mina_block.Validated.forget |> With_hash.data
+    |> Mina_block.header |> Mina_block.Header.protocol_state
   in
   let root_blockchain_state =
     Protocol_state.blockchain_state root_protocol_state
@@ -137,7 +140,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
   assert (
     Frozen_ledger_hash.equal
       (Frozen_ledger_hash.of_ledger_hash
-         (Ledger.Any_ledger.M.merkle_root root_ledger))
+         (Ledger.Any_ledger.M.merkle_root root_ledger) )
       root_blockchain_state_ledger_hash ) ;
   let root_breadcrumb =
     Breadcrumb.create ~validated_transition
@@ -145,31 +148,32 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
       ~transition_receipt_time
   in
   let root_node =
-    {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+    { Node.breadcrumb = root_breadcrumb; successor_hashes = []; length = 0 }
   in
-  let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+  let table = State_hash.Table.of_alist_exn [ (root_hash, root_node) ] in
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
   { logger
   ; root_ledger
-  ; root= root_hash
-  ; best_tip= root_hash
+  ; root = root_hash
+  ; best_tip = root_hash
   ; table
   ; consensus_local_state
   ; max_length
   ; precomputed_values
   ; protocol_states_for_root_scan_state
   ; persistent_root_instance
-  ; time_controller }
+  ; time_controller
+  }
 
 let root_data t =
   let open Root_data in
   let root = root t in
-  { transition= External_transition.Validated.lift @@ Breadcrumb.validated_transition root
-  ; staged_ledger= Breadcrumb.staged_ledger root
-  ; protocol_states=
-      State_hash.Map.data t.protocol_states_for_root_scan_state }
+  { transition = Breadcrumb.validated_transition root
+  ; staged_ledger = Breadcrumb.staged_ledger root
+  ; protocol_states = State_hash.Map.data t.protocol_states_for_root_scan_state
+  }
 
-let max_length {max_length; _} = max_length
+let max_length { max_length; _ } = max_length
 
 let root_length t = (Hashtbl.find_exn t.table t.root).length
 
@@ -215,7 +219,7 @@ let genesis_constants t = t.precomputed_values.genesis_constants
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
-let best_tip_path_length_exn {table; root; best_tip; _} =
+let best_tip_path_length_exn { table; root; best_tip; _ } =
   let open Option.Let_syntax in
   let result =
     let%bind best_tip_node = Hashtbl.find table best_tip in
@@ -224,8 +228,7 @@ let best_tip_path_length_exn {table; root; best_tip; _} =
   in
   result |> Option.value_exn
 
-let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t
-    =
+let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t =
   let rec go ancestors1 ancestors2 b1 b2 =
     let sh1 = Breadcrumb.state_hash b1 in
     let sh2 = Breadcrumb.state_hash b2 in
@@ -266,7 +269,8 @@ module Visualizor = struct
                 [%log' debug t.logger]
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson successor_state_hash)
-                    ; ("error", `String "missing from frontier") ]
+                    ; ("error", `String "missing from frontier")
+                    ]
                   "Could not visualize state $state_hash: $error" ;
                 acc_graph ) )
 end
@@ -288,7 +292,7 @@ let visualize_to_string t =
 let calculate_root_transition_diff t heir =
   let root = root t in
   let heir_hash = Breadcrumb.state_hash heir in
-  let heir_transition = External_transition.Validated.lift @@ Breadcrumb.validated_transition heir in
+  let heir_transition = Breadcrumb.validated_transition heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->
@@ -306,18 +310,16 @@ let calculate_root_transition_diff t heir =
         let scan_state =
           Staged_ledger.scan_state (Breadcrumb.staged_ledger breadcrumb)
         in
-        {transition; scan_state} )
+        { transition; scan_state } )
   in
   let protocol_states =
-    Protocol_states_for_root_scan_state
-    .protocol_states_for_next_root_scan_state
+    Protocol_states_for_root_scan_state.protocol_states_for_next_root_scan_state
       t.protocol_states_for_root_scan_state
       ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
       ~old_root_state:(Breadcrumb.protocol_state_with_hashes root)
   in
   let new_root_data =
-    Root_data.Limited.create
-      ~transition:heir_transition
+    Root_data.Limited.create ~transition:heir_transition
       ~scan_state:(Staged_ledger.scan_state heir_staged_ledger)
       ~pending_coinbase:
         (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
@@ -326,9 +328,10 @@ let calculate_root_transition_diff t heir =
   let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
   Diff.Full.E.E
     (Root_transitioned
-       { new_root= new_root_data
-       ; garbage= Full garbage_nodes
-       ; just_emitted_a_proof })
+       { new_root = new_root_data
+       ; garbage = Full garbage_nodes
+       ; just_emitted_a_proof
+       } )
 
 let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     ~enable_epoch_ledger_sync =
@@ -374,17 +377,14 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   let old_root_node = Hashtbl.find_exn t.table t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
   let genesis_ledger_hash =
-    old_root_node.breadcrumb
-    |> Breadcrumb.protocol_state
-    |> Protocol_state.blockchain_state
-    |> Blockchain_state.genesis_ledger_hash
+    old_root_node.breadcrumb |> Breadcrumb.protocol_state
+    |> Protocol_state.blockchain_state |> Blockchain_state.genesis_ledger_hash
   in
   (* STEP 0 *)
   let () =
     match enable_epoch_ledger_sync with
     | `Enabled snarked_ledger ->
-        O1trace.sync_thread "update_consensus_local_state"
-          (fun () ->
+        O1trace.sync_thread "update_consensus_local_state" (fun () ->
             Consensus.Hooks.frontier_root_transition
               (Breadcrumb.consensus_state old_root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
@@ -411,7 +411,8 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
     Hashtbl.remove t.table t.root ;
-    O1trace.sync_thread "commit_frontier_root_snarked_ledger" (fun () -> Ledger.commit m1) ;
+    O1trace.sync_thread "commit_frontier_root_snarked_ledger" (fun () ->
+        Ledger.commit m1 ) ;
     [%test_result: Ledger_hash.t]
       ~message:
         "Merkle root of new root's staged ledger mask is the same after \
@@ -443,7 +444,13 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
           ~directory_name:location
       in
       [%log' info t.logger]
-        ~metadata:[ ("potential_snarked_ledger_hash", Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger)] "Enqueued a snarked ledger" ;
+        ~metadata:
+          [ ( "potential_snarked_ledger_hash"
+            , Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash
+              @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger
+            )
+          ]
+        "Enqueued a snarked ledger" ;
       Persistent_root.Instance.enqueue_snarked_ledger ~location
         t.persistent_root_instance ;
       let s = t.root_ledger in
@@ -456,7 +463,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       Non_empty_list.iter
         (Option.value_exn
            (Staged_ledger.proof_txns_with_state_hashes
-              (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
+              (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) )
         ~f:(fun (txn, state_hash) ->
           (*Validate transactions against the protocol state associated with the transaction*)
           let txn_state_view =
@@ -469,7 +476,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
                 (Ledger.apply_transaction
                    ~constraint_constants:
                      t.precomputed_values.constraint_constants ~txn_state_view
-                   mt txn.data)
+                   mt txn.data )
               : Ledger.Transaction_applied.t ) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
@@ -491,17 +498,17 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         (Breadcrumb.transition_receipt_time new_root_node.breadcrumb)
   in
   (*Update the protocol states required for scan state at the new root.
-  Note: this should be after applying the transactions to the snarked ledger (Step 5)
-  because the protocol states corresponding to those transactions won't be part
-  of the new_root_protocol_states since those transactions would have been
-  deleted from the scan state after emitting the proof*)
+    Note: this should be after applying the transactions to the snarked ledger (Step 5)
+    because the protocol states corresponding to those transactions won't be part
+    of the new_root_protocol_states since those transactions would have been
+    deleted from the scan state after emitting the proof*)
   let new_protocol_states_map =
     new_root_protocol_states
     |> List.map ~f:(fun s -> (State_hash.With_state_hashes.state_hash s, s))
     |> State_hash.Map.of_alist_exn
   in
   t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
-  let new_root_node = {new_root_node with breadcrumb= new_root_breadcrumb} in
+  let new_root_node = { new_root_node with breadcrumb = new_root_breadcrumb } in
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
   (* rewrite the root pointer to the new root hash *)
@@ -517,7 +524,7 @@ let calculate_diffs t breadcrumb =
       in
       let root_node = Hashtbl.find_exn t.table t.root in
       let current_best_tip = best_tip t in
-      let diffs = [Full.E.E (New_node (Full breadcrumb))] in
+      let diffs = [ Full.E.E (New_node (Full breadcrumb)) ] in
       (* check if new breadcrumb extends frontier to longer than k *)
       let diffs =
         if parent_node.length + 1 - root_node.length > t.max_length then
@@ -537,7 +544,8 @@ let calculate_diffs t breadcrumb =
                ~logger:
                  (Logger.extend t.logger
                     [ ( "selection_context"
-                      , `String "comparing new breadcrumb to best tip" ) ]))
+                      , `String "comparing new breadcrumb to best tip" )
+                    ] ) )
             `Take
         then Full.E.E (Best_tip_changed breadcrumb_hash) :: diffs
         else diffs
@@ -553,23 +561,32 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
       let parent_hash = Breadcrumb.parent_hash breadcrumb in
       let parent_node = Hashtbl.find_exn t.table parent_hash in
-      let node = {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1} in
+      let node =
+        { Node.breadcrumb
+        ; successor_hashes = []
+        ; length = parent_node.length + 1
+        }
+      in
       ( match Hashtbl.add t.table ~key:breadcrumb_hash ~data:node with
-        | `Duplicate ->
-          [%log' error t.logger] "Same block ($state_hash) was applied to transition frontier more than once; this could indicate that you are running multiple block producers with the same keypair"
-            ~metadata:[("state_hash", State_hash.to_yojson breadcrumb_hash)]
-        | `Ok ->
+      | `Duplicate ->
+          [%log' error t.logger]
+            "Same block ($state_hash) was applied to transition frontier more \
+             than once; this could indicate that you are running multiple \
+             block producers with the same keypair"
+            ~metadata:[ ("state_hash", State_hash.to_yojson breadcrumb_hash) ]
+      | `Ok ->
           Hashtbl.set t.table ~key:parent_hash
             ~data:
               { parent_node with
-                successor_hashes= breadcrumb_hash :: parent_node.successor_hashes
+                successor_hashes =
+                  breadcrumb_hash :: parent_node.successor_hashes
               } ) ;
       ((), None)
   | Best_tip_changed new_best_tip ->
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
-  | Root_transitioned {new_root; garbage= Full garbage; _} ->
+  | Root_transitioned { new_root; garbage = Full garbage; _ } ->
       let new_root_hash = (Root_data.Limited.hashes new_root).state_hash in
       let old_root_hash = t.root in
       let new_root_protocol_states =
@@ -609,7 +626,12 @@ module Metrics = struct
 
   let empty_blocks_at_best_tip t =
     let rec go acc b =
-      if not (List.is_empty ( Breadcrumb.validated_transition b |> Mina_block.Validated.valid_commands)) then acc
+      if
+        not
+          (List.is_empty
+             ( Breadcrumb.validated_transition b
+             |> Mina_block.Validated.valid_commands ) )
+      then acc
       else match parent t b with None -> acc | Some b -> go (acc + 1) b
     in
     go 0 (best_tip t)
@@ -631,15 +653,14 @@ module Metrics = struct
 
   let has_coinbase b =
     let d1, d2 =
-    ( Breadcrumb.block b
-    |> Mina_block.body
-    |> Mina_block.Body.staged_ledger_diff )
+      ( Breadcrumb.block b |> Mina_block.body
+      |> Mina_block.Body.staged_ledger_diff )
         .diff
     in
     match (d1.coinbase, d2) with
-    | Zero, None | Zero, Some {coinbase= Zero; _} ->
+    | Zero, None | Zero, Some { coinbase = Zero; _ } ->
         false
-    | Zero, Some {coinbase= One _; _} | One _, _ | Two _, _ ->
+    | Zero, Some { coinbase = One _; _ } | One _, _ | Two _, _ ->
         true
 
   let intprop f b = Unsigned.UInt32.to_int (f (Breadcrumb.consensus_state b))
@@ -677,8 +698,8 @@ module Metrics = struct
     else Float.of_int length_change /. Float.of_int slot_change
 end
 
-let update_metrics_with_diff (type mutant) t
-    (diff : (Diff.full, mutant) Diff.t) : unit =
+let update_metrics_with_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
+    : unit =
   let open Metrics in
   match diff with
   | New_node (Full b) ->
@@ -687,17 +708,19 @@ let update_metrics_with_diff (type mutant) t
         Counter.inc_one Transition_frontier.total_breadcrumbs ;
         Gauge.set Transition_frontier.accepted_block_slot_time_sec
           (slot_time t b |> slot_time_to_offset_time_span))
-  | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
+  | Root_transitioned { garbage = Full garbage_breadcrumbs; _ } ->
       let new_root_breadcrumb = root t in
       Mina_metrics.(
         let num_breadcrumbs_removed =
           Int.to_float (1 + List.length garbage_breadcrumbs)
         in
         let num_finalized_staged_txns =
-          Int.to_float (List.length (Breadcrumb.validated_transition new_root_breadcrumb |> Mina_block.Validated.valid_commands ))
+          Int.to_float
+            (List.length
+               ( Breadcrumb.validated_transition new_root_breadcrumb
+               |> Mina_block.Validated.valid_commands ) )
         in
-        Gauge.dec Transition_frontier.active_breadcrumbs
-          num_breadcrumbs_removed ;
+        Gauge.dec Transition_frontier.active_breadcrumbs num_breadcrumbs_removed ;
         Gauge.set Transition_frontier.recently_finalized_staged_txns
           num_finalized_staged_txns ;
         Counter.inc Transition_frontier.finalized_staged_txns
@@ -740,7 +763,10 @@ let update_metrics_with_diff (type mutant) t
       in
       Mina_metrics.(
         Gauge.set Transition_frontier.best_tip_user_txns
-          (Int.to_float (List.length (Breadcrumb.validated_transition best_tip |> Mina_block.Validated.valid_commands ))) ;
+          (Int.to_float
+             (List.length
+                ( Breadcrumb.validated_transition best_tip
+                |> Mina_block.Validated.valid_commands ) ) ) ;
         if is_recent_block then
           Gauge.set Transition_frontier.best_tip_coinbase
             (if has_coinbase best_tip then 1. else 0.) ;
@@ -777,16 +803,15 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
           | None ->
               prev_root
           | Some state_hash ->
-              Some {state_hash}
+              Some { state_hash }
         in
-        (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
-    )
+        (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants) )
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
   if
     (not
-       ([%equal: [`Enabled of _ | `Disabled]] enable_epoch_ledger_sync
-          `Disabled))
+       ([%equal: [ `Enabled of _ | `Disabled ]] enable_epoch_ledger_sync
+          `Disabled ) )
     && not has_long_catchup_job
   then
     Debug_assert.debug_assert (fun () ->
@@ -795,15 +820,15 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
             ~constants:consensus_constants
             ~consensus_state:
               (Breadcrumb.consensus_state
-                 (Hashtbl.find_exn t.table t.best_tip).breadcrumb)
+                 (Hashtbl.find_exn t.table t.best_tip).breadcrumb )
             ~local_state:t.consensus_local_state
         with
         | Some jobs ->
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
             if local_state_was_synced_at_start then (
               [%log' fatal t.logger]
-                "after lock transition, the best tip consensus state is out \
-                 of sync with the local state -- bug in either \
+                "after lock transition, the best tip consensus state is out of \
+                 sync with the local state -- bug in either \
                  required_local_state_sync or frontier_root_transition."
                 ~metadata:
                   [ ( "sync_jobs"
@@ -811,7 +836,8 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
                   ; ( "local_state"
                     , Consensus.Data.Local_state.to_yojson
                         t.consensus_local_state )
-                  ; ("tf_viz", `String (visualize_to_string t)) ] ;
+                  ; ("tf_viz", `String (visualize_to_string t))
+                  ] ;
               failwith
                 "local state desynced after applying diffs to full frontier" )
         | None ->
@@ -819,6 +845,10 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
   `New_root_and_diffs_with_mutants (new_root, diffs_with_mutants)
 
 module For_tests = struct
+  open Core_kernel
+  open Mina_base
+  open Signature_lib
+
   let find_protocol_state_exn t hash =
     match find_protocol_state t hash with
     | Some s ->
@@ -827,7 +857,7 @@ module For_tests = struct
         failwith
           (sprintf
              !"Protocol state with hash %s not found"
-             (State_body_hash.to_yojson hash |> Yojson.Safe.to_string))
+             (State_body_hash.to_yojson hash |> Yojson.Safe.to_string) )
 
   let equal t1 t2 =
     let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
@@ -844,10 +874,96 @@ module For_tests = struct
           let%map successors2 = get_successor_nodes t2 breadcrumb2 in
           List.equal State_hash.equal
             (successors1 |> List.sort ~compare:State_hash.compare)
-            (successors2 |> List.sort ~compare:State_hash.compare))
+            (successors2 |> List.sort ~compare:State_hash.compare) )
          |> Option.value_map ~default:false ~f:Fn.id
     in
     List.equal equal_breadcrumb
       (all_breadcrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
+
+  let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+  let constraint_constants = precomputed_values.constraint_constants
+
+  let ledger_depth = constraint_constants.ledger_depth
+
+  let proof_level = precomputed_values.proof_level
+
+  let logger = Logger.null ()
+
+  let verifier () =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Verifier.create ~logger ~proof_level ~constraint_constants
+          ~conf_dir:None
+          ~pids:(Child_processes.Termination.create_pid_table ()) )
+
+  module Genesis_ledger = (val precomputed_values.genesis_ledger)
+
+  let accounts_with_secret_keys = Lazy.force Genesis_ledger.accounts
+
+  let max_length = 5
+
+  let gen_breadcrumb ~verifier =
+    Breadcrumb.For_tests.gen ~logger ~precomputed_values ~verifier
+      ?trust_system:None ~accounts_with_secret_keys
+
+  let gen_breadcrumb_seq ~verifier =
+    Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ~verifier
+      ?trust_system:None ~accounts_with_secret_keys
+
+  module Transfer =
+    Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)
+
+  let create_frontier () =
+    let open Core in
+    let epoch_ledger_location =
+      Filename.temp_dir_name ^/ "epoch_ledger"
+      ^ (Uuid_unix.create () |> Uuid.to_string)
+    in
+    let consensus_local_state =
+      Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+        ~genesis_ledger:Genesis_ledger.t
+        ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+        ~epoch_ledger_location ~ledger_depth:constraint_constants.ledger_depth
+        ~genesis_state_hash:
+          (State_hash.With_state_hashes.state_hash
+             precomputed_values.protocol_state_with_hashes )
+    in
+    let root_ledger =
+      Or_error.ok_exn
+        (Transfer.transfer_accounts
+           ~src:(Lazy.force Genesis_ledger.t)
+           ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
+    in
+    Protocol_version.(set_current zero) ;
+    let root_data =
+      let open Root_data in
+      { transition =
+          Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
+      ; staged_ledger =
+          Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+      ; protocol_states = []
+      }
+    in
+    let persistent_root =
+      Persistent_root.create ~logger
+        ~directory:(Filename.temp_file "snarked_ledger" "")
+        ~ledger_depth
+    in
+    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    let persistent_root_instance =
+      Persistent_root.create_instance_exn persistent_root
+    in
+    create ~logger ~root_data
+      ~root_ledger:
+        (Mina_ledger.Ledger.Any_ledger.cast
+           (module Mina_ledger.Ledger)
+           root_ledger )
+      ~consensus_local_state ~max_length ~precomputed_values
+      ~time_controller:(Block_time.Controller.basic ~logger)
+      ~persistent_root_instance
+
+  let clean_up_persistent_root ~frontier =
+    let persistent_root_instance = persistent_root_instance frontier in
+    Persistent_root.Instance.destroy persistent_root_instance
 end
