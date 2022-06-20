@@ -376,7 +376,8 @@ let merkle_root_after_parties_exn ~constraint_constants ~txn_state_view ledger
   let _applied =
     Or_error.ok_exn
       (apply_parties_unchecked ~constraint_constants ~state_view:txn_state_view
-         masked_ledger parties )
+         masked_ledger
+         (Parties.Valid.forget parties) )
   in
   let root = merkle_root masked_ledger in
   ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;

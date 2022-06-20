@@ -96,8 +96,8 @@ let verify_heterogenous (ts : Instance.t list) =
         let tick_combined_evals =
           Plonk_checks.evals_of_split_evals
             (module Tick.Field)
-            (Double.map evals.evals ~f:(fun e -> e.evals))
-            ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
+            evals.evals.evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
+          |> Plonk_types.Evals.to_in_circuit
         in
         let tick_domain =
           Plonk_checks.domain
@@ -148,17 +148,13 @@ let verify_heterogenous (ts : Instance.t list) =
           in
           (absorb sponge, squeeze)
         in
-        let absorb_evals
-            { Plonk_types.All_evals.With_public_input.public_input = x_hat
-            ; evals = e
-            } =
-          let xs, ys = Plonk_types.Evals.to_vectors e in
-          List.iter
-            Vector.([| x_hat |] :: (to_list xs @ to_list ys))
-            ~f:(Array.iter ~f:absorb)
-        in
-        Double.(iter ~f:absorb_evals evals.evals) ;
-        absorb evals.ft_eval1 ;
+        ( absorb evals.ft_eval1 ;
+          let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
+          let x1, x2 = evals.evals.public_input in
+          absorb x1 ;
+          absorb x2 ;
+          List.iter xs ~f:(fun (x1, x2) ->
+              Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
         let xi_actual = squeeze () in
         let r_actual = squeeze () in
         Timer.clock __LOC__ ;
@@ -172,8 +168,7 @@ let verify_heterogenous (ts : Instance.t list) =
           Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
             ~domain:tick_domain ~ft_eval1:evals.ft_eval1
             ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-            (Double.map evals.evals ~f:(fun e -> e.evals))
-            ~x_hat:(Double.map evals.evals ~f:(fun e -> e.public_input))
+            evals.evals
             ~old_bulletproof_challenges:
               (Vector.map ~f:Ipa.Step.compute_challenges
                  statement.pass_through.old_bulletproof_challenges )
@@ -273,7 +268,8 @@ let verify_heterogenous (ts : Instance.t list) =
       eprintf !"bad verify: %s\n%!" e ;
       false
 
-let verify (type a n) (max_proofs_verified : (module Nat.Intf with type n = n))
+let verify (type a return_typ n)
+    (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous

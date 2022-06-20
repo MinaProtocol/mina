@@ -83,9 +83,7 @@ module Worker_state = struct
                        [] )
                in
                let%map all_verified =
-                 Pickles.Side_loaded.verify
-                   ~value_to_field_elements:Zkapp_statement.to_field_elements
-                   to_verify
+                 Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
                in
                List.map cs ~f:(function
                  | `Valid c ->

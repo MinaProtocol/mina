@@ -205,6 +205,90 @@ let%test_module "Transaction union tests" =
 
     let account_fee = Fee.to_int constraint_constants.account_creation_fee
 
+    let test_transaction ~constraint_constants ?txn_global_slot ledger txn =
+      let source = Ledger.merkle_root ledger in
+      let pending_coinbase_stack = Pending_coinbase.Stack.empty in
+      let state_body, state_body_hash =
+        match txn_global_slot with
+        | None ->
+            (state_body, state_body_hash)
+        | Some txn_global_slot ->
+            let state_body =
+              let state =
+                (* NB: The [previous_state_hash] is a dummy, do not use. *)
+                Mina_state.Protocol_state.create
+                  ~previous_state_hash:Tick0.Field.zero ~body:state_body
+              in
+              let consensus_state_at_slot =
+                Consensus.Data.Consensus_state.Value.For_tests
+                .with_global_slot_since_genesis
+                  (Mina_state.Protocol_state.consensus_state state)
+                  txn_global_slot
+              in
+              Mina_state.Protocol_state.(
+                create_value
+                  ~previous_state_hash:(previous_state_hash state)
+                  ~genesis_state_hash:(genesis_state_hash state)
+                  ~blockchain_state:(blockchain_state state)
+                  ~consensus_state:consensus_state_at_slot
+                  ~constants:
+                    (Protocol_constants_checked.value_of_t
+                       Genesis_constants.compiled.protocol ))
+                .body
+            in
+            let state_body_hash =
+              Mina_state.Protocol_state.Body.hash state_body
+            in
+            (state_body, state_body_hash)
+      in
+      let txn_state_view : Zkapp_precondition.Protocol_state.View.t =
+        Mina_state.Protocol_state.Body.view state_body
+      in
+      let mentioned_keys, pending_coinbase_stack_target =
+        let pending_coinbase_stack =
+          Pending_coinbase.Stack.push_state state_body_hash
+            pending_coinbase_stack
+        in
+        match (txn : Transaction.Valid.t) with
+        | Command (Signed_command uc) ->
+            ( Signed_command.accounts_accessed (uc :> Signed_command.t)
+            , pending_coinbase_stack )
+        | Command (Parties _) ->
+            failwith "Parties commands not yet supported"
+        | Fee_transfer ft ->
+            (Fee_transfer.receivers ft, pending_coinbase_stack)
+        | Coinbase cb ->
+            ( Coinbase.accounts_accessed cb
+            , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
+      in
+      let sok_signer =
+        match to_preunion (Transaction.forget txn) with
+        | `Transaction t ->
+            (Transaction_union.of_transaction t).signer |> Public_key.compress
+        | `Parties c ->
+            Account_id.public_key (Parties.fee_payer c)
+      in
+      let sparse_ledger =
+        Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
+      in
+      let _applied =
+        Or_error.ok_exn
+        @@ Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
+             (Transaction.forget txn)
+      in
+      let target = Ledger.merkle_root ledger in
+      let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
+      Transaction_snark.check_transaction ~constraint_constants ~sok_message
+        ~source ~target ~init_stack:pending_coinbase_stack
+        ~pending_coinbase_stack_state:
+          { Transaction_snark.Pending_coinbase_stack_state.source =
+              pending_coinbase_stack
+          ; target = pending_coinbase_stack_target
+          }
+        ~zkapp_account1:None ~zkapp_account2:None
+        { transaction = txn; block_data = state_body }
+        (unstage @@ Sparse_ledger.handler sparse_ledger)
+
     let%test_unit "account creation fee - user commands" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = U.Wallet.random_wallets ~n:3 () |> Array.to_list in
@@ -518,11 +602,12 @@ let%test_module "Transaction union tests" =
               b1, b2 resp.), carryforward the state from a previous \
               transaction t0 in b1" =
       let state_hash_and_body1 =
+        let open Staged_ledger_diff in
         let state_body0 =
           Mina_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-            ~constraint_constants ~consensus_constants
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
         let state_body_hash0 =
@@ -541,10 +626,11 @@ let%test_module "Transaction union tests" =
               transaction t0 in b1" =
       let state_hash_and_body1 =
         let state_body0 =
+          let open Staged_ledger_diff in
           Mina_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-            ~constraint_constants ~consensus_constants
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
         let state_body_hash0 =

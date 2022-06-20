@@ -72,7 +72,10 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       - me_only
   *)
   ; prev_proof_evals :
-      (Impl.Field.t, Impl.Field.t array) Plonk_types.All_evals.t
+      ( Impl.Field.t
+      , Impl.Field.t array
+      , Impl.Boolean.var )
+      Plonk_types.All_evals.In_circuit.t
         (** The evaluations from the step proof that this proof wraps *)
   ; prev_challenges :
       ((Impl.Field.t, Tick.Rounds.n) Vector.t, 'max_proofs_verified) Vector.t
@@ -124,6 +127,8 @@ end
 
 open Core_kernel
 
+let lookup_config : Plonk_types.Lookup_config.t = { lookup = No; runtime = No }
+
 let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
@@ -144,9 +149,7 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
         (Branch_data.typ
            (module Impl)
            ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
-    ; (let lengths = Evaluation_lengths.create ~of_int:Fn.id in
-       Plonk_types.All_evals.typ lengths Field.typ ~default:Field.Constant.zero
-      )
+    ; Plonk_types.All_evals.typ (module Impl) lookup_config
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
     ; Vector.typ Inner_curve.typ max_proofs_verified
     ]
