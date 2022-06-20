@@ -400,6 +400,7 @@ struct
       -> choices:
            (   self:(var, value, max_proofs_verified, branches) Tag.t
             -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+      -> unit
       -> ( prev_valuess
          , widthss
          , heightss
@@ -412,9 +413,8 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ~branches:(module Branches)
-       ~max_proofs_verified:(module Max_proofs_verified) ~name
-       ~constraint_constants ~public_input ~auxiliary_typ ~choices ->
+   fun ~self ~cache ?disk_keys ~branches:(module Branches) ~max_proofs_verified
+       ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -432,13 +432,18 @@ struct
       }
     in
     Timer.start __LOC__ ;
+    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                         with type n = max_proofs_verified )
+    in
     let T = Max_proofs_verified.eq in
     let choices = choices ~self in
     let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
     let T = Nat.eq_exn prev_varss_n Branches.n in
     let padded, (module Maxes) =
       max_local_max_proofs_verifieds
-        (module Max_proofs_verified)
+        ( module struct
+          include Max_proofs_verified
+        end )
         prev_varss_length choices ~self:self.id
     in
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
@@ -458,8 +463,7 @@ struct
             x :: f xs
       in
       M.f full_signature prev_varss_n prev_varss_length ~self
-        ~choices:(f choices)
-        ~max_proofs_verified:(module Max_proofs_verified)
+        ~choices:(f choices) ~max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let module Branch_data = struct
@@ -636,8 +640,7 @@ struct
       in
       Timer.clock __LOC__ ;
       Wrap_main.wrap_main full_signature prev_varss_length step_vks
-        proofs_verifieds step_domains prev_wrap_domains
-        (module Max_proofs_verified)
+        proofs_verifieds step_domains prev_wrap_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
@@ -687,7 +690,12 @@ struct
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
-    let module S = Step.Make (Arg_var) (Arg_value) (Max_proofs_verified) in
+    let module S =
+      Step.Make (Arg_var) (Arg_value)
+        (struct
+          include Max_proofs_verified
+        end)
+    in
     let (typ : (var, value) Impls.Step.Typ.t) =
       match public_input with
       | Input typ ->
@@ -807,7 +815,7 @@ struct
     let data : _ Types_map.Compiled.t =
       { branches = Branches.n
       ; proofs_verifieds
-      ; max_proofs_verified = (module Max_proofs_verified)
+      ; max_proofs_verified
       ; public_input = typ
       ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
       ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
@@ -998,8 +1006,9 @@ let compile_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~cache ?disk_keys ~branches ~max_proofs_verified ~name
-      ~public_input ~auxiliary_typ ~constraint_constants ~choices:(fun ~self ->
-        conv_irs (choices ~self) )
+      ~public_input ~auxiliary_typ ~constraint_constants
+      ~choices:(fun ~self -> conv_irs (choices ~self))
+      ()
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
@@ -1025,8 +1034,19 @@ let compile_promise :
     type return_type = ret_value
 
     module Max_local_max_proofs_verified = Max_proofs_verified
-    module Max_proofs_verified_vec = Nvector (Max_proofs_verified)
-    include Proof.Make (Max_proofs_verified) (Max_local_max_proofs_verified)
+
+    module Max_proofs_verified_vec = Nvector (struct
+      include Max_proofs_verified
+    end)
+
+    include
+      Proof.Make
+        (struct
+          include Max_proofs_verified
+        end)
+        (struct
+          include Max_local_max_proofs_verified
+        end)
 
     let id = wrap_disk_key
 
@@ -1034,7 +1054,9 @@ let compile_promise :
 
     let verify_promise ts =
       verify_promise
-        (module Max_proofs_verified)
+        ( module struct
+          include Max_proofs_verified
+        end )
         (module Value)
         (Lazy.force verification_key)
         ts

@@ -292,9 +292,9 @@ module Snark_worker = struct
     | `Off _ ->
         None
 
-  let replace_key
-      ({ processes = { snark_worker; _ }; config = { logger; _ }; _ } as t)
-      new_key =
+  let replace_key t new_key =
+    let snark_worker = t.processes.snark_worker in
+    let logger = t.config.logger in
     match (snark_worker, new_key) with
     | `Off _, None ->
         [%log info]
