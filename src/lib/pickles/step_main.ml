@@ -153,7 +153,7 @@ let step_main :
            , (Field.t, max_proofs_verified) Vector.t )
            Types.Step.Statement.t )
        Staged.t =
- fun (module Req) (module Max_proofs_verified) ~self_branches ~local_signature
+ fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
      ~proofs_verified ~lte ~public_input ~basic ~self rule ->
   let module T (F : T4) = struct
@@ -247,6 +247,10 @@ let step_main :
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
+        let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                             with type n = max_proofs_verified
+                                         )
+        in
         let T = Max_proofs_verified.eq in
         let prev_statements =
           exists prev_values_typs ~request:(fun () -> Req.Prev_inputs)
@@ -370,7 +374,7 @@ let step_main :
                     ; proofs_verifieds =
                         `Known
                           (Vector.map basic.proofs_verifieds ~f:Field.of_int)
-                    ; max_proofs_verified = (module Max_proofs_verified)
+                    ; max_proofs_verified
                     ; public_input = basic.public_input
                     ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains
