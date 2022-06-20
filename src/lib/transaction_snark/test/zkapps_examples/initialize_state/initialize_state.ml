@@ -95,8 +95,8 @@ let%test_module "Initialize state test" =
       let (), party_proof =
         Async.Thread_safe.block_on_async_exn (fun () ->
             initialize_prover []
-              { transaction = Party.Body.digest party_body
-              ; at_party = Parties.Call_forest.empty
+              { party = Party.Body.digest party_body
+              ; calls = Parties.Call_forest.empty
               } )
 
       let party : Party.Graphql_repr.t =
@@ -116,8 +116,8 @@ let%test_module "Initialize state test" =
             update_state_prover
               ~handler:(Zkapps_initialize_state.update_state_handler new_state)
               []
-              { transaction = Party.Body.digest party_body
-              ; at_party = Parties.Call_forest.empty
+              { party = Party.Body.digest party_body
+              ; calls = Parties.Call_forest.empty
               } )
 
       let party : Party.Graphql_repr.t =

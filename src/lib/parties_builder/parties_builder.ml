@@ -95,8 +95,8 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
     { parties.fee_payer with authorization = fee_payer_signature }
   in
   let other_parties_with_valid_signatures =
-    Parties.Call_forest.mapi parties.other_parties
-      ~f:(fun ndx ({ body; authorization } : Party.t) ->
+    Parties.Call_forest.mapi_with_trees parties.other_parties
+      ~f:(fun _ ({ body; authorization } : Party.t) tree ->
         let authorization_with_valid_signature =
           match authorization with
           | Control.Signature _dummy ->
@@ -121,19 +121,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
               | None ->
                   authorization
               | Some prover ->
-                  let proof_party =
-                    Parties.Call_forest.hash
-                      (List.drop parties.other_parties ndx)
-                  in
-                  let txn_stmt : Zkapp_statement.t =
-                    let commitment =
-                      if body.use_full_commitment then full_tx_commitment
-                      else tx_commitment
-                    in
-                    { transaction = commitment
-                    ; at_party = (proof_party :> Snark_params.Tick.Field.t)
-                    }
-                  in
+                  let txn_stmt = Zkapp_statement.of_tree tree in
                   let handler
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with _ -> respond Unhandled

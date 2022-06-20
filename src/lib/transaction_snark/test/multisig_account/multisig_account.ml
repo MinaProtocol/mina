@@ -362,9 +362,14 @@ let%test_module "multisig_account" =
                 (*FIXME: is this correct? *)
                 Parties.Transaction_commitment.create ~other_parties_hash
               in
-              let at_party = Parties.Call_forest.hash ps in
               let tx_statement : Zkapp_statement.t =
-                { transaction; at_party = (at_party :> Field.t) }
+                { party =
+                    Party.Body.digest
+                      (Parties.add_caller_simple snapp_party_data
+                         Token_id.default )
+                        .body
+                ; calls = (Parties.Digest.Forest.empty :> field)
+                }
               in
               let msg =
                 tx_statement |> Zkapp_statement.to_field_elements

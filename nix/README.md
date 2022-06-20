@@ -4,9 +4,9 @@ Nix is a declarative package manager for Linux, macOS and other
 UNIX-like systems. You can read more about Nix on its [official
 website](https://nixos.org).
 
-Mina can be built using Nix, in multiple ways.
+Mina can be built using Nix, in multiple ways. Follow the steps below to get started and read the [troubleshooting section](#troubleshooting) if you encounter any problem.
 
-## TL;DR installing Nix
+## 1. Install Nix
 
 If you don't already have Nix on your machine, you can install it with
 the following command:
@@ -19,31 +19,13 @@ You may also install Nix from your distribution's official repository;
 Note however that it is preferrable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
-## Note about submodules
-
-Nix will **not** fetch submodules for you. You have to make sure that
-you have the entire mina source code, including submodules, before you
-run any nix commands. This should make sure you have the right
-versions checked out (in most cases):
-
-```
-git submodule sync
-git submodule update --init --recursive
-```
-
-If you don't do this, Nix may not always yell at you right away
-(especially if all the submodule directories are present in the tree
-somehow, but not correctly filled in). It will however fail with a
-strange error during the build, when it fails to find a
-dependency. Make sure you do this!
-
-## Note about Flakes
+## 2. Enable Flakes (optional but recommended)
 
 Mina is packaged using [Nix Flakes](https://nixos.wiki/wiki/Flakes),
 which are an experimental feature of Nix. However, compatibility with
 pre-flake Nix is provided. If you wish to contribute the Nix
 expressions in this repository, or want to get some convenience
-features and speed improvements, it is advisable to enable flakes. For
+features and speed improvements, **it is advisable to enable flakes**. For
 this, you'll want to make sure you're running recent Nix (⩾2.5) and
 have enabled the relevant experimental features, either in
 `/etc/nix/nix.conf` or (recommended) in `~/.config/nix/nix.conf`:
@@ -56,46 +38,32 @@ echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-~/.config
 You can check that your flake support is working by running `nix flake
 metadata github:nixos/nixpkgs` for example.
 
-If you're using flakes, you have to run the `./nix/pin.sh` script to
+## 3. Add a nix registry entry
+
+If you're using flakes (see previous section), **you have to run the `./nix/pin.sh` script** to
 get the `mina` registry entry, since that's the easiest way to enable
 submodules to be available to the build.
 
-## Note about git LFS
+## 4. Use it
 
-If you have git LFS installed and configured on your system, the build may fail with strange errors similar to this:
+### IDE with LSP support (vscode, emacs, (neo)vim, ...)
 
-```
-Downloading docs/res/all_data_structures.dot.png (415 KB)
-Error downloading object: docs/res/all_data_structures.dot.png (fed6771): Smudge error: Error downloading docs/res/all_data_structures.dot.png (fed6771190a9b063246074bbfe3b1fc0ba4240fdc41abcf026d5bc449ca4f9b8): batch request: missing protocol: ""
-
-Errors logged to /tmp/nix-115798-1/lfs/logs/20220121T113801.442266054.log
-Use `git lfs logs last` to view the log.
-error: external filter 'git-lfs filter-process' failed
-fatal: docs/res/all_data_structures.dot.png: smudge filter lfs failed
-error: program 'git' failed with exit code 128
-(use '--show-trace' to show detailed location information)
-```
-
-You can fix this by setting `GIT_LFS_SKIP_SMUDGE=1` env variable, e.g. by running
+Just run
 
 ```
-export GIT_LFS_SKIP_SMUDGE=1
+nix develop mina#with-lsp -c $EDITOR .
 ```
-Before running any `nix` commands.
 
-## "Impure" build
+if you have your `$EDITOR` variable set correctly. Otherwise, replace it with
+the editor you want to edit Mina with.
 
-You can use Nix to only fetch the "system" (native) dependencies of
-Mina, and let `opam`, `cargo` and `go` figure out the relevant
-language-specific dependencies. To do so, run `nix-shell` (or `nix
-develop mina#impure` if you have flakes).
+This command will try to `dune build @check` in `src/app/cli`, in order to get
+type information necessary for the LSP to work. This might take a while, but
+will only happen once. After it's done, you will be dropped in your favourite editor.
 
-It will drop you in a shell with all the relevant libraries and
-binaries available, and show you the instructions for building Mina.
+### "Pure" build
 
-## "Pure" build
-
-You can also use Nix to fetch all the dependencies, and then only use
+You can use Nix to fetch all the dependencies, and then only use
 `dune` as a build system to build Mina itself.
 
 This way, you can build the entirety of Mina inside the Nix sandbox
@@ -108,9 +76,18 @@ you're using flakes). This will drop you in a shell with all
 dependencies, including OCaml, Rust and Go ones available, so the only
 thing you have to do is run `dune build src/app/cli/src/mina.exe`. You
 can also just run `eval "$buildPhase"` to run the same command as
-would be run inside the nix sandbox.
+would be run inside the nix sandbox. Note that `opam` will **not** be available in that shell, since Nix takes over the job of computing and installing dependencies. If you need to modify the opam switch, use the impure build (next section).
+### "Impure" build
 
-## Building a docker image
+You can also use Nix to only fetch the "system" (native) dependencies of
+Mina, and let `opam`, `cargo` and `go` figure out the relevant
+language-specific dependencies. To do so, run `nix-shell` (or `nix
+develop mina#impure` if you have flakes).
+
+It will drop you in a shell with all the relevant libraries and
+binaries available, and show you the instructions for building Mina.
+
+### Building a docker image
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we
 can use its result to produce other useful artifacts with Nix. For
@@ -122,9 +99,11 @@ can load the image using `docker load -i result`, then note the tag it
 outputs. You can then run Mina from this docker image with `docker run
 mina:<tag> mina.exe <args>`.
 
-## Contributing to Nix expressions
 
-You probably want to [enable flakes](#note-about-flakes) if you plan
+## Miscellaneous
+### Contributing to Nix expressions
+
+You probably want to [enable flakes](#2-enable-flakes-optional-but-recommended) if you plan
 to contribute to the Nix expressions here.
 
 Most Nix things (including this README ☺) are located inside the
@@ -151,3 +130,47 @@ nixpkgs with some overlays applied (see
 [./overlay.nix](./overlay.nix)). All the dependencies are then
 provided to the final Mina derivation. See [./ocaml.nix](./ocaml.nix)
 for more details.
+
+## Troubleshooting
+
+
+### Submodules
+
+Nix will **not** fetch submodules for you. You have to make sure that
+you have the entire mina source code, including submodules, before you
+run any nix commands. This should make sure you have the right
+versions checked out (in most cases):
+
+```
+git submodule sync
+git submodule update --init --recursive
+```
+
+If you don't do this, Nix may not always yell at you right away
+(especially if all the submodule directories are present in the tree
+somehow, but not correctly filled in). It will however fail with a
+strange error during the build, when it fails to find a
+dependency. Make sure you do this!
+
+### git LFS
+
+If you have git LFS installed and configured on your system, the build may fail with strange errors similar to this:
+
+```
+Downloading docs/res/all_data_structures.dot.png (415 KB)
+Error downloading object: docs/res/all_data_structures.dot.png (fed6771): Smudge error: Error downloading docs/res/all_data_structures.dot.png (fed6771190a9b063246074bbfe3b1fc0ba4240fdc41abcf026d5bc449ca4f9b8): batch request: missing protocol: ""
+
+Errors logged to /tmp/nix-115798-1/lfs/logs/20220121T113801.442266054.log
+Use `git lfs logs last` to view the log.
+error: external filter 'git-lfs filter-process' failed
+fatal: docs/res/all_data_structures.dot.png: smudge filter lfs failed
+error: program 'git' failed with exit code 128
+(use '--show-trace' to show detailed location information)
+```
+
+You can fix this by setting `GIT_LFS_SKIP_SMUDGE=1` env variable, e.g. by running
+
+```
+export GIT_LFS_SKIP_SMUDGE=1
+```
+Before running any `nix` commands.
