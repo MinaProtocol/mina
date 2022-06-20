@@ -45,14 +45,7 @@ let payload_of_fee_payer_party_js
     |> Mina_numbers.Account_nonce.of_string
   in
   { Party.Fee_payer.body =
-      { public_key = fee_payer_pk
-      ; update = Party.Update.noop
-      ; fee
-      ; events = []
-      ; sequence_events = []
-      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-      ; nonce
-      }
+      { public_key = fee_payer_pk; fee; valid_until = None; nonce }
   ; authorization = Signature.dummy
   }
 
