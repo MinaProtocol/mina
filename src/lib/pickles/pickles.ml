@@ -403,6 +403,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       -> choices:
            (   self:(A.t, A_value.t, max_branching, branches) Tag.t
             -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+      -> unit
       -> ( prev_valuess
          , widthss
          , heightss
@@ -412,9 +413,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ~branches:(module Branches)
-       ~max_branching:(module Max_branching) ~name ~constraint_constants ~typ
-       ~choices ->
+   fun ~self ~cache ?disk_keys ~branches:(module Branches) ~max_branching ~name
+       ~constraint_constants ~typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -432,13 +432,18 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       }
     in
     Timer.start __LOC__ ;
+    let module Max_branching = ( val max_branching : Nat.Add.Intf
+                                   with type n = max_branching )
+    in
     let T = Max_branching.eq in
     let choices = choices ~self in
     let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
     let T = Nat.eq_exn prev_varss_n Branches.n in
     let padded, (module Maxes) =
       max_local_max_branchings
-        (module Max_branching)
+        ( module struct
+          include Max_branching
+        end )
         prev_varss_length choices ~self:self.id
     in
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
@@ -454,8 +459,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             x :: f xs
       in
       M.f full_signature prev_varss_n prev_varss_length ~self
-        ~choices:(f choices)
-        ~max_branching:(module Max_branching)
+        ~choices:(f choices) ~max_branching
     in
     Timer.clock __LOC__ ;
     let module Branch_data = struct
@@ -622,8 +626,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       Timer.clock __LOC__ ;
       Wrap_main.wrap_main full_signature prev_varss_length step_vks step_widths
-        step_domains prev_wrap_domains
-        (module Max_branching)
+        step_domains prev_wrap_domains max_branching
     in
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
@@ -668,7 +671,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
-    let module S = Step.Make (A) (A_value) (Max_branching) in
+    let module S =
+      Step.Make (A) (A_value)
+        (struct
+          include Max_branching
+        end)
+    in
     let provers =
       let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
       let f :
@@ -770,7 +778,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let data : _ Types_map.Compiled.t =
       { branches = Branches.n
       ; branchings = step_widths
-      ; max_branching = (module Max_branching)
+      ; max_branching
       ; typ
       ; value_to_field_elements = A_value.to_field_elements
       ; var_to_field_elements = A.to_field_elements
@@ -926,7 +934,9 @@ let compile :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~cache ?disk_keys ~branches ~max_branching ~name ~typ
-      ~constraint_constants ~choices:(fun ~self -> conv_irs (choices ~self))
+      ~constraint_constants
+      ~choices:(fun ~self -> conv_irs (choices ~self))
+      ()
   in
   let (module Max_branching) = max_branching in
   let T = Max_branching.eq in
@@ -934,8 +944,19 @@ let compile :
     type statement = A_value.t
 
     module Max_local_max_branching = Max_branching
-    module Max_branching_vec = Nvector (Max_branching)
-    include Proof.Make (Max_branching) (Max_local_max_branching)
+
+    module Max_branching_vec = Nvector (struct
+      include Max_branching
+    end)
+
+    include
+      Proof.Make
+        (struct
+          include Max_branching
+        end)
+        (struct
+          include Max_local_max_branching
+        end)
 
     let id = wrap_disk_key
 
@@ -943,7 +964,9 @@ let compile :
 
     let verify ts =
       verify
-        (module Max_branching)
+        ( module struct
+          include Max_branching
+        end )
         (module A_value)
         (Lazy.force verification_key)
         ts
