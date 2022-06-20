@@ -3,10 +3,10 @@
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:df7043f51c884dfb39caf8a40e6569e30bfdd4fa0636e19806f47d079b63d074",
-  minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:df7043f51c884dfb39caf8a40e6569e30bfdd4fa0636e19806f47d079b63d074",
-  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:ac1b2446d9115587b28d7e42f8863f2fd3891d27d5fb2ff7b98bbe4e27c5f145",
-  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:ec496e26be7430bbbf02327bdc74e2e247c1ceae894c7e31d77c238cdb1d4072",
+  minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:37d8b7f1a96fda041c4d27d01e35d808756d763a577927a9b17120377d1cbc8e",
+  minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:37d8b7f1a96fda041c4d27d01e35d808756d763a577927a9b17120377d1cbc8e",
+  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:74c495dc1fb2d92bb070228f49862a7df2b3c9e7c4acc91336ae45693b18c277",
+  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:7b87afb98d55233476c59ff43e5eaf33f4df0d4be445125fe740dcfd0f7ae58f",
   delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:8ca5880845514ef56a36bf766a0f9de96e6200d61b51f80d9f684a0ec9c031f4",
   elixirToolchain = "elixir:1.10-alpine",
   rustToolchain = "codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3",
