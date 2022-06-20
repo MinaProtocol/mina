@@ -95,8 +95,12 @@ toc();
 tic("verify transaction proof");
 let parties = JSON.parse(partiesJsonInitialize);
 let proof = parties.otherParties[0].authorization.proof;
-let statement = Ledger.transactionStatement(partiesJsonInitialize, 0);
-let ok = await Ledger.verifyPartyProof(statement, proof, verificationKey.data);
+let publicInput = Ledger.zkappPublicInput(partiesJsonInitialize, 0);
+let ok = await Ledger.verifyPartyProof(
+  publicInput,
+  proof,
+  verificationKey.data
+);
 toc();
 console.log("did proof verify?", ok);
 if (!ok) throw Error("proof didn't verify");

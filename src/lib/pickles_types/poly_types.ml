@@ -34,3 +34,8 @@ end
 module type T5 = sig
   type (_, _, _, _, _) t
 end
+
+(** Order-6 type functions (6 type parameters). *)
+module type T6 = sig
+  type (_, _, _, _, _, _) t
+end
