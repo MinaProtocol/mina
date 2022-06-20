@@ -395,6 +395,7 @@ struct
       -> choices:
            (   self:(var, value, max_proofs_verified, branches) Tag.t
             -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+      -> unit
       -> ( prev_valuess
          , widthss
          , heightss
