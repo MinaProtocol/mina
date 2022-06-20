@@ -24,7 +24,7 @@
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))
- (flags -short-paths -g -w @a-4-29-34-40-41-42-44-45-48-58-59-60))
+ (flags -short-paths -g -w @a-4-29-34-40-41-42-44-45-48-58-59-60-69))
 
 (executable
  (package client_sdk)
@@ -50,4 +50,4 @@
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_custom_printf))
- (flags -short-paths -g -w @a-4-29-34-40-41-42-44-45-48-58-59-60))
+ (flags -short-paths -g -w @a-4-29-34-40-41-42-44-45-48-58-59-60-69))
