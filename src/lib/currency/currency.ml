@@ -409,7 +409,7 @@ end = struct
 
     let magnitude { magnitude; _ } = magnitude
 
-    let zero = create ~magnitude:zero ~sgn:Sgn.Pos
+    let zero : t = create ~magnitude:zero ~sgn:Sgn.Pos
 
     let gen =
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
@@ -464,7 +464,7 @@ end = struct
       if Unsigned.(equal zero t.magnitude) then zero
       else { t with sgn = Sgn.negate t.sgn }
 
-    let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
+    let of_unsigned magnitude : t = create ~magnitude ~sgn:Sgn.Pos
 
     let ( + ) = add
 

@@ -105,7 +105,7 @@ module Job_view = struct
                   ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_r)
                   ]
               ] )
-        ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase)
+        ; ("Supply Increase", Currency.Amount.Signed.to_yojson s.supply_increase)
         ]
     in
     let job_to_yojson =
@@ -259,7 +259,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
       in
       let%map fee_excess = Fee_excess.combine s.fee_excess s'.fee_excess
       and supply_increase =
-        Amount.add s.supply_increase s'.supply_increase
+        Amount.Signed.add s.supply_increase s'.supply_increase
         |> option "Error adding supply_increases"
       and _valid_pending_coinbase_stack =
         if
