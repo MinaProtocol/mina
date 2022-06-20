@@ -1,10 +1,12 @@
 {
-  description = "Mina, a cryptocurrency with a lightweight, constant-size blockchain";
+  description =
+    "Mina, a cryptocurrency with a lightweight, constant-size blockchain";
   nixConfig = {
     allow-import-from-derivation = "true";
     extra-substituters = [ "https://storage.googleapis.com/mina-nix-cache" ];
-    extra-trusted-public-keys =
-      [ "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c=" ];
+    extra-trusted-public-keys = [
+      "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+    ];
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
@@ -58,7 +60,8 @@
       };
       pipeline = with flake-buildkite-pipeline.lib; {
         steps = flakeSteps {
-          pushToBinaryCaches = [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
+          pushToBinaryCaches =
+            [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
           signWithKeys = [ "/var/secrets/nix-cache-key.sec" ];
           commonExtraStepConfig = {
             agents = [ "nix" ];
@@ -217,7 +220,18 @@
         packages.default = ocamlPackages.mina;
 
         devShell = ocamlPackages.mina-dev;
-        devShells.default = ocamlPackages.mina-dev;
+        devShells.default = self.devShell.${system};
+
+        devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          nativeBuildInputs = oa.nativeBuildInputs
+            ++ [ ocamlPackages.ocaml-lsp-server ];
+          shellHook = ''
+            # TODO: dead code doesn't allow us to have nice things
+            pushd src/app/cli
+            dune build @check
+            popd
+          '';
+        });
 
         packages.impure-shell = import ./nix/impure-shell.nix pkgs;
         devShells.impure = import ./nix/impure-shell.nix pkgs;
