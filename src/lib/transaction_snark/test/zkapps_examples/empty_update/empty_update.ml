@@ -28,7 +28,7 @@ let tag, _, p_module, Pickles.Provers.[ prover ] =
     (module Statement)
     ~public_input:(Output Zkapp_statement.typ)
     ~branches:(module Nat.N1)
-    ~max_proofs_verified:(module Nat.N0) (* You have to put 2 here... *)
+    ~max_proofs_verified:(module Nat.N0)
     ~name:"empty_update"
     ~constraint_constants:
       (Genesis_constants.Constraint_constants.to_snark_keys_header
