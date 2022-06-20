@@ -26,6 +26,7 @@ module Tick_field_sponge = Tick_field_sponge
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
+module Types_map = Types_map
 module Dirty = Dirty
 module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
