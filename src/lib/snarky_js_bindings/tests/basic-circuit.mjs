@@ -10,6 +10,7 @@ let FieldArrayTyp = (size) => ({
   sizeInFields: () => size,
   toFields: (f) => f,
   ofFields: (f) => f,
+  check: () => {},
 });
 class Main extends Circuit {
   static snarkyMain(preimage, [hash]) {
