@@ -2,6 +2,8 @@ open Core_kernel
 
 let max_log_line_length = 1 lsl 20
 
+let max_log_line_length = 1 lsl 20
+
 module Level = struct
   type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
   [@@deriving sexp, equal, compare, show { with_path = false }, enumerate]
