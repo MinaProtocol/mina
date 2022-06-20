@@ -2048,10 +2048,10 @@ module Block_and_internal_command = struct
                  (block_id,
                  internal_command_id,
                  sequence_no,
-                 secondary_sequence_no
+                 secondary_sequence_no,
                  status,
                  failure_reason)
-               VALUES (?, ?, ?, ?::transaction_status, ?)
+               VALUES (?, ?, ?, ?, ?::transaction_status, ?)
          |sql} )
       { block_id
       ; internal_command_id
@@ -2774,10 +2774,18 @@ module Block = struct
                         match status with
                         | Applied ->
                             (applied_str, None)
-                        | Failed failures ->
+                        | Failed failures -> (
                             (* for a single fee transfer, there's exactly one failure *)
-                            ( failed_str
-                            , Some (List.concat failures |> List.hd_exn) )
+                            match failures with
+                            | [ [ failure ] ] ->
+                                (failed_str, Some failure)
+                            | _ ->
+                                failwithf
+                                  !"Invalid failure status %{sexp: \
+                                    Transaction_status.Failure.Collection.t} \
+                                    for fee transfer %{sexp: \
+                                    Mina_base.Fee_transfer.t}"
+                                  failures fee_transfer_bundled () )
                       in
                       [ (id, status) ]
                   | [ id2; id1 ] ->
@@ -2797,13 +2805,20 @@ module Block = struct
                             | [ []; [ failure2 ] ] ->
                                 (applied_status, (failed_str, Some failure2))
                             | _ ->
-                                failwith "Invalid failures for fee transfer" )
+                                failwithf
+                                  !"Invalid failure status %{sexp: \
+                                    Transaction_status.Failure.Collection.t} \
+                                    for fee transfer %{sexp: \
+                                    Mina_base.Fee_transfer.t}"
+                                  failures fee_transfer_bundled () )
                       in
                       [ (id1, status1); (id2, status2) ]
                   | _ ->
-                      failwith
-                        "Unexpected number of single fee transfers in a fee \
-                         transfer transaction"
+                      failwithf
+                        !"Unexpected number of single fee transfers in a fee \
+                          transfer transaction %{sexp: \
+                          Mina_base.Fee_transfer.t}"
+                        fee_transfer_bundled ()
                 in
                 let%map () =
                   Mina_caqti.deferred_result_list_fold
@@ -2822,8 +2837,11 @@ module Block = struct
                 in
                 sequence_no + 1
             | { data = Coinbase coinbase; status } ->
+                let fee_transfer_via_coinbase =
+                  Mina_base.Coinbase.fee_transfer coinbase
+                in
                 let%bind () =
-                  match Mina_base.Coinbase.fee_transfer coinbase with
+                  match fee_transfer_via_coinbase with
                   | None ->
                       return ()
                   | Some { receiver_pk; fee } ->
@@ -2868,16 +2886,25 @@ module Block = struct
                   | Applied ->
                       (applied_str, None)
                   | Failed failures -> (
-                      (* at most two failures in a coinbase transaction First one for the fee transfer and the second for reward transfer*)
-                      match failures with
-                      | [ _; [] ] ->
+                      (* at most two failures in a coinbase transaction First one for the fee transfer (if any) and the second for reward transfer*)
+                      match
+                        (failures, Option.is_none fee_transfer_via_coinbase)
+                      with
+                      | [ [] ], true ->
                           applied_status
-                      | [ _; [ failure2 ] ] ->
+                      | [ _; [] ], false ->
+                          applied_status
+                      | [ [ failure2 ] ], true ->
+                          (failed_str, Some failure2)
+                      | [ _; [ failure2 ] ], false ->
                           (failed_str, Some failure2)
                       | _ ->
-                          failwith
-                            "Invalid failure status for reward transfer in \
-                             coinbase transaction" )
+                          failwithf
+                            !"Invalid failure status %{sexp: \
+                              Transaction_status.Failure.Collection.t} for \
+                              reward transfer in coinbase transaction %{sexp: \
+                              Mina_base.Coinbase.t}"
+                            failures coinbase () )
                 in
                 let%map () =
                   Block_and_internal_command.add
