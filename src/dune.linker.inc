@@ -5,7 +5,7 @@
 (rule
   (target dune-linker)
   (enabled_if %{bin-available:lld})
-  (action (with-stdout-to dune-linker (echo "-fuse-ld=lld"))))
+  (action (with-stdout-to dune-linker (echo "-ccopt=%{read:dune-linker} -fuse-ld=lld"))))
 
 (rule
   (target dune-linker)

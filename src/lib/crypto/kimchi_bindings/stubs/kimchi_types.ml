@@ -57,8 +57,17 @@ type nonrec 'caml_f proof_evaluations =
 type nonrec 'caml_g poly_comm =
   { unshifted : 'caml_g array; shifted : 'caml_g option }
 
+type nonrec ('caml_g, 'caml_f) recursion_challenge =
+  { chals : 'caml_f array; comm : 'caml_g poly_comm }
+
 type nonrec ('g, 'f) opening_proof =
   { lr : ('g * 'g) array; delta : 'g; z1 : 'f; z2 : 'f; sg : 'g }
+
+type nonrec 'caml_g lookup_commitments =
+  { sorted : 'caml_g poly_comm array
+  ; aggreg : 'caml_g poly_comm
+  ; runtime : 'caml_g poly_comm option
+  }
 
 type nonrec 'caml_g prover_commitments =
   { w_comm :
@@ -79,6 +88,7 @@ type nonrec 'caml_g prover_commitments =
       * 'caml_g poly_comm
   ; z_comm : 'caml_g poly_comm
   ; t_comm : 'caml_g poly_comm
+  ; lookup : 'caml_g lookup_commitments option
   }
 
 type nonrec ('caml_g, 'caml_f) prover_proof =
@@ -87,7 +97,7 @@ type nonrec ('caml_g, 'caml_f) prover_proof =
   ; evals : 'caml_f proof_evaluations * 'caml_f proof_evaluations
   ; ft_eval1 : 'caml_f
   ; public : 'caml_f array
-  ; prev_challenges : ('caml_f array * 'caml_g poly_comm) array
+  ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
   }
 
 type nonrec wire = { row : int; col : int }

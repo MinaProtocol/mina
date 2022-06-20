@@ -26,13 +26,6 @@ end
 
 (* TODO: this is extremely expensive as implemented and needs to be replaced with an extension *)
 let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
-  let open Or_error.Let_syntax in
-  let%map check_cmd =
-    Result.of_option (User_command.check cmd)
-      ~error:(Error.of_string "Invalid signature")
-    |> Result.map ~f:(fun x ->
-           Transaction_hash.User_command_with_valid_signature.create x )
-  in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
   | None ->
@@ -54,8 +47,19 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             List.exists ~f:in_breadcrumb
               (Transition_frontier.all_breadcrumbs transition_frontier)
           then return State.Pending ;
-          if Transaction_pool.Resource_pool.member resource_pool check_cmd then
-            return State.Pending ;
+          (*This is to look for commands in the pool which are valid.
+             Membership check requires only the user command and no other
+             aspect of User_command.Valid.t and so no need to check signatures
+             or extract zkApp verification keys.*)
+          let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                checked_cmd ) =
+            User_command.to_valid_unsafe cmd
+          in
+          if
+            Transaction_pool.Resource_pool.member resource_pool
+              (Transaction_hash.User_command_with_valid_signature.create
+                 checked_cmd )
+          then return State.Pending ;
           State.Unknown )
 
 let%test_module "transaction_status" =
@@ -155,9 +159,8 @@ let%test_module "transaction_status" =
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Checking status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
-                ( Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     (Signed_command user_command) ) ) )
+                (get_status ~frontier_broadcast_pipe ~transaction_pool
+                   (Signed_command user_command) ) ) )
 
     let%test_unit "A pending transaction is either in the transition frontier \
                    or transaction pool, but not in the best path of the \
@@ -178,9 +181,8 @@ let%test_module "transaction_status" =
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
-                Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     (Signed_command user_command)
+                get_status ~frontier_broadcast_pipe ~transaction_pool
+                  (Signed_command user_command)
               in
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
@@ -218,7 +220,6 @@ let%test_module "transaction_status" =
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
-                ( Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     (Signed_command unknown_user_command) ) ) )
+                (get_status ~frontier_broadcast_pipe ~transaction_pool
+                   (Signed_command unknown_user_command) ) ) )
   end )

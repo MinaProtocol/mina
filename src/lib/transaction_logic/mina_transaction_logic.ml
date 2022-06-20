@@ -1710,9 +1710,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     Transaction_status.Failure.Collection.of_single_failure
       Update_not_permitted_balance
 
-  let append_failure f (s : Transaction_status.Failure.Collection.t) :
+  let append_entry f (s : Transaction_status.Failure.Collection.t) :
       Transaction_status.Failure.Collection.t =
-    match s with [] -> single_failure | h :: t -> (h @ f) :: t
+    match s with [] -> [ f ] | h :: t -> h :: f :: t
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance
       ~modify_timing =
@@ -1756,10 +1756,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             let%map _action1, a1, l1 = get_or_create t account_id1 in
             let emptys1 = previous_empty_accounts action1 account_id1 in
             set t l1 { a1 with balance; timing } ;
-            (emptys1, append_failure no_failure empty) )
+            (emptys1, empty) )
           else
             (*failure for each fee transfer single*)
-            Ok ([], append_failure update_failed single_failure)
+            Ok ([], append_entry update_failed single_failure)
         else
           let a2, action2, `Has_permission_to_receive can_receive2 =
             has_permission_to_receive ~ledger:t account_id2
@@ -1777,7 +1777,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let%map _action1, a1, l1 = get_or_create t account_id1 in
               let emptys1 = previous_empty_accounts action1 account_id1 in
               set t l1 { a1 with balance = balance1 } ;
-              (emptys1, empty) )
+              (emptys1, append_entry no_failure empty) )
             else Ok ([], single_failure)
           in
           let%map emptys2, failures' =
@@ -1785,8 +1785,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let%map _action2, a2, l2 = get_or_create t account_id2 in
               let emptys2 = previous_empty_accounts action2 account_id2 in
               set t l2 { a2 with balance = balance2; timing = timing2 } ;
-              (emptys2, append_failure no_failure failures) )
-            else Ok ([], append_failure update_failed failures)
+              (emptys2, append_entry no_failure failures) )
+            else Ok ([], append_entry update_failed failures)
           in
           (emptys1 @ emptys2, failures')
 
@@ -1856,7 +1856,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                 ( transferee_location
                 , { transferee_account with balance; timing } )
             , Some transferee_account.timing
-            , empty )
+            , append_entry no_failure empty )
           else return (receiver_reward, [], None, None, single_failure)
     in
     let receiver_id = Account_id.create receiver Token_id.default in
@@ -1891,8 +1891,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             balance = receiver_balance
           ; timing = coinbase_receiver_timing
           } ;
-        append_failure empty failures1 )
-      else return (append_failure update_failed failures1)
+        append_entry no_failure failures1 )
+      else return (append_entry update_failed failures1)
     in
     Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
     if Transaction_status.Failure.Collection.is_empty failures then
@@ -2106,7 +2106,7 @@ module For_tests = struct
       }
     |> Signed_command.forget_check
 
-  let party_send ?(use_full_commitment = true)
+  let party_send ?(use_full_commitment = true) ?(double_sender_nonce = true)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       { Transaction_spec.fee
       ; sender = sender, sender_nonce
@@ -2125,9 +2125,11 @@ module For_tests = struct
          This would also allow us to prevent replays of snapp proofs, by
          allowing them to bump their nonce.
       *)
-      sender_nonce |> Account.Nonce.to_uint32
-      |> Unsigned.UInt32.(mul (of_int 2))
-      |> Account.Nonce.to_uint32
+      if double_sender_nonce then
+        sender_nonce |> Account.Nonce.to_uint32
+        |> Unsigned.UInt32.(mul (of_int 2))
+        |> Account.Nonce.to_uint32
+      else sender_nonce
     in
     let parties : Parties.Simple.t =
       { fee_payer =

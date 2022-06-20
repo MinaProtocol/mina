@@ -3517,8 +3517,7 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
         let hash = State_hash.With_state_hashes.state_hash in
         match%bind
           add_block_aux ~logger ~pool ~delete_older_than ~hash ~add_block
-            ~accounts_accessed ~accounts_created ~tokens_used
-            (With_hash.map ~f:External_transition.decompose block)
+            ~accounts_accessed ~accounts_created ~tokens_used block
         with
         | Error e ->
             let state_hash = hash block in
