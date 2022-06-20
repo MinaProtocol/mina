@@ -2848,9 +2848,9 @@ module Block = struct
                             | [ [ failure1 ]; _ ] ->
                                 (failed_str, Some failure1)
                             | _ ->
-                                failwith
-                                  "Invalid failure status for fee transfer in \
-                                   a coinbase transaction" )
+                                failwithf
+                                  !"Invalid failure status %{sexp: Transaction_status.Failure.Collection.t} for fee transfer in \
+                                   a coinbase transaction %{sexp: Mina_base.Coinbase.t}" failures coinbase () )
                       in
                       Block_and_internal_command.add
                         (module Conn)
