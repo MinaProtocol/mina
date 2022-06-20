@@ -78,7 +78,7 @@ let fee_excess : t -> Fee_excess.t Or_error.t = function
 
 let supply_increase = function
   | Command _ | Fee_transfer _ ->
-      Ok Currency.Amount.zero
+      Ok Currency.Amount.Signed.zero
   | Coinbase t ->
       Coinbase.supply_increase t
 

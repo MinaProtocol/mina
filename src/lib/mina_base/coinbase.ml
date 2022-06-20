@@ -67,12 +67,13 @@ let create ~amount ~receiver ~fee_transfer =
 let supply_increase { receiver = _; amount; fee_transfer } =
   match fee_transfer with
   | None ->
-      Ok amount
+      Ok (Currency.Amount.Signed.of_unsigned amount)
   | Some { fee; _ } ->
       Currency.Amount.sub amount (Currency.Amount.of_fee fee)
       |> Option.value_map
            ~f:(fun _ -> Ok amount)
            ~default:(Or_error.error_string "Coinbase underflow")
+      |> Or_error.map ~f:Currency.Amount.Signed.of_unsigned
 
 let fee_excess t =
   Or_error.map (supply_increase t) ~f:(fun _increase -> Fee_excess.empty)

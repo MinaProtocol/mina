@@ -346,6 +346,6 @@ let supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->
-      payload.body.amount
+      Amount.Signed.of_unsigned payload.body.amount
   | Payment | Stake_delegation | Create_account | Mint_tokens | Fee_transfer ->
-      Amount.zero
+      Amount.Signed.zero

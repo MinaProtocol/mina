@@ -159,7 +159,9 @@ let%snarkydef step ~(logger : Logger.t)
         (previous_state |> Protocol_state.blockchain_state).registers
         { txn_snark.target with pending_coinbase_stack = () }
     and supply_increase_is_zero =
-      Currency.Amount.(equal_var txn_snark.supply_increase (var_of_t zero))
+      Currency.Amount.(
+        Signed.Checked.equal txn_snark.supply_increase
+          (Signed.Checked.of_unsigned (var_of_t zero)))
     in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let coinbase_receiver =
