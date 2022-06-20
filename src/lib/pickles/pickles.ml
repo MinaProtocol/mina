@@ -1204,10 +1204,13 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = []
                   ; main =
-                      (fun [] self ->
+                      (fun { previous_public_inputs = []; public_input = self } ->
                         dummy_constraints () ;
                         Field.Assert.equal self Field.zero ;
-                        ([], (), ()) )
+                        { previous_proofs_should_verify = []
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
@@ -1263,7 +1266,12 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = []
                   ; main =
-                      (fun [] () -> dummy_constraints () ; ([], Field.zero, ()))
+                      (fun _ ->
+                        dummy_constraints () ;
+                        { previous_proofs_should_verify = []
+                        ; public_output = Field.zero
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
@@ -1310,12 +1318,17 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ self ]
                   ; main =
-                      (fun [ prev ] self ->
+                      (fun { previous_public_inputs = [ prev ]
+                           ; public_input = self
+                           } ->
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        ([ proof_must_verify ], (), ()) )
+                        { previous_proofs_should_verify = [ proof_must_verify ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
@@ -1372,12 +1385,18 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ No_recursion.tag; self ]
                   ; main =
-                      (fun [ _; prev ] self ->
+                      (fun { previous_public_inputs = [ _; prev ]
+                           ; public_input = self
+                           } ->
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        ([ Boolean.true_; proof_must_verify ], (), ()) )
+                        { previous_proofs_should_verify =
+                            [ Boolean.true_; proof_must_verify ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
@@ -1453,7 +1472,9 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ No_recursion_return.tag; self ]
                   ; main =
-                      (fun [ _; prev ] () ->
+                      (fun { previous_public_inputs = [ _; prev ]
+                           ; public_input = ()
+                           } ->
                         let is_base_case =
                           exists Boolean.typ ~request:(fun () -> Is_base_case)
                         in
@@ -1462,7 +1483,11 @@ let%test_module "test no side-loaded" =
                           Field.(
                             if_ is_base_case ~then_:zero ~else_:(one + prev))
                         in
-                        ([ Boolean.true_; proof_must_verify ], self, ()) )
+                        { previous_proofs_should_verify =
+                            [ Boolean.true_; proof_must_verify ]
+                        ; public_output = self
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
@@ -1540,9 +1565,12 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = []
                   ; main =
-                      (fun [] x ->
+                      (fun { previous_public_inputs = []; public_input = x } ->
                         dummy_constraints () ;
-                        ([], Field.(add one) x, ()) )
+                        { previous_proofs_should_verify = []
+                        ; public_output = Field.(add one) x
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
@@ -1601,7 +1629,7 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = []
                   ; main =
-                      (fun [] input ->
+                      (fun { previous_public_inputs = []; public_input = input } ->
                         dummy_constraints () ;
                         let sponge =
                           Step_main_inputs.Sponge.create
@@ -1614,7 +1642,10 @@ let%test_module "test no side-loaded" =
                         Step_main_inputs.Sponge.absorb sponge
                           (`Field blinding_value) ;
                         let result = Step_main_inputs.Sponge.squeeze sponge in
-                        ([], result, blinding_value) )
+                        { previous_proofs_should_verify = []
+                        ; public_output = result
+                        ; auxiliary_output = blinding_value
+                        } )
                   }
                 ] ) )
 

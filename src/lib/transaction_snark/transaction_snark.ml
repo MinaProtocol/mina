@@ -2252,27 +2252,38 @@ module Base = struct
           { identifier = "proved"
           ; prevs = M.[ side_loaded 0 ]
           ; main =
-              (fun [ snapp_statement ] stmt ->
+              (fun { previous_public_inputs = [ snapp_statement ]
+                   ; public_input = stmt
+                   } ->
                 main ?witness:!witness s ~constraint_constants
                   (List.mapi [ snapp_statement ] ~f:(fun i x -> (i, x)))
                   stmt ;
-                ([ b ], (), ()) )
+                { previous_proofs_should_verify = [ b ]
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
           ; prevs = M.[]
           ; main =
-              (fun [] stmt ->
+              (fun { previous_public_inputs = []; public_input = stmt } ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                ([], (), ()) )
+                { previous_proofs_should_verify = []
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
       | Opt_signed ->
           { identifier = "opt_signed"
           ; prevs = M.[]
           ; main =
-              (fun [] stmt ->
+              (fun { previous_public_inputs = []; public_input = stmt } ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                ([], (), ()) )
+                { previous_proofs_should_verify = []
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
   end
 
@@ -3069,9 +3080,12 @@ module Base = struct
     { identifier = "transaction"
     ; prevs = []
     ; main =
-        (fun [] x ->
+        (fun { previous_public_inputs = []; public_input = x } ->
           Run.run_checked (main ~constraint_constants x) ;
-          ([], (), ()) )
+          { previous_proofs_should_verify = []
+          ; public_output = ()
+          ; auxiliary_output = ()
+          } )
     }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3166,9 +3180,12 @@ module Merge = struct
     { identifier = "merge"
     ; prevs = [ self; self ]
     ; main =
-        (fun [ s1; s2 ] x ->
+        (fun { previous_public_inputs = [ s1; s2 ]; public_input = x } ->
           Run.run_checked (main [ s1; s2 ] x) ;
-          ([ b; b ], (), ()) )
+          { previous_proofs_should_verify = [ b; b ]
+          ; public_output = ()
+          ; auxiliary_output = ()
+          } )
     }
 end
 
@@ -4216,16 +4233,12 @@ module For_tests = struct
         { identifier = "trivial-rule"
         ; prevs = []
         ; main =
-            (fun [] x ->
-              trivial_main x |> Run.run_checked
-              |> fun _ :
-                     (unit
-                      Pickles_types.Hlist0.H1
-                        (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                      .t
-                     * unit
-                     * unit) ->
-              ([], (), ()) )
+            (fun { previous_public_inputs = []; public_input = x } ->
+              trivial_main x |> Run.run_checked ;
+              { previous_proofs_should_verify = []
+              ; public_output = ()
+              ; auxiliary_output = ()
+              } )
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
@@ -4243,23 +4256,19 @@ module For_tests = struct
           ; { identifier = "dummy"
             ; prevs = [ self; self ]
             ; main =
-                (fun [ _; _ ] _ ->
-                  Impl.run_checked (dummy_constraints ())
-                  |> fun () ->
+                (fun { previous_public_inputs = [ _; _ ]; public_input = _ } ->
+                  Impl.run_checked (dummy_constraints ()) ;
                   (* Unsatisfiable. *)
-                  Run.exists Field.typ ~compute:(fun () ->
-                      Run.Field.Constant.zero )
-                  |> fun s ->
-                  Run.Field.(Assert.equal s (s + one))
-                  |> fun () :
-                         (( Zkapp_statement.Checked.t
-                          * (Zkapp_statement.Checked.t * unit) )
-                          Pickles_types.Hlist0.H1
-                            (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                          .t
-                         * unit
-                         * unit) ->
-                  ([ Boolean.true_; Boolean.true_ ], (), ()) )
+                  let s =
+                    Run.exists Field.typ ~compute:(fun () ->
+                        Run.Field.Constant.zero )
+                  in
+                  Run.Field.(Assert.equal s (s + one)) ;
+                  { previous_proofs_should_verify =
+                      [ Boolean.true_; Boolean.true_ ]
+                  ; public_output = ()
+                  ; auxiliary_output = ()
+                  } )
             }
           ] )
     in

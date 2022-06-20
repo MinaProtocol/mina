@@ -305,13 +305,16 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
   { identifier = "step"
   ; prevs = [ self; transaction_snark ]
   ; main =
-      (fun [ x1; x2 ] x ->
+      (fun { previous_public_inputs = [ x1; x2 ]; public_input = x } ->
         let b1, b2 =
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
                [ x1; x2 ] x )
         in
-        ([ b1; b2 ], (), ()) )
+        { previous_proofs_should_verify = [ b1; b2 ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 module Statement = struct

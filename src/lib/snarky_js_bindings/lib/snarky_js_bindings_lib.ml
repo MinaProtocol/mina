@@ -1627,10 +1627,19 @@ let dummy_constraints =
           (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t )
 
+type ('prev_vars, 'public_input) main_input =
+  { previous_public_inputs : 'prev_vars list; public_input : 'public_input }
+
+type main_return =
+  { previous_proofs_should_verify : Boolean.var list
+  ; public_output : unit
+  ; auxiliary_output : unit
+  }
+
 type ('a_var, 'a_value, 'a_weird) pickles_rule =
   { identifier : string
   ; prevs : 'a_weird list
-  ; main : 'a_var list -> 'a_var -> Boolean.var list * unit * unit
+  ; main : ('a_var, 'a_var) main_input -> main_return
   }
 
 type pickles_rule_js =
@@ -1657,7 +1666,7 @@ let create_pickles_rule ~self (rule : pickles_rule_js) =
   { identifier = Js.to_string rule##.identifier
   ; prevs
   ; main =
-      (fun prev_inputs public_input ->
+      (fun { previous_public_inputs = prev_inputs; public_input } ->
         dummy_constraints () ;
         let should_verifys =
           rule##.main
@@ -1666,7 +1675,10 @@ let create_pickles_rule ~self (rule : pickles_rule_js) =
           |> Js.to_array |> Array.to_list
           |> List.map ~f:(fun b -> b##.value)
         in
-        (should_verifys, (), ()) )
+        { previous_proofs_should_verify = should_verifys
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let other_verification_key_constr :

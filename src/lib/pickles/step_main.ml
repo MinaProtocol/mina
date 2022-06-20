@@ -260,10 +260,17 @@ let step_main :
           exists prev_values_typs ~request:(fun () -> Req.Prev_inputs)
         in
         let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-        let proofs_should_verify, ret_var, auxiliary_var =
+        let { Inductive_rule.previous_proofs_should_verify =
+                proofs_should_verify
+            ; public_output = ret_var
+            ; auxiliary_output = auxiliary_var
+            } =
           (* Run the application logic of the rule on the predecessor statements *)
           with_label "rule_main" (fun () ->
-              rule.main prev_statements app_state )
+              rule.main
+                { previous_public_inputs = prev_statements
+                ; public_input = app_state
+                } )
         in
         let () =
           exists Typ.unit ~request:(fun () ->
