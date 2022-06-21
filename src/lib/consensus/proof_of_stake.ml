@@ -2175,9 +2175,6 @@ module Data = struct
         compute_supercharge_coinbase ~winner_account
           ~global_slot:global_slot_since_genesis
       in
-      (* TODO: keep track of total_currency in transaction snark. The current_slot
-       * implementation would allow an adversary to make then total_currency incorrect by
-       * not adding the coinbase to their account. *)
       let%bind new_total_currency, `Overflow overflow =
         Currency.Amount.Checked.add_signed_flagged previous_state.total_currency
           supply_increase
