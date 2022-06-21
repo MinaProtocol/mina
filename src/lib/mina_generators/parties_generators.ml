@@ -650,10 +650,11 @@ end
    The type `c` is associated with the `token_id` field, which is `unit` for the
    fee payer, and `Token_id.t` for other parties.
 *)
-let gen_party_body_components (type a b c d) ?(limited = false) ?(update = None)
-    ?account_id ~account_state_tbl ?vk ?failure ?(new_account = false)
-    ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ?permissions_auth ?(required_balance_change : a option)
+let gen_party_body_components (type a b c d) ?(limited = false)
+    ?(no_new_account = false) ?(update = None) ?account_id ~account_state_tbl
+    ?vk ?failure ?(new_account = false) ?(zkapp_account = false)
+    ?(is_fee_payer = false) ?available_public_keys ?permissions_auth
+    ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option) ?protocol_state_view
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment :
@@ -674,7 +675,8 @@ let gen_party_body_components (type a b c d) ?(limited = false) ?(update = None)
      so we can't just pick a ledger account
   *)
   let new_account =
-    new_account || (zkapp_account && Option.is_none account_id)
+    (not no_new_account)
+    && (new_account || (zkapp_account && Option.is_none account_id))
   in
   let%bind update =
     match update with
@@ -992,8 +994,8 @@ let gen_party_body_components (type a b c d) ?(limited = false) ?(update = None)
   ; caller
   }
 
-let gen_party_from ?(limited = false) ?(update = None) ?failure
-    ?(new_account = false) ?(zkapp_account = false) ?account_id
+let gen_party_from ?(limited = false) ?(no_new_account = false) ?(update = None)
+    ?failure ?(new_account = false) ?(zkapp_account = false) ?account_id
     ?permissions_auth ?required_balance_change ?required_balance ~authorization
     ~available_public_keys ~ledger ~account_state_tbl ?vk () =
   let open Quickcheck.Let_syntax in
@@ -1012,8 +1014,8 @@ let gen_party_from ?(limited = false) ?(update = None) ?failure
         false
   in
   let%bind body_components =
-    gen_party_body_components ~limited ~update ?failure ~new_account
-      ~zkapp_account
+    gen_party_body_components ~limited ~no_new_account ~update ?failure
+      ~new_account ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?vk ~available_public_keys
       ?required_balance_change ?required_balance ~ledger ~account_state_tbl
@@ -1241,10 +1243,10 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
           (* Signature authorization to start *)
           let authorization = Control.Signature Signature.dummy in
           let required_balance_change = Currency.Amount.Signed.zero in
-          gen_party_from ~limited ~update ?failure ~authorization
-            ~new_account:new_parties ~permissions_auth ~zkapp_account
-            ~available_public_keys ~required_balance_change ~ledger
-            ~account_state_tbl ?vk ()
+          gen_party_from ~no_new_account ~limited ~update ?failure
+            ~authorization ~new_account:new_parties ~permissions_auth
+            ~zkapp_account ~available_public_keys ~required_balance_change
+            ~ledger ~account_state_tbl ?vk ()
         in
         let%bind party =
           (* authorization according to chosen permissions auth *)
@@ -1314,9 +1316,9 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
           in
           (* if we use this account again, it will have a Signature authorization *)
           let permissions_auth = Control.Tag.Signature in
-          gen_party_from ~limited ~update ?failure ~account_id ~authorization
-            ~permissions_auth ~zkapp_account ~available_public_keys ~ledger
-            ~account_state_tbl ?vk ()
+          gen_party_from ~no_new_account ~limited ~update ?failure ~account_id
+            ~authorization ~permissions_auth ~zkapp_account
+            ~available_public_keys ~ledger ~account_state_tbl ?vk ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
         go (party :: party0 :: acc) (n - 1)
@@ -1368,10 +1370,10 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
           None
     in
     let authorization = Control.Signature Signature.dummy in
-    gen_party_from ~limited ~update:(Some Party.Update.dummy) ?failure
-      ~authorization ~account_id:fee_payer_account_id ~available_public_keys
-      ~ledger ~required_balance_change ?required_balance ~account_state_tbl ?vk
-      ()
+    gen_party_from ~no_new_account ~limited ~update:(Some Party.Update.dummy)
+      ?failure ~authorization ~account_id:fee_payer_account_id
+      ~available_public_keys ~ledger ~required_balance_change ?required_balance
+      ~account_state_tbl ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
