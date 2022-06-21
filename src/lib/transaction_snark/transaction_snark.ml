@@ -2621,24 +2621,6 @@ module Base = struct
              in
              let%bind () =
                [%with_label "Burned tokens in fee payer"]
-                 (*let%bind accumulate_burned_tokens =
-                     Boolean.all
-                       [ is_coinbase_or_fee_transfer
-                       ; Boolean.not update_account
-                       ]
-                   in
-                   let%bind amt, `Overflow overflow =
-                     Amount.Checked.add_flagged !burned_tokens
-                       (Amount.Checked.of_fee fee)
-                   in
-                   let%bind () =
-                     Boolean.(
-                       Assert.any [ not accumulate_burned_tokens; not overflow ])
-                   in
-                   let%map amt =
-                     Amount.Checked.if_ accumulate_burned_tokens ~then_:amt
-                       ~else_:!burned_tokens
-                   in*)
                  (let%map amt =
                     add_burned_tokens !burned_tokens
                       (Amount.Checked.of_fee fee)
@@ -2680,7 +2662,7 @@ module Base = struct
                   Balance.Checked.if_ update_account ~then_:updated_balance
                     ~else_:account.balance )
              in
-             let%bind public_key =
+             let%map public_key =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
                  ~then_:(Account_id.Checked.public_key fee_payer)
                  ~else_:account.public_key
@@ -2694,35 +2676,20 @@ module Base = struct
                  ~then_:(Account_id.Checked.public_key fee_payer)
                  ~else_:account.delegate
              in
-             let a =
-               { Account.Poly.balance
-               ; public_key
-               ; token_id
-               ; token_permissions = account.token_permissions
-               ; token_symbol = account.token_symbol
-               ; nonce = next_nonce
-               ; receipt_chain_hash
-               ; delegate
-               ; voting_for = account.voting_for
-               ; timing
-               ; permissions = account.permissions
-               ; zkapp = account.zkapp
-               ; zkapp_uri = account.zkapp_uri
-               }
-             in
-             let%map () =
-               as_prover
-                 Impl.As_prover.(
-                   fun _ ->
-                     let acc = read Account.typ a in
-                     let acc_before = read Account.typ account in
-                     Core.printf
-                       !"Fee payer account before %{sexp: Account.t } after \
-                         %{sexp: Account.t } \n\
-                         %!"
-                       acc_before acc)
-             in
-             a ) )
+             { Account.Poly.balance
+             ; public_key
+             ; token_id
+             ; token_permissions = account.token_permissions
+             ; token_symbol = account.token_symbol
+             ; nonce = next_nonce
+             ; receipt_chain_hash
+             ; delegate
+             ; voting_for = account.voting_for
+             ; timing
+             ; permissions = account.permissions
+             ; zkapp = account.zkapp
+             ; zkapp_uri = account.zkapp_uri
+             } ) )
     in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
@@ -2895,23 +2862,6 @@ module Base = struct
                  ; update_account
                  ]
              in
-             let%bind () =
-               as_prover
-                 Impl.As_prover.(
-                   fun _ ->
-                     let is_empty_writeable =
-                       read Boolean.typ is_empty_and_writeable
-                     in
-                     let user_command_fails =
-                       read Boolean.typ user_command_fails
-                     in
-                     let update_account = read Boolean.typ update_account in
-                     Core.printf
-                       !"is_empty_writeable %b user_command_fails %b \
-                         update_account %b\n\
-                         %!"
-                       is_empty_writeable user_command_fails update_account)
-             in
              let%bind balance =
                Balance.Checked.if_ update_account ~then_:balance
                  ~else_:account.balance
@@ -2920,7 +2870,7 @@ module Base = struct
                (* Only default tokens may participate in delegation. *)
                Boolean.(is_empty_and_writeable &&& token_default)
              in
-             let%bind delegate =
+             let%map delegate =
                Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
                  ~else_:account.delegate
@@ -2941,36 +2891,21 @@ module Base = struct
                  ~then_:payload.body.token_locked
                  ~else_:account.token_permissions.token_locked
              in
-             let a =
-               { Account.Poly.balance
-               ; public_key
-               ; token_id
-               ; token_permissions =
-                   { Token_permissions.token_owner; token_locked }
-               ; token_symbol = account.token_symbol
-               ; nonce = account.nonce
-               ; receipt_chain_hash = account.receipt_chain_hash
-               ; delegate
-               ; voting_for = account.voting_for
-               ; timing = account.timing
-               ; permissions = account.permissions
-               ; zkapp = account.zkapp
-               ; zkapp_uri = account.zkapp_uri
-               }
-             in
-             let%map () =
-               as_prover
-                 Impl.As_prover.(
-                   fun _ ->
-                     let acc = read Account.typ a in
-                     let acc_before = read Account.typ account in
-                     Core.printf
-                       !"Receiver account before %{sexp: Account.t } after \
-                         %{sexp: Account.t } \n\
-                         %!"
-                       acc_before acc)
-             in
-             a ) )
+             { Account.Poly.balance
+             ; public_key
+             ; token_id
+             ; token_permissions =
+                 { Token_permissions.token_owner; token_locked }
+             ; token_symbol = account.token_symbol
+             ; nonce = account.nonce
+             ; receipt_chain_hash = account.receipt_chain_hash
+             ; delegate
+             ; voting_for = account.voting_for
+             ; timing = account.timing
+             ; permissions = account.permissions
+             ; zkapp = account.zkapp
+             ; zkapp_uri = account.zkapp_uri
+             } ) )
     in
     let%bind user_command_fails =
       Boolean.(!receiver_overflow ||| user_command_fails)
@@ -3098,7 +3033,7 @@ module Base = struct
                  (Boolean.Assert.( = ) underflow
                     user_command_failure.source_insufficient_balance )
              in
-             let%bind delegate =
+             let%map delegate =
                let%bind may_delegate =
                  Boolean.all [ is_stake_delegation; update_account ]
                in
@@ -3110,35 +3045,20 @@ module Base = struct
                 of [user_command_fails], but we throw the resulting hash away
                 in [final_root] below, so it shouldn't matter.
              *)
-             let a =
-               { Account.Poly.balance
-               ; public_key = account.public_key
-               ; token_id = account.token_id
-               ; token_permissions = account.token_permissions
-               ; token_symbol = account.token_symbol
-               ; nonce = account.nonce
-               ; receipt_chain_hash = account.receipt_chain_hash
-               ; delegate
-               ; voting_for = account.voting_for
-               ; timing
-               ; permissions = account.permissions
-               ; zkapp = account.zkapp
-               ; zkapp_uri = account.zkapp_uri
-               }
-             in
-             let%map () =
-               as_prover
-                 Impl.As_prover.(
-                   fun _ ->
-                     let acc = read Account.typ a in
-                     let acc_before = read Account.typ account in
-                     Core.printf
-                       !"Source account before %{sexp: Account.t } after \
-                         %{sexp: Account.t } \n\
-                         %!"
-                       acc_before acc)
-             in
-             a ) )
+             { Account.Poly.balance
+             ; public_key = account.public_key
+             ; token_id = account.token_id
+             ; token_permissions = account.token_permissions
+             ; token_symbol = account.token_symbol
+             ; nonce = account.nonce
+             ; receipt_chain_hash = account.receipt_chain_hash
+             ; delegate
+             ; voting_for = account.voting_for
+             ; timing
+             ; permissions = account.permissions
+             ; zkapp = account.zkapp
+             ; zkapp_uri = account.zkapp_uri
+             } ) )
     in
     let%bind fee_excess =
       (* - payments:         payload.common.fee

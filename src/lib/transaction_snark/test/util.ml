@@ -504,7 +504,6 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                   (List.concat f) ) ) ;
         (false, Some res)
     | Error e ->
-        Core.printf !"Out-of-circuit Error %s\n%!" (Error.to_string_hum e) ;
         if Option.is_none expected_failure then
           failwith
             (sprintf "Ledger.apply_transaction failed with %s"
@@ -545,7 +544,6 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           (unstage @@ Sparse_ledger.handler sparse_ledger) )
   with
   | Error e ->
-      Core.printf !"In-snark Error %s\n%!" (Error.to_string_hum e) ;
       assert expect_snark_failure
   | Ok _ ->
       assert (not expect_snark_failure)

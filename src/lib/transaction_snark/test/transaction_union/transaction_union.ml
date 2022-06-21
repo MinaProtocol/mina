@@ -1,10 +1,8 @@
 open Core
 open Mina_ledger
 open Currency
-
-(*open Signature_lib
-  open Mina_transaction
-*)
+open Signature_lib
+open Mina_transaction
 module U = Transaction_snark_tests.Util
 open Mina_base
 
@@ -18,7 +16,7 @@ let ledger_depth = U.ledger_depth
 
 let state_body_hash = U.genesis_state_body_hash
 
-(*let%test_module "Transaction union tests" =
+let%test_module "Transaction union tests" =
   ( module struct
     (* For tests let's just monkey patch ledger and sparse ledger to freeze their
      * ledger_hashes. The nominal type is just so we don't mix this up in our
@@ -207,7 +205,8 @@ let state_body_hash = U.genesis_state_body_hash
                 ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target ~init_stack:pending_coinbase_stack
-                ~pending_coinbase_stack_state ~supply_increase:user_command_supply_increase
+                ~pending_coinbase_stack_state
+                ~supply_increase:user_command_supply_increase
                 { transaction = t1; block_data = state_body }
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
@@ -1991,7 +1990,7 @@ let state_body_hash = U.genesis_state_body_hash
               let txn_global_slot = Mina_numbers.Global_slot.of_int 100 in
               List.iter transactions ~f:(fun txn ->
                   U.test_transaction_union ~txn_global_slot ledger txn ) ) )
-  end ) *)
+  end )
 
 let%test_module "legacy transactions using zkApp accounts" =
   ( module struct
@@ -2292,7 +2291,6 @@ let%test_module "legacy transactions using zkApp accounts" =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
-      (*TODO; create another snapp account wiht same perms*)
       let fee = Fee.of_int 1000000 in
       let amount = U.constraint_constants.coinbase_amount in
       (*send coinbase reward to a zkApp account*)
