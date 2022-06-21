@@ -534,7 +534,8 @@ module For_tests : sig
          , unit
          , unit
          , Zkapp_statement.t
-         , (unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t) Async.Deferred.t )
+         , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t) Async.Deferred.t
+         )
          Pickles.Prover.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
@@ -570,7 +571,8 @@ module For_tests : sig
             , unit
             , unit
             , Zkapp_statement.t
-            , (unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t) Async.Deferred.t )
+            , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+              Async.Deferred.t )
             Pickles.Prover.t ]
 
   val multiple_transfers : Spec.t -> Parties.t

@@ -2234,6 +2234,8 @@ module Base = struct
         , Statement.With_sok.var
         , Statement.With_sok.t
         , unit
+        , unit
+        , unit
         , unit )
         Pickles.Inductive_rule.t =
       let open Hlist in
@@ -2253,27 +2255,38 @@ module Base = struct
           { identifier = "proved"
           ; prevs = M.[ side_loaded 0 ]
           ; main =
-              (fun [ snapp_statement ] stmt ->
+              (fun { previous_public_inputs = [ snapp_statement ]
+                   ; public_input = stmt
+                   } ->
                 main ?witness:!witness s ~constraint_constants
                   (List.mapi [ snapp_statement ] ~f:(fun i x -> (i, x)))
                   stmt ;
-                ([ b ], ()) )
+                { previous_proofs_should_verify = [ b ]
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
           ; prevs = M.[]
           ; main =
-              (fun [] stmt ->
+              (fun { previous_public_inputs = []; public_input = stmt } ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                ([], ()) )
+                { previous_proofs_should_verify = []
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
       | Opt_signed ->
           { identifier = "opt_signed"
           ; prevs = M.[]
           ; main =
-              (fun [] stmt ->
+              (fun { previous_public_inputs = []; public_input = stmt } ->
                 main ?witness:!witness s ~constraint_constants [] stmt ;
-                ([], ()) )
+                { previous_proofs_should_verify = []
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
   end
 
@@ -3203,9 +3216,12 @@ module Base = struct
     { identifier = "transaction"
     ; prevs = []
     ; main =
-        (fun [] x ->
+        (fun { previous_public_inputs = []; public_input = x } ->
           Run.run_checked (main ~constraint_constants x) ;
-          ([], ()) )
+          { previous_proofs_should_verify = []
+          ; public_output = ()
+          ; auxiliary_output = ()
+          } )
     }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3300,9 +3316,12 @@ module Merge = struct
     { identifier = "merge"
     ; prevs = [ self; self ]
     ; main =
-        (fun [ s1; s2 ] x ->
+        (fun { previous_public_inputs = [ s1; s2 ]; public_input = x } ->
           Run.run_checked (main [ s1; s2 ] x) ;
-          ([ b; b ], ()) )
+          { previous_proofs_should_verify = [ b; b ]
+          ; public_output = ()
+          ; auxiliary_output = ()
+          } )
     }
 end
 
@@ -3327,7 +3346,7 @@ let system ~proof_level ~constraint_constants =
       Pickles.compile ~cache:Cache_dir.cache
         (module Statement.With_sok.Checked)
         (module Statement.With_sok)
-        ~public_input:(Input Statement.With_sok.typ)
+        ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
         ~branches:(module Nat.N5)
         ~max_proofs_verified:(module Nat.N2)
         ~name:"transaction-snark"
@@ -4246,14 +4265,14 @@ struct
                 statement )
     in
     let open Async in
-    let%map (), proof = res in
+    let%map (), (), proof = res in
     Base.Parties_snark.witness := None ;
     { proof; statement }
 
   let of_transaction_union ~statement ~init_stack transaction state_body handler
       =
     let open Async in
-    let%map (), proof =
+    let%map (), (), proof =
       base []
         ~handler:
           (Base.transaction_union_handler handler transaction state_body
@@ -4304,7 +4323,7 @@ struct
     let%bind s = Async.return (Statement.merge t12 t23) in
     let s = { s with sok_digest } in
     let open Async in
-    let%map (), proof =
+    let%map (), (), proof =
       merge [ (x12.statement, x12.proof); (x23.statement, x23.proof) ] s
     in
     Ok { statement = s; proof }
@@ -4349,21 +4368,18 @@ module For_tests = struct
         { identifier = "trivial-rule"
         ; prevs = []
         ; main =
-            (fun [] x ->
-              trivial_main x |> Run.run_checked
-              |> fun _ :
-                     (unit
-                      Pickles_types.Hlist0.H1
-                        (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                      .t
-                     * unit) ->
-              ([], ()) )
+            (fun { previous_public_inputs = []; public_input = x } ->
+              trivial_main x |> Run.run_checked ;
+              { previous_proofs_should_verify = []
+              ; public_output = ()
+              ; auxiliary_output = ()
+              } )
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
         (module Zkapp_statement.Checked)
         (module Zkapp_statement)
-        ~public_input:(Input Zkapp_statement.typ)
+        ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"trivial"
@@ -4375,22 +4391,19 @@ module For_tests = struct
           ; { identifier = "dummy"
             ; prevs = [ self; self ]
             ; main =
-                (fun [ _; _ ] _ ->
-                  Impl.run_checked (dummy_constraints ())
-                  |> fun () ->
+                (fun { previous_public_inputs = [ _; _ ]; public_input = _ } ->
+                  Impl.run_checked (dummy_constraints ()) ;
                   (* Unsatisfiable. *)
-                  Run.exists Field.typ ~compute:(fun () ->
-                      Run.Field.Constant.zero )
-                  |> fun s ->
-                  Run.Field.(Assert.equal s (s + one))
-                  |> fun () :
-                         (( Zkapp_statement.Checked.t
-                          * (Zkapp_statement.Checked.t * unit) )
-                          Pickles_types.Hlist0.H1
-                            (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                          .t
-                         * unit) ->
-                  ([ Boolean.true_; Boolean.true_ ], ()) )
+                  let s =
+                    Run.exists Field.typ ~compute:(fun () ->
+                        Run.Field.Constant.zero )
+                  in
+                  Run.Field.(Assert.equal s (s + one)) ;
+                  { previous_proofs_should_verify =
+                      [ Boolean.true_; Boolean.true_ ]
+                  ; public_output = ()
+                  ; auxiliary_output = ()
+                  } )
             }
           ] )
     in
@@ -4705,7 +4718,8 @@ module For_tests = struct
                     in
                     p
               in
-              let%map.Async.Deferred (), (pi : Pickles.Side_loaded.Proof.t) =
+              let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t)
+                  =
                 prover ~handler [] tx_statement
               in
               ( { body = simple_snapp_party.body; authorization = Proof pi }
@@ -4901,7 +4915,7 @@ module For_tests = struct
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
-    let%map.Async.Deferred (), (pi : Pickles.Side_loaded.Proof.t) =
+    let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t) =
       trivial_prover ~handler [] tx_statement
     in
     let fee_payer_signature_auth =

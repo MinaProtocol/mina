@@ -117,7 +117,7 @@ module Worker_state = struct
                        let txn_snark_statement, txn_snark_proof =
                          ledger_proof_opt chain next_state t
                        in
-                       let%map.Async.Deferred (), proof =
+                       let%map.Async.Deferred (), (), proof =
                          B.step
                            ~handler:
                              (Consensus.Data.Prover_state.handler
