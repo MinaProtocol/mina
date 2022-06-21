@@ -123,7 +123,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with _ -> respond Unhandled
                   in
-                  let (), proof =
+                  let (), (), proof =
                     Async_unix.Thread_safe.block_on_async_exn (fun () ->
                         prover ?handler:(Some handler)
                           ( []

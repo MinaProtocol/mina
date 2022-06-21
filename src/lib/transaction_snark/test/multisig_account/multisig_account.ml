@@ -204,15 +204,19 @@ let%test_module "multisig_account" =
                   { identifier = "multisig-rule"
                   ; prevs = []
                   ; main =
-                      (fun [] x ->
+                      (fun { previous_public_inputs = []; public_input = x } ->
                         multisig_main x |> Run.run_checked ;
-                        ([], ()) )
+                        { previous_proofs_should_verify = []
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
                   (module Zkapp_statement.Checked)
                   (module Zkapp_statement)
                   ~public_input:(Input Zkapp_statement.typ)
+                  ~auxiliary_typ:Typ.unit
                   ~branches:(module Nat.N2)
                   ~max_proofs_verified:(module Nat.N2)
                     (* You have to put 2 here... *)
@@ -225,7 +229,9 @@ let%test_module "multisig_account" =
                     ; { identifier = "dummy"
                       ; prevs = [ self; self ]
                       ; main =
-                          (fun [ _; _ ] _ ->
+                          (fun { previous_public_inputs = [ _; _ ]
+                               ; public_input = _
+                               } ->
                             Impl.run_checked
                               (Transaction_snark.dummy_constraints ()) ;
                             (* Unsatisfiable. *)
@@ -234,7 +240,11 @@ let%test_module "multisig_account" =
                                   Run.Field.Constant.zero )
                             in
                             Run.Field.(Assert.equal s (s + one)) ;
-                            ([ Boolean.true_; Boolean.true_ ], ()) )
+                            { previous_proofs_should_verify =
+                                [ Boolean.true_; Boolean.true_ ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                       }
                     ] )
               in
@@ -392,7 +402,7 @@ let%test_module "multisig_account" =
                 | _ ->
                     respond Unhandled
               in
-              let (), (pi : Pickles.Side_loaded.Proof.t) =
+              let (), (), (pi : Pickles.Side_loaded.Proof.t) =
                 (fun () -> multisig_prover ~handler [] tx_statement)
                 |> Async.Thread_safe.block_on_async_exn
               in

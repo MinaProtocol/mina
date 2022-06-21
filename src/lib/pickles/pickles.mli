@@ -12,6 +12,7 @@ module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
+module Types_map = Types_map
 module Step_verifier = Step_verifier
 module Common = Common
 
@@ -244,6 +245,7 @@ val compile_promise :
        , 'ret_var
        , 'ret_value )
        Inductive_rule.public_input
+  -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
@@ -257,8 +259,10 @@ val compile_promise :
            , 'a_var
            , 'a_value
            , 'ret_var
-           , 'ret_value )
-           H4_4.T(Inductive_rule).t )
+           , 'ret_value
+           , 'auxiliary_var
+           , 'auxiliary_value )
+           H4_6.T(Inductive_rule).t )
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
@@ -268,7 +272,9 @@ val compile_promise :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('ret_value * ('max_proofs_verified, 'max_proofs_verified) Proof.t)
+       , ( 'ret_value
+         * 'auxiliary_value
+         * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
          Promise.t )
        H3_2.T(Prover).t
 
@@ -291,6 +297,7 @@ val compile :
        , 'ret_var
        , 'ret_value )
        Inductive_rule.public_input
+  -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
@@ -304,8 +311,10 @@ val compile :
            , 'a_var
            , 'a_value
            , 'ret_var
-           , 'ret_value )
-           H4_4.T(Inductive_rule).t )
+           , 'ret_value
+           , 'auxiliary_var
+           , 'auxiliary_value )
+           H4_6.T(Inductive_rule).t )
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
@@ -315,6 +324,8 @@ val compile :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('ret_value * ('max_proofs_verified, 'max_proofs_verified) Proof.t)
+       , ( 'ret_value
+         * 'auxiliary_value
+         * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
          Deferred.t )
        H3_2.T(Prover).t
