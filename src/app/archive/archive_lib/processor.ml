@@ -2028,7 +2028,7 @@ module Block_and_internal_command = struct
     ; status : string
     ; failure_reason : string option
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields]
 
   let table_name = "blocks_internal_commands"
 
@@ -2091,6 +2091,23 @@ module Block_and_internal_command = struct
           (module Conn)
           ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
           ~status ~failure_reason
+
+  let load (module Conn : CONNECTION) ~block_id ~internal_command_id
+      ~sequence_no ~secondary_sequence_no =
+    let comma_cols = String.concat Fields.names ~sep:"," in
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup4 int int int int)
+         typ
+         (sprintf
+            {sql| SELECT %s FROM blocks_internal_commands
+               WHERE block_id = $1
+               AND internal_command_id = $2
+               AND sequence_no = $3
+               AND secondary_sequence_no = $4
+           |sql}
+            comma_cols ) )
+      (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 end
 
 module Block_and_signed_command = struct
