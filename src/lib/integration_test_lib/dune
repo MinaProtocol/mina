@@ -21,6 +21,7 @@
    async_unix
    stdio
    extlib
+   sexp_diff_kernel
    ;; local libraries
    key_gen
    visualization

@@ -10,4 +10,5 @@ let create (type a) ~(of_int : int -> a) : a Plonk_types.Evals.t =
   ; s = Vector.init Permuts_minus_1.n ~f:(fun _ -> one)
   ; generic_selector = one
   ; poseidon_selector = one
+  ; lookup = None
   }

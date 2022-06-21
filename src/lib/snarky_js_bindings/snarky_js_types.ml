@@ -8,4 +8,5 @@ let () =
       ; ("Party", layout Party.Graphql_repr.deriver)
       ]
   in
+
   print_endline (js_layout |> Yojson.Safe.pretty_to_string)

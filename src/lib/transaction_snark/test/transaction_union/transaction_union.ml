@@ -274,7 +274,7 @@ let%test_module "Transaction union tests" =
             , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
       in
       let sok_signer =
-        match to_preunion (txn :> Transaction.t) with
+        match to_preunion (Transaction.forget txn) with
         | `Transaction t ->
             (Transaction_union.of_transaction t).signer |> Public_key.compress
         | `Parties c ->
@@ -286,7 +286,7 @@ let%test_module "Transaction union tests" =
       let _applied =
         Or_error.ok_exn
         @@ Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
-             (txn :> Transaction.t)
+             (Transaction.forget txn)
       in
       let target = Ledger.merkle_root ledger in
       let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
@@ -615,11 +615,12 @@ let%test_module "Transaction union tests" =
               b1, b2 resp.), carryforward the state from a previous \
               transaction t0 in b1" =
       let state_hash_and_body1 =
+        let open Staged_ledger_diff in
         let state_body0 =
           Mina_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-            ~constraint_constants ~consensus_constants
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
         let state_body_hash0 =
@@ -638,10 +639,11 @@ let%test_module "Transaction union tests" =
               transaction t0 in b1" =
       let state_hash_and_body1 =
         let state_body0 =
+          let open Staged_ledger_diff in
           Mina_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-            ~constraint_constants ~consensus_constants
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
         in
         let state_body_hash0 =

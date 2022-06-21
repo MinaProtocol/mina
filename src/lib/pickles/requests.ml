@@ -23,6 +23,7 @@ module Wrap = struct
           , max_proofs_verified )
           Vector.t
           t
+      | Which_branch : int t
       | Step_accs : (Tock.Inner_curve.Affine.t, max_proofs_verified) Vector.t t
       | Old_bulletproof_challenges :
           max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
@@ -68,6 +69,7 @@ module Wrap = struct
       type _ t +=
         | Evals :
             (Tock.Field.t, Tock.Field.t array) Plonk_types.All_evals.t vec t
+        | Which_branch : int t
         | Step_accs : Tock.Inner_curve.Affine.t vec t
         | Old_bulletproof_challenges :
             max_local_max_proofs_verifieds H1.T(Challenges_vector.Constant).t t
@@ -101,6 +103,8 @@ module Step = struct
   module type S = sig
     type statement
 
+    type return_value
+
     type prev_values
 
     (* TODO: As an optimization this can be the local proofs-verified size *)
@@ -121,18 +125,20 @@ module Step = struct
           t
       | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
       | App_state : statement t
+      | Return_value : return_value -> unit t
       | Unfinalized_proofs :
           (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
       | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
   end
 
   let create :
-      type local_signature local_branches statement prev_values max_proofs_verified.
+      type local_signature local_branches statement return_value prev_values prev_ret_values max_proofs_verified.
          unit
       -> (module S
             with type local_signature = local_signature
              and type local_branches = local_branches
              and type statement = statement
+             and type return_value = return_value
              and type prev_values = prev_values
              and type max_proofs_verified = max_proofs_verified ) =
    fun () ->
@@ -140,6 +146,8 @@ module Step = struct
       type nonrec max_proofs_verified = max_proofs_verified
 
       type nonrec statement = statement
+
+      type nonrec return_value = return_value
 
       type nonrec prev_values = prev_values
 
@@ -158,6 +166,7 @@ module Step = struct
             t
         | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
         | App_state : statement t
+        | Return_value : return_value -> unit t
         | Unfinalized_proofs :
             (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
         | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t

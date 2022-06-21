@@ -8,7 +8,6 @@
    base64
    capnp
    digestif
-   stdint
    stdio
    core
    libp2p_ipc
@@ -33,6 +32,7 @@
    timeout_lib
    mina_metrics
    o1trace
+   staged_ledger_diff
    )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

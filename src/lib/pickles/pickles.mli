@@ -12,6 +12,7 @@ module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
+module Types_map = Types_map
 module Step_verifier = Step_verifier
 module Common = Common
 
@@ -73,7 +74,7 @@ end
 module Proof : sig
   type ('max_width, 'mlmb) t
 
-  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
+  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> domain_log2:int -> ('w, 'm) t
 
   module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
     type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]
@@ -190,6 +191,8 @@ module Side_loaded : sig
       end
     end]
 
+    val of_proof : _ Proof.t -> t
+
     val to_base64 : t -> string
 
     val of_base64 : string -> (t, string) Result.t
@@ -198,18 +201,16 @@ module Side_loaded : sig
   val create :
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
-    -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
-    -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
   val verify_promise :
-       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+       typ:('var, 'value) Impls.Step.Typ.t
     -> (Verification_key.t * 'value * Proof.t) list
     -> bool Promise.t
 
   val verify :
-       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+       typ:('var, 'value) Impls.Step.Typ.t
     -> (Verification_key.t * 'value * Proof.t) list
     -> bool Deferred.t
 
@@ -221,78 +222,100 @@ module Side_loaded : sig
   (* Must be called immediately before calling the prover for the inductive rule
      for which this tag is used as a predecessor. *)
   val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
+
+  val srs_precomputation : unit -> unit
 end
 
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile_promise :
-     ?self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+     ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
-  -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> public_input:
+       ( 'var
+       , 'value
+       , 'a_var
+       , 'a_value
+       , 'ret_var
+       , 'ret_value )
+       Inductive_rule.public_input
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
-       (   self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+       (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
         -> ( 'prev_varss
            , 'prev_valuess
            , 'widthss
            , 'heightss
            , 'a_var
-           , 'a_value )
-           H4_2.T(Inductive_rule).t )
-  -> ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+           , 'a_value
+           , 'ret_var
+           , 'ret_value )
+           H4_4.T(Inductive_rule).t )
+  -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
-           and type statement = 'a_value )
+           and type statement = 'value )
      * ( 'prev_valuess
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_proofs_verified, 'max_proofs_verified) Proof.t Promise.t )
+       , ('ret_value * ('max_proofs_verified, 'max_proofs_verified) Proof.t)
+         Promise.t )
        H3_2.T(Prover).t
 
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile :
-     ?self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+     ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
-  -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> public_input:
+       ( 'var
+       , 'value
+       , 'a_var
+       , 'a_value
+       , 'ret_var
+       , 'ret_value )
+       Inductive_rule.public_input
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
-       (   self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+       (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
         -> ( 'prev_varss
            , 'prev_valuess
            , 'widthss
            , 'heightss
            , 'a_var
-           , 'a_value )
-           H4_2.T(Inductive_rule).t )
-  -> ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+           , 'a_value
+           , 'ret_var
+           , 'ret_value )
+           H4_4.T(Inductive_rule).t )
+  -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
-           and type statement = 'a_value )
+           and type statement = 'value )
      * ( 'prev_valuess
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_proofs_verified, 'max_proofs_verified) Proof.t Deferred.t )
+       , ('ret_value * ('max_proofs_verified, 'max_proofs_verified) Proof.t)
+         Deferred.t )
        H3_2.T(Prover).t

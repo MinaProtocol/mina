@@ -1002,9 +1002,7 @@ module T = struct
 
   let forget_prediff_info ((a : Transaction.Valid.t With_status.t list), b, c, d)
       =
-    ((a :> Transaction.t With_status.t list), b, c, d)
-
-  [%%if feature_zkapps]
+    (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
   let check_commands ledger ~verifier (cs : User_command.t list) =
     let cs =
@@ -1032,35 +1030,6 @@ module T = struct
             Error
               (Verifier.Failure.Verification_failed
                  (Error.of_string "batch verification failed") ) ) )
-
-  [%%else]
-
-  (* imeckler: added this version because the call to the verifier was
-     causing super catchup to proceed more slowly than it could have otherwise.
-
-     The reason is as follows: catchup would have, say 100 blocks in the "to verify"
-     queue and 20 in the "already verified, to apply" queue. Those 20 would be
-     processed very slowly because each one would have to call the verifier, which
-     the other queue was trying to call as well. *)
-  let check_commands _ledger ~verifier:_ (cs : User_command.t list) :
-      (User_command.Valid.t list, _) result Deferred.Or_error.t =
-    Result.all
-      (List.map cs ~f:(function
-        | Parties _ ->
-            Error
-              (Verifier.Failure.Verification_failed
-                 (Error.of_string "check_commands: snapp commands disabled") )
-        | Signed_command c -> (
-            match Signed_command.check c with
-            | Some c ->
-                Ok (User_command.Signed_command c)
-            | None ->
-                Error
-                  (Verifier.Failure.Verification_failed
-                     (Error.of_string "signature failed to verify") ) ) ) )
-    |> Deferred.Or_error.return
-
-  [%%endif]
 
   let apply ?skip_verification ~constraint_constants t
       (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
@@ -1318,7 +1287,7 @@ module T = struct
       let budget =
         Or_error.map2
           (sum_fees (Sequence.to_list uc_seq) ~f:(fun t ->
-               User_command.fee (t.data :> User_command.t) ) )
+               User_command.fee (User_command.forget_check t.data) ) )
           (sum_fees
              (List.filter
                 ~f:(fun (k, _) ->
@@ -1399,7 +1368,7 @@ module T = struct
       let open Or_error.Let_syntax in
       let payment_fees =
         sum_fees (Sequence.to_list t.commands_rev) ~f:(fun t ->
-            User_command.fee (t.data :> User_command.t) )
+            User_command.(fee (forget_check t.data)) )
       in
       let prover_fee_others =
         Public_key.Compressed.Map.fold t.fee_transfers ~init:(Ok Fee.zero)
@@ -1530,7 +1499,7 @@ module T = struct
             match t.budget with
             | Ok b ->
                 option "Fee insufficient"
-                  (Fee.sub b (User_command.fee (uc.data :> User_command.t)))
+                  (Fee.sub b User_command.(fee (forget_check uc.data)))
             | _ ->
                 rebudget new_t
           in
@@ -1619,7 +1588,7 @@ module T = struct
           check_constraints_and_update ~constraint_constants resources'
             (Option.value_map uc_opt ~default:log ~f:(fun uc ->
                  Diff_creation_log.discard_command `No_space
-                   (uc.data :> User_command.t)
+                   (User_command.forget_check uc.data)
                    log ) )
       else
         (* insufficient budget; reduce the cost*)
@@ -1636,7 +1605,7 @@ module T = struct
       check_constraints_and_update ~constraint_constants resources'
         (Option.value_map uc_opt ~default:log ~f:(fun uc ->
              Diff_creation_log.discard_command `No_work
-               (uc.data :> User_command.t)
+               (User_command.forget_check uc.data)
                log ) )
 
   let one_prediff ~constraint_constants cw_seq ts_seq ~receiver ~add_coinbase
@@ -1798,6 +1767,77 @@ module T = struct
       epoch_ledger
     |> not
 
+  let validate_party_proofs ~logger ~validating_ledger
+      (txn : User_command.Valid.t) =
+    let open Result.Let_syntax in
+    let get_verification_keys account_ids =
+      List.fold_until account_ids ~init:Account_id.Map.empty
+        ~f:(fun acc id ->
+          let get_vk () =
+            let open Option.Let_syntax in
+            let%bind loc =
+              Transaction_snark.Transaction_validator.Hashless_ledger
+              .location_of_account validating_ledger id
+            in
+            let%bind account =
+              Transaction_snark.Transaction_validator.Hashless_ledger.get
+                validating_ledger loc
+            in
+            let%bind zkapp = account.zkapp in
+            let%map vk = zkapp.verification_key in
+            vk.hash
+          in
+          match get_vk () with
+          | Some vk ->
+              Continue (Account_id.Map.update acc id ~f:(fun _ -> vk))
+          | None ->
+              [%log error]
+                ~metadata:[ ("account_id", Account_id.to_yojson id) ]
+                "Staged_ledger_diff creation: Verification key not found for \
+                 party with proof authorization and account_id $account_id" ;
+              Stop Account_id.Map.empty )
+        ~finish:Fn.id
+    in
+    match txn with
+    | Parties p ->
+        let%map checked_verification_keys =
+          Account_id.Map.of_alist_or_error p.verification_keys
+        in
+        let proof_parties =
+          Parties.Call_forest.fold ~init:Account_id.Set.empty
+            p.parties.other_parties ~f:(fun acc p ->
+              if Control.(Tag.equal Proof (tag (Party.authorization p))) then
+                Account_id.Set.add acc (Party.account_id p)
+              else acc )
+        in
+        let current_verification_keys =
+          get_verification_keys (Account_id.Set.to_list proof_parties)
+        in
+        if
+          Account_id.Set.length proof_parties
+          = Account_id.Map.length checked_verification_keys
+          && Account_id.Map.equal Parties.Valid.Verification_key_hash.equal
+               checked_verification_keys current_verification_keys
+        then true
+        else (
+          [%log error]
+            ~metadata:
+              [ ( "checked_verification_keys"
+                , [%to_yojson:
+                    (Account_id.t * Parties.Valid.Verification_key_hash.t) list]
+                    (Account_id.Map.to_alist checked_verification_keys) )
+              ; ( "current_verification_keys"
+                , [%to_yojson:
+                    (Account_id.t * Parties.Valid.Verification_key_hash.t) list]
+                    (Account_id.Map.to_alist current_verification_keys) )
+              ]
+            "Staged_ledger_diff creation: Verifcation keys used for verifying \
+             proofs $checked_verification_keys and verification keys in the \
+             ledger $current_verification_keys don't match" ;
+          false )
+    | _ ->
+        Ok true
+
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ?(log_block_creation = false) t ~coinbase_receiver ~logger
@@ -1882,10 +1922,17 @@ module T = struct
               match
                 O1trace.sync_thread "validate_transaction_against_staged_ledger"
                   (fun () ->
+                    let%bind valid_proofs =
+                      validate_party_proofs ~logger ~validating_ledger txn
+                    in
+                    let%bind () =
+                      if valid_proofs then Ok ()
+                      else Or_error.errorf "Verification key mismatch"
+                    in
                     Transaction_validator.apply_transaction
                       ~constraint_constants validating_ledger
                       ~txn_state_view:current_state_view
-                      (Command (txn :> User_command.t)) )
+                      (Command (User_command.forget_check txn)) )
               with
               | Error e ->
                   [%log error]
@@ -2002,6 +2049,9 @@ let%test_module "staged ledger tests" =
 
     let logger = Logger.null ()
 
+    let `VK vk, `Prover snapp_prover =
+      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -2067,11 +2117,12 @@ let%test_module "staged ledger tests" =
             ~protocol_constants:genesis_constants.protocol
         in
         let compile_time_genesis =
+          let open Staged_ledger_diff in
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
           Mina_state.Genesis_protocol_state.t
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-            ~constraint_constants ~consensus_constants
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
         in
         compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
@@ -2150,7 +2201,7 @@ let%test_module "staged ledger tests" =
             let%bind _ =
               Ledger.apply_transaction ~constraint_constants test_ledger
                 ~txn_state_view:(dummy_state_view ())
-                (Command (cmd :> User_command.t))
+                (Command (User_command.forget_check cmd))
             in
             apply_cmds cmds
       in
@@ -2348,19 +2399,34 @@ let%test_module "staged ledger tests" =
         -> int option list
         -> Sl.t ref
         -> ?expected_proof_count:int option (*Number of ledger proofs expected*)
+        -> ?allow_failures:bool
         -> Ledger.Mask.Attached.t
         -> [ `One_prover | `Many_provers ]
         -> (   Transaction_snark_work.Statement.t
             -> Transaction_snark_work.Checked.t option )
         -> unit Deferred.t =
      fun account_ids_to_check cmds cmd_iters sl ?(expected_proof_count = None)
-         test_mask provers stmt_to_work ->
+         ?(allow_failures = false) test_mask provers stmt_to_work ->
       let%map total_ledger_proofs =
         iter_cmds_acc cmds cmd_iters 0
           (fun cmds_left count_opt cmds_this_iter proof_count ->
             let%bind ledger_proof, diff =
               create_and_apply sl cmds_this_iter stmt_to_work
             in
+            List.iter (Staged_ledger_diff.commands diff) ~f:(fun c ->
+                match With_status.status c with
+                | Applied ->
+                    ()
+                | Failed ftl ->
+                    if not allow_failures then
+                      failwith
+                        (sprintf
+                           "Transaction application failed for command %s. \
+                            Failures %s"
+                           ( User_command.to_yojson (With_status.data c)
+                           |> Yojson.Safe.to_string )
+                           ( Transaction_status.Failure.Collection.to_yojson ftl
+                           |> Yojson.Safe.to_string ) ) ) ;
             let proof_count' =
               proof_count + if Option.is_some ledger_proof then 1 else 0
             in
@@ -2383,8 +2449,8 @@ let%test_module "staged ledger tests" =
                   (List.map (Staged_ledger_diff.commands diff)
                      ~f:(fun { With_status.data; _ } -> data) )
                   ( Sequence.take cmds_this_iter cmds_applied_this_iter
-                    |> Sequence.to_list
-                    :> User_command.t list )
+                  |> Sequence.map ~f:User_command.forget_check
+                  |> Sequence.to_list )
             | None ->
                 () ) ;
             let coinbase_cost = coinbase_cost diff in
@@ -2425,98 +2491,33 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
 
-    let gen_zkapps ~iters ~num_zkapps :
+    let gen_zkapps ?failure ~num_zkapps iters :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind parties_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators.sequence_parties_with_ledger
-          ~length:num_zkapps ()
+          ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
-          | Parties parties, fee_payer_keypair, keymap ->
-              let memo_hash = Signed_command_memo.hash parties.memo in
-              let fee_payer_hash =
-                Party.of_fee_payer parties.fee_payer
-                |> Parties.Digest.Party.create
-              in
-              let fee_payer_signature =
-                Signature_lib.Schnorr.Chunked.sign fee_payer_keypair.private_key
-                  (Random_oracle.Input.Chunked.field
-                     ( Parties.commitment parties
-                     |> Parties.Transaction_commitment.create_complete
-                          ~memo_hash ~fee_payer_hash ) )
-              in
-              (* replace fee payer signature, because new protocol state invalidates the old *)
-              let fee_payer_with_valid_signature =
-                { parties.fee_payer with authorization = fee_payer_signature }
-              in
-              let memo_hash = Signed_command_memo.hash parties.memo in
-              let other_parties_hash = Parties.other_parties_hash parties in
-              let sign_for_other_party ~use_full_commitment sk =
-                let tx_commitment =
-                  Parties.Transaction_commitment.create ~other_parties_hash
-                in
-                let full_tx_commitment =
-                  Parties.Transaction_commitment.create_complete tx_commitment
-                    ~memo_hash ~fee_payer_hash
-                in
-                let commitment =
-                  if use_full_commitment then full_tx_commitment
-                  else tx_commitment
-                in
-                Signature_lib.Schnorr.Chunked.sign sk
-                  (Random_oracle.Input.Chunked.field commitment)
-              in
-              (* replace other party's signatures, because of new protocol state *)
-              let other_parties_with_valid_signatures =
-                Parties.Call_forest.map parties.other_parties
-                  ~f:(fun ({ body; authorization } : Party.t) ->
-                    let authorization_with_valid_signature =
-                      match authorization with
-                      | Control.Signature _dummy ->
-                          let pk = body.public_key in
-                          let sk =
-                            match
-                              Signature_lib.Public_key.Compressed.Map.find
-                                keymap pk
-                            with
-                            | Some sk ->
-                                sk
-                            | None ->
-                                failwithf
-                                  "gen_from: Could not find secret key for \
-                                   public key %s in keymap"
-                                  (Signature_lib.Public_key.Compressed
-                                   .to_base58_check pk )
-                                  ()
-                          in
-                          let use_full_commitment = body.use_full_commitment in
-                          let signature =
-                            sign_for_other_party ~use_full_commitment sk
-                          in
-                          Control.Signature signature
-                      | Proof _ | None_given ->
-                          authorization
-                    in
-                    ( { body
-                      ; authorization = authorization_with_valid_signature
-                      }
-                      : Party.t ) )
-              in
-              let parties' =
-                { parties with
-                  fee_payer = fee_payer_with_valid_signature
-                ; other_parties = other_parties_with_valid_signatures
-                }
-              in
-              User_command.Parties parties'
+          | Parties parties, _fee_payer_keypair, _keymap ->
+              User_command.Parties parties
           | Signed_command _, _, _ ->
               failwith "Expected a Parties, got a Signed command" )
       in
       assert (List.length zkapps = num_zkapps) ;
       return (ledger, zkapps, List.init iters ~f:(Fn.const None))
+
+    let gen_failing_zkapps_at_capacity :
+        (Ledger.t * User_command.Valid.t list * int option list)
+        Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
+      let num_zkapps = transaction_capacity * iters in
+      gen_zkapps
+        ~failure:Mina_generators.Parties_generators.Invalid_account_precondition
+        ~num_zkapps iters
 
     let gen_zkapps_at_capacity :
         (Ledger.t * User_command.Valid.t list * int option list)
@@ -2524,7 +2525,7 @@ let%test_module "staged ledger tests" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
       let num_zkapps = transaction_capacity * iters in
-      gen_zkapps ~num_zkapps ~iters
+      gen_zkapps ~num_zkapps iters
 
     let gen_zkapps_below_capacity ?(extra_blocks = false) () :
         (Ledger.t * User_command.Valid.t list * int option list)
@@ -2540,7 +2541,7 @@ let%test_module "staged ledger tests" =
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
       let num_zkapps = List.fold zkapps_per_iter ~init:0 ~f:( + ) in
-      gen_zkapps ~num_zkapps ~iters
+      gen_zkapps ~num_zkapps iters
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
       the function of [extra_block_count] and is same for all generated values*)
@@ -2621,6 +2622,17 @@ let%test_module "staged ledger tests" =
               in
               test_simple account_ids zkapps iters sl test_mask `Many_provers
                 stmt_to_work_random_prover ) )
+
+    let%test_unit "Max_throughput with zkApp transactions that may fail" =
+      (* limit trials to prevent too-many-open-files failure *)
+      Quickcheck.test ~trials:2 gen_failing_zkapps_at_capacity
+        ~f:(fun (ledger, zkapps, iters) ->
+          async_with_given_ledger ledger (fun sl test_mask ->
+              let account_ids =
+                Ledger.accounts ledger |> Account_id.Set.to_list
+              in
+              test_simple account_ids zkapps iters ~allow_failures:true sl
+                test_mask `Many_provers stmt_to_work_random_prover ) )
 
     let%test_unit "Be able to include random number of commands" =
       Quickcheck.test (gen_below_capacity ()) ~trials:20
@@ -2767,7 +2779,7 @@ let%test_module "staged ledger tests" =
                     let cmds_this_iter =
                       cmds_this_iter |> Sequence.to_list
                       |> List.map ~f:(fun cmd ->
-                             { With_status.data = (cmd :> User_command.t)
+                             { With_status.data = User_command.forget_check cmd
                              ; status = Applied
                              } )
                     in
@@ -2878,7 +2890,7 @@ let%test_module "staged ledger tests" =
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
-         *)
+           *)
 
     let test_random_number_of_proofs :
            Ledger.init_state
@@ -3035,7 +3047,7 @@ let%test_module "staged ledger tests" =
           )
 
     (** Like test_random_number_of_proofs but with random proof fees.
-         *)
+           *)
     let test_random_proof_fee :
            Ledger.init_state
         -> User_command.Valid.t list
@@ -3716,4 +3728,140 @@ let%test_module "staged ledger tests" =
                       assert true
                   | Error _ ->
                       assert false ) ) )
+
+    let%test_unit "Mismatched verification keys in zkApp accounts and \
+                   transactions" =
+      let open Transaction_snark.For_tests in
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind test_spec = Mina_transaction_logic.For_tests.Test_spec.gen in
+        let pks =
+          Public_key.Compressed.Set.of_list
+            (List.map (Array.to_list test_spec.init_ledger) ~f:(fun s ->
+                 Public_key.compress (fst s).public_key ) )
+        in
+        let%map kp =
+          Quickcheck.Generator.filter Keypair.gen ~f:(fun kp ->
+              not
+                (Public_key.Compressed.Set.mem pks
+                   (Public_key.compress kp.public_key) ) )
+        in
+        (test_spec, kp)
+      in
+      Quickcheck.test ~trials:1 gen
+        ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
+          let fee = Fee.of_int 1_000_000 in
+          let amount = Amount.of_int 10_000_000_000 in
+          let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
+          let snapp_update =
+            { Party.Update.dummy with
+              delegate = Zkapp_basic.Set_or_keep.Set snapp_pk
+            }
+          in
+          let memo = Signed_command_memo.dummy in
+          let test_spec : Spec.t =
+            { sender = (new_kp, Mina_base.Account.Nonce.zero)
+            ; fee
+            ; fee_payer = None
+            ; receivers = []
+            ; amount
+            ; zkapp_account_keypairs = [ new_kp ]
+            ; memo
+            ; new_zkapp_account = false
+            ; snapp_update
+            ; current_auth = Permissions.Auth_required.Proof
+            ; call_data = Snark_params.Tick.Field.zero
+            ; events = []
+            ; sequence_events = []
+            ; preconditions = None
+            }
+          in
+          Ledger.with_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Mina_transaction_logic.For_tests.Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  (*create a snapp account*)
+                  let snapp_permissions =
+                    let default = Permissions.user_default in
+                    { default with
+                      set_delegate = Permissions.Auth_required.Proof
+                    }
+                  in
+                  let snapp_account_id =
+                    Account_id.create snapp_pk Token_id.default
+                  in
+                  let dummy_vk =
+                    let data = Pickles.Side_loaded.Verification_key.dummy in
+                    let hash = Zkapp_account.digest_vk data in
+                    ({ data; hash } : _ With_hash.t)
+                  in
+                  let valid_against_ledger =
+                    let new_mask =
+                      Ledger.Mask.create ~depth:(Ledger.depth ledger) ()
+                    in
+                    let l = Ledger.register_mask ledger new_mask in
+                    Transaction_snark.For_tests.create_trivial_zkapp_account
+                      ~permissions:snapp_permissions ~vk ~ledger:l snapp_pk ;
+                    l
+                  in
+                  let%bind parties =
+                    Transaction_snark.For_tests.update_states ~snapp_prover
+                      ~constraint_constants test_spec
+                  in
+                  let valid_parties =
+                    Option.value_exn
+                      (Parties.Valid.to_valid ~ledger:valid_against_ledger
+                         ~get:Ledger.get
+                         ~location_of_account:Ledger.location_of_account parties )
+                  in
+                  ignore
+                    (Ledger.unregister_mask_exn valid_against_ledger
+                       ~loc:__LOC__ ) ;
+                  (*Different key in the staged ledger*)
+                  Transaction_snark.For_tests.create_trivial_zkapp_account
+                    ~permissions:snapp_permissions ~vk:dummy_vk ~ledger snapp_pk ;
+                  let open Async.Deferred.Let_syntax in
+                  let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
+                  let%bind _proof, diff =
+                    create_and_apply sl
+                      (Sequence.singleton (User_command.Parties valid_parties))
+                      stmt_to_work_one_prover
+                  in
+                  let commands = Staged_ledger_diff.commands diff in
+                  (*Parties with incompatible vk should not be in the diff*)
+                  assert (List.is_empty commands) ;
+                  (*Update the account to have correct vk*)
+                  let loc =
+                    Option.value_exn
+                      (Ledger.location_of_account ledger snapp_account_id)
+                  in
+                  let account = Option.value_exn (Ledger.get ledger loc) in
+                  Ledger.set ledger loc
+                    { account with
+                      zkapp =
+                        Some
+                          { (Option.value_exn account.zkapp) with
+                            verification_key = Some vk
+                          }
+                    } ;
+                  let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
+                  let%bind _proof, diff =
+                    create_and_apply sl
+                      (Sequence.singleton (User_command.Parties valid_parties))
+                      stmt_to_work_one_prover
+                  in
+                  let commands = Staged_ledger_diff.commands diff in
+                  assert (List.length commands = 1) ;
+                  match List.hd_exn commands with
+                  | { With_status.data = Parties _ps; status = Applied } ->
+                      return ()
+                  | { With_status.data = Parties _ps; status = Failed tbl } ->
+                      failwith
+                        (sprintf "Parties application failed %s"
+                           ( Transaction_status.Failure.Collection.to_yojson tbl
+                           |> Yojson.Safe.to_string ) )
+                  | _ ->
+                      failwith "expecting parties transaction" ) ) )
   end )

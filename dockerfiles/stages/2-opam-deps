@@ -11,6 +11,8 @@ FROM build-deps AS opam-deps
 ARG MINA_DIR=mina
 # branch to checkout for opam dependencies
 ARG MINA_BRANCH=compatible
+# mina repository to pull from
+ARG MINA_REPO=https://github.com/MinaProtocol/mina
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
@@ -27,7 +29,7 @@ RUN git clone \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  https://github.com/MinaProtocol/mina ${HOME}/${MINA_DIR}
+  ${MINA_REPO} ${HOME}/${MINA_DIR}
 
 WORKDIR $HOME/$MINA_DIR
 

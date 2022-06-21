@@ -1,9 +1,6 @@
 [%%import "/src/config.mlh"]
 
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core
 open Async
 open Mina_state
@@ -76,8 +73,10 @@ module Inputs = struct
       ~protocol_constants:genesis_constants.protocol
 
   let protocol_state_with_hashes =
+    let open Staged_ledger_diff in
     Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
       ~genesis_epoch_data ~constraint_constants ~consensus_constants
+      ~genesis_body_reference
 end
 
 module Dummy = struct
@@ -90,6 +89,7 @@ module Dummy = struct
 
   let compiled_values =
     let open Inputs in
+    let open Staged_ledger_diff in
     if generate_genesis_proof then
       Some
         (Async.return
@@ -99,6 +99,7 @@ module Dummy = struct
            ; genesis_constants
            ; genesis_ledger = (module Test_genesis_ledger)
            ; genesis_epoch_data
+           ; genesis_body_reference
            ; consensus_constants
            ; protocol_state_with_hashes
            ; constraint_system_digests = hashes
@@ -112,6 +113,7 @@ module Make_real () = struct
 
   let compiled_values =
     let open Inputs in
+    let open Staged_ledger_diff in
     if generate_genesis_proof then
       Some
         (let%bind () = return () in
@@ -131,6 +133,7 @@ module Make_real () = struct
              ; genesis_constants
              ; genesis_ledger = (module Test_genesis_ledger)
              ; genesis_epoch_data
+             ; genesis_body_reference
              ; consensus_constants
              ; protocol_state_with_hashes
              ; constraint_system_digests = None
@@ -164,71 +167,76 @@ let main () =
 
       let for_unit_tests =
         lazy
-          (let protocol_state_with_hashes =
-             Mina_state.Genesis_protocol_state.t
-               ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-               ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.for_unit_tests
-               ~consensus_constants:
-                 (Lazy.force Consensus.Constants.for_unit_tests)
-           in
-           { runtime_config = Runtime_config.default
-           ; constraint_constants =
-               Genesis_constants.Constraint_constants.for_unit_tests
-           ; proof_level = Genesis_constants.Proof_level.for_unit_tests
-           ; genesis_constants = Genesis_constants.for_unit_tests
-           ; genesis_ledger = Genesis_ledger.for_unit_tests
-           ; genesis_epoch_data = Consensus.Genesis_epoch_data.for_unit_tests
-           ; consensus_constants = Lazy.force Consensus.Constants.for_unit_tests
-           ; protocol_state_with_hashes
-           ; constraint_system_digests =
-               lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
-           ; proof_data = None
-           } )
+          (let open Staged_ledger_diff in
+          let protocol_state_with_hashes =
+            Mina_state.Genesis_protocol_state.t
+              ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+              ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+              ~constraint_constants:
+                Genesis_constants.Constraint_constants.for_unit_tests
+              ~consensus_constants:
+                (Lazy.force Consensus.Constants.for_unit_tests)
+              ~genesis_body_reference
+          in
+          { runtime_config = Runtime_config.default
+          ; constraint_constants =
+              Genesis_constants.Constraint_constants.for_unit_tests
+          ; proof_level = Genesis_constants.Proof_level.for_unit_tests
+          ; genesis_constants = Genesis_constants.for_unit_tests
+          ; genesis_ledger = Genesis_ledger.for_unit_tests
+          ; genesis_epoch_data = Consensus.Genesis_epoch_data.for_unit_tests
+          ; genesis_body_reference
+          ; consensus_constants = Lazy.force Consensus.Constants.for_unit_tests
+          ; protocol_state_with_hashes
+          ; constraint_system_digests =
+              lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
+          ; proof_data = None
+          })
 
       let compiled_inputs =
         lazy
-          (let constraint_constants =
-             Genesis_constants.Constraint_constants.compiled
-           in
-           let genesis_constants = Genesis_constants.compiled in
-           let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
-           let consensus_constants =
-             Consensus.Constants.create ~constraint_constants
-               ~protocol_constants:genesis_constants.protocol
-           in
-           let protocol_state_with_hashes =
-             Mina_state.Genesis_protocol_state.t
-               ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
-               ~constraint_constants ~consensus_constants
-           in
-           { Genesis_proof.Inputs.runtime_config = Runtime_config.default
-           ; constraint_constants
-           ; proof_level = Genesis_constants.Proof_level.compiled
-           ; genesis_constants
-           ; genesis_ledger = (module Test_genesis_ledger)
-           ; genesis_epoch_data
-           ; consensus_constants
-           ; protocol_state_with_hashes
-           ; constraint_system_digests =
-               [%e
-                 match compiled_values with
-                 | Some { constraint_system_digests = hashes; _ } ->
-                     [%expr Some [%e hashes_to_expr ~loc (Lazy.force hashes)]]
-                 | None ->
-                     [%expr None]]
-           ; blockchain_proof_system_id =
-               [%e
-                 match compiled_values with
-                 | Some
-                     { proof_data = Some { blockchain_proof_system_id = id; _ }
-                     ; _
-                     } ->
-                     [%expr Some [%e vk_id_to_expr ~loc id]]
-                 | _ ->
-                     [%expr None]]
-           } )
+          (let open Staged_ledger_diff in
+          let constraint_constants =
+            Genesis_constants.Constraint_constants.compiled
+          in
+          let genesis_constants = Genesis_constants.compiled in
+          let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
+          let consensus_constants =
+            Consensus.Constants.create ~constraint_constants
+              ~protocol_constants:genesis_constants.protocol
+          in
+          let protocol_state_with_hashes =
+            Mina_state.Genesis_protocol_state.t
+              ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
+              ~constraint_constants ~consensus_constants ~genesis_body_reference
+          in
+          { Genesis_proof.Inputs.runtime_config = Runtime_config.default
+          ; constraint_constants
+          ; proof_level = Genesis_constants.Proof_level.compiled
+          ; genesis_constants
+          ; genesis_ledger = (module Test_genesis_ledger)
+          ; genesis_epoch_data
+          ; genesis_body_reference
+          ; consensus_constants
+          ; protocol_state_with_hashes
+          ; constraint_system_digests =
+              [%e
+                match compiled_values with
+                | Some { constraint_system_digests = hashes; _ } ->
+                    [%expr Some [%e hashes_to_expr ~loc (Lazy.force hashes)]]
+                | None ->
+                    [%expr None]]
+          ; blockchain_proof_system_id =
+              [%e
+                match compiled_values with
+                | Some
+                    { proof_data = Some { blockchain_proof_system_id = id; _ }
+                    ; _
+                    } ->
+                    [%expr Some [%e vk_id_to_expr ~loc id]]
+                | _ ->
+                    [%expr None]]
+          })
 
       let compiled =
         [%e
@@ -244,6 +252,7 @@ let main () =
                      ; genesis_constants = inputs.genesis_constants
                      ; genesis_ledger = inputs.genesis_ledger
                      ; genesis_epoch_data = inputs.genesis_epoch_data
+                     ; genesis_body_reference = inputs.genesis_body_reference
                      ; consensus_constants = inputs.consensus_constants
                      ; protocol_state_with_hashes =
                          inputs.protocol_state_with_hashes

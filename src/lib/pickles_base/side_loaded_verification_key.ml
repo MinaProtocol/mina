@@ -148,10 +148,7 @@ module Repr = struct
   module Stable = struct
     module V2 = struct
       type 'g t =
-        { step_data :
-            (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
-        ; max_width : Width.Stable.V1.t
+        { max_proofs_verified : Proofs_verified.Stable.V1.t
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         }
       [@@deriving sexp, equal, compare, yojson]
@@ -165,11 +162,8 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('g, 'vk) t =
-        { step_data :
-            (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
-        ; max_width : Width.Stable.V1.t
+      type ('g, 'proofs_verified, 'vk) t =
+        { max_proofs_verified : 'proofs_verified
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option
         }
@@ -197,29 +191,13 @@ let wrap_index_to_input (type gs f) (g : gs -> f array) t =
 let width_size = Nat.to_int Width.Length.n
 
 let to_input (type a) ~(field_of_int : int -> a) :
-    (a * a, _) Poly.t -> a Random_oracle_input.Chunked.t =
+    (a * a, _, _) Poly.t -> a Random_oracle_input.Chunked.t =
   let open Random_oracle_input.Chunked in
-  let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
-  fun { step_data; max_width; wrap_index } : _ Random_oracle_input.Chunked.t ->
-    let num_branches =
-      packed
-        (field_of_int (At_most.length step_data), Nat.to_int Max_branches.Log2.n)
-    in
-    let step_domains, step_widths =
-      At_most.extend_to_vector step_data
-        (dummy_domains, dummy_width)
-        Max_branches.n
-      |> Vector.unzip
-    in
-    let width w = (field_of_int (Width.to_int w), width_size) in
+  fun { max_proofs_verified; wrap_index } : _ Random_oracle_input.Chunked.t ->
     List.reduce_exn ~f:append
-      [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
-            map_reduce [| h |] ~f:(fun (Pow_2_roots_of_unity x) ->
-                packed (field_of_int x, max_log2_degree) ) )
-      ; Array.map (Vector.to_array step_widths) ~f:width |> packeds
-      ; packed (width max_width)
+      [ Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
+          ~one:(field_of_int 1) max_proofs_verified
       ; wrap_index_to_input
           (Fn.compose Array.of_list (fun (x, y) -> [ x; y ]))
           wrap_index
-      ; num_branches
       ]

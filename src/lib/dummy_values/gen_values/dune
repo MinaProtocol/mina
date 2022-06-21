@@ -1,5 +1,6 @@
 (executable
  (name gen_values)
+ (link_flags (-linkall))
  (libraries
    ;; opam libraries
    async_unix
@@ -10,6 +11,7 @@
    async
    ppxlib
    ppxlib.ast
+   ppxlib.astlib
    core_kernel
    compiler-libs
    async_kernel

@@ -1,3 +1,4 @@
+use kimchi::proof::caml::CamlRecursionChallenge;
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
@@ -14,12 +15,13 @@ use wires_15_stubs::{
     pasta_fq_plonk_proof::*,
     pasta_fq_plonk_verifier_index::*,
     plonk_verifier_index::{
-        CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain, CamlPlonkVerificationEvals,
-        CamlPlonkVerifierIndex,
+        CamlLookupSelectors, CamlLookupVerifierIndex, CamlLookupsUsed, CamlPlonkDomain,
+        CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
     projective::{pallas::*, vesta::*},
     srs::{fp::*, fq::*},
     CamlCircuitGate,
+    CamlLookupCommitments,
     CamlLookupEvaluations,
     CamlOpeningProof,
     CamlPolyComm,
@@ -92,7 +94,9 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlLookupEvaluations<T1> => "lookup_evaluations");
     decl_type!(w, env, CamlProofEvaluations::<T1> => "proof_evaluations");
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
+    decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
+    decl_type!(w, env, CamlLookupCommitments::<T1> => "lookup_commitments");
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
 
@@ -106,6 +110,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_module!(w, env, "VerifierIndex", {
         decl_module!(w, env, "Lookup", {
             decl_type!(w, env, CamlLookupsUsed => "lookups_used");
+            decl_type!(w, env, CamlLookupSelectors<T1> => "lookup_selectors");
             decl_type!(w, env, CamlLookupVerifierIndex<T1> => "t");
         });
         decl_type!(w, env, CamlPlonkDomain<T1> => "domain");
@@ -334,6 +339,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fp_srs_write => "write");
                 decl_func!(w, env, caml_fp_srs_read => "read");
                 decl_func!(w, env, caml_fp_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_fp_srs_add_lagrange_basis=> "add_lagrange_basis");
                 decl_func!(w, env, caml_fp_srs_commit_evaluations => "commit_evaluations");
                 decl_func!(w, env, caml_fp_srs_b_poly_commitment => "b_poly_commitment");
                 decl_func!(w, env, caml_fp_srs_batch_accumulator_check => "batch_accumulator_check");
@@ -347,6 +353,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fq_srs_write => "write");
                 decl_func!(w, env, caml_fq_srs_read => "read");
                 decl_func!(w, env, caml_fq_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_fq_srs_add_lagrange_basis=> "add_lagrange_basis");
                 decl_func!(w, env, caml_fq_srs_commit_evaluations => "commit_evaluations");
                 decl_func!(w, env, caml_fq_srs_b_poly_commitment => "b_poly_commitment");
                 decl_func!(w, env, caml_fq_srs_batch_accumulator_check => "batch_accumulator_check");
