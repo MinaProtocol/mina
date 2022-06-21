@@ -241,7 +241,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
   ; prevs = [ self; self ]
   ; main =
-      (fun [ _; _ ] _ ->
+      (fun { previous_public_inputs = [ _; _ ]; public_input = _ } ->
         Transaction_snark.dummy_constraints ()
         |> Snark_params.Tick.Run.run_checked ;
         (* Unsatisfiable. *)
@@ -249,7 +249,10 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
           Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
         in
         Run.Field.(Assert.equal s (s + one)) ;
-        ([ Boolean.true_; Boolean.true_ ], ()) )
+        { previous_proofs_should_verify = [ Boolean.true_; Boolean.true_ ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let gen_snapp_ledger =

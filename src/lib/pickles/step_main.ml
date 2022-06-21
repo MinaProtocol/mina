@@ -102,14 +102,15 @@ let finalize_previous_and_verify = ()
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
-    type proofs_verified self_branches prev_vars prev_values prev_ret_vars var value a_var a_value ret_var ret_value max_proofs_verified local_branches local_signature.
+    type proofs_verified self_branches prev_vars prev_values prev_ret_vars var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
            and type statement = a_value
            and type prev_values = prev_values
            and type max_proofs_verified = max_proofs_verified
-           and type return_value = ret_value )
+           and type return_value = ret_value
+           and type auxiliary_value = auxiliary_value )
     -> (module Nat.Add.Intf with type n = max_proofs_verified)
     -> self_branches:self_branches Nat.t
          (* How many branches does this proof system have *)
@@ -131,6 +132,7 @@ let step_main :
          , ret_var
          , ret_value )
          Inductive_rule.public_input
+    -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
     -> basic:
          ( var
          , value
@@ -145,7 +147,9 @@ let step_main :
        , a_var
        , a_value
        , ret_var
-       , ret_value )
+       , ret_value
+       , auxiliary_var
+       , auxiliary_value )
        Inductive_rule.t
     -> (   unit
         -> ( (Unfinalized.t, max_proofs_verified) Vector.t
@@ -155,7 +159,7 @@ let step_main :
        Staged.t =
  fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
-     ~proofs_verified ~lte ~public_input ~basic ~self rule ->
+     ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
@@ -256,15 +260,29 @@ let step_main :
           exists prev_values_typs ~request:(fun () -> Req.Prev_inputs)
         in
         let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-        let proofs_should_verify, ret_var =
+        let { Inductive_rule.previous_proofs_should_verify =
+                proofs_should_verify
+            ; public_output = ret_var
+            ; auxiliary_output = auxiliary_var
+            } =
           (* Run the application logic of the rule on the predecessor statements *)
           with_label "rule_main" (fun () ->
-              rule.main prev_statements app_state )
+              rule.main
+                { previous_public_inputs = prev_statements
+                ; public_input = app_state
+                } )
         in
         let () =
           exists Typ.unit ~request:(fun () ->
               let ret_value = As_prover.read output_typ ret_var in
               Req.Return_value ret_value )
+        in
+        let () =
+          exists Typ.unit ~request:(fun () ->
+              let auxiliary_value =
+                As_prover.read auxiliary_typ auxiliary_var
+              in
+              Req.Auxiliary_value auxiliary_value )
         in
         (* Compute proof parts outside of the prover before requesting values.
         *)

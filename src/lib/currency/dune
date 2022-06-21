@@ -2,6 +2,7 @@
  (name currency)
  (public_name currency)
  (library_flags -linkall)
+ (flags -w -22) ; Silence ppx_version's warnings
  (inline_tests)
  (libraries
    ;; opam libraries
@@ -15,6 +16,7 @@
    result
    ppx_inline_test.config
    zarith
+   mina_wire_types
    ;; local libraries
    bignum_bigint
    bitstring_lib
