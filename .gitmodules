@@ -13,9 +13,9 @@
 [submodule "frontend/wallet/tablecloth"]
 	path = frontend/wallet/tablecloth
 	url = https://github.com/bkase/tablecloth
-[submodule "src/lib/marlin"]
-	path = src/lib/marlin
-	url = https://github.com/o1-labs/marlin.git
+[submodule "src/lib/crypto/proof-systems"]
+	path = src/lib/crypto/proof-systems
+	url = https://github.com/o1-labs/proof-systems.git
 [submodule "src/external/ppx_version"]
 	path = src/external/ppx_version
 	url = https://github.com/o1-labs/ppx_version.git
@@ -29,3 +29,6 @@
 [submodule "src/external/capnp-ocaml"]
 	path = src/external/capnp-ocaml
 	url = https://github.com/o1-labs/capnp-ocaml.git
+[submodule "src/lib/snarky_js_bindings/snarkyjs"]
+	path = src/lib/snarky_js_bindings/snarkyjs
+	url = https://github.com/o1-labs/snarkyjs.git

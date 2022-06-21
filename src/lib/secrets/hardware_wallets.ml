@@ -97,10 +97,10 @@ let sign ~hd_index ~public_key ~user_command_payload :
     (Signed_command.With_valid_signature.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   let input =
-    Transaction_union_payload.to_input
+    Transaction_union_payload.to_input_legacy
     @@ Transaction_union_payload.of_user_command_payload user_command_payload
   in
-  let fields = Random_oracle.pack_input input in
+  let fields = Random_oracle.Legacy.pack_input input in
   let messages =
     Array.map fields ~f:(fun field -> Tick.Field.to_string field)
   in
