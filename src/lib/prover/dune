@@ -38,6 +38,7 @@
    transaction_snark
    logger.file_system
    data_hash_lib
+   staged_ledger_diff
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

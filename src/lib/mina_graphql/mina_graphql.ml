@@ -3972,7 +3972,7 @@ module Queries = struct
                  ; hash = Transaction_hash.hash_command cmd
                  } )
         in
-        let%bind txn =
+        let%map txn =
           match (serialized_payment, serialized_zkapp) with
           | None, None | Some _, Some _ ->
               Error
@@ -3985,10 +3985,8 @@ module Queries = struct
         in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
         let transaction_pool = Mina_lib.transaction_pool coda in
-        Result.map_error
-          (Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-             ~transaction_pool txn.data )
-          ~f:Error.to_string_hum )
+        Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
+          ~transaction_pool txn.data )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
@@ -4014,9 +4012,11 @@ module Queries = struct
         let { With_hash.data = genesis_state
             ; hash = { State_hash.State_hashes.state_hash = hash; _ }
             } =
+          let open Staged_ledger_diff in
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants
+            ~genesis_body_reference
         in
         let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data =

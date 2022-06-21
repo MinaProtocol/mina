@@ -51,7 +51,7 @@ module type S = sig
        , N2.n * (N2.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
-       , Proof.t Async.Deferred.t )
+       , (unit * unit * Proof.t) Async.Deferred.t )
        Pickles.Prover.t
 
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t

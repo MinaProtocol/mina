@@ -320,9 +320,9 @@ module Statement_var = struct
   let to_field_elements (t : t) = [| Data_as_hash.hash t |]
 end
 
-let typ = Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
-
 type tag = (Statement_var.t, Statement.t, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
+
+let typ = Data_as_hash.typ ~hash:(fun t -> (Protocol_state.hashes t).state_hash)
 
 let check w ?handler ~proof_level ~constraint_constants new_state_hash :
     unit Or_error.t =
@@ -338,13 +338,16 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
   { identifier = "step"
   ; prevs = [ self; transaction_snark ]
   ; main =
-      (fun x ->
-        let prev_blockchain_stmt, txn_snark_stmt =
+      (fun { public_input = x } ->
+        let b1, b2 =
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
                x )
         in
-        [ prev_blockchain_stmt; txn_snark_stmt ] )
+        { previous_proof_statements = [ b1; b2 ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 module type S = sig
@@ -365,7 +368,7 @@ module type S = sig
        , N2.n * (N2.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
-       , Proof.t Async.Deferred.t )
+       , (unit * unit * Proof.t) Async.Deferred.t )
        Pickles.Prover.t
 
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
@@ -403,7 +406,7 @@ end) : S = struct
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)
-      ~typ
+      ~public_input:(Input typ) ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

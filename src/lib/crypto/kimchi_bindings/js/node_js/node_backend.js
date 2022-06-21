@@ -116,7 +116,7 @@ var plonk_wasm = (function() {
     // global scope, yet not attached to the global object, so we can't access
     // it differently.
     if (worker_threads.isMainThread) {
-        plonk_wasm.initThreadPool(3, __filename);
+        plonk_wasm.initThreadPool(require('os').cpus().length - 1, __filename);
     } else {
         wasm_ready(plonk_wasm);
     }

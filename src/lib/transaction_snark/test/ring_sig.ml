@@ -50,9 +50,12 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   { identifier = "ring-sig-rule"
   ; prevs = []
   ; main =
-      (fun x ->
+      (fun { public_input = x } ->
         Run.run_checked @@ ring_sig_main x ;
-        [] )
+        { previous_proof_statements = []
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let%test_unit "1-of-1" =
@@ -121,7 +124,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             Pickles.compile ~cache:Cache_dir.cache
               (module Zkapp_statement.Checked)
               (module Zkapp_statement)
-              ~typ:Zkapp_statement.typ
+              ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N2)
               ~max_proofs_verified:(module Nat.N2)
                 (* You have to put 2 here... *)
@@ -243,9 +246,13 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let transaction : Parties.Transaction_commitment.t =
             Parties.Transaction_commitment.create ~other_parties_hash
           in
-          let at_party = Parties.Call_forest.hash ps in
           let tx_statement : Zkapp_statement.t =
-            { transaction; at_party = (at_party :> field) }
+            { party =
+                Party.Body.digest
+                  (Parties.add_caller_simple snapp_party_data Token_id.default)
+                    .body
+            ; calls = (Parties.Digest.Forest.empty :> field)
+            }
           in
           let msg =
             tx_statement |> Zkapp_statement.to_field_elements
@@ -260,7 +267,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             | _ ->
                 respond Unhandled
           in
-          let pi : Pickles.Side_loaded.Proof.t =
+          let (), (), (pi : Pickles.Side_loaded.Proof.t) =
             (fun () -> ringsig_prover ~handler [] tx_statement)
             |> Async.Thread_safe.block_on_async_exn
           in

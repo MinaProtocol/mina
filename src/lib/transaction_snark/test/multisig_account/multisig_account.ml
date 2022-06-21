@@ -204,15 +204,20 @@ let%test_module "multisig_account" =
                   { identifier = "multisig-rule"
                   ; prevs = []
                   ; main =
-                      (fun x ->
+                      (fun { public_input = x } ->
                         Run.run_checked @@ multisig_main x ;
-                        [] )
+
+                        { previous_proof_statements = []
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
                   (module Zkapp_statement.Checked)
                   (module Zkapp_statement)
-                  ~typ:Zkapp_statement.typ
+                  ~public_input:(Input Zkapp_statement.typ)
+                  ~auxiliary_typ:Typ.unit
                   ~branches:(module Nat.N2)
                   ~max_proofs_verified:(module Nat.N2)
                     (* You have to put 2 here... *)
@@ -238,13 +243,17 @@ let%test_module "multisig_account" =
                               (Transaction_snark.dummy_constraints ()) ;
                             (* Unsatisfiable. *)
                             Run.Field.(Assert.equal s (s + one)) ;
-                            [ { public_input
-                              ; proof_must_verify = Boolean.true_
-                              }
-                            ; { public_input
-                              ; proof_must_verify = Boolean.true_
-                              }
-                            ] )
+                            { previous_proof_statements =
+                                [ { public_input
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ; { public_input
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                       }
                     ] )
               in
@@ -372,9 +381,14 @@ let%test_module "multisig_account" =
                 (*FIXME: is this correct? *)
                 Parties.Transaction_commitment.create ~other_parties_hash
               in
-              let at_party = Parties.Call_forest.hash ps in
               let tx_statement : Zkapp_statement.t =
-                { transaction; at_party = (at_party :> Field.t) }
+                { party =
+                    Party.Body.digest
+                      (Parties.add_caller_simple snapp_party_data
+                         Token_id.default )
+                        .body
+                ; calls = (Parties.Digest.Forest.empty :> field)
+                }
               in
               let msg =
                 tx_statement |> Zkapp_statement.to_field_elements
@@ -401,7 +415,7 @@ let%test_module "multisig_account" =
                 | _ ->
                     respond Unhandled
               in
-              let pi : Pickles.Side_loaded.Proof.t =
+              let (), (), (pi : Pickles.Side_loaded.Proof.t) =
                 (fun () -> multisig_prover ~handler [] tx_statement)
                 |> Async.Thread_safe.block_on_async_exn
               in

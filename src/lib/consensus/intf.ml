@@ -26,7 +26,12 @@ end
 
 module type Blockchain_state = sig
   module Poly : sig
-    type ('staged_ledger_hash, 'snarked_ledger_hash, 'local_state, 'time) t
+    type ( 'staged_ledger_hash
+         , 'snarked_ledger_hash
+         , 'local_state
+         , 'time
+         , 'body_ref )
+         t
     [@@deriving sexp]
   end
 
@@ -35,7 +40,8 @@ module type Blockchain_state = sig
       ( Staged_ledger_hash.t
       , Frozen_ledger_hash.t
       , Mina_transaction_logic.Parties_logic.Local_state.Value.t
-      , Block_time.t )
+      , Block_time.t
+      , Body_reference.t )
       Poly.t
     [@@deriving sexp]
   end
@@ -44,19 +50,22 @@ module type Blockchain_state = sig
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
     , Mina_transaction_logic.Parties_logic.Local_state.Checked.t
-    , Block_time.Checked.t )
+    , Block_time.Checked.t
+    , Body_reference.var )
     Poly.t
 
   val staged_ledger_hash :
-    ('staged_ledger_hash, _, _, _) Poly.t -> 'staged_ledger_hash
+    ('staged_ledger_hash, _, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
-    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _, _) Poly.t -> 'frozen_ledger_hash
 
   val genesis_ledger_hash :
-    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _, _) Poly.t -> 'frozen_ledger_hash
 
-  val timestamp : (_, _, _, 'time) Poly.t -> 'time
+  val timestamp : (_, _, _, 'time, _) Poly.t -> 'time
+
+  val body_reference : (_, _, _, _, 'body_reference) Poly.t -> 'body_reference
 end
 
 module type Protocol_state = sig
@@ -749,4 +758,6 @@ module type S = sig
          and type consensus_transition := Consensus_transition.Value.t
          and type block_data := Block_data.t
   end
+
+  module Body_reference = Body_reference
 end

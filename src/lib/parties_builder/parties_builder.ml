@@ -31,8 +31,8 @@ let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
   ; caller
   }
 
-let mk_parties_transaction ~fee ~fee_payer_pk ~fee_payer_nonce other_parties :
-    Parties.t =
+let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
+    other_parties : Parties.t =
   let fee_payer : Party.Fee_payer.t =
     { body =
         { update = Party.Update.noop
@@ -46,8 +46,12 @@ let mk_parties_transaction ~fee ~fee_payer_pk ~fee_payer_nonce other_parties :
     ; authorization = Signature.dummy
     }
   in
+  let memo =
+    Option.value_map memo ~default:Signed_command_memo.dummy
+      ~f:Signed_command_memo.create_from_string_exn
+  in
   { fee_payer
-  ; memo = Signed_command_memo.dummy
+  ; memo
   ; other_parties =
       other_parties
       |> Parties.Call_forest.map
@@ -91,8 +95,8 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
     { parties.fee_payer with authorization = fee_payer_signature }
   in
   let other_parties_with_valid_signatures =
-    Parties.Call_forest.mapi parties.other_parties
-      ~f:(fun ndx ({ body; authorization } : Party.t) ->
+    Parties.Call_forest.mapi_with_trees parties.other_parties
+      ~f:(fun _ ({ body; authorization } : Party.t) tree ->
         let authorization_with_valid_signature =
           match authorization with
           | Control.Signature _dummy ->
@@ -117,24 +121,12 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
               | None ->
                   authorization
               | Some prover ->
-                  let proof_party =
-                    Parties.Call_forest.hash
-                      (List.drop parties.other_parties ndx)
-                  in
-                  let txn_stmt : Zkapp_statement.t =
-                    let commitment =
-                      if body.use_full_commitment then full_tx_commitment
-                      else tx_commitment
-                    in
-                    { transaction = commitment
-                    ; at_party = (proof_party :> Snark_params.Tick.Field.t)
-                    }
-                  in
+                  let txn_stmt = Zkapp_statement.of_tree tree in
                   let handler
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with _ -> respond Unhandled
                   in
-                  let proof =
+                  let (), (), proof =
                     Async_unix.Thread_safe.block_on_async_exn (fun () ->
                         prover ?handler:(Some handler)
                           ( []

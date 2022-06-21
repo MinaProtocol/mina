@@ -131,6 +131,7 @@ val negative_one :
   -> genesis_epoch_data:Consensus.Genesis_epoch_data.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
+  -> genesis_body_reference:Consensus.Body_reference.t
   -> Value.t
 
 val hash_checked : var -> (State_hash.var * State_body_hash.var) Checked.t

@@ -39,11 +39,12 @@ end)
 
 let genesis_state_body =
   let compile_time_genesis =
+    let open Staged_ledger_diff in
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
       ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
       ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
 
@@ -238,7 +239,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
   ; prevs = [ self; self ]
   ; main =
-      (fun _ ->
+      (fun { public_input = _ } ->
         let s =
           Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
         in
@@ -248,9 +249,13 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
         Impl.run_checked (Transaction_snark.dummy_constraints ()) ;
         (* Unsatisfiable. *)
         Run.Field.(Assert.equal s (s + one)) ;
-        [ { public_input; proof_must_verify = Boolean.true_ }
-        ; { public_input; proof_must_verify = Boolean.true_ }
-        ] )
+        { previous_proof_statements =
+            [ { public_input; proof_must_verify = Boolean.true_ }
+            ; { public_input; proof_must_verify = Boolean.true_ }
+            ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let gen_snapp_ledger =
