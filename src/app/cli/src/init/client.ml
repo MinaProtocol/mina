@@ -452,8 +452,8 @@ let batch_test_zkapps =
          let%bind keypair_files = Sys.readdir keypair_path >>| Array.to_list in
          let%bind keypairs =
            Deferred.List.map keypair_files ~f:(fun keypair_file ->
-               Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
-                 keypair_file )
+               Filename.concat keypair_path keypair_file
+               |> Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" )
          in
          match%bind
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Generate_random_zkapps.rpc
