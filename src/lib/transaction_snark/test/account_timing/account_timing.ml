@@ -369,7 +369,7 @@ let%test_module "account timing check" =
             failwith "Expected signed user command"
       in
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
-      let sparse_ledger_after, _ =
+      let sparse_ledger_after, txn_applied =
         Mina_ledger.Sparse_ledger.apply_transaction ~constraint_constants
           ~txn_state_view sparse_ledger_before transaction
         |> Or_error.ok_exn
@@ -385,6 +385,10 @@ let%test_module "account timing check" =
         | _ ->
             stack_with_state
       in
+      let supply_increase =
+        Mina_ledger.Ledger.Transaction_applied.supply_increase txn_applied
+        |> Or_error.ok_exn
+      in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message
         ~source:(Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
         ~target:(Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_after)
@@ -393,7 +397,7 @@ let%test_module "account timing check" =
           { source = Pending_coinbase.Stack.empty
           ; target = coinbase_stack_target
           }
-        ~zkapp_account1:None ~zkapp_account2:None
+        ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
         }

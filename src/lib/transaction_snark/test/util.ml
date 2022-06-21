@@ -546,7 +546,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           { transaction = txn; block_data = state_body }
           (unstage @@ Sparse_ledger.handler sparse_ledger) )
   with
-  | Error e ->
+  | Error _e ->
       assert expect_snark_failure
   | Ok _ ->
       assert (not expect_snark_failure)
