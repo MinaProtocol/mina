@@ -79,7 +79,7 @@ module Worker_state = struct
         let chain_state = Blockchain_snark.Blockchain.state chain in
         ( { source = reg chain_state
           ; target = reg next_state
-          ; supply_increase = Currency.Amount.zero
+          ; supply_increase = Currency.Amount.Signed.zero
           ; fee_excess = Fee_excess.zero
           ; sok_digest = Sok_message.Digest.default
           }
@@ -117,7 +117,7 @@ module Worker_state = struct
                        let txn_snark_statement, txn_snark_proof =
                          ledger_proof_opt chain next_state t
                        in
-                       let%map.Async.Deferred (), proof =
+                       let%map.Async.Deferred (), (), proof =
                          B.step
                            ~handler:
                              (Consensus.Data.Prover_state.handler

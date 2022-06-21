@@ -159,7 +159,9 @@ let%snarkydef step ~(logger : Logger.t)
         (previous_state |> Protocol_state.blockchain_state).registers
         { txn_snark.target with pending_coinbase_stack = () }
     and supply_increase_is_zero =
-      Currency.Amount.(equal_var txn_snark.supply_increase (var_of_t zero))
+      Currency.Amount.(
+        Signed.Checked.equal txn_snark.supply_increase
+          (Signed.Checked.of_unsigned (var_of_t zero)))
     in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let coinbase_receiver =
@@ -308,13 +310,16 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
   { identifier = "step"
   ; prevs = [ self; transaction_snark ]
   ; main =
-      (fun [ x1; x2 ] x ->
+      (fun { previous_public_inputs = [ x1; x2 ]; public_input = x } ->
         let b1, b2 =
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
                [ x1; x2 ] x )
         in
-        ([ b1; b2 ], ()) )
+        { previous_proofs_should_verify = [ b1; b2 ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 module Statement = struct
@@ -356,7 +361,7 @@ module type S = sig
        , N2.n * (N2.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
-       , (unit * Proof.t) Async.Deferred.t )
+       , (unit * unit * Proof.t) Async.Deferred.t )
        Pickles.Prover.t
 
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
@@ -397,7 +402,7 @@ end) : S = struct
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)
-      ~public_input:(Input typ)
+      ~public_input:(Input typ) ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

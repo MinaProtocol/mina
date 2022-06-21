@@ -168,7 +168,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
     { sok_digest = Mina_base.Sok_message.Digest.default
     ; source = reg (Protocol_state.blockchain_state prev_state)
     ; target = reg (Protocol_state.blockchain_state curr)
-    ; supply_increase = Currency.Amount.zero
+    ; supply_increase = Currency.Amount.Signed.zero
     ; fee_excess = Fee_excess.zero
     }
   in
@@ -223,7 +223,7 @@ let blockchain_snark_state (inputs : Inputs.t) :
   ((module T), (module B))
 
 let create_values txn b (t : Inputs.t) =
-  let%map.Async.Deferred (), genesis_proof = base_proof b t in
+  let%map.Async.Deferred (), (), genesis_proof = base_proof b t in
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level

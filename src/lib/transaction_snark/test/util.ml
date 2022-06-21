@@ -241,7 +241,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
   ; prevs = [ self; self ]
   ; main =
-      (fun [ _; _ ] _ ->
+      (fun { previous_public_inputs = [ _; _ ]; public_input = _ } ->
         Transaction_snark.dummy_constraints ()
         |> Snark_params.Tick.Run.run_checked ;
         (* Unsatisfiable. *)
@@ -249,7 +249,10 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
           Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
         in
         Run.Field.(Assert.equal s (s + one)) ;
-        ([ Boolean.true_; Boolean.true_ ], ()) )
+        { previous_proofs_should_verify = [ Boolean.true_; Boolean.true_ ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let gen_snapp_ledger =
@@ -484,7 +487,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let sparse_ledger =
     Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
   in
-  let expect_snark_failure =
+  let expect_snark_failure, applied_transaction =
     match
       Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
         txn_unchecked
@@ -496,14 +499,13 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
               failwith
                 (sprintf "Expected Ledger.apply_transaction to fail with %s"
                    (Transaction_status.Failure.describe
-                      (Option.value_exn expected_failure) ) )
+                      (List.hd_exn (Option.value_exn expected_failure)) ) )
           | Failed f ->
               assert (
-                Transaction_status.Failure.Collection.equal
-                  (Transaction_status.Failure.Collection.of_single_failure
-                     (Option.value_exn expected_failure) )
-                  f ) ) ;
-        false
+                List.equal Transaction_status.Failure.equal
+                  (Option.value_exn expected_failure)
+                  (List.concat f) ) ) ;
+        (false, Some res)
     | Error e ->
         if Option.is_none expected_failure then
           failwith
@@ -512,7 +514,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
         else if
           String.equal (Error.to_string_hum e)
             (Transaction_status.Failure.describe
-               (Option.value_exn expected_failure) )
+               (List.hd_exn (Option.value_exn expected_failure)) )
         then ()
         else
           failwith
@@ -520,12 +522,17 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                "Expected Ledger.apply_transaction to fail with %s but failed \
                 with %s"
                (Transaction_status.Failure.describe
-                  (Option.value_exn expected_failure) )
+                  (List.hd_exn (Option.value_exn expected_failure)) )
                (Error.to_string_hum e) ) ;
-        true
+        (true, None)
   in
   let target = Ledger.merkle_root ledger in
   let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
+  let supply_increase =
+    Option.value_map applied_transaction ~default:Amount.Signed.zero
+      ~f:(fun txn ->
+        Ledger.Transaction_applied.supply_increase txn |> Or_error.ok_exn )
+  in
   match
     Or_error.try_with (fun () ->
         Transaction_snark.check_transaction ~constraint_constants ~sok_message
@@ -535,11 +542,11 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                 pending_coinbase_stack
             ; target = pending_coinbase_stack_target
             }
-          ~zkapp_account1:None ~zkapp_account2:None
+          ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
           { transaction = txn; block_data = state_body }
           (unstage @@ Sparse_ledger.handler sparse_ledger) )
   with
-  | Error _e ->
+  | Error e ->
       assert expect_snark_failure
   | Ok _ ->
       assert (not expect_snark_failure)

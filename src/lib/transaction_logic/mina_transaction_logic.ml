@@ -91,6 +91,7 @@ module Transaction_applied = struct
         type t =
           { fee_transfer : Fee_transfer.Stable.V2.t With_status.Stable.V2.t
           ; previous_empty_accounts : Account_id.Stable.V2.t list
+          ; burned_tokens : Currency.Amount.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -106,6 +107,7 @@ module Transaction_applied = struct
         type t =
           { coinbase : Coinbase.Stable.V1.t With_status.Stable.V2.t
           ; previous_empty_accounts : Account_id.Stable.V2.t list
+          ; burned_tokens : Currency.Amount.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -141,6 +143,40 @@ module Transaction_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  let burned_tokens : t -> Currency.Amount.t =
+   fun { varying; _ } ->
+    match varying with
+    | Command _ ->
+        Currency.Amount.zero
+    | Fee_transfer f ->
+        f.burned_tokens
+    | Coinbase c ->
+        c.burned_tokens
+
+  let supply_increase : t -> Currency.Amount.Signed.t Or_error.t =
+   fun t ->
+    let open Or_error.Let_syntax in
+    let burned_tokens = Currency.Amount.Signed.of_unsigned (burned_tokens t) in
+    let txn : Transaction.t =
+      match t.varying with
+      | Command
+          (Signed_command { common = { user_command = { data; _ }; _ }; _ }) ->
+          Command (Signed_command data)
+      | Command (Parties c) ->
+          Command (Parties c.command.data)
+      | Fee_transfer f ->
+          Fee_transfer f.fee_transfer.data
+      | Coinbase c ->
+          Coinbase c.coinbase.data
+    in
+    let%bind expected_supply_increase =
+      Transaction.expected_supply_increase txn
+    in
+    Currency.Amount.Signed.(
+      add (of_unsigned expected_supply_increase) (negate burned_tokens))
+    |> Option.value_map ~default:(Or_error.error_string "overflow") ~f:(fun v ->
+           Ok v )
 
   let transaction_with_status : t -> Transaction.t With_status.t =
    fun { varying; _ } ->
@@ -217,6 +253,7 @@ module type S = sig
       type t = Transaction_applied.Fee_transfer_applied.t =
         { fee_transfer : Fee_transfer.t With_status.t
         ; previous_empty_accounts : Account_id.t list
+        ; burned_tokens : Currency.Amount.t
         }
       [@@deriving sexp]
     end
@@ -225,6 +262,7 @@ module type S = sig
       type t = Transaction_applied.Coinbase_applied.t =
         { coinbase : Coinbase.t With_status.t
         ; previous_empty_accounts : Account_id.t list
+        ; burned_tokens : Currency.Amount.t
         }
       [@@deriving sexp]
     end
@@ -240,6 +278,10 @@ module type S = sig
     type t = Transaction_applied.t =
       { previous_hash : Ledger_hash.t; varying : Varying.t }
     [@@deriving sexp]
+
+    val burned_tokens : t -> Currency.Amount.t
+
+    val supply_increase : t -> Currency.Amount.Signed.t Or_error.t
 
     val transaction : t -> Transaction.t With_status.t
 
@@ -1738,8 +1780,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           let%map _action, a, loc = get_or_create t account_id in
           let emptys = previous_empty_accounts action account_id in
           set t loc { a with balance; timing } ;
-          (emptys, empty) )
-        else Ok ([], single_failure)
+          (emptys, empty, Currency.Amount.zero) )
+        else Ok ([], single_failure, Currency.Amount.of_fee ft.fee)
     | `Two (ft1, ft2) ->
         let account_id1 = Fee_transfer.Single.receiver ft1 in
         let a1, action1, `Has_permission_to_receive can_receive1 =
@@ -1756,10 +1798,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             let%map _action1, a1, l1 = get_or_create t account_id1 in
             let emptys1 = previous_empty_accounts action1 account_id1 in
             set t l1 { a1 with balance; timing } ;
-            (emptys1, empty) )
+            (emptys1, empty, Currency.Amount.zero) )
           else
             (*failure for each fee transfer single*)
-            Ok ([], append_entry update_failed single_failure)
+            Ok
+              ( []
+              , append_entry update_failed single_failure
+              , Currency.Amount.of_fee fee )
         else
           let a2, action2, `Has_permission_to_receive can_receive2 =
             has_permission_to_receive ~ledger:t account_id2
@@ -1772,27 +1817,36 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           let%bind balance2 =
             modify_balance action2 account_id2 a2.balance ft2.fee
           in
-          let%bind emptys1, failures =
+          let%bind emptys1, failures, burned_tokens1 =
             if can_receive1 then (
               let%map _action1, a1, l1 = get_or_create t account_id1 in
               let emptys1 = previous_empty_accounts action1 account_id1 in
               set t l1 { a1 with balance = balance1 } ;
-              (emptys1, append_entry no_failure empty) )
-            else Ok ([], single_failure)
+              (emptys1, append_entry no_failure empty, Currency.Amount.zero) )
+            else Ok ([], single_failure, Currency.Amount.of_fee ft1.fee)
           in
-          let%map emptys2, failures' =
+          let%bind emptys2, failures', burned_tokens2 =
             if can_receive2 then (
               let%map _action2, a2, l2 = get_or_create t account_id2 in
               let emptys2 = previous_empty_accounts action2 account_id2 in
               set t l2 { a2 with balance = balance2; timing = timing2 } ;
-              (emptys2, append_entry no_failure failures) )
-            else Ok ([], append_entry update_failed failures)
+              (emptys2, append_entry no_failure failures, Currency.Amount.zero)
+              )
+            else
+              Ok
+                ( []
+                , append_entry update_failed failures
+                , Currency.Amount.of_fee ft2.fee )
           in
-          (emptys1 @ emptys2, failures')
+          let%map burned_tokens =
+            error_opt "burned tokens overflow"
+              (Currency.Amount.add burned_tokens1 burned_tokens2)
+          in
+          (emptys1 @ emptys2, failures', burned_tokens)
 
   let apply_fee_transfer ~constraint_constants ~txn_global_slot t transfer =
     let open Or_error.Let_syntax in
-    let%map previous_empty_accounts, failures =
+    let%map previous_empty_accounts, failures, burned_tokens =
       process_fee_transfer t transfer
         ~modify_balance:(fun action _ b f ->
           let%bind amount =
@@ -1809,7 +1863,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       else { data = transfer; status = Failed failures }
     in
     Transaction_applied.Fee_transfer_applied.
-      { fee_transfer = ft_with_status; previous_empty_accounts }
+      { fee_transfer = ft_with_status; previous_empty_accounts; burned_tokens }
 
   let apply_coinbase ~constraint_constants ~txn_global_slot t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
@@ -1820,10 +1874,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
              , emptys1
              , transferee_update
              , transferee_timing_prev
-             , failures1 ) =
+             , failures1
+             , burned_tokens1 ) =
       match fee_transfer with
       | None ->
-          return (coinbase_amount, [], None, None, empty)
+          return (coinbase_amount, [], None, None, empty, Currency.Amount.zero)
       | Some ({ receiver_pk = transferee; fee } as ft) ->
           assert (not @@ Public_key.Compressed.equal transferee receiver) ;
           let transferee_id = Coinbase.Fee_transfer.receiver ft in
@@ -1856,8 +1911,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                 ( transferee_location
                 , { transferee_account with balance; timing } )
             , Some transferee_account.timing
-            , append_entry no_failure empty )
-          else return (receiver_reward, [], None, None, single_failure)
+            , append_entry no_failure empty
+            , Currency.Amount.zero )
+          else return (receiver_reward, [], None, None, single_failure, fee)
     in
     let receiver_id = Account_id.create receiver Token_id.default in
     let receiver_account, action2, `Has_permission_to_receive can_receive =
@@ -1881,7 +1937,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       in
       add_amount receiver_account.balance amount
     in
-    let%map failures =
+    let%bind failures, burned_tokens2 =
       if can_receive then (
         let%map _action2, receiver_account, receiver_location =
           get_or_create t receiver_id
@@ -1891,20 +1947,24 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             balance = receiver_balance
           ; timing = coinbase_receiver_timing
           } ;
-        append_entry no_failure failures1 )
-      else return (append_entry update_failed failures1)
+        (append_entry no_failure failures1, Currency.Amount.zero) )
+      else return (append_entry update_failed failures1, receiver_reward)
     in
     Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
-    if Transaction_status.Failure.Collection.is_empty failures then
-      Transaction_applied.Coinbase_applied.
-        { coinbase = { With_status.data = cb; status = Applied }
-        ; previous_empty_accounts = emptys1 @ emptys2
-        }
-    else
-      Transaction_applied.Coinbase_applied.
-        { coinbase = { With_status.data = cb; status = Failed failures }
-        ; previous_empty_accounts = emptys1 @ emptys2
-        }
+    let%map burned_tokens =
+      error_opt "burned tokens overflow"
+        (Amount.add burned_tokens1 burned_tokens2)
+    in
+    let coinbase_with_status =
+      if Transaction_status.Failure.Collection.is_empty failures then
+        { With_status.data = cb; status = Applied }
+      else { With_status.data = cb; status = Failed failures }
+    in
+    Transaction_applied.Coinbase_applied.
+      { coinbase = coinbase_with_status
+      ; previous_empty_accounts = emptys1 @ emptys2
+      ; burned_tokens
+      }
 
   let apply_transaction ~constraint_constants
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
