@@ -34,7 +34,7 @@ let%test_module "Initialize state test" =
       Pickles.compile ~cache:Cache_dir.cache
         (module Statement)
         (module Statement)
-        ~public_input:(Output Zkapp_statement.typ)
+        ~public_input:(Output Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
@@ -97,7 +97,7 @@ let%test_module "Initialize state test" =
       let party_body =
         Zkapps_initialize_state.generate_initialize_party pk_compressed
 
-      let _stmt, party_proof =
+      let _stmt, (), party_proof =
         Async.Thread_safe.block_on_async_exn (initialize_prover [])
 
       let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
@@ -114,7 +114,7 @@ let%test_module "Initialize state test" =
         Zkapps_initialize_state.generate_update_state_party pk_compressed
           new_state
 
-      let _stmt, party_proof =
+      let _stmt, (), party_proof =
         Async.Thread_safe.block_on_async_exn
           (update_state_prover
              ~handler:(Zkapps_initialize_state.update_state_handler new_state)

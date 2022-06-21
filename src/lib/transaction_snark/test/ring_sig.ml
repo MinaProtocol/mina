@@ -50,9 +50,12 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   { identifier = "ring-sig-rule"
   ; prevs = []
   ; main =
-      (fun [] x ->
+      (fun { previous_public_inputs = []; public_input = x } ->
         ring_sig_main x |> Run.run_checked ;
-        ([], ()) )
+        { previous_proofs_should_verify = []
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let%test_unit "1-of-1" =
@@ -121,7 +124,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             Pickles.compile ~cache:Cache_dir.cache
               (module Zkapp_statement.Checked)
               (module Zkapp_statement)
-              ~public_input:(Input Zkapp_statement.typ)
+              ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N2)
               ~max_proofs_verified:(module Nat.N2)
                 (* You have to put 2 here... *)
@@ -264,7 +267,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             | _ ->
                 respond Unhandled
           in
-          let (), (pi : Pickles.Side_loaded.Proof.t) =
+          let (), (), (pi : Pickles.Side_loaded.Proof.t) =
             (fun () -> ringsig_prover ~handler [] tx_statement)
             |> Async.Thread_safe.block_on_async_exn
           in
