@@ -254,6 +254,7 @@ val check_transaction :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> zkapp_account1:Zkapp_account.t option
   -> zkapp_account2:Zkapp_account.t option
+  -> supply_increase:Amount.Signed.t
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -265,6 +266,7 @@ val check_user_command :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> supply_increase:Amount.Signed.t
   -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -279,6 +281,7 @@ val generate_transaction_witness :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> zkapp_account1:Zkapp_account.t option
   -> zkapp_account2:Zkapp_account.t option
+  -> supply_increase:Amount.Signed.t
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit

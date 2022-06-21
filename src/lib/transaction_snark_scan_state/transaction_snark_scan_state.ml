@@ -192,7 +192,7 @@ let create_expected_statement ~constraint_constants
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
-  let%bind after, _ =
+  let%bind after, applied_transaction =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction )
@@ -222,7 +222,9 @@ let create_expected_statement ~constraint_constants
         pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
-  let%map supply_increase = Transaction.supply_increase transaction in
+  let%map supply_increase =
+    Ledger.Transaction_applied.supply_increase applied_transaction
+  in
   { Transaction_snark.Statement.source =
       { ledger = source_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack

@@ -76,11 +76,11 @@ let fee_excess : t -> Fee_excess.t Or_error.t = function
   | Coinbase t ->
       Coinbase.fee_excess t
 
-let supply_increase = function
+let expected_supply_increase = function
   | Command _ | Fee_transfer _ ->
-      Ok Currency.Amount.Signed.zero
+      Ok Currency.Amount.zero
   | Coinbase t ->
-      Coinbase.supply_increase t
+      Coinbase.expected_supply_increase t
 
 let public_keys : t -> _ = function
   | Command (Signed_command cmd) ->

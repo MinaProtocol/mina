@@ -503,9 +503,8 @@ module T = struct
       txn_state_view =
     let open Result.Let_syntax in
     (*TODO: check fee_excess as a result of applying the txns matches with this*)
-    let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
-    and supply_increase =
-      Transaction.supply_increase s |> to_staged_ledger_or_error
+    let%bind fee_excess =
+      Transaction.fee_excess s |> to_staged_ledger_or_error
     in
     let source_merkle_root =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
@@ -517,7 +516,7 @@ module T = struct
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
     let empty_local_state = Mina_state.Local_state.empty () in
-    let%map applied_txn =
+    let%bind applied_txn =
       ( match
           Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
             s
@@ -529,6 +528,10 @@ module T = struct
                s (Error.to_string_hum e) )
       | res ->
           res )
+      |> to_staged_ledger_or_error
+    in
+    let%map supply_increase =
+      Ledger.Transaction_applied.supply_increase applied_txn
       |> to_staged_ledger_or_error
     in
     let target_merkle_root =
