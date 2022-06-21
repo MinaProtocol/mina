@@ -7,6 +7,10 @@ open Import
 (* The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
      , 'a_value
+     , 'ret_var
+     , 'ret_value
+     , 'auxiliary_var
+     , 'auxiliary_value
      , 'max_proofs_verified
      , 'branches
      , 'prev_vars
@@ -17,7 +21,7 @@ type ( 'a_var
   | T :
       { proofs_verified :
           'proofs_verified Nat.t * ('prev_vars, 'proofs_verified) Hlist.Length.t
-      ; index : Types.Index.t
+      ; index : int
       ; lte : ('proofs_verified, 'max_proofs_verified) Nat.Lte.t
       ; domains : Domains.t
       ; rule :
@@ -25,26 +29,36 @@ type ( 'a_var
           , 'prev_values
           , 'local_widths
           , 'local_heights
-          , 'a_avar
-          , 'a_value )
+          , 'a_var
+          , 'a_value
+          , 'ret_var
+          , 'ret_value
+          , 'auxiliary_var
+          , 'auxiliary_value )
           Inductive_rule.t
       ; main :
              step_domains:(Domains.t, 'branches) Vector.t
+          -> unit
           -> ( (Unfinalized.t, 'max_proofs_verified) Vector.t
              , Impls.Step.Field.t
              , (Impls.Step.Field.t, 'max_proofs_verified) Vector.t )
              Types.Step.Statement.t
-          -> unit
       ; requests :
           (module Requests.Step.S
              with type statement = 'a_value
               and type max_proofs_verified = 'max_proofs_verified
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
-              and type local_branches = 'local_heights )
+              and type local_branches = 'local_heights
+              and type return_value = 'ret_value
+              and type auxiliary_value = 'auxiliary_value )
       }
       -> ( 'a_var
          , 'a_value
+         , 'ret_var
+         , 'ret_value
+         , 'auxiliary_var
+         , 'auxiliary_value
          , 'max_proofs_verified
          , 'branches
          , 'prev_vars
@@ -55,13 +69,20 @@ type ( 'a_var
 
 (* Compile an inductive rule. *)
 let create
-    (type branches max_proofs_verified local_signature local_branches a_var
-    a_value prev_vars prev_values ) ~index
-    ~(self : (a_var, a_value, max_proofs_verified, branches) Tag.t)
-    ~wrap_domains ~(max_proofs_verified : max_proofs_verified Nat.t)
+    (type branches max_proofs_verified local_signature local_branches var value
+    a_var a_value ret_var ret_value prev_vars prev_values ) ~index
+    ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
+    ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
-    ~typ var_to_field_elements value_to_field_elements
-    (rule : _ Inductive_rule.t) =
+    ~(public_input :
+       ( var
+       , value
+       , a_var
+       , a_value
+       , ret_var
+       , ret_value )
+       Inductive_rule.public_input ) ~auxiliary_typ var_to_field_elements
+    value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in
@@ -98,22 +119,25 @@ let create
   in
   let lte = Nat.lte_exn self_width max_proofs_verified in
   let requests = Requests.Step.create () in
+  let (typ : (var, value) Impls.Step.Typ.t) =
+    match public_input with
+    | Input typ ->
+        typ
+    | Output typ ->
+        typ
+    | Input_and_output (input_typ, output_typ) ->
+        Impls.Step.Typ.(input_typ * output_typ)
+  in
   Timer.clock __LOC__ ;
   let step ~step_domains =
     Step_main.step_main requests
       (Nat.Add.create max_proofs_verified)
       rule
       ~basic:
-        { typ
-        ; proofs_verifieds
-        ; var_to_field_elements
-        ; value_to_field_elements
-        ; wrap_domains
-        ; step_domains
-        }
-      ~self_branches:branches ~proofs_verified ~local_signature:widths
-      ~local_signature_length ~local_branches:heights ~local_branches_length
-      ~lte ~self
+        { public_input = typ; proofs_verifieds; wrap_domains; step_domains }
+      ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
+      ~local_signature:widths ~local_signature_length ~local_branches:heights
+      ~local_branches_length ~lte ~self
     |> unstage
   in
   Timer.clock __LOC__ ;
@@ -129,9 +153,8 @@ let create
     in
     Fix_domains.domains
       (module Impls.Step)
-      etyp
-      (Snarky_backendless.Typ.unit ())
-      main
+      (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
+      etyp main
   in
   Timer.clock __LOC__ ;
   T

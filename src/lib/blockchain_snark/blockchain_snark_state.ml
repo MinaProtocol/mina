@@ -63,13 +63,6 @@ let non_pc_registers_equal_var t1 t2 =
           Local_state.Checked.equal' (F.get f t1) (F.get f t2) @ acc )
       |> Impl.Boolean.all )
 
-let non_pc_registers_equal t1 t2 =
-  let module F = Core_kernel.Field in
-  let f eq field = eq (F.get field t1) (F.get field t2) in
-  Registers.Fields.for_all
-    ~ledger:(f Frozen_ledger_hash.equal)
-    ~pending_coinbase_stack:(f Unit.equal) ~local_state:(f Local_state.equal)
-
 (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
       Input:
         old : Blockchain.t
@@ -166,7 +159,9 @@ let%snarkydef step ~(logger : Logger.t)
         (previous_state |> Protocol_state.blockchain_state).registers
         { txn_snark.target with pending_coinbase_stack = () }
     and supply_increase_is_zero =
-      Currency.Amount.(equal_var txn_snark.supply_increase (var_of_t zero))
+      Currency.Amount.(
+        Signed.Checked.equal txn_snark.supply_increase
+          (Signed.Checked.of_unsigned (var_of_t zero)))
     in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let coinbase_receiver =
@@ -234,7 +229,8 @@ let%snarkydef step ~(logger : Logger.t)
       Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
     in
     let%bind () =
-      Boolean.Assert.any [ txn_snark_input_correct; nothing_changed ]
+      with_label __LOC__
+        (Boolean.Assert.any [ txn_snark_input_correct; nothing_changed ])
     in
     let transaction_snark_should_verifiy = Boolean.not nothing_changed in
     let%bind result =
@@ -286,7 +282,9 @@ let%snarkydef step ~(logger : Logger.t)
     | Full ->
         Boolean.not is_base_case
   in
-  let%map () = Boolean.Assert.any [ is_base_case; success ] in
+  let%map () =
+    with_label __LOC__ (Boolean.Assert.any [ is_base_case; success ])
+  in
   (prev_should_verify, txn_snark_should_verify)
 
 let check w ?handler ~proof_level ~constraint_constants txn_snark new_state_hash
@@ -312,30 +310,16 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
   { identifier = "step"
   ; prevs = [ self; transaction_snark ]
   ; main =
-      (fun [ x1; x2 ] x ->
+      (fun { previous_public_inputs = [ x1; x2 ]; public_input = x } ->
         let b1, b2 =
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
                [ x1; x2 ] x )
         in
-        [ b1; b2 ] )
-  ; main_value =
-      (fun [ prev; (txn : Transaction_snark.Statement.With_sok.t) ] curr ->
-        let registers (t : Protocol_state.Value.t) =
-          (Protocol_state.blockchain_state t).registers
-        in
-        [ not
-            (Consensus.Data.Consensus_state.is_genesis_state
-               (Protocol_state.consensus_state curr) )
-        ; List.for_all ~f:Fn.id
-            [ non_pc_registers_equal (registers prev) (registers curr)
-            ; Currency.Amount.(equal zero)
-                txn.Transaction_snark.Statement.supply_increase
-            ; Pending_coinbase.Stack.equal txn.source.pending_coinbase_stack
-                txn.target.pending_coinbase_stack
-            ]
-          |> not
-        ] )
+        { previous_proofs_should_verify = [ b1; b2 ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 module Statement = struct
@@ -377,7 +361,7 @@ module type S = sig
        , N2.n * (N2.n * unit)
        , N1.n * (N5.n * unit)
        , Protocol_state.Value.t
-       , Proof.t Async.Deferred.t )
+       , (unit * unit * Proof.t) Async.Deferred.t )
        Pickles.Prover.t
 
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
@@ -418,7 +402,7 @@ end) : S = struct
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)
-      ~typ
+      ~public_input:(Input typ) ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

@@ -58,7 +58,13 @@ type 'command t_ = 'command Poly.t =
   | Fee_transfer of Fee_transfer.t
   | Coinbase of Coinbase.t
 
-let forget : Valid.t -> t = fun x -> (x :> t)
+let forget : Valid.t -> t = function
+  | Command t ->
+      Command (User_command.forget_check t)
+  | Fee_transfer t ->
+      Fee_transfer t
+  | Coinbase t ->
+      Coinbase t
 
 let fee_excess : t -> Fee_excess.t Or_error.t = function
   | Command (Signed_command t) ->
@@ -70,11 +76,11 @@ let fee_excess : t -> Fee_excess.t Or_error.t = function
   | Coinbase t ->
       Coinbase.fee_excess t
 
-let supply_increase = function
+let expected_supply_increase = function
   | Command _ | Fee_transfer _ ->
       Ok Currency.Amount.zero
   | Coinbase t ->
-      Coinbase.supply_increase t
+      Coinbase.expected_supply_increase t
 
 let public_keys : t -> _ = function
   | Command (Signed_command cmd) ->

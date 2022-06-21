@@ -21,7 +21,7 @@ let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
   Pickles.compile ~cache:Cache_dir.cache
     (module Zkapp_statement.Checked)
     (module Zkapp_statement)
-    ~typ:Zkapp_statement.typ
+    ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
     ~branches:(module Nat.N2)
     ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
     ~name:"empty_update"
@@ -38,18 +38,20 @@ let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 (* TODO: This should be entirely unnecessary. *)
 let party_body = Zkapps_empty_update.generate_party pk_compressed
 
-let party_proof =
+let (), (), party_proof =
   Async.Thread_safe.block_on_async_exn (fun () ->
       prover []
-        { transaction = Party.Body.digest party_body
-        ; at_party = Parties.Call_forest.empty
+        { party = Party.Body.digest party_body
+        ; calls = Parties.Call_forest.empty
         } )
 
-let party : Party.t = { body = party_body; authorization = Proof party_proof }
+let party : Party.Graphql_repr.t =
+  Party.to_graphql_repr ~call_depth:0
+    { body = party_body; authorization = Proof party_proof }
 
-let deploy_party_body : Party.Body.t =
+let deploy_party_body : Party.Body.Graphql_repr.t =
   (* TODO: This is a pain. *)
-  { Party.Body.dummy with
+  { Party.Body.Graphql_repr.dummy with
     public_key = pk_compressed
   ; update =
       { Party.Update.dummy with
@@ -63,12 +65,15 @@ let deploy_party_body : Party.Body.t =
                 Zkapp_account.digest_vk vk
             }
       }
-  ; account_precondition = Accept
+  ; preconditions =
+      { Party.Preconditions.network = Zkapp_precondition.Protocol_state.accept
+      ; account = Accept
+      }
   ; caller = Token_id.default
   ; use_full_commitment = true
   }
 
-let deploy_party : Party.t =
+let deploy_party : Party.Graphql_repr.t =
   (* TODO: This is a pain. *)
   { body = deploy_party_body; authorization = Signature Signature.dummy }
 
@@ -77,8 +82,9 @@ let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
 let ps =
   (* TODO: This is a pain. *)
   Parties.Call_forest.of_parties_list
-    ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+    ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
     [ deploy_party; party ]
+  |> Parties.Call_forest.map ~f:Party.of_graphql_repr
   |> Parties.Call_forest.accumulate_hashes_predicated
 
 let memo = Signed_command_memo.empty
@@ -146,7 +152,8 @@ let parties : Parties.t =
     { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
     ; other_parties =
         Parties.Call_forest.of_parties_list [ deploy_party; party ]
-          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+          ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
+        |> Parties.Call_forest.map ~f:Party.of_graphql_repr
         |> Parties.Call_forest.accumulate_hashes'
     ; memo
     }

@@ -83,6 +83,7 @@
    graphql
    fields_derivers.graphql
    o1trace
-   verifier)
+   verifier
+   staged_ledger_diff)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))

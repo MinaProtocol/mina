@@ -15,7 +15,7 @@ module Transition_frontier = struct
   type t =
     | Breadcrumb_added of
         { block :
-            External_transition.Raw.Stable.Latest.t
+            Mina_block.Stable.Latest.t
             State_hash.With_state_hashes.Stable.Latest.t
               (* ledger index, account *)
         ; accounts_accessed : (int * Mina_base.Account.Stable.Latest.t) list
@@ -47,7 +47,8 @@ type t =
 [@@deriving bin_io_unversioned]
 
 module Builder = struct
-  let breadcrumb_added ~(precomputed_values : Precomputed_values.t) breadcrumb =
+  let breadcrumb_added ~(precomputed_values : Precomputed_values.t) ~logger
+      breadcrumb =
     let validated_block = Breadcrumb.validated_transition breadcrumb in
     let commands = Mina_block.Validated.valid_commands validated_block in
     let staged_ledger = Breadcrumb.staged_ledger breadcrumb in
@@ -73,6 +74,8 @@ module Builder = struct
     in
     let block_with_hash = Mina_block.Validated.forget validated_block in
     let block = With_hash.data block_with_hash in
+    let state_hash = (With_hash.hash block_with_hash).state_hash in
+    let start = Time.now () in
     let account_ids_accessed = Mina_block.account_ids_accessed block in
     let accounts_accessed =
       List.filter_map account_ids_accessed ~f:(fun acct_id ->
@@ -84,6 +87,14 @@ module Builder = struct
           let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
           Some (index, account) )
     in
+    let accounts_accessed_time = Time.now () in
+    [%log debug]
+      "Archive data generation for $state_hash: accounts-accessed took $time ms"
+      ~metadata:
+        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+        ; ( "time"
+          , `Float (Time.Span.to_ms (Time.diff accounts_accessed_time start)) )
+        ] ;
     let accounts_created =
       let account_creation_fee =
         precomputed_values.constraint_constants.account_creation_fee
@@ -106,8 +117,18 @@ module Builder = struct
           let owner = Mina_ledger.Ledger.token_owner ledger token_id in
           (token_id, owner) )
     in
+    let account_created_time = Time.now () in
+    [%log debug]
+      "Archive data generation for $state_hash: accounts-created took $time ms"
+      ~metadata:
+        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+        ; ( "time"
+          , `Float
+              (Time.Span.to_ms
+                 (Time.diff account_created_time accounts_accessed_time) ) )
+        ] ;
     Transition_frontier.Breadcrumb_added
-      { block = With_hash.map ~f:External_transition.compose block_with_hash
+      { block = block_with_hash
       ; accounts_accessed
       ; accounts_created
       ; tokens_used

@@ -22,7 +22,7 @@ module Base = struct
           , ('s, 'sgs, 'bp_chals) Me_only.Step.t
           , 'dlog_me_onlys )
           Types.Step.Statement.t
-      ; index : Types.Index.t
+      ; index : int
       ; prev_evals : 'prev_evals
       ; proof : Tick.Proof.t
       }
@@ -60,7 +60,7 @@ module Base = struct
                 Scalar_challenge.Stable.V2.t
                 Bulletproof_challenge.Stable.V1.t
                 Step_bp_vec.Stable.V1.t
-              , Index.Stable.V1.t )
+              , Branch_data.Stable.V1.t )
               Types.Wrap.Statement.Minimal.Stable.V1.t
           ; prev_evals :
               ( Tick.Field.Stable.V1.t
@@ -84,7 +84,7 @@ module Base = struct
           , 'step_me_only
           , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
             Step_bp_vec.t
-          , Index.t )
+          , Branch_data.t )
           Types.Wrap.Statement.Minimal.t
       ; prev_evals : (Tick.Field.t, Tick.Field.t array) Plonk_types.All_evals.t
       ; proof : Tock.Proof.t
@@ -113,8 +113,8 @@ end
 
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
-let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t)
-    : (w, h) t =
+let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
+    (most_recent_width : r Nat.t) ~domain_log2 : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -127,7 +127,20 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t
                 { xi = scalar_chal ()
                 ; combined_inner_product = Shifted_value (tick ())
                 ; b = Shifted_value (tick ())
-                ; which_branch = Option.value_exn (Index.of_int 0)
+                ; branch_data =
+                    { proofs_verified =
+                        ( match most_recent_width with
+                        | Z ->
+                            N0
+                        | S Z ->
+                            N1
+                        | S (S Z) ->
+                            N2
+                        | _ ->
+                            assert false )
+                    ; domain_log2 =
+                        Branch_data.Domain_log2.of_int_exn domain_log2
+                    }
                 ; bulletproof_challenges = Dummy.Ipa.Step.challenges
                 ; plonk =
                     { alpha = scalar_chal ()
@@ -161,6 +174,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t
             { w_comm = Vector.map lengths.w ~f:g
             ; z_comm = g lengths.z
             ; t_comm = g lengths.t
+            ; lookup = None
             }
         ; openings =
             { proof =
@@ -171,23 +185,22 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t
                 ; delta = g0
                 ; challenge_polynomial_commitment = g0
                 }
-            ; evals =
-                Tuple_lib.Double.map Dummy.evals.evals ~f:(fun e -> e.evals)
+            ; evals = Dummy.evals.evals.evals
             ; ft_eval1 = Dummy.evals.ft_eval1
             }
         }
     ; prev_evals =
-        (let e () =
-           Plonk_types.Evals.map
-             (Evaluation_lengths.create ~of_int:Fn.id)
-             ~f:tick_arr
+        (let e =
+           Plonk_types.Evals.map (Evaluation_lengths.create ~of_int:Fn.id)
+             ~f:(fun n -> (tick_arr n, tick_arr n))
          in
-         let ex () =
-           { Plonk_types.All_evals.With_public_input.public_input = tick ()
-           ; evals = e ()
+         let ex =
+           { Plonk_types.All_evals.With_public_input.public_input =
+               (tick (), tick ())
+           ; evals = e
            }
          in
-         { ft_eval1 = tick (); evals = (ex (), ex ()) } )
+         { ft_eval1 = tick (); evals = ex } )
     }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct

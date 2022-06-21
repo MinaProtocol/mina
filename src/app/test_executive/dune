@@ -42,6 +42,8 @@
    integers
    user_command_input
    participating_state
+   sgn
+   parties_builder
    network_pool
  )
  (instrumentation (backend bisect_ppx))

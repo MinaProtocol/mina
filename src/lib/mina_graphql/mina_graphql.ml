@@ -160,6 +160,13 @@ module Reflection = struct
   end
 end
 
+let get_ledger_and_breadcrumb coda =
+  coda |> Mina_lib.best_tip |> Participating_state.active
+  |> Option.map ~f:(fun tip ->
+         ( Transition_frontier.Breadcrumb.staged_ledger tip
+           |> Staged_ledger.ledger
+         , tip ) )
+
 module Types = struct
   open Schema
   open Graphql_lib.Base_types
@@ -324,14 +331,22 @@ module Types = struct
   let merkle_path_element :
       (_, [ `Left of Zkapp_basic.F.t | `Right of Zkapp_basic.F.t ] option) typ =
     obj "MerklePathElement" ~fields:(fun _ ->
-        [ field "isRightBranch" ~typ:(non_null bool)
+        [ field "left" ~typ:string
             ~args:Arg.[]
             ~resolve:(fun _ x ->
-              match x with `Left _ -> false | `Right _ -> true )
-        ; field "otherHash" ~typ:(non_null string)
+              match x with
+              | `Left h ->
+                  Some (Zkapp_basic.F.to_string h)
+              | `Right _ ->
+                  None )
+        ; field "right" ~typ:string
             ~args:Arg.[]
             ~resolve:(fun _ x ->
-              match x with `Left h | `Right h -> Zkapp_basic.F.to_string h )
+              match x with
+              | `Left _ ->
+                  None
+              | `Right h ->
+                  Some (Zkapp_basic.F.to_string h) )
         ] )
 
   module DaemonStatus = struct
@@ -594,12 +609,20 @@ module Types = struct
                 magnitude = Currency.Amount.of_fee fee_excess_l.magnitude
               } )
         ; field "supplyIncrease" ~typ:(non_null uint64)
-            ~doc:"Increase in total coinbase reward "
+            ~doc:"Increase in total supply"
             ~args:Arg.[]
+            ~deprecated:(Deprecated (Some "Use supplyChange"))
             ~resolve:(fun _
                           ({ supply_increase; _ } :
                             Transaction_snark.Statement.t ) ->
-              Currency.Amount.to_uint64 supply_increase )
+              Currency.Amount.to_uint64 supply_increase.magnitude )
+        ; field "supplyChange" ~typ:(non_null signed_fee)
+            ~doc:"Increase/Decrease in total supply"
+            ~args:Arg.[]
+            ~resolve:(fun _
+                          ({ supply_increase; _ } :
+                            Transaction_snark.Statement.t ) -> supply_increase
+              )
         ; field "workId" ~doc:"Unique identifier for a snark work"
             ~typ:(non_null int)
             ~args:Arg.[]
@@ -852,23 +875,19 @@ module Types = struct
           ; zkapp_uri
           } =
         let open Option.Let_syntax in
-        let%bind public_key = public_key in
         let%bind token_permissions = token_permissions in
         let%bind token_symbol = token_symbol in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
-        let%bind delegate = delegate in
         let%bind voting_for = voting_for in
-        let%bind timing = timing in
         let%bind permissions = permissions in
-        let%bind zkapp = zkapp in
         let%map zkapp_uri = zkapp_uri in
         { Account.Poly.public_key
         ; token_id
         ; token_permissions
         ; token_symbol
         ; nonce
-        ; balance
+        ; balance = balance.AnnotatedBalance.total
         ; receipt_chain_hash
         ; delegate
         ; voting_for
@@ -1369,6 +1388,31 @@ module Types = struct
                        List.map ~f:Snark_params.Tick.Field.to_string
                          (Pickles_types.Vector.to_list
                             zkapp_account.sequence_state ) ) )
+             ; field "leafHash"
+                 ~doc:
+                   "The base58Check-encoded hash of this account to bootstrap \
+                    the merklePath"
+                 ~typ:string
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   let open Option.Let_syntax in
+                   let%map account = Partial_account.to_full_account account in
+                   Zkapp_basic.F.to_string
+                     (Ledger_hash.of_digest (Account.digest account)) )
+             ; field "merklePath"
+                 ~doc:
+                   "Merkle path is a list of path elements that are either the \
+                    left or right hashes up to the root"
+                 ~typ:(list (non_null merkle_path_element))
+                 ~args:Arg.[]
+                 ~resolve:(fun { ctx = mina; _ } { index; _ } ->
+                   let open Option.Let_syntax in
+                   let%bind ledger, _breadcrumb =
+                     get_ledger_and_breadcrumb mina
+                   in
+                   let%bind index = index in
+                   Option.try_with (fun () ->
+                       Ledger.merkle_path_at_index_exn ledger index ) )
              ] ) )
 
     let account = Lazy.force account
@@ -3829,13 +3873,6 @@ module Queries = struct
           ]
       ~resolve:account_resolver
 
-  let get_ledger_and_breadcrumb coda =
-    coda |> Mina_lib.best_tip |> Participating_state.active
-    |> Option.map ~f:(fun tip ->
-           ( Transition_frontier.Breadcrumb.staged_ledger tip
-             |> Staged_ledger.ledger
-           , tip ) )
-
   let account =
     field "account" ~doc:"Find any account via a public key and token"
       ~typ:Types.AccountObj.account
@@ -3857,25 +3894,6 @@ module Queries = struct
             let%map account = Ledger.get ledger location in
             Types.AccountObj.Partial_account.of_full_account ~breadcrumb account
             |> Types.AccountObj.lift coda pk ) )
-
-  let account_merkle_path =
-    field "accountMerklePath" ~doc:"Get the merkle path for an account"
-      ~typ:(list (non_null Types.merkle_path_element))
-      ~args:
-        Arg.
-          [ arg "publicKey" ~doc:"Public key of account being retrieved"
-              ~typ:(non_null Types.Input.public_key_arg)
-          ; arg' "token"
-              ~doc:"Token of account being retrieved (defaults to MINA)"
-              ~typ:Types.Input.token_id_arg ~default:Token_id.default
-          ]
-      ~resolve:(fun { ctx = mina; _ } () pk token ->
-        let open Option.Let_syntax in
-        let%bind ledger, _breadcrumb = get_ledger_and_breadcrumb mina in
-        let%map location =
-          Ledger.location_of_account ledger (Account_id.create pk token)
-        in
-        Ledger.merkle_path ledger location )
 
   let accounts_for_pk =
     field "accounts" ~doc:"Find all accounts for a public key"
@@ -3967,7 +3985,7 @@ module Queries = struct
                  ; hash = Transaction_hash.hash_command cmd
                  } )
         in
-        let%bind txn =
+        let%map txn =
           match (serialized_payment, serialized_zkapp) with
           | None, None | Some _, Some _ ->
               Error
@@ -3980,10 +3998,8 @@ module Queries = struct
         in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
         let transaction_pool = Mina_lib.transaction_pool coda in
-        Result.map_error
-          (Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-             ~transaction_pool txn.data )
-          ~f:Error.to_string_hum )
+        Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
+          ~transaction_pool txn.data )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
@@ -4009,9 +4025,11 @@ module Queries = struct
         let { With_hash.data = genesis_state
             ; hash = { State_hash.State_hashes.state_hash = hash; _ }
             } =
+          let open Staged_ledger_diff in
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants
+            ~genesis_body_reference
         in
         let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data =
@@ -4383,7 +4401,6 @@ module Queries = struct
     ; connection_gating_config
     ; account
     ; accounts_for_pk
-    ; account_merkle_path
     ; token_owner
     ; token_accounts
     ; current_snark_worker

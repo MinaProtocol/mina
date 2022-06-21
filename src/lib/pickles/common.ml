@@ -28,12 +28,7 @@ let wrap_domains ~proofs_verified =
   let h =
     match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
   in
-  { Domains.h = Pow_2_roots_of_unity h
-  ; x =
-      Pow_2_roots_of_unity
-        (let (T (typ, _, _)) = Impls.Wrap.input () in
-         Int.ceil_log2 (Impls.Wrap.Data_spec.size [ typ ]) )
-  }
+  { Domains.h = Pow_2_roots_of_unity h }
 
 let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
   let g (x, y) = [ x; y ] in
@@ -42,13 +37,6 @@ let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
     (Types.Step.Proof_state.Me_only.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state )
-
-let hash_dlog_me_only (type n) (_max_proofs_verified : n Nat.t)
-    (t : (Tick.Curve.Affine.t, (_, n) Vector.t) Types.Wrap.Proof_state.Me_only.t)
-    =
-  Tock_field_sponge.digest Tock_field_sponge.params
-    (Types.Wrap.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]) )
 
 let dlog_pcs_batch (type proofs_verified total)
     ((without_degree_bound, _pi) :
@@ -71,15 +59,6 @@ let time lab f =
       printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
       x )
     f ()
-
-let bits_random_oracle =
-  let h = Digestif.blake2s 32 in
-  fun ~length s ->
-    Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
-    |> List.concat_map ~f:(fun c ->
-           let c = Char.to_int c in
-           List.init 8 ~f:(fun i -> (c lsr i) land 1 = 1) )
-    |> fun a -> List.take a length
 
 let bits_to_bytes bits =
   let byte_of_bits bs =
@@ -288,3 +267,29 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
   in
   f_comm + chunked_t_comm
   + negate (scale chunked_t_comm plonk.zeta_to_domain_size)
+
+let combined_evaluation (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    ~(xi : Impl.Field.t) (without_degree_bound : _ list) =
+  let open Impl in
+  let open Field in
+  let mul_and_add ~(acc : Field.t) ~(xi : Field.t)
+      (fx : (Field.t, Boolean.var) Plonk_types.Opt.t) : Field.t =
+    match fx with
+    | None ->
+        acc
+    | Some fx ->
+        fx + (xi * acc)
+    | Maybe (b, fx) ->
+        Field.if_ b ~then_:(fx + (xi * acc)) ~else_:acc
+  in
+  with_label __LOC__ (fun () ->
+      Pcs_batch.combine_split_evaluations ~mul_and_add
+        ~init:(function
+          | Some x ->
+              x
+          | None ->
+              Field.zero
+          | Maybe (b, x) ->
+              (b :> Field.t) * x )
+        ~xi without_degree_bound )

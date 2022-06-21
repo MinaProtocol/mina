@@ -96,6 +96,18 @@ macro_rules! impl_srs {
 
             #[ocaml_gen::func]
             #[ocaml::func]
+            pub fn [<$name:snake _add_lagrange_basis>](
+                srs: $name,
+                log2_size: ocaml::Int,
+            ) {
+                let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+                    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
+                ptr.add_lagrange_basis(domain);
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
             pub fn [<$name:snake _commit_evaluations>](
                 srs: $name,
                 domain_size: ocaml::Int,

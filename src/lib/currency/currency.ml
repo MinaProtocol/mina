@@ -14,6 +14,7 @@ open Let_syntax
 
 open Intf
 module Signed_poly = Signed_poly
+module Wire_types = Mina_wire_types.Currency
 
 type uint64 = Unsigned.uint64
 
@@ -408,7 +409,7 @@ end = struct
 
     let magnitude { magnitude; _ } = magnitude
 
-    let zero = create ~magnitude:zero ~sgn:Sgn.Pos
+    let zero : t = create ~magnitude:zero ~sgn:Sgn.Pos
 
     let gen =
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
@@ -463,7 +464,7 @@ end = struct
       if Unsigned.(equal zero t.magnitude) then zero
       else { t with sgn = Sgn.negate t.sgn }
 
-    let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
+    let of_unsigned magnitude : t = create ~magnitude ~sgn:Sgn.Pos
 
     let ( + ) = add
 
@@ -871,63 +872,156 @@ module Fee = struct
 end
 
 module Amount = struct
-  module T =
-    Make
-      (Unsigned_extended.UInt64)
-      (struct
-        let length = currency_length
-      end)
+  (* See documentation for {!module:Mina_wire_types} *)
+  module Make_sig (A : sig
+    type t
+  end) =
+  struct
+    module type S = sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
 
-  [%%ifdef consensus_mechanism]
+          (* not automatically derived *)
+          val dhall_type : Ppx_dhall_type.Dhall_type.t
+        end
+      end]
 
-  include (
-    T :
-      module type of T
-        with type var = T.var
-         and module Signed = T.Signed
-         and module Checked := T.Checked )
+      [%%ifdef consensus_mechanism]
 
-  [%%else]
+      (* Give a definition to var, it will be hidden at the interface level *)
+      include
+        Basic
+          with type t := Stable.Latest.t
+           and type var =
+            Pickles.Impls.Step.Impl.Internal_Basic.field
+            Snarky_backendless.Cvar.t
 
-  include (T : module type of T with module Signed = T.Signed)
+      [%%else]
 
-  [%%endif]
+      include Basic with type t := Stable.Latest.t
 
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+      [%%endif]
 
-    module V1 = struct
-      type t = Unsigned_extended.UInt64.Stable.V1.t
-      [@@deriving sexp, compare, hash, equal, yojson]
+      include Arithmetic_intf with type t := t
 
-      [%%define_from_scope to_yojson, of_yojson, dhall_type]
+      include Codable.S with type t := t
 
-      let to_latest = Fn.id
-    end
-  end]
+      [%%ifdef consensus_mechanism]
 
-  let of_fee (fee : Fee.t) : t = fee
+      module Signed :
+        Signed_intf
+          with type magnitude := t
+           and type magnitude_var := var
+           and type signed_fee := Fee.Signed.t
+           and type Checked.signed_fee_var := Fee.Signed.Checked.t
 
-  let to_fee (fee : t) : Fee.t = fee
+      [%%else]
 
-  let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
+      module Signed :
+        Signed_intf with type magnitude := t and type signed_fee := Fee.Signed.t
 
-  [%%ifdef consensus_mechanism]
+      [%%endif]
 
-  module Checked = struct
-    include T.Checked
+      (* TODO: Delete these functions *)
 
-    let of_fee (fee : Fee.var) : var = fee
+      val of_fee : Fee.t -> t
 
-    let to_fee (t : var) : Fee.var = t
+      val to_fee : t -> Fee.t
 
-    module Unsafe = struct
-      let of_field : Field.Var.t -> var = Fn.id
+      val add_fee : t -> Fee.t -> t option
+
+      [%%ifdef consensus_mechanism]
+
+      module Checked : sig
+        include
+          Checked_arithmetic_intf
+            with type var := var
+             and type signed_var := Signed.var
+             and type value := t
+
+        val add_signed : var -> Signed.var -> var Checked.t
+
+        val of_fee : Fee.var -> var
+
+        val to_fee : var -> Fee.var
+
+        module Unsafe : sig
+          val of_field : Field.Var.t -> t
+        end
+      end
+
+      [%%endif]
+
+      val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
     end
   end
+  [@@warning "-32"]
 
-  [%%endif]
+  module Make_str (A : sig
+    type t = Unsigned_extended.UInt64.Stable.V1.t
+  end) : Make_sig(A).S = struct
+    module T =
+      Make
+        (Unsigned_extended.UInt64)
+        (struct
+          let length = currency_length
+        end)
+
+    [%%ifdef consensus_mechanism]
+
+    include (
+      T :
+        module type of T
+          with type var = T.var
+           and module Signed = T.Signed
+           and module Checked := T.Checked )
+
+    [%%else]
+
+    include (T : module type of T with module Signed = T.Signed)
+
+    [%%endif]
+
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type t = Unsigned_extended.UInt64.Stable.V1.t
+        [@@deriving sexp, compare, hash, equal, yojson]
+
+        [%%define_from_scope to_yojson, of_yojson, dhall_type]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let of_fee (fee : Fee.t) : t = fee
+
+    let to_fee (fee : t) : Fee.t = fee
+
+    let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
+
+    [%%ifdef consensus_mechanism]
+
+    module Checked = struct
+      include T.Checked
+
+      let of_fee (fee : Fee.var) : var = fee
+
+      let to_fee (t : var) : Fee.var = t
+
+      module Unsafe = struct
+        let of_field : Field.Var.t -> var = Fn.id
+      end
+    end
+
+    [%%endif]
+  end
+
+  include Wire_types.Make.Amount (Make_sig) (Make_str)
 end
 
 module Balance = struct

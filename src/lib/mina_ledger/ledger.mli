@@ -146,15 +146,19 @@ module Transaction_applied : sig
 
   module Fee_transfer_applied : sig
     type t = Transaction_applied.Fee_transfer_applied.t =
-      { fee_transfer : Fee_transfer.t
+      { fee_transfer : Fee_transfer.t With_status.t
       ; previous_empty_accounts : Account_id.t list
+      ; burned_tokens : Currency.Amount.t
       }
     [@@deriving sexp]
   end
 
   module Coinbase_applied : sig
     type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase : Coinbase.t; previous_empty_accounts : Account_id.t list }
+      { coinbase : Coinbase.t With_status.t
+      ; previous_empty_accounts : Account_id.t list
+      ; burned_tokens : Currency.Amount.t
+      }
     [@@deriving sexp]
   end
 
@@ -169,6 +173,10 @@ module Transaction_applied : sig
   type t = Transaction_applied.t =
     { previous_hash : Ledger_hash.t; varying : Varying.t }
   [@@deriving sexp]
+
+  val burned_tokens : t -> Currency.Amount.t
+
+  val supply_increase : t -> Currency.Amount.Signed.t Or_error.t
 
   val transaction : t -> Transaction.t With_status.t
 

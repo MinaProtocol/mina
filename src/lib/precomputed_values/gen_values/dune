@@ -9,6 +9,7 @@
    core_kernel
    ppxlib
    ppxlib.ast
+   ppxlib.astlib
    async
    core
    ocaml-migrate-parsetree
@@ -16,6 +17,7 @@
    ocaml-compiler-libs.common
    async_unix
    base.caml
+   sexplib0
    ;; local libraries
    coda_runtime_config
    consensus
@@ -32,6 +34,7 @@
    pickles
    test_genesis_ledger
    coda_genesis_ledger
+   staged_ledger_diff
  )
  (preprocessor_deps ../../../config.mlh)
  (preprocess

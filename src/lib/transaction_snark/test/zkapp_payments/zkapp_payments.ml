@@ -32,7 +32,7 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      Parties.of_wire
+      Parties.of_simple
         { fee_payer =
             { body =
                 { public_key = acct1.account.public_key
@@ -69,10 +69,12 @@ let%test_module "Zkapp payments tests" =
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state_precondition =
-                      Zkapp_precondition.Protocol_state.accept
+                  ; preconditions =
+                      { Party.Preconditions.network =
+                          Zkapp_precondition.Protocol_state.accept
+                      ; account = Accept
+                      }
                   ; use_full_commitment = false
-                  ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = Signature Signature.dummy
@@ -87,10 +89,12 @@ let%test_module "Zkapp payments tests" =
                   ; sequence_events = []
                   ; call_data = Field.zero
                   ; call_depth = 0
-                  ; protocol_state_precondition =
-                      Zkapp_precondition.Protocol_state.accept
+                  ; preconditions =
+                      { Party.Preconditions.network =
+                          Zkapp_precondition.Protocol_state.accept
+                      ; account = Accept
+                      }
                   ; use_full_commitment = false
-                  ; account_precondition = Accept
                   ; caller = Call
                   }
               ; authorization = None_given
@@ -118,6 +122,11 @@ let%test_module "Zkapp payments tests" =
                 let txn_state_view =
                   Mina_state.Protocol_state.Body.view U.genesis_state_body
                 in
+                (*Testing merkle root change*)
+                let (`If_this_is_used_it_should_have_a_comment_justifying_it t1)
+                    =
+                  Parties.Valid.to_valid_unsafe t1
+                in
                 merkle_root_after_parties_exn ledger ~txn_state_view t1
               in
               let hash_post = Ledger.merkle_root ledger in
@@ -131,8 +140,7 @@ let%test_module "Zkapp payments tests" =
                 party_send ~constraint_constants (List.hd_exn specs)
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger [ parties ] )
-          |> fun _ -> () )
+              ignore (U.apply_parties ledger [ parties ] : Sparse_ledger.t) ) )
 
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
@@ -148,7 +156,7 @@ let%test_module "Zkapp payments tests" =
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              U.apply_parties ledger partiess |> fun _ -> () ) )
+              ignore (U.apply_parties ledger partiess : Sparse_ledger.t) ) )
 
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in
@@ -189,8 +197,7 @@ let%test_module "Zkapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =
@@ -257,8 +264,7 @@ let%test_module "Zkapp payments tests" =
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
                     ; sequence_events = []
-                    ; protocol_state_precondition = None
-                    ; account_precondition = None
+                    ; preconditions = None
                     }
                   in
                   let parties =

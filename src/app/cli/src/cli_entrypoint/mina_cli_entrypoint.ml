@@ -495,6 +495,12 @@ let setup_daemon logger =
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-rejected-blocks.log"
                ~max_size:rejected_blocks_log_size ~num_rotate:50 ) ;
+        Logger.Consumer_registry.register ~id:Logger.Logger_id.oversized_logs
+          ~processor:(Logger.Processor.raw ())
+          ~transport:
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
+               ~log_filename:"mina-oversized-logs.log"
+               ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
         let version_metadata =
           [ ("commit", `String Mina_version.commit_id)
           ; ("branch", `String Mina_version.branch)
@@ -1682,23 +1688,10 @@ let mina_commands logger =
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (module Coda_peers_test)
-        ; (module Coda_block_production_test)
-        ; (module Coda_shared_state_test)
+      ( [ (module Coda_shared_state_test)
         ; (module Coda_transitive_peers_test)
-        ; (module Coda_shared_prefix_test)
-        ; (module Coda_shared_prefix_multiproducer_test)
-        ; (module Coda_five_nodes_test)
-        ; (module Coda_restart_node_test)
-        ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
-        ; (module Coda_long_fork)
-        ; (module Coda_txns_and_restart_non_producers)
-        ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
-        ; (module Full_test)
-        ; (module Transaction_snark_profiler)
-        ; (module Coda_archive_processor_test)
         ]
         : (module Integration_test) list )
   in

@@ -792,7 +792,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolStatePrecondition",
+              "name": "networkPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -800,7 +800,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePreconditionInput",
+                  "name": "NetworkPreconditionInput",
                   "ofType": null
                 }
               },
@@ -924,14 +924,14 @@
               "defaultValue": null
             },
             {
-              "name": "protocolStatePrecondition",
+              "name": "networkPrecondition",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePreconditionInput",
+                  "name": "NetworkPreconditionInput",
                   "ofType": null
                 }
               },
@@ -2308,7 +2308,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ProtocolStatePreconditionInput",
+          "name": "NetworkPreconditionInput",
           "description": null,
           "fields": [
             {
@@ -2828,6 +2828,78 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "PreconditionsInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "network",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "NetworkPreconditionInput",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "account",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "AccountPreconditionInput",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "network",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "NetworkPreconditionInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "account",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "AccountPreconditionInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "PartyBodyInput",
           "description": null,
           "fields": [
@@ -3004,7 +3076,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolStatePrecondition",
+              "name": "preconditions",
               "description": null,
               "args": [],
               "type": {
@@ -3012,23 +3084,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePreconditionInput",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "accountPrecondition",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "AccountPreconditionInput",
+                  "name": "PreconditionsInput",
                   "ofType": null
                 }
               },
@@ -3224,28 +3280,14 @@
               "defaultValue": null
             },
             {
-              "name": "protocolStatePrecondition",
+              "name": "preconditions",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ProtocolStatePreconditionInput",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "accountPrecondition",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "AccountPreconditionInput",
+                  "name": "PreconditionsInput",
                   "ofType": null
                 }
               },
@@ -6292,7 +6334,7 @@
             },
             {
               "name": "supplyIncrease",
-              "description": "Increase in total coinbase reward ",
+              "description": "Increase in total supply",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6300,6 +6342,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "Use supplyChange"
+            },
+            {
+              "name": "supplyChange",
+              "description": "Increase/Decrease in total supply",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
                   "ofType": null
                 }
               },
@@ -6873,6 +6931,49 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "Preconditions",
+          "description": null,
+          "fields": [
+            {
+              "name": "network",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "NetworkPrecondition",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "account",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AccountPrecondition",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "Sign",
           "description": null,
@@ -7103,7 +7204,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolStatePrecondition",
+              "name": "preconditions",
               "description": null,
               "args": [],
               "type": {
@@ -7111,23 +7212,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProtocolStatePrecondition",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "accountPrecondition",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "AccountPrecondition",
+                  "name": "Preconditions",
                   "ofType": null
                 }
               },
@@ -7503,7 +7588,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ProtocolStatePrecondition",
+          "name": "NetworkPrecondition",
           "description": null,
           "fields": [
             {
@@ -8242,7 +8327,7 @@
               "deprecationReason": null
             },
             {
-              "name": "protocolStatePrecondition",
+              "name": "networkPrecondition",
               "description": null,
               "args": [],
               "type": {
@@ -8250,7 +8335,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ProtocolStatePrecondition",
+                  "name": "NetworkPrecondition",
                   "ofType": null
                 }
               },
@@ -10450,49 +10535,6 @@
         },
         {
           "kind": "OBJECT",
-          "name": "MerklePathElement",
-          "description": null,
-          "fields": [
-            {
-              "name": "isRightBranch",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "otherHash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
           "name": "NetworkPeerPayload",
           "description": null,
           "fields": [
@@ -10614,6 +10656,33 @@
                   "ofType": null
                 }
               },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "MerklePathElement",
+          "description": null,
+          "fields": [
+            {
+              "name": "left",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "right",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -11401,6 +11470,36 @@
                   "ofType": {
                     "kind": "SCALAR",
                     "name": "String",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "leafHash",
+              "description":
+                "The base58Check-encoded hash of this account to bootstrap the merklePath",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "merklePath",
+              "description":
+                "Merkle path is a list of path elements that are either the left or right hashes up to the root",
+              "args": [],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "MerklePathElement",
                     "ofType": null
                   }
                 }
@@ -12932,52 +13031,6 @@
                       "name": "Account",
                       "ofType": null
                     }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "accountMerklePath",
-              "description": "Get the merkle path for an account",
-              "args": [
-                {
-                  "name": "token",
-                  "description":
-                    "Token of account being retrieved (defaults to MINA)",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "TokenId",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "publicKey",
-                  "description": "Public key of account being retrieved",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "LIST",
-                "name": null,
-                "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "OBJECT",
-                    "name": "MerklePathElement",
-                    "ofType": null
                   }
                 }
               },

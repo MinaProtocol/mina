@@ -33,15 +33,29 @@ module Make () = struct
 
       let to_latest = Fn.id
 
+      let to_yojson t : Yojson.Safe.t = `String (T1.to_hex t)
+
+      let of_yojson (v : Yojson.Safe.t) =
+        let open Ppx_deriving_yojson_runtime in
+        match v with
+        | `String s ->
+            Option.value_map ~default:(Result.Error "not a hex string")
+              ~f:(fun x -> Result.Ok x)
+              (T1.of_hex_opt s)
+        | _ ->
+            Result.Error "not a string"
+
       module Arg = struct
         type nonrec t = t
 
         [%%define_locally T1.(to_string, of_string)]
       end
 
-      include Binable.Of_stringable (Arg)
+      include Binable.Of_stringable_without_uuid (Arg)
     end
   end]
+
+  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
   [%%define_locally
   T1.(of_raw_string, to_raw_string, digest_string, digest_bigstring, to_hex)]

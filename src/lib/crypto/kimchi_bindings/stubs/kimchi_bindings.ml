@@ -105,6 +105,9 @@ module Protocol = struct
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
         = "caml_fp_srs_lagrange_commitment"
 
+      external add_lagrange_basis : t -> int -> unit
+        = "caml_fp_srs_add_lagrange_basis"
+
       external commit_evaluations :
            t
         -> int
@@ -143,6 +146,9 @@ module Protocol = struct
         -> int
         -> Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
         = "caml_fq_srs_lagrange_commitment"
+
+      external add_lagrange_basis : t -> int -> unit
+        = "caml_fq_srs_add_lagrange_basis"
 
       external commit_evaluations :
            t

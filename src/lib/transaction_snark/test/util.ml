@@ -39,11 +39,12 @@ end)
 
 let genesis_state_body =
   let compile_time_genesis =
+    let open Staged_ledger_diff in
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
       ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
       ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
 
@@ -126,127 +127,132 @@ let check_parties_with_merges_exn ?expected_failure
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
-      let witnesses, _final_ledger =
-        match
-          Or_error.try_with (fun () ->
-              Transaction_snark.parties_witnesses_exn ~constraint_constants
-                ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
-                [ ( `Pending_coinbase_init_stack init_stack
-                  , `Pending_coinbase_of_statement
-                      (pending_coinbase_state_stack ~state_body_hash)
-                  , parties )
-                ] )
-        with
-        | Ok a ->
-            a
-        | Error e ->
-            failwith
-              (sprintf "parties_witnesses_exn failed with %s"
-                 (Error.to_string_hum e) )
-      in
-      let open Async.Deferred.Let_syntax in
-      let%map p =
-        match List.rev witnesses with
-        | [] ->
-            failwith "no witnesses generated"
-        | (witness, spec, stmt, snapp_statement) :: rest ->
-            let open Async.Deferred.Or_error.Let_syntax in
-            let%bind p1 =
-              Async.Deferred.Or_error.try_with (fun () ->
-                  T.of_parties_segment_exn ~statement:stmt ~witness ~spec
-                    ~snapp_statement )
-            in
-            Async.Deferred.List.fold ~init:(Ok p1) rest
-              ~f:(fun acc (witness, spec, stmt, snapp_statement) ->
-                let%bind prev = Async.Deferred.return acc in
-                let%bind curr =
-                  Async.Deferred.Or_error.try_with (fun () ->
-                      T.of_parties_segment_exn ~statement:stmt ~witness ~spec
-                        ~snapp_statement )
-                in
-                let sok_digest =
-                  Sok_message.create ~fee:Fee.zero
-                    ~prover:(Quickcheck.random_value Public_key.Compressed.gen)
-                  |> Sok_message.digest
-                in
-                T.merge ~sok_digest prev curr )
-      in
-      let p = Or_error.ok_exn p in
-      let target_ledger_root_snark =
-        (Transaction_snark.statement p).target.ledger
-      in
-      let applied =
-        Ledger.apply_transaction ~constraint_constants
-          ~txn_state_view:state_view ledger
-          (Mina_transaction.Transaction.Command (Parties parties))
-        |> Or_error.ok_exn
-      in
-      ( match applied.varying with
-      | Command (Parties { command; _ }) -> (
-          match command.status with
-          | Applied -> (
-              match expected_failure with
-              | Some failure ->
-                  failwith
-                    (sprintf
-                       !"Application did not fail as expected. Expected \
-                         failure: \
-                         %{sexp:Mina_base.Transaction_status.Failure.t}"
-                       failure )
-              | None ->
-                  () )
-          | Failed failure_tbl -> (
-              match expected_failure with
-              | None ->
-                  failwith
-                    (sprintf
-                       !"Application failed. Failure statuses: %{sexp: \
-                         Mina_base.Transaction_status.Failure.Collection.t}"
-                       failure_tbl )
-              | Some failure ->
-                  let failures = List.concat failure_tbl in
-                  assert (not (List.is_empty failures)) ;
-                  let failed_as_expected =
-                    (*Check that there's at least the expected failure*)
-                    List.fold failures ~init:false ~f:(fun acc f ->
-                        acc
-                        || Mina_base.Transaction_status.Failure.(
-                             equal failure f) )
-                  in
-                  if not failed_as_expected then
-                    failwith
-                      (sprintf
-                         !"Application failed but not as expected. Expected \
-                           failure: \
-                           %{sexp:Mina_base.Transaction_status.Failure.t} \
-                           Failure statuses: %{sexp: \
-                           Mina_base.Transaction_status.Failure.Collection.t}"
-                         failure failure_tbl ) ) )
-      | _ ->
-          failwith "parties expected" ) ;
-      let target_ledger_root = Ledger.merkle_root ledger in
-      [%test_eq: Ledger_hash.t] target_ledger_root target_ledger_root_snark )
+      match
+        Or_error.try_with (fun () ->
+            Transaction_snark.parties_witnesses_exn ~constraint_constants
+              ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+              [ ( `Pending_coinbase_init_stack init_stack
+                , `Pending_coinbase_of_statement
+                    (pending_coinbase_state_stack ~state_body_hash)
+                , parties )
+              ] )
+      with
+      | Error e -> (
+          match expected_failure with
+          | Some failure ->
+              assert (
+                String.is_substring (Error.to_string_hum e)
+                  ~substring:(Transaction_status.Failure.to_string failure) ) ;
+              Async.Deferred.unit
+          | None ->
+              failwith
+                (sprintf "apply_transaction failed with %s"
+                   (Error.to_string_hum e) ) )
+      | Ok (witnesses, _) -> (
+          let open Async.Deferred.Let_syntax in
+          let applied =
+            Ledger.apply_transaction ~constraint_constants
+              ~txn_state_view:state_view ledger
+              (Mina_transaction.Transaction.Command (Parties parties))
+            |> Or_error.ok_exn
+          in
+          match applied.varying with
+          | Command (Parties { command; _ }) -> (
+              match command.status with
+              | Applied -> (
+                  match expected_failure with
+                  | Some failure ->
+                      failwith
+                        (sprintf
+                           !"Application did not fail as expected. Expected \
+                             failure: \
+                             %{sexp:Mina_base.Transaction_status.Failure.t}"
+                           failure )
+                  | None ->
+                      let%map p =
+                        match List.rev witnesses with
+                        | [] ->
+                            failwith "no witnesses generated"
+                        | (witness, spec, stmt, snapp_statement) :: rest ->
+                            let open Async.Deferred.Or_error.Let_syntax in
+                            let%bind p1 =
+                              Async.Deferred.Or_error.try_with (fun () ->
+                                  T.of_parties_segment_exn ~statement:stmt
+                                    ~witness ~spec ~snapp_statement )
+                            in
+                            Async.Deferred.List.fold ~init:(Ok p1) rest
+                              ~f:(fun acc (witness, spec, stmt, snapp_statement)
+                                 ->
+                                let%bind prev = Async.Deferred.return acc in
+                                let%bind curr =
+                                  Async.Deferred.Or_error.try_with (fun () ->
+                                      T.of_parties_segment_exn ~statement:stmt
+                                        ~witness ~spec ~snapp_statement )
+                                in
+                                let sok_digest =
+                                  Sok_message.create ~fee:Fee.zero
+                                    ~prover:
+                                      (Quickcheck.random_value
+                                         Public_key.Compressed.gen )
+                                  |> Sok_message.digest
+                                in
+                                T.merge ~sok_digest prev curr )
+                      in
+                      let p = Or_error.ok_exn p in
+                      let target_ledger_root_snark =
+                        (Transaction_snark.statement p).target.ledger
+                      in
+                      let target_ledger_root = Ledger.merkle_root ledger in
+                      [%test_eq: Ledger_hash.t] target_ledger_root
+                        target_ledger_root_snark )
+              | Failed failure_tbl -> (
+                  match expected_failure with
+                  | None ->
+                      failwith
+                        (sprintf
+                           !"Application failed. Failure statuses: %{sexp: \
+                             Mina_base.Transaction_status.Failure.Collection.t}"
+                           failure_tbl )
+                  | Some failure ->
+                      let failures = List.concat failure_tbl in
+                      assert (not (List.is_empty failures)) ;
+                      let failed_as_expected =
+                        (*Check that there's at least the expected failure*)
+                        List.fold failures ~init:false ~f:(fun acc f ->
+                            acc
+                            || Mina_base.Transaction_status.Failure.(
+                                 equal failure f) )
+                      in
+                      if not failed_as_expected then
+                        failwith
+                          (sprintf
+                             !"Application failed but not as expected. \
+                               Expected failure: \
+                               %{sexp:Mina_base.Transaction_status.Failure.t} \
+                               Failure statuses: %{sexp: \
+                               Mina_base.Transaction_status.Failure.Collection.t}"
+                             failure failure_tbl )
+                      else Async.Deferred.unit ) )
+          | _ ->
+              failwith "parties expected" ) )
 
 let dummy_rule self : _ Pickles.Inductive_rule.t =
   let open Tick in
   { identifier = "dummy"
   ; prevs = [ self; self ]
-  ; main_value = (fun [ _; _ ] _ -> [ true; true ])
   ; main =
-      (fun [ _; _ ] _ ->
+      (fun { previous_public_inputs = [ _; _ ]; public_input = _ } ->
         Transaction_snark.dummy_constraints ()
-        |> Snark_params.Tick.Run.run_checked
-        |> fun () ->
+        |> Snark_params.Tick.Run.run_checked ;
         (* Unsatisfiable. *)
-        Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
-        |> fun s ->
-        Run.Field.(Assert.equal s (s + one))
-        |> fun () :
-               (Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit))
-               Pickles_types.Hlist0.H1
-                 (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-               .t ->
-        [ Boolean.true_; Boolean.true_ ] )
+        let s =
+          Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
+        in
+        Run.Field.(Assert.equal s (s + one)) ;
+        { previous_proofs_should_verify = [ Boolean.true_; Boolean.true_ ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let gen_snapp_ledger =
@@ -481,7 +487,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let sparse_ledger =
     Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
   in
-  let expect_snark_failure =
+  let expect_snark_failure, applied_transaction =
     match
       Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
         txn_unchecked
@@ -493,14 +499,13 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
               failwith
                 (sprintf "Expected Ledger.apply_transaction to fail with %s"
                    (Transaction_status.Failure.describe
-                      (Option.value_exn expected_failure) ) )
+                      (List.hd_exn (Option.value_exn expected_failure)) ) )
           | Failed f ->
               assert (
-                Transaction_status.Failure.Collection.equal
-                  (Transaction_status.Failure.Collection.of_single_failure
-                     (Option.value_exn expected_failure) )
-                  f ) ) ;
-        false
+                List.equal Transaction_status.Failure.equal
+                  (Option.value_exn expected_failure)
+                  (List.concat f) ) ) ;
+        (false, Some res)
     | Error e ->
         if Option.is_none expected_failure then
           failwith
@@ -509,7 +514,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
         else if
           String.equal (Error.to_string_hum e)
             (Transaction_status.Failure.describe
-               (Option.value_exn expected_failure) )
+               (List.hd_exn (Option.value_exn expected_failure)) )
         then ()
         else
           failwith
@@ -517,12 +522,17 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                "Expected Ledger.apply_transaction to fail with %s but failed \
                 with %s"
                (Transaction_status.Failure.describe
-                  (Option.value_exn expected_failure) )
+                  (List.hd_exn (Option.value_exn expected_failure)) )
                (Error.to_string_hum e) ) ;
-        true
+        (true, None)
   in
   let target = Ledger.merkle_root ledger in
   let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
+  let supply_increase =
+    Option.value_map applied_transaction ~default:Amount.Signed.zero
+      ~f:(fun txn ->
+        Ledger.Transaction_applied.supply_increase txn |> Or_error.ok_exn )
+  in
   match
     Or_error.try_with (fun () ->
         Transaction_snark.check_transaction ~constraint_constants ~sok_message
@@ -532,11 +542,11 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                 pending_coinbase_stack
             ; target = pending_coinbase_stack_target
             }
-          ~zkapp_account1:None ~zkapp_account2:None
+          ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
           { transaction = txn; block_data = state_body }
           (unstage @@ Sparse_ledger.handler sparse_ledger) )
   with
-  | Error _e ->
+  | Error e ->
       assert expect_snark_failure
   | Ok _ ->
       assert (not expect_snark_failure)

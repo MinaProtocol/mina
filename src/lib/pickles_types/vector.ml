@@ -15,6 +15,10 @@ end
 
 include T
 
+let hd (type a n) (t : (a, n s) t) : a = match t with x :: _ -> x
+
+let unsingleton (type a) ([ x ] : (a, z s) t) : a = x
+
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
  fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
 

@@ -63,11 +63,12 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
   in
   let state_body =
     let compile_time_genesis =
+      let open Staged_ledger_diff in
       (*not using Precomputed_values.for_unit_test because of dependency cycle*)
       Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
         ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-        ~constraint_constants ~consensus_constants
+        ~constraint_constants ~consensus_constants ~genesis_body_reference
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
@@ -132,12 +133,13 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:Genesis_constants.compiled.protocol
   in
+  let open Staged_ledger_diff in
   let compile_time_genesis =
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
       ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
       ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let protocol_state_predicate =
     let protocol_state_predicate_view =
@@ -321,8 +323,7 @@ let create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
-    ; protocol_state_precondition = None
-    ; account_precondition = None
+    ; preconditions = None
     }
   in
   let parties =
@@ -357,8 +358,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
-    ; protocol_state_precondition = None
-    ; account_precondition = None
+    ; preconditions = None
     }
   in
   let%bind parties =
@@ -398,8 +398,7 @@ let transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers =
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
-    ; protocol_state_precondition = None
-    ; account_precondition = None
+    ; preconditions = None
     }
   in
   let parties = Transaction_snark.For_tests.multiple_transfers spec in
@@ -427,8 +426,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
-    ; protocol_state_precondition = None
-    ; account_precondition = None
+    ; preconditions = None
     }
   in
   let%bind parties =
@@ -464,8 +462,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
-    ; protocol_state_precondition = None
-    ; account_precondition = None
+    ; preconditions = None
     }
   in
   let%bind parties =
@@ -503,8 +500,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events
-    ; protocol_state_precondition = None
-    ; account_precondition = None
+    ; preconditions = None
     }
   in
   let%bind parties =
@@ -540,8 +536,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
-    ; protocol_state_precondition = None
-    ; account_precondition = None
+    ; preconditions = None
     }
   in
   let%bind parties =
@@ -578,8 +573,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
     ; sequence_events = []
-    ; protocol_state_precondition = None
-    ; account_precondition = None
+    ; preconditions = None
     }
   in
   let%bind parties =
@@ -730,6 +724,7 @@ let%test_module "ZkApps test transaction" =
         ~f:(fun (user_cmd, _, _, _) ->
           match user_cmd with
           | Parties p ->
+              let p = Parties.Valid.forget p in
               let q = graphql_zkapp_command p in
               Async.Thread_safe.block_on_async_exn (fun () ->
                   match%map hit_server p q with

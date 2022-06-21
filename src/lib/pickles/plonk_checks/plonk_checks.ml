@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Pickles_base
-open Tuple_lib
 module Scalars = Scalars
 module Domain = Domain
 
@@ -11,8 +10,7 @@ type 'field vanishing_polynomial_domain =
 type 'field plonk_domain =
   < vanishing_polynomial : 'field -> 'field
   ; shifts : 'field Plonk_types.Shifts.t
-  ; generator : 'field
-  ; size : 'field >
+  ; generator : 'field >
 
 type 'field domain = < size : 'field ; vanishing_polynomial : 'field -> 'field >
 
@@ -55,13 +53,10 @@ let vanishing_polynomial (type t) ((module F) : t field) domain x =
 
 let domain (type t) ((module F) : t field) ~shifts ~domain_generator
     (domain : Domain.t) : t plonk_domain =
-  let size = F.of_int (Domain.size domain) in
   let log2_size = Domain.log2_size domain in
   let shifts = shifts ~log2_size in
   let generator = domain_generator ~log2_size in
   object
-    method size = size
-
     method shifts = shifts
 
     method vanishing_polynomial x = vanishing_polynomial (module F) domain x
@@ -84,32 +79,33 @@ let actual_evaluation (type f) (module Field : Field_intf with type t = f)
   | [] ->
       failwith "empty list"
 
-let evals_of_split_evals field ~zeta ~zetaw
-    ((es1, es2) : _ Plonk_types.Evals.t Double.t) ~rounds =
+let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
+    =
   let e = Fn.flip (actual_evaluation field ~rounds) in
-  Plonk_types.Evals.(map es1 ~f:(e zeta), map es2 ~f:(e zetaw))
+  Plonk_types.Evals.map es ~f:(fun (x1, x2) -> (e zeta x1, e zetaw x2))
 
 open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
 let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
     ~field_of_hex ~domain ~srs_length_log2
     ({ alpha; beta = _; gamma = _; zeta } : (c, _) Minimal.t)
-    ((e0, e1) : _ Plonk_types.Evals.t Double.t) =
-  let w0 = Vector.to_array e0.w in
-  let w1 = Vector.to_array e1.w in
+    (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) =
+  let ww = Vector.to_array e.w in
+  let w0 = Array.map ww ~f:fst in
+  let w1 = Array.map ww ~f:snd in
   let var (col, row) =
-    let e, w =
+    let get_eval, w =
       match (row : Scalars.curr_or_next) with
       | Curr ->
-          (e0, w0)
+          (fst, w0)
       | Next ->
-          (e1, w1)
+          (snd, w1)
     in
     match (col : Scalars.Column.t) with
     | Witness i ->
         w.(i)
     | Index Poseidon ->
-        e.poseidon_selector
+        get_eval e.poseidon_selector
     | Index i ->
         failwithf
           !"Index %{sexp:Scalars.Gate_type.t}\n\
@@ -182,19 +178,23 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t) ({ alpha = _; beta; gamma; zeta } : _ Minimal.t)
-      ((e0, e1) : _ Plonk_types.Evals.t Double.t) p_eval0 =
+      (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
+    let open Plonk_types.Evals.In_circuit in
+    let e0 field = fst (field e) in
+    let e1 field = snd (field e) in
+    let e0_s = Vector.map e.s ~f:fst in
     let zkp = env.zk_polynomial in
     let alpha_pow = env.alpha_pow in
     let zeta1m1 = env.zeta_to_n_minus_1 in
     let open F in
-    let w0 = Vector.to_array e0.w in
+    let w0 = Vector.to_array e.w |> Array.map ~f:fst in
     let ft_eval0 =
       let a0 = alpha_pow perm_alpha0 in
       let w_n = w0.(Nat.to_int Plonk_types.Permuts_minus_1.n) in
-      let init = (w_n + gamma) * e1.z * a0 * zkp in
+      let init = (w_n + gamma) * e1 z * a0 * zkp in
       (* TODO: This shares some computation with the permutation scalar in
          derive_plonk. Could share between them. *)
-      Vector.foldi e0.s ~init ~f:(fun i acc s ->
+      Vector.foldi e0_s ~init ~f:(fun i acc s ->
           ((beta * s) + w0.(i) + gamma) * acc )
     in
     let shifts = domain#shifts in
@@ -202,7 +202,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let ft_eval0 =
       ft_eval0
       - Array.foldi shifts
-          ~init:(alpha_pow perm_alpha0 * zkp * e0.z)
+          ~init:(alpha_pow perm_alpha0 * zkp * e0 z)
           ~f:(fun i acc s -> acc * (gamma + (beta * zeta * s) + w0.(i)))
     in
     let nominator =
@@ -210,7 +210,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         * alpha_pow Int.(perm_alpha0 + 1)
         * (zeta - env.omega_to_minus_3)
       + (zeta1m1 * alpha_pow Int.(perm_alpha0 + 2) * (zeta - one)) )
-      * (one - e0.z)
+      * (one - e0 z)
     in
     let denominator = (zeta - env.omega_to_minus_3) * (zeta - one) in
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
@@ -223,24 +223,29 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let _ = with_label in
     let open F in
     fun ({ alpha; beta; gamma; zeta } : _ Minimal.t)
-        ((e0, e1) : _ Plonk_types.Evals.t Double.t) ->
+        (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
+          (*((e0, e1) : _ Plonk_types.Evals.In_circuit.t Double.t) *) ->
+      let open Plonk_types.Evals.In_circuit in
+      let e0 field = fst (field e) in
+      let e1 field = snd (field e) in
       let zkp = env.zk_polynomial in
       let index_terms = Sc.index_terms env in
       let alpha_pow = env.alpha_pow in
+      let w0 = Vector.map e.w ~f:fst in
       let perm =
-        let w0 = Vector.to_array e0.w in
+        let w0 = Vector.to_array w0 in
         with_label __LOC__ (fun () ->
-            Vector.foldi e0.s
-              ~init:(e1.z * beta * alpha_pow perm_alpha0 * zkp)
-              ~f:(fun i acc s -> acc * (gamma + (beta * s) + w0.(i)))
+            Vector.foldi e.s
+              ~init:(e1 z * beta * alpha_pow perm_alpha0 * zkp)
+              ~f:(fun i acc (s, _) -> acc * (gamma + (beta * s) + w0.(i)))
             |> negate )
       in
       let generic =
         let open Vector in
-        let (l1 :: r1 :: o1 :: l2 :: r2 :: o2 :: _) = e0.w in
+        let (l1 :: r1 :: o1 :: l2 :: r2 :: o2 :: _) = w0 in
         let m1 = l1 * r1 in
         let m2 = l2 * r2 in
-        [ e0.generic_selector; l1; r1; o1; m1; l2; r2; o2; m2 ]
+        [ e0 generic_selector; l1; r1; o1; m1; l2; r2; o2; m2 ]
       in
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
@@ -250,7 +255,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; zeta
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
         ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
-        ; poseidon_selector = e0.poseidon_selector
+        ; poseidon_selector = e0 poseidon_selector
         ; vbmul = Lazy.force (Hashtbl.find_exn index_terms (Index VarBaseMul))
         ; complete_add =
             Lazy.force (Hashtbl.find_exn index_terms (Index CompleteAdd))

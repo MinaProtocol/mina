@@ -474,6 +474,8 @@ module type Account_intf = sig
 
   val set_timing : t -> timing -> t
 
+  val is_timed : t -> bool
+
   val set_token_id : t -> token_id -> t
 
   type balance
@@ -563,12 +565,12 @@ end
 module Eff = struct
   type (_, _) t =
     | Check_account_precondition :
-        'bool * 'party * 'account * 'global_state
-        -> ( 'bool
+        'party * 'account * 'local_state
+        -> ( 'local_state
            , < bool : 'bool
              ; party : 'party
              ; account : 'account
-             ; global_state : 'global_state
+             ; local_state : 'local_state
              ; .. > )
            t
     | Check_protocol_state_precondition :
@@ -793,6 +795,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   type get_next_party_result =
     { party : Party.t
+    ; party_forest : Ps.t
     ; new_call_stack : Call_stack.t
     ; new_frame : Stack_frame.t
     }
@@ -881,7 +884,7 @@ module Make (Inputs : Inputs_intf) = struct
            and caller_caller = party_caller in
            Stack_frame.make ~calls:party_forest ~caller ~caller_caller )
     in
-    { party; new_frame; new_call_stack }
+    { party; party_forest; new_frame; new_call_stack }
 
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start : [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
@@ -944,7 +947,11 @@ module Make (Inputs : Inputs_intf) = struct
         | `No ->
             (local_state.stack_frame, local_state.call_stack)
       in
-      let { party; new_frame = remaining; new_call_stack = call_stack } =
+      let { party
+          ; party_forest = at_party
+          ; new_frame = remaining
+          ; new_call_stack = call_stack
+          } =
         with_label ~label:"get next party" (fun () ->
             (* TODO: Make the stack frame hashed inside of the local state *)
             get_next_party to_pop call_stack )
@@ -1002,7 +1009,7 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.token_id
         }
       in
-      ((party, remaining, call_stack), to_pop, local_state, acct)
+      ((party, remaining, call_stack), at_party, local_state, acct)
     in
     let local_state =
       { local_state with stack_frame = remaining; call_stack }
@@ -1013,12 +1020,8 @@ module Make (Inputs : Inputs_intf) = struct
        verify a snapp proof.
     *)
     Account.register_verification_key a ;
-    let account_precondition_satisfied =
-      h.perform (Check_account_precondition (is_start', party, a, global_state))
-    in
     let local_state =
-      Local_state.add_check local_state Account_precondition_unsatisfied
-        account_precondition_satisfied
+      h.perform (Check_account_precondition (party, a, local_state))
     in
     let protocol_state_predicate_satisfied =
       h.perform
@@ -1036,9 +1039,7 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Party.check_authorization ~commitment
-        ~at_party:(Stack_frame.calls at_party)
-        party
+      Inputs.Party.check_authorization ~commitment ~at_party party
     in
     (* The fee-payer must increment their nonce. *)
     let local_state =
@@ -1075,13 +1076,16 @@ module Make (Inputs : Inputs_intf) = struct
     let a = Account.set_token_id a (Party.token_id party) in
     let party_token = Party.token_id party in
     let party_token_is_default = Token_id.(equal default) party_token in
+    let account_is_untimed = Bool.not (Account.is_timed a) in
     (* Set account timing for new accounts, if specified. *)
     let a, local_state =
       let timing = Party.Update.timing party in
       let local_state =
         Local_state.add_check local_state
           Update_not_permitted_timing_existing_account
-          Bool.(account_is_new ||| Set_or_keep.is_keep timing)
+          Bool.(
+            Set_or_keep.is_keep timing
+            ||| (account_is_untimed &&& signature_verifies))
       in
       let timing =
         Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)

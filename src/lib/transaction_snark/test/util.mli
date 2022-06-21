@@ -40,8 +40,12 @@ val dummy_rule :
      , 'a * ('a * unit)
      , 'b * ('b * unit)
      , 'c * ('c * unit)
-     , 'd
-     , 'e )
+     , Zkapp_statement.Checked.t
+     , Zkapp_statement.t
+     , unit
+     , 'i
+     , unit
+     , unit )
      Pickles.Inductive_rule.t
 
 (** Generates base and merge snarks of all the party segments
@@ -63,7 +67,9 @@ val trivial_zkapp :
        , unit
        , unit
        , Zkapp_statement.t
-       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+       , ( unit
+         * unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t ] )
   Lazy.t
@@ -82,7 +88,9 @@ val test_snapp_update :
        , unit
        , unit
        , Zkapp_statement.t
-       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+       , ( unit
+         * unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Spec.t
@@ -137,7 +145,7 @@ end
 val check_balance : Account_id.t -> int -> Ledger.t -> unit
 
 val test_transaction_union :
-     ?expected_failure:Transaction_status.Failure.t
+     ?expected_failure:Transaction_status.Failure.t list
   -> ?txn_global_slot:Mina_numbers.Global_slot.t
   -> Ledger.t
   -> Mina_transaction.Transaction.Valid.t

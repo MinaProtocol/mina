@@ -28,7 +28,7 @@ let%test_module "Initialize state test" =
       Pickles.compile ~cache:Cache_dir.cache
         (module Zkapp_statement.Checked)
         (module Zkapp_statement)
-        ~typ:Zkapp_statement.typ
+        ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N3)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"empty_update"
@@ -46,8 +46,8 @@ let%test_module "Initialize state test" =
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
     module Deploy_party = struct
-      let party_body : Party.Body.t =
-        { Party.Body.dummy with
+      let party_body : Party.Body.Graphql_repr.t =
+        { Party.Body.Graphql_repr.dummy with
           public_key = pk_compressed
         ; update =
             { Party.Update.dummy with
@@ -76,10 +76,14 @@ let%test_module "Initialize state test" =
                   }
             }
         ; use_full_commitment = true
-        ; account_precondition = Accept
+        ; preconditions =
+            { Party.Preconditions.network =
+                Zkapp_precondition.Protocol_state.accept
+            ; account = Accept
+            }
         }
 
-      let party : Party.t =
+      let party : Party.Graphql_repr.t =
         (* TODO: This is a pain. *)
         { body = party_body; authorization = Signature Signature.dummy }
     end
@@ -88,15 +92,16 @@ let%test_module "Initialize state test" =
       let party_body =
         Zkapps_initialize_state.generate_initialize_party pk_compressed
 
-      let party_proof =
+      let (), (), party_proof =
         Async.Thread_safe.block_on_async_exn (fun () ->
             initialize_prover []
-              { transaction = Party.Body.digest party_body
-              ; at_party = Parties.Call_forest.empty
+              { party = Party.Body.digest party_body
+              ; calls = Parties.Call_forest.empty
               } )
 
-      let party : Party.t =
-        { body = party_body; authorization = Proof party_proof }
+      let party : Party.Graphql_repr.t =
+        Party.to_graphql_repr ~call_depth:0
+          { body = party_body; authorization = Proof party_proof }
     end
 
     module Update_state_party = struct
@@ -106,17 +111,18 @@ let%test_module "Initialize state test" =
         Zkapps_initialize_state.generate_update_state_party pk_compressed
           new_state
 
-      let party_proof =
+      let (), (), party_proof =
         Async.Thread_safe.block_on_async_exn (fun () ->
             update_state_prover
               ~handler:(Zkapps_initialize_state.update_state_handler new_state)
               []
-              { transaction = Party.Body.digest party_body
-              ; at_party = Parties.Call_forest.empty
+              { party = Party.Body.digest party_body
+              ; calls = Parties.Call_forest.empty
               } )
 
-      let party : Party.t =
-        { body = party_body; authorization = Proof party_proof }
+      let party : Party.Graphql_repr.t =
+        Party.to_graphql_repr ~call_depth:0
+          { body = party_body; authorization = Proof party_proof }
     end
 
     let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
@@ -125,8 +131,9 @@ let%test_module "Initialize state test" =
       let ps =
         (* TODO: This is a pain. *)
         Parties.Call_forest.of_parties_list
-          ~party_depth:(fun (p : Party.t) -> p.body.call_depth)
+          ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
           parties
+        |> Parties.Call_forest.map ~f:Party.of_graphql_repr
         |> Parties.Call_forest.accumulate_hashes_predicated
       in
       let memo = Signed_command_memo.empty in
@@ -250,21 +257,24 @@ let%test_module "Initialize state test" =
 
     let%test_unit "Update without initialize fails" =
       let account =
-        test_parties ~expected_failure:Account_precondition_unsatisfied
+        test_parties
+          ~expected_failure:Account_proved_state_precondition_unsatisfied
           [ Deploy_party.party; Update_state_party.party ]
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Double initialize fails" =
       let account =
-        test_parties ~expected_failure:Account_precondition_unsatisfied
+        test_parties
+          ~expected_failure:Account_proved_state_precondition_unsatisfied
           [ Deploy_party.party; Initialize_party.party; Initialize_party.party ]
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Initialize after update fails" =
       let account =
-        test_parties ~expected_failure:Account_precondition_unsatisfied
+        test_parties
+          ~expected_failure:Account_proved_state_precondition_unsatisfied
           [ Deploy_party.party
           ; Initialize_party.party
           ; Update_state_party.party

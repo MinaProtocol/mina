@@ -11,6 +11,7 @@ import {
   Mina,
   signFeePayer,
   Permissions,
+  Ledger,
 } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
 
@@ -29,7 +30,7 @@ class SimpleZkapp extends SmartContract {
   deploy(args) {
     super.deploy(args);
     // TODO: this is bad.. we have to fetch current permissions and enable to update just one of them
-    this.self.update.permissions.setValue({
+    this.setPermissions({
       ...Permissions.default(),
       editState: Permissions.proofOrSignature(),
     });
@@ -89,6 +90,20 @@ partiesJsonInitialize = signFeePayer(partiesJsonInitialize, senderKey, {
   transactionFee,
 });
 toc();
+
+// verify the proof
+tic("verify transaction proof");
+let parties = JSON.parse(partiesJsonInitialize);
+let proof = parties.otherParties[0].authorization.proof;
+let publicInput = Ledger.zkappPublicInput(partiesJsonInitialize, 0);
+let ok = await Ledger.verifyPartyProof(
+  publicInput,
+  proof,
+  verificationKey.data
+);
+toc();
+console.log("did proof verify?", ok);
+if (!ok) throw Error("proof didn't verify");
 
 tic("apply initialize transaction");
 Local.applyJsonTransaction(partiesJsonInitialize);

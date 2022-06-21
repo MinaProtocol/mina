@@ -54,12 +54,18 @@ let%test_module "Archive node unit tests" =
       Mina_generators.User_command_generators.payment_with_random_participants
         ~keys ~max_amount:1000 ~fee_range:10 ()
 
+    let genesis_state_view =
+      let genesis_state_body =
+        precomputed_values.protocol_state_with_hashes.data.body
+      in
+      Mina_state.Protocol_state.Body.view genesis_state_body
+
     let user_command_zkapp_gen :
         ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind initial_balance =
-        Base_quickcheck.Generator.int64_uniform_inclusive 2_000_000_000L
-          4_000_000_000L
+        Base_quickcheck.Generator.int64_uniform_inclusive 200_000_000_000_000L
+          400_000_000_000_000L
         >>| Unsigned.UInt64.of_int64 >>| Currency.Balance.of_uint64
       and fee_payer_key_index =
         Base_quickcheck.Generator.int_inclusive 0 @@ (Array.length keys - 1)
@@ -83,7 +89,7 @@ let%test_module "Archive node unit tests" =
       |> fun _ ->
       let%map (parties : Parties.t) =
         Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
-          ~keymap ~ledger ()
+          ~keymap ~ledger ~protocol_state_view:genesis_state_view ()
       in
       User_command.Parties parties
 
@@ -237,8 +243,8 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added ~precomputed_values breadcrumb)
-                )
+                  (Diff.Builder.breadcrumb_added ~precomputed_values ~logger
+                     breadcrumb ) )
               breadcrumbs
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
@@ -312,7 +318,7 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added breadcrumb) )
+                  (Diff.Builder.breadcrumb_added ~logger breadcrumb) )
               breadcrumbs
           in
           let max_height =

@@ -374,7 +374,7 @@ struct
                   ~fee_payer_nonce:
                     ( Transaction_hash.User_command_with_valid_signature.command
                         cmd
-                    |> User_command.nonce_exn )
+                    |> User_command.application_nonce )
               with
               | Ok (t, _) ->
                   Some (cmd, t)
@@ -404,7 +404,7 @@ struct
 
     let get_all { pool; _ } = Indexed_pool.get_all pool
 
-    let find_by_hash { pool; _ } hash = Indexed_pool.find_by_hash pool hash
+    let find_by_hash x hash = Indexed_pool.find_by_hash x.pool hash
 
     (** Get the best tip ledger*)
     let get_best_tip_ledger frontier =
@@ -1631,7 +1631,7 @@ struct
                in
                let get_nonce txn =
                  Transaction_hash.User_command_with_valid_signature.command txn
-                 |> User_command.nonce_exn
+                 |> User_command.application_nonce
                in
                if cmp <> 0 then cmp
                else
@@ -1750,7 +1750,7 @@ let%test_module _ =
               let account_id = Account_id.create compressed Token_id.default in
               ( account_id
               , Account.create account_id
-                @@ Currency.Balance.of_int 1_000_000_000_000 ) )
+                @@ Currency.Balance.of_formatted_string "900000000.0" ) )
         in
         let ledger = Account_id.Table.of_alist_exn accounts in
         ((pipe_r, ref ledger), pipe_w)
@@ -1812,8 +1812,8 @@ let%test_module _ =
             (User_command.fee_payer cmd2)
         then
           Account.Nonce.compare
-            (User_command.nonce_exn cmd1)
-            (User_command.nonce_exn cmd2)
+            (User_command.application_nonce cmd1)
+            (User_command.application_nonce cmd2)
         else
           let get_fee_wu cmd = User_command.fee_per_wu cmd in
           (* descending order of fee/weight *)
@@ -1861,7 +1861,7 @@ let%test_module _ =
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
                    (Quickcheck_lib.of_array test_keys) )
-              ~max_amount:100_000_000_000 ~fee_range:10_000_000_000 ()
+              ~max_amount:1_000_000_000 ~fee_range:1_000_000_000 ()
           in
           go (n + 1) (cmd :: cmds)
         else Quickcheck.Generator.return @@ List.rev cmds
@@ -1917,8 +1917,14 @@ let%test_module _ =
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
             let%map (parties : Parties.t) =
-              Mina_generators.Parties_generators.gen_parties_from ~succeed:true
-                ~keymap ~fee_payer_keypair ~ledger ()
+              Mina_generators.Parties_generators.gen_parties_from ~keymap
+                ~fee_payer_keypair ~ledger ()
+            in
+            let parties =
+              Option.value_exn
+                (Parties.Valid.to_valid ~ledger ~get:Mina_ledger.Ledger.get
+                   ~location_of_account:Mina_ledger.Ledger.location_of_account
+                   parties )
             in
             User_command.Parties parties
           in
@@ -2141,8 +2147,8 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_int amount
                 } ) )
 
-    let mk_parties ?valid_period ?fee_payer_idx ~sender_idx ~receiver_idx ~fee
-        ~nonce ~amount () =
+    let mk_transfer_parties ?valid_period ?fee_payer_idx ~sender_idx
+        ~receiver_idx ~fee ~nonce ~amount () =
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
@@ -2182,11 +2188,22 @@ let%test_module _ =
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
         ; sequence_events = []
-        ; protocol_state_precondition = Some protocol_state_precondition
-        ; account_precondition = None
+        ; preconditions =
+            Some
+              { Party.Preconditions.network = protocol_state_precondition
+              ; account = Party.Account_precondition.Accept
+              }
         }
       in
       let parties = Transaction_snark.For_tests.multiple_transfers test_spec in
+      let parties =
+        Option.value_exn
+          (Parties.Valid.to_valid ~ledger:()
+             ~get:(fun _ _ -> failwith "Not expecting proof parties")
+             ~location_of_account:(fun _ _ ->
+               failwith "Not expecting proof parties" )
+             parties )
+      in
       User_command.Parties parties
 
     let mk_payment ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount ()
@@ -2273,6 +2290,15 @@ let%test_module _ =
 
     let mk_expired_not_accepted_test assert_pool_txs pool ~padding cmds =
       assert_pool_txs [] ;
+      let%bind () =
+        let current_time = Block_time.now time_controller in
+        let slot_end =
+          Consensus.Data.Consensus_time.(
+            of_time_exn ~constants:consensus_constants current_time
+            |> end_time ~constants:consensus_constants)
+        in
+        at (Block_time.to_time slot_end)
+      in
       let curr_slot = current_global_slot () in
       let slot_padding = Mina_numbers.Global_slot.of_int padding in
       let curr_slot_plus_padding =
@@ -2324,7 +2350,7 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
             setup_test ()
           in
-          mk_expired_not_accepted_test assert_pool_txs pool ~padding:25
+          mk_expired_not_accepted_test assert_pool_txs pool ~padding:55
             (mk_parties_cmds pool) )
 
     let%test_unit "Expired transactions that are already in the pool are \
@@ -2483,13 +2509,13 @@ let%test_module _ =
             List.take independent_cmds (List.length independent_cmds / 2)
           in
           let expires_later1 =
-            mk_parties
+            mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
               ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
               ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ()
           in
           let expires_later2 =
-            mk_parties
+            mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~fee_payer_idx:(0, 2) ~sender_idx:1 ~receiver_idx:9
               ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ()
@@ -2525,13 +2551,13 @@ let%test_module _ =
           assert_pool_txs cmds_wo_check ;
           (* Add new commands, remove old commands some of which are now expired *)
           let expired_zkapp =
-            mk_parties
+            mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time }
               ~fee_payer_idx:(9, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:3
               ~receiver_idx:5 ~amount:1_000_000_000 ()
           in
           let unexpired_zkapp =
-            mk_parties
+            mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~fee_payer_idx:(8, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:4
               ~receiver_idx:9 ~amount:1_000_000_000 ()
@@ -2595,8 +2621,9 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let party_transfer =
-            mk_parties ~fee_payer_idx:(0, 0) ~sender_idx:1 ~receiver_idx:9
-              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:0 ()
+            mk_transfer_parties ~fee_payer_idx:(0, 0) ~sender_idx:1
+              ~receiver_idx:9 ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:0
+              ()
           in
           let valid_commands = [ party_transfer ] in
           let cmds_wo_check =
@@ -2719,7 +2746,7 @@ let%test_module _ =
           mk_payment ~sender_idx:0 ~fee:16_000_000_000 ~nonce:0 ~receiver_idx:1
             ~amount:440_000_000_000 ()
         ; (* insufficient fee *)
-          mk_payment ~sender_idx:1 ~fee:4_000_000_000 ~nonce:0 ~receiver_idx:1
+          mk_payment ~sender_idx:1 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:1
             ~amount:788_000_000_000 ()
         ; (* sufficient *)
           mk_payment ~sender_idx:2 ~fee:20_000_000_000 ~nonce:1 ~receiver_idx:4

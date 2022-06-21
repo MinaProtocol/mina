@@ -152,6 +152,7 @@ let inferred_nonce ~get_current_nonce ~(fee_payer : Account_id.t) ~nonce_map =
   match Map.find nonce_map fee_payer with
   | Some (min_nonce, nonce) ->
       (* Multiple user commands from the same fee-payer. *)
+      (* TODO: this logic does not currently support parties transactions, as parties transactions can increment the fee payer nonce more than once (#11001) *)
       let next_nonce = Account_nonce.succ nonce in
       let updated_map = update_map ~data:(min_nonce, next_nonce) in
       Ok (min_nonce, next_nonce, updated_map)

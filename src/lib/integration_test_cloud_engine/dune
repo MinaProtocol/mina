@@ -4,7 +4,16 @@
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)
- (preprocess (pps ppx_coda graphql_ppx ppx_optcomp ppx_version ppx_let ppx_inline_test ppx_custom_printf ppx_deriving_yojson ppx_pipebang ppx_sexp_conv))
+ (preprocess (pps
+               ppx_coda ppx_version ppx_let ppx_inline_test ppx_pipebang
+               ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving
+               ppx_sexp_conv
+               ; GraphQL with config
+               graphql_ppx --
+               -extend-query Graphql_lib.Serializing.ExtendQuery
+               -extend-mutation Graphql_lib.Serializing.ExtendQuery
+               -future-added-value false
+               ))
  (libraries
    ;; opam libraries
    async_unix

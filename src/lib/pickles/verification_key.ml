@@ -10,12 +10,18 @@ module Verifier_index_json = struct
       | Joint
     [@@deriving yojson]
 
+    type 't lookup_selectors =
+          't Kimchi_types.VerifierIndex.Lookup.lookup_selectors =
+      { lookup_gate : 't option }
+    [@@deriving yojson]
+
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
       { lookup_used : lookups_used
       ; lookup_table : 'polyComm array
-      ; lookup_selectors : 'polyComm array
+      ; lookup_selectors : 'polyComm lookup_selectors
       ; table_ids : 'polyComm option
       ; max_joint_size : int
+      ; runtime_tables_selector : 'polyComm option
       }
     [@@deriving yojson]
   end
@@ -84,7 +90,6 @@ module Repr = struct
         { commitments :
             Backend.Tock.Curve.Affine.Stable.V1.t
             Plonk_verification_key_evals.Stable.V2.t
-        ; step_domains : Domains.Stable.V1.t array
         ; data : Data.Stable.V1.t
         }
       [@@deriving to_yojson]
@@ -99,7 +104,6 @@ module Stable = struct
   module V2 = struct
     type t =
       { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
-      ; step_domains : Domains.t array
       ; index :
           (Impls.Wrap.Verification_key.t
           [@to_yojson
@@ -111,7 +115,7 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    let of_repr srs { Repr.commitments = c; step_domains; data = d } =
+    let of_repr srs { Repr.commitments = c; data = d } =
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
         let d = Domain.Pow_2_roots_of_unity log2_size in
@@ -144,7 +148,7 @@ module Stable = struct
         ; lookup_index = None
         }
       in
-      { commitments = c; step_domains; data = d; index = t }
+      { commitments = c; data = d; index = t }
 
     include
       Binable.Of_binable
@@ -152,8 +156,8 @@ module Stable = struct
         (struct
           type nonrec t = t
 
-          let to_binable { commitments; step_domains; data; index = _ } =
-            { Repr.commitments; data; step_domains }
+          let to_binable { commitments; data; index = _ } =
+            { Repr.commitments; data }
 
           let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
         end)
@@ -179,8 +183,5 @@ let dummy =
   lazy
     (let rows = Domain.size (Common.wrap_domains ~proofs_verified:2).h in
      let g = Backend.Tock.Curve.(to_affine_exn one) in
-     { Repr.commitments = dummy_commitments g
-     ; step_domains = [||]
-     ; data = { constraints = rows }
-     }
+     { Repr.commitments = dummy_commitments g; data = { constraints = rows } }
      |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1) )
