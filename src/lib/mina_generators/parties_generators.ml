@@ -1432,7 +1432,7 @@ let setup_fee_payer_and_available_keys_and_account_state_tbl_limited
                 Some account ) ) ;
 
   let acct_ids = Account_id.Table.keys account_state_tbl in
-  let%map fee_payer_index = Int.gen_incl 0 (List.length acct_ids) in
+  let%map fee_payer_index = Int.gen_incl 0 (List.length acct_ids - 1) in
   let fee_payer_acct_id = List.nth_exn acct_ids fee_payer_index in
   let fee_payer_pk = Account_id.public_key fee_payer_acct_id in
   let fee_payer_keypair =
