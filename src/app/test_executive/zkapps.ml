@@ -607,12 +607,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_create_accounts)
     in
     let%bind () =
-      section_hard
-        "Wait for zkapp to create accounts to be included in transition \
-         frontier"
-        (wait_for_zkapp parties_create_account)
-    in
-    let%bind () =
       let sender = List.hd_exn zkapp_keypairs in
       let nonce = Account.Nonce.zero in
       section_hard "Send payment from zkApp account"
