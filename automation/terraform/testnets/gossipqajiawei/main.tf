@@ -56,7 +56,7 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default     = 1
+  default     = 3
 }
 
 variable "plain_node_count" {
@@ -65,8 +65,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "gossipqajiawei"
-  mina_image = "minaprotocol/mina-daemon:1.3.2alpha1-develop-665edf8-bullseye-devnet"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.2alpha1-develop-665edf8-bullseye"
+  mina_image = "minaprotocol/mina-daemon:1.3.2alpha1-batch-zkapp-tool-6410e94-bullseye-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.2alpha1-batch-zkapp-tool-6410e94-bullseye-devnet"
   seed_region = "us-central1"
   seed_zone = "us-central1-c"
 

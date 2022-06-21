@@ -1,43 +1,43 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2022-06-21T11:58:18Z"
+    "genesis_state_timestamp": "2022-06-21T13:42:55Z"
   },
   "ledger": {
     "name": "gossipqajiawei",
     "accounts": [
       {
-        "pk": "B62qot3taqhxomY6iA8FmAKvxNPBWw5Rv1JDLpzKpzL6NdSSDwBWf4f",
-        "delegate": "B62qot3taqhxomY6iA8FmAKvxNPBWw5Rv1JDLpzKpzL6NdSSDwBWf4f",
+        "pk": "B62qos9u6cXaqUxzXe3zG8vUqaefcrrvnoK9niXNo3KdbEhVpnPt2VB",
+        "delegate": "B62qos9u6cXaqUxzXe3zG8vUqaefcrrvnoK9niXNo3KdbEhVpnPt2VB",
         "sk": null,
         "balance": "375000.000000000"
       },
       {
-        "pk": "B62qkTJLCUQ67hXx14U1H6n6nQrTEKko9Zb6heDgZn58MY1PZhMRA4C",
-        "delegate": "B62qkTJLCUQ67hXx14U1H6n6nQrTEKko9Zb6heDgZn58MY1PZhMRA4C",
+        "pk": "B62qiqGQYgjJFq2Pf8zVRjB9yuHBabQBZN1e5bGFWAY8Qs5Us7p9kby",
+        "delegate": "B62qiqGQYgjJFq2Pf8zVRjB9yuHBabQBZN1e5bGFWAY8Qs5Us7p9kby",
         "sk": null,
         "balance": "375000.000000000"
       },
       {
-        "pk": "B62qmGe9MMks8dan3yeGJ7Mb6ZV8oEZ1QsBv6xtHsCWsg6FxMpnmj5x",
-        "delegate": "B62qmGe9MMks8dan3yeGJ7Mb6ZV8oEZ1QsBv6xtHsCWsg6FxMpnmj5x",
+        "pk": "B62qrxztjKyzrXFXHLdxTbxi7cpLMbr2iw6bvm21qZFZZ9rbMSMFbBN",
+        "delegate": "B62qrxztjKyzrXFXHLdxTbxi7cpLMbr2iw6bvm21qZFZZ9rbMSMFbBN",
         "sk": null,
         "balance": "375000.000000000"
       },
       {
-        "pk": "B62qmLmT4DWv6eTnVLycyTTt2E8SbRNu38RtMKbUxTbuDHTmCCv1Phi",
-        "delegate": "B62qmLmT4DWv6eTnVLycyTTt2E8SbRNu38RtMKbUxTbuDHTmCCv1Phi",
+        "pk": "B62qkFpRn5tN2yET3ALn4SM7oTyzy5oxcKFky5WyMBPjArJH3omrTH5",
+        "delegate": "B62qkFpRn5tN2yET3ALn4SM7oTyzy5oxcKFky5WyMBPjArJH3omrTH5",
         "sk": null,
         "balance": "2250000.000000000"
       },
       {
-        "pk": "B62qocFidcE6gRfg3DSkK6inZvcGwa4s8jRGtsvuQLjfg5cH7y5sGVH",
-        "delegate": "B62qocFidcE6gRfg3DSkK6inZvcGwa4s8jRGtsvuQLjfg5cH7y5sGVH",
+        "pk": "B62qqsBhUBYfbFQ1MfxyVvv2ZpKGV4PiLKHDSbhJHFqXzqNabD2mVhg",
+        "delegate": "B62qqsBhUBYfbFQ1MfxyVvv2ZpKGV4PiLKHDSbhJHFqXzqNabD2mVhg",
         "sk": null,
         "balance": "2250000.000000000"
       },
       {
-        "pk": "B62qjSHoXy1BeA9p1cX9po5oegmzECDPRZpxJCwPjEybktQyAtBVWDH",
-        "delegate": "B62qjSHoXy1BeA9p1cX9po5oegmzECDPRZpxJCwPjEybktQyAtBVWDH",
+        "pk": "B62qjqdXxYYShqFkEzSiJbgDpKrTntABQuuiJG5k2dFrPFTEb3oC7cP",
+        "delegate": "B62qjqdXxYYShqFkEzSiJbgDpKrTntABQuuiJG5k2dFrPFTEb3oC7cP",
         "sk": null,
         "balance": "2250000.000000000"
       }
