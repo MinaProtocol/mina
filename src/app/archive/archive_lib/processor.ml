@@ -2768,6 +2768,17 @@ module Block = struct
                       :: acc )
                 in
                 let fee_transfer_infos_with_balances =
+                  (*Structure of the failure status:
+                    I. Only one fee transfer in the transaction (`One) and it fails:
+                        [[failure]]
+                    II. Two fee transfers in the transaction (`Two)-
+                        Both fee transfers fail:
+                          [[failure-of-first-fee-transfer]; [failure-of-second-fee-transfer]]
+                        First succeeds and second one fails:
+                          [[];[failure-of-second-fee-transfer]]
+                        First fails and second succeeds:
+                          [[failure-of-first-fee-transfer];[]]
+                  *)
                   match fee_transfer_infos with
                   | [ id ] ->
                       let status =
@@ -2840,6 +2851,16 @@ module Block = struct
                 let fee_transfer_via_coinbase =
                   Mina_base.Coinbase.fee_transfer coinbase
                 in
+                (*Structure of the failure status:
+                  I. No fee transfer and coinbase transfer fails: [[failure]]
+                  II. With fee transfer-
+                    Both fee transfer and coinbase fails:
+                      [[failure-of-fee-transfer]; [failure-of-coinbase]]
+                    Fee transfer succeeds and coinbase fails:
+                      [[];[failure-of-coinbase]]
+                    Fee transfer fails and coinbase succeeds:
+                      [[failure-of-fee-transfer];[]]
+                *)
                 let%bind () =
                   match fee_transfer_via_coinbase with
                   | None ->
@@ -2891,7 +2912,11 @@ module Block = struct
                         (failures, Option.is_none fee_transfer_via_coinbase)
                       with
                       | [ [] ], true ->
-                          applied_status
+                          failwithf
+                            !"Expecting the status to be Applied if there are \
+                              no failures in coinbase transaction %{sexp: \
+                              Mina_base.Coinbase.t}"
+                            coinbase ()
                       | [ _; [] ], false ->
                           applied_status
                       | [ [ failure2 ] ], true ->
