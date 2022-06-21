@@ -2283,6 +2283,20 @@ module Base = struct
         Mina_state.Protocol_state.Body.Value.t Snarky_backendless.Request.t
     | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
 
+  let%snarkydef add_burned_tokens acc_burned_tokens amount
+      ~is_coinbase_or_fee_transfer ~update_account =
+    let%bind accumulate_burned_tokens =
+      Boolean.all [ is_coinbase_or_fee_transfer; Boolean.not update_account ]
+    in
+    let%bind amt, `Overflow overflow =
+      Amount.Checked.add_flagged acc_burned_tokens amount
+    in
+    let%bind () =
+      Boolean.(Assert.any [ not accumulate_burned_tokens; not overflow ])
+    in
+    Amount.Checked.if_ accumulate_burned_tokens ~then_:amt
+      ~else_:acc_burned_tokens
+
   let%snarkydef apply_tagged_transaction
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       (type shifted)
@@ -2512,6 +2526,7 @@ module Base = struct
       in
       Boolean.(is_coinbase_or_fee_transfer &&& fee_may_be_charged)
     in
+    let burned_tokens = ref Currency.Amount.(var_of_t zero) in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
         (Frozen_ledger_hash.modify_account_send
@@ -2603,6 +2618,33 @@ module Base = struct
                   in
                   Amount.Signed.Checked.(
                     add fee_payer_amount account_creation_fee) )
+             in
+             let%bind () =
+               [%with_label "Burned tokens in fee payer"]
+                 (*let%bind accumulate_burned_tokens =
+                     Boolean.all
+                       [ is_coinbase_or_fee_transfer
+                       ; Boolean.not update_account
+                       ]
+                   in
+                   let%bind amt, `Overflow overflow =
+                     Amount.Checked.add_flagged !burned_tokens
+                       (Amount.Checked.of_fee fee)
+                   in
+                   let%bind () =
+                     Boolean.(
+                       Assert.any [ not accumulate_burned_tokens; not overflow ])
+                   in
+                   let%map amt =
+                     Amount.Checked.if_ accumulate_burned_tokens ~then_:amt
+                       ~else_:!burned_tokens
+                   in*)
+                 (let%map amt =
+                    add_burned_tokens !burned_tokens
+                      (Amount.Checked.of_fee fee)
+                      ~is_coinbase_or_fee_transfer ~update_account
+                  in
+                  burned_tokens := amt )
              in
              let txn_global_slot = current_global_slot in
              let%bind timing =
@@ -2832,6 +2874,15 @@ module Base = struct
                receiver_overflow := overflow ;
                Balance.Checked.if_ overflow ~then_:account.balance
                  ~else_:balance
+             in
+             let%bind () =
+               [%with_label "Burned tokens in receiver"]
+                 (let%map amt =
+                    add_burned_tokens !burned_tokens receiver_increase
+                      ~is_coinbase_or_fee_transfer
+                      ~update_account:permitted_to_receive
+                  in
+                  burned_tokens := amt )
              in
              let%bind user_command_fails =
                Boolean.(!receiver_overflow ||| user_command_fails)
@@ -3122,9 +3173,19 @@ module Base = struct
              ~else_:user_command_excess )
     in
     let%bind supply_increase =
-      Amount.Signed.Checked.if_ is_coinbase
-        ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
-        ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
+      [%with_label "Calculate supply increase"]
+        (let%bind expected_supply_increase =
+           Amount.Signed.Checked.if_ is_coinbase
+             ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
+             ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
+         in
+         let%bind amt, `Overflow overflow =
+           Amount.Signed.Checked.(
+             add_flagged expected_supply_increase
+               (negate (of_unsigned !burned_tokens)))
+         in
+         let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
+         amt )
     in
     let%map final_root =
       (* Ensure that only the fee-payer was charged if this was an invalid user
@@ -3419,17 +3480,16 @@ module type S = sig
     t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
-let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
-    source target init_stack pending_coinbase_stack_state transaction state_body
-    handler =
+let check_transaction_union ?(preeval = false) ~constraint_constants
+    ~supply_increase sok_message source target init_stack
+    pending_coinbase_stack_state transaction state_body handler =
   if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
   in
   let statement : Statement.With_sok.t =
-    Statement.Poly.with_empty_local_state ~source ~target
-      ~supply_increase:(Transaction_union.supply_increase transaction)
+    Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
       ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~sok_digest
@@ -3449,7 +3509,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
-    ~zkapp_account2:_
+    ~zkapp_account2:_ ~supply_increase
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   let transaction =
@@ -3460,22 +3520,23 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
   | `Parties _ ->
       failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
-      check_transaction_union ?preeval ~constraint_constants sok_message source
-        target init_stack pending_coinbase_stack_state
+      check_transaction_union ?preeval ~constraint_constants ~supply_increase
+        sok_message source target init_stack pending_coinbase_stack_state
         (Transaction_union.of_transaction t)
         state_body handler
 
 let check_user_command ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state t_in_block handler =
+    ~init_stack ~pending_coinbase_stack_state ~supply_increase t_in_block
+    handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
   check_transaction ~constraint_constants ~sok_message ~source ~target
     ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:None
-    ~zkapp_account2:None
+    ~zkapp_account2:None ~supply_increase
     { t_in_block with transaction = Command (Signed_command user_command) }
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
-    sok_message source target transaction_in_block init_stack
+    ~supply_increase sok_message source target transaction_in_block init_stack
     pending_coinbase_stack_state handler =
   if preeval then failwith "preeval currently disabled" ;
   let transaction =
@@ -3487,8 +3548,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     Base.transaction_union_handler handler transaction state_body init_stack
   in
   let statement : Statement.With_sok.t =
-    Statement.Poly.with_empty_local_state ~source ~target
-      ~supply_increase:(Transaction_union.supply_increase transaction)
+    Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
       ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~sok_digest
@@ -3501,7 +3561,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
-    ~zkapp_account2:_
+    ~zkapp_account2:_ ~supply_increase
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   match
@@ -3513,7 +3573,7 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
       failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
       generate_transaction_union_witness ?preeval ~constraint_constants
-        sok_message source target
+        ~supply_increase sok_message source target
         { transaction_in_block with
           transaction = Transaction_union.of_transaction t
         }

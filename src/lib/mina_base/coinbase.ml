@@ -64,19 +64,19 @@ let create ~amount ~receiver ~fee_transfer =
     Ok { t with fee_transfer = adjusted_fee_transfer }
   else Or_error.error_string "Coinbase.create: invalid coinbase"
 
-let supply_increase { receiver = _; amount; fee_transfer } =
+let expected_supply_increase { receiver = _; amount; fee_transfer } =
   match fee_transfer with
   | None ->
-      Ok (Currency.Amount.Signed.of_unsigned amount)
+      Ok amount
   | Some { fee; _ } ->
       Currency.Amount.sub amount (Currency.Amount.of_fee fee)
       |> Option.value_map
            ~f:(fun _ -> Ok amount)
            ~default:(Or_error.error_string "Coinbase underflow")
-      |> Or_error.map ~f:Currency.Amount.Signed.of_unsigned
 
 let fee_excess t =
-  Or_error.map (supply_increase t) ~f:(fun _increase -> Fee_excess.empty)
+  Or_error.map (expected_supply_increase t) ~f:(fun _increase ->
+      Fee_excess.empty )
 
 module Gen = struct
   let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
