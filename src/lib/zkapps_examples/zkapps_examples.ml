@@ -400,23 +400,18 @@ let dummy_constraints () =
          Modify snarky to do this.
 *)
 let party_circuit f
-    { Pickles.Inductive_rule.previous_public_inputs = []
-    ; public_input =
-        ({ party = party_digest; calls } : Zkapp_statement.Checked.t)
-    } =
+    { Pickles.Inductive_rule.previous_public_inputs = []; public_input = () } =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
-  let returned_transaction = Party.Checked.digest party in
-  let returned_calls =
+  let calls =
     (* TODO: This should be returned from
              [Party_under_construction.In_circuit.to_party].
     *)
     Field.constant Parties.Call_forest.empty
   in
-  Run.Field.Assert.equal returned_transaction party_digest ;
-  Run.Field.Assert.equal returned_calls calls ;
   { Pickles.Inductive_rule.previous_proofs_should_verify = []
-  ; public_output = ()
+  ; public_output =
+      ({ party = Party.Checked.digest party; calls } : Zkapp_statement.Checked.t)
   ; auxiliary_output = ()
   }
