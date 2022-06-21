@@ -1,0 +1,80 @@
+nodeExporter:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+pushgateway:
+  enabled: false
+
+kubeStateMetrics:
+  enabled: false
+
+kubeApiServer:
+  enabled: false
+
+kubeApiServer:
+  enabled: false
+
+kubelet:
+  enabled: false
+
+kubeControllerManager:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
+prometheusOperator:
+  enabled: false
+
+
+grafana:
+  defaultDashboardsEnabled: false
+  extraConfigmapMounts: 
+  - name: simplified-mainnet-dashboard
+    mountPath: /var/lib/grafana/dashboards
+    configMap: simplified-mainnet-dashboard
+    readOnly: true
+
+  sidecar: 
+    datasources:
+      defaultDatasourceEnabled: false
+  
+  additionalDataSources: 
+    - name: Prometheus
+      access: proxy
+      type: prometheus
+      url: http://gossipqa-prom-prometheus-server:80
+      isDefault: true
+
+  persistence:
+    type: pvc
+    enabled: true
+    storageClassName: ssd-retain
+    accessModes:
+      - ReadWriteOnce
+    size: 100Gi
+    # annotations: {}
+    finalizers:
+      - kubernetes.io/pvc-protection
+    # selectorLabels: {}
+    # subPath: ""
+    # existingClaim:
+
+    ## If persistence is not enabled, this allows to mount the
+    ## local storage in-memory to improve performance
+    ##
+    inMemory:
+      enabled: false
+      ## The maximum usage on memory medium EmptyDir would be
+      ## the minimum value between the SizeLimit specified
+      ## here and the sum of memory limits of all containers in a pod
+      ##
+      # sizeLimit: 300Mi

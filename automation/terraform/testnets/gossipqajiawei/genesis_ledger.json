@@ -1,0 +1,46 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2022-06-21T11:58:18Z"
+  },
+  "ledger": {
+    "name": "gossipqajiawei",
+    "accounts": [
+      {
+        "pk": "B62qot3taqhxomY6iA8FmAKvxNPBWw5Rv1JDLpzKpzL6NdSSDwBWf4f",
+        "delegate": "B62qot3taqhxomY6iA8FmAKvxNPBWw5Rv1JDLpzKpzL6NdSSDwBWf4f",
+        "sk": null,
+        "balance": "375000.000000000"
+      },
+      {
+        "pk": "B62qkTJLCUQ67hXx14U1H6n6nQrTEKko9Zb6heDgZn58MY1PZhMRA4C",
+        "delegate": "B62qkTJLCUQ67hXx14U1H6n6nQrTEKko9Zb6heDgZn58MY1PZhMRA4C",
+        "sk": null,
+        "balance": "375000.000000000"
+      },
+      {
+        "pk": "B62qmGe9MMks8dan3yeGJ7Mb6ZV8oEZ1QsBv6xtHsCWsg6FxMpnmj5x",
+        "delegate": "B62qmGe9MMks8dan3yeGJ7Mb6ZV8oEZ1QsBv6xtHsCWsg6FxMpnmj5x",
+        "sk": null,
+        "balance": "375000.000000000"
+      },
+      {
+        "pk": "B62qmLmT4DWv6eTnVLycyTTt2E8SbRNu38RtMKbUxTbuDHTmCCv1Phi",
+        "delegate": "B62qmLmT4DWv6eTnVLycyTTt2E8SbRNu38RtMKbUxTbuDHTmCCv1Phi",
+        "sk": null,
+        "balance": "2250000.000000000"
+      },
+      {
+        "pk": "B62qocFidcE6gRfg3DSkK6inZvcGwa4s8jRGtsvuQLjfg5cH7y5sGVH",
+        "delegate": "B62qocFidcE6gRfg3DSkK6inZvcGwa4s8jRGtsvuQLjfg5cH7y5sGVH",
+        "sk": null,
+        "balance": "2250000.000000000"
+      },
+      {
+        "pk": "B62qjSHoXy1BeA9p1cX9po5oegmzECDPRZpxJCwPjEybktQyAtBVWDH",
+        "delegate": "B62qjSHoXy1BeA9p1cX9po5oegmzECDPRZpxJCwPjEybktQyAtBVWDH",
+        "sk": null,
+        "balance": "2250000.000000000"
+      }
+    ]
+  }
+}
