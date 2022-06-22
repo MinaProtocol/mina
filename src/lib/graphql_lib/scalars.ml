@@ -36,7 +36,7 @@ end
 module UInt64 : S_JSON with type t = Unsigned.UInt64.t = struct
   type t = Unsigned.UInt64.t
 
-  let parse = Decoders.uint64
+  let parse json = Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
 
   let serialize = Encoders.uint64
 
@@ -64,7 +64,8 @@ end
 module Balance : S_JSON with type t = Currency.Balance.t = struct
   type t = Currency.Balance.t
 
-  let parse = Decoders.balance
+  let parse json =
+    Yojson.Basic.Util.to_string json |> Currency.Balance.of_string
 
   let serialize x = `String (Currency.Balance.to_string x)
 
@@ -74,7 +75,8 @@ end
 module TokenId : S_JSON with type t = Mina_base.Token_id.t = struct
   type t = Mina_base.Token_id.t
 
-  let parse = Decoders.token
+  let parse json =
+    Yojson.Basic.Util.to_string json |> Mina_base.Token_id.of_string
 
   let serialize tid = `String (Mina_base.Token_id.to_string tid)
 
@@ -86,7 +88,7 @@ end
 module Amount : S_JSON with type t = Currency.Amount.t = struct
   type t = Currency.Amount.t
 
-  let parse = Decoders.amount
+  let parse json = Yojson.Basic.Util.to_string json |> Currency.Amount.of_string
 
   let serialize x = `String (Currency.Amount.to_string x)
 
@@ -96,7 +98,7 @@ end
 module Fee : S_JSON with type t = Currency.Fee.t = struct
   type t = Currency.Fee.t
 
-  let parse = Decoders.fee
+  let parse json = Yojson.Basic.Util.to_string json |> Currency.Fee.of_string
 
   let serialize value = `String (Currency.Fee.to_string value)
 
