@@ -10,7 +10,7 @@ module Get_status =
       stateHash
       protocolState {
         blockchainState {
-          utcDate @ppxCustom(module: "Serializing.Int64_s")
+          utcDate @ppxCustom(module: "Serializing.Int64")
         }
         consensusState {
           blockHeight @ppxCustom(module: "Serializing.Int64")
