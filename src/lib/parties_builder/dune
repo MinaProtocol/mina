@@ -7,6 +7,7 @@
    async_kernel
    async_unix
    core_kernel
+   async
    ;; local libraries
    mina_base
    currency
@@ -24,6 +25,6 @@
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_annot ppx_snarky ppx_here ppx_coda ppx_version))
+  (pps ppx_jane ppx_annot ppx_snarky ppx_here ppx_coda ppx_version))
  (instrumentation (backend bisect_ppx))
  (synopsis "Builder Parties.t via combinators"))

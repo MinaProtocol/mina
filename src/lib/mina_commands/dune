@@ -11,6 +11,7 @@
    sexplib0
    splittable_random
    ;; local libraries
+   parties_builder
    mina_generators
    pickles.backend
    mina_base.import

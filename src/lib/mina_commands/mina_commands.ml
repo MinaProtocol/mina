@@ -30,15 +30,18 @@ let generate_random_zkapps t
     let open Quickcheck.Generator.Let_syntax in
     if n > 0 then
       let%bind parties =
-        Mina_generators.Parties_generators.gen_parties_with_limited_keys ~keymap
-          ~ledger ~protocol_state_view ~account_state_tbl ?parties_size ~vk
-          ~prover ()
+        Mina_generators.Parties_generators.gen_parties_with_limited_keys ~ledger
+          ~keymap ~protocol_state_view ~account_state_tbl ?parties_size ~vk ()
       in
       go (n - 1) (parties :: acc)
     else return (List.rev acc)
   in
-  Quickcheck.Generator.generate (go num_of_parties []) ~size:num_of_parties
-    ~random:(Splittable_random.State.create Random.State.default)
+  let parties_dummy_auth_list =
+    Quickcheck.Generator.generate (go num_of_parties []) ~size:num_of_parties
+      ~random:(Splittable_random.State.create Random.State.default)
+  in
+  Deferred.List.map parties_dummy_auth_list ~f:(fun parties_dummy_auth ->
+      Parties_builder.replace_authorizations ~prover ~keymap parties_dummy_auth )
 
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
