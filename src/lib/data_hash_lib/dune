@@ -31,6 +31,7 @@
    snarky.intf
    fields_derivers.zkapps
    fields_derivers.json
+   test_util
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
