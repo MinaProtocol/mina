@@ -462,6 +462,7 @@ let batch_test_zkapps =
            |> Deferred.map ~f:Or_error.join
          with
          | Ok parties_list ->
+             let logger = Logger.create () in
              [%log] "generated parties"
                ~metadata:
                  [ ( "parties"
