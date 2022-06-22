@@ -1,0 +1,153 @@
+# kubectl apply -f helm/cron_jobs/gossipqa-txn-burst-cronjob.yaml
+# the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
+# make sure you're in the gossipqa namespace
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gossipqa-zkapp-burst-cronjob
+spec:
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - '
+printf "/ip4/35.203.110.9/tcp/10000/p2p/12D3KooWQ8WqJqH6SDazbPTfRGTdCN4uajzVkVWEjL3Cwye8e18s\n/ip4/34.152.17.2/tcp/10001/p2p/12D3KooWRxbT7qa9fyWgxSbbrNxSeoPKt1tENHFCFQwQJZrpcj6h\n/ip4/34.152.52.61/tcp/10002/p2p/12D3KooWMxyrFZiG2cf6vzT8Sfqzhorkxe3oQ5nEmjYjJuHq3EF4\n" > /gossipqa_seed_list.txt;
+
+curl https://raw.githubusercontent.com/MinaProtocol/mina/fd36b1d2fcb53677e7a0aded3672d714cdf9fa6a/automation/terraform/testnets/gossipqajiawei/genesis_ledger.json > /gossipqa-genesis_ledger.json;
+
+echo "booting mina daemon";
+
+mina daemon --config-file /gossipqa-genesis_ledger.json --peer-list-file /gossipqa_seed_list.txt &
+
+echo "sleeping";
+sleep 480;
+echo "done sleeping";
+while true; do
+  DAEMON_STATUS=$(mina client status);
+  echo "Daemon Status: $DAEMON_STATUS";
+  STATUS=$(mina client status | grep "Sync status");
+  echo "$STATUS" | grep "Synced";
+  RESULT=$?;
+  if [ $RESULT -eq 0 ]; then
+    echo "daemon is synced";
+    break;
+  else
+    echo "waiting for daemon to sync";
+    sleep 60;
+  fi;
+done;
+
+mkdir /tmpkeys;
+chmod 700 /tmpkeys;
+
+cp /keys/whale-1/whale-1-key /tmpkeys;
+chmod 600 /tmpkeys/whale-1-key;
+cp /keys/whale-2/whale-2-key /tmpkeys;
+chmod 600 /tmpkeys/whale-2-key;
+cp /keys/whale-3/whale-3-key /tmpkeys;
+chmod 600 /tmpkeys/whale-3-key;
+
+mina advanced batch-test-zkapps "/tmpkeys" 100 --parties-size 5;
+sleep 180;
+ echo "ran batch zkapps";
+            '
+            
+            env:
+            - name: MINA_PRIVKEY_PASS
+              value: "123"
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            image: minaprotocol/mina-daemon:1.3.2alpha1-batch-zkapp-tool-29dc18b-bullseye-devnet
+            imagePullPolicy: IfNotPresent
+            name: gossipqa-txn-burst-cronjob
+            resources:
+              limits:
+              requests:
+                memory: 14.0Gi
+                cpu: 12.0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /keys/whale-1
+              name: whale-1-key
+            - mountPath: /keys/whale-2
+              name: whale-2-key
+            - mountPath: /keys/whale-3
+              name: whale-3-key
+            # - mountPath: /config
+            #   name: daemon-config
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes: [
+            # {
+            #   "name":"daemon-config",
+            #   "configMap": {
+            #     "name": "seed-daemon-config"
+            #   }
+            # },
+            {
+              "name": "whale-1-key",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "whale-1-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "whale-1-key.pub"
+                  }
+                ],
+                "secretName": "whale-1-key"
+              }
+            },
+            {
+              "name": "whale-2-key",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "whale-2-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "whale-2-key.pub"
+                  }
+                ],
+                "secretName": "whale-2-key"
+              }
+            },
+            {
+              "name": "whale-3-key",
+              "secret": {
+                "defaultMode": 0600,
+                "items": [
+                  {
+                    "key": "key",
+                    "path": "whale-3-key"
+                  },
+                  {
+                    "key": "pub",
+                    "path": "whale-3-key.pub"
+                  }
+                ],
+                "secretName": "whale-3-key"
+              }
+            }
+
+          ]
+  schedule: "*/30 * * * *"
+  # every day at 1pm GMT, which is 6am PST
+  successfulJobsHistoryLimit: 3
+  suspend: false
