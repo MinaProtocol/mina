@@ -444,7 +444,7 @@ struct
     let witnesses = ref None in
     let return_value = ref None in
     let auxiliary_value = ref None in
-    let compute_prev_proof_parts inners_must_verify prev_proof_requests =
+    let compute_prev_proof_parts prev_proof_requests =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
