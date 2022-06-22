@@ -1,1 +1,0 @@
-../../../lib/rosetta_lib/test/test_encodings.ml

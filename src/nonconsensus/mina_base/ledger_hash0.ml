@@ -1,1 +1,0 @@
-../../lib/mina_base/ledger_hash0.ml
