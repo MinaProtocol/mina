@@ -71,7 +71,7 @@ let main dry_run check path =
   in
   exit 0
 
-let cli =
+let _cli =
   let open Command.Let_syntax in
   Command.async ~summary:"Format all ml and mli files"
     (let%map_open path =

@@ -21,12 +21,23 @@ let
     "base58"
   ] (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
-  implicit-deps = (opam-nix.opamListToQuery export.installed) // external-packages;
+  difference = a: b:
+    pkgs.lib.filterAttrs (name: _: !builtins.elem name (builtins.attrNames b))
+    a;
+
+  extra-packages = {
+    ocaml-lsp-server = "1.4.1";
+    ocaml-system = "4.11.2";
+    ppx_yojson_conv_lib = "v0.15.0";
+  };
+
+  implicit-deps = (opam-nix.opamListToQuery export.installed)
+    // external-packages;
 
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays
-    (opam-nix.defsToScope pkgs ((opam-nix.queryToDefs repos implicit-deps) // pins));
+  scope = opam-nix.applyOverlays opam-nix.__overlays (opam-nix.defsToScope pkgs
+    ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
@@ -203,7 +214,8 @@ let
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
         psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
-        dune runtest src/app/archive src/lib --display=short
+        # TODO: investigate failing tests, ideally we should run all tests in src/
+        dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
 
       mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''

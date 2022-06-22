@@ -58,8 +58,8 @@ let check_wrap_domains ds =
    It pads each list with "dummy domains" to have length equal to Max_branching.n.
    Then it transposes that matrix.
 *)
-let pad_domains (type prev_varss prev_valuess branches n)
-    (module Max_branching : Nat.Intf with type n = n)
+let pad_domains (type prev_varss prev_valuess branches n n')
+    (module Max_branching : Nat.Intf with type n = n')
     (pi_branches : (prev_varss, branches) Length.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t ) =
@@ -137,7 +137,7 @@ let wrap_main
     (step_domains : (Domains.t, branches) Vector.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t )
-    (module Max_branching : Nat.Add.Intf with type n = max_branching) :
+    (max_branching : (module Nat.Add.Intf with type n = max_branching)) :
     (max_branching, max_local_max_branchings) Requests.Wrap.t
     * (   ( _
           , _
@@ -156,6 +156,9 @@ let wrap_main
     Common.wrap_domains
   in
   Timer.clock __LOC__ ;
+  let module Max_branching = ( val max_branching : Nat.Add.Intf
+                                 with type n = max_branching )
+  in
   let T = Max_branching.eq in
   let branches = Hlist.Length.to_nat pi_branches in
   Timer.clock __LOC__ ;
@@ -250,7 +253,11 @@ let wrap_main
     in
     let domainses =
       with_label __LOC__ (fun () ->
-          pad_domains (module Max_branching) pi_branches prev_wrap_domains )
+          pad_domains
+            ( module struct
+              include Max_branching
+            end )
+            pi_branches prev_wrap_domains )
     in
     let eval_lengths =
       with_label __LOC__ (fun () ->
@@ -411,10 +418,8 @@ let wrap_main
               ~f:(Unsafe.unpack_unboolean ~length:Challenge.length) )
       in
       with_label __LOC__ (fun () ->
-          incrementally_verify_proof
-            (module Max_branching)
-            ~step_widths ~step_domains ~verification_key:pairing_plonk_index ~xi
-            ~sponge
+          incrementally_verify_proof max_branching ~step_widths ~step_domains
+            ~verification_key:pairing_plonk_index ~xi ~sponge
             ~public_input:(pack_statement Max_branching.n prev_statement)
             ~sg_old:prev_step_accs ~combined_inner_product ~advice:{ b }
             ~messages ~which_branch ~openings_proof
