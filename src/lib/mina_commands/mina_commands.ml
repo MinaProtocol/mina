@@ -146,11 +146,6 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
-let setup_and_submit_zkapp_commands t (parties_list : Parties.t list) =
-  let open Participating_state.Let_syntax in
-  let%map _is_active = Mina_lib.active_or_bootstrapping t in
-  Mina_lib.add_zkapp_transactions t parties_list
-
 let setup_and_submit_zkapp_command t (snapp_parties : Parties.t) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)

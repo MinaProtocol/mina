@@ -30,17 +30,14 @@ module Send_user_commands = struct
       ~bin_response
 end
 
-module Send_zkapp_commands = struct
-  type query = Parties.Stable.Latest.t list [@@deriving bin_io_unversioned]
+module Send_zkapp_command = struct
+  type query = Parties.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-  type response =
-    ( Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t
-    * Network_pool.Transaction_pool.Diff_versioned.Rejected.Stable.Latest.t )
-    Or_error.t
+  type response = Parties.Stable.Latest.t Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Send_zkapp_commands" ~version:0 ~bin_query
+    Rpc.Rpc.create ~name:"Send_zkapp_command" ~version:0 ~bin_query
       ~bin_response
 end
 
