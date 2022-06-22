@@ -26,8 +26,17 @@ let
     a;
 
   extra-packages = {
-    ocaml-lsp-server = "1.4.1";
-    ocaml-system = "4.11.2";
+    ocaml-lsp-server = "1.11.6";
+    ocaml-system = "4.14.0";
+    stdune = "3.3.1";
+    pp = "1.1.2";
+    dyn = "3.3.1";
+    ordering = "3.3.1";
+    ocamlformat-rpc-lib = "0.22.4";
+    dune-rpc = "3.3.1";
+    xdg = "3.3.1";
+    omd = "1.3.1";
+    fiber = "3.3.1";
     ppx_yojson_conv_lib = "v0.15.0";
   };
 
