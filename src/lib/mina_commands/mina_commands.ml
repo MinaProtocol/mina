@@ -10,12 +10,13 @@ let txn_count = ref 0
 let generate_random_zkapps t
     ((kps, num_of_parties, parties_size) : Keypair.t list * int * int option) =
   let open Participating_state.Let_syntax in
+  (*
   let config = Mina_lib.config t in
   let `VK vk, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp
       ~constraint_constants:config.precomputed_values.constraint_constants ()
   in
-
+  *)
   let%bind ledger = Mina_lib.best_ledger t in
   let%map protocol_state = Mina_lib.best_protocol_state t in
   let protocol_state_view =
@@ -32,8 +33,10 @@ let generate_random_zkapps t
     if n > 0 then
       let%bind parties =
         Mina_generators.Parties_generators.gen_parties_with_limited_keys ~keymap
-          ~ledger ~protocol_state_view ~account_state_tbl ?parties_size ~vk
-          ~prover ()
+          ~ledger ~protocol_state_view ~account_state_tbl ?parties_size
+          (*~vk
+            ~prover*)
+          ()
       in
       go (n - 1) (parties :: acc)
     else return (List.rev acc)
