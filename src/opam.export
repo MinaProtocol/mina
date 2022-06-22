@@ -268,7 +268,7 @@ package "graphql_ppx" {
   ]
   dev-repo: "git+https://github.com/o1-labs/graphql_ppx.git"
   url {
-    src: "https://github.com/o1-labs/graphql_ppx/archive/12541a10c9a1b176426fc78938256af23a5129d8.tar.gz"
-    checksum: "sha256=3f63758dcbafcd9f78f7a47dc8bc4ba66c33297ef72f0f16fbab01f46297cca5"
+    src: "https://github.com/o1-labs/graphql_ppx/archive/f3ba4f7622240a2299f622b0c1d910f734579c25.tar.gz"
+         checksum: "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
   }
 }
