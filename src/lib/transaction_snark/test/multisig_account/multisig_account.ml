@@ -204,21 +204,19 @@ let%test_module "multisig_account" =
                   { identifier = "multisig-rule"
                   ; prevs = []
                   ; main =
-                      (fun [] x ->
-                        multisig_main x |> Run.run_checked
-                        |> fun _ :
-                               unit
-                               Pickles_types.Hlist0.H1
-                                 (Pickles_types.Hlist.E01
-                                    (Pickles.Inductive_rule.B))
-                               .t ->
-                        [] )
+                      (fun { previous_public_inputs = []; public_input = x } ->
+                        multisig_main x |> Run.run_checked ;
+                        { previous_proofs_should_verify = []
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
                   (module Zkapp_statement.Checked)
                   (module Zkapp_statement)
-                  ~typ:Zkapp_statement.typ
+                  ~public_input:(Input Zkapp_statement.typ)
+                  ~auxiliary_typ:Typ.unit
                   ~branches:(module Nat.N2)
                   ~max_proofs_verified:(module Nat.N2)
                     (* You have to put 2 here... *)
@@ -231,23 +229,22 @@ let%test_module "multisig_account" =
                     ; { identifier = "dummy"
                       ; prevs = [ self; self ]
                       ; main =
-                          (fun [ _; _ ] _ ->
+                          (fun { previous_public_inputs = [ _; _ ]
+                               ; public_input = _
+                               } ->
                             Impl.run_checked
-                              (Transaction_snark.dummy_constraints ())
-                            |> fun () ->
+                              (Transaction_snark.dummy_constraints ()) ;
                             (* Unsatisfiable. *)
-                            Run.exists Field.typ ~compute:(fun () ->
-                                Run.Field.Constant.zero )
-                            |> fun s ->
-                            Run.Field.(Assert.equal s (s + one))
-                            |> fun () :
-                                   ( Zkapp_statement.Checked.t
-                                   * (Zkapp_statement.Checked.t * unit) )
-                                   Pickles_types.Hlist0.H1
-                                     (Pickles_types.Hlist.E01
-                                        (Pickles.Inductive_rule.B))
-                                   .t ->
-                            [ Boolean.true_; Boolean.true_ ] )
+                            let s =
+                              Run.exists Field.typ ~compute:(fun () ->
+                                  Run.Field.Constant.zero )
+                            in
+                            Run.Field.(Assert.equal s (s + one)) ;
+                            { previous_proofs_should_verify =
+                                [ Boolean.true_; Boolean.true_ ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                       }
                     ] )
               in
@@ -375,9 +372,14 @@ let%test_module "multisig_account" =
                 (*FIXME: is this correct? *)
                 Parties.Transaction_commitment.create ~other_parties_hash
               in
-              let at_party = Parties.Call_forest.hash ps in
               let tx_statement : Zkapp_statement.t =
-                { transaction; at_party = (at_party :> Field.t) }
+                { party =
+                    Party.Body.digest
+                      (Parties.add_caller_simple snapp_party_data
+                         Token_id.default )
+                        .body
+                ; calls = (Parties.Digest.Forest.empty :> field)
+                }
               in
               let msg =
                 tx_statement |> Zkapp_statement.to_field_elements
@@ -404,7 +406,7 @@ let%test_module "multisig_account" =
                 | _ ->
                     respond Unhandled
               in
-              let pi : Pickles.Side_loaded.Proof.t =
+              let (), (), (pi : Pickles.Side_loaded.Proof.t) =
                 (fun () -> multisig_prover ~handler [] tx_statement)
                 |> Async.Thread_safe.block_on_async_exn
               in

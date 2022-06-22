@@ -1,5 +1,51 @@
 final: prev:
-let pkgs = final;
+let
+  pkgs = final;
+  rustPlatformFor = rust:
+    prev.makeRustPlatform {
+      cargo = rust;
+      rustc = rust;
+      # override stdenv.targetPlatform here, if neccesary
+    };
+  toolchainHashes = {
+    "1.58.0" = "sha256-eQBpSmy9+oHfVyPs0Ea+GVZ0fvIatj6QVhNhYKOJ6Jk=";
+    "nightly-2021-11-16" = "sha256-ErdLrUf9f3L/JtM5ghbefBMgsjDMYN3YHDTfGc008b4=";
+    # copy this line with the correct toolchain name
+    "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  };
+  cargoHashes = narHashesFromCargoLock ../src/lib/crypto/Cargo.lock;
+  rustChannelFromToolchainFileOf = file: with pkgs.lib; let
+    inherit (pkgs.lib) hasPrefix removePrefix readFile warn;
+    toolchain = (builtins.fromTOML (readFile file)).toolchain;
+    # nice error message if the toolchain is missing
+    placeholderPos = builtins.unsafeGetAttrPos "placeholder" toolchainHashes;
+    in pkgs.rustChannelOf rec {
+      channel = if hasPrefix "nightly-" toolchain.channel then "nightly" else toolchain.channel;
+      date = if channel == "nightly" then removePrefix "nightly-" toolchain.channel else null;
+      sha256 = toolchainHashes.${toolchain.channel} or
+        (warn ''Please add the rust toolchain hash (see error message below) for "${toolchain.channel}" at ${placeholderPos.file}:${toString placeholderPos.line}'' toolchainHashes.placeholder);
+    };
+
+  # mapFilterListToAttrs :: (x -> {name: str, value: b}) -> (x -> bool) -> [x] -> {b}
+  mapFilterListToAttrs = f: m: l:
+    builtins.listToAttrs (map m (builtins.filter f l));
+
+  # extract git rev & urls from cargo lockfile, feed them to fetchgit to acquire
+  # the sha256 hash that's used at build time
+  # narHashesfromcargolock :: path -> {pkgname: hash}
+  narHashesFromCargoLock = file:
+    let
+      inherit (pkgs.lib) hasPrefix last head;
+      inherit (builtins) split readFile;
+      package = (fromTOML (readFile file)).package;
+    in mapFilterListToAttrs (x: x ? source && hasPrefix "git+" x.source) (x: {
+      name = "${x.name}-${x.version}";
+      value = (fetchGit {
+        rev = last (split "#" x.source);
+        url = last (split "\\+" (head (split "\\?" x.source)));
+        allRefs = true;
+      }).narHash;
+    }) package;
 in {
   # nixpkgs + musl problems
   postgresql =
@@ -57,47 +103,41 @@ in {
   });
 
   # Rust stuff (for marlin_plonk_bindings_stubs)
-  crypto-rust-musl = ((final.crypto-rust-toolchain.rust.override { targets = [ "x86_64-unknown-linux-musl" ]; }).overrideAttrs
-    (oa: {
-      nativeBuildInputs = [ final.makeWrapper ];
-      buildCommand = oa.buildCommand + ''
-        for exe in $(find "$out/bin" -type f -or -type l); do
-          wrapProgram "$exe" --prefix LD_LIBRARY_PATH : ${final.gcc-unwrapped.lib}/lib
-        done
-      '';
-    })) // {
-      inherit (prev.rust) toRustTarget toRustTargetSpec;
-    };
-
-  rustPlatform-musl = prev.makeRustPlatform {
-    cargo = final.crypto-rust-musl;
-    rustc = final.crypto-rust-musl;
+  crypto-rust-musl = ((final.crypto-rust.override {
+    targets = [ "x86_64-unknown-linux-musl" ];
+  }).overrideAttrs (oa: {
+    nativeBuildInputs = [ final.makeWrapper ];
+    buildCommand = oa.buildCommand + ''
+      for exe in $(find "$out/bin" -type f -or -type l); do
+        wrapProgram "$exe" --prefix LD_LIBRARY_PATH : ${final.gcc-unwrapped.lib}/lib
+      done
+    '';
+  })) // {
+    inherit (prev.rust) toRustTarget toRustTargetSpec;
   };
 
-  crypto-rust-toolchain = final.rustChannelOf rec {
-    channel = (builtins.fromTOML (builtins.readFile ../src/lib/crypto/rust-toolchain.toml)).toolchain.channel;
-    # update the hash if the assertion fails
-    sha256 = assert channel == "1.58.0"; "sha256-eQBpSmy9+oHfVyPs0Ea+GVZ0fvIatj6QVhNhYKOJ6Jk=";
-  };
-
-  rustPlatform-latest = prev.makeRustPlatform {
-    cargo = final.crypto-rust-toolchain.rust;
-    rustc = final.crypto-rust-toolchain.rust;
-  };
+  crypto-rust = (rustChannelFromToolchainFileOf ../src/lib/crypto/rust-toolchain.toml).rust;
 
   # Dependencies which aren't in nixpkgs and local packages which need networking to build
-  kimchi_bindings_stubs = (if pkgs.stdenv.hostPlatform.isMusl then
-    pkgs.rustPlatform-musl
-  else
-    pkgs.rustPlatform-latest).buildRustPackage {
-      pname = "kimchi_bindings_stubs";
-      version = "0.1.0";
-      src = ../src/lib/crypto;
-      nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
-      # FIXME: tests fail
-      doCheck = false;
-      cargoLock.lockFile = ../src/lib/crypto/Cargo.lock;
-    };
+  kimchi_bindings_stubs = (rustPlatformFor
+    (if pkgs.stdenv.hostPlatform.isMusl then
+      final.crypto-rust-musl
+    else
+      final.crypto-rust)).buildRustPackage {
+        pname = "kimchi_bindings_stubs";
+        version = "0.1.0";
+        src = final.lib.sourceByRegex ../src [
+          "^lib(/crypto(/.*)?)?$"
+          "^external(/wasm-bindgen-rayon(/.*)?)?"
+        ];
+        cargoBuildFlags = ["-p wires_15_stubs" "-p binding_generation"];
+        sourceRoot = "source/lib/crypto";
+        nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
+        # FIXME: tests fail
+        doCheck = false;
+        cargoLock.lockFile = ../src/lib/crypto/Cargo.lock;
+        cargoLock.outputHashes = cargoHashes;
+      };
 
   go-capnproto2 = pkgs.buildGoModule rec {
     pname = "capnpc-go";
@@ -156,5 +196,90 @@ in {
       cp -r --reflink=auto ${pkgs.libp2p_ipc_go}/ vendor/libp2p_ipc
       sed -i 's/.*libp2p_ipc.*//' go.mod
     '';
+  };
+
+  kimchi-rust = rustChannelFromToolchainFileOf ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
+  kimchi-rust-wasm = pkgs.kimchi-rust.rust.override {
+    targets = [ "wasm32-unknown-unknown" ];
+    # rust-src is needed for -Zbuild-std
+    extensions = [ "rust-src" ];
+  };
+
+  # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
+  kimchi-rust-std-deps = pkgs.rustPlatform.importCargoLock {
+    lockFile = pkgs.runCommand "cargo.lock" { } ''
+      cp ${pkgs.kimchi-rust.rust-src}/lib/rustlib/src/rust/Cargo.lock $out
+    '';
+  };
+
+  plonk_wasm = let
+
+    lock = ../src/lib/crypto/Cargo.lock;
+
+    deps = builtins.listToAttrs (map (pkg: {
+      inherit (pkg) name;
+      value = pkg;
+    }) (builtins.fromTOML (builtins.readFile lock)).package);
+
+    rustPlatform = rustPlatformFor final.kimchi-rust-wasm;
+
+    wasm-bindgen-cli = rustPlatform.buildRustPackage rec {
+
+      pname = "wasm-bindgen-cli";
+      version = deps.wasm-bindgen.version;
+      src = final.fetchCrate {
+        inherit pname version;
+        sha256 = "sha256-DUcY22b9+PD6RD53CwcoB+ynGulYTEYjkkonDNeLbGM=";
+      };
+
+      cargoSha256 = "sha256-mfVQ6rSzCgwYrN9WwydEpkm6k0E3302Kfs/LaGzRSHE=";
+      nativeBuildInputs = [ final.pkg-config ];
+
+      buildInputs = with final;
+        [ openssl ] ++ lib.optionals stdenv.isDarwin [ curl Security ];
+
+      checkInputs = [ final.nodejs ];
+
+      # other tests require it to be ran in the wasm-bindgen monorepo
+      cargoTestFlags = [ "--test=interface-types" ];
+    };
+  in rustPlatform.buildRustPackage {
+    pname = "plonk_wasm";
+    version = "0.1.0";
+    src = final.lib.sourceByRegex ../src [
+      "^lib(/crypto(/.*)?)?$"
+      "^lib/crypto/Cargo\.(lock|toml)$"
+      "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
+      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+    ];
+    sourceRoot = "source/lib/crypto";
+    nativeBuildInputs = [ pkgs.wasm-pack wasm-bindgen-cli ];
+    cargoLock.lockFile = lock;
+    cargoLock.outputHashes = cargoHashes;
+
+    # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
+    # Want to run after cargoSetupPostUnpackHook
+    prePatch = ''
+      chmod +w /build/cargo-vendor-dir
+      ln -sf ${pkgs.kimchi-rust-std-deps}/*/ /build/cargo-vendor-dir
+      chmod -w /build/cargo-vendor-dir
+    '';
+
+    # adapted from cargoBuildHook
+    buildPhase = ''
+      runHook preBuild
+      (
+      set -x
+      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
+      cd kimchi_bindings/wasm
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web ./.
+      )
+      runHook postBuild
+    '';
+    dontCargoBuild = true;
+    dontCargoCheck = true;
+    installPhase = ":";
+    cargoBuildFeatures = [ "nodejs" ];
   };
 }

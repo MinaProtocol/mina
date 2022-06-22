@@ -5,11 +5,11 @@
         "nixpkgs-lib": "nixpkgs-lib"
       },
       "locked": {
-        "lastModified": 1650549377,
-        "narHash": "sha256-if2xXtEnJTtc3olurH4LKlAt70dpGGxJhkctCCIqgyQ=",
+        "lastModified": 1654768881,
+        "narHash": "sha256-XuSUp870TDDETi5rs+R7VklxMm29u8BUVnM6lfbQq7w=",
         "owner": "tweag",
         "repo": "flake-buildkite-pipeline",
-        "rev": "0b5f41b562cf2f5be0cf07b9980a87bcebfadb68",
+        "rev": "d420396096b405c8eae22801b3723a30a8ff48f4",
         "type": "github"
       },
       "original": {
@@ -131,12 +131,17 @@
       }
     },
     "nix-npm-buildPackage": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
-        "lastModified": 1643828355,
-        "narHash": "sha256-yeej9SblWlh5DQlLr/AGz8vVG0TrDZg38Yy2fv6wk7U=",
+        "lastModified": 1654786772,
+        "narHash": "sha256-Qul9GG6EJ1IFfgnZ440KAxTEPfFpbnmf54EVFM9+iZA=",
         "owner": "serokell",
         "repo": "nix-npm-buildpackage",
-        "rev": "d9acd44139f56202084bd918cdf6b945935acfd6",
+        "rev": "ca922a16839ae62a568bcb0771e78e080b4d6059",
         "type": "github"
       },
       "original": {
