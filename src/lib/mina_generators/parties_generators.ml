@@ -1390,7 +1390,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
       ~account_state_tbl ?protocol_state_view ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
-  let%bind memo = Signed_command_memo.gen in
+  let%map memo = Signed_command_memo.gen in
   let parties_dummy_signatures : Parties.t =
     Parties.of_simple { fee_payer; other_parties; memo }
   in
@@ -1445,6 +1445,6 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
                 Some { account with receipt_chain_hash } )
       | Control.None_given ->
           () ) ;
-  return
-  @@ Parties_builder.replace_authorizations ?prover ~keymap
-       parties_dummy_signatures
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      Parties_builder.replace_authorizations ?prover ~keymap
+        parties_dummy_signatures )
