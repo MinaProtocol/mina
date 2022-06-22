@@ -8,6 +8,7 @@
 open Core_kernel
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 open Signature_lib
 
 type input = { epoch : int; staking_ledger : Runtime_config.Ledger.t }
@@ -618,9 +619,8 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
             in
             let%bind payments_by_coinbase_receivers =
               match%map
-                Archive_lib.Processor.deferred_result_list_fold
-                  coinbase_receiver_ids ~init:[]
-                  ~f:(fun accum coinbase_receiver_id ->
+                Mina_caqti.deferred_result_list_fold coinbase_receiver_ids
+                  ~init:[] ~f:(fun accum coinbase_receiver_id ->
                     let%bind cb_receiver_pk =
                       pk_of_pk_id pool coinbase_receiver_id
                     in

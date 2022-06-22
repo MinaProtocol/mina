@@ -19,8 +19,10 @@
    with_hash
    mina_base
    mina_state
+   mina_transaction
    mina_block
    signature_lib
+   mina_base.import
    mina_numbers
  )
  (preprocess

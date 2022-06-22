@@ -56,7 +56,10 @@
    graphql_lib
    node_status
    o1trace_webkit_event
+   generated_graphql_queries
+   mina_transaction
    mina_user_error
+   mina_ledger
    mina_block
    mina_lib
    mina_base
@@ -70,6 +73,7 @@
    node_error_service
    genesis_ledger_helper
    signature_lib
+   mina_base.import
    mina_numbers
    precomputed_values
    with_hash
@@ -92,6 +96,7 @@
    group_map
    snark_work_lib
    mina_compile_config
+   mina_transaction_logic
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh ../../../../../graphql_schema.json)

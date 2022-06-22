@@ -139,12 +139,22 @@ module Balance : S_JSON with type t = Currency.Balance.t = struct
   let serialize = unimplemented_serializer "balance"
 end
 
+module Optional_balance = Optional (Balance)
+
 module Token : S_JSON with type t = Mina_base.Token_id.t = struct
   type t = Mina_base.Token_id.t
 
   let parse = Decoders.token
 
   let serialize = Encoders.token
+end
+
+module Token_s = struct
+  type t = [ `Token_id of string ]
+
+  let parse json = `Token_id (Yojson.Basic.Util.to_string json)
+
+  let serialize (x : t) = unimplemented_serializer "token" x
 end
 
 module Amount : S_JSON with type t = Currency.Amount.t = struct
@@ -179,11 +189,11 @@ module State_hash : S_STRING with type t = Mina_base.State_hash.t = struct
   let serialize = unimplemented_serializer "state_hash"
 end
 
-module Transaction_hash : S_STRING with type t = Mina_base.Transaction_hash.t =
-struct
-  type t = Mina_base.Transaction_hash.t
+module Transaction_hash :
+  S_STRING with type t = Mina_transaction.Transaction_hash.t = struct
+  type t = Mina_transaction.Transaction_hash.t
 
-  let parse = Mina_base.Transaction_hash.of_base58_check_exn
+  let parse = Mina_transaction.Transaction_hash.of_base58_check_exn
 
   let serialize = unimplemented_serializer "transaction_hash"
 end
