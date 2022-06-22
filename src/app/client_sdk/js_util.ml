@@ -24,6 +24,38 @@ type payload_common_js =
   ; memo : string_js Js.prop >
   Js.t
 
+type payload_fee_payer_party_js =
+  < fee : string_js Js.prop
+  ; feePayer : string_js Js.prop
+  ; nonce : string_js Js.prop
+  ; memo : string_js Js.prop >
+  Js.t
+
+let payload_of_fee_payer_party_js
+    (fee_payer_party_js : payload_fee_payer_party_js) : Party.Fee_payer.t =
+  let fee_payer_pk =
+    fee_payer_party_js##.feePayer
+    |> Js.to_string |> Signature_lib.Public_key.of_base58_check_decompress_exn
+  in
+  let fee =
+    fee_payer_party_js##.fee |> Js.to_string |> Currency.Fee.of_string
+  in
+  let nonce =
+    fee_payer_party_js##.nonce |> Js.to_string
+    |> Mina_numbers.Account_nonce.of_string
+  in
+  { Party.Fee_payer.body =
+      { public_key = fee_payer_pk
+      ; update = Party.Update.noop
+      ; fee
+      ; events = []
+      ; sequence_events = []
+      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+      ; nonce
+      }
+  ; authorization = Signature.dummy
+  }
+
 let payload_common_of_js (payload_common_js : payload_common_js) =
   let fee_js = payload_common_js##.fee in
   let fee = Js.to_string fee_js |> Currency.Fee.of_string in
@@ -31,7 +63,6 @@ let payload_common_of_js (payload_common_js : payload_common_js) =
     payload_common_js##.feePayer
     |> Js.to_string |> Signature_lib.Public_key.of_base58_check_decompress_exn
   in
-  let fee_token = Token_id.default in
   let nonce_js = payload_common_js##.nonce in
   let nonce = Js.to_string nonce_js |> Mina_numbers.Account_nonce.of_string in
   let valid_until_js = payload_common_js##.validUntil in
@@ -39,7 +70,7 @@ let payload_common_of_js (payload_common_js : payload_common_js) =
   let memo_js = payload_common_js##.memo in
   let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
   Signed_command_payload.Common.Poly.
-    { fee; fee_token; fee_payer_pk; nonce; valid_until; memo }
+    { fee; fee_payer_pk; nonce; valid_until; memo }
 
 type payment_payload_js =
   < source : string_js Js.prop
@@ -61,12 +92,11 @@ let payment_body_of_js payment_payload =
     payment_payload##.receiver |> Js.to_string
     |> Signature_lib.Public_key.of_base58_check_decompress_exn
   in
-  let token_id = Token_id.default in
   let amount =
     payment_payload##.amount |> Js.to_string |> Currency.Amount.of_string
   in
   Signed_command_payload.Body.Payment
-    Payment_payload.Poly.{ source_pk; receiver_pk; token_id; amount }
+    Payment_payload.Poly.{ source_pk; receiver_pk; amount }
 
 let payload_of_payment_js payment_js : Signed_command_payload.t =
   let common = payload_common_of_js payment_js##.common in

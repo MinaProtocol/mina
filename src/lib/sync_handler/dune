@@ -30,4 +30,5 @@
    staged_ledger
    truth
    proof_carrying_data
+   mina_ledger
 ))
