@@ -998,7 +998,7 @@ let snark_pool_list =
                        ~f:(fun w ->
                          { Cli_lib.Graphql_types.Completed_works.Work.work_ids =
                              Array.to_list w.work_ids
-                         ; fee = Currency.Fee.of_uint64 w.fee
+                         ; fee = w.fee
                          ; prover = w.prover
                          } )
                        response.snarkPool ) )
@@ -1085,8 +1085,7 @@ let pending_snark_work =
                             .work_id = w.work_id
                           ; fee_excess =
                               to_signed_fee_exn f.sign f.fee_magnitude
-                          ; supply_increase =
-                              Currency.Amount.of_uint64 w.supply_increase
+                          ; supply_increase = w.supply_increase
                           ; source_ledger_hash =
                               hash_of_string w.source_ledger_hash
                           ; target_ledger_hash =
@@ -1217,7 +1216,7 @@ let set_snark_work_fee =
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
                (Currency.Fee.to_int fee)
-               (Unsigned.UInt64.to_int response.setSnarkWorkFee.lastFee) ) )
+               (Currency.Fee.to_int response.setSnarkWorkFee.lastFee) ) )
 
 let import_key =
   Command.async

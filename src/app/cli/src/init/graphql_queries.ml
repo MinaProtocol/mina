@@ -8,10 +8,10 @@ module Get_tracked_accounts =
 {|
 query {
   trackedAccounts {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
     locked
     balance {
-      total @ppxCustom(module: "Serializing.Balance")
+      total
     }
   }
 }
@@ -23,7 +23,7 @@ module Get_tracked_account =
 query ($public_key: PublicKey!, $token: UInt64) {
   account(publicKey: $public_key, token: $token) {
     balance {
-      total @ppxCustom(module: "Serializing.Balance")
+      total
     }
   }
 }
@@ -34,7 +34,7 @@ module Get_all_accounts =
 {|
 query ($public_key: PublicKey!) {
   accounts(publicKey: $public_key) {
-    token @ppxCustom(module: "Serializing.Token")
+    token
   }
 }
 |}]
@@ -44,7 +44,7 @@ module Create_account =
 {|
 mutation ($password: String!) {
   createAccount(input: {password: $password}) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -54,7 +54,7 @@ module Create_hd_account =
 {|
 mutation ($hd_index: UInt32!) {
   createHDAccount(input: {index: $hd_index}) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -64,7 +64,7 @@ module Unlock_account =
 {|
 mutation ($password: String!, $public_key: PublicKey!) {
   unlockAccount(input: {password: $password, publicKey: $public_key }) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -74,7 +74,7 @@ module Lock_account =
 {|
 mutation ($public_key: PublicKey!) {
   lockAccount(input: {publicKey: $public_key }) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -90,8 +90,8 @@ module Snark_pool =
 {|
 query snarkPool {
   snarkPool {
-  fee @ppxCustom(module: "Serializing.UInt64")
-  prover @ppxCustom(module: "Serializing.Public_key")
+  fee
+  prover
   work_ids: workIds
 }
 }
@@ -107,9 +107,9 @@ query pendingSnarkWork {
       target_ledger_hash: targetLedgerHash
       fee_excess: feeExcess {
         sign
-        fee_magnitude: feeMagnitude @ppxCustom(module: "Serializing.UInt64")
+        fee_magnitude: feeMagnitude
       }
-      supply_increase: supplyIncrease @ppxCustom(module: "Serializing.UInt64")
+      supply_increase: supplyIncrease
       work_id: workId
       }
     }
@@ -121,8 +121,8 @@ module Set_coinbase_receiver =
 {|
 mutation ($public_key: PublicKey) {
   setCoinbaseReceiver(input : {publicKey: $public_key}) {
-    lastCoinbaseReceiver @ppxCustom(module: "Serializing.Public_key")
-    currentCoinbaseReceiver @ppxCustom(module: "Serializing.Public_key")
+    lastCoinbaseReceiver
+    currentCoinbaseReceiver
     }
   }
 |}]
@@ -132,7 +132,7 @@ module Set_snark_worker =
 {|
 mutation ($public_key: PublicKey) {
   setSnarkWorker (input : {publicKey: $public_key}) {
-      lastSnarkWorker @ppxCustom(module: "Serializing.Public_key")
+      lastSnarkWorker
     }
   }
 |}]
@@ -142,7 +142,7 @@ module Set_snark_work_fee =
 {|
 mutation ($fee: UInt64!) {
   setSnarkWorkFee(input: {fee: $fee}) {
-    lastFee @ppxCustom(module: "Serializing.UInt64")
+    lastFee
     }
 }
 |}]
@@ -212,11 +212,11 @@ query user_commands($public_key: PublicKey) {
     id
     isDelegation
     nonce
-    from @ppxCustom(module: "Serializing.Public_key")
-    to_: to @ppxCustom(module: "Serializing.Public_key")
-    amount @ppxCustom(module: "Serializing.Amount")
-    fee @ppxCustom(module: "Serializing.Fee")
-    memo @ppxCustom(module: "Serializing.Memo")
+    from
+    to_: to
+    amount
+    fee
+    memo
   }
 }
 |}]
@@ -290,7 +290,7 @@ module Import_account =
 {|
 mutation ($path: String!, $password: String!) {
   importAccount (path: $path, password: $password) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
     already_imported: alreadyImported
     success
   }
