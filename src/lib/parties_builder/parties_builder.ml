@@ -64,7 +64,8 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
 (* replace dummy signatures, proofs with valid ones for fee payer, other parties
    [keymap] maps compressed public keys to private keys
 *)
-let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
+let replace_authorizations ?prover ~keymap (parties : Parties.t) :
+    Parties.t Async_kernel.Deferred.t =
   let memo_hash = Signed_command_memo.hash parties.memo in
   let fee_payer_hash =
     Party.of_fee_payer parties.fee_payer |> Parties.Digest.Party.create
@@ -94,10 +95,11 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
   let fee_payer_with_valid_signature =
     { parties.fee_payer with authorization = fee_payer_signature }
   in
-  let other_parties_with_valid_signatures =
-    Parties.Call_forest.mapi_with_trees parties.other_parties
+  let open Async.Deferred.Let_syntax in
+  let%map other_parties_with_valid_signatures =
+    Parties.Call_forest.deferred_mapi parties.other_parties
       ~f:(fun _ ({ body; authorization } : Party.t) tree ->
-        let authorization_with_valid_signature =
+        let%map authorization_with_valid_signature =
           match authorization with
           | Control.Signature _dummy ->
               let pk = body.public_key in
@@ -115,32 +117,30 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
               in
               let use_full_commitment = body.use_full_commitment in
               let signature = sign_for_party ~use_full_commitment sk in
-              Control.Signature signature
+              return (Control.Signature signature)
           | Proof _ -> (
               match prover with
               | None ->
-                  authorization
+                  return authorization
               | Some prover ->
                   let txn_stmt = Zkapp_statement.of_tree tree in
                   let handler
                       (Snarky_backendless.Request.With { request; respond }) =
                     match request with _ -> respond Unhandled
                   in
-                  let (), (), proof =
-                    Async_unix.Thread_safe.block_on_async_exn (fun () ->
-                        prover ?handler:(Some handler)
-                          ( []
-                            : ( unit
-                              , unit
-                              , unit )
-                              Pickles_types.Hlist.H3.T
-                                (Pickles.Statement_with_proof)
-                              .t )
-                          txn_stmt )
+                  let%map (), (), proof =
+                    prover ?handler:(Some handler)
+                      ( []
+                        : ( unit
+                          , unit
+                          , unit )
+                          Pickles_types.Hlist.H3.T(Pickles.Statement_with_proof)
+                          .t )
+                      txn_stmt
                   in
                   Control.Proof proof )
           | None_given ->
-              authorization
+              return authorization
         in
         { Party.body; authorization = authorization_with_valid_signature } )
   in

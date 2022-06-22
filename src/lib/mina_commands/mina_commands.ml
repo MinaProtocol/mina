@@ -10,6 +10,11 @@ let txn_count = ref 0
 let generate_random_zkapps t
     ((kps, num_of_parties, parties_size) : Keypair.t list * int * int option) =
   let open Participating_state.Let_syntax in
+  let config = Mina_lib.config t in
+  let `VK vk, `Prover prover =
+    Transaction_snark.For_tests.create_trivial_snapp
+      ~constraint_constants:config.precomputed_values.constraint_constants ()
+  in
   let%bind ledger = Mina_lib.best_ledger t in
   let%map protocol_state = Mina_lib.best_protocol_state t in
   let protocol_state_view =
@@ -20,20 +25,23 @@ let generate_random_zkapps t
         (Public_key.compress public_key, private_key) )
     |> Public_key.Compressed.Map.of_alist_exn
   in
-
   let account_state_tbl = Account_id.Table.create () in
   let rec go n acc : Parties.t list Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     if n > 0 then
       let%bind parties =
-        Mina_generators.Parties_generators.gen_parties_with_limited_keys ~keymap
-          ~ledger ~protocol_state_view ~account_state_tbl ?parties_size ()
+        Mina_generators.Parties_generators.gen_parties_with_limited_keys ~ledger
+          ~keymap ~protocol_state_view ~account_state_tbl ?parties_size ~vk ()
       in
       go (n - 1) (parties :: acc)
     else return (List.rev acc)
   in
-  Quickcheck.Generator.generate (go num_of_parties []) ~size:num_of_parties
-    ~random:(Splittable_random.State.create Random.State.default)
+  let parties_dummy_auth_list =
+    Quickcheck.Generator.generate (go num_of_parties []) ~size:num_of_parties
+      ~random:(Splittable_random.State.create Random.State.default)
+  in
+  Deferred.List.map parties_dummy_auth_list ~f:(fun parties_dummy_auth ->
+      Parties_builder.replace_authorizations ~prover ~keymap parties_dummy_auth )
 
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
@@ -137,11 +145,6 @@ let setup_and_submit_user_commands t user_command_list =
     ~metadata:
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
-
-let setup_and_submit_zkapp_commands t (parties_list : Parties.t list) =
-  let open Participating_state.Let_syntax in
-  let%map _is_active = Mina_lib.active_or_bootstrapping t in
-  Mina_lib.add_zkapp_transactions t parties_list
 
 let setup_and_submit_zkapp_command t (snapp_parties : Parties.t) =
   let open Participating_state.Let_syntax in

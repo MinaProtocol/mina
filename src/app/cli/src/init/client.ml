@@ -462,14 +462,23 @@ let batch_test_zkapps =
            |> Deferred.map ~f:Or_error.join
          with
          | Ok parties_list ->
-             Daemon_rpcs.Client.dispatch_with_message
-               Daemon_rpcs.Send_zkapp_commands.rpc parties_list port
-               ~success:(fun _ ->
-                 "Successfully generated and enqueued zkapp commands in pool" )
-               ~error:(fun e ->
-                 sprintf "Failed to send zkapp commands %s"
-                   (Error.to_string_hum e) )
-               ~join_error:Or_error.join
+             let logger = Logger.create () in
+             [%log debug] "generated parties"
+               ~metadata:
+                 [ ( "parties"
+                   , `List
+                       (List.map parties_list ~f:(fun parties ->
+                            Parties.to_yojson parties ) ) )
+                 ] ;
+             Deferred.List.iter parties_list ~f:(fun parties ->
+                 Daemon_rpcs.Client.dispatch_with_message
+                   Daemon_rpcs.Send_zkapp_command.rpc parties port
+                   ~success:(fun _ ->
+                     "Successfully enqueued a zkapp command in pool" )
+                   ~error:(fun e ->
+                     sprintf "Failed to send zkapp command %s"
+                       (Error.to_string_hum e) )
+                   ~join_error:Or_error.join )
          | Error e ->
              eprintf "Failed to generate zkapps %s" (Error.to_string_hum e) ;
              exit 1 ) )

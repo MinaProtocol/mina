@@ -1131,11 +1131,8 @@ let setup_fee_payer_and_available_keys_and_account_state_tbl
   (fee_payer_account_id, available_public_keys, account_state_tbl)
 
 let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
-    ~fee_payer_account_id ~(fee_payer_keypair : Signature_lib.Keypair.t)
-    ~available_public_keys ~account_state_tbl
-    ~(keymap :
-       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ~ledger ?protocol_state_view ?vk ?prover ?parties_size () =
+    ~fee_payer_account_id ~available_public_keys ~account_state_tbl ~ledger
+    ?protocol_state_view ?vk ?parties_size () =
   let open Quickcheck.Let_syntax in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
@@ -1376,9 +1373,21 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
       ~account_state_tbl ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
-  let%bind memo = Signed_command_memo.gen in
-  let parties_dummy_signatures : Parties.t =
-    Parties.of_simple { fee_payer; other_parties; memo }
+  let%map memo = Signed_command_memo.gen in
+  Parties.of_simple { fee_payer; other_parties; memo }
+
+let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
+    ~(keymap :
+       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
+    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?prover () =
+  let fee_payer_account_id, available_public_keys, account_state_tbl =
+    setup_fee_payer_and_available_keys_and_account_state_tbl ~fee_payer_keypair
+      ~keymap ?account_state_tbl ~ledger
+  in
+  let open Quickcheck.Generator.Let_syntax in
+  let%map parties_dummy_signatures =
+    gen_parties_base ?failure ~fee_payer_account_id ~available_public_keys
+      ~account_state_tbl ~ledger ?protocol_state_view ?vk ()
   in
   (* add fee payer keys to keymap, if not present *)
   let keymap =
@@ -1392,21 +1401,9 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false) ?failure
     | `Ok keymap' ->
         keymap'
   in
-  return
-  @@ Parties_builder.replace_authorizations ?prover ~keymap
-       parties_dummy_signatures
-
-let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
-    ~(keymap :
-       Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?prover () =
-  let fee_payer_account_id, available_public_keys, account_state_tbl =
-    setup_fee_payer_and_available_keys_and_account_state_tbl ~fee_payer_keypair
-      ~keymap ?account_state_tbl ~ledger
-  in
-  gen_parties_base ?failure ~fee_payer_account_id ~fee_payer_keypair
-    ~available_public_keys ~account_state_tbl ~keymap ~ledger
-    ?protocol_state_view ?vk ?prover ()
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      Parties_builder.replace_authorizations ?prover ~keymap
+        parties_dummy_signatures )
 
 let setup_fee_payer_and_available_keys_and_account_state_tbl_limited
     ~(keymap :
@@ -1447,16 +1444,15 @@ let setup_fee_payer_and_available_keys_and_account_state_tbl_limited
   , account_state_tbl )
 
 let gen_parties_with_limited_keys ?failure ~keymap ?account_state_tbl ~ledger
-    ?protocol_state_view ?vk ?prover ?parties_size () =
+    ?protocol_state_view ?vk ?parties_size () =
   let open Quickcheck.Let_syntax in
   let%bind ( fee_payer_account_id
-           , fee_payer_keypair
+           , _fee_payer_keypair
            , available_public_keys
            , account_state_tbl ) =
     setup_fee_payer_and_available_keys_and_account_state_tbl_limited ~keymap
       ?account_state_tbl ~ledger
   in
   gen_parties_base ~no_new_account:true ~limited:true ?failure
-    ~fee_payer_account_id ~fee_payer_keypair ~available_public_keys
-    ~account_state_tbl ~keymap ~ledger ?protocol_state_view ?vk ?prover
-    ?parties_size ()
+    ~fee_payer_account_id ~available_public_keys ~account_state_tbl ~ledger
+    ?protocol_state_view ?vk ?parties_size ()

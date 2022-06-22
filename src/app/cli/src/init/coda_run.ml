@@ -296,15 +296,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ( Mina_commands.setup_and_submit_user_commands coda ts
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
-    ; implement Daemon_rpcs.Send_zkapp_commands.rpc (fun () ps ->
+    ; implement Daemon_rpcs.Send_zkapp_command.rpc (fun () p ->
           Deferred.map
-            ( Mina_commands.setup_and_submit_zkapp_commands coda ps
+            ( Mina_commands.setup_and_submit_zkapp_command coda p
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Generate_random_zkapps.rpc (fun () kps ->
-          return
-            ( Mina_commands.generate_random_zkapps coda kps
-            |> Participating_state.active_error ) )
+          Mina_commands.generate_random_zkapps coda kps
+          |> Participating_state.to_deferred_or_error )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
           return
             ( Mina_commands.get_balance coda aid

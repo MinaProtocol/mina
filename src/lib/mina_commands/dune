@@ -11,6 +11,7 @@
    sexplib0
    splittable_random
    ;; local libraries
+   parties_builder
    mina_generators
    pickles.backend
    mina_base.import
@@ -46,10 +47,13 @@
    gossip_net
    data_hash_lib
    mina_ledger
+   with_hash
    kimchi_backend.pasta
    pickles
    random_oracle
    transition_frontier_base
+   transaction_snark
+   snark_params
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare)))

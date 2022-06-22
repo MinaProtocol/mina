@@ -57,6 +57,21 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
 
 let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
+let dump_trivial_zkapp_account () =
+  let keypair = Keypair.create () in
+  let pk = Public_key.compress keypair.public_key in
+  let account_id = Account_id.create pk Token_id.default in
+  let initial_balance = Currency.Balance.of_int 1_000_000_000 in
+  let account = Account.create account_id initial_balance in
+  let account =
+    { account with
+      zkapp = Some { Zkapp_account.default with verification_key = Some vk }
+    }
+  in
+  Yojson.Safe.pretty_print Format.std_formatter
+    (Runtime_config.Accounts.to_yojson
+       [ Genesis_ledger_helper.Accounts.Single.of_account account None ] )
+
 let generate_parties_and_apply_them_consecutively () =
   let num_of_fee_payers = 5 in
   let trials = 6 in
@@ -160,6 +175,7 @@ let test_timed_account () =
       done )
 
 let () =
+  dump_trivial_zkapp_account () ;
   let num_of_fee_payers = 5 in
   let trials = 2 in
   generate_parties_and_apply_them_consecutively () ;
