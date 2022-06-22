@@ -203,7 +203,7 @@
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-        packages.mina_static = ocamlPackages_static.mina;
+
         packages.marlin_plonk_bindings_stubs = pkgs.marlin_plonk_bindings_stubs;
         packages.go-capnproto2 = pkgs.go-capnproto2;
         packages.libp2p_helper = pkgs.libp2p_helper;
