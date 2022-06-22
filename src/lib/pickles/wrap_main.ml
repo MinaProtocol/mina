@@ -129,6 +129,11 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
   Field.(Assert.equal ((of_int 2 * y) + (is_odd :> t)) x) ;
   res
 
+let lookup_config = { Plonk_types.Lookup_config.lookup = No; runtime = No }
+
+let commitment_lookup_config =
+  { Plonk_types.Lookup_config.lookup = No; runtime = No }
+
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss prev_valuess env
@@ -144,8 +149,8 @@ let wrap_main
     (step_domains : (Domains.t, branches) Vector.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t )
-    (module Max_proofs_verified : Nat.Add.Intf with type n = max_proofs_verified)
-    :
+    (max_proofs_verified :
+      (module Nat.Add.Intf with type n = max_proofs_verified) ) :
     (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t
     * (   ( _
           , _
@@ -159,6 +164,9 @@ let wrap_main
           Types.Wrap.Statement.In_circuit.t
        -> unit ) =
   Timer.clock __LOC__ ;
+  let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                       with type n = max_proofs_verified )
+  in
   let T = Max_proofs_verified.eq in
   let branches = Hlist.Length.to_nat pi_branches in
   Timer.clock __LOC__ ;
@@ -287,7 +295,9 @@ let wrap_main
         let domainses =
           with_label __LOC__ (fun () ->
               pad_domains
-                (module Max_proofs_verified)
+                ( module struct
+                  include Max_proofs_verified
+                end )
                 pi_branches prev_wrap_domains )
         in
         let new_bulletproof_challenges =
@@ -295,9 +305,7 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Plonk_types.All_evals.typ
-                      (Evaluation_lengths.create ~of_int:Fn.id)
-                      Field.typ ~default:Field.Constant.zero
+                    Plonk_types.All_evals.typ (module Impl) lookup_config
                   in
                   Vector.typ ty Max_proofs_verified.n
                 in
@@ -380,7 +388,7 @@ let wrap_main
                       with_label __LOC__ (fun () ->
                           finalize_other_proof
                             (module Wrap_hack.Padded_length)
-                            ~max_quot_size ~actual_proofs_verified
+                            ~actual_proofs_verified
                             ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
                             ~sponge ~old_bulletproof_challenges deferred_values
                             evals )
@@ -435,16 +443,17 @@ let wrap_main
           let messages =
             with_label __LOC__ (fun () ->
                 exists
-                  (Plonk_types.Messages.typ ~dummy:Inner_curve.Params.one
-                     Inner_curve.typ ~bool:Boolean.typ
+                  (Plonk_types.Messages.typ
+                     (module Impl)
+                     Inner_curve.typ ~bool:Boolean.typ commitment_lookup_config
+                     ~dummy:Inner_curve.Params.one
                      ~commitment_lengths:
                        (Commitment_lengths.create ~of_int:Fn.id) )
                   ~request:(fun () -> Req.Messages) )
           in
           let sponge = Opt.create sponge_params in
           with_label __LOC__ (fun () ->
-              incrementally_verify_proof
-                (module Max_proofs_verified)
+              incrementally_verify_proof max_proofs_verified
                 ~actual_proofs_verified_mask ~step_domains
                 ~verification_key:step_plonk_index ~xi ~sponge
                 ~public_input:

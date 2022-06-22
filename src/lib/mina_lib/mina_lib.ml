@@ -73,8 +73,7 @@ type command_inputs =
   | Snapp_command_inputs of Parties.t list
 
 type pipes =
-  { validated_transitions_reader :
-      External_transition.Validated.t Strict_pipe.Reader.t
+  { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
   ; producer_transition_writer :
       ( Transition_frontier.Breadcrumb.t
       , Strict_pipe.synchronous
@@ -293,9 +292,9 @@ module Snark_worker = struct
     | `Off _ ->
         None
 
-  let replace_key
-      ({ processes = { snark_worker; _ }; config = { logger; _ }; _ } as t)
-      new_key =
+  let replace_key t new_key =
+    let snark_worker = t.processes.snark_worker in
+    let logger = t.config.logger in
     match (snark_worker, new_key) with
     | `Off _, None ->
         [%log info]
@@ -1809,8 +1808,7 @@ let create ?wallets (config : Config.t) =
             let api_pipe, new_blocks_pipe =
               Strict_pipe.Reader.(
                 Fork.two
-                  (map downstream_pipe ~f:(fun (`Transition t, _, _) ->
-                       External_transition.Validated.lift t ) ))
+                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
             in
             (network_pipe, api_pipe, new_blocks_pipe)
           in

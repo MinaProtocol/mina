@@ -174,6 +174,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             { w_comm = Vector.map lengths.w ~f:g
             ; z_comm = g lengths.z
             ; t_comm = g lengths.t
+            ; lookup = None
             }
         ; openings =
             { proof =
@@ -184,23 +185,22 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 ; delta = g0
                 ; challenge_polynomial_commitment = g0
                 }
-            ; evals =
-                Tuple_lib.Double.map Dummy.evals.evals ~f:(fun e -> e.evals)
+            ; evals = Dummy.evals.evals.evals
             ; ft_eval1 = Dummy.evals.ft_eval1
             }
         }
     ; prev_evals =
-        (let e () =
-           Plonk_types.Evals.map
-             (Evaluation_lengths.create ~of_int:Fn.id)
-             ~f:tick_arr
+        (let e =
+           Plonk_types.Evals.map (Evaluation_lengths.create ~of_int:Fn.id)
+             ~f:(fun n -> (tick_arr n, tick_arr n))
          in
-         let ex () =
-           { Plonk_types.All_evals.With_public_input.public_input = tick ()
-           ; evals = e ()
+         let ex =
+           { Plonk_types.All_evals.With_public_input.public_input =
+               (tick (), tick ())
+           ; evals = e
            }
          in
-         { ft_eval1 = tick (); evals = (ex (), ex ()) } )
+         { ft_eval1 = tick (); evals = ex } )
     }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct

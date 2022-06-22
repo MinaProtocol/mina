@@ -7,7 +7,6 @@ open Core
 open Async_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
-open Mina_block
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions
@@ -53,8 +52,7 @@ type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
 
 let genesis_root_data ~precomputed_values =
   let transition =
-    External_transition.Validated.lift @@ Mina_block.Validated.lift
-    @@ Mina_block.genesis ~precomputed_values
+    Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
   in
   let constraint_constants = precomputed_values.constraint_constants in
   let scan_state = Staged_ledger.Scan_state.empty ~constraint_constants () in
@@ -655,9 +653,7 @@ module For_tests = struct
     in
     let root_data =
       Root_data.Limited.create
-        ~transition:
-          ( External_transition.Validated.lift
-          @@ Breadcrumb.validated_transition root )
+        ~transition:(Breadcrumb.validated_transition root)
         ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
         ~pending_coinbase:
           ( Breadcrumb.staged_ledger root
@@ -675,8 +671,7 @@ module For_tests = struct
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         let transition = Root_data.Limited.transition root_data in
         Persistent_root.Instance.set_root_state_hash instance
-          ( Mina_block.Validated.state_hash
-          @@ External_transition.Validated.lower transition ) ;
+          (Mina_block.Validated.state_hash transition) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;

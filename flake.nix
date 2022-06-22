@@ -1,10 +1,12 @@
 {
-  description = "Mina, a cryptocurrency with a lightweight, constant-size blockchain";
+  description =
+    "Mina, a cryptocurrency with a lightweight, constant-size blockchain";
   nixConfig = {
     allow-import-from-derivation = "true";
     extra-substituters = [ "https://storage.googleapis.com/mina-nix-cache" ];
-    extra-trusted-public-keys =
-      [ "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c=" ];
+    extra-trusted-public-keys = [
+      "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+    ];
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
@@ -12,6 +14,7 @@
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
+  inputs.nix-npm-buildPackage.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.url = "github:tweag/opam-nix";
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
@@ -58,7 +61,8 @@
       };
       pipeline = with flake-buildkite-pipeline.lib; {
         steps = flakeSteps {
-          pushToBinaryCaches = [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
+          pushToBinaryCaches =
+            [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
           signWithKeys = [ "/var/secrets/nix-cache-key.sec" ];
           commonExtraStepConfig = {
             agents = [ "nix" ];
@@ -82,7 +86,9 @@
           ]);
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
-        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage { };
+        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage {
+          nodejs = pkgs.nodejs-16_x;
+        };
 
         submodules = map builtins.head (builtins.filter lib.isList
           (map (builtins.match "	path = (.*)")
@@ -162,7 +168,7 @@
             patchelf \
               --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
               --set-rpath "${pkgs.stdenv.cc.cc.lib}/lib" \
-              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux
+              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux ./node_modules/gentype/vendor-linux/gentype.exe
           '';
           yarnBuildMore = ''
             cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
@@ -172,6 +178,43 @@
             mkdir -p $out/share/client_sdk
             mv src/*.js $out/share/client_sdk
           '';
+        };
+
+        # snarkyjs
+        packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
+          src = ./src/lib/snarky_js_bindings/snarkyjs;
+          preBuild = ''
+            BINDINGS_PATH=./dist/server/node_bindings
+            mkdir -p "$BINDINGS_PATH"
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/server/node_bindings
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/server/node_bindings
+            chmod -R 777 "$BINDINGS_PATH"
+
+            # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
+            # better error messages
+            # TODO: find a less hacky way to make adjustments to jsoo compiler output
+            # `s` is the jsoo representation of the error message string, and `s.c` is the actual JS string
+            sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+            sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+            sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+          '';
+          npmBuild = "npm run build -- --bindings=./dist/server/node_bindings";
+          # TODO: add snarky-run
+          # TODO
+          # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
+        };
+
+        packages.mina-signer = nix-npm-buildPackage.buildNpmPackage {
+          src = ./frontend/mina-signer;
+          preBuild = ''
+            cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
+            chmod 0666 src/client_sdk.bc.js
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm{.js,_bg.wasm} src
+            chmod 0666 src/plonk_wasm{.js,_bg.wasm}
+          '';
+          npmBuild = "npm run build";
+          doCheck = true;
+          checkPhase = "npm test";
         };
 
         inherit ocamlPackages ocamlPackages_static;
@@ -215,11 +258,31 @@
         packages.default = ocamlPackages.mina;
 
         devShell = ocamlPackages.mina-dev;
-        devShells.default = ocamlPackages.mina-dev;
+        devShells.default = self.devShell.${system};
+
+        devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          nativeBuildInputs = oa.nativeBuildInputs
+            ++ [ ocamlPackages.ocaml-lsp-server ];
+          shellHook = ''
+            # TODO: dead code doesn't allow us to have nice things
+            pushd src/app/cli
+            dune build @check
+            popd
+          '';
+        });
+
         # TODO: think about rust toolchain in the dev shell
         packages.impure-shell =
           (import ./nix/impure-shell.nix pkgs).inputDerivation;
         devShells.impure = import ./nix/impure-shell.nix pkgs;
+        devShells.rust-wasm-impure = pkgs.mkShell {
+          name = "mina-rust-wasm-shell";
+          buildInputs = [
+            pkgs.kimchi-rust-wasm
+            pkgs.wasm-pack
+            pkgs.wasm-bindgen-cli
+          ];
+        };
 
         inherit checks;
       });
