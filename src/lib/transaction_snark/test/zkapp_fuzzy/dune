@@ -11,6 +11,9 @@
    core_kernel
    yojson
    ;; local libraries
+   runtime_config
+   genesis_ledger_helper
+   genesis_ledger_helper_lib
    logger
    mina_base.import
    data_hash_lib
