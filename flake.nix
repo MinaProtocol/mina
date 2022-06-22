@@ -231,7 +231,6 @@
           '';
         });
 
-        packages.impure-shell = import ./nix/impure-shell.nix pkgs;
         devShells.impure = import ./nix/impure-shell.nix pkgs;
 
         inherit checks;
