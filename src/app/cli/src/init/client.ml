@@ -463,7 +463,7 @@ let batch_test_zkapps =
          with
          | Ok parties_list ->
              let logger = Logger.create () in
-             [%log] "generated parties"
+             [%log debug] "generated parties"
                ~metadata:
                  [ ( "parties"
                    , `List
