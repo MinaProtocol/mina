@@ -462,6 +462,13 @@ let batch_test_zkapps =
            |> Deferred.map ~f:Or_error.join
          with
          | Ok parties_list ->
+             [%log] "generated parties"
+               ~metadata:
+                 [ ( "parties"
+                   , `List
+                       (List.map parties_list ~f:(fun parties ->
+                            Parties.to_yojson parties ) ) )
+                 ] ;
              Daemon_rpcs.Client.dispatch_with_message
                Daemon_rpcs.Send_zkapp_commands.rpc parties_list port
                ~success:(fun _ ->
