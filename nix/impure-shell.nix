@@ -22,14 +22,15 @@ pkgs.mkShell {
   OPAMSWITCH = "mina";
   shellHook = ''
     eval $(opam env)
-    if ! opam list --installed 2>&1 | grep mina 2>&1 > /dev/null; then
+    if ! opam switch list --short 2>&1 | grep -w mina 2>&1 > /dev/null; then
       printf "=== Welcome to Mina! ===\n"
       printf "You are currently in a shell with all native libraries present.\n"
       printf "To get all OCaml dependencies, run:\n"
       echo
       tput bold
-      printf 'opam init --bare\n'
-      printf 'opam switch import src/opam.export\n'
+      printf 'opam init --bare # Only if you are running opam for the first time\n'
+      printf 'opam update\n'
+      printf 'opam switch import src/opam.export --strict\n'
       printf 'eval $(opam env)\n'
       printf './scripts/pin-external-packages.sh\n'
       tput sgr0
