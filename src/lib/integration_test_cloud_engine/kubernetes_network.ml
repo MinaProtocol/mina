@@ -696,9 +696,7 @@ module Node = struct
       let unlock_account_obj =
         Graphql.Unlock_account.(
           make
-          @@ makeVariables ~password:node_password
-               ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ())
+          @@ makeVariables ~password:node_password ~public_key:sender_pub_key ())
       in
       exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
@@ -780,7 +778,7 @@ module Node = struct
     [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
     return zkapp_id
 
-  let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+  let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
     let sender_pk_str =
@@ -827,24 +825,18 @@ module Node = struct
     res
 
   let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~token
-      ~(valid_until : Mina_numbers.Global_slot.t) ~raw_signature =
+      ~amount ~fee ~nonce ~memo ~(valid_until : Mina_numbers.Global_slot.t)
+      ~raw_signature =
     [%log info] "Sending a payment with raw signature"
       ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
     let send_payment_graphql () =
       let open Graphql.Send_payment_with_raw_sig in
-      let variables =
-        makeVariables
-          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-          ~amount:(Graphql_lib.Encoders.amount amount)
-          ~token:(Graphql_lib.Encoders.token token)
-          ~fee:(Graphql_lib.Encoders.fee fee)
-          ~nonce:(Graphql_lib.Encoders.nonce nonce)
-          ~memo
-          ~validUntil:(Graphql_lib.Encoders.nonce valid_until)
-          ~rawSignature:raw_signature ()
+      let input =
+        Mina_graphql.Types.Input.SendPaymentInput.make_input
+          ~from:sender_pub_key ~to_:receiver_pub_key ~amount ~fee ~memo ~nonce
+          ~valid_until:(Mina_numbers.Global_slot.to_uint32 valid_until)
+          ()
       in
       let variables = makeVariables ~input ~rawSignature:raw_signature () in
       let send_payment_obj = make variables in
@@ -877,9 +869,9 @@ module Node = struct
     res
 
   let must_send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
+      ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature =
     send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
+      ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =

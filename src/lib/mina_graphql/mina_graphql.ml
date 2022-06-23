@@ -2128,10 +2128,10 @@ module Types = struct
                   { peer_id; host = Unix.Inet_addr.of_string host; libp2p_port }
             with _ -> Error "Invalid format for NetworkPeer.host" )
           ~fields:
-            [ arg "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+            [ arg "peerId" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
             ; arg "host" ~doc:"IP address of the remote host"
                 ~typ:(non_null string)
-            ; arg "libp2p_port" ~typ:(non_null int)
+            ; arg "libp2pPort" ~typ:(non_null int)
             ]
           ~split:(fun f (p : input) ->
             f p.peer_id (Unix.Inet_addr.to_string p.host) p.libp2p_port )
@@ -2141,15 +2141,15 @@ module Types = struct
       type input = Account.key
 
       let arg_typ =
-        scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
-          ~coerce:(fun key ->
-            match key with
+        scalar "PublicKey" ~doc:"Public key in Base58Check format"
+          ~coerce:(fun pk ->
+            match pk with
             | `String s ->
-                Result.try_with (fun () ->
-                    Public_key.of_base58_check_decompress_exn s )
-                |> Result.map_error ~f:(fun e -> Exn.to_string e)
+                Result.map_error
+                  (Public_key.Compressed.of_base58_check s)
+                  ~f:Error.to_string_hum
             | _ ->
-                Error "Invalid format for public key." )
+                Error "Expected public key as a string in Base58Check format" )
           ~to_json:(function
             | (k : input) -> `String (Public_key.Compressed.to_base58_check k)
             )
@@ -2168,8 +2168,7 @@ module Types = struct
       type input = Token_id.t
 
       let arg_typ =
-        scalar "TokenId"
-          ~doc:"String representation of a token's UInt64 identifier"
+        scalar "TokenId" ~doc:"Base58Check representation of a token identifier"
           ~coerce:(fun token ->
             try
               match token with
@@ -2179,6 +2178,153 @@ module Types = struct
                   Error "Invalid format for token."
             with _ -> Error "Invalid format for token." )
           ~to_json:(function (i : input) -> `String (Token_id.to_string i))
+    end
+
+    module Sign = struct
+      type input = Sgn.t
+
+      let arg_typ =
+        enum "Sign"
+          ~values:
+            [ enum_value "PLUS" ~value:Sgn.Pos
+            ; enum_value "MINUS" ~value:Sgn.Neg
+            ]
+    end
+
+    module Field = struct
+      type input = Snark_params.Tick0.Field.t
+
+      let arg_typ =
+        scalar "Field"
+          ~coerce:(fun field ->
+            match field with
+            | `String s ->
+                Ok (Snark_params.Tick.Field.of_string s)
+            | _ ->
+                Error "Expected a string representing a field element" )
+          ~to_json:(function
+            | (f : input) -> `String (Snark_params.Tick.Field.to_string f) )
+    end
+
+    module Nonce = struct
+      type input = Mina_base.Account.Nonce.t
+
+      let arg_typ =
+        scalar "Nonce"
+          ~coerce:(fun nonce ->
+            (* of_string might raise *)
+            try
+              match nonce with
+              | `String s ->
+                  (* a nonce is a uint32, GraphQL ints are signed int32, so use string *)
+                  Ok (Mina_base.Account.Nonce.of_string s)
+              | _ ->
+                  Error "Expected string for nonce"
+            with exn -> Error (Exn.to_string exn) )
+          ~to_json:(function
+            | n -> `String (Mina_base.Account.Nonce.to_string n) )
+    end
+
+    module SnarkedLedgerHash = struct
+      type input = Frozen_ledger_hash.t
+
+      let arg_typ =
+        scalar "SnarkedLedgerHash"
+          ~coerce:(fun hash ->
+            match hash with
+            | `String s ->
+                Result.map_error
+                  (Frozen_ledger_hash.of_base58_check s)
+                  ~f:Error.to_string_hum
+            | _ ->
+                Error "Expected snarked ledger hash in Base58Check format" )
+          ~to_json:(function
+            | (h : input) -> `String (Frozen_ledger_hash.to_base58_check h) )
+    end
+
+    module BlockTime = struct
+      type input = Block_time.t
+
+      let arg_typ =
+        scalar "BlockTime"
+          ~coerce:(fun block_time ->
+            match block_time with
+            | `String s -> (
+                try
+                  (* a block time is a uint64, GraphQL ints are signed int32, so use string *)
+                  (* of_string might raise *)
+                  Ok (Block_time.of_string_exn s)
+                with exn -> Error (Exn.to_string exn) )
+            | _ ->
+                Error "Expected string for block time" )
+          ~to_json:(function (t : input) -> `String (Block_time.to_string t))
+    end
+
+    module Length = struct
+      type input = Mina_numbers.Length.t
+
+      let arg_typ =
+        scalar "Length"
+          ~coerce:(fun length ->
+            (* of_string might raise *)
+            match length with
+            | `String s -> (
+                try
+                  (* a length is a uint32, GraphQL ints are signed int32, so use string *)
+                  Ok (Mina_numbers.Length.of_string s)
+                with exn -> Error (Exn.to_string exn) )
+            | _ ->
+                Error "Expected string for length" )
+          ~to_json:(function
+            | (l : input) -> `String (Mina_numbers.Length.to_string l) )
+    end
+
+    module CurrencyAmount = struct
+      type input = Currency.Amount.t
+
+      let arg_typ =
+        scalar "CurrencyAmount"
+          ~coerce:(fun amt ->
+            match amt with
+            | `String s -> (
+                try Ok (Currency.Amount.of_string s)
+                with exn -> Error (Exn.to_string exn) )
+            | _ ->
+                Error "Expected string for currency amount" )
+          ~to_json:(function
+            | (c : input) -> `String (Currency.Amount.to_string c) )
+          ~doc:
+            "uint64 encoded as a json string representing an ammount of \
+             currency"
+    end
+
+    module Fee = struct
+      type input = Currency.Fee.t
+
+      let arg_typ =
+        scalar "Fee"
+          ~coerce:(fun fee ->
+            match fee with
+            | `String s -> (
+                try Ok (Currency.Fee.of_string s)
+                with exn -> Error (Exn.to_string exn) )
+            | _ ->
+                Error "Expected string for fee" )
+          ~to_json:(function (f : input) -> `String (Currency.Fee.to_string f))
+          ~doc:"uint64 encoded as a json string representing a fee"
+    end
+
+    module SendTestZkappInput = struct
+      type input = Mina_base.Parties.t
+
+      let arg_typ =
+        scalar "SendTestZkappInput" ~doc:"Parties for a test zkApp"
+          ~coerce:(fun json ->
+            let json = to_yojson json in
+            Result.try_with (fun () -> Mina_base.Parties.of_json json)
+            |> Result.map_error ~f:(fun ex -> Exn.to_string ex) )
+          ~to_json:(fun (x : input) ->
+            Yojson.Safe.to_basic @@ Mina_base.Parties.to_json x )
     end
 
     module PrecomputedBlock = struct
@@ -2483,29 +2629,27 @@ module Types = struct
         { from : (Epoch_seed.t, bool) Public_key.Compressed.Poly.t
         ; to_ : Account.key
         ; amount : Currency.Amount.t
-        ; token : Token_id.t option
         ; fee : Currency.Fee.t
-        ; valid_until : Unsigned.uint32 option
+        ; valid_until : UInt32.input option
         ; memo : string option
-        ; nonce : Unsigned.uint32 option
+        ; nonce : Mina_numbers.Account_nonce.t option
         }
       [@@deriving make]
 
       let arg_typ =
         let open Fields in
         obj "SendPaymentInput"
-          ~coerce:(fun from to_ token amount fee valid_until memo nonce ->
-            (from, to_, token, amount, fee, valid_until, memo, nonce) )
+          ~coerce:(fun from to_ amount fee valid_until memo nonce ->
+            (from, to_, amount, fee, valid_until, memo, nonce) )
           ~split:(fun f (x : input) ->
-            f x.from x.to_ x.token
+            f x.from x.to_
               (Currency.Amount.to_uint64 x.amount)
               (Currency.Fee.to_uint64 x.fee)
               x.valid_until x.memo x.nonce )
           ~fields:
             [ from ~doc:"Public key of sender of payment"
             ; to_ ~doc:"Public key of recipient of payment"
-            ; token_opt ~doc:"Token to send"
-            ; amount ~doc:"Amount of mina to send to receiver"
+            ; amount ~doc:"Amount of MINA to send to receiver"
             ; fee ~doc:"Fee amount in order to send payment"
             ; valid_until
             ; memo
@@ -2513,129 +2657,34 @@ module Types = struct
             ]
     end
 
-    let create_token =
-      let open Fields in
-      obj "SendCreateTokenInput"
-        ~coerce:(fun fee_payer token_owner fee valid_until memo nonce ->
-          (fee_payer, token_owner, fee, valid_until, memo, nonce) )
-        ~fields:
-          [ fee_payer_opt
-              ~doc:"Public key to pay the fee from (defaults to the tokenOwner)"
-          ; token_owner ~doc:"Public key to create the token for"
-          ; fee ~doc:"Fee amount in order to create a token"
-          ; valid_until
-          ; memo
-          ; nonce
-          ]
-
-    let create_token_account =
-      let open Fields in
-      obj "SendCreateTokenAccountInput"
-        ~coerce:(fun token_owner token receiver fee fee_payer valid_until memo
-                     nonce ->
-          ( token_owner
-          , token
-          , receiver
-          , fee
-          , fee_payer
-          , valid_until
-          , memo
-          , nonce ) )
-        ~fields:
-          [ token_owner ~doc:"Public key of the token's owner"
-          ; token ~doc:"Token to create an account for"
-          ; receiver ~doc:"Public key to create the account for"
-          ; fee ~doc:"Fee amount in order to create a token account"
-          ; fee_payer_opt
-              ~doc:
-                "Public key to pay the fees from and sign the transaction with \
-                 (defaults to the receiver)"
-          ; valid_until
-          ; memo
-          ; nonce
-          ]
-
-    let mint_tokens =
-      let open Fields in
-      obj "SendMintTokensInput"
-        ~coerce:(fun token_owner token receiver amount fee valid_until memo
-                     nonce ->
-          (token_owner, token, receiver, amount, fee, valid_until, memo, nonce)
-          )
-        ~fields:
-          [ token_owner ~doc:"Public key of the token's owner"
-          ; token ~doc:"Token to mint more of"
-          ; receiver_opt
-              ~doc:
-                "Public key to mint the new tokens for (defaults to token \
-                 owner's account)"
-          ; arg "amount"
-              ~doc:"Amount of token to create in the receiver's account"
-              ~typ:(non_null uint64_arg)
-          ; fee ~doc:"Fee amount in order to mint tokens"
-          ; valid_until
-          ; memo
-          ; nonce
-          ]
-
-    let rosetta_transaction =
-      Schema.Arg.scalar "RosettaTransaction"
-        ~doc:"A transaction encoded in the rosetta format"
-        ~coerce:(fun graphql_json ->
-          Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
-          |> Result.map_error ~f:Error.to_string_hum )
-
-    module SendCreateTokenAccountInput = struct
-      type input =
-        { token_owner : PublicKey.input
-        ; token : TokenId.input
-        ; receiver : PublicKey.input
-        ; fee : UInt64.input
-        ; fee_payer : PublicKey.input option
-        ; valid_until : UInt32.input option
-        ; memo : string option
-        ; nonce : UInt32.input option
-        }
-      [@@deriving make]
+    module SendZkappInput = struct
+      type input = SendTestZkappInput.input
 
       let arg_typ =
-        let open Fields in
-        obj "SendCreateTokenAccountInput"
-          ~coerce:(fun token_owner token receiver fee fee_payer valid_until memo
-                       nonce ->
-            ( token_owner
-            , token
-            , receiver
-            , fee
-            , fee_payer
-            , valid_until
-            , memo
-            , nonce ) )
-          ~split:(fun f (x : input) ->
-            f x.token_owner x.token x.receiver x.fee x.fee_payer x.valid_until
-              x.memo x.nonce )
+        let conv (x : Parties.t Fields_derivers_graphql.Schema.Arg.arg_typ) :
+            Parties.t Graphql_async.Schema.Arg.arg_typ =
+          Obj.magic x
+        in
+        let arg_typ =
+          { arg_typ = Parties.arg_typ () |> conv
+          ; to_json =
+              (function x -> Yojson.Safe.to_basic (Parties.parties_to_json x))
+          }
+        in
+        obj "SendZkappInput" ~coerce:Fn.id
+          ~split:(fun f (x : input) -> f x)
           ~fields:
-            [ token_owner ~doc:"Public key of the token's owner"
-            ; token ~doc:"Token to create an account for"
-            ; receiver ~doc:"Public key to create the account for"
-            ; fee ~doc:"Fee amount in order to create a token account"
-            ; fee_payer_opt
-                ~doc:
-                  "Public key to pay the fees from and sign the transaction \
-                   with (defaults to the receiver)"
-            ; valid_until
-            ; memo
-            ; nonce
+            [ arg "parties"
+                ~doc:"Parties structure representing the transaction"
+                ~typ:arg_typ
             ]
     end
 
-    module SendMintTokensInput = struct
+    module SendDelegationInput = struct
       type input =
-        { token_owner : PublicKey.input
-        ; token : TokenId.input
-        ; receiver : PublicKey.input option
-        ; amount : UInt64.input
-        ; fee : UInt64.input
+        { from : PublicKey.input
+        ; to_ : PublicKey.input
+        ; fee : Currency.Fee.t
         ; valid_until : UInt32.input option
         ; memo : string option
         ; nonce : UInt32.input option
@@ -2644,25 +2693,17 @@ module Types = struct
 
       let arg_typ =
         let open Fields in
-        obj "SendMintTokensInput"
-          ~coerce:(fun token_owner token receiver amount fee valid_until memo
-                       nonce ->
-            (token_owner, token, receiver, amount, fee, valid_until, memo, nonce)
-            )
+        obj "SendDelegationInput"
+          ~coerce:(fun from to_ fee valid_until memo nonce ->
+            (from, to_, fee, valid_until, memo, nonce) )
           ~split:(fun f (x : input) ->
-            f x.token_owner x.token x.receiver x.amount x.fee x.valid_until
-              x.memo x.nonce )
+            f x.from x.to_
+              (Currency.Fee.to_uint64 x.fee)
+              x.valid_until x.memo x.nonce )
           ~fields:
-            [ token_owner ~doc:"Public key of the token's owner"
-            ; token ~doc:"Token to mint more of"
-            ; receiver_opt
-                ~doc:
-                  "Public key to mint the new tokens for (defaults to token \
-                   owner's account)"
-            ; arg "amount"
-                ~doc:"Amount of token to create in the receiver's account"
-                ~typ:(non_null UInt64.arg_typ)
-            ; fee ~doc:"Fee amount in order to mint tokens"
+            [ from ~doc:"Public key of sender of a stake delegation"
+            ; to_ ~doc:"Public key of the account being delegated to"
+            ; fee ~doc:"Fee amount in order to send a stake delegation"
             ; valid_until
             ; memo
             ; nonce
@@ -2674,11 +2715,11 @@ module Types = struct
 
       let arg_typ =
         Schema.Arg.scalar "RosettaTransaction"
-          ~doc:"A transaction encoded in the rosetta format"
+          ~doc:"A transaction encoded in the Rosetta format"
           ~coerce:(fun graphql_json ->
             Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
             |> Result.map_error ~f:Error.to_string_hum )
-          ~to_json:Fn.id
+          ~to_json:(Fn.id : input -> input)
     end
 
     module AddAccountInput = struct
@@ -3536,7 +3577,8 @@ module Mutations = struct
   let make_zkapp_endpoint ~name ~doc ~f =
     io_field name ~doc
       ~typ:(non_null Types.Payload.send_zkapp)
-      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.send_zkapp) ]
+      ~args:
+        Arg.[ arg "input" ~typ:(non_null Types.Input.SendZkappInput.arg_typ) ]
       ~resolve:(fun { ctx = coda; _ } () parties ->
         f coda parties (* TODO: error handling? *) )
 
@@ -3553,7 +3595,9 @@ module Mutations = struct
     io_field "internalSendZkapp"
       ~doc:"Send a zkApp (for internal testing purposes)"
       ~args:
-        Arg.[ arg "parties" ~typ:(non_null Types.Input.internal_send_zkapp) ]
+        Arg.
+          [ arg "parties" ~typ:(non_null Types.Input.SendTestZkappInput.arg_typ)
+          ]
       ~typ:(non_null Types.Payload.send_zkapp)
       ~resolve:(fun { ctx = mina; _ } () parties ->
         send_zkapp_command mina parties )
@@ -3987,7 +4031,7 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled zkApp commands"
-              ~typ:Types.Input.public_key_arg
+              ~typ:Types.Input.PublicKey.arg_typ
           ; arg "hashes" ~doc:"Hashes of the zkApp commands to find in the pool"
               ~typ:(list (non_null string))
           ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of zkApp commands"
@@ -4162,7 +4206,7 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "tokenId" ~doc:"Token ID to find accounts for"
-              ~typ:(non_null Types.Input.token_id_arg)
+              ~typ:(non_null Types.Input.TokenId.arg_typ)
           ]
       ~resolve:(fun { ctx = coda; _ } () token_id ->
         match get_ledger_and_breadcrumb coda with

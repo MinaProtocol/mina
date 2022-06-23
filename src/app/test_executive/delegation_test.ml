@@ -38,9 +38,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let[@warning "-8"] [ node_a; node_b ] = Network.block_producers network in
     let%bind () =
       section "Delegate all mina currency from node_b to node_a"
-        (let amount = Currency.Amount.of_int 2_000_000_000 in
-         (* let fee = Currency.Fee.of_int 10_000_000 in *)
-         let delegation_receiver = node_a in
+        (let delegation_receiver = node_a in
          let%bind delegation_receiver_pub_key =
            Util.pub_key_of_node delegation_receiver
          in
