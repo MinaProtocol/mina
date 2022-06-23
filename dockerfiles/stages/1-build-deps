@@ -20,7 +20,7 @@ ARG GO_VERSION=1.16.5
 ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.58.1
+ARG RUST_VERSION=nightly-2021-11-16
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
@@ -91,7 +91,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
-  && ~/.cargo/bin/cargo install wasm-pack \
+  && /home/opam/.cargo/bin/cargo install wasm-pack \
   && rm /tmp/rustup-init
 # For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
 # As opposed to introducing another shell script here (that mostly just determines the platform)
