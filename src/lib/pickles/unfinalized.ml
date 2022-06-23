@@ -55,7 +55,7 @@ module Constant = struct
       }
     in
     let evals =
-      Tuple_lib.Double.map Dummy.evals_combined.evals ~f:(fun e -> e.evals)
+      Plonk_types.Evals.to_in_circuit Dummy.evals_combined.evals.evals
     in
     let env =
       Plonk_checks.scalars_env

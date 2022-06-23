@@ -2,7 +2,7 @@
  *  In this context, "full" refers to the fact that this frontier contains
  *  "fully expanded blockchain states" (i.e. [Breadcrumb]s). By comparison,
  *  the persistent frontier only contains "light blockchain states" (i.e.
- *  [External_transition]s). This module is only concerned with the core
+ *  [Mina_block]s). This module is only concerned with the core
  *  data structure of the frontier, and is further wrapped with logic to
  *  integrate the core data structure with the various other concerns of
  *  the transition frontier (e.g. extensions, persistence, etc...) in the
@@ -60,4 +60,27 @@ module For_tests : sig
 
   val find_protocol_state_exn :
     t -> State_hash.t -> Mina_state.Protocol_state.value
+
+  val gen_breadcrumb :
+       verifier:Verifier.t
+    -> ?send_to_random_pk:bool
+    -> unit
+    -> (   Frontier_base.Breadcrumb.t
+        -> Frontier_base.Breadcrumb.t Async_kernel.Deferred.t )
+       Base_quickcheck.Generator.t
+
+  val gen_breadcrumb_seq :
+       verifier:Verifier.t
+    -> int
+    -> (   Frontier_base.Breadcrumb.t
+        -> Frontier_base.Breadcrumb.t list Async_kernel.Deferred.t )
+       Base_quickcheck.Generator.t
+
+  val create_frontier : unit -> t
+
+  val clean_up_persistent_root : frontier:t -> unit
+
+  val verifier : unit -> Verifier.t
+
+  val max_length : int
 end

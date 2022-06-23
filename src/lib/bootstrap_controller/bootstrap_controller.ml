@@ -554,10 +554,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 (* Close the old frontier and reload a new on from disk. *)
                 let new_root_data : Transition_frontier.Root_data.Limited.t =
                   Transition_frontier.Root_data.Limited.create
-                    ~transition:
-                      Mina_block.(
-                        External_transition.Validated.lift
-                        @@ Validated.lift new_root)
+                    ~transition:(Mina_block.Validated.lift new_root)
                     ~scan_state ~pending_coinbase ~protocol_states
                 in
                 let%bind () =
@@ -832,10 +829,7 @@ let%test_module "Bootstrap_controller tests" =
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :
           Mina_block.initial_valid_block Envelope.Incoming.t list ) =
-      let root =
-        With_hash.data @@ fst
-        @@ Transition_frontier.Breadcrumb.validated_transition root
-      in
+      let root = Transition_frontier.Breadcrumb.block root in
       ignore
         ( List.fold_result ~init:root incoming_transitions
             ~f:(fun max_acc incoming_transition ->
@@ -975,7 +969,7 @@ let%test_module "Bootstrap_controller tests" =
             ~data:
               ( Transition_frontier.best_tip weaker_chain.state.frontier
               |> Transition_frontier.Breadcrumb.validated_transition
-              |> External_transition.Validated.to_initial_validated )
+              |> Mina_block.Validated.to_initial_validated )
             ~sender:
               (Envelope.Sender.Remote
                  (weaker_chain.peer.host, weaker_chain.peer.peer_id))
@@ -984,7 +978,7 @@ let%test_module "Bootstrap_controller tests" =
             ~data:
               ( Transition_frontier.best_tip stronger_chain.state.frontier
               |> Transition_frontier.Breadcrumb.validated_transition
-              |> External_transition.Validated.to_initial_validated )
+              |> Mina_block.Validated.to_initial_validated )
             ~sender:
               (Envelope.Sender.Remote
                  (stronger_chain.peer.host, stronger_chain.peer.peer_id))

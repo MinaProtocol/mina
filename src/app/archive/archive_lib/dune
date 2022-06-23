@@ -64,6 +64,7 @@
    mina_transaction
    protocol_version
    mina_version
+   staged_ledger_diff
  )
  (inline_tests)
  (modes native)
