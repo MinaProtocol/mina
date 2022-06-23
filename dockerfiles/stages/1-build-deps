@@ -93,8 +93,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
   && /tmp/rustup-init -y --default-toolchain "nightly-${RUST_NIGHTLY}" --profile minimal \
-  && rm /tmp/rustup-init \
-  && curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | bash # also install wasm-pack for js builds
+  && rm /tmp/rustup-init
 # For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
 # As opposed to introducing another shell script here (that mostly just determines the platform)
 # we just download the binary for the only platform we care about in this docker environment
@@ -136,6 +135,10 @@ RUN mkdir --mode=700 ~/.gnupg \
   && echo 'export PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"' >> ~/.bashrc \
   && echo 'ulimit -s unlimited' >> ~/.bashrc \
   && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
+
+# --- wasm-pack install
+RUN cargo install wasm-pack
+# curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | bash
 
 # --- Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
