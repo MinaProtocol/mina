@@ -1,0 +1,57 @@
+(library
+ (name snarky_js_bindings_lib)
+ (libraries
+   ;; opam libraries ;;
+   core_kernel
+   base
+   base.caml
+   integers
+   sexplib0
+   yojson
+   ;; local libraries ;;
+   mina_base
+   mina_base.import
+   snarky.backendless
+   h_list
+   pickles
+   pickles.backend
+   pickles.limb_vector
+   pickles_types
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.common
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   block_time
+   currency
+   data_hash_lib
+   fields_derivers
+   fields_derivers_zkapps
+   genesis_constants
+   mina_numbers
+   mina_transaction
+   mina_transaction_logic
+   random_oracle
+   random_oracle_input
+   sgn
+   signature_lib
+   snark_keys_header
+   snark_params
+   sponge
+   tuple_lib
+   with_hash
+   ;; js-specific libraries ;;
+   js_of_ocaml
+   bindings_js
+   integers_stubs_js
+   zarith_stubs_js
+   ;; js-specific overrides ;;
+   cache_dir.fake
+   digestif.ocaml
+   mina_metrics.none
+   promise.js
+   promise.js_helpers
+   run_in_thread.fake)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_custom_printf ppx_version js_of_ocaml-ppx)))

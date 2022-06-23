@@ -4,13 +4,13 @@ module Work = Transaction_snark_work.Statement
 
 module T = struct
   type view =
-    { removed: int
-    ; refcount_table: int Work.Table.t
+    { removed : int
+    ; refcount_table : int Work.Table.t
           (** Tracks the number of blocks that have each work statement in
               their scan state.
               Work is included iff it is a member of some block scan state.
           *)
-    ; best_tip_table: Work.Hash_set.t
+    ; best_tip_table : Work.Hash_set.t
           (** The set of all snark work statements present in the scan state
               for the last 10 blocks in the best chain.
           *)
@@ -18,12 +18,12 @@ module T = struct
   [@@deriving sexp]
 
   type t =
-    { refcount_table: int Work.Table.t
+    { refcount_table : int Work.Table.t
           (** Tracks the number of blocks that have each work statement in
               their scan state.
               Work is included iff it is a member of some block scan state.
           *)
-    ; best_tip_table: Work.Hash_set.t
+    ; best_tip_table : Work.Hash_set.t
           (** The set of all snark work statements present in the scan state
               for the last 10 blocks in the best chain.
           *)
@@ -67,8 +67,9 @@ module T = struct
 
   let create ~logger:_ frontier =
     let t =
-      { refcount_table= Work.Table.create ()
-      ; best_tip_table= Work.Hash_set.create () }
+      { refcount_table = Work.Table.create ()
+      ; best_tip_table = Work.Hash_set.create ()
+      }
     in
     let () =
       let breadcrumb = Full_frontier.root frontier in
@@ -78,17 +79,18 @@ module T = struct
       ignore (add_scan_state_to_ref_table t.refcount_table scan_state : bool)
     in
     ( t
-    , { removed= 0
-      ; refcount_table= t.refcount_table
-      ; best_tip_table= t.best_tip_table } )
+    , { removed = 0
+      ; refcount_table = t.refcount_table
+      ; best_tip_table = t.best_tip_table
+      } )
 
-  type diff_update = {num_removed: int; is_added: bool}
+  type diff_update = { num_removed : int; is_added : bool }
 
   let handle_diffs t frontier diffs_with_mutants =
     let open Diff.Full.With_mutant in
-    let {num_removed; is_added} =
-      List.fold diffs_with_mutants ~init:{num_removed= 0; is_added= false}
-        ~f:(fun {num_removed; is_added} -> function
+    let { num_removed; is_added } =
+      List.fold diffs_with_mutants ~init:{ num_removed = 0; is_added = false }
+        ~f:(fun { num_removed; is_added } -> function
         | E (New_node (Full breadcrumb), _) ->
             let scan_state =
               Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
@@ -96,9 +98,10 @@ module T = struct
             let added_scan_state =
               add_scan_state_to_ref_table t.refcount_table scan_state
             in
-            {num_removed; is_added= is_added || added_scan_state}
-        | E (Root_transitioned {new_root= _; garbage= Full garbage_nodes; _}, _)
-          ->
+            { num_removed; is_added = is_added || added_scan_state }
+        | E
+            ( Root_transitioned { new_root = _; garbage = Full garbage_nodes; _ }
+            , _ ) ->
             let open Diff.Node_list in
             let extra_num_removed =
               List.fold garbage_nodes ~init:0 ~f:(fun acc node ->
@@ -111,7 +114,7 @@ module T = struct
                   in
                   acc + delta )
             in
-            {num_removed= num_removed + extra_num_removed; is_added}
+            { num_removed = num_removed + extra_num_removed; is_added }
         | E (Best_tip_changed new_best_tip_hash, _) ->
             let rec update_best_tip_table blocks_remaining state_hash =
               match Full_frontier.find frontier state_hash with
@@ -132,13 +135,14 @@ module T = struct
             let num_blocks_to_include = 3 in
             Hash_set.clear t.best_tip_table ;
             update_best_tip_table num_blocks_to_include new_best_tip_hash ;
-            {num_removed; is_added= true} )
+            { num_removed; is_added = true } )
     in
     if num_removed > 0 || is_added then
       Some
-        { removed= num_removed
-        ; refcount_table= t.refcount_table
-        ; best_tip_table= t.best_tip_table }
+        { removed = num_removed
+        ; refcount_table = t.refcount_table
+        ; best_tip_table = t.best_tip_table
+        }
     else None
 end
 

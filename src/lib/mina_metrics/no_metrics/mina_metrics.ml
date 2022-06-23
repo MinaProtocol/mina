@@ -73,6 +73,14 @@ end
 
 module Bootstrap = struct
   let bootstrap_time_ms : Gauge.t = ()
+
+  let staking_epoch_ledger_sync_ms : Counter.t = ()
+
+  let next_epoch_ledger_sync_ms : Counter.t = ()
+
+  let root_snarked_ledger_sync_ms : Counter.t = ()
+
+  let num_of_root_snarked_ledger_retargeted : Gauge.t = ()
 end
 
 module Transaction_pool = struct
@@ -106,6 +114,14 @@ module Network = struct
     module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Snark_work = struct
@@ -120,6 +136,14 @@ module Network = struct
     module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Transaction = struct
@@ -132,6 +156,14 @@ module Network = struct
     let received : Counter.t = ()
 
     module Validation_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
   end
@@ -265,6 +297,8 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t = ()
 
   let ipc_latency_ns_summary : Ipc_latency_histogram.t = ()
+
+  let ipc_logs_received_total : Counter.t = ()
 end
 
 module Pipe = struct
@@ -398,7 +432,7 @@ module Transition_frontier = struct
 
   let best_tip_block_height : Gauge.t = ()
 
-  let root_snarked_ledger_accounts : Gauge.t = ()
+  let root_snarked_ledger_accounts : Counter.t = ()
 
   let root_snarked_ledger_total_currency : Gauge.t = ()
 end
@@ -451,6 +485,14 @@ module Block_latency = struct
   end
 
   module Inclusion_time = struct
+    let v : Gauge.t = ()
+
+    let update : Time.Span.t -> unit = fun _ -> ()
+
+    let clear : unit -> unit = fun _ -> ()
+  end
+
+  module Validation_acceptance_time = struct
     let v : Gauge.t = ()
 
     let update : Time.Span.t -> unit = fun _ -> ()

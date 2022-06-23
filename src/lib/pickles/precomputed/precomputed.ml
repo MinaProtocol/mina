@@ -1,1 +1,1 @@
-include Zexe_backend.Pasta.Precomputed
+include Kimchi_backend.Pasta.Precomputed
