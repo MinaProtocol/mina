@@ -242,12 +242,17 @@ module Update = struct
       t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind app_state =
-      let%bind fields =
-        let field_gen = Snark_params.Tick.Field.gen in
-        Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
-      in
-      (* won't raise because length is correct *)
-      Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
+      if zkapp_account then
+        let%bind fields =
+          let field_gen = Snark_params.Tick.Field.gen in
+          Quickcheck.Generator.list_with_length 8 (Set_or_keep.gen field_gen)
+        in
+        (* won't raise because length is correct *)
+        Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
+      else
+        return
+          ( List.init 8 ~f:(fun _ -> Set_or_keep.Keep)
+          |> Zkapp_state.V.of_list_exn )
     in
     let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
     let%bind verification_key =
@@ -280,7 +285,7 @@ module Update = struct
           ; "https://faceplant.com"
           ]
       in
-      Set_or_keep.gen uri_gen
+      if zkapp_account then Set_or_keep.gen uri_gen else return Set_or_keep.Keep
     in
     let%bind token_symbol =
       let token_gen =

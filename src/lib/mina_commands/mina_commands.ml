@@ -8,18 +8,19 @@ open Mina_base
 let txn_count = ref 0
 
 let generate_random_zkapps t
-    ((kps, num_of_parties, parties_size) : Keypair.t list * int * int option) =
+    ({ zkapp_keypairs = kps
+     ; transaction_count = num_of_parties
+     ; max_parties_count = parties_size
+     ; fee_payer_keypair
+     } :
+      Daemon_rpcs.Generate_random_zkapps.query ) =
   let open Participating_state.Let_syntax in
   let config = Mina_lib.config t in
   let `VK vk, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp
       ~constraint_constants:config.precomputed_values.constraint_constants ()
   in
-  let%bind ledger = Mina_lib.best_ledger t in
-  let%map protocol_state = Mina_lib.best_protocol_state t in
-  let protocol_state_view =
-    Mina_state.Protocol_state.Body.view protocol_state.body
-  in
+  let%map ledger = Mina_lib.best_ledger t in
   let keymap =
     List.map kps ~f:(fun { public_key; private_key } ->
         (Public_key.compress public_key, private_key) )
@@ -31,7 +32,7 @@ let generate_random_zkapps t
     if n > 0 then
       let%bind parties =
         Mina_generators.Parties_generators.gen_parties_with_limited_keys ~ledger
-          ~keymap ~protocol_state_view ~account_state_tbl ?parties_size ~vk ()
+          ~keymap ~account_state_tbl ?parties_size ~vk ~fee_payer_keypair ()
       in
       go (n - 1) (parties :: acc)
     else return (List.rev acc)
@@ -39,6 +40,14 @@ let generate_random_zkapps t
   let parties_dummy_auth_list =
     Quickcheck.Generator.generate (go num_of_parties []) ~size:num_of_parties
       ~random:(Splittable_random.State.create Random.State.default)
+  in
+  (*Add fee payer to the keymap to generate signature*)
+  let fee_payer_pk =
+    Signature_lib.Public_key.compress fee_payer_keypair.public_key
+  in
+  let keymap =
+    Public_key.Compressed.Map.add_exn keymap ~key:fee_payer_pk
+      ~data:fee_payer_keypair.private_key
   in
   Deferred.List.map parties_dummy_auth_list ~f:(fun parties_dummy_auth ->
       Parties_builder.replace_authorizations ~prover ~keymap parties_dummy_auth )

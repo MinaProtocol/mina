@@ -445,19 +445,32 @@ let batch_test_zkapps =
       flag "--parties-size" ~aliases:[ "parties-size" ]
         ~doc:"NUM maximum number of parties in 1 zkapp commands" (optional int))
   in
-  Command.async ~summary:"Generate multiple zkapps and send them"
+  let privkey_path = Cli_lib.Flag.privkey_read_path in
+  Command.async
+    ~summary:
+      "Generate multiple zkapps using the passed fee payer keypair and \
+       broadcast it to the network "
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 keypair_path num_of_zkapps parties_size)
-       ~f:(fun port (keypair_path, num_of_zkapps, parties_size) ->
+       (Args.zip4 keypair_path num_of_zkapps parties_size privkey_path)
+       ~f:(fun port (keypair_path, num_of_zkapps, parties_size, privkey_path) ->
+         let%bind fee_payer_keypair =
+           Secrets.Keypair.Terminal_stdin.read_exn ~which:"Fee payer"
+             privkey_path
+         in
          let%bind keypair_files = Sys.readdir keypair_path >>| Array.to_list in
          let%bind keypairs =
            Deferred.List.map keypair_files ~f:(fun keypair_file ->
                Filename.concat keypair_path keypair_file
-               |> Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" )
+               |> Secrets.Keypair.Terminal_stdin.read_exn
+                    ~which:"Zkapp account keypair" )
          in
          match%bind
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Generate_random_zkapps.rpc
-             (keypairs, num_of_zkapps, parties_size)
+             { zkapp_keypairs = keypairs
+             ; transaction_count = num_of_zkapps
+             ; max_parties_count = parties_size
+             ; fee_payer_keypair
+             }
              port
            |> Deferred.map ~f:Or_error.join
          with

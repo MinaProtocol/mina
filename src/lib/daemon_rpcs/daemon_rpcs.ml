@@ -42,7 +42,12 @@ module Send_zkapp_command = struct
 end
 
 module Generate_random_zkapps = struct
-  type query = Signature_lib.Keypair.Stable.Latest.t list * int * int option
+  type query =
+    { zkapp_keypairs : Signature_lib.Keypair.Stable.Latest.t list
+    ; transaction_count : int
+    ; max_parties_count : int option
+    ; fee_payer_keypair : Signature_lib.Keypair.Stable.Latest.t
+    }
   [@@deriving bin_io_unversioned]
 
   type response = Parties.Stable.Latest.t list Or_error.t
