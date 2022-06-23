@@ -496,8 +496,7 @@ module Snark_pool = struct
                 run_test proof_lists ) )
 
       let%test_unit "some invalid proofs" =
-        Quickcheck.test ~trials:10
-          (gen ~valid_count:`Any ~invalid_count:`Any)
+        Quickcheck.test ~trials:10 (gen ~valid_count:`Any ~invalid_count:`Any)
           ~f:(fun proof_lists ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_test proof_lists ) )

@@ -55,10 +55,11 @@ module Auth_required = struct
         | Proof
         | Signature
         | Both
-        | Impossible (* Both and either can both be subsumed in verification key.
-                        It is good to have "Either" as a separate thing to spare the owner from
-                        having to make a proof instead of a signature. Both, I'm not sure if there's
-                        a good justification for. *)
+        | Impossible
+          (* Both and either can both be subsumed in verification key.
+             It is good to have "Either" as a separate thing to spare the owner from
+             having to make a proof instead of a signature. Both, I'm not sure if there's
+             a good justification for. *)
       [@@deriving sexp, equal, compare, hash, yojson, enum]
 
       let to_latest = Fn.id

@@ -1353,8 +1353,7 @@ let import_key =
        Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
     (let%map_open.Command access_method =
-       choose_one
-         ~if_nothing_chosen:(Default_to `None)
+       choose_one ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1564,8 +1563,7 @@ let export_key =
 let list_accounts =
   Command.async ~summary:"List all owned accounts"
     (let%map_open.Command access_method =
-       choose_one
-         ~if_nothing_chosen:(Default_to `None)
+       choose_one ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
