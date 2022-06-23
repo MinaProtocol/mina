@@ -9,9 +9,19 @@ module Client = Graphql_lib.Client.Make (struct
 end)
 
 let ingress_uri ~graphql_target_node =
-  let host = graphql_target_node in
+  let target = Str.split (Str.regexp ":") graphql_target_node in
+  let host =
+    match List.nth target 0 with Some data -> data | None -> "127.0.0.1"
+  in
+  let port =
+    match List.nth target 1 with
+    | Some data ->
+        int_of_string data
+    | None ->
+        3085
+  in
   let path = "/graphql" in
-  Uri.make ~scheme:"http" ~host ~path ~port:3085 ()
+  Uri.make ~scheme:"http" ~host ~path ~port ()
 
 (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
 (* copied from src/lib/integration_test_cloud_engine/kubernetes_network.ml and tweaked *)
@@ -19,6 +29,10 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     ?(initial_delay_sec = 30.0) ~graphql_target_node query_obj =
   let open Deferred.Let_syntax in
   let uri = ingress_uri ~graphql_target_node in
+  Format.printf
+    "txn burst tool: about to execute the GraphQL query against the endpoint= \
+     %s@."
+    (Uri.to_string uri) ;
   let rec retry n =
     if n <= 0 then
       Deferred.Or_error.errorf "GraphQL request to %s failed too many times"
@@ -63,7 +77,7 @@ module Get_account_data =
 [%graphql
 {|
 
-query ($public_key: PublicKey) {
+query ($public_key: PublicKey!) {
   account(publicKey: $public_key) {
     nonce
     balance {
@@ -80,17 +94,18 @@ let get_account_data ~public_key ~graphql_target_node =
   let open Deferred.Or_error.Let_syntax in
   let pk = public_key |> Public_key.compress in
   let get_acct_data_obj =
-    Get_account_data.make ~public_key:(Graphql_lib.Encoders.public_key pk) ()
+    Get_account_data.(
+      make @@ makeVariables ~public_key:(Graphql_lib.Encoders.public_key pk) ())
   in
   let%bind balance_obj =
     exec_graphql_request ~graphql_target_node get_acct_data_obj
   in
-  match balance_obj#account with
+  match balance_obj.account with
   | None ->
       Deferred.Or_error.errorf "Account with %s not found"
         (Public_key.Compressed.to_string pk)
   | Some acc -> (
-      match acc#nonce with
+      match acc.nonce with
       | Some s ->
           return (int_of_string s)
       | None ->
@@ -109,32 +124,26 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
     Mina_base.Signed_command.sign_payload sender_priv_key
       { common =
           { fee
-          ; fee_token = Mina_base.Token_id.default
           ; fee_payer_pk = sender_pub_key
           ; nonce
           ; valid_until = Mina_numbers.Global_slot.max_value
           ; memo = Mina_base.Signed_command_memo.empty
           }
-      ; body =
-          Payment
-            { source_pk = sender_pub_key
-            ; receiver_pk
-            ; token_id = Mina_base.Token_id.default
-            ; amount
-            }
+      ; body = Payment { source_pk = sender_pub_key; receiver_pk; amount }
       }
   in
   let graphql_query =
-    Send_payment.make
-      ~receiver:(Graphql_lib.Encoders.public_key receiver_pk)
-      ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-      ~amount:(Graphql_lib.Encoders.amount amount)
-      ~fee:(Graphql_lib.Encoders.fee fee)
-      ~nonce:(Graphql_lib.Encoders.nonce nonce)
-      ~field:(Snark_params.Tick.Field.to_string field)
-      ~scalar:(Snark_params.Tick.Inner_curve.Scalar.to_string scalar)
-      ()
+    Send_payment.(
+      make
+      @@ makeVariables
+           ~receiver:(Graphql_lib.Encoders.public_key receiver_pk)
+           ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+           ~amount:(Graphql_lib.Encoders.amount amount)
+           ~fee:(Graphql_lib.Encoders.fee fee)
+           ~nonce:(Graphql_lib.Encoders.nonce nonce)
+           ~field:(Snark_params.Tick.Field.to_string field)
+           ~scalar:(Snark_params.Tick.Inner_curve.Scalar.to_string scalar)
+           ())
   in
   let%map res = exec_graphql_request ~graphql_target_node graphql_query in
-  let (`UserCommand id_obj) = res#sendPayment#payment in
-  id_obj#id
+  res.sendPayment.payment.id
