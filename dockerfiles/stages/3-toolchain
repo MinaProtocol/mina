@@ -19,9 +19,6 @@ ARG MINA_DIR=mina
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
-# Rust nightly toolchain for WebAssembly builds
-ARG RUST_NIGHTLY=2021-11-16
-
 ENV PATH "$PATH:$HOME/.cargo/bin"
 
 # don't keep sources, to force reinstall of pinned packages from Mina sources
@@ -127,8 +124,3 @@ RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHAL
     | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
 
 USER opam
-
-# --- extra Rust toolchain and wasm-pack for Wasm builds
-RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
-    && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}"
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | bash
