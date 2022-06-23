@@ -29,10 +29,6 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     ?(initial_delay_sec = 30.0) ~graphql_target_node query_obj =
   let open Deferred.Let_syntax in
   let uri = ingress_uri ~graphql_target_node in
-  Format.printf
-    "txn burst tool: about to execute the GraphQL query against the endpoint= \
-     %s@."
-    (Uri.to_string uri) ;
   let rec retry n =
     if n <= 0 then
       Deferred.Or_error.errorf "GraphQL request to %s failed too many times"
