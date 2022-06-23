@@ -1,4 +1,3 @@
-open Pickles_types.Hlist
 open Snark_params.Tick
 open Snark_params.Tick.Run
 open Currency
@@ -400,19 +399,19 @@ let dummy_constraints () =
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
-let party_circuit f ([] : _ H1.T(Id).t)
-    ({ party = party_digest; calls } : Zkapp_statement.Checked.t) :
-    _ H1.T(E01(Pickles.Inductive_rule.B)).t * unit =
+let party_circuit f
+    { Pickles.Inductive_rule.previous_public_inputs = []; public_input = () } =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
-  let returned_transaction = Party.Checked.digest party in
-  let returned_calls =
+  let calls =
     (* TODO: This should be returned from
              [Party_under_construction.In_circuit.to_party].
     *)
     Field.constant Parties.Call_forest.empty
   in
-  Run.Field.Assert.equal returned_transaction party_digest ;
-  Run.Field.Assert.equal returned_calls calls ;
-  ([], ())
+  { Pickles.Inductive_rule.previous_proofs_should_verify = []
+  ; public_output =
+      ({ party = Party.Checked.digest party; calls } : Zkapp_statement.Checked.t)
+  ; auxiliary_output = ()
+  }

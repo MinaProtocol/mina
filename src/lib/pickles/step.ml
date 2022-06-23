@@ -41,13 +41,15 @@ struct
                a rule in proof system i. max_local_max_proof_verifieds is the max of the N_i.
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
-      local_widths local_heights prevs_length var value ret_var ret_value )
-      ?handler
+      local_widths local_heights prevs_length var value ret_var ret_value
+      auxiliary_var auxiliary_value ) ?handler
       (T branch_data :
         ( A.t
         , A_value.t
         , ret_var
         , ret_value
+        , auxiliary_var
+        , auxiliary_value
         , Max_proofs_verified.n
         , self_branches
         , prev_vars
@@ -68,8 +70,9 @@ struct
          , A_value.t
          , ret_var
          , ret_value )
-         Inductive_rule.public_input ) pk self_dlog_vk
-      (prev_values : prev_values H1.T(Id).t)
+         Inductive_rule.public_input )
+      ~(auxiliary_typ : (auxiliary_var, auxiliary_value) Impls.Step.Typ.t) pk
+      self_dlog_vk (prev_values : prev_values H1.T(Id).t)
       (prev_proofs : (local_widths, local_widths) H2.T(P).t) :
       ( ( value
         , (_, Max_proofs_verified.n) Vector.t
@@ -78,7 +81,8 @@ struct
         , _
         , (_, Max_proofs_verified.n) Vector.t )
         P.Base.Step.t
-      * ret_value )
+      * ret_value
+      * auxiliary_value )
       Promise.t =
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
@@ -440,6 +444,7 @@ struct
     let x_hats = ref None in
     let witnesses = ref None in
     let return_value = ref None in
+    let auxiliary_value = ref None in
     let compute_prev_proof_parts inners_must_verify =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
@@ -609,6 +614,9 @@ struct
       | Req.Return_value res ->
           return_value := Some res ;
           k ()
+      | Req.Auxiliary_value res ->
+          auxiliary_value := Some res ;
+          k ()
       | Req.Unfinalized_proofs ->
           k (Lazy.force unfinalized_proofs_extended)
       | Req.Pass_through ->
@@ -708,5 +716,6 @@ struct
                    } ) )
             lte Max_proofs_verified.n Dummy.evals
       }
-    , Option.value_exn !return_value )
+    , Option.value_exn !return_value
+    , Option.value_exn !auxiliary_value )
 end

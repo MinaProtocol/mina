@@ -1700,7 +1700,9 @@ module Choices = struct
          , 'arg_var
          , 'arg_value
          , 'ret_var
-         , 'ret_value )
+         , 'ret_value
+         , 'auxiliary_var
+         , 'auxiliary_value )
          t =
       | Rule :
           (   self:('var, 'value, 'width, 'height) Pickles.Tag.t
@@ -1711,7 +1713,9 @@ module Choices = struct
               , 'arg_var
               , 'arg_value
               , 'ret_var
-              , 'ret_value )
+              , 'ret_value
+              , 'auxiliary_var
+              , 'auxiliary_value )
               Pickles.Inductive_rule.t )
           -> ( 'var
              , 'value
@@ -1720,7 +1724,9 @@ module Choices = struct
              , 'arg_var
              , 'arg_value
              , 'ret_var
-             , 'ret_value )
+             , 'ret_value
+             , 'auxiliary_var
+             , 'auxiliary_value )
              t
 
     let rec should_verifys :
@@ -1749,22 +1755,47 @@ module Choices = struct
       should_verifys 0 tags should_verifys_js
 
     let rec vars_to_public_input :
-        type prev_vars prev_values widths heights.
-           (prev_vars, prev_values, widths, heights) H4.T(Pickles.Tag).t
+        type prev_vars prev_values widths heights width height.
+           public_input_size:int
+        -> self:
+             ( Public_input.t
+             , Public_input.Constant.t
+             , width
+             , height )
+             Pickles.Tag.t
+        -> (prev_vars, prev_values, widths, heights) H4.T(Pickles.Tag).t
         -> prev_vars H1.T(Id).t
         -> Public_input.t list =
-     fun tags inputs ->
+     fun ~public_input_size ~self tags inputs ->
       match (tags, inputs) with
       | [], [] ->
           []
       | tag :: tags, input :: inputs ->
-          let (Typ typ) = Pickles.Types_map.public_input tag in
+          let (Typ typ) =
+            match Type_equal.Id.same_witness tag.id self.id with
+            | None ->
+                Pickles.Types_map.public_input tag
+            | Some T ->
+                public_input_typ public_input_size
+          in
           let input = fst (typ.var_to_fields input) in
-          let inputs = vars_to_public_input tags inputs in
+          let inputs =
+            vars_to_public_input ~public_input_size ~self tags inputs
+          in
           input :: inputs
 
-    let create (rule : pickles_rule_js) :
-        (_, _, _, _, Public_input.t, Public_input.Constant.t, unit, unit) t =
+    let create ~public_input_size (rule : pickles_rule_js) :
+        ( _
+        , _
+        , _
+        , _
+        , Public_input.t
+        , Public_input.Constant.t
+        , unit
+        , unit
+        , unit
+        , unit )
+        t =
       let (Prevs prevs) = Prevs.of_rule rule in
       Rule
         (fun ~self ->
@@ -1772,16 +1803,20 @@ module Choices = struct
           { Pickles.Inductive_rule.identifier = Js.to_string rule##.identifier
           ; prevs
           ; main =
-              (fun prev_inputs public_input ->
+              (fun { previous_public_inputs; public_input } ->
                 dummy_constraints () ;
-                let should_verifys =
+                let previous_proofs_should_verify =
                   rule##.main
                     (Public_input.to_js public_input)
                     (Public_input.list_to_js
-                       (vars_to_public_input prevs prev_inputs) )
+                       (vars_to_public_input ~public_input_size ~self prevs
+                          previous_public_inputs ) )
                   |> should_verifys prevs
                 in
-                (should_verifys, ()) )
+                { previous_proofs_should_verify
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           } )
   end
 
@@ -1792,7 +1827,9 @@ module Choices = struct
        , 'arg_var
        , 'arg_value
        , 'ret_var
-       , 'ret_value )
+       , 'ret_value
+       , 'auxiliary_var
+       , 'auxiliary_value )
        t =
     | Choices :
         (   self:('var, 'value, 'width, 'height) Pickles.Tag.t
@@ -1803,8 +1840,10 @@ module Choices = struct
             , 'arg_var
             , 'arg_value
             , 'ret_var
-            , 'ret_value )
-            H4_4.T(Pickles.Inductive_rule).t )
+            , 'ret_value
+            , 'auxiliary_var
+            , 'auxiliary_value )
+            H4_6.T(Pickles.Inductive_rule).t )
         -> ( 'var
            , 'value
            , 'width
@@ -1812,12 +1851,24 @@ module Choices = struct
            , 'arg_var
            , 'arg_value
            , 'ret_var
-           , 'ret_value )
+           , 'ret_value
+           , 'auxiliary_var
+           , 'auxiliary_value )
            t
 
-  let of_js js_rules =
+  let of_js ~public_input_size js_rules =
     let rec get_rules (Choices rules) index :
-        (_, _, _, _, Public_input.t, Public_input.Constant.t, unit, unit) t =
+        ( _
+        , _
+        , _
+        , _
+        , Public_input.t
+        , Public_input.Constant.t
+        , unit
+        , unit
+        , unit
+        , unit )
+        t =
       if index < 0 then Choices rules
       else
         let js_rule =
@@ -1825,8 +1876,8 @@ module Choices = struct
               raise_errorf
                 "Rules array is sparse; the entry at index %i is missing" index )
         in
-        let (Rule rule) = Inductive_rule.create js_rule in
-        let rules ~self : _ H4_4.T(Pickles.Inductive_rule).t =
+        let (Rule rule) = Inductive_rule.create ~public_input_size js_rule in
+        let rules ~self : _ H4_6.T(Pickles.Inductive_rule).t =
           rule ~self :: rules ~self
         in
         get_rules (Choices rules) (index - 1)
@@ -1910,12 +1961,13 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   in
   let (module Branches) = nat_module branches in
   let (module Max_proofs_verified) = nat_add_module max_proofs in
-  let (Choices choices) = Choices.of_js choices in
+  let (Choices choices) = Choices.of_js ~public_input_size choices in
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices
       (module Public_input)
       (module Public_input.Constant)
       ~public_input:(Input (public_input_typ public_input_size))
+      ~auxiliary_typ:Typ.unit
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
@@ -1949,7 +2001,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
         Public_input.(public_input_js |> of_js |> to_constant)
       in
       prover ?handler:None prevs public_input
-      |> Promise.map ~f:(fun ((), proof) -> proof)
+      |> Promise.map ~f:(fun ((), (), proof) -> proof)
       |> Promise_js_helpers.to_js
     in
     prove
@@ -1960,7 +2012,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
          , b
          , c
          , Public_input.Constant.t
-         , (unit * Proof.t) Promise.t )
+         , (unit * unit * Proof.t) Promise.t )
          Pickles.Provers.t
       -> (   public_input_js
           -> Proof.t public_input_with_proof_js Js.js_array Js.t
