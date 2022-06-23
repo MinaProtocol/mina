@@ -93,6 +93,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
   && /tmp/rustup-init -y --default-toolchain "nightly-${RUST_NIGHTLY}" --profile minimal \
+  && ~/.cargo/bin/cargo install wasm-pack \
   && rm /tmp/rustup-init
 # For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
 # As opposed to introducing another shell script here (that mostly just determines the platform)
@@ -137,7 +138,7 @@ RUN mkdir --mode=700 ~/.gnupg \
   && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
 
 # --- wasm-pack install
-RUN cargo install wasm-pack
+# RUN ~/.cargo/bin/cargo install wasm-pack
 # curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | bash
 
 # --- Ocaml install of a given OCAML_VERSION via opam switch
