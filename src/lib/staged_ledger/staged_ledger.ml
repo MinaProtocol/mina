@@ -1933,9 +1933,9 @@ module T = struct
             ~finish:Fn.id
         in
         (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
-        let valid_on_this_ledger =
-          Sequence.fold_until transactions_by_fee ~init:(Sequence.empty, 0)
-            ~f:(fun (seq, count) txn ->
+        let valid_on_this_ledger, invalid_on_this_ledger =
+          Sequence.fold_until transactions_by_fee ~init:(Sequence.empty, [], 0)
+            ~f:(fun (valid_seq, invalid_txns, count) txn ->
               match
                 O1trace.sync_thread "validate_transaction_against_staged_ledger"
                   (fun () ->
@@ -1959,16 +1959,19 @@ module T = struct
                       ]
                     "Staged_ledger_diff creation: Skipping user command: \
                      $user_command due to error: $error" ;
-                  Continue (seq, count)
+                  Continue (valid_seq, (txn, e) :: invalid_txns, count)
               | Ok status ->
                   let txn_with_status = { With_status.data = txn; status } in
-                  let seq' =
-                    Sequence.append (Sequence.singleton txn_with_status) seq
+                  let valid_seq' =
+                    Sequence.append
+                      (Sequence.singleton txn_with_status)
+                      valid_seq
                   in
                   let count' = count + 1 in
-                  if count' >= Scan_state.free_space t.scan_state then Stop seq'
-                  else Continue (seq', count') )
-            ~finish:fst
+                  if count' >= Scan_state.free_space t.scan_state then
+                    Stop (valid_seq', invalid_txns)
+                  else Continue (valid_seq', invalid_txns, count') )
+            ~finish:(fun (valid, invalid, _) -> (valid, invalid))
         in
         let diff, log =
           O1trace.sync_thread "generate_staged_ledger_diff" (fun () ->
@@ -2009,7 +2012,8 @@ module T = struct
                 , Diff_creation_log.detail_list_to_yojson
                     (List.map ~f:List.rev detailed) )
               ] ;
-        { Staged_ledger_diff.With_valid_signatures_and_proofs.diff } )
+        ( { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
+        , invalid_on_this_ledger ) )
 
   let latest_block_accounts_created t ~previous_block_state_hash =
     let scan_state = scan_state t in
@@ -2099,7 +2103,7 @@ let%test_module "staged ledger tests" =
           ~transactions_by_fee:txns ~get_completed_work:stmt_to_work
           ~supercharge_coinbase ~coinbase_receiver
       in
-      let diff =
+      let diff, _invalid_txns =
         match diff with
         | Ok x ->
             x
@@ -2878,16 +2882,16 @@ let%test_module "staged ledger tests" =
               iter_cmds_acc cmds iters ()
                 (fun _cmds_left _count_opt cmds_this_iter () ->
                   let diff =
-                    let diff =
+                    let diff_result =
                       Sl.create_diff ~constraint_constants !sl ~logger
                         ~current_state_view:(dummy_state_view ())
                         ~transactions_by_fee:cmds_this_iter
                         ~get_completed_work:stmt_to_work ~coinbase_receiver
                         ~supercharge_coinbase:true
                     in
-                    match diff with
-                    | Ok x ->
-                        Staged_ledger_diff.forget x
+                    match diff_result with
+                    | Ok (diff, _invalid_txns) ->
+                        Staged_ledger_diff.forget diff
                     | Error e ->
                         Error.raise (Pre_diff_info.Error.to_error e)
                   in
@@ -3629,19 +3633,19 @@ let%test_module "staged ledger tests" =
       Quickcheck.test command_insufficient_funds ~trials:1
         ~f:(fun (ledger_init_state, invalid_command) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
-              let diff =
+              let diff_result =
                 Sl.create_diff ~constraint_constants !sl ~logger
                   ~current_state_view:(dummy_state_view ())
                   ~transactions_by_fee:(Sequence.of_list [ invalid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
               in
-              ( match diff with
-              | Ok x ->
+              ( match diff_result with
+              | Ok (diff, _invalid_txns) ->
                   assert (
                     List.is_empty
                       (Staged_ledger_diff.With_valid_signatures_and_proofs
-                       .commands x ) )
+                       .commands diff ) )
               | Error e ->
                   Error.raise (Pre_diff_info.Error.to_error e) ) ;
               Deferred.unit ) )
@@ -3701,26 +3705,26 @@ let%test_module "staged ledger tests" =
       Quickcheck.test g ~trials:1
         ~f:(fun (ledger_init_state, valid_command, invalid_command) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
-              let diff =
+              let diff_result =
                 Sl.create_diff ~constraint_constants !sl ~logger
                   ~current_state_view:(dummy_state_view ())
                   ~transactions_by_fee:(Sequence.of_list [ valid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
               in
-              match diff with
+              match diff_result with
               | Error e ->
                   Error.raise (Pre_diff_info.Error.to_error e)
-              | Ok x -> (
+              | Ok (diff, _invalid_txns) -> (
                   assert (
                     List.length
                       (Staged_ledger_diff.With_valid_signatures_and_proofs
-                       .commands x )
+                       .commands diff )
                     = 1 ) ;
-                  let f, s = x.diff in
+                  let f, s = diff.diff in
                   [%log info] "Diff %s"
                     ( Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .to_yojson x
+                      .to_yojson diff
                     |> Yojson.Safe.to_string ) ;
                   let failed_command =
                     With_status.
