@@ -446,15 +446,16 @@ let setup_daemon logger =
         raise (Error.to_exn (Error.of_string "Invalid pubsub topic mode"))
   in
   fun () ->
-    let open Deferred.Let_syntax in
     O1trace.thread "mina" (fun () ->
+        let open Deferred.Let_syntax in
         let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
         let%bind () = File_system.create_dir conf_dir in
         let () =
           if is_background then (
             Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
               conf_dir ;
-            Daemon.daemonize ~redirect_stdout:`Dev_null ?cd:working_dir
+            Daemon.daemonize ~allow_threads_to_have_been_created:true
+              ~redirect_stdout:`Dev_null ?cd:working_dir
               ~redirect_stderr:`Dev_null () )
           else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
         in
@@ -465,27 +466,27 @@ let setup_daemon logger =
         Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
           ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
                ~num_rotate:logrotate_num_rotate ) ;
         let best_tip_diff_log_size = 1024 * 1024 * 5 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-best-tip.log"
                ~max_size:best_tip_diff_log_size ~num_rotate:1 ) ;
         let rejected_blocks_log_size = 1024 * 1024 * 5 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.rejected_blocks
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-rejected-blocks.log"
                ~max_size:rejected_blocks_log_size ~num_rotate:50 ) ;
         Logger.Consumer_registry.register ~id:Logger.Logger_id.oversized_logs
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
                ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
         let version_metadata =
@@ -633,21 +634,10 @@ let setup_daemon logger =
             (conf_dir ^/ "daemon.json", `May_be_missing)
           in
           let config_file_envvar =
-            (* TODO: remove deprecated variable, eventually *)
-            let mina_config_file = "MINA_CONFIG_FILE" in
-            let coda_config_file = "CODA_CONFIG_FILE" in
-            match
-              (Sys.getenv mina_config_file, Sys.getenv coda_config_file)
-            with
-            | Some config_file, _ ->
+            match Sys.getenv "MINA_CONFIG_FILE" with
+            | Some config_file ->
                 Some (config_file, `Must_exist)
-            | None, Some config_file ->
-                [%log warn]
-                  "Using deprecated environment variable %s, please use %s \
-                   instead"
-                  coda_config_file mina_config_file ;
-                Some (config_file, `Must_exist)
-            | None, None ->
+            | None ->
                 None
           in
           let config_files =
@@ -944,9 +934,7 @@ let setup_daemon logger =
             >>| Or_error.ok
           in
           let client_trustlist =
-            (* TODO: remove deprecated var, eventually *)
             let mina_client_trustlist = "MINA_CLIENT_TRUSTLIST" in
-            let coda_client_trustlist = "CODA_CLIENT_TRUSTLIST" in
             let cidrs_of_env_str env_str env_var =
               let cidrs =
                 String.split ~on:',' env_str
@@ -961,19 +949,10 @@ let setup_daemon logger =
               Some
                 (List.append cidrs (Option.value ~default:[] client_trustlist))
             in
-            match
-              ( Unix.getenv mina_client_trustlist
-              , Unix.getenv coda_client_trustlist )
-            with
-            | Some env_str, _ ->
+            match Unix.getenv mina_client_trustlist with
+            | Some env_str ->
                 cidrs_of_env_str env_str mina_client_trustlist
-            | None, Some env_str ->
-                [%log warn]
-                  "Using deprecated environment variable %s, please use %s \
-                   instead"
-                  coda_client_trustlist mina_client_trustlist ;
-                cidrs_of_env_str env_str coda_client_trustlist
-            | None, None ->
+            | None ->
                 client_trustlist
           in
           Stream.iter
@@ -1035,7 +1014,7 @@ let setup_daemon logger =
           in
           let genesis_ledger_hash =
             Precomputed_values.genesis_ledger precomputed_values
-            |> Lazy.force |> Ledger.merkle_root
+            |> Lazy.force |> Mina_ledger.Ledger.merkle_root
           in
           let block_production_keypairs =
             block_production_keypair

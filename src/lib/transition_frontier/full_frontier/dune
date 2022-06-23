@@ -23,6 +23,7 @@
    transition_frontier_persistent_root
    transition_frontier_base
    consensus
+   mina_ledger
    mina_block
    data_hash_lib
    precomputed_values
@@ -31,6 +32,19 @@
    staged_ledger_diff
    mina_numbers
    debug_assert
+   ; for tests
+   async
+   async_kernel
+   async_unix
+   child_processes
+   coda_genesis_ledger
+   core.uuid
+   core_kernel.uuid
+   genesis_constants
+   merkle_ledger
+   protocol_version
+   signature_lib
+   verifier
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))

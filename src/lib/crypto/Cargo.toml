@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "kimchi_bindings/stubs",
+    "kimchi_bindings/stubs/binding_generation",
+    "kimchi_bindings/wasm",
+]
+exclude = [
+    "proof-systems",
+]
+
+[profile.release]
+debug = true

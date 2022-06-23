@@ -2,6 +2,7 @@ open Core
 open Async
 open Signature_lib
 open Mina_base
+open Mina_transaction
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -479,15 +480,8 @@ let batch_send_payments =
             Public_key.of_base58_check_decompress_exn receiver
           in
           User_command_input.create ~signer:signer_pk ~fee
-            ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty ~valid_until
-            ~body:
-              (Payment
-                 { source_pk = signer_pk
-                 ; receiver_pk
-                 ; token_id = Token_id.default
-                 ; amount
-                 } )
+            ~body:(Payment { source_pk = signer_pk; receiver_pk; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
@@ -561,144 +555,6 @@ let delegate_stake_graphql =
          in
          printf "Dispatched stake delegation with ID %s\n"
            response.sendDelegation.delegation.id ) )
-
-let create_new_token_graphql =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receiver_flag =
-    flag "--receiver" ~aliases:[ "receiver" ]
-      ~doc:"PUBLICKEY Public key to create the new token for"
-      (optional public_key_compressed)
-  in
-  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
-  Command.async ~summary:"Create a new token"
-    (Cli_lib.Background_daemon.graphql_init args
-       ~f:(fun
-            graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver)
-          ->
-         let receiver = Option.value ~default:sender receiver in
-         let%map response =
-           Graphql_client.query_exn
-             Graphql_queries.Send_create_token.(
-               make
-               @@ makeVariables ~sender ~receiver
-                    ~fee:(Currency.Fee.to_uint64 fee)
-                    ?nonce ?memo ())
-             graphql_endpoint
-         in
-         printf "Dispatched create new token command with TRANSACTION_ID %s\n"
-           response.createToken.createNewToken.id ) )
-
-let create_new_account_graphql =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receiver_flag =
-    flag "--receiver" ~aliases:[ "receiver" ]
-      ~doc:"PUBLICKEY Public key to create the new account for"
-      (required public_key_compressed)
-  in
-  let token_owner_flag =
-    flag "--token-owner" ~aliases:[ "token-owner" ]
-      ~doc:"PUBLICKEY Public key for the owner of the token"
-      (optional public_key_compressed)
-  in
-  let token_flag =
-    flag "--token" ~aliases:[ "token" ]
-      ~doc:"TOKEN_ID The ID of the token to create the account for"
-      (required token_id)
-  in
-  let args =
-    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_owner_flag
-      token_flag
-  in
-  Command.async ~summary:"Create a new account for a token"
-    (Cli_lib.Background_daemon.graphql_init args
-       ~f:(fun
-            graphql_endpoint
-            ( { Cli_lib.Flag.sender; fee; nonce; memo }
-            , receiver
-            , token_owner
-            , token )
-          ->
-         let%bind token_owner =
-           match token_owner with
-           | Some token_owner ->
-               Deferred.return token_owner
-           | None when Token_id.(equal default) token ->
-               (* NOTE: Doesn't matter who we say the owner is for the default
-                        token, arbitrarily choose the receiver.
-               *)
-               Deferred.return receiver
-           | None -> (
-               let%map token_owner =
-                 Graphql_client.(
-                   query_exn
-                     Graphql_queries.Get_token_owner.(
-                       make @@ makeVariables ~token ()))
-                   graphql_endpoint
-               in
-               match token_owner.tokenOwner with
-               | Some token_owner ->
-                   Graphql_lib.Decoders.public_key token_owner
-               | None ->
-                   failwith
-                     "Unknown token: Cannot find the owner for the given token"
-               )
-         in
-         let%map response =
-           Graphql_client.query_exn
-             Graphql_queries.Send_create_token_account.(
-               make
-               @@ makeVariables ~sender ~receiver ~tokenOwner:token_owner ~token
-                    ~fee:(Currency.Fee.to_uint64 fee)
-                    ?nonce ?memo ())
-             graphql_endpoint
-         in
-         printf
-           "Dispatched create new token account command with TRANSACTION_ID %s\n"
-           response.createTokenAccount.createNewTokenAccount.id ) )
-
-let mint_tokens_graphql =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receiver_flag =
-    flag "--receiver" ~aliases:[ "receiver" ]
-      ~doc:
-        "PUBLICKEY Public key of the account to create new tokens in (defaults \
-         to the sender)"
-      (optional public_key_compressed)
-  in
-  let token_flag =
-    flag "--token" ~aliases:[ "token" ]
-      ~doc:"TOKEN_ID The ID of the token to mint" (required token_id)
-  in
-  let amount_flag =
-    flag "--amount" ~aliases:[ "amount" ]
-      ~doc:"VALUE Number of new tokens to create" (required txn_amount)
-  in
-  let args =
-    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_flag
-      amount_flag
-  in
-  Command.async ~summary:"Mint more of a token owned by the command's sender"
-    (Cli_lib.Background_daemon.graphql_init args
-       ~f:(fun
-            graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, token, amount)
-          ->
-         let%map response =
-           Graphql_client.query_exn
-             Graphql_queries.Send_mint_tokens.(
-               make
-               @@ makeVariables ~sender ?receiver ~token
-                    ~amount:(Currency.Amount.to_uint64 amount)
-                    ~fee:(Currency.Fee.to_uint64 fee)
-                    ?nonce ?memo ())
-             graphql_endpoint
-         in
-         printf "Dispatched mint token command with TRANSACTION_ID %s\n"
-           response.mintTokens.mintTokens.id ) )
 
 let cancel_transaction_graphql =
   let txn_id_flag =
@@ -972,7 +828,7 @@ let hash_ledger =
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
-           (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+           (Mina_ledger.Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
        in
        Deferred.return
        @@
@@ -1138,6 +994,36 @@ let pooled_user_commands =
          let%map response = Graphql_client.query_exn graphql graphql_endpoint in
          let json_response = Q.serialize response |> Q.toJson in
          print_string (Yojson.Basic.to_string json_response) ) )
+
+let pooled_zkapp_commands =
+  let public_key_flag =
+    Command.Param.(
+      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
+  in
+  Command.async
+    ~summary:"Retrieve all the zkApp commands that are pending inclusion"
+    (Cli_lib.Background_daemon.graphql_init public_key_flag
+       ~f:(fun graphql_endpoint maybe_public_key ->
+         let public_key =
+           Yojson.Safe.to_basic
+           @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
+         in
+         let graphql =
+           Graphql_queries.Pooled_zkapp_commands.(
+             make @@ makeVariables ~public_key ())
+         in
+         let%bind raw_response =
+           Graphql_client.query_json_exn graphql graphql_endpoint
+         in
+         let%map json_response =
+           try
+             let kvs = Yojson.Safe.Util.to_assoc raw_response in
+             List.hd_exn kvs |> snd |> return
+           with _ ->
+             eprintf "Failed to read result of pooled zkApp commands" ;
+             exit 1
+         in
+         print_string (Yojson.Safe.to_string json_response) ) )
 
 let to_signed_fee_exn sign magnitude =
   let sgn = match sign with `PLUS -> Sgn.Pos | `MINUS -> Neg in
@@ -1815,7 +1701,10 @@ let add_peers_graphql =
                  |> Mina_net2.Multiaddr.to_peer
                with
                | Some peer ->
-                   peer
+                   { Graphql_queries.Add_peers.host = peer.host
+                   ; libp2pPort = peer.libp2p_port
+                   ; peerId = peer.peer_id
+                   }
                | None ->
                    eprintf
                      "Could not parse %s as a peer address. It should use the \
@@ -1849,16 +1738,10 @@ let compile_time_constants =
            home ^/ Cli_lib.Default.conf_dir_name
          in
          let config_file =
-           (* TODO: eventually, remove CODA_ variable *)
-           let mina_config_file = "MINA_CONFIG_FILE" in
-           let coda_config_file = "CODA_CONFIG_FILE" in
-           match (Sys.getenv mina_config_file, Sys.getenv coda_config_file) with
-           | Some config_file, _ ->
+           match Sys.getenv "MINA_CONFIG_FILE" with
+           | Some config_file ->
                config_file
-           | None, Some config_file ->
-               (* we print a deprecation warning on daemon startup, don't print here *)
-               config_file
-           | None, None ->
+           | None ->
                conf_dir ^/ "daemon.json"
          in
          let open Async in
@@ -1960,21 +1843,6 @@ let node_status =
          | Error err ->
              printf "Failed to get node status: %s\n%!"
                (Error.to_string_hum err) ) )
-
-let next_available_token_cmd =
-  Command.async
-    ~summary:
-      "The next token ID that has not been allocated. Token IDs are allocated \
-       sequentially, so all lower token IDs have been allocated"
-    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
-       ~f:(fun graphql_endpoint () ->
-         let%map response =
-           Graphql_client.query_exn
-             Graphql_queries.Next_available_token.(make @@ makeVariables ())
-             graphql_endpoint
-         in
-         printf "Next available token ID: %s\n"
-           (Token_id.to_string response.nextAvailableToken) ) )
 
 let object_lifetime_statistics =
   let open Daemon_rpcs in
@@ -2348,9 +2216,6 @@ let client =
     ; ("get-tokens", get_tokens_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
-    ; ("create-token", create_new_token_graphql)
-    ; ("create-token-account", create_new_account_graphql)
-    ; ("mint-tokens", mint_tokens_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
@@ -2385,6 +2250,7 @@ let advanced =
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
     ; ("pooled-user-commands", pooled_user_commands)
+    ; ("pooled-zkapp-commands", pooled_zkapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
@@ -2396,7 +2262,6 @@ let advanced =
     ; ("validate-keypair", Cli_lib.Commands.validate_keypair)
     ; ("validate-transaction", Cli_lib.Commands.validate_transaction)
     ; ("send-rosetta-transactions", send_rosetta_transactions_graphql)
-    ; ("next-available-token", next_available_token_cmd)
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)

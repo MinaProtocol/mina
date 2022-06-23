@@ -23,7 +23,7 @@ include Frontier_intf.S
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
 
-type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
   [@@deriving register_event]
 
 val max_catchup_chunk_length : int
@@ -43,7 +43,7 @@ val load :
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
   -> precomputed_values:Precomputed_values.t
-  -> catchup_mode:[`Normal | `Super]
+  -> catchup_mode:[ `Normal | `Super ]
   -> unit
   -> ( t
      , [> `Failure of string
@@ -62,15 +62,27 @@ val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
 
-val root_snarked_ledger : t -> Ledger.Db.t
+val root_snarked_ledger : t -> Mina_ledger.Ledger.Db.t
 
 val extensions : t -> Extensions.t
 
 val genesis_state_hash : t -> State_hash.t
 
-val rejected_blocks : (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t * [`Invalid_proof | `Invalid_delta_transition_chain_proof | `Too_early | `Too_late | `Invalid_genesis_protocol_state | `Invalid_protocol_version  | `Mismatched_protocol_version]) Core.Queue.t
+val rejected_blocks :
+  ( State_hash.t
+  * Network_peer.Envelope.Sender.t
+  * Block_time.t
+  * [ `Invalid_proof
+    | `Invalid_delta_transition_chain_proof
+    | `Too_early
+    | `Too_late
+    | `Invalid_genesis_protocol_state
+    | `Invalid_protocol_version
+    | `Mismatched_protocol_version ] )
+  Core.Queue.t
 
-val validated_blocks : (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
+val validated_blocks :
+  (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
 
 module For_tests : sig
   open Core_kernel
@@ -87,7 +99,7 @@ module For_tests : sig
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> precomputed_values:Precomputed_values.t
-    -> catchup_mode:[`Normal | `Super]
+    -> catchup_mode:[ `Normal | `Super ]
     -> unit
     -> ( t
        , [> `Failure of string
@@ -116,13 +128,14 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:Ledger.t
-                                 * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * Mina_state.Protocol_state.value
-                              Mina_base.State_hash.With_state_hashes.t
-                              list )
-                            Quickcheck.Generator.t
+    -> ?root_ledger_and_accounts:
+         Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
+    -> ?gen_root_breadcrumb:
+         ( Breadcrumb.t
+         * Mina_state.Protocol_state.value
+           Mina_base.State_hash.With_state_hashes.t
+           list )
+         Quickcheck.Generator.t
     -> max_length:int
     -> size:int
     -> ?use_super_catchup:bool
@@ -135,13 +148,14 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:Ledger.t
-                                 * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * Mina_state.Protocol_state.value
-                              Mina_base.State_hash.With_state_hashes.t
-                              list )
-                            Quickcheck.Generator.t
+    -> ?root_ledger_and_accounts:
+         Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
+    -> ?gen_root_breadcrumb:
+         ( Breadcrumb.t
+         * Mina_state.Protocol_state.value
+           Mina_base.State_hash.With_state_hashes.t
+           list )
+         Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
     -> max_length:int
     -> frontier_size:int

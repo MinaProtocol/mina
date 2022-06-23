@@ -1,0 +1,32 @@
+(library
+  (name zkapp_tokens_tests)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   async
+   async_kernel
+   async_unix
+   core_kernel
+   sexplib0
+   ;; local libraries
+   mina_base.import
+   transaction_snark
+   mina_ledger
+   mina_base
+   mina_generators
+   currency
+   pickles
+   mina_numbers
+   parties_builder
+   signature_lib
+   genesis_constants
+   sgn
+   transaction_snark_tests
+   test_util
+   mina_transaction_logic
+   )
+  (library_flags -linkall)
+  (inline_tests)
+  (preprocess
+    (pps ppx_snarky ppx_version ppx_jane ppx_coda))
+  (instrumentation (backend bisect_ppx)))
