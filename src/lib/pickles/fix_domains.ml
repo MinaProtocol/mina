@@ -20,10 +20,8 @@ let rough_domains : Domains.t =
 let domains (type field a)
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type field = field
-       and type R1CS_constraint_system.t = ( a
-                                           , field )
-                                           Zexe_backend_common
-                                           .Plonk_constraint_system
-                                           .t ) (Spec.ETyp.T (typ, conv)) main =
+       and type R1CS_constraint_system.t =
+         (a, field) Zexe_backend_common.Plonk_constraint_system.t )
+    (Spec.ETyp.T (typ, conv)) main =
   let main x () : unit = main (conv x) in
   domains (Impl.constraint_system ~exposing:[ typ ] main)

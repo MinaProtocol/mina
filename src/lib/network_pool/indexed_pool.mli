@@ -18,7 +18,7 @@ module Command_error : sig
         [ `Balance of Currency.Amount.t ] * Currency.Amount.t
     | (* NOTE: don't punish for this, attackers can induce nodes to banlist
           each other that way! *)
-        Insufficient_replace_fee of
+      Insufficient_replace_fee of
         [ `Replace_fee of Currency.Fee.t ] * Currency.Fee.t
     | Overflow
     | Bad_token
