@@ -60,9 +60,6 @@
       };
       pipeline = with flake-buildkite-pipeline.lib; {
         steps = flakeSteps {
-          pushToBinaryCaches =
-            [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
-          signWithKeys = [ "/var/secrets/nix-cache-key.sec" ];
           commonExtraStepConfig = {
             agents = [ "nix" ];
             soft_fail = "true";
