@@ -3,6 +3,8 @@ open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
+module Ledger = Mina_ledger.Ledger
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_state
 open Pipe_lib.Strict_pipe
 open Network_peer
@@ -19,6 +21,7 @@ type t =
   ; mutable best_seen_transition : Mina_block.initial_valid_block
   ; mutable current_root : Mina_block.initial_valid_block
   ; network : Mina_networking.t
+  ; mutable num_of_root_snarked_ledger_retargeted : int
   }
 
 type time = Time.Span.t
@@ -113,6 +116,8 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
       ~equal:(fun (hash1, _, _) (hash2, _, _) -> State_hash.equal hash1 hash2)
   with
   | `New ->
+      t.num_of_root_snarked_ledger_retargeted <-
+        t.num_of_root_snarked_ledger_retargeted + 1 ;
       `Syncing_new_snarked_ledger
   | `Update_data ->
       `Updating_root_transition
@@ -184,6 +189,7 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
             ; ( "external_transition"
               , Mina_block.to_yojson (With_hash.data transition) )
             ] ;
+
         Deferred.ignore_m
         @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
              transition )
@@ -258,6 +264,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           ; precomputed_values
           ; best_seen_transition = initial_root_transition
           ; current_root = initial_root_transition
+          ; num_of_root_snarked_ledger_retargeted = 0
           }
         in
         let transition_graph = Transition_cache.create () in
@@ -294,6 +301,12 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
              Sync_ledger.Db.destroy root_sync_ledger ;
              data )
         in
+        Mina_metrics.(
+          Counter.inc Bootstrap.root_snarked_ledger_sync_ms
+            Time.Span.(to_ms sync_ledger_time)) ;
+        Mina_metrics.(
+          Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
+            (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
         let%bind ( staged_ledger_data_download_time
                  , staged_ledger_construction_time
                  , staged_ledger_aux_result ) =
@@ -386,10 +399,22 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                   time_deferred
                     (let open Deferred.Let_syntax in
                     let temp_mask = Ledger.of_database temp_snarked_ledger in
+                    (*TODO: is "snarked_local_state" passed here really snarked?*)
+                    let `Needs_some_work_for_zkapps_on_mainnet =
+                      Mina_base.Util.todo_zkapps
+                    in
                     let%map result =
                       Staged_ledger
                       .of_scan_state_pending_coinbases_and_snarked_ledger
-                        ~logger ~verifier ~constraint_constants ~scan_state
+                        ~logger
+                        ~snarked_local_state:
+                          Mina_block.(
+                            t.current_root |> Validation.block |> header
+                            |> Header.protocol_state
+                            |> Protocol_state.blockchain_state
+                            |> Blockchain_state.registers
+                            |> Registers.local_state)
+                        ~verifier ~constraint_constants ~scan_state
                         ~snarked_ledger:temp_mask ~expected_merkle_root
                         ~pending_coinbases ~get_state
                     in
@@ -529,10 +554,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 (* Close the old frontier and reload a new on from disk. *)
                 let new_root_data : Transition_frontier.Root_data.Limited.t =
                   Transition_frontier.Root_data.Limited.create
-                    ~transition:
-                      Mina_block.(
-                        External_transition.Validated.lift
-                        @@ Validated.lift new_root)
+                    ~transition:(Mina_block.Validated.lift new_root)
                     ~scan_state ~pending_coinbase ~protocol_states
                 in
                 let%bind () =
@@ -690,6 +712,7 @@ let%test_module "Bootstrap_controller tests" =
       ; best_seen_transition = transition
       ; current_root = transition
       ; network
+      ; num_of_root_snarked_ledger_retargeted = 0
       }
 
     let%test_unit "Bootstrap controller caches all transitions it is passed \
@@ -806,10 +829,7 @@ let%test_module "Bootstrap_controller tests" =
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :
           Mina_block.initial_valid_block Envelope.Incoming.t list ) =
-      let root =
-        With_hash.data @@ fst
-        @@ Transition_frontier.Breadcrumb.validated_transition root
-      in
+      let root = Transition_frontier.Breadcrumb.block root in
       ignore
         ( List.fold_result ~init:root incoming_transitions
             ~f:(fun max_acc incoming_transition ->
@@ -894,6 +914,12 @@ let%test_module "Bootstrap_controller tests" =
                 Transition_frontier.root_snarked_ledger frontier
                 |> Ledger.of_database
               in
+              let snarked_local_state =
+                Transition_frontier.root frontier
+                |> Transition_frontier.Breadcrumb.protocol_state
+                |> Protocol_state.blockchain_state |> Blockchain_state.registers
+                |> Registers.local_state
+              in
               let scan_state = Staged_ledger.scan_state staged_ledger in
               let get_state hash =
                 match Transition_frontier.find_protocol_state frontier hash with
@@ -911,8 +937,8 @@ let%test_module "Bootstrap_controller tests" =
               let%map actual_staged_ledger =
                 Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
                   ~scan_state ~logger ~verifier ~constraint_constants
-                  ~snarked_ledger ~expected_merkle_root ~pending_coinbases
-                  ~get_state
+                  ~snarked_ledger ~snarked_local_state ~expected_merkle_root
+                  ~pending_coinbases ~get_state
                 |> Deferred.Or_error.ok_exn
               in
               assert (
@@ -943,7 +969,7 @@ let%test_module "Bootstrap_controller tests" =
             ~data:
               ( Transition_frontier.best_tip weaker_chain.state.frontier
               |> Transition_frontier.Breadcrumb.validated_transition
-              |> External_transition.Validated.to_initial_validated )
+              |> Mina_block.Validated.to_initial_validated )
             ~sender:
               (Envelope.Sender.Remote
                  (weaker_chain.peer.host, weaker_chain.peer.peer_id))
@@ -952,7 +978,7 @@ let%test_module "Bootstrap_controller tests" =
             ~data:
               ( Transition_frontier.best_tip stronger_chain.state.frontier
               |> Transition_frontier.Breadcrumb.validated_transition
-              |> External_transition.Validated.to_initial_validated )
+              |> Mina_block.Validated.to_initial_validated )
             ~sender:
               (Envelope.Sender.Remote
                  (stronger_chain.peer.host, stronger_chain.peer.peer_id))

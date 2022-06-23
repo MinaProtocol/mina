@@ -17,25 +17,22 @@ module Checked = struct
 
   let in_seed_update_range ~(constants : Constants.var) (slot : var) =
     let open Tick in
-    let open Snarky_integer in
     let module Length = Mina_numbers.Length in
-    let integer_mul i i' = make_checked (fun () -> Integer.mul ~m i i') in
-    let to_integer = Length.Checked.to_integer in
-    let%bind third_epoch =
-      make_checked (fun () ->
-          let q, r =
-            Integer.div_mod ~m
-              (to_integer constants.slots_per_epoch)
-              (Integer.constant ~m (Bignum_bigint.of_int 3))
-          in
-          Tick.Run.Boolean.Assert.is_true
-            (Integer.equal ~m r (Integer.constant ~m Bignum_bigint.zero)) ;
-          q )
+    let constant c =
+      Length.Checked.Unsafe.of_field (Field.Var.constant (Field.of_int c))
     in
-    let two = Integer.constant ~m (Bignum_bigint.of_int 2) in
-    let%bind ck_times_2 = integer_mul third_epoch two in
-    make_checked (fun () ->
-        Integer.lt ~m (T.Checked.to_integer slot) ck_times_2 )
+    let%bind third_epoch =
+      let%bind q, r =
+        Length.Checked.div_mod constants.slots_per_epoch (constant 3)
+      in
+      let%map () = Length.Checked.Assert.equal r (constant 0) in
+      q
+    in
+    let two = constant 2 in
+    let%bind ck_times_2 = Length.Checked.mul third_epoch two in
+    Length.Checked.( < )
+      (Length.Checked.Unsafe.of_field (T.Checked.to_field slot))
+      ck_times_2
 end
 
 let gen (constants : Constants.t) =
