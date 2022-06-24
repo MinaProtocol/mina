@@ -14,7 +14,6 @@
    async_unix
    ;; local libraries
    currency
-   mina_base.import
    graphql_lib
    signature_lib
    mina_base
