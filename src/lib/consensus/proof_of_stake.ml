@@ -4487,8 +4487,7 @@ let%test_module "Proof of stake tests" =
                    vrfs & different hashes" =
       Quickcheck.test
         (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
-           ~vrf_output_relativity:`Equal () )
-        ~f:(fun (a, b) ->
+           ~vrf_output_relativity:`Equal () ) ~f:(fun (a, b) ->
           if
             State_hash.(
               With_state_hashes.state_hash b > With_state_hashes.state_hash a)

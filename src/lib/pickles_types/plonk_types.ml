@@ -691,8 +691,7 @@ module Messages = struct
     let lookup =
       Lookup.opt_typ
         (module Impl)
-        ~lookup ~runtime ~dummy:[| dummy |]
-        (wo [ 1 ])
+        ~lookup ~runtime ~dummy:[| dummy |] (wo [ 1 ])
     in
     of_hlistable
       [ Vector.typ (wo w_lens) Columns.n; wo [ z ]; wo [ t ]; lookup ]

@@ -41,9 +41,7 @@ struct
   let of_deferred (deferred : unit Deferred.t) =
     let var = Var.create `Empty in
     don't_wait_for
-      (Deferred.map deferred ~f:(fun () ->
-           Var.set var `Filled ;
-           stabilize () ) ) ;
+      (Deferred.map deferred ~f:(fun () -> Var.set var `Filled ; stabilize ())) ;
     var
 
   let of_ivar (ivar : unit Ivar.t) = of_deferred (Ivar.read ivar)

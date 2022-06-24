@@ -129,7 +129,8 @@ module Merge = struct
       module V1 = struct
         type 'merge t =
           | Empty
-          | Part of 'merge (*When only the left component of the job is available since we always complete the jobs from left to right*)
+          | Part of 'merge
+            (*When only the left component of the job is available since we always complete the jobs from left to right*)
           | Full of 'merge Record.Stable.V1.t
         [@@deriving sexp]
       end

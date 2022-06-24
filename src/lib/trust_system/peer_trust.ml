@@ -366,8 +366,7 @@ let%test_module "peer_trust" =
             let%map () = act_constant_rate db 1.1 Action.Slow_punish in
             match Peer_trust_test.lookup_ip db peer0 with
             | [ (_, { banned = Banned_until _; _ }) ] ->
-                assert_ban_pipe [ 0 ] ;
-                true
+                assert_ban_pipe [ 0 ] ; true
             | [ (_, { banned = Unbanned; _ }) ] ->
                 false
             | _ ->
@@ -408,8 +407,7 @@ let%test_module "peer_trust" =
             let%map () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
             match Peer_trust_test.lookup_ip db peer0 with
             | [ (_, { trust = -1.0; banned = Banned_until _ }) ] ->
-                assert_ban_pipe [ 0 ] ;
-                true
+                assert_ban_pipe [ 0 ] ; true
             | [ (_, { banned = Banned_until _; _ }) ] ->
                 failwith "Trust not set to -1"
             | [ (_, { banned = Unbanned; _ }) ] ->

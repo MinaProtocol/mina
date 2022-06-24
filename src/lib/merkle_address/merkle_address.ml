@@ -247,17 +247,15 @@ module Range = struct
 
   let subtree_range_seq ~ledger_depth address =
     let first_node, last_node = subtree_range ~ledger_depth address in
-    Sequence.unfold
-      ~init:(first_node, `Don't_stop)
-      ~f:(function
-        | _, `Stop ->
-            None
-        | current_node, `Don't_stop ->
-            if compare current_node last_node = 0 then
-              Some (current_node, (current_node, `Stop))
-            else
-              Option.map (next current_node) ~f:(fun next_node ->
-                  (current_node, (next_node, `Don't_stop)) ) )
+    Sequence.unfold ~init:(first_node, `Don't_stop) ~f:(function
+      | _, `Stop ->
+          None
+      | current_node, `Don't_stop ->
+          if compare current_node last_node = 0 then
+            Some (current_node, (current_node, `Stop))
+          else
+            Option.map (next current_node) ~f:(fun next_node ->
+                (current_node, (next_node, `Don't_stop)) ) )
 end
 
 let%test "Bitstring bin_io serialization does not change" =

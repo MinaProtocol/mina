@@ -3510,7 +3510,7 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( ({ authorization = a1; _ }
+    | ( ( { authorization = a1; _ }
         :: ({ authorization = Proof _; _ } :: _ as parties) )
         :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -3531,8 +3531,9 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( ({ authorization = (Signature _ | None_given) as a1; _ }
-        :: { authorization = (Signature _ | None_given) as a2; _ } :: parties )
+    | ( ( { authorization = (Signature _ | None_given) as a1; _ }
+        :: { authorization = (Signature _ | None_given) as a2; _ }
+        :: parties )
         :: partiess
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
@@ -3546,9 +3547,9 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~before ~after
           :: acc )
     | ( []
-        :: ({ authorization = a1; _ }
+        :: ( { authorization = a1; _ }
            :: ({ authorization = Proof _; _ } :: _ as parties) )
-           :: partiess
+        :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party is in the next transaction, and the next party contains a
            proof, don't pair it with this party.
@@ -3559,10 +3560,10 @@ let group_by_parties_rev (partiess : Party.t list list)
               ~before ~after
           :: acc )
     | ( []
-        :: ({ authorization = (Signature _ | None_given) as a1; _ }
-           :: { authorization = (Signature _ | None_given) as a2; _ } :: parties
-           )
-           :: partiess
+        :: ( { authorization = (Signature _ | None_given) as a1; _ }
+           :: { authorization = (Signature _ | None_given) as a2; _ }
+           :: parties )
+        :: partiess
       , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next two parties do not contain proofs, and are within the same
            new transaction. Pair them.
@@ -3576,7 +3577,7 @@ let group_by_parties_rev (partiess : Party.t list list)
           :: acc )
     | ( [ { authorization = (Signature _ | None_given) as a1; _ } ]
         :: ({ authorization = (Signature _ | None_given) as a2; _ } :: parties)
-           :: partiess
+        :: partiess
       , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
       ->
         (* The next two parties do not contain proofs, and the second is within
@@ -3591,7 +3592,7 @@ let group_by_parties_rev (partiess : Party.t list list)
           :: acc )
     | ( []
         :: ({ authorization = a1; _ } :: parties)
-           :: (({ authorization = Proof _; _ } :: _) :: _ as partiess)
+        :: (({ authorization = Proof _; _ } :: _) :: _ as partiess)
       , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
         (* The next transaction contains a proof, and this party is in a new
            transaction, don't pair it with the next party.
@@ -3603,12 +3604,12 @@ let group_by_parties_rev (partiess : Party.t list list)
           :: acc )
     | ( []
         :: [ { authorization = (Signature _ | None_given) as a1; _ } ]
-           :: ({ authorization = (Signature _ | None_given) as a2; _ }
-              :: parties )
-              :: partiess
+        :: ({ authorization = (Signature _ | None_given) as a2; _ } :: parties)
+        :: partiess
       , [ _ ]
-        :: [ before; _after1 ] :: (_before2 :: (after :: _ as stmts)) :: stmtss
-      ) ->
+        :: [ before; _after1 ]
+        :: (_before2 :: (after :: _ as stmts))
+        :: stmtss ) ->
         (* The next two parties do not contain proofs, the first is within a
            new transaction, and the second is within another new transaction.
            Pair them.
@@ -3895,7 +3896,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
                    , `Pending_coinbase_of_statement
                        pending_coinbase_stack_state2
                    , parties2 )
-                   :: rest ->
+                :: rest ->
                   let commitment', full_commitment' =
                     mk_next_commitments parties2.parties
                   in

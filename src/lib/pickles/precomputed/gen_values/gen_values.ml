@@ -27,8 +27,7 @@ let max_public_input_size = 128
 
 let vesta =
   let max_domain_log2 = Nat.to_int Vesta_based_plonk.Rounds.n in
-  List.map
-    (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
+  List.map (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
     ~f:(fun d ->
       let domain_size = 1 lsl d in
       let n = Int.min max_public_input_size domain_size in
@@ -42,8 +41,7 @@ let vesta =
 
 let pallas =
   let max_domain_log2 = Nat.to_int Pallas_based_plonk.Rounds.n in
-  List.map
-    (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
+  List.map (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
     ~f:(fun d ->
       let domain_size = 1 lsl d in
       let n = Int.min max_public_input_size domain_size in

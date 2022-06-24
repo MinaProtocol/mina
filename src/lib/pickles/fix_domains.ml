@@ -17,11 +17,8 @@ let rough_domains : Domains.t =
 let domains (type field rust_gates)
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type field = field
-       and type R1CS_constraint_system.t = ( field
-                                           , rust_gates )
-                                           Kimchi_backend_common
-                                           .Plonk_constraint_system
-                                           .t )
+       and type R1CS_constraint_system.t =
+         (field, rust_gates) Kimchi_backend_common.Plonk_constraint_system.t )
     (Spec.ETyp.T (typ, conv, _conv_inv))
     (Spec.ETyp.T (return_typ, _ret_conv, ret_conv_inv)) main =
   let main x () = ret_conv_inv (main (conv x)) in

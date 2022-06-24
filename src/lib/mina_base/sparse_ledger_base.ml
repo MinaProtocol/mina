@@ -82,8 +82,7 @@ module L = struct
         ; token_id = Account_id.token_id id
         }
       in
-      set t loc account' ;
-      (`Added, account', loc) )
+      set t loc account' ; (`Added, account', loc) )
     else (`Existed, account, loc)
 
   let get_or_create t id = Or_error.try_with (fun () -> get_or_create_exn t id)
@@ -95,8 +94,7 @@ module L = struct
         let loc = M.find_index_exn !t id in
         let a = M.get_exn !t loc in
         if Public_key.Compressed.(equal empty a.public_key) then (
-          set t loc to_set ;
-          (`Added, loc) )
+          set t loc to_set ; (`Added, loc) )
         else (`Existed, loc) )
 
   let create_new_account t id to_set =

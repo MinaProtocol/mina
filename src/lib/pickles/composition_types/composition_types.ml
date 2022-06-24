@@ -634,15 +634,9 @@ module Wrap = struct
             ; index
             ] : _ t =
         let open Vector in
-        let (combined_inner_product
-            :: b
-               :: zeta_to_srs_length
-                  :: zeta_to_domain_size
-                     :: poseidon_selector
-                        :: vbmul
-                           :: complete_add
-                              :: endomul :: endomul_scalar :: perm :: generic )
-            =
+        let ( combined_inner_product :: b :: zeta_to_srs_length
+            :: zeta_to_domain_size :: poseidon_selector :: vbmul :: complete_add
+            :: endomul :: endomul_scalar :: perm :: generic ) =
           fp
         in
         let [ beta; gamma ] = challenge in
@@ -890,15 +884,10 @@ module Step = struct
         let of_data
             Hlist.HlistId.
               [ Vector.(
-                  combined_inner_product
-                  :: b
-                     :: zeta_to_srs_length
-                        :: zeta_to_domain_size
-                           :: poseidon_selector
-                              :: vbmul
-                                 :: complete_add
-                                    :: endomul
-                                       :: endomul_scalar :: perm :: generic)
+                  combined_inner_product :: b :: zeta_to_srs_length
+                  :: zeta_to_domain_size :: poseidon_selector :: vbmul
+                  :: complete_add :: endomul :: endomul_scalar :: perm
+                  :: generic)
               ; Vector.[ sponge_digest_before_evaluations ]
               ; Vector.[ beta; gamma ]
               ; Vector.[ alpha; zeta; xi ]
