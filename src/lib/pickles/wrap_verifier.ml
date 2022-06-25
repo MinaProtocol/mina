@@ -190,6 +190,7 @@ struct
       |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
       |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
 
+  (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
       ~domain:
         ( (which_branch : n One_hot_vector.t)
@@ -203,6 +204,26 @@ struct
         | [| g |] ->
             let g = Inner_curve.Constant.of_affine g in
             Inner_curve.constant g
+        | _ ->
+            assert false )
+    |> Vector.map2
+         (which_branch :> (Boolean.var, n) Vector.t)
+         ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
+    |> Vector.reduce_exn ~f:(Double.map2 ~f:Field.( + ))
+
+  let scaled_lagrange (type n) c
+      ~domain:
+        ( (which_branch : n One_hot_vector.t)
+        , (domains : (Domains.t, n) Vector.t) ) i =
+    Vector.map domains ~f:(fun d ->
+        let d =
+          Precomputed.Lagrange_precomputations.index_of_domain_log2
+            (Domain.log2_size d.h)
+        in
+        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
+        | [| g |] ->
+            let g = Inner_curve.Constant.of_affine g in
+            Inner_curve.Constant.scale g c |> Inner_curve.constant
         | _ ->
             assert false )
     |> Vector.map2
@@ -472,13 +493,6 @@ struct
       ~(messages : _ Messages.In_circuit.t) ~which_branch ~openings_proof
       ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t) =
     let T = Max_proofs_verified.eq in
-    let public_input =
-      Array.concat_map public_input ~f:(function
-        | `Field (x, b) ->
-            [| (x, Field.size_in_bits); ((b :> Field.t), 1) |]
-        | `Packed_bits (x, n) ->
-            [| (x, n) |] )
-    in
     let sg_old =
       with_label __LOC__ (fun () ->
           Vector.map2 actual_proofs_verified_mask sg_old ~f:(fun keep sg ->
@@ -491,26 +505,52 @@ struct
         in
         let open Plonk_types.Messages in
         let x_hat =
+          let domain = (which_branch, step_domains) in
+          let public_input =
+            Array.concat_map public_input ~f:(function
+              | `Field (x, b) ->
+                  [| `Field (x, Field.size_in_bits)
+                   ; `Field ((b :> Field.t), 1)
+                  |]
+              | `Packed_bits (x, n) ->
+                  [| `Field (x, n) |] )
+          in
+          let constant_part, non_constant_part =
+            List.partition_map
+              Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
+              ~f:(fun (i, t) ->
+                match t with
+                | `Field (Constant c, _) ->
+                    First
+                      ( if Field.Constant.(equal zero) c then None
+                      else if Field.Constant.(equal one) c then
+                        Some (lagrange ~domain i)
+                      else
+                        Some
+                          (scaled_lagrange ~domain
+                             (Inner_curve.Constant.Scalar.project
+                                (Field.Constant.unpack c) )
+                             i ) )
+                | `Field x ->
+                    Second (i, x) )
+          in
           with_label __LOC__ (fun () ->
-              let domain = (which_branch, step_domains) in
               let terms =
-                with_label __LOC__ (fun () ->
-                    Array.mapi public_input ~f:(fun i x ->
-                        match x with
-                        | b, 1 ->
-                            assert_ (Constraint.boolean (b :> Field.t)) ;
-                            `Cond_add
-                              (Boolean.Unsafe.of_cvar b, lagrange ~domain i)
-                        | x, n ->
-                            `Add_with_correction
-                              ( (x, n)
-                              , lagrange_with_correction ~input_length:n ~domain
-                                  i ) ) )
+                List.map non_constant_part ~f:(fun (i, x) ->
+                    match x with
+                    | b, 1 ->
+                        assert_ (Constraint.boolean (b :> Field.t)) ;
+                        `Cond_add (Boolean.Unsafe.of_cvar b, lagrange ~domain i)
+                    | x, n ->
+                        `Add_with_correction
+                          ( (x, n)
+                          , lagrange_with_correction ~input_length:n ~domain i
+                          ) )
               in
               let correction =
                 with_label __LOC__ (fun () ->
-                    Array.reduce_exn
-                      (Array.filter_map terms ~f:(function
+                    List.reduce_exn
+                      (List.filter_map terms ~f:(function
                         | `Cond_add _ ->
                             None
                         | `Add_with_correction (_, (_, corr)) ->
@@ -518,7 +558,12 @@ struct
                       ~f:Ops.add_fast )
               in
               with_label __LOC__ (fun () ->
-                  Array.foldi terms ~init:correction ~f:(fun i acc term ->
+                  let init =
+                    List.fold
+                      (List.filter_map ~f:Fn.id constant_part)
+                      ~init:correction ~f:Ops.add_fast
+                  in
+                  List.foldi terms ~init ~f:(fun i acc term ->
                       match term with
                       | `Cond_add (b, g) ->
                           with_label __LOC__ (fun () ->

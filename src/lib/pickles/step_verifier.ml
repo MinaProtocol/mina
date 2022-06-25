@@ -129,8 +129,33 @@ struct
       if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
     in
     with_label __LOC__ (fun () ->
+        let constant_part, non_constant_part =
+          List.partition_map (Array.to_list ts) ~f:(fun (t, g) ->
+              match t with
+              | `Field (Constant c) | `Packed_bits (Constant c, _) ->
+                  First
+                    ( if Field.Constant.(equal zero) c then None
+                    else if Field.Constant.(equal one) c then Some g
+                    else
+                      Some
+                        (Inner_curve.Constant.scale g
+                           (Inner_curve.Constant.Scalar.project
+                              (Field.Constant.unpack c) ) ) )
+              | `Field x ->
+                  Second (`Field x, g)
+              | `Packed_bits (x, n) ->
+                  Second (`Packed_bits (x, n), g) )
+        in
+        let add_opt xo y =
+          Option.value_map xo ~default:y ~f:(fun x ->
+              Inner_curve.Constant.( + ) x y )
+        in
+        let constant_part =
+          List.filter_map constant_part ~f:Fn.id
+          |> List.fold ~init:None ~f:(fun acc x -> Some (add_opt acc x))
+        in
         let correction, acc =
-          Array.mapi ts ~f:(fun i (s, x) ->
+          List.mapi non_constant_part ~f:(fun i (s, x) ->
               let rr, n =
                 match s with
                 | `Packed_bits (s, n) ->
@@ -149,10 +174,11 @@ struct
               in
               let cc = pow2pow x n in
               (cc, rr) )
-          |> Array.reduce_exn ~f:(fun (a1, b1) (a2, b2) ->
+          |> List.reduce_exn ~f:(fun (a1, b1) (a2, b2) ->
                  (Inner_curve.Constant.( + ) a1 a2, Inner_curve.( + ) b1 b2) )
         in
-        Inner_curve.(acc + constant (Constant.negate correction)) )
+        Inner_curve.(
+          acc + constant (Constant.negate correction |> add_opt constant_part)) )
 
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (Sponge.squeeze sponge) ~constrain_low_bits:true
@@ -345,7 +371,9 @@ struct
   open Tuple_lib
 
   let public_input_commitment_dynamic (type n) (which : n O.t)
-      (domains : (Domains.t, n) Vector.t) ~public_input =
+      (domains : (Domains.t, n) Vector.t)
+      ~(public_input :
+         [ `Field of Field.t | `Packed_bits of Field.t * int ] array ) =
     (*
     let domains : (Domains.t, Nat.N3.n) Vector.t =
       Vector.map ~f:(fun proofs_verified -> Common.wrap_domains ~proofs_verified)
@@ -405,8 +433,31 @@ struct
           [ g; negate (pow2pow g actual_shift) ] )
     in
     let x_hat =
+      let constant_part, non_constant_part =
+        List.partition_map
+          (Array.to_list (Array.mapi ~f:(fun i t -> (i, t)) public_input))
+          ~f:(fun (i, t) ->
+            match t with
+            | `Field (Constant c) | `Packed_bits (Constant c, _) ->
+                First
+                  ( if Field.Constant.(equal zero) c then None
+                  else if Field.Constant.(equal one) c then Some (lagrange i)
+                  else
+                    Some
+                      ( select_curve_points ~points_for_domain:(fun d ->
+                            [ Inner_curve.Constant.scale
+                                (lagrange_commitment d i)
+                                (Inner_curve.Constant.Scalar.project
+                                   (Field.Constant.unpack c) )
+                            ] )
+                      |> Vector.unsingleton ) )
+            | `Field x ->
+                Second (i, (x, Public_input_scalar.Constant.size_in_bits))
+            | `Packed_bits (x, n) ->
+                Second (i, (x, n)) )
+      in
       let terms =
-        Array.mapi public_input ~f:(fun i x ->
+        List.map non_constant_part ~f:(fun (i, x) ->
             match x with
             | b, 1 ->
                 assert_ (Constraint.boolean (b :> Field.t)) ;
@@ -416,15 +467,20 @@ struct
                   ((x, n), lagrange_with_correction ~input_length:n i) )
       in
       let correction =
-        Array.reduce_exn
-          (Array.filter_map terms ~f:(function
+        List.reduce_exn
+          (List.filter_map terms ~f:(function
             | `Cond_add _ ->
                 None
             | `Add_with_correction (_, [ _; corr ]) ->
                 Some corr ) )
           ~f:Ops.add_fast
       in
-      Array.foldi terms ~init:correction ~f:(fun i acc term ->
+      let init =
+        List.fold
+          (List.filter_map constant_part ~f:Fn.id)
+          ~init:correction ~f:Ops.add_fast
+      in
+      List.fold terms ~init ~f:(fun acc term ->
           match term with
           | `Cond_add (b, g) ->
               with_label __LOC__ (fun () ->
@@ -475,12 +531,7 @@ struct
                        ~f:(fun proofs_verified ->
                          Common.wrap_domains ~proofs_verified )
                        [ 0; 1; 2 ] )
-                    ~public_input:
-                      (Array.map public_input ~f:(function
-                        | `Field x ->
-                            (x, Public_input_scalar.Constant.size_in_bits)
-                        | `Packed_bits (b, n) ->
-                            (b, n) ) ) )
+                    ~public_input )
         in
         let without = Type.Without_degree_bound in
         let absorb_g gs = absorb sponge without gs in
