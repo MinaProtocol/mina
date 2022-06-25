@@ -780,6 +780,7 @@ struct
         ( _
         , _
         , _ Shifted_value.Type2.t
+        , _
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -814,7 +815,9 @@ struct
     let r = scalar_to_field (SC.SC.create r_actual) in
     let plonk = map_plonk_to_field plonk in
     let zetaw = Field.mul domain#generator plonk.zeta in
-    let plonk_minimal = Plonk.to_minimal plonk in
+    let plonk_minimal =
+      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option
+    in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
       (* TODO: zeta_n is recomputed in [env] below *)
@@ -833,7 +836,7 @@ struct
         ~field_of_hex:(fun s ->
           Kimchi_pasta.Pasta.Bigint256.of_hex_string s
           |> Kimchi_pasta.Pasta.Fq.of_bigint |> Field.constant )
-        ~domain (Plonk.to_minimal plonk) combined_evals
+        ~domain plonk_minimal combined_evals
     in
     let combined_inner_product_correct =
       let evals1, evals2 =

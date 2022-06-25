@@ -66,7 +66,7 @@ module Make (A : T0) (A_value : T0) = struct
     let t =
       Fix_domains.domains
         (module Impls.Wrap)
-        (Impls.Wrap.input ())
+        (Impls.Wrap.input ~lookup)
         (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
         main
     in

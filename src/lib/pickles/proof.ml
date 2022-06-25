@@ -147,6 +147,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                     ; beta = chal ()
                     ; gamma = chal ()
                     ; zeta = scalar_chal ()
+                    ; joint_combiner = None
                     }
                 }
             ; sponge_digest_before_evaluations =

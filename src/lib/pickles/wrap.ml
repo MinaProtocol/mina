@@ -173,6 +173,7 @@ let wrap
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
       prev_statement_with_hashes
+      ~lookup:{ zero = Common.Lookup_config.tick_zero; use = Yes }
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges
@@ -372,7 +373,22 @@ let wrap
     P.Base.Me_only.Wrap.prepare next_statement.proof_state.me_only
   in
   let%map.Promise next_proof =
-    let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
+    let (T (input, conv, _conv_inv)) =
+      Impls.Wrap.input
+        ~lookup:
+          { zero =
+              { value =
+                  { challenge = Challenge.Constant.zero
+                  ; scalar = Shifted_value Tick.Field.zero
+                  }
+              ; var =
+                  { challenge = Impls.Wrap.Field.zero
+                  ; scalar = Shifted_value Impls.Wrap.Field.zero
+                  }
+              }
+          ; use = No
+          }
+    in
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
@@ -400,11 +416,21 @@ let wrap
                 me_only =
                   Wrap_hack.hash_dlog_me_only max_proofs_verified
                     me_only_prepared
+              ; deferred_values =
+                  { next_statement.proof_state.deferred_values with
+                    plonk =
+                      { next_statement.proof_state.deferred_values.plonk with
+                        lookup =
+                          (* TODO: This assumes wrap circuits do not use lookup *)
+                          None
+                      }
+                  }
               }
           } )
   in
   ( { proof = next_proof
-    ; statement = Types.Wrap.Statement.to_minimal next_statement
+    ; statement =
+        Types.Wrap.Statement.to_minimal next_statement ~to_option:Opt.to_option
     ; prev_evals =
         { Plonk_types.All_evals.evals =
             { public_input = x_hat; evals = proof.openings.evals }

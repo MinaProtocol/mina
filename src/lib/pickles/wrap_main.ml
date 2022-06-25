@@ -84,12 +84,12 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_proofs_verified t =
-  with_label __LOC__ (fun () ->
-      Spec.pack
-        (module Impl)
-        (Types.Step.Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
-        (Types.Step.Statement.to_data t) )
+let pack_statement max_proofs_verified ~lookup t =
+  let open Types.Step in
+  Spec.pack
+    (module Impl)
+    (Statement.spec max_proofs_verified Backend.Tock.Rounds.n lookup)
+    (Statement.to_data t ~option_map:Plonk_types.Opt.map)
 
 let shifts ~log2_size =
   Common.tock_shifts ~log2_size |> Plonk_types.Shifts.map ~f:Impl.Field.constant
@@ -134,6 +134,9 @@ let lookup_config = { Plonk_types.Lookup_config.lookup = No; runtime = No }
 let commitment_lookup_config =
   { Plonk_types.Lookup_config.lookup = No; runtime = No }
 
+let lookup_config_for_pack =
+  { Types.Wrap.Lookup_config.zero = Common.Lookup_config.tock_zero; use = No }
+
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss prev_valuess env
@@ -155,6 +158,7 @@ let wrap_main
     * (   ( _
           , _
           , _ Shifted_value.Type1.t
+          , _
           , _
           , _
           , _
@@ -194,6 +198,7 @@ let wrap_main
         ( _
         , _
         , _ Shifted_value.Type1.t
+        , _
         , _
         , _
         , _
@@ -239,9 +244,12 @@ let wrap_main
           with_label __LOC__ (fun () ->
               let open Types.Step.Proof_state in
               let typ =
-                typ ~assert_16_bits:(assert_n_bits ~n:16)
+                typ
                   (module Impl)
-                  Max_proofs_verified.n
+                  Common.Lookup_config.tock_zero
+                  ~assert_16_bits:(assert_n_bits ~n:16)
+                  (Vector.init Max_proofs_verified.n ~f:(fun _ ->
+                       Plonk_types.Opt.Flag.No ) )
                   (Shifted_value.Type2.typ Field.typ)
               in
               exists typ ~request:(fun () -> Req.Proof_state) )
@@ -454,7 +462,8 @@ let wrap_main
                 ~verification_key:step_plonk_index ~xi ~sponge
                 ~public_input:
                   (Array.map
-                     (pack_statement Max_proofs_verified.n prev_statement)
+                     (pack_statement Max_proofs_verified.n
+                        ~lookup:lookup_config_for_pack prev_statement )
                      ~f:(function
                     | `Field (Shifted_value x) ->
                         `Field (split_field x)

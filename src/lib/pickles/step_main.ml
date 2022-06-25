@@ -71,13 +71,30 @@ let verify_one
             ; old_bulletproof_challenges = prev_challenges
             } )
     in
+    let proof_state =
+      { proof_state with
+        deferred_values =
+          { proof_state.deferred_values with
+            plonk =
+              { proof_state.deferred_values.plonk with
+                lookup =
+                  Plonk_types.Opt.map proof_state.deferred_values.plonk.lookup
+                    ~f:
+                      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+                      .Lookup
+                      .to_struct
+              }
+          }
+      }
+    in
     { Types.Wrap.Statement.pass_through = prev_me_only
     ; proof_state = { proof_state with me_only = pass_through }
     }
   in
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
+        verify ~lookup_config:{ zero; use }
+          ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
           ~is_base_case:(Boolean.not should_verify)
           ~sg_old:prev_challenge_polynomial_commitments ~proof:wrap_proof
           ~wrap_verification_key:d.wrap_key statement unfinalized )
@@ -198,7 +215,7 @@ let step_main :
       | [], [], [], Z, Z, Z ->
           []
       | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->
-          let t = Per_proof_witness.typ Typ.unit n1 n2 in
+          let t = Per_proof_witness.typ Typ.unit n1 n2 ~lookup in
           t :: join ds ns1 ns2 ld ln1 ln2
       | [], _, _, _, _, _ ->
           .
@@ -259,7 +276,7 @@ let step_main :
         and unfinalized_proofs =
           exists
             (Vector.typ
-               (Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n)
+               (Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup)
                Max_proofs_verified.n )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and pass_through =

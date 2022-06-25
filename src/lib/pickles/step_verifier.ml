@@ -508,7 +508,8 @@ struct
       ~(plonk :
          ( _
          , _
-         , _ Shifted_value.Type2.t )
+         , _ Shifted_value.Type2.t
+         , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
         let receive ty f =
@@ -860,6 +861,7 @@ struct
         , Field.t Shifted_value.Type1.t
         , _
         , _
+        , _
         , Field.Constant.t Branch_data.Checked.t )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -905,7 +907,7 @@ struct
     let zetaw = Field.mul domain#generator plonk.zeta in
     let xi = scalar xi in
     let r = scalar (SC.SC.create r_actual) in
-    let plonk_minimal = Plonk.to_minimal plonk in
+    let plonk_minimal = Plonk.to_minimal plonk ~to_option:Opt.to_option in
     let combined_evals =
       let n = Int.ceil_log2 Max_degree.step in
       let zeta_n : Field.t = pow2_pow plonk.zeta n in
@@ -1101,13 +1103,14 @@ struct
       proof new_accumulator : Boolean.var =
     Boolean.false_
 
-  let verify ~proofs_verified ~is_base_case ~sg_old
+  let verify ~proofs_verified ~is_base_case ~sg_old ~lookup_config
       ~(proof : Wrap_proof.Checked.t) ~wrap_domain ~wrap_verification_key
       statement
       (unfinalized :
         ( _
         , _
         , _ Shifted_value.Type2.t
+        , _
         , _
         , _
         , _ )
@@ -1117,8 +1120,9 @@ struct
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            Types.Wrap.Statement.In_circuit.spec
-            (Types.Wrap.Statement.In_circuit.to_data statement) )
+            (Types.Wrap.Statement.In_circuit.spec lookup_config)
+            (Types.Wrap.Statement.In_circuit.to_data
+               ~option_map:Plonk_types.Opt.map statement ) )
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
                `Field x
