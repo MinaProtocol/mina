@@ -87,6 +87,37 @@ module Shifts = struct
     Shifted_value.Type2.Shift.create (module Tick.Field)
 end
 
+module Lookup_config = struct
+  let tick_zero : _ Composition_types.Zero_values.t =
+    { value =
+        { challenge = Challenge.Constant.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+        }
+    ; var =
+        { challenge = Impls.Step.Field.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value
+              (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
+        }
+    }
+
+  let tock_zero : _ Composition_types.Zero_values.t =
+    { value =
+        { challenge = Challenge.Constant.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+        }
+    ; var =
+        { challenge = Impls.Wrap.Field.zero
+        ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
+        }
+    }
+
+  let tick ~lookup:flag : _ Composition_types.Wrap.Lookup_config.t =
+    { use = No; zero = tick_zero }
+end
+
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
   | Finite (x, y) ->
       (x, y)
@@ -167,9 +198,9 @@ module Ipa = struct
   end
 end
 
-let tock_unpadded_public_input_of_statement prev_statement =
+let tock_unpadded_public_input_of_statement prev_statement ~lookup =
   let input =
-    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
+    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input ~lookup in
     Impls.Wrap.generate_public_input [ typ ] prev_statement
   in
   List.init
@@ -178,12 +209,12 @@ let tock_unpadded_public_input_of_statement prev_statement =
 
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_proofs_verified
+let tick_public_input_of_statement ~max_proofs_verified ~lookup
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n
+        ~wrap_rounds:Tock.Rounds.n ~lookup
     in
     Impls.Step.generate_public_input [ input ] prev_statement
   in
