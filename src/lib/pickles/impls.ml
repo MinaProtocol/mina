@@ -128,9 +128,9 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds =
+  let input ~proofs_verified ~wrap_rounds ~lookup =
     let open Types.Step.Statement in
-    let spec = spec proofs_verified wrap_rounds in
+    let spec = spec proofs_verified wrap_rounds lookup in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
@@ -142,8 +142,15 @@ module Step = struct
            , Fn.id ) )
         spec
     in
-    let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+    let typ =
+      Typ.transport typ
+        ~there:(to_data ~option_map:Option.map)
+        ~back:(of_data ~option_map:Option.map)
+    in
+    Spec.ETyp.T
+      ( typ
+      , (fun x -> of_data ~option_map:Plonk_types.Opt.map (f x))
+      , fun x -> f_inv (to_data ~option_map:Plonk_types.Opt.map x) )
 end
 
 module Wrap = struct
@@ -225,7 +232,7 @@ module Wrap = struct
     let to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
-  let input () =
+  let input ~lookup =
     let fp : ('a, Other_field.Constant.t) Typ.t = Other_field.typ_unchecked in
     let open Types.Wrap.Statement in
     let (T (typ, f, f_inv)) =
@@ -237,13 +244,15 @@ module Wrap = struct
                Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
-        In_circuit.spec
+        (In_circuit.spec lookup)
     in
     let typ =
-      Typ.transport typ ~there:In_circuit.to_data ~back:In_circuit.of_data
+      Typ.transport typ
+        ~there:(In_circuit.to_data ~option_map:Option.map)
+        ~back:(In_circuit.of_data ~option_map:Option.map)
     in
     Spec.ETyp.T
       ( typ
-      , (fun x -> In_circuit.of_data (f x))
-      , fun x -> f_inv (In_circuit.to_data x) )
+      , (fun x -> In_circuit.of_data ~option_map:Plonk_types.Opt.map (f x))
+      , fun x -> f_inv (In_circuit.to_data ~option_map:Plonk_types.Opt.map x) )
 end
