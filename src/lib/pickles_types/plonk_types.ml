@@ -20,6 +20,23 @@ module Permuts_vec = Vector.Vector_7
 
 module Opt = struct
   type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
+  [@@deriving sexp, compare, yojson, hash, equal]
+
+  let to_option : ('a, _) t -> 'a option = function
+    | Some x ->
+        Some x
+    | Maybe (_, x) ->
+        Some x
+    | None ->
+        None
+
+  let value_exn = function
+    | Some x ->
+        x
+    | Maybe (_, x) ->
+        x
+    | None ->
+        failwith "Opt.value_exn"
 
   let of_option (t : 'a option) : ('a, 'bool) t =
     match t with None -> None | Some x -> Some x
@@ -84,34 +101,61 @@ module Opt = struct
                failwith "Opt.none_typ: expected None" )
          ~back:(fun () : _ t -> None)
 
-  let maybe_typ (type a a_var f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~(dummy : a) (a_typ : (a_var, a, f) Typ.t) :
-      ((a_var, Impl.Boolean.var) t, a option, f) Typ.t =
+  let maybe_typ (type a a_var bool_var f)
+      (bool_typ : (bool_var, bool, f) Snarky_backendless.Typ.t) ~(dummy : a)
+      (a_typ : (a_var, a, f) Typ.t) : ((a_var, bool_var) t, a option, f) Typ.t =
     Typ.transport
-      (Typ.tuple2 Impl.Boolean.typ a_typ)
+      (Typ.tuple2 bool_typ a_typ)
       ~there:(fun (t : a option) ->
         match t with None -> (false, dummy) | Some x -> (true, x) )
       ~back:(fun (b, x) -> if b then Some x else None)
     |> Typ.transport_var
-         ~there:(fun (t : (a_var, Impl.Boolean.var) t) ->
+         ~there:(fun (t : (a_var, _) t) ->
            match t with
            | Maybe (b, x) ->
                (b, x)
            | None | Some _ ->
-               failwith "Opt.some_typ: expected Some" )
+               failwith "Opt.some_typ: expected Maybe" )
          ~back:(fun (b, x) -> Maybe (b, x))
 
-  let typ (type a a_var f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      (flag : Flag.t) (a_typ : (a_var, a, f) Typ.t) ~(dummy : a) =
+  let constant_layout_typ (type a a_var f) (bool_typ : _ Typ.t) (flag : Flag.t)
+      (a_typ : (a_var, a, f) Typ.t) ~(dummy : a) =
+    let (Typ bool_typ) = bool_typ in
+    let bool_typ : _ Typ.t =
+      let check =
+        (* No need to boolean constrain in the No or Yes case *)
+        match flag with
+        | No | Yes ->
+            fun _ -> Checked.return ()
+        | Maybe ->
+            bool_typ.check
+      in
+      Typ { bool_typ with check }
+    in
+    Typ.transport
+      (Typ.tuple2 bool_typ a_typ)
+      ~there:(fun (t : a option) ->
+        match t with None -> (false, dummy) | Some x -> (true, x) )
+      ~back:(fun (b, x) -> if b then Some x else None)
+    |> Typ.transport_var
+         ~there:(fun (t : (a_var, _) t) ->
+           match t with
+           | Maybe (b, x) ->
+               (b, x)
+           | None | Some _ ->
+               failwith "Opt.some_typ: expected Maybe" )
+         ~back:(fun (b, x) ->
+           match flag with No -> None | Yes -> Some x | Maybe -> Maybe (b, x) )
+
+  let typ (type a a_var f) bool_typ (flag : Flag.t)
+      (a_typ : (a_var, a, f) Typ.t) ~(dummy : a) =
     match flag with
     | Yes ->
         some_typ a_typ
     | No ->
         none_typ ()
     | Maybe ->
-        maybe_typ (module Impl) ~dummy a_typ
+        maybe_typ bool_typ ~dummy a_typ
 
   module Early_stop_sequence = struct
     (* A sequence that should be considered to have stopped at
@@ -395,7 +439,7 @@ module Evals = struct
       ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
       =
     let open Impl in
-    let lookup_typ = Lookup.opt_typ (module Impl) lookup_config e ~dummy in
+    let lookup_typ = Lookup.opt_typ Impl.Boolean.typ lookup_config e ~dummy in
     Typ.of_hlistable
       [ Vector.typ e Columns.n
       ; e
@@ -627,11 +671,11 @@ module Messages = struct
       ; runtime = Option.map2 ~f t1.runtime t2.runtime
       }
 
-    let typ impl e ~runtime ~dummy =
+    let typ bool_typ e ~runtime ~dummy =
       Snarky_backendless.Typ.of_hlistable
         [ Snarky_backendless.Typ.array ~length:sorted_length e
         ; e
-        ; Opt.typ impl runtime e ~dummy
+        ; Opt.typ bool_typ runtime e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
@@ -643,11 +687,11 @@ module Messages = struct
         | Maybe : Nat.N31.n t
     end
 
-    let opt_typ impl ~(lookup : Opt.Flag.t) ~(runtime : Opt.Flag.t) ~dummy:z elt
-        =
-      Opt.typ impl lookup
+    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime : Opt.Flag.t) ~dummy:z
+        elt =
+      Opt.typ bool_typ lookup
         ~dummy:(dummy z ~runtime:Opt.Flag.(equal runtime Yes))
-        (typ impl ~runtime ~dummy:z elt)
+        (typ bool_typ ~runtime ~dummy:z elt)
   end
 
   [%%versioned
@@ -689,9 +733,7 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ
-        (module Impl)
-        ~lookup ~runtime ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable
