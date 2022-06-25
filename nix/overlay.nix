@@ -43,6 +43,7 @@ let
       value = (fetchGit {
         rev = last (split "#" x.source);
         url = last (split "\\+" (head (split "\\?" x.source)));
+        allRefs = true;
       }).narHash;
     }) package;
 in {
@@ -135,6 +136,7 @@ in {
         # FIXME: tests fail
         doCheck = false;
         cargoLock.lockFile = ../src/lib/crypto/Cargo.lock;
+        cargoLock.outputHashes = cargoHashes;
       };
 
   go-capnproto2 = pkgs.buildGoModule rec {
@@ -234,7 +236,7 @@ in {
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
-        [ openssl ] ++ lib.optionals stdenv.isDarwin [ curl Security ];
+        [ openssl ] ++ lib.optionals stdenv.isDarwin [ curl darwin.apple_sdk.frameworks.Security ];
 
       checkInputs = [ final.nodejs ];
 
@@ -258,9 +260,9 @@ in {
     # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
     # Want to run after cargoSetupPostUnpackHook
     prePatch = ''
-      chmod +w /build/cargo-vendor-dir
-      ln -sf ${pkgs.kimchi-rust-std-deps}/*/ /build/cargo-vendor-dir
-      chmod -w /build/cargo-vendor-dir
+      chmod +w $NIX_BUILD_TOP/cargo-vendor-dir
+      ln -sf ${pkgs.kimchi-rust-std-deps}/*/ $NIX_BUILD_TOP/cargo-vendor-dir
+      chmod -w $NIX_BUILD_TOP/cargo-vendor-dir
     '';
 
     # adapted from cargoBuildHook

@@ -112,6 +112,8 @@ module Step = struct
   module type S = sig
     type statement
 
+    type return_value
+
     type prev_values
 
     (* TODO: As an optimization this can be the local proofs-verified size *)
@@ -120,6 +122,8 @@ module Step = struct
     type local_signature
 
     type local_branches
+
+    type auxiliary_value
 
     type _ t +=
       | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
@@ -132,18 +136,22 @@ module Step = struct
           t
       | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
       | App_state : statement t
+      | Return_value : return_value -> unit t
+      | Auxiliary_value : auxiliary_value -> unit t
       | Unfinalized_proofs :
           (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
       | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
   end
 
   let create :
-      type local_signature local_branches statement prev_values max_proofs_verified.
+      type local_signature local_branches statement return_value auxiliary_value prev_values prev_ret_values max_proofs_verified.
          unit
       -> (module S
             with type local_signature = local_signature
              and type local_branches = local_branches
              and type statement = statement
+             and type return_value = return_value
+             and type auxiliary_value = auxiliary_value
              and type prev_values = prev_values
              and type max_proofs_verified = max_proofs_verified ) =
    fun () ->
@@ -151,6 +159,10 @@ module Step = struct
       type nonrec max_proofs_verified = max_proofs_verified
 
       type nonrec statement = statement
+
+      type nonrec return_value = return_value
+
+      type nonrec auxiliary_value = auxiliary_value
 
       type nonrec prev_values = prev_values
 
@@ -169,6 +181,8 @@ module Step = struct
             t
         | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
         | App_state : statement t
+        | Return_value : return_value -> unit t
+        | Auxiliary_value : auxiliary_value -> unit t
         | Unfinalized_proofs :
             (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
         | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t

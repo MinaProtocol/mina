@@ -16,8 +16,6 @@ open Common
 module Make
     (A : T0) (A_value : sig
       type t
-
-      val to_field_elements : t -> Tick.Field.t array
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
@@ -43,10 +41,15 @@ struct
                a rule in proof system i. max_local_max_proof_verifieds is the max of the N_i.
             *)
       max_local_max_proof_verifieds self_branches prev_vars prev_values
-      local_widths local_heights prevs_length ) ?handler
+      local_widths local_heights prevs_length var value ret_var ret_value
+      auxiliary_var auxiliary_value ) ?handler
       (T branch_data :
         ( A.t
         , A_value.t
+        , ret_var
+        , ret_value
+        , auxiliary_var
+        , auxiliary_value
         , Max_proofs_verified.n
         , self_branches
         , prev_vars
@@ -59,16 +62,27 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~self_dlog_plonk_index pk self_dlog_vk
-      (prev_values : prev_values H1.T(Id).t)
+      ~self_dlog_plonk_index
+      ~(public_input :
+         ( var
+         , value
+         , A.t
+         , A_value.t
+         , ret_var
+         , ret_value )
+         Inductive_rule.public_input )
+      ~(auxiliary_typ : (auxiliary_var, auxiliary_value) Impls.Step.Typ.t) pk
+      self_dlog_vk (prev_values : prev_values H1.T(Id).t)
       (prev_proofs : (local_widths, local_widths) H2.T(P).t) :
-      ( A_value.t
-      , (_, Max_proofs_verified.n) Vector.t
-      , (_, prevs_length) Vector.t
-      , (_, prevs_length) Vector.t
-      , _
-      , (_, Max_proofs_verified.n) Vector.t )
-      P.Base.Step.t
+      ( ( value
+        , (_, Max_proofs_verified.n) Vector.t
+        , (_, prevs_length) Vector.t
+        , (_, prevs_length) Vector.t
+        , _
+        , (_, Max_proofs_verified.n) Vector.t )
+        P.Base.Step.t
+      * ret_value
+      * auxiliary_value )
       Promise.t =
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
@@ -198,11 +212,15 @@ struct
           , _ )
           Wrap.Statement.In_circuit.t =
         { pass_through =
-            (* TODO: Only do this hashing when necessary *)
-            Common.hash_step_me_only
-              (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
-                 statement.pass_through )
-              ~app_state:data.value_to_field_elements
+            (let to_field_elements =
+               let (Typ typ) = data.public_input in
+               fun x -> fst (typ.value_to_fields x)
+             in
+             (* TODO: Only do this hashing when necessary *)
+             Common.hash_step_me_only
+               (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
+                  statement.pass_through )
+               ~app_state:to_field_elements )
         ; proof_state =
             { statement.proof_state with
               deferred_values =
@@ -425,6 +443,8 @@ struct
     let statements_with_hashes = ref None in
     let x_hats = ref None in
     let witnesses = ref None in
+    let return_value = ref None in
+    let auxiliary_value = ref None in
     let compute_prev_proof_parts inners_must_verify =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
@@ -524,8 +544,18 @@ struct
                  t.statement.proof_state.deferred_values.bulletproof_challenges
              end )
          in
+         let (return_value : ret_value) = Option.value_exn !return_value in
+         let (app_state : value) =
+           match public_input with
+           | Input _ ->
+               next_state
+           | Output _ ->
+               return_value
+           | Input_and_output _ ->
+               (next_state, return_value)
+         in
          (* Have the sg be available in the opening proof and verify it. *)
-         { app_state = next_state
+         { app_state
          ; challenge_polynomial_commitments =
              Option.value_exn !challenge_polynomial_commitments
          ; old_bulletproof_challenges
@@ -581,6 +611,12 @@ struct
           k self_dlog_plonk_index
       | Req.App_state ->
           k next_state
+      | Req.Return_value res ->
+          return_value := Some res ;
+          k ()
+      | Req.Auxiliary_value res ->
+          auxiliary_value := Some res ;
+          k ()
       | Req.Unfinalized_proofs ->
           k (Lazy.force unfinalized_proofs_extended)
       | Req.Pass_through ->
@@ -666,18 +702,20 @@ struct
       ; pass_through
       }
     in
-    { P.Base.Step.proof = next_proof
-    ; statement = next_statement
-    ; index = branch_data.index
-    ; prev_evals =
-        Vector.extend
-          (Vector.map2 prev_evals (Option.value_exn !x_hats)
-             ~f:(fun (es, ft_eval1) x_hat ->
-               Plonk_types.All_evals.
-                 { ft_eval1
-                 ; evals =
-                     { With_public_input.evals = es; public_input = x_hat }
-                 } ) )
-          lte Max_proofs_verified.n Dummy.evals
-    }
+    ( { P.Base.Step.proof = next_proof
+      ; statement = next_statement
+      ; index = branch_data.index
+      ; prev_evals =
+          Vector.extend
+            (Vector.map2 prev_evals (Option.value_exn !x_hats)
+               ~f:(fun (es, ft_eval1) x_hat ->
+                 Plonk_types.All_evals.
+                   { ft_eval1
+                   ; evals =
+                       { With_public_input.evals = es; public_input = x_hat }
+                   } ) )
+            lte Max_proofs_verified.n Dummy.evals
+      }
+    , Option.value_exn !return_value
+    , Option.value_exn !auxiliary_value )
 end

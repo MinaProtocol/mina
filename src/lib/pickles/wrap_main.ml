@@ -152,8 +152,8 @@ let wrap_main
     (step_domains : (Domains.t, branches) Vector.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t )
-    (module Max_proofs_verified : Nat.Add.Intf with type n = max_proofs_verified)
-    :
+    (max_proofs_verified :
+      (module Nat.Add.Intf with type n = max_proofs_verified) ) :
     (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t
     * (   ( _
           , _
@@ -168,6 +168,9 @@ let wrap_main
           Types.Wrap.Statement.In_circuit.t
        -> unit ) =
   Timer.clock __LOC__ ;
+  let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                       with type n = max_proofs_verified )
+  in
   let T = Max_proofs_verified.eq in
   let branches = Hlist.Length.to_nat pi_branches in
   Timer.clock __LOC__ ;
@@ -300,7 +303,9 @@ let wrap_main
         let domainses =
           with_label __LOC__ (fun () ->
               pad_domains
-                (module Max_proofs_verified)
+                ( module struct
+                  include Max_proofs_verified
+                end )
                 pi_branches prev_wrap_domains )
         in
         let new_bulletproof_challenges =
@@ -456,8 +461,7 @@ let wrap_main
           in
           let sponge = Opt.create sponge_params in
           with_label __LOC__ (fun () ->
-              incrementally_verify_proof
-                (module Max_proofs_verified)
+              incrementally_verify_proof max_proofs_verified
                 ~actual_proofs_verified_mask ~step_domains
                 ~verification_key:step_plonk_index ~xi ~sponge
                 ~public_input:
