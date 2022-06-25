@@ -216,6 +216,9 @@ let wrap
       ; beta = O.beta o
       ; gamma = O.gamma o
       ; zeta = scalar_chal O.zeta
+      ; joint_combiner =
+          (* TODO: Needs to be changed when lookups are fully implemented *)
+          None
       }
     in
     let r = scalar_chal O.u in
@@ -233,6 +236,8 @@ let wrap
       let zeta = to_field plonk0.zeta
 
       let alpha = to_field plonk0.alpha
+
+      let joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
     end in
     let domain = Domain.Pow_2_roots_of_unity step_vk.domain.log_size_of_group in
     let w = step_vk.domain.group_gen in
@@ -241,7 +246,11 @@ let wrap
       (Tick.Field.domain_generator ~log2_size:(Domain.log2_size domain)) ;
     let zetaw = Tick.Field.mul As_field.zeta w in
     let tick_plonk_minimal =
-      { plonk0 with zeta = As_field.zeta; alpha = As_field.alpha }
+      { plonk0 with
+        zeta = As_field.zeta
+      ; alpha = As_field.alpha
+      ; joint_combiner = As_field.joint_combiner
+      }
     in
     let tick_combined_evals =
       Plonk_checks.evals_of_split_evals
@@ -344,6 +353,12 @@ let wrap
                 ; alpha = plonk0.alpha
                 ; beta = chal plonk0.beta
                 ; gamma = chal plonk0.gamma
+                ; lookup =
+                    Opt.map plonk.lookup ~f:(fun l ->
+                        { l with
+                          joint_combiner =
+                            Option.value_exn plonk0.joint_combiner
+                        } )
                 }
             }
         ; sponge_digest_before_evaluations =

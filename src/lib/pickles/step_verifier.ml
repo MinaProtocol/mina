@@ -9,6 +9,8 @@ open Common
 open Import
 module S = Sponge
 
+let lookup_verification_enabled = false
+
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
@@ -602,13 +604,17 @@ struct
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
+        let joint_combiner =
+          if lookup_verification_enabled then failwith "TODO" else None
+        in
         assert_eq_deferred_values
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
+          ; joint_combiner
           }
-          { alpha; beta; gamma; zeta } ;
+          { alpha; beta; gamma; zeta; joint_combiner } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let compute_challenges ~scalar chals =

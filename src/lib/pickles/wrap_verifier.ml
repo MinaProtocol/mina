@@ -10,6 +10,8 @@ open Plonk_types
 open Tuple_lib
 open Import
 
+let lookup_verification_enabled = false
+
 (* given [chals], compute
    \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
 let challenge_polynomial ~one ~add ~mul chals =
@@ -469,6 +471,7 @@ struct
       ; gamma = gamma_1
       ; zeta = zeta_1
       } =
+    if lookup_verification_enabled then failwith "TODO" else () ;
     chal beta_0 beta_1 ;
     chal gamma_0 gamma_1 ;
     scalar_chal alpha_0 alpha_1 ;
@@ -670,13 +673,17 @@ struct
                   ~f:(Array.map ~f:(fun (keep, x) -> (keep, `Finite x)))
               , [] )
         in
+        let joint_combiner =
+          if lookup_verification_enabled then failwith "TODO" else None
+        in
         assert_eq_marlin
           { alpha = plonk.alpha
           ; beta = plonk.beta
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
+          ; joint_combiner
           }
-          { alpha; beta; gamma; zeta } ;
+          { alpha; beta; gamma; zeta; joint_combiner } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
