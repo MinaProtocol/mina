@@ -131,12 +131,17 @@
       }
     },
     "nix-npm-buildPackage": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
-        "lastModified": 1643828355,
-        "narHash": "sha256-yeej9SblWlh5DQlLr/AGz8vVG0TrDZg38Yy2fv6wk7U=",
+        "lastModified": 1654786772,
+        "narHash": "sha256-Qul9GG6EJ1IFfgnZ440KAxTEPfFpbnmf54EVFM9+iZA=",
         "owner": "serokell",
         "repo": "nix-npm-buildpackage",
-        "rev": "d9acd44139f56202084bd918cdf6b945935acfd6",
+        "rev": "ca922a16839ae62a568bcb0771e78e080b4d6059",
         "type": "github"
       },
       "original": {
@@ -237,11 +242,11 @@
     "opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1653310919,
-        "narHash": "sha256-xnetrEmHpHMA711XNeAbJO4PPoIA47b+5/tju/BeMGY=",
+        "lastModified": 1655897591,
+        "narHash": "sha256-9NuW1SpRqLLNj/vKxTY+SMYSzuZkjlYtN0Rsf10KCc4=",
         "owner": "ocaml",
         "repo": "opam-repository",
-        "rev": "103be3e9078d608d5ff5e3e80a74245195fc1e2d",
+        "rev": "74ecec8eec6d5161ce99fc72378cc6e363a3faed",
         "type": "github"
       },
       "original": {

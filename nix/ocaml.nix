@@ -21,12 +21,33 @@ let
     "base58"
   ] (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
-  implicit-deps = (opam-nix.opamListToQuery export.installed) // external-packages;
+  difference = a: b:
+    pkgs.lib.filterAttrs (name: _: !builtins.elem name (builtins.attrNames b))
+    a;
+
+  export-installed = opam-nix.opamListToQuery export.installed;
+
+  extra-packages = with implicit-deps; {
+    dune-rpc = dune;
+    dyn = dune;
+    fiber = dune;
+    ocaml-lsp-server = "1.11.6";
+    ocaml-system = ocaml;
+    ocamlformat-rpc-lib = "0.22.4";
+    omd = "1.3.1";
+    ordering = dune;
+    pp = "1.1.2";
+    ppx_yojson_conv_lib = "v0.15.0";
+    stdune = dune;
+    xdg = dune;
+  };
+
+  implicit-deps = export-installed // external-packages;
 
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays
-    (opam-nix.defsToScope pkgs ((opam-nix.queryToDefs repos implicit-deps) // pins));
+  scope = opam-nix.applyOverlays opam-nix.__overlays (opam-nix.defsToScope pkgs
+    ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
@@ -130,6 +151,10 @@ let
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+
+        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+
         configurePhase = ''
           export MINA_ROOT="$PWD"
           export -f patchShebangs stopNest isScript
@@ -170,6 +195,7 @@ let
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
+        shellHook = "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
       } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; }
         // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
           OCAMLPARAM = "_,cclib=-lc++";
@@ -206,7 +232,9 @@ let
       } ''
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
-        psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
+        pushd src/app/archive
+        psql "$MINA_TEST_POSTGRES" < create_schema.sql
+        popd
         # TODO: investigate failing tests, ideally we should run all tests in src/
         dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
@@ -222,11 +250,14 @@ let
 
         outputs = [ "out" ];
 
-        checkInputs = [ pkgs.nodejs ];
+        checkInputs = [ pkgs.nodejs-16_x ];
 
         buildPhase = ''
-          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$opam__zarith__lib/zarith"
-          dune build --display=short src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
+          dune build --display=short \
+            src/lib/crypto/kimchi_bindings/js/node_js \
+            src/app/client_sdk/client_sdk.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_node.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
         '';
 
         doCheck = true;
@@ -243,8 +274,9 @@ let
         '';
 
         installPhase = ''
-          mkdir -p $out/share/client_sdk
+          mkdir -p $out/share/client_sdk $out/share/snarkyjs_bindings
           mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
+          mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
         '';
       });
 

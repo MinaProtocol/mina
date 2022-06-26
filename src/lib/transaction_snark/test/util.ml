@@ -39,11 +39,12 @@ end)
 
 let genesis_state_body =
   let compile_time_genesis =
+    let open Staged_ledger_diff in
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
       ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
       ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
 
@@ -240,20 +241,18 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
   ; prevs = [ self; self ]
   ; main =
-      (fun [ _; _ ] _ ->
+      (fun { previous_public_inputs = [ _; _ ]; public_input = _ } ->
         Transaction_snark.dummy_constraints ()
-        |> Snark_params.Tick.Run.run_checked
-        |> fun () ->
+        |> Snark_params.Tick.Run.run_checked ;
         (* Unsatisfiable. *)
-        Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
-        |> fun s ->
-        Run.Field.(Assert.equal s (s + one))
-        |> fun () :
-               (Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit))
-               Pickles_types.Hlist0.H1
-                 (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-               .t ->
-        [ Boolean.true_; Boolean.true_ ] )
+        let s =
+          Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
+        in
+        Run.Field.(Assert.equal s (s + one)) ;
+        { previous_proofs_should_verify = [ Boolean.true_; Boolean.true_ ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let gen_snapp_ledger =

@@ -63,6 +63,7 @@ val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
+  -> genesis_body_reference:Consensus.Body_reference.t
   -> Value.t
 
 val consensus_transition :
