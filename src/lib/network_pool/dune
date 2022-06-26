@@ -70,6 +70,7 @@
    kimchi_backend_common
    kimchi_backend.pasta
    genesis_ledger
+   staged_ledger_diff
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
