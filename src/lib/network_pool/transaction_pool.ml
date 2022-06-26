@@ -1693,6 +1693,7 @@ let%test_module _ =
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
             ~constraint_constants ~consensus_constants
+            ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         in
         compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
