@@ -438,24 +438,58 @@ let get_nonce_exn ~rpc public_key port =
 let unwrap_user_command (`UserCommand x) = x
 
 let batch_test_zkapps =
-  let keypair_path = Command.Param.(anon @@ ("keypair-path" %: string)) in
-  let num_of_zkapps = Command.Param.(anon @@ ("num-of-zkapps" %: int)) in
-  let parties_size =
-    Command.Param.(
+  let params =
+    let open Command.Let_syntax in
+    let%map_open keypair_path = anon @@ ("keypair-path" %: string)
+    and parties_size =
       flag "--parties-size" ~aliases:[ "parties-size" ]
-        ~doc:"NUM maximum number of parties in 1 zkapp commands" (optional int))
+        ~doc:"NUM maximum number of parties in 1 zkapp commands" (optional int)
+    and fee_payer_privkey_path = Cli_lib.Flag.privkey_read_path
+    and rate_limit =
+      flag "--apply-rate-limit" ~aliases:[ "apply-rate-limit" ]
+        ~doc:
+          "TRUE/FALSE Whether to emit sleep commands between commands to \
+           enforce sleeps (default: true)"
+        (optional_with_default true bool)
+    and rate_limit_level =
+      flag "--rate-limit-level" ~aliases:[ "rate-limit-level" ]
+        ~doc:
+          "NUM Number of transactions that can be sent in a time interval \
+           before hitting the rate limit. Used for rate limiting (default: \
+           200)"
+        (optional_with_default 200 int)
+    and rate_limit_interval =
+      flag "--rate-limit-interval" ~aliases:[ "rate-limit-interval" ]
+        ~doc:
+          "NUM_MILLISECONDS Interval that the rate-limiter is applied over. \
+           Used for rate limiting (default: 300000)"
+        (optional_with_default 300000 int)
+    in
+    ( keypair_path
+    , fee_payer_privkey_path
+    , parties_size
+    , rate_limit
+    , rate_limit_level
+    , rate_limit_interval )
   in
-  let privkey_path = Cli_lib.Flag.privkey_read_path in
   Command.async
     ~summary:
       "Generate multiple zkapps using the passed fee payer keypair and \
        broadcast it to the network "
-    (Cli_lib.Background_daemon.rpc_init
-       (Args.zip4 keypair_path num_of_zkapps parties_size privkey_path)
-       ~f:(fun port (keypair_path, num_of_zkapps, parties_size, privkey_path) ->
+    (Cli_lib.Background_daemon.rpc_init params
+       ~f:(fun
+            port
+            ( keypair_path
+            , fee_payer_privkey_path
+            , parties_size
+            , rate_limit
+            , rate_limit_level
+            , rate_limit_interval )
+          ->
+         let open Deferred.Let_syntax in
          let%bind fee_payer_keypair =
            Secrets.Keypair.Terminal_stdin.read_exn ~which:"Fee payer"
-             privkey_path
+             fee_payer_privkey_path
          in
          let%bind keypair_files = Sys.readdir keypair_path >>| Array.to_list in
          let%bind keypairs =
@@ -464,10 +498,47 @@ let batch_test_zkapps =
                |> Secrets.Keypair.Terminal_stdin.read_exn
                     ~which:"Zkapp account keypair" )
          in
+         let transaction_count =
+           let constraint_constants =
+             Genesis_constants.Constraint_constants.compiled
+           in
+           let txns_per_block =
+             Int.pow 2 constraint_constants.transaction_capacity_log_2
+           in
+           let slot_time = constraint_constants.block_window_duration_ms in
+           let fill_rate = 0.75 (*based on current config*) in
+           let transaction_count =
+             Float.(
+               of_int txns_per_block /. of_int slot_time *. fill_rate
+               *. of_int rate_limit_interval)
+           in
+           min (Float.to_int transaction_count) rate_limit_level
+         in
+         let batch_count = ref 0 in
+         let limit =
+           (* call this function after a transaction happens *)
+           (* TODO, in the current state of things, this function counts to limit_level of transactions, and then slaps a pause after it.  This happens even if the transactions themselves took far longer than the pause.  It thereby makes the rate slower and more conservative than would appear.  In future, perhaps implement with some sort of Timer *)
+           if rate_limit then ( fun () ->
+             incr batch_count ;
+             if !batch_count >= transaction_count then
+               let%bind () =
+                 Deferred.return
+                   (Format.printf
+                      "zkapp txn burst: rate limiting, pausing for %d \
+                       milliseconds... @."
+                      rate_limit_interval )
+               in
+               let%bind () =
+                 Async.after (Time.Span.create ~ms:rate_limit_interval ())
+               in
+               Deferred.return (batch_count := 0)
+             else Deferred.return () )
+           else fun () -> Deferred.return ()
+         in
          match%bind
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Generate_random_zkapps.rpc
              { zkapp_keypairs = keypairs
-             ; transaction_count = num_of_zkapps
+             ; transaction_count
              ; max_parties_count = parties_size
              ; fee_payer_keypair
              }
@@ -484,14 +555,17 @@ let batch_test_zkapps =
                             Parties.to_yojson parties ) ) )
                  ] ;
              Deferred.List.iter parties_list ~f:(fun parties ->
-                 Daemon_rpcs.Client.dispatch_with_message
-                   Daemon_rpcs.Send_zkapp_command.rpc parties port
-                   ~success:(fun _ ->
-                     "Successfully enqueued a zkapp command in pool" )
-                   ~error:(fun e ->
-                     sprintf "Failed to send zkapp command %s"
-                       (Error.to_string_hum e) )
-                   ~join_error:Or_error.join )
+                 let%bind () =
+                   Daemon_rpcs.Client.dispatch_with_message
+                     Daemon_rpcs.Send_zkapp_command.rpc parties port
+                     ~success:(fun _ ->
+                       "Successfully enqueued a zkapp command in pool" )
+                     ~error:(fun e ->
+                       sprintf "Failed to send zkapp command %s"
+                         (Error.to_string_hum e) )
+                     ~join_error:Or_error.join
+                 in
+                 limit () )
          | Error e ->
              eprintf "Failed to generate zkapps %s" (Error.to_string_hum e) ;
              exit 1 ) )

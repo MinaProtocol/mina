@@ -1389,7 +1389,7 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false)
       ~available_public_keys ~ledger ~required_balance_change ?required_balance
       ~account_state_tbl ?vk ()
   in
-  let other_parties = balancing_party :: other_parties0 in
+  let other_parties = other_parties0 @ [ balancing_party ] in
   let%map memo = Signed_command_memo.gen in
   Parties.of_simple { fee_payer; other_parties; memo }
 
@@ -1466,7 +1466,7 @@ let setup_available_keys_and_account_state_tbl_limited
                     Some (account, `Can_use_in_other_parties) ) ) ;
       (available_public_keys, account_state_tbl)
 
-let gen_parties_with_limited_keys ?failure ~keymap ?account_state_tbl ~ledger
+let gen_parties_with_limited_keys ~keymap ?account_state_tbl ~ledger
     ?protocol_state_view ?vk ?parties_size
     ~(fee_payer_keypair : Signature_lib.Keypair.t) () =
   let open Quickcheck.Generator.Let_syntax in
@@ -1484,6 +1484,6 @@ let gen_parties_with_limited_keys ?failure ~keymap ?account_state_tbl ~ledger
     let%map index = Int.gen_uniform_incl 0 (List.length ids - 1) in
     List.nth ids index
   in
-  gen_parties_base ~no_new_account:true ~limited:true ?failure
-    ~fee_payer_account_id ?balancing_account_id ~available_public_keys
-    ~account_state_tbl ~ledger ?protocol_state_view ?vk ?parties_size ()
+  gen_parties_base ~no_new_account:true ~limited:true ~fee_payer_account_id
+    ?balancing_account_id ~available_public_keys ~account_state_tbl ~ledger
+    ?protocol_state_view ?vk ?parties_size ()
