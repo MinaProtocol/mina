@@ -239,15 +239,21 @@ let%test_module "multisig_account" =
                               Run.exists Zkapp_statement.typ ~compute:(fun () ->
                                   assert false )
                             in
+                            let proof =
+                              Run.exists (Typ.Internal.ref ())
+                                ~compute:(fun () -> assert false)
+                            in
                             Impl.run_checked
                               (Transaction_snark.dummy_constraints ()) ;
                             (* Unsatisfiable. *)
                             Run.Field.(Assert.equal s (s + one)) ;
                             { previous_proof_statements =
                                 [ { public_input
+                                  ; proof
                                   ; proof_must_verify = Boolean.true_
                                   }
                                 ; { public_input
+                                  ; proof
                                   ; proof_must_verify = Boolean.true_
                                   }
                                 ]
@@ -416,7 +422,7 @@ let%test_module "multisig_account" =
                     respond Unhandled
               in
               let (), (), (pi : Pickles.Side_loaded.Proof.t) =
-                (fun () -> multisig_prover ~handler [] tx_statement)
+                (fun () -> multisig_prover ~handler tx_statement)
                 |> Async.Thread_safe.block_on_async_exn
               in
               let fee_payer =

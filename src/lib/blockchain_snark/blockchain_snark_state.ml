@@ -10,30 +10,43 @@ include struct
 
   type _ t +=
     | Prev_state : Protocol_state.Value.t t
+    | Prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t t
     | Transition : Snark_transition.Value.t t
     | Txn_snark : Transaction_snark.Statement.With_sok.t t
+    | Txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t t
 end
 
 module Witness = struct
   type t =
     { prev_state : Protocol_state.Value.t
+    ; prev_state_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
     ; transition : Snark_transition.Value.t
     ; txn_snark : Transaction_snark.Statement.With_sok.t
+    ; txn_snark_proof : (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
     }
 end
 
 let blockchain_handler on_unhandled
-    { Witness.prev_state; transition; txn_snark } =
+    { Witness.prev_state
+    ; prev_state_proof
+    ; transition
+    ; txn_snark
+    ; txn_snark_proof
+    } =
   let open Snarky_backendless.Request in
   fun (With { request; respond } as r) ->
     let k x = respond (Provide x) in
     match request with
     | Prev_state ->
         k prev_state
+    | Prev_state_proof ->
+        k prev_state_proof
     | Transition ->
         k transition
     | Txn_snark ->
         k txn_snark
+    | Txn_snark_proof ->
+        k txn_snark_proof
     | _ ->
         on_unhandled r
 
@@ -298,12 +311,20 @@ let%snarkydef step ~(logger : Logger.t)
     | Full ->
         Boolean.not is_base_case
   in
-  let%map () = Boolean.Assert.any [ is_base_case; success ] in
+  let%bind () = Boolean.Assert.any [ is_base_case; success ] in
+  let%bind previous_blockchain_proof =
+    exists (Typ.Internal.ref ()) ~request:(As_prover.return Prev_state_proof)
+  in
+  let%map txn_snark_proof =
+    exists (Typ.Internal.ref ()) ~request:(As_prover.return Txn_snark_proof)
+  in
   ( { Pickles.Inductive_rule.Previous_proof_statement.public_input =
         previous_blockchain_proof_input
+    ; proof = previous_blockchain_proof
     ; proof_must_verify = prev_should_verify
     }
   , { Pickles.Inductive_rule.Previous_proof_statement.public_input = txn_snark
+    ; proof = txn_snark_proof
     ; proof_must_verify = txn_snark_should_verify
     } )
 

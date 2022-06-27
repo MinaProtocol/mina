@@ -1648,6 +1648,18 @@ module Base = struct
       end
     end
 
+    type _ Snarky_backendless.Request.t +=
+      | Zkapp_proof :
+          (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Snarky_backendless.Request.t
+
+    let handle_zkapp_proof (proof : _ Pickles.Proof.t)
+        (Snarky_backendless.Request.With { request; respond }) =
+      match request with
+      | Zkapp_proof ->
+          respond (Provide proof)
+      | _ ->
+          respond Unhandled
+
     module Single (I : Single_inputs) = struct
       open I
 
@@ -2241,8 +2253,13 @@ module Base = struct
                 let zkapp_input =
                   main ?witness:!witness s ~constraint_constants stmt
                 in
+                let proof =
+                  Run.exists (Typ.Internal.ref ()) ~request:(fun () ->
+                      Zkapp_proof )
+                in
                 { previous_proof_statements =
                     [ { public_input = Option.value_exn zkapp_input
+                      ; proof
                       ; proof_must_verify = b
                       }
                     ]
@@ -3115,13 +3132,20 @@ module Merge = struct
     | Statements_to_merge :
         (Statement.With_sok.t * Statement.With_sok.t)
         Snarky_backendless.Request.t
+    | Proofs_to_merge :
+        ( (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+        * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t )
+        Snarky_backendless.Request.t
 
   let handle
       ((left_stmt, right_stmt) : Statement.With_sok.t * Statement.With_sok.t)
+      ((left_proof, right_proof) : _ Pickles.Proof.t * _ Pickles.Proof.t)
       (Snarky_backendless.Request.With { request; respond }) =
     match request with
     | Statements_to_merge ->
         respond (Provide (left_stmt, right_stmt))
+    | Proofs_to_merge ->
+        respond (Provide (left_proof, right_proof))
     | _ ->
         respond Unhandled
 
@@ -3194,9 +3218,14 @@ module Merge = struct
     ; main =
         (fun { public_input = x } ->
           let s1, s2 = Run.run_checked (main x) in
+          let p1, p2 =
+            Run.exists
+              Typ.(Internal.ref () * Internal.ref ())
+              ~request:(fun () -> Proofs_to_merge)
+          in
           { previous_proof_statements =
-              [ { public_input = s1; proof_must_verify = b }
-              ; { public_input = s2; proof_must_verify = b }
+              [ { public_input = s1; proof = p1; proof_must_verify = b }
+              ; { public_input = s2; proof = p2; proof_must_verify = b }
               ]
           ; public_output = ()
           ; auxiliary_output = ()
@@ -4080,18 +4109,17 @@ struct
     let res =
       match spec with
       | Opt_signed ->
-          opt_signed [] statement
+          opt_signed statement
       | Opt_signed_opt_signed ->
-          opt_signed_opt_signed [] statement
+          opt_signed_opt_signed statement
       | Proved -> (
           match snapp_proof_data ~witness with
           | None ->
               failwith "of_parties_segment: Expected exactly one proof"
           | Some (p, v) ->
-              (* TODO: We should not have to pass the statement in here. *)
+              Pickles.Side_loaded.in_prover (Base.side_loaded 0) v.data ;
               proved
-                ( Pickles.Side_loaded.in_prover (Base.side_loaded 0) v.data ;
-                  [ p ] )
+                ~handler:(Base.Parties_snark.handle_zkapp_proof p)
                 statement )
     in
     let open Async in
@@ -4103,7 +4131,7 @@ struct
       =
     let open Async in
     let%map (), (), proof =
-      base []
+      base
         ~handler:
           (Base.transaction_union_handler handler transaction state_body
              init_stack )
@@ -4155,8 +4183,9 @@ struct
     let open Async in
     let%map (), (), proof =
       merge
-        ~handler:(Merge.handle (x12.statement, x23.statement))
-        [ x12.proof; x23.proof ] s
+        ~handler:
+          (Merge.handle (x12.statement, x23.statement) (x12.proof, x23.proof))
+        s
     in
     Ok { statement = s; proof }
 
@@ -4232,12 +4261,22 @@ module For_tests = struct
                     Run.exists Zkapp_statement.typ ~compute:(fun () ->
                         assert false )
                   in
+                  let proof =
+                    Run.exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                        assert false )
+                  in
                   Impl.run_checked (dummy_constraints ()) ;
                   (* Unsatisfiable. *)
                   Run.Field.(Assert.equal s (s + one)) ;
                   { previous_proof_statements =
-                      [ { public_input; proof_must_verify = Boolean.true_ }
-                      ; { public_input; proof_must_verify = Boolean.true_ }
+                      [ { public_input
+                        ; proof
+                        ; proof_must_verify = Boolean.true_
+                        }
+                      ; { public_input
+                        ; proof
+                        ; proof_must_verify = Boolean.true_
+                        }
                       ]
                   ; public_output = ()
                   ; auxiliary_output = ()
@@ -4558,7 +4597,7 @@ module For_tests = struct
               in
               let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t)
                   =
-                prover ~handler [] tx_statement
+                prover ~handler tx_statement
               in
               ( { body = simple_snapp_party.body; authorization = Proof pi }
                 : Party.Simple.t )
@@ -4754,7 +4793,7 @@ module For_tests = struct
       match request with _ -> respond Unhandled
     in
     let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t) =
-      trivial_prover ~handler [] tx_statement
+      trivial_prover ~handler tx_statement
     in
     let fee_payer_signature_auth =
       let txn_comm =

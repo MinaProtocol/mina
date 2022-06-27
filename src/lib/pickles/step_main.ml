@@ -256,15 +256,19 @@ let step_main :
             let previous_proof_statements =
               let rec go :
                   type prev_vars prev_values ns1 ns2.
-                     prev_vars H1.T(Inductive_rule.Previous_proof_statement).t
+                     ( prev_vars
+                     , ns1 )
+                     H2.T(Inductive_rule.Previous_proof_statement).t
                   -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
-                  -> prev_values
-                     H1.T(Inductive_rule.Previous_proof_statement.Constant).t =
+                  -> ( prev_values
+                     , ns1 )
+                     H2.T(Inductive_rule.Previous_proof_statement.Constant).t =
                fun previous_proof_statement tags ->
                 match (previous_proof_statement, tags) with
                 | [], [] ->
                     []
-                | { public_input; proof_must_verify } :: stmts, tag :: tags ->
+                | ( { public_input; proof; proof_must_verify } :: stmts
+                  , tag :: tags ) ->
                     let public_input =
                       (fun (type var value n m) (tag : (var, value, n, m) Tag.t)
                            (var : var) : value ->
@@ -279,6 +283,7 @@ let step_main :
                         tag public_input
                     in
                     { public_input
+                    ; proof = As_prover.Ref.get proof
                     ; proof_must_verify =
                         As_prover.read Boolean.typ proof_must_verify
                     }
@@ -309,7 +314,7 @@ let step_main :
           let rec go :
               type vars ns1 ns2.
                  (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
-              -> vars H1.T(Inductive_rule.Previous_proof_statement).t
+              -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
               -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
            fun proofs stmts ->
             match (proofs, stmts) with
@@ -328,7 +333,7 @@ let step_main :
                   -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t
                   -> vars H1.T(E01(Unfinalized)).t
-                  -> vars H1.T(Inductive_rule.Previous_proof_statement).t
+                  -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
                   -> (vars, n) Length.t
                   -> (_, n) Vector.t * B.t list =
                fun proofs datas pass_throughs unfinalizeds stmts pi ->

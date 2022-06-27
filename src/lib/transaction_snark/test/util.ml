@@ -244,12 +244,15 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
         let public_input =
           Run.exists Zkapp_statement.typ ~compute:(fun () -> assert false)
         in
+        let proof =
+          Run.exists (Typ.Internal.ref ()) ~compute:(fun () -> assert false)
+        in
         Impl.run_checked (Transaction_snark.dummy_constraints ()) ;
         (* Unsatisfiable. *)
         Run.Field.(Assert.equal s (s + one)) ;
         { previous_proof_statements =
-            [ { public_input; proof_must_verify = Boolean.true_ }
-            ; { public_input; proof_must_verify = Boolean.true_ }
+            [ { public_input; proof; proof_must_verify = Boolean.true_ }
+            ; { public_input; proof; proof_must_verify = Boolean.true_ }
             ]
         ; public_output = ()
         ; auxiliary_output = ()

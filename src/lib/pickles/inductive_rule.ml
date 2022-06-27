@@ -7,11 +7,18 @@ module B = struct
 end
 
 module Previous_proof_statement = struct
-  type 'prev_var t = { public_input : 'prev_var; proof_must_verify : B.t }
+  type ('prev_var, 'width) t =
+    { public_input : 'prev_var
+    ; proof : ('width, 'width) Proof.t Impls.Step.As_prover.Ref.t
+    ; proof_must_verify : B.t
+    }
 
   module Constant = struct
-    type 'prev_value t =
-      { public_input : 'prev_value; proof_must_verify : bool }
+    type ('prev_value, 'width) t =
+      { public_input : 'prev_value
+      ; proof : ('width, 'width) Proof.t
+      ; proof_must_verify : bool
+      }
   end
 end
 
@@ -43,8 +50,9 @@ type 'public_input main_input =
   }
 
 (** The return type of an inductive rule's main function. *)
-type ('prev_vars, 'public_output, 'auxiliary_output) main_return =
-  { previous_proof_statements : 'prev_vars H1.T(Previous_proof_statement).t
+type ('prev_vars, 'widths, 'public_output, 'auxiliary_output) main_return =
+  { previous_proof_statements :
+      ('prev_vars, 'widths) H2.T(Previous_proof_statement).t
         (** A list of booleans, determining whether each previous proof must
             verify.
         *)
@@ -106,7 +114,8 @@ type ( 'prev_vars
   { identifier : string
   ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
   ; main :
-      'a_var main_input -> ('prev_vars, 'ret_var, 'auxiliary_var) main_return
+         'a_var main_input
+      -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
   }
 
 module T
