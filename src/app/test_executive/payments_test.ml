@@ -166,7 +166,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~memo:
                (Signed_command_memo.to_raw_bytes_exn
                   signed_cmmd.payload.common.memo )
-             ~token:(Signed_command_payload.token signed_cmmd.payload)
              ~valid_until:signed_cmmd.payload.common.valid_until
              ~raw_signature:
                (Mina_base.Signature.Raw.encode signed_cmmd.signature)
@@ -256,7 +255,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~memo:
               (Signed_command_memo.to_raw_bytes_exn
                  signed_cmmd.payload.common.memo )
-            ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
               (Mina_base.Signature.Raw.encode signed_cmmd.signature)
@@ -305,7 +303,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~memo:
               (Signed_command_memo.to_raw_bytes_exn
                  signed_cmmd.payload.common.memo )
-            ~token:(Signed_command_payload.token signed_cmmd.payload)
             ~valid_until:signed_cmmd.payload.common.valid_until
             ~raw_signature:
               (Mina_base.Signature.Raw.encode signed_cmmd.signature)
@@ -429,13 +426,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind sender_pub_key = Util.pub_key_of_node sender in
          let%bind () =
            (*
-            To fill up a `small` transaction capacity with work delay of 1, 
+            To fill up a `small` transaction capacity with work delay of 1,
             there needs to be 12 total txns sent.
 
             Calculation is as follows:
             Max number trees in the scan state is
               `(transaction_capacity_log+1) * (work_delay+1)`
-            and for 2^2 transaction capacity and work delay 1 it is 
+            and for 2^2 transaction capacity and work delay 1 it is
               `(2+1)*(1+1)=6`.
             Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
             In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
