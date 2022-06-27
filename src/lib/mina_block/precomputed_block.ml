@@ -69,7 +69,7 @@ include T
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t = T.t =
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
@@ -91,9 +91,14 @@ end]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~scheduled_time ~staged_ledger block =
+    ~scheduled_time ~staged_ledger block_with_hash =
   let ledger = Staged_ledger.ledger staged_ledger in
+  let block = With_hash.data block_with_hash in
+  let state_hash =
+    (With_hash.hash block_with_hash).State_hash.State_hashes.state_hash
+  in
   let account_ids_accessed = Block.account_ids_accessed block in
+  let start = Time.now () in
   let accounts_accessed =
     List.filter_map account_ids_accessed ~f:(fun acct_id ->
         try
@@ -111,6 +116,14 @@ let of_block ~logger
           None )
   in
   let header = Block.header block in
+  let accounts_accessed_time = Time.now () in
+  [%log debug]
+    "Precomputed block for $state_hash: accounts-accessed took $time ms"
+    ~metadata:
+      [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+      ; ( "time"
+        , `Float (Time.Span.to_ms (Time.diff accounts_accessed_time start)) )
+      ] ;
   let accounts_created =
     let account_creation_fee = constraint_constants.account_creation_fee in
     let previous_block_state_hash =
@@ -131,10 +144,22 @@ let of_block ~logger
         let owner = Mina_ledger.Ledger.token_owner ledger token_id in
         (token_id, owner) )
   in
+  let account_created_time = Time.now () in
+  [%log debug]
+    "Precomputed block for $state_hash: accounts-created took $time ms"
+    ~metadata:
+      [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
+      ; ( "time"
+        , `Float
+            (Time.Span.to_ms
+               (Time.diff account_created_time accounts_accessed_time) ) )
+      ] ;
+
   { scheduled_time
   ; protocol_state = Header.protocol_state header
   ; protocol_state_proof = Header.protocol_state_proof header
-  ; staged_ledger_diff = Body.staged_ledger_diff (Block.body block)
+  ; staged_ledger_diff =
+      Staged_ledger_diff.Body.staged_ledger_diff (Block.body block)
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; accounts_accessed
   ; accounts_created
@@ -145,16 +170,14 @@ let of_block ~logger
     If the underlying types change, you should write a conversion, or add
     optional fields and handle them appropriately.
 *)
+(* But if you really need to update it, see output of CLI command:
+   `dune exec dump_blocks 2> block.txt` *)
 let%test_unit "Sexp serialization is stable" =
-  let serialized_block =
-    External_transition_sample_precomputed_block.sample_block_sexp
-  in
+  let serialized_block = Sample_precomputed_block.sample_block_sexp in
   ignore @@ t_of_sexp @@ Sexp.of_string serialized_block
 
 let%test_unit "Sexp serialization roundtrips" =
-  let serialized_block =
-    External_transition_sample_precomputed_block.sample_block_sexp
-  in
+  let serialized_block = Sample_precomputed_block.sample_block_sexp in
   let sexp = Sexp.of_string serialized_block in
   let sexp_roundtrip = sexp_of_t @@ t_of_sexp sexp in
   [%test_eq: Sexp.t] sexp sexp_roundtrip
@@ -163,10 +186,10 @@ let%test_unit "Sexp serialization roundtrips" =
     If the underlying types change, you should write a conversion, or add
     optional fields and handle them appropriately.
 *)
+(* But if you really need to update it, see output of CLI command:
+   `dune exec dump_blocks 2> block.txt` *)
 let%test_unit "JSON serialization is stable" =
-  let serialized_block =
-    External_transition_sample_precomputed_block.sample_block_json
-  in
+  let serialized_block = Sample_precomputed_block.sample_block_json in
   match of_yojson @@ Yojson.Safe.from_string serialized_block with
   | Ok _ ->
       ()
@@ -174,9 +197,7 @@ let%test_unit "JSON serialization is stable" =
       failwith err
 
 let%test_unit "JSON serialization roundtrips" =
-  let serialized_block =
-    External_transition_sample_precomputed_block.sample_block_json
-  in
+  let serialized_block = Sample_precomputed_block.sample_block_json in
   let json = Yojson.Safe.from_string serialized_block in
   let json_roundtrip =
     match Result.map ~f:to_yojson @@ of_yojson json with

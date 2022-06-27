@@ -40,8 +40,12 @@ val dummy_rule :
      , 'a * ('a * unit)
      , 'b * ('b * unit)
      , 'c * ('c * unit)
-     , 'd
-     , 'e )
+     , Zkapp_statement.Checked.t
+     , Zkapp_statement.t
+     , unit
+     , 'i
+     , unit
+     , unit )
      Pickles.Inductive_rule.t
 
 (** Generates base and merge snarks of all the party segments
@@ -63,7 +67,9 @@ val trivial_zkapp :
        , unit
        , unit
        , Zkapp_statement.t
-       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+       , ( unit
+         * unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t ] )
   Lazy.t
@@ -82,7 +88,9 @@ val test_snapp_update :
        , unit
        , unit
        , Zkapp_statement.t
-       , (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t
+       , ( unit
+         * unit
+         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
          Async.Deferred.t )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Spec.t

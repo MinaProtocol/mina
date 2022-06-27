@@ -49,6 +49,7 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   in
   let nybbles_per_row = 8 in
   let bits_per_row = 2 * nybbles_per_row in
+  [%test_eq: int] (num_bits mod bits_per_row) 0 ;
   let rows = num_bits / bits_per_row in
   let nybbles_by_row =
     lazy

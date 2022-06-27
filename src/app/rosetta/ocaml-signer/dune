@@ -8,6 +8,7 @@
    core
    core_kernel
    async
+   base
    lib
    async_unix
    async.async_command
@@ -28,7 +29,8 @@
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -40,14 +42,15 @@
  (public_name signer)
  (modes native)
  (modules signer)
- (libraries signer_cli async core_kernel)
+ (libraries signer_cli async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -59,14 +62,15 @@
  (public_name signer-testnet)
  (modes native)
  (modules signer_testnet_signatures)
- (libraries signer_cli async core_kernel)
+ (libraries signer_cli async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -78,14 +82,15 @@
  (public_name signer-mainnet)
  (modes native)
  (modules signer_mainnet_signatures)
- (libraries signer_cli async core_kernel)
+ (libraries signer_cli async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))

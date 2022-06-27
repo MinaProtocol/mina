@@ -50,6 +50,7 @@ module Worker_state = struct
     Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
+        Pickles.Side_loaded.srs_precomputation () ;
         Deferred.return
           (let module M = struct
              module T = Transaction_snark.Make (struct
@@ -82,9 +83,7 @@ module Worker_state = struct
                        [] )
                in
                let%map all_verified =
-                 Pickles.Side_loaded.verify
-                   ~value_to_field_elements:Zkapp_statement.to_field_elements
-                   to_verify
+                 Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
                in
                List.map cs ~f:(function
                  | `Valid c ->

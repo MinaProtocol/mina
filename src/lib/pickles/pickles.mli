@@ -11,6 +11,7 @@ module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Tag = Tag
+module Types_map = Types_map
 module Step_verifier = Step_verifier
 module Common = Common
 
@@ -72,7 +73,7 @@ end
 module Proof : sig
   type ('max_width, 'mlmb) t
 
-  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
+  val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> domain_log2:int -> ('w, 'm) t
 
   module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
     type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]
@@ -98,11 +99,15 @@ module Statement_with_proof : sig
 end
 
 module Inductive_rule : sig
+  module B : sig
+    type t = Impls.Step.Boolean.var
+  end
+
   module Previous_proof_statement : sig
     type ('prev_var, 'width) t =
       { public_input : 'prev_var
       ; proof : ('width, 'width) Proof.t Impls.Step.As_prover.Ref.t
-      ; proof_must_verify : Impls.Step.Boolean.var
+      ; proof_must_verify : B.t
       }
 
     module Constant : sig
@@ -114,10 +119,107 @@ module Inductive_rule : sig
     end
   end
 
-  type ('prev_vars, 'prev_values, 'widths, 'heights, 'a_var, 'a_value) t =
+  (** This type relates the types of the input and output types of an inductive
+    rule's [main] function to the type of the public input to the resulting
+    circuit.
+*)
+  type ( 'var
+       , 'value
+       , 'input_var
+       , 'input_value
+       , 'ret_var
+       , 'ret_value )
+       public_input =
+    | Input :
+        ('var, 'value) Impls.Step.Typ.t
+        -> ('var, 'value, 'var, 'value, unit, unit) public_input
+    | Output :
+        ('ret_var, 'ret_value) Impls.Step.Typ.t
+        -> ('ret_var, 'ret_value, unit, unit, 'ret_var, 'ret_value) public_input
+    | Input_and_output :
+        ('var, 'value) Impls.Step.Typ.t
+        * ('ret_var, 'ret_value) Impls.Step.Typ.t
+        -> ( 'var * 'ret_var
+           , 'value * 'ret_value
+           , 'var
+           , 'value
+           , 'ret_var
+           , 'ret_value )
+           public_input
+
+  (** The input type of an inductive rule's main function. *)
+  type 'public_input main_input =
+    { public_input : 'public_input
+          (** The publicly-exposed input to the circuit's main function. *)
+    }
+
+  (** The return type of an inductive rule's main function. *)
+  type ('prev_vars, 'widths, 'public_output, 'auxiliary_output) main_return =
+    { previous_proof_statements :
+        ('prev_vars, 'widths) H2.T(Previous_proof_statement).t
+          (** A list of booleans, determining whether each previous proof must
+            verify.
+        *)
+    ; public_output : 'public_output
+          (** The publicly-exposed output from the circuit's main function. *)
+    ; auxiliary_output : 'auxiliary_output
+          (** The auxiliary output from the circuit's main function. This value
+            is returned to the prover, but not exposed to or used by verifiers.
+        *)
+    }
+
+  (** This type models an "inductive rule". It includes
+    - the list of previous statements which this one assumes
+    - the snarky main function
+
+    The types parameters are:
+    - ['prev_vars] the tuple-list of public input circuit types to the previous
+      proofs.
+      - For example, [Boolean.var * (Boolean.var * unit)] represents 2 previous
+        proofs whose public inputs are booleans
+    - ['prev_values] the tuple-list of public input non-circuit types to the
+      previous proofs.
+      - For example, [bool * (bool * unit)] represents 2 previous proofs whose
+        public inputs are booleans.
+    - ['widths] is a tuple list of the maximum number of previous proofs each
+      previous proof itself had.
+      - For example, [Nat.z Nat.s * (Nat.z * unit)] represents 2 previous
+        proofs where the first has at most 1 previous proof and the second had
+        zero previous proofs.
+    - ['heights] is a tuple list of the number of inductive rules in each of
+      the previous proofs
+      - For example, [Nat.z Nat.s Nat.s * (Nat.z Nat.s * unit)] represents 2
+        previous proofs where the first had 2 inductive rules and the second
+        had 1.
+    - ['a_var] is the in-circuit type of the [main] function's public input.
+    - ['a_value] is the out-of-circuit type of the [main] function's public
+      input.
+    - ['ret_var] is the in-circuit type of the [main] function's public output.
+    - ['ret_value] is the out-of-circuit type of the [main] function's public
+      output.
+    - ['auxiliary_var] is the in-circuit type of the [main] function's
+      auxiliary data, to be returned to the prover but not exposed in the
+      public input.
+    - ['auxiliary_value] is the out-of-circuit type of the [main] function's
+      auxiliary data, to be returned to the prover but not exposed in the
+      public input.
+*)
+  type ( 'prev_vars
+       , 'prev_values
+       , 'widths
+       , 'heights
+       , 'a_var
+       , 'a_value
+       , 'ret_var
+       , 'ret_value
+       , 'auxiliary_var
+       , 'auxiliary_value )
+       t =
     { identifier : string
     ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
-    ; main : 'a_var -> ('prev_vars, 'widths) H2.T(Previous_proof_statement).t
+    ; main :
+           'a_var main_input
+        -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
     }
 end
 
@@ -209,6 +311,8 @@ module Side_loaded : sig
       end
     end]
 
+    val of_proof : _ Proof.t -> t
+
     val to_base64 : t -> string
 
     val of_base64 : string -> (t, string) Result.t
@@ -217,18 +321,16 @@ module Side_loaded : sig
   val create :
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
-    -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
-    -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
   val verify_promise :
-       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+       typ:('var, 'value) Impls.Step.Typ.t
     -> (Verification_key.t * 'value * Proof.t) list
     -> bool Promise.t
 
   val verify :
-       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+       typ:('var, 'value) Impls.Step.Typ.t
     -> (Verification_key.t * 'value * Proof.t) list
     -> bool Deferred.t
 
@@ -240,78 +342,110 @@ module Side_loaded : sig
   (* Must be called immediately before calling the prover for the inductive rule
      for which this tag is used as a predecessor. *)
   val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
+
+  val srs_precomputation : unit -> unit
 end
 
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile_promise :
-     ?self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+     ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
-  -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> public_input:
+       ( 'var
+       , 'value
+       , 'a_var
+       , 'a_value
+       , 'ret_var
+       , 'ret_value )
+       Inductive_rule.public_input
+  -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
-       (   self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+       (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
         -> ( 'prev_varss
            , 'prev_valuess
            , 'widthss
            , 'heightss
            , 'a_var
-           , 'a_value )
-           H4_2.T(Inductive_rule).t )
-  -> ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+           , 'a_value
+           , 'ret_var
+           , 'ret_value
+           , 'auxiliary_var
+           , 'auxiliary_value )
+           H4_6.T(Inductive_rule).t )
+  -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
-           and type statement = 'a_value )
+           and type statement = 'value )
      * ( 'prev_valuess
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_proofs_verified, 'max_proofs_verified) Proof.t Promise.t )
+       , ( 'ret_value
+         * 'auxiliary_value
+         * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
+         Promise.t )
        H3_2.T(Prover).t
 
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile :
-     ?self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+     ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
-  -> typ:('a_var, 'a_value) Impls.Step.Typ.t
+  -> public_input:
+       ( 'var
+       , 'value
+       , 'a_var
+       , 'a_value
+       , 'ret_var
+       , 'ret_value )
+       Inductive_rule.public_input
+  -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:
-       (   self:('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+       (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
         -> ( 'prev_varss
            , 'prev_valuess
            , 'widthss
            , 'heightss
            , 'a_var
-           , 'a_value )
-           H4_2.T(Inductive_rule).t )
-  -> ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
+           , 'a_value
+           , 'ret_var
+           , 'ret_value
+           , 'auxiliary_var
+           , 'auxiliary_value )
+           H4_6.T(Inductive_rule).t )
+  -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
-           and type statement = 'a_value )
+           and type statement = 'value )
      * ( 'prev_valuess
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_proofs_verified, 'max_proofs_verified) Proof.t Deferred.t )
+       , ( 'ret_value
+         * 'auxiliary_value
+         * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
+         Deferred.t )
        H3_2.T(Prover).t

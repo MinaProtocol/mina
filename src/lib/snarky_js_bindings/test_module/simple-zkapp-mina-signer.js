@@ -59,7 +59,10 @@ tic("create update transaction (with proof)");
 let partiesJsonUpdate = await Mina.transaction(() =>
   new SimpleZkapp(zkappAddress).update(Field(3))
 )
-  .then((tx) => tx.prove())
+  .then(async (tx) => {
+    await tx.prove();
+    return tx;
+  })
   .then((tx) => tx.toJSON());
 toc();
 

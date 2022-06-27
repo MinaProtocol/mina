@@ -204,15 +204,20 @@ let%test_module "multisig_account" =
                   { identifier = "multisig-rule"
                   ; prevs = []
                   ; main =
-                      (fun x ->
+                      (fun { public_input = x } ->
                         Run.run_checked @@ multisig_main x ;
-                        [] )
+
+                        { previous_proof_statements = []
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
                   (module Zkapp_statement.Checked)
                   (module Zkapp_statement)
-                  ~typ:Zkapp_statement.typ
+                  ~public_input:(Input Zkapp_statement.typ)
+                  ~auxiliary_typ:Typ.unit
                   ~branches:(module Nat.N2)
                   ~max_proofs_verified:(module Nat.N2)
                     (* You have to put 2 here... *)
@@ -242,15 +247,19 @@ let%test_module "multisig_account" =
                               (Transaction_snark.dummy_constraints ()) ;
                             (* Unsatisfiable. *)
                             Run.Field.(Assert.equal s (s + one)) ;
-                            [ { public_input
-                              ; proof
-                              ; proof_must_verify = Boolean.true_
-                              }
-                            ; { public_input
-                              ; proof
-                              ; proof_must_verify = Boolean.true_
-                              }
-                            ] )
+                            { previous_proof_statements =
+                                [ { public_input
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ; { public_input
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                       }
                     ] )
               in
@@ -319,7 +328,7 @@ let%test_module "multisig_account" =
                 ; authorization = Signature.dummy
                 }
               in
-              let sender_party_data : Party.Wire.t =
+              let sender_party_data : Party.Simple.t =
                 { body =
                     { public_key = sender_pk
                     ; update = Party.Update.noop
@@ -331,17 +340,18 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
-                    ; account_precondition =
-                        Nonce (Account.Nonce.succ sender_nonce)
+                    ; preconditions =
+                        { Party.Preconditions.network =
+                            Zkapp_precondition.Protocol_state.accept
+                        ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        }
                     ; use_full_commitment = false
                     ; caller = Call
                     }
                 ; authorization = Signature Signature.dummy
                 }
               in
-              let snapp_party_data : Party.Wire.t =
+              let snapp_party_data : Party.Simple.t =
                 { body =
                     { public_key = multisig_account_pk
                     ; update = update_empty_permissions
@@ -353,10 +363,11 @@ let%test_module "multisig_account" =
                     ; sequence_events = []
                     ; call_data = Field.zero
                     ; call_depth = 0
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
-                    ; account_precondition =
-                        Full Zkapp_precondition.Account.accept
+                    ; preconditions =
+                        { Party.Preconditions.network =
+                            Zkapp_precondition.Protocol_state.accept
+                        ; account = Full Zkapp_precondition.Account.accept
+                        }
                     ; use_full_commitment = false
                     ; caller = Call
                     }
@@ -366,9 +377,9 @@ let%test_module "multisig_account" =
               let memo = Signed_command_memo.empty in
               let ps =
                 Parties.Call_forest.of_parties_list
-                  ~party_depth:(fun (p : Party.Wire.t) -> p.body.call_depth)
+                  ~party_depth:(fun (p : Party.Simple.t) -> p.body.call_depth)
                   [ sender_party_data; snapp_party_data ]
-                |> Parties.Call_forest.add_callers'
+                |> Parties.Call_forest.add_callers_simple
                 |> Parties.Call_forest.accumulate_hashes_predicated
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
@@ -376,9 +387,14 @@ let%test_module "multisig_account" =
                 (*FIXME: is this correct? *)
                 Parties.Transaction_commitment.create ~other_parties_hash
               in
-              let at_party = Parties.Call_forest.hash ps in
               let tx_statement : Zkapp_statement.t =
-                { transaction; at_party = (at_party :> Field.t) }
+                { party =
+                    Party.Body.digest
+                      (Parties.add_caller_simple snapp_party_data
+                         Token_id.default )
+                        .body
+                ; calls = (Parties.Digest.Forest.empty :> field)
+                }
               in
               let msg =
                 tx_statement |> Zkapp_statement.to_field_elements
@@ -405,7 +421,7 @@ let%test_module "multisig_account" =
                 | _ ->
                     respond Unhandled
               in
-              let pi : Pickles.Side_loaded.Proof.t =
+              let (), (), (pi : Pickles.Side_loaded.Proof.t) =
                 (fun () -> multisig_prover ~handler tx_statement)
                 |> Async.Thread_safe.block_on_async_exn
               in
@@ -423,7 +439,7 @@ let%test_module "multisig_account" =
                       (Random_oracle.Input.Chunked.field txn_comm)
                 }
               in
-              let sender : Party.Wire.t =
+              let sender : Party.Simple.t =
                 { body = sender_party_data.body
                 ; authorization =
                     Signature
@@ -432,7 +448,7 @@ let%test_module "multisig_account" =
                 }
               in
               let parties : Parties.t =
-                Parties.of_wire
+                Parties.of_simple
                   { fee_payer
                   ; other_parties =
                       [ sender

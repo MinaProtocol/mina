@@ -48,6 +48,8 @@ module Make (Engine : Intf.Engine.S) () :
 
   let network_state t = Broadcast_pipe.Reader.peek t.network_state_reader
 
+  let event_router t = t.event_router
+
   let create ~logger ~network ~event_router ~network_state_reader =
     let t = { logger; network; event_router; network_state_reader } in
     `Don't_call_in_tests t
@@ -138,8 +140,11 @@ module Make (Engine : Intf.Engine.S) () :
     in
     match result with
     | `Hard_timeout ->
-        Malleable_error.hard_error_format "hit a hard timeout waiting for %s"
-          condition.description
+        let exit_code =
+          match condition.id with Nodes_to_initialize -> Some 20 | _ -> None
+        in
+        Malleable_error.hard_error_format ?exit_code
+          "hit a hard timeout waiting for %s" condition.description
     | `Failure error ->
         Malleable_error.hard_error
           (Error.of_list
@@ -208,7 +213,8 @@ module Make (Engine : Intf.Engine.S) () :
         : 'a Event_router.event_subscription ) ;
     log_error_accumulator
 
-  let lift_accumulated_log_errors { warn; faulty_peer; error; fatal } =
+  let lift_accumulated_log_errors ?exit_code { warn; faulty_peer; error; fatal }
+      =
     let open Test_error in
     let lift error_array =
       DynArray.to_list error_array
@@ -223,5 +229,8 @@ module Make (Engine : Intf.Engine.S) () :
     in
     let soft_errors = accumulate_errors (lift warn @ lift faulty_peer) in
     let hard_errors = accumulate_errors (lift error @ lift fatal) in
-    { Set.soft_errors; hard_errors }
+    let exit_code =
+      if Error_accumulator.is_empty hard_errors then None else exit_code
+    in
+    { Set.soft_errors; hard_errors; exit_code }
 end

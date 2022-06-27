@@ -15,8 +15,8 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
-    type t =
+  module V3 : sig
+    type nonrec t =
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
@@ -50,5 +50,5 @@ val of_block :
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> scheduled_time:Block_time.Time.t
   -> staged_ledger:Staged_ledger.t
-  -> Block.t
+  -> (Block.t, Mina_base.State_hash.State_hashes.t) With_hash.t
   -> t

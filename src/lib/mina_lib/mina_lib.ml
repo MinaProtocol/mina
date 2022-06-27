@@ -73,8 +73,7 @@ type command_inputs =
   | Snapp_command_inputs of Parties.t list
 
 type pipes =
-  { validated_transitions_reader :
-      External_transition.Validated.t Strict_pipe.Reader.t
+  { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
   ; producer_transition_writer :
       ( Transition_frontier.Breadcrumb.t
       , Strict_pipe.synchronous
@@ -293,9 +292,9 @@ module Snark_worker = struct
     | `Off _ ->
         None
 
-  let replace_key
-      ({ processes = { snark_worker; _ }; config = { logger; _ }; _ } as t)
-      new_key =
+  let replace_key t new_key =
+    let snark_worker = t.processes.snark_worker in
+    let logger = t.config.logger in
     match (snark_worker, new_key) with
     | `Off _, None ->
         [%log info]
@@ -662,18 +661,15 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       account_id
   in
   let txn_pool_nonce =
-    let nonces =
-      List.map pooled_transactions
-        ~f:
-          (Fn.compose User_command.nonce_exn
-             Transaction_hash.User_command_with_valid_signature.command )
-    in
-    (* The last nonce gives us the maximum nonce in the transaction pool *)
-    List.last nonces
+    List.last pooled_transactions
+    |> Option.map
+         ~f:
+           (Fn.compose User_command.target_nonce
+              Transaction_hash.User_command_with_valid_signature.command )
   in
   match txn_pool_nonce with
   | Some nonce ->
-      Participating_state.Option.return (Account.Nonce.succ nonce)
+      Participating_state.Option.return nonce
   | None ->
       let open Participating_state.Option.Let_syntax in
       let%map account = get_account t account_id in
@@ -1812,8 +1808,7 @@ let create ?wallets (config : Config.t) =
             let api_pipe, new_blocks_pipe =
               Strict_pipe.Reader.(
                 Fork.two
-                  (map downstream_pipe ~f:(fun (`Transition t, _, _) ->
-                       External_transition.Validated.lift t ) ))
+                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
             in
             (network_pipe, api_pipe, new_blocks_pipe)
           in

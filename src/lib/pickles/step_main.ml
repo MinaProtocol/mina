@@ -23,10 +23,6 @@ let one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
-(* Converts a one hot vector to an Index.t value *)
-let one_hot_vector_to_index v =
-  one_hot_vector_to_num v |> Types.Index.of_field (module Impl)
-
 let verify_one
     ({ app_state
      ; wrap_proof
@@ -49,32 +45,28 @@ let verify_one
           sponge
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
-        finalize_other_proof d.max_proofs_verified ~max_width:d.max_width
-          ~step_widths:d.proofs_verifieds ~step_domains:d.step_domains ~sponge
-          ~prev_challenges proof_state.deferred_values prev_proof_evals )
+        finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
+          ~sponge ~prev_challenges proof_state.deferred_values prev_proof_evals )
   in
-  let which_branch = proof_state.deferred_values.which_branch in
-  let proof_state =
-    with_label __LOC__ (fun () ->
-        { proof_state with
-          deferred_values =
-            { proof_state.deferred_values with
-              which_branch =
-                one_hot_vector_to_num proof_state.deferred_values.which_branch
-                |> Types.Index.of_field (module Impl)
-            }
-        } )
-  in
+  let branch_data = proof_state.deferred_values.branch_data in
   let statement =
     let prev_me_only =
       with_label __LOC__ (fun () ->
           let hash =
+            let to_field_elements =
+              let (Typ typ) = d.public_input in
+              fun x -> fst (typ.var_to_fields x)
+            in
             (* TODO: Don't rehash when it's not necessary *)
-            unstage (hash_me_only_opt ~index:d.wrap_key d.var_to_field_elements)
+            unstage (hash_me_only_opt ~index:d.wrap_key to_field_elements)
           in
           hash ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
-            ~which_branch
+            ~proofs_verified_mask:
+              (Vector.trim branch_data.proofs_verified_mask
+                 (Nat.lte_exn
+                    (Vector.length prev_challenge_polynomial_commitments)
+                    Nat.N2.n ) )
             (* Use opt sponge for cutting off the bulletproof challenges early *)
             { app_state
             ; dlog_plonk_index = d.wrap_key
@@ -89,8 +81,7 @@ let verify_one
   in
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~proofs_verified:d.max_proofs_verified
-          ~wrap_domain:d.wrap_domains.h
+        verify ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
           ~is_base_case:(Boolean.not should_verify)
           ~sg_old:prev_challenge_polynomial_commitments ~proof:wrap_proof
           ~wrap_verification_key:d.wrap_key statement unfinalized )
@@ -111,13 +102,15 @@ let finalize_previous_and_verify = ()
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
-    type proofs_verified self_branches prev_vars prev_values a_var a_value max_proofs_verified local_branches local_signature.
+    type proofs_verified self_branches prev_vars prev_values prev_ret_vars var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
            and type statement = a_value
            and type prev_values = prev_values
-           and type max_proofs_verified = max_proofs_verified )
+           and type max_proofs_verified = max_proofs_verified
+           and type return_value = ret_value
+           and type auxiliary_value = auxiliary_value )
     -> (module Nat.Add.Intf with type n = max_proofs_verified)
     -> self_branches:self_branches Nat.t
          (* How many branches does this proof system have *)
@@ -131,19 +124,32 @@ let step_main :
     -> local_branches_length:(local_branches, proofs_verified) Hlist.Length.t
     -> proofs_verified:(prev_vars, proofs_verified) Hlist.Length.t
     -> lte:(proofs_verified, max_proofs_verified) Nat.Lte.t
-    -> basic:
-         ( a_var
+    -> public_input:
+         ( var
+         , value
+         , a_var
          , a_value
+         , ret_var
+         , ret_value )
+         Inductive_rule.public_input
+    -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
+    -> basic:
+         ( var
+         , value
          , max_proofs_verified
          , self_branches )
          Types_map.Compiled.basic
-    -> self:(a_var, a_value, max_proofs_verified, self_branches) Tag.t
+    -> self:(var, value, max_proofs_verified, self_branches) Tag.t
     -> ( prev_vars
        , prev_values
        , local_signature
        , local_branches
        , a_var
-       , a_value )
+       , a_value
+       , ret_var
+       , ret_value
+       , auxiliary_var
+       , auxiliary_value )
        Inductive_rule.t
     -> (   unit
         -> ( (Unfinalized.t, max_proofs_verified) Vector.t
@@ -151,9 +157,9 @@ let step_main :
            , (Field.t, max_proofs_verified) Vector.t )
            Types.Step.Statement.t )
        Staged.t =
- fun (module Req) (module Max_proofs_verified) ~self_branches ~local_signature
+ fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
-     ~proofs_verified ~lte ~basic ~self rule ->
+     ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
@@ -204,15 +210,45 @@ let step_main :
         let f = Fn.id
       end)
   in
+  let (input_typ, output_typ)
+        : (a_var, a_value) Typ.t * (ret_var, ret_value) Typ.t =
+    match public_input with
+    | Input typ ->
+        (typ, Typ.unit)
+    | Output typ ->
+        (Typ.unit, typ)
+    | Input_and_output (input_typ, output_typ) ->
+        (input_typ, output_typ)
+  in
   let main () : _ Types.Step.Statement.t =
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
+        let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                             with type n = max_proofs_verified
+                                         )
+        in
         let T = Max_proofs_verified.eq in
-        let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
-        let previous_proof_statements =
+        let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
+        let { Inductive_rule.previous_proof_statements
+            ; public_output = ret_var
+            ; auxiliary_output = auxiliary_var
+            } =
           (* Run the application logic of the rule on the predecessor statements *)
-          with_label "rule_main" (fun () -> rule.main app_state)
+          with_label "rule_main" (fun () ->
+              rule.main { public_input = app_state } )
+        in
+        let () =
+          exists Typ.unit ~request:(fun () ->
+              let ret_value = As_prover.read output_typ ret_var in
+              Req.Return_value ret_value )
+        in
+        let () =
+          exists Typ.unit ~request:(fun () ->
+              let auxiliary_value =
+                As_prover.read auxiliary_typ auxiliary_var
+              in
+              Req.Auxiliary_value auxiliary_value )
         in
         (* Compute proof parts outside of the prover before requesting values.
         *)
@@ -239,9 +275,9 @@ let step_main :
                         let typ : (var, value) Typ.t =
                           match Type_equal.Id.same_witness self.id tag.id with
                           | Some T ->
-                              basic.typ
+                              basic.public_input
                           | None ->
-                              Types_map.typ tag
+                              Types_map.public_input tag
                         in
                         As_prover.read typ var )
                         tag public_input
@@ -276,7 +312,7 @@ let step_main :
         let prevs =
           (* Inject the app-state values into the per-proof witnesses. *)
           let rec go :
-              type vars vals ns1 ns2.
+              type vars ns1 ns2.
                  (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
               -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
               -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
@@ -292,7 +328,7 @@ let step_main :
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
-                  type vars vals ns1 ns2 n.
+                  type vars vals prev_vals ns1 ns2 n.
                      (vars, ns1, ns2) H3.T(Per_proof_witness).t
                   -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t
@@ -330,20 +366,18 @@ let step_main :
                   H.f proofs_verified (Vector.trim unfinalized_proofs lte)
                 and datas =
                   let self_data :
-                      ( a_var
-                      , a_value
+                      ( var
+                      , value
                       , max_proofs_verified
                       , self_branches )
                       Types_map.For_step.t =
                     { branches = self_branches
                     ; proofs_verifieds =
-                        Vector.map basic.proofs_verifieds ~f:Field.of_int
-                    ; max_proofs_verified = (module Max_proofs_verified)
-                    ; max_width = None
-                    ; typ = basic.typ
-                    ; var_to_field_elements = basic.var_to_field_elements
-                    ; value_to_field_elements = basic.value_to_field_elements
-                    ; wrap_domains = basic.wrap_domains
+                        `Known
+                          (Vector.map basic.proofs_verifieds ~f:Field.of_int)
+                    ; max_proofs_verified
+                    ; public_input = basic.public_input
+                    ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
                     }
@@ -352,9 +386,9 @@ let step_main :
                     H4.Map (Tag) (Types_map.For_step)
                       (struct
                         let f :
-                            type a b n m.
-                               (a, b, n, m) Tag.t
-                            -> (a, b, n, m) Types_map.For_step.t =
+                            type a1 a2 n m.
+                               (a1, a2, n, m) Tag.t
+                            -> (a1, a2, n, m) Types_map.For_step.t =
                          fun tag ->
                           match Type_equal.Id.same_witness self.id tag.id with
                           | Some T ->
@@ -393,9 +427,20 @@ let step_main :
           in
           with_label "hash_me_only" (fun () ->
               let hash_me_only =
-                unstage
-                  (hash_me_only ~index:dlog_plonk_index
-                     basic.var_to_field_elements )
+                let to_field_elements =
+                  let (Typ typ) = basic.public_input in
+                  fun x -> fst (typ.var_to_fields x)
+                in
+                unstage (hash_me_only ~index:dlog_plonk_index to_field_elements)
+              in
+              let (app_state : var) =
+                match public_input with
+                | Input _ ->
+                    app_state
+                | Output _ ->
+                    ret_var
+                | Input_and_output _ ->
+                    (app_state, ret_var)
               in
               hash_me_only
                 { app_state

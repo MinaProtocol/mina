@@ -74,6 +74,17 @@ macro_rules! impl_srs {
             }
 
             #[wasm_bindgen]
+            pub fn [<$name:snake _add_lagrange_basis>](
+                srs: &[<Wasm $field_name:camel Srs>],
+                log2_size: i32,
+            ) {
+                let ptr: &mut commitment_dlog::srs::SRS<$G> =
+                    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
+                ptr.add_lagrange_basis(domain);
+            }
+
+            #[wasm_bindgen]
             pub fn [<$name:snake _write>](
                 append: Option<bool>,
                 srs: &[<Wasm $field_name:camel Srs>],

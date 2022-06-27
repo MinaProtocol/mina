@@ -1,23 +1,38 @@
 open Core_kernel
 
-let add_caller' (p : Party.Body.Wire.t) caller : Party.Body.t =
-  { public_key = p.public_key
-  ; token_id = p.token_id
-  ; update = p.update
-  ; balance_change = p.balance_change
-  ; increment_nonce = p.increment_nonce
-  ; events = p.events
-  ; sequence_events = p.sequence_events
-  ; call_data = p.call_data
-  ; call_depth = p.call_depth
-  ; protocol_state_precondition = p.protocol_state_precondition
-  ; account_precondition = p.account_precondition
-  ; use_full_commitment = p.use_full_commitment
-  ; caller
-  }
-
 let add_caller (p : Party.Wire.t) caller : Party.t =
-  { body = add_caller' p.body caller; authorization = p.authorization }
+  let add_caller_body (p : Party.Body.Wire.t) caller : Party.Body.t =
+    { public_key = p.public_key
+    ; token_id = p.token_id
+    ; update = p.update
+    ; balance_change = p.balance_change
+    ; increment_nonce = p.increment_nonce
+    ; events = p.events
+    ; sequence_events = p.sequence_events
+    ; call_data = p.call_data
+    ; preconditions = p.preconditions
+    ; use_full_commitment = p.use_full_commitment
+    ; caller
+    }
+  in
+  { body = add_caller_body p.body caller; authorization = p.authorization }
+
+let add_caller_simple (p : Party.Simple.t) caller : Party.t =
+  let add_caller_body (p : Party.Body.Simple.t) caller : Party.Body.t =
+    { public_key = p.public_key
+    ; token_id = p.token_id
+    ; update = p.update
+    ; balance_change = p.balance_change
+    ; increment_nonce = p.increment_nonce
+    ; events = p.events
+    ; sequence_events = p.sequence_events
+    ; call_data = p.call_data
+    ; preconditions = p.preconditions
+    ; use_full_commitment = p.use_full_commitment
+    ; caller
+    }
+  in
+  { body = add_caller_body p.body caller; authorization = p.authorization }
 
 module Call_forest = struct
   let empty = Outside_hash_image.t
@@ -67,19 +82,28 @@ module Call_forest = struct
     let iter2_exn ts1 ts2 ~f =
       fold2_exn ts1 ts2 ~init:() ~f:(fun () p1 p2 -> f p1 p2)
 
-    let rec mapi' ~i (t : _ t) ~f =
-      let l, calls = mapi_forest' ~i:(i + 1) t.calls ~f in
-      (l, { calls; party = f i t.party; party_digest = t.party_digest })
+    let rec mapi_with_trees' ~i (t : _ t) ~f =
+      let l, calls = mapi_forest_with_trees' ~i:(i + 1) t.calls ~f in
+      (l, { calls; party = f i t.party t; party_digest = t.party_digest })
 
-    and mapi_forest' ~i x ~f =
+    and mapi_forest_with_trees' ~i x ~f =
       let rec go i acc = function
         | [] ->
             (i, List.rev acc)
         | t :: ts ->
-            let l, elt' = mapi' ~i ~f (With_stack_hash.elt t) in
+            let l, elt' = mapi_with_trees' ~i ~f (With_stack_hash.elt t) in
             go l (With_stack_hash.map t ~f:(fun _ -> elt') :: acc) ts
       in
       go i [] x
+
+    let mapi_with_trees t ~f = mapi_with_trees' ~i:0 t ~f |> snd
+
+    let mapi_forest_with_trees t ~f = mapi_forest_with_trees' ~i:0 t ~f |> snd
+
+    let mapi' ~i t ~f = mapi_with_trees' ~i t ~f:(fun i party _ -> f i party)
+
+    let mapi_forest' ~i t ~f =
+      mapi_forest_with_trees' ~i t ~f:(fun i party _ -> f i party)
 
     let map_forest ~f t = mapi_forest' ~i:0 ~f:(fun _ x -> f x) t |> snd
 
@@ -249,8 +273,50 @@ module Call_forest = struct
     end
   end]
 
-  let rec of_parties_list ~(party_depth : 'p -> int) (parties : 'p list) :
-      ('p, unit, unit) t =
+  module Shape = struct
+    module I = struct
+      type t = int
+
+      let quickcheck_shrinker = Quickcheck.Shrinker.empty ()
+
+      let quickcheck_generator = [%quickcheck.generator: int]
+
+      let quickcheck_observer = [%quickcheck.observer: int]
+    end
+
+    type t = Node of (I.t * t) list [@@deriving quickcheck]
+  end
+
+  let rec shape (t : _ t) : Shape.t =
+    Node (List.mapi t ~f:(fun i { elt; stack_hash = _ } -> (i, shape elt.calls)))
+
+  let match_up (type a b) (xs : a list) (ys : (int * b) list) : (a * b) list =
+    let rec go i_curr xs ys =
+      match (xs, ys) with
+      | [], [] ->
+          []
+      | x :: xs', (i, y) :: ys' ->
+          if i_curr = i then (x, y) :: go (i_curr + 1) xs' ys'
+          else if i_curr < i then go (i_curr + 1) xs' ys'
+          else assert false
+      | [], _ :: _ ->
+          assert false
+      | _ :: _, [] ->
+          []
+    in
+    go 0 xs ys
+
+  let rec mask (t : ('p, 'h1, unit) t) (Node shape : Shape.t) :
+      ('p, 'h1, unit) t =
+    List.map (match_up t shape)
+      ~f:(fun ({ With_stack_hash.elt = t_sub; stack_hash = () }, shape_sub) ->
+        { With_stack_hash.elt =
+            { t_sub with calls = mask t_sub.calls shape_sub }
+        ; stack_hash = ()
+        } )
+
+  let rec of_parties_list_map ~(f : 'p1 -> 'p2) ~(party_depth : 'p1 -> int)
+      (parties : 'p1 list) : ('p2, unit, unit) t =
     match parties with
     | [] ->
         []
@@ -260,23 +326,29 @@ module Call_forest = struct
           List.split_while ps ~f:(fun p' -> party_depth p' > depth)
         in
         { With_stack_hash.elt =
-            { Tree.party = p
+            { Tree.party = f p
             ; party_digest = ()
-            ; calls = of_parties_list ~party_depth children
+            ; calls = of_parties_list_map ~f ~party_depth children
             }
         ; stack_hash = ()
         }
-        :: of_parties_list ~party_depth siblings
+        :: of_parties_list_map ~f ~party_depth siblings
 
-  let to_parties_list (xs : _ t) =
-    let rec collect (xs : _ t) acc =
+  let of_parties_list ~party_depth parties =
+    of_parties_list_map ~f:Fn.id ~party_depth parties
+
+  let to_parties_list_map ~f (xs : _ t) =
+    let rec collect depth (xs : _ t) acc =
       match xs with
       | [] ->
           acc
       | { elt = { party; calls; party_digest = _ }; stack_hash = _ } :: xs ->
-          party :: acc |> collect calls |> collect xs
+          f ~depth party :: acc |> collect (depth + 1) calls |> collect depth xs
     in
-    List.rev (collect xs [])
+    List.rev (collect 0 xs [])
+
+  let to_parties_list xs =
+    to_parties_list_map ~f:(fun ~depth:_ party -> party) xs
 
   let hd_party (xs : _ t) =
     match xs with
@@ -288,6 +360,8 @@ module Call_forest = struct
   let map = Tree.map_forest
 
   let mapi = Tree.mapi_forest
+
+  let mapi_with_trees = Tree.mapi_forest_with_trees
 
   let%test_unit "Party_or_stack.of_parties_list" =
     let parties_list_1 = [ 0; 0; 0; 0 ] in
@@ -453,12 +527,23 @@ module Call_forest = struct
         Account_id.(
           derive_token_id ~owner:(create p.body.public_key p.body.token_id)) )
 
-  let remove_callers (type party_with_caller party_without_sender h1 h2 id)
+  let add_callers_simple (type h1 h2) (ps : (Party.Simple.t, h1, h2) t) :
+      (Party.t, h1, h2) t =
+    add_callers ps
+      ~call_type:(fun p -> p.body.caller)
+      ~add_caller:add_caller_simple ~null_id:Token_id.default
+      ~party_id:(fun p ->
+        Account_id.(
+          derive_token_id ~owner:(create p.body.public_key p.body.token_id)) )
+
+  let remove_callers
+      (type party_with_caller party_without_sender h1 h2 h1' h2' id)
+      ~(map_party_digest : h1 -> h1') ~(map_stack_hash : h2 -> h2')
       (ps : (party_with_caller, h1, h2) t) ~(equal_id : id -> id -> bool)
       ~(add_call_type :
          party_with_caller -> Party.Call_type.t -> party_without_sender )
       ~(null_id : id) ~(party_caller : party_with_caller -> id) :
-      (party_without_sender, h1, h2) t =
+      (party_without_sender, h1', h2') t =
     let rec go ~top_level_party parent_caller ps =
       let call_type_for_party p : Party.Call_type.t =
         if top_level_party then Call
@@ -473,10 +558,10 @@ module Call_forest = struct
           let ty = call_type_for_party p in
           { With_stack_hash.elt =
               { Tree.party = add_call_type p ty
-              ; party_digest
+              ; party_digest = map_party_digest party_digest
               ; calls = go ~top_level_party:false (party_caller p) calls
               }
-          ; stack_hash
+          ; stack_hash = map_stack_hash stack_hash
           }
           :: go ~top_level_party parent_caller ps
       | [] ->
@@ -550,6 +635,7 @@ module Call_forest = struct
       expected_output ;
     [%test_eq: With_call_type.t]
       (remove_callers expected_output ~equal_id:Int.equal
+         ~map_party_digest:Fn.id ~map_stack_hash:Fn.id
          ~add_call_type:(fun p call_type -> { p with caller = call_type })
          ~null_id
          ~party_caller:(fun p -> p.caller) )
@@ -576,19 +662,24 @@ module Call_forest = struct
 
     let accumulate_hashes xs : _ t = accumulate_hashes ~hash_party xs
 
-    let of_parties_list xs : _ t =
-      of_parties_list
-        ~party_depth:(fun ((p : Party.Wire.t), _) -> p.body.call_depth)
-        xs
+    let of_parties_simple_list (xs : (Party.Simple.t * 'a) list) : _ t =
+      of_parties_list xs ~party_depth:(fun ((p : Party.Simple.t), _) ->
+          p.body.call_depth )
       |> add_callers
-           ~call_type:(fun ((p : Party.Wire.t), _) -> p.body.caller)
-           ~add_caller:(fun (p, vk) (caller : Token_id.t) ->
-             ((add_caller p caller : Party.t), vk) )
+           ~call_type:(fun ((p : Party.Simple.t), _) -> p.body.caller)
+           ~add_caller:(fun (p, x) id -> (add_caller_simple p id, x))
            ~null_id:Token_id.default
-           ~party_id:(fun (p, _) ->
+           ~party_id:(fun ((p : Party.Simple.t), _) ->
              Account_id.(
                derive_token_id ~owner:(create p.body.public_key p.body.token_id))
              )
+      |> accumulate_hashes
+
+    let of_parties_list (xs : (Party.Graphql_repr.t * 'a) list) : _ t =
+      of_parties_list_map
+        ~party_depth:(fun ((p : Party.Graphql_repr.t), _) -> p.body.call_depth)
+        ~f:(fun (p, x) -> (Party.of_graphql_repr p, x))
+        xs
       |> accumulate_hashes
 
     let to_parties_list (x : _ t) = to_parties_list x
@@ -612,13 +703,13 @@ module Call_forest = struct
         false )
 end
 
-module Wire = struct
+module Graphql_repr = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         { fee_payer : Party.Fee_payer.Stable.V1.t
-        ; other_parties : Party.Wire.Stable.V1.t list
+        ; other_parties : Party.Graphql_repr.Stable.V1.t list
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -626,92 +717,243 @@ module Wire = struct
       let to_latest = Fn.id
     end
   end]
+end
 
-  module Valid = struct
-    module Stable = Stable
+module Simple = struct
+  (* For easily constructing values *)
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { fee_payer : Party.Fee_payer.Stable.V1.t
+        ; other_parties : Party.Simple.Stable.V1.t list
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
 
-    type t = Stable.Latest.t
-  end
-
-  let check_depths (t : t) =
-    try
-      let (_ : int) =
-        List.fold ~init:0 t.other_parties ~f:(fun depth party ->
-            let new_depth = party.body.call_depth in
-            if new_depth >= 0 && new_depth <= depth + 1 then new_depth
-            else assert false )
-      in
-      true
-    with _ -> false
-
-  let check (t : t) : bool = check_depths t
+      let to_latest = Fn.id
+    end
+  end]
 end
 
 module Digest = Call_forest.Digest
 
-[%%versioned_binable
-module Stable = struct
-  module V1 = struct
-    type t =
-      { fee_payer : Party.Fee_payer.Stable.V1.t
-      ; other_parties :
-          ( Party.Stable.V1.t
-          , Digest.Party.Stable.V1.t
-          , Digest.Forest.Stable.V1.t )
-          Call_forest.Stable.V1.t
-      ; memo : Signed_command_memo.Stable.V1.t
-      }
-    [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
+module T = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { fee_payer : Party.Fee_payer.Stable.V1.t
+        ; other_parties :
+            ( Party.Stable.V1.t
+            , Digest.Party.Stable.V1.t
+            , Digest.Forest.Stable.V1.t )
+            Call_forest.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving annot, sexp, compare, equal, hash, yojson, fields]
 
-    let to_latest = Fn.id
+      let to_latest = Fn.id
 
-    let version_byte = Base58_check.Version_bytes.snapp_command
+      let version_byte = Base58_check.Version_bytes.snapp_command
 
-    let description = "Parties"
+      let description = "Parties"
 
-    let of_wire (w : Wire.t) : t =
-      { fee_payer = w.fee_payer
-      ; memo = w.memo
-      ; other_parties =
-          w.other_parties
-          |> Call_forest.of_parties_list ~party_depth:(fun (p : Party.Wire.t) ->
-                 p.body.call_depth )
-          |> Call_forest.add_callers
-               ~call_type:(fun (p : Party.Wire.t) -> p.body.caller)
-               ~add_caller ~null_id:Token_id.default
-               ~party_id:(fun (p : Party.Wire.t) ->
-                 Account_id.(
-                   derive_token_id
-                     ~owner:(create p.body.public_key p.body.token_id)) )
-          |> Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
-                 Digest.Party.create p )
-      }
+      module Wire = struct
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              { fee_payer : Party.Fee_payer.Stable.V1.t
+              ; other_parties :
+                  (Party.Wire.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
+              ; memo : Signed_command_memo.Stable.V1.t
+              }
+            [@@deriving sexp, compare, equal, hash, yojson]
 
-    let to_wire (t : t) : Wire.t =
-      { fee_payer = t.fee_payer
-      ; memo = t.memo
-      ; other_parties =
-          Call_forest.to_parties_list
-            (Call_forest.remove_callers ~equal_id:Token_id.equal
-               ~add_call_type:Party.to_wire ~null_id:Token_id.default
-               ~party_caller:(fun p -> p.body.caller)
-               t.other_parties )
-      }
+            let to_latest = Fn.id
+          end
+        end]
 
-    include
-      Binable.Of_binable_without_uuid
-        (Wire.Stable.V1)
-        (struct
-          type nonrec t = t
+        let check (t : t) : unit =
+          List.iter t.other_parties ~f:(fun p ->
+              assert (Party.Call_type.equal p.elt.party.body.caller Call) )
 
-          let of_binable = of_wire
+        let of_graphql_repr (t : Graphql_repr.t) : t =
+          { fee_payer = t.fee_payer
+          ; memo = t.memo
+          ; other_parties =
+              Call_forest.of_parties_list_map t.other_parties
+                ~f:Party.of_graphql_repr
+                ~party_depth:(fun (p : Party.Graphql_repr.t) ->
+                  p.body.call_depth )
+              |> Call_forest.remove_callers ~equal_id:Token_id.equal
+                   ~map_party_digest:ignore ~map_stack_hash:ignore
+                   ~add_call_type:Party.to_wire ~null_id:Token_id.default
+                   ~party_caller:(fun p -> p.body.caller)
+          }
 
-          let to_binable = to_wire
-        end)
-  end
-end]
+        let to_graphql_repr (t : t) : Graphql_repr.t =
+          { fee_payer = t.fee_payer
+          ; memo = t.memo
+          ; other_parties =
+              t.other_parties
+              |> Call_forest.add_callers
+                   ~call_type:(fun (p : Party.Wire.t) -> p.body.caller)
+                   ~add_caller ~null_id:Token_id.default
+                   ~party_id:(fun (p : Party.Wire.t) ->
+                     Account_id.(
+                       derive_token_id
+                         ~owner:(create p.body.public_key p.body.token_id)) )
+              |> Call_forest.to_parties_list_map ~f:(fun ~depth party ->
+                     Party.to_graphql_repr party ~call_depth:depth )
+          }
+
+        let gen =
+          let open Quickcheck.Generator in
+          let open Let_syntax in
+          let gen_call_forest =
+            let%map xs =
+              fixed_point (fun self ->
+                  let%bind calls_length = small_non_negative_int in
+                  list_with_length calls_length
+                    (let%map party = Party.Wire.gen and calls = self in
+                     { With_stack_hash.stack_hash = ()
+                     ; elt =
+                         { Call_forest.Tree.party; party_digest = (); calls }
+                     } ) )
+            in
+            (* All top level parties should be "Call" not "Delegate_call" *)
+            List.map xs
+              ~f:
+                (With_stack_hash.map
+                   ~f:(fun (t : (Party.Wire.t, _, _) Call_forest.Tree.t) ->
+                     { t with
+                       party =
+                         { t.party with
+                           body = { t.party.body with caller = Call }
+                         }
+                     } ) )
+          in
+          let open Quickcheck.Let_syntax in
+          let%map fee_payer = Party.Fee_payer.gen
+          and other_parties = gen_call_forest
+          and memo = Signed_command_memo.gen in
+          { fee_payer; other_parties; memo }
+
+        let shrinker : t Quickcheck.Shrinker.t =
+          Quickcheck.Shrinker.create (fun t ->
+              let shape = Call_forest.shape t.other_parties in
+              Sequence.map
+                (Quickcheck.Shrinker.shrink
+                   Call_forest.Shape.quickcheck_shrinker shape )
+                ~f:(fun shape' ->
+                  { t with
+                    other_parties = Call_forest.mask t.other_parties shape'
+                  } ) )
+      end
+
+      let of_wire (w : Wire.t) : t =
+        { fee_payer = w.fee_payer
+        ; memo = w.memo
+        ; other_parties =
+            w.other_parties
+            |> Call_forest.add_callers
+                 ~call_type:(fun (p : Party.Wire.t) -> p.body.caller)
+                 ~add_caller ~null_id:Token_id.default
+                 ~party_id:(fun (p : Party.Wire.t) ->
+                   Account_id.(
+                     derive_token_id
+                       ~owner:(create p.body.public_key p.body.token_id)) )
+            |> Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
+                   Digest.Party.create p )
+        }
+
+      let to_wire (t : t) : Wire.t =
+        { fee_payer = t.fee_payer
+        ; memo = t.memo
+        ; other_parties =
+            Call_forest.remove_callers ~equal_id:Token_id.equal
+              ~map_party_digest:ignore ~map_stack_hash:ignore
+              ~add_call_type:Party.to_wire ~null_id:Token_id.default
+              ~party_caller:(fun p -> p.body.caller)
+              t.other_parties
+        }
+
+      include
+        Binable.Of_binable_without_uuid
+          (Wire.Stable.V1)
+          (struct
+            type nonrec t = t
+
+            let of_binable t = Wire.check t ; of_wire t
+
+            let to_binable = to_wire
+          end)
+    end
+  end]
+end
+
+include T
 
 [%%define_locally Stable.Latest.(of_wire, to_wire)]
+
+let of_simple (w : Simple.t) : t =
+  { fee_payer = w.fee_payer
+  ; memo = w.memo
+  ; other_parties =
+      Call_forest.of_parties_list w.other_parties
+        ~party_depth:(fun (p : Party.Simple.t) -> p.body.call_depth)
+      |> Call_forest.add_callers
+           ~call_type:(fun (p : Party.Simple.t) -> p.body.caller)
+           ~add_caller:add_caller_simple ~null_id:Token_id.default
+           ~party_id:(fun (p : Party.Simple.t) ->
+             Account_id.(
+               derive_token_id ~owner:(create p.body.public_key p.body.token_id))
+             )
+      |> Call_forest.accumulate_hashes ~hash_party:(fun (p : Party.t) ->
+             Digest.Party.create p )
+  }
+
+let to_simple (t : t) : Simple.t =
+  { fee_payer = t.fee_payer
+  ; memo = t.memo
+  ; other_parties =
+      Call_forest.remove_callers ~equal_id:Token_id.equal
+        ~map_party_digest:ignore ~map_stack_hash:ignore
+        ~add_call_type:(fun { body = b; authorization } call_type ->
+          { Party.Simple.authorization
+          ; body =
+              { public_key = b.public_key
+              ; token_id = b.token_id
+              ; update = b.update
+              ; balance_change = b.balance_change
+              ; increment_nonce = b.increment_nonce
+              ; events = b.events
+              ; sequence_events = b.sequence_events
+              ; call_data = b.call_data
+              ; preconditions = b.preconditions
+              ; use_full_commitment = b.use_full_commitment
+              ; caller = call_type
+              ; call_depth = 0
+              }
+          } )
+        ~null_id:Token_id.default
+        ~party_caller:(fun (p : Party.t) -> p.body.caller)
+        t.other_parties
+      |> Call_forest.to_parties_list_map ~f:(fun ~depth (p : Party.Simple.t) ->
+             { p with body = { p.body with call_depth = depth } } )
+  }
+
+let%test_unit "wire embedded in t" =
+  let module Wire = Stable.Latest.Wire in
+  Quickcheck.test ~trials:10 ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
+      [%test_eq: Wire.t] (to_wire (of_wire w)) w )
+
+let%test_unit "wire embedded in graphql" =
+  let module Wire = Stable.Latest.Wire in
+  Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
+      [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
 
 let parties (t : t) : _ Call_forest.t =
   let p = t.fee_payer in
@@ -726,7 +968,18 @@ let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
-let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).body.nonce
+let application_nonce (t : t) : Account.Nonce.t = (fee_payer_party t).body.nonce
+
+let target_nonce (t : t) : Account.Nonce.t =
+  let base_nonce = Account.Nonce.succ (application_nonce t) in
+  let fee_payer_pubkey = t.fee_payer.body.public_key in
+  let fee_payer_party_increments =
+    List.count (Call_forest.to_list t.other_parties) ~f:(fun p ->
+        Signature_lib.Public_key.Compressed.equal p.body.public_key
+          fee_payer_pubkey
+        && p.body.increment_nonce )
+  in
+  Account.Nonce.add base_nonce (Account.Nonce.of_int fee_payer_party_increments)
 
 let fee_token (_t : t) = Token_id.default
 
@@ -830,7 +1083,10 @@ module Verifiable = struct
       type t =
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
-            Pickles.Side_loaded.Verification_key.Stable.V2.t option
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
             Call_forest.With_hashes.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
@@ -907,10 +1163,119 @@ let weight (parties : t) : int =
     ; Weight.memo memo
     ]
 
-module Valid = struct
-  module Stable = Stable
+module type Valid_intf = sig
+  module Verification_key_hash : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t = Zkapp_basic.F.Stable.V1.t
+        [@@deriving sexp, compare, equal, hash, yojson]
+      end
+    end]
+  end
 
-  type t = Stable.Latest.t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = private
+        { parties : T.Stable.V1.t
+        ; verification_keys :
+            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+    end
+  end]
+
+  val to_valid_unsafe :
+    T.t -> [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ]
+
+  val to_valid :
+       T.t
+    -> ledger:'a
+    -> get:('a -> 'b -> Account.t option)
+    -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> t option
+
+  val of_verifiable : Verifiable.t -> t option
+
+  val forget : t -> T.t
+end
+
+module Valid : Valid_intf = struct
+  module S = Stable
+
+  module Verification_key_hash = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Zkapp_basic.F.Stable.V1.t
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { parties : S.V1.t
+        ; verification_keys :
+            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let create ~verification_keys parties : t = { parties; verification_keys }
+
+  let of_verifiable (t : Verifiable.t) : t option =
+    let open Option.Let_syntax in
+    let tbl = Account_id.Table.create () in
+    let%map () =
+      Call_forest.fold t.other_parties ~init:(Some ())
+        ~f:(fun acc (p, vk_opt) ->
+          let%bind _ok = acc in
+          let account_id = Party.account_id p in
+          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
+            let%map { With_hash.hash; _ } = vk_opt in
+            Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
+          else acc )
+    in
+    { parties = of_verifiable t
+    ; verification_keys = Account_id.Table.to_alist tbl
+    }
+
+  let to_valid_unsafe (t : T.t) :
+      [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ] =
+    `If_this_is_used_it_should_have_a_comment_justifying_it
+      (create t ~verification_keys:[])
+
+  let forget (t : t) : T.t = t.parties
+
+  let to_valid (t : T.t) ~ledger ~get ~location_of_account : t option =
+    let open Option.Let_syntax in
+    let find_vk account_id =
+      let%bind location = location_of_account ledger account_id in
+      let%bind (account : Account.t) = get ledger location in
+      let%bind zkapp = account.zkapp in
+      zkapp.verification_key
+    in
+    let tbl = Account_id.Table.create () in
+    let%map () =
+      Call_forest.fold t.other_parties ~init:(Some ()) ~f:(fun acc p ->
+          let%bind _ok = acc in
+          let account_id = Party.account_id p in
+          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
+            Option.map (find_vk account_id) ~f:(fun vk ->
+                Account_id.Table.update tbl account_id ~f:(fun _ ->
+                    With_hash.hash vk ) )
+          else acc )
+    in
+    create ~verification_keys:(Account_id.Table.to_alist tbl) t
 end
 
 include Codable.Make_base58_check (Stable.Latest)
@@ -921,15 +1286,18 @@ include Codable.Make_base58_check (Stable.Latest)
 type other_parties = (Party.t, Digest.Party.t, Digest.Forest.t) Call_forest.t
 
 let other_parties_deriver obj =
-  let of_parties_with_depth (ps : Party.t list) : other_parties =
-    Call_forest.of_parties_list ps ~party_depth:(fun (p : Party.t) ->
-        p.body.call_depth )
+  let of_parties_with_depth (ps : Party.Graphql_repr.t list) : other_parties =
+    Call_forest.of_parties_list ps
+      ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
+    |> Call_forest.map ~f:Party.of_graphql_repr
     |> Call_forest.accumulate_hashes'
-  and to_parties_with_depth (ps : other_parties) : Party.t list =
-    Call_forest.to_list ps
+  and to_parties_with_depth (ps : other_parties) : Party.Graphql_repr.t list =
+    ps
+    |> Call_forest.to_parties_list_map ~f:(fun ~depth p ->
+           Party.to_graphql_repr ~call_depth:depth p )
   in
   let open Fields_derivers_zkapps.Derivers in
-  let inner = (list @@ Party.deriver @@ o ()) @@ o () in
+  let inner = (list @@ Party.Graphql_repr.deriver @@ o ()) @@ o () in
   iso ~map:of_parties_with_depth ~contramap:to_parties_with_depth inner obj
 
 let deriver obj =
@@ -950,7 +1318,7 @@ let of_json x = Fields_derivers_zkapps.(of_json (deriver @@ Derivers.o ())) x
 
 let other_parties_of_json x =
   Fields_derivers_zkapps.(
-    of_json ((list @@ Party.deriver @@ o ()) @@ derivers ()))
+    of_json ((list @@ Party.Graphql_repr.deriver @@ o ()) @@ derivers ()))
     x
 
 let parties_to_json x =

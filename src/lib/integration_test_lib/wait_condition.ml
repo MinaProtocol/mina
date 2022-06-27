@@ -31,8 +31,17 @@ struct
         'b Event_type.t * 'a * ('a -> Node.t -> 'b -> 'a predicate_result)
         -> predicate
 
+  type wait_condition_id =
+    | Nodes_to_initialize
+    | Blocks_to_be_produced
+    | Nodes_to_synchronize
+    | Signed_command_to_be_included_in_frontier
+    | Ledger_proofs_emitted_since_genesis
+    | Zkapp_to_be_included_in_frontier
+
   type t =
-    { description : string
+    { id : wait_condition_id
+    ; description : string
     ; predicate : predicate
     ; soft_timeout : Network_time_span.t
     ; hard_timeout : Network_time_span.t
@@ -44,19 +53,22 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  let network_state ~description ~(f : Network_state.t -> bool) : t =
+  let network_state ~id ~description ~(f : Network_state.t -> bool) : t =
     let check () (state : Network_state.t) =
       if f state then Predicate_passed else Predicate_continuation ()
     in
-    { description
+    { id
+    ; description
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Literal (Time.Span.of_hr 1.0)
     ; hard_timeout = Literal (Time.Span.of_hr 2.0)
     }
 
+  let wait_condition_id t = t.id
+
   let nodes_to_initialize nodes =
     let open Network_state in
-    network_state
+    network_state ~id:Nodes_to_initialize
       ~description:
         ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
         |> Printf.sprintf "[%s] to initialize" )
@@ -87,7 +99,8 @@ struct
       *)
       (2 * n) + 1
     in
-    { description = Printf.sprintf "%d blocks to be produced" n
+    { id = Blocks_to_be_produced
+    ; description = Printf.sprintf "%d blocks to be produced" n
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -115,7 +128,8 @@ struct
       |> List.map ~f:(fun node -> "\"" ^ Node.id node ^ "\"")
       |> String.concat ~sep:", "
     in
-    { description = Printf.sprintf "%s to synchronize" formatted_nodes
+    { id = Nodes_to_synchronize
+    ; description = Printf.sprintf "%s to synchronize" formatted_nodes
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -148,7 +162,8 @@ struct
     in
 
     let soft_timeout_in_slots = 8 in
-    { description =
+    { id = Signed_command_to_be_included_in_frontier
+    ; description =
         Printf.sprintf "signed command with hash %s"
           (Transaction_hash.to_base58_check txn_hash)
     ; predicate = Network_state_predicate (check (), check)
@@ -166,13 +181,14 @@ struct
       Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
         num_proofs
     in
-    { description
+    { id = Ledger_proofs_emitted_since_genesis
+    ; description
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots 15
     ; hard_timeout = Slots 20
     }
 
-  let snapp_to_be_included_in_frontier ~has_failures ~parties =
+  let zkapp_to_be_included_in_frontier ~has_failures ~parties =
     let command_matches_parties cmd =
       let open User_command in
       match cmd with
@@ -182,12 +198,12 @@ struct
           false
     in
     let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
-      let snapp_opt =
+      let zkapp_opt =
         List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
             cmd_with_status.With_status.data |> User_command.forget_check
             |> command_matches_parties )
       in
-      match snapp_opt with
+      match zkapp_opt with
       | Some cmd_with_status ->
           let actual_status = cmd_with_status.With_status.status in
           let successful =
@@ -208,8 +224,9 @@ struct
     in
     let soft_timeout_in_slots = 8 in
     let is_first = ref true in
-    { description =
-        sprintf "snapp with fee payer %s and other parties (%s)"
+    { id = Zkapp_to_be_included_in_frontier
+    ; description =
+        sprintf "zkApp with fee payer %s and other parties (%s), memo: %s"
           (Signature_lib.Public_key.Compressed.to_base58_check
              parties.fee_payer.body.public_key )
           (Parties.Call_forest.Tree.fold_forest ~init:"" parties.other_parties
@@ -222,6 +239,7 @@ struct
                  is_first := false ;
                  str )
                else acc ^ ", " ^ str ) )
+          (Signed_command_memo.to_string_hum parties.memo)
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

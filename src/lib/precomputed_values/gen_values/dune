@@ -9,6 +9,7 @@
    core_kernel
    ppxlib
    ppxlib.ast
+   ppxlib.astlib
    async
    core
    ocaml-migrate-parsetree
@@ -33,6 +34,7 @@
    pickles
    test_genesis_ledger
    coda_genesis_ledger
+   staged_ledger_diff
  )
  (preprocessor_deps ../../../config.mlh)
  (preprocess

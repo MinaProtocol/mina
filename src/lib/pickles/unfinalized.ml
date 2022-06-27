@@ -55,7 +55,7 @@ module Constant = struct
       }
     in
     let evals =
-      Tuple_lib.Double.map Dummy.evals_combined.evals ~f:(fun e -> e.evals)
+      Plonk_types.Evals.to_in_circuit Dummy.evals_combined.evals.evals
     in
     let env =
       Plonk_checks.scalars_env
@@ -95,7 +95,10 @@ end
 
 let typ ~wrap_rounds : (t, Constant.t) Typ.t =
   Types.Step.Proof_state.Per_proof.In_circuit.spec wrap_rounds
-  |> Spec.typ (module Impl) (Shifted_value.typ Other_field.typ)
+  |> Spec.typ
+       (module Impl)
+       ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
+       (Shifted_value.typ Other_field.typ)
   |> Typ.transport ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
        ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data
   |> Typ.transport_var

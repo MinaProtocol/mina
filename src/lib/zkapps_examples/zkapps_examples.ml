@@ -1,4 +1,3 @@
-open Pickles_types.Hlist
 open Snark_params.Tick
 open Snark_params.Tick.Run
 open Currency
@@ -114,36 +113,36 @@ module Party_under_construction = struct
     ; events = []
     ; sequence_events = []
     ; call_data = Field.Constant.zero
-    ; call_depth = 0
-    ; protocol_state_precondition =
-        { snarked_ledger_hash = Ignore
-        ; timestamp = Ignore
-        ; blockchain_length = Ignore
-        ; min_window_density = Ignore
-        ; last_vrf_output = ()
-        ; total_currency = Ignore
-        ; global_slot_since_hard_fork = Ignore
-        ; global_slot_since_genesis = Ignore
-        ; staking_epoch_data =
-            { ledger =
-                { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-            ; seed = Ignore
-            ; start_checkpoint = Ignore
-            ; lock_checkpoint = Ignore
-            ; epoch_length = Ignore
+    ; preconditions =
+        { Party.Preconditions.network =
+            { snarked_ledger_hash = Ignore
+            ; timestamp = Ignore
+            ; blockchain_length = Ignore
+            ; min_window_density = Ignore
+            ; last_vrf_output = ()
+            ; total_currency = Ignore
+            ; global_slot_since_hard_fork = Ignore
+            ; global_slot_since_genesis = Ignore
+            ; staking_epoch_data =
+                { ledger =
+                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+                ; seed = Ignore
+                ; start_checkpoint = Ignore
+                ; lock_checkpoint = Ignore
+                ; epoch_length = Ignore
+                }
+            ; next_epoch_data =
+                { ledger =
+                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+                ; seed = Ignore
+                ; start_checkpoint = Ignore
+                ; lock_checkpoint = Ignore
+                ; epoch_length = Ignore
+                }
             }
-        ; next_epoch_data =
-            { ledger =
-                { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-            ; seed = Ignore
-            ; start_checkpoint = Ignore
-            ; lock_checkpoint = Ignore
-            ; epoch_length = Ignore
-            }
+        ; account = Full (Account_condition.to_predicate t.account_condition)
         }
     ; use_full_commitment = false
-    ; account_precondition =
-        Full (Account_condition.to_predicate t.account_condition)
     ; caller = t.token_id
     }
 
@@ -321,37 +320,41 @@ module Party_under_construction = struct
       ; events = var_of_t Zkapp_account.Events.typ []
       ; sequence_events = var_of_t Zkapp_account.Events.typ []
       ; call_data = Field.zero
-      ; call_depth = As_prover.Ref.create (fun () -> 0)
-      ; protocol_state_precondition =
-          var_of_t Zkapp_precondition.Protocol_state.typ
-            { snarked_ledger_hash = Ignore
-            ; timestamp = Ignore
-            ; blockchain_length = Ignore
-            ; min_window_density = Ignore
-            ; last_vrf_output = ()
-            ; total_currency = Ignore
-            ; global_slot_since_hard_fork = Ignore
-            ; global_slot_since_genesis = Ignore
-            ; staking_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
+      ; preconditions =
+          { Party.Preconditions.Checked.network =
+              var_of_t Zkapp_precondition.Protocol_state.typ
+                { snarked_ledger_hash = Ignore
+                ; timestamp = Ignore
+                ; blockchain_length = Ignore
+                ; min_window_density = Ignore
+                ; last_vrf_output = ()
+                ; total_currency = Ignore
+                ; global_slot_since_hard_fork = Ignore
+                ; global_slot_since_genesis = Ignore
+                ; staking_epoch_data =
+                    { ledger =
+                        { Epoch_ledger.Poly.hash = Ignore
+                        ; total_currency = Ignore
+                        }
+                    ; seed = Ignore
+                    ; start_checkpoint = Ignore
+                    ; lock_checkpoint = Ignore
+                    ; epoch_length = Ignore
+                    }
+                ; next_epoch_data =
+                    { ledger =
+                        { Epoch_ledger.Poly.hash = Ignore
+                        ; total_currency = Ignore
+                        }
+                    ; seed = Ignore
+                    ; start_checkpoint = Ignore
+                    ; lock_checkpoint = Ignore
+                    ; epoch_length = Ignore
+                    }
                 }
-            ; next_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
-            }
+          ; account = Account_condition.to_predicate t.account_condition
+          }
       ; use_full_commitment = Boolean.false_
-      ; account_precondition =
-          Account_condition.to_predicate t.account_condition
       ; caller = t.token_id
       }
 
@@ -396,18 +399,19 @@ let dummy_constraints () =
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
-let party_circuit f ({ transaction; at_party } : Zkapp_statement.Checked.t) :
-    _ H2.T(Pickles.Inductive_rule.Previous_proof_statement).t =
+let party_circuit f { Pickles.Inductive_rule.public_input = () } :
+    _ Pickles.Inductive_rule.main_return =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
-  let returned_transaction = Party.Checked.digest party in
-  let returned_at_party =
+  let calls =
     (* TODO: This should be returned from
              [Party_under_construction.In_circuit.to_party].
     *)
     Field.constant Parties.Call_forest.empty
   in
-  Run.Field.Assert.equal returned_transaction transaction ;
-  Run.Field.Assert.equal returned_at_party at_party ;
-  []
+  { Pickles.Inductive_rule.previous_proof_statements = []
+  ; public_output =
+      ({ party = Party.Checked.digest party; calls } : Zkapp_statement.Checked.t)
+  ; auxiliary_output = ()
+  }
