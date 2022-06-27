@@ -2080,18 +2080,31 @@ let proof_of_base64 str i : some_proof =
   | _ ->
       failwith "invalid proof index"
 
+let verify (public_input : public_input_js) (proof : proof)
+    (vk : Js.js_string Js.t) =
+  let public_input = Public_input.Constant.of_js public_input in
+  let typ = public_input_typ (Array.length public_input) in
+  let proof = Pickles.Side_loaded.Proof.of_proof proof in
+  let vk =
+    Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
+  in
+  Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
+  |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+
 let pickles =
   object%js
     val compile = pickles_compile
 
-    val proofToString =
-      fun (proof : proof) ->
-        proof |> Pickles.Side_loaded.Proof.of_proof
-        |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
+    val verify = verify
 
     val proofToBase64 = proof_to_base64
 
     val proofOfBase64 = proof_of_base64
+
+    val proofToBase64Transaction =
+      fun (proof : proof) ->
+        proof |> Pickles.Side_loaded.Proof.of_proof
+        |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
   end
 
 module Ledger = struct
@@ -2508,20 +2521,6 @@ module Ledger = struct
         | Proof _ | None_given ->
             () )
 
-  let verify_party_proof (public_input : public_input_js)
-      (proof : Js.js_string Js.t) (vk : Js.js_string Js.t) =
-    let public_input = Public_input.Constant.of_js public_input in
-    let proof =
-      Result.ok_or_failwith
-        (Pickles.Side_loaded.Proof.of_base64 (Js.to_string proof))
-    in
-    let vk =
-      Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
-    in
-    Pickles.Side_loaded.verify_promise ~typ:(public_input_typ 2)
-      [ (vk, public_input, proof) ]
-    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
-
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
     |> Js.string
@@ -2660,7 +2659,6 @@ module Ledger = struct
     static_method "signFieldElement" sign_field_element ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
-    static_method "verifyPartyProof" verify_party_proof ;
 
     static_method "publicKeyToString" public_key_to_string ;
     static_method "publicKeyOfString" public_key_of_string ;
