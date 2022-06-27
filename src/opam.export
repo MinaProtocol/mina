@@ -266,9 +266,9 @@ package "graphql_ppx" {
     ["dune" "build" "-p" name "-j" jobs]
     ["dune" "runtest" "-p" name "-j" jobs] {with-test}
   ]
-  dev-repo: "git+https://github.com/reasonml-community/graphql-ppx.git"
+  dev-repo: "git+https://github.com/o1-labs/graphql_ppx.git"
   url {
-    src: "https://github.com/reasonml-community/graphql-ppx/archive/eb8648d1552fbc11989b9197ef41a7a958b2545f.tar.gz"
-    checksum: "sha256=f2aa35f1de4a9c7ef6fac9766a72e2d8bd112036fcf23c3e0906e74d5eb4be7b"
+    src: "https://github.com/o1-labs/graphql_ppx/archive/f3ba4f7622240a2299f622b0c1d910f734579c25.tar.gz"
+         checksum: "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
   }
 }
