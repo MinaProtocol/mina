@@ -535,6 +535,7 @@ let batch_test_zkapps =
              else Deferred.return () )
            else fun () -> Deferred.return ()
          in
+         Core.printf "Generating %d parties transactions\n%!" transaction_count ;
          match%bind
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Generate_random_zkapps.rpc
              { zkapp_keypairs = keypairs
@@ -546,20 +547,14 @@ let batch_test_zkapps =
            |> Deferred.map ~f:Or_error.join
          with
          | Ok parties_list ->
-             let logger = Logger.create () in
-             [%log debug] "generated parties"
-               ~metadata:
-                 [ ( "parties"
-                   , `List
-                       (List.map parties_list ~f:(fun parties ->
-                            Parties.to_yojson parties ) ) )
-                 ] ;
              Deferred.List.iter parties_list ~f:(fun parties ->
                  let%bind () =
                    Daemon_rpcs.Client.dispatch_with_message
                      Daemon_rpcs.Send_zkapp_command.rpc parties port
                      ~success:(fun _ ->
-                       "Successfully enqueued a zkapp command in pool" )
+                       sprintf
+                         "%d. Successfully enqueued a zkapp command in pool"
+                         !batch_count )
                      ~error:(fun e ->
                        sprintf "Failed to send zkapp command %s"
                          (Error.to_string_hum e) )
