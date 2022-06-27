@@ -59,8 +59,7 @@ module Inputs = struct
   type parties_inputs =
     ( Transaction_witness.Parties_segment_witness.t
     * Transaction_snark.Parties_segment.Basic.t
-    * Transaction_snark.Statement.With_sok.t
-    * (int * Zkapp_statement.t) option )
+    * Transaction_snark.Statement.With_sok.t )
     list
   [@@deriving sexp, to_yojson]
 
@@ -184,8 +183,7 @@ module Inputs = struct
                           | [] ->
                               Deferred.Or_error.error_string
                                 "no witnesses generated"
-                          | (witness, spec, stmt, _snapp_statement) :: rest as
-                            inputs ->
+                          | (witness, spec, stmt) :: rest as inputs ->
                               let%bind (p1 : Ledger_proof.t) =
                                 log_base_snark
                                   ~statement:{ stmt with sok_digest } ~spec
@@ -195,10 +193,7 @@ module Inputs = struct
 
                               let%map (p : Ledger_proof.t) =
                                 Deferred.List.fold ~init:(Ok p1) rest
-                                  ~f:(fun
-                                       acc
-                                       (witness, spec, stmt, _snapp_statement)
-                                     ->
+                                  ~f:(fun acc (witness, spec, stmt) ->
                                     let%bind (prev : Ledger_proof.t) =
                                       Deferred.return acc
                                     in

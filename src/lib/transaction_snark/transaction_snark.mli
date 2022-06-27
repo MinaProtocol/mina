@@ -428,10 +428,7 @@ val parties_witnesses_exn :
      * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
      * Parties.t )
      list
-  -> ( Parties_segment.Witness.t
-     * Parties_segment.Basic.t
-     * Statement.With_sok.t
-     * (int * Zkapp_statement.t) option )
+  -> (Parties_segment.Witness.t * Parties_segment.Basic.t * Statement.With_sok.t)
      list
      * Mina_ledger.Sparse_ledger.t
 

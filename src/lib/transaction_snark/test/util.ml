@@ -100,8 +100,7 @@ let apply_parties ledger parties =
       (`Ledger ledger) parties
   in
   let open Impl in
-  List.iter (List.rev witnesses)
-    ~f:(fun (witness, spec, statement, _snapp_stmt) ->
+  List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
@@ -171,7 +170,7 @@ let check_parties_with_merges_exn ?expected_failure
                         match List.rev witnesses with
                         | [] ->
                             failwith "no witnesses generated"
-                        | (witness, spec, stmt, _snapp_statement) :: rest ->
+                        | (witness, spec, stmt) :: rest ->
                             let open Async.Deferred.Or_error.Let_syntax in
                             let%bind p1 =
                               Async.Deferred.Or_error.try_with (fun () ->

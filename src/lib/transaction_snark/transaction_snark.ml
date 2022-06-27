@@ -3777,66 +3777,20 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
       :: _ ->
         ledger
   in
-  let rev_parties_stmts =
-    List.fold_left partiess ~init:[]
-      ~f:(fun acc (_, _, (parties : Parties.t)) ->
-        let acc_with_fee_payer = None :: acc in
-        let other_parties =
-          parties.other_parties |> Zkapp_statement.zkapp_statements_of_forest'
-          |> Parties.Call_forest.With_hashes.to_parties_list
-          |> List.map ~f:(fun (_party, stmt) -> Some stmt)
-        in
-        List.rev_append other_parties acc_with_fee_payer )
-  in
-  let states_with_stmts =
-    let rec zip_rev acc l1 l2 =
-      match (l1, l2) with
-      | [], [] ->
-          acc
-      | ( stmt :: l1
-        , ({ Parties_intermediate_state.spec = Proved; _ } as x2) :: l2 ) ->
-          zip_rev ((stmt, x2) :: acc) l1 l2
-      | ( _ :: l1
-        , ({ Parties_intermediate_state.spec = Opt_signed; _ } as x2) :: l2 ) ->
-          zip_rev ((None, x2) :: acc) l1 l2
-      | ( _ :: _ :: l1
-        , ({ Parties_intermediate_state.spec = Opt_signed_opt_signed; _ } as x2)
-          :: l2 ) ->
-          zip_rev ((None, x2) :: acc) l1 l2
-      | [], _ :: _
-      | _ :: _, []
-      | ( [ _ ]
-        , { Parties_intermediate_state.spec = Opt_signed_opt_signed; _ } :: _ )
-        ->
-          assert false
-    in
-    zip_rev [] rev_parties_stmts states_rev
-  in
-  ( List.fold_left states_with_stmts ~init:[]
+  ( List.fold_right states_rev ~init:[]
       ~f:(fun
+           { Parties_intermediate_state.kind
+           ; spec
+           ; state_before = { global = source_global; local = source_local }
+           ; state_after = { global = target_global; local = target_local }
+           }
            witnesses
-           ( (stmt : Zkapp_statement.t option)
-           , { Parties_intermediate_state.kind
-             ; spec
-             ; state_before = { global = source_global; local = source_local }
-             ; state_after = { global = target_global; local = target_local }
-             } )
          ->
         (*Transaction snark says nothing about failure status*)
         let source_local = { source_local with failure_status_tbl = [] } in
         let target_local = { target_local with failure_status_tbl = [] } in
         let current_commitment = !commitment in
         let current_full_commitment = !full_commitment in
-        let snapp_stmt =
-          match spec with
-          | Proved ->
-              (* NB: This is only correct if we assume that a proved party will
-                 never appear first in a transaction.
-              *)
-              Some (0, Option.value_exn stmt)
-          | _ ->
-              None
-        in
         let ( start_parties
             , next_commitment
             , next_full_commitment
@@ -4040,7 +3994,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           ; sok_digest = Sok_message.Digest.default
           }
         in
-        (w, spec, statement, snapp_stmt) :: witnesses )
+        (w, spec, statement) :: witnesses )
   , final_ledger )
 
 module Make (Inputs : sig
