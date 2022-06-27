@@ -96,7 +96,7 @@ module Proof : sig
 end
 
 module Statement_with_proof : sig
-  type ('s, 'max_width, _) t = 's * ('max_width, 'max_width) Proof.t
+  type ('s, 'max_width, _) t = ('max_width, 'max_width) Proof.t
 end
 
 val verify_promise :

@@ -399,8 +399,7 @@ let dummy_constraints () =
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
-let party_circuit f
-    { Pickles.Inductive_rule.previous_public_inputs = []; public_input = () } =
+let party_circuit f { Pickles.Inductive_rule.public_input = () } =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
@@ -410,7 +409,7 @@ let party_circuit f
     *)
     Field.constant Parties.Call_forest.empty
   in
-  { Pickles.Inductive_rule.previous_proofs_should_verify = []
+  { Pickles.Inductive_rule.previous_proof_statements = []
   ; public_output =
       ({ party = Party.Checked.digest party; calls } : Zkapp_statement.Checked.t)
   ; auxiliary_output = ()

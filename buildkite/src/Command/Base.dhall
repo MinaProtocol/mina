@@ -66,12 +66,14 @@ let TaggedKey = {
   default = {=}
 }
 
+let ExitStatus = <Code : Integer | Any>
+
 -- Retry requires you feed an exit status (as a string so we can support
 -- negative codes), and optionally a limit to the number of times this command
 -- should be retried.
 let Retry = {
   Type = {
-    exit_status : Integer,
+    exit_status : ExitStatus,
     limit : Optional Natural
   },
   default = {
@@ -162,7 +164,11 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       (\(retry : Retry.Type) ->
                       {
                         -- we always require the exit status
-                        exit_status = Some (B/ExitStatus.Integer retry.exit_status),
+                        exit_status = Some (
+                            merge
+                              { Code = \(i : Integer) -> B/ExitStatus.Integer i
+                              , Any = B/ExitStatus.String "*" }
+                            retry.exit_status),
                         -- but limit is optional
                         limit =
                           Optional/map
@@ -174,18 +180,20 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                     -- per https://buildkite.com/docs/agent/v3#exit-codes:
                     ([
                       -- infra error
-                      Retry::{ exit_status = -1, limit = Some 2 },
+                      Retry::{ exit_status = ExitStatus.Code -1, limit = Some 2 },
+                      -- infra error
+                      Retry::{ exit_status = ExitStatus.Code +255, limit = Some 2 },
                       -- common/flake error
-                      Retry::{ exit_status = +1, limit = Some 1 },
+                      Retry::{ exit_status = ExitStatus.Code +1, limit = Some 1 },
                       -- apt-get update race condition error
-                      Retry::{ exit_status = +100, limit = Some 2 },
+                      Retry::{ exit_status = ExitStatus.Code +100, limit = Some 2 },
                       -- Git checkout error
-                      Retry::{ exit_status = +128, limit = Some 2 },
-                      -- Unknown error with >1MB of logs, potentially Pre-empted nodes
-                      Retry::{ exit_status = +255, limit = Some 2 }
+                      Retry::{ exit_status = ExitStatus.Code +128, limit = Some 2 }
                     ] #
                     -- and the retries that are passed in (if any)
-                    c.retries)
+                    c.retries #
+                    -- Other job-specific errors
+                    [ Retry::{ exit_status = ExitStatus.Any, limit = Some 1 } ])
                 in
                 B/Retry.ListAutomaticRetry/Type xs),
               manual = Some (B/Manual.Manual/Type {
@@ -232,5 +240,5 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
-in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, Retry = Retry}
+in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, Retry = Retry, ExitStatus = ExitStatus}
 

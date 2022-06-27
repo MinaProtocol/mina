@@ -31,8 +31,8 @@ have enabled the relevant experimental features, either in
 `/etc/nix/nix.conf` or (recommended) in `~/.config/nix/nix.conf`:
 
 ```
-mkdir -p "${XDG_CONFIG_HOME-~/.config}/nix"
-echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-~/.config}/nix/nix.conf"
+mkdir -p "${XDG_CONFIG_HOME-${HOME}/.config}/nix"
+echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-${HOME}/.config}/nix/nix.conf"
 ```
 
 You can check that your flake support is working by running `nix flake
