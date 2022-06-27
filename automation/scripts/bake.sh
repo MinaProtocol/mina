@@ -37,8 +37,8 @@ echo Config File Path is ${CONFIG_FILE}
 
 first7=$(echo ${GIT_PATHSPEC} | cut -c1-7)
 
-hub_baked_tag="minaprotocol/mina-daemon-baked:${DOCKER_TAG}-${TESTNET}"
-gcr_baked_tag="gcr.io/o1labs-192920/mina-daemon-baked:${DOCKER_TAG}-${TESTNET}"
+hub_baked_tag="minaprotocol/mina-daemon-baked:${DOCKER_TAG}-${TESTNET}-${first7}"
+gcr_baked_tag="gcr.io/o1labs-192920/mina-daemon-baked:${DOCKER_TAG}-${TESTNET}-${first7}"
 
 docker_tag_exists() {
   curl --silent -f -lSL "https://index.docker.io/v1/repositories/minaprotocol/mina-daemon/tags/${DOCKER_TAG}" > /dev/null
@@ -65,12 +65,12 @@ for i in $(seq 60); do
   sleep 30
 done
 
-cat Dockerfile | docker build --no-cache \
-  -t "${hub_baked_tag}" \
+docker build \
+  -t "${hub_baked_tag}" --no-cache \
   --build-arg "BAKE_VERSION=${DOCKER_TAG}" \
   --build-arg "COMMIT_HASH=${GIT_PATHSPEC}" \
   --build-arg "TESTNET_NAME=${TESTNET}" \
-  --build-arg "CONFIG_FILE=${CONFIG_FILE}" -
+  --build-arg "CONFIG_FILE=${CONFIG_FILE}" .
 
 docker tag "$hub_baked_tag" "$gcr_baked_tag"
 

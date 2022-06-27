@@ -28,7 +28,8 @@ locals {
           name      = "whale-${index+1}-${i+1}"
           unique_node_index= index+1
           total_node_index= 1+ i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) #summation of all duplicates so far
-          full_peer = "/dns4/whale-${index+1}-${i+1}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port +i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ]))}/p2p/${trimspace(data.local_file.libp2p_peers[element (local.whale_block_producer_libp2p_names,i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) )  ].content)}",
+          full_peer = "/dns4/whale-${index+1}-${i+1}.${var.testnet_name}.o1test.net/tcp/${var.block_producer_starting_host_port +i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ]))}/p2p/${trimspace(data.local_file.libp2p_peers[element (local.whale_block_producer_libp2p_names,i+ length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):0 ]  ])) )  ].content)}",
+
           port      = var.block_producer_starting_host_port+i + length ( flatten([for b in slice(var.whales,0, index) : [ for k in range(b.duplicates):"" ]  ]))
           class  = "whale"
 
@@ -43,7 +44,8 @@ locals {
           name      = "fish-${index+1}-${i+1}"
           unique_node_index= index+1
           total_node_index= 1+ i+length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ]))
-          full_peer = "/dns4/fish-${index+1}-${i+1}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port +i+ length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ]))}/p2p/${trimspace(data.local_file.libp2p_peers[element (local.fish_block_producer_libp2p_names,i+ length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ])) )  ].content)}",
+          full_peer = "/dns4/fish-${index+1}-${i+1}.${var.testnet_name}.o1test.net/tcp/${var.block_producer_starting_host_port +i+ length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ]))}/p2p/${trimspace(data.local_file.libp2p_peers[element (local.fish_block_producer_libp2p_names,i+ length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):0 ]  ])) )  ].content)}",
+
           port      = var.block_producer_starting_host_port+i + length ( flatten([for b in slice(var.fishes,0, index) : [ for k in range(b.duplicates):"" ]  ]))
           class  = "fish"
 
@@ -60,7 +62,7 @@ locals {
 
   seed_static_peers = [
     for index, name in keys(data.local_file.libp2p_seed_peers) : {
-      full_peer = "/dns4/${name}.${var.testnet_name}/tcp/${var.seed_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_seed_peers[name].content)}",
+      full_peer = "/dns4/${name}.${var.testnet_name}.o1test.net/tcp/${var.seed_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_seed_peers[name].content)}",
       port      = var.seed_starting_host_port + index
       name      = local.seed_names[index]
       unique_node_index= -1
@@ -81,8 +83,10 @@ locals {
     postgresDB              = "archive"
     postgresqlUsername      = "postgres"
     postgresqlPassword      = "foobar"
+    # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
     remoteSchemaFile        = var.mina_archive_schema
-
+    remoteSchemaAuxFiles    = var.mina_archive_schema_aux_files
+    
     persistenceEnabled      = true
     persistenceSize         = "8Gi"
     persistenceStorageClass = "ssd-delete"

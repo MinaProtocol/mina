@@ -17,7 +17,8 @@ pkgs.mkShell {
     zlib.dev
     bzip2.dev
     ncurses
-    cargo
+    rustup
+    wasm-pack
   ];
   OPAMSWITCH = "mina";
   shellHook = ''

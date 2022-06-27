@@ -25,7 +25,9 @@
    async_rpc_kernel
    sexp_diff_kernel
    ;; local libraries
+   mina_base.util
    unsigned_extended
+   kimchi_backend.pasta
    fold_lib
    random_oracle_input
    outside_hash_image
@@ -41,9 +43,12 @@
    vrf_lib
    snark_params
    with_hash
+   mina_ledger
    consensus.vrf
    snarky_taylor
    mina_base
+   mina_transaction_logic
+   key_gen
    block_time
    perf_histograms
    test_util
@@ -65,9 +70,7 @@
    snark_bits
    sparse_ledger_lib
    trust_system
-   snarky_integer
-   bitstring_lib
-   pasta
+   mina_base.import
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess
@@ -93,7 +96,7 @@
 (executable
  (name proof_of_stake_fuzzer)
  (modules proof_of_stake_fuzzer)
- (libraries core_kernel signature_lib mina_state mina_block consensus prover blockchain_snark)
+ (libraries core_kernel signature_lib mina_state mina_block consensus prover blockchain_snark logger.file_system)
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane)))

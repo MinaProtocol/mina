@@ -54,8 +54,6 @@ exception Libp2p_helper_died_unexpectedly
 (** Handle to all network functionality. *)
 type t
 
-module Bitswap_block = Bitswap_block
-
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
 
     They generally look like paths, and are read left-to-right. Each protocol

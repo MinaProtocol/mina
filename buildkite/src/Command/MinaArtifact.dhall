@@ -54,7 +54,11 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
             label = "Build Mina for ${DebianVersions.capitalName debVersion}",
             key = "build-deb-pkg",
             target = Size.XLarge,
-            retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
+            retries = [
+              Command.Retry::{
+                exit_status = Command.ExitStatus.Code +2,
+                limit = Some 2
+              } ] -- libp2p error
           },
 
         -- daemon devnet image
@@ -69,6 +73,19 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         in
 
         DockerImage.generateStep daemonDevnetSpec,
+
+        -- daemon berkeley image
+        let daemonBerkeleySpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-daemon",
+          network="berkeley",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep daemonBerkeleySpec,
 
         -- daemon mainnet image
         let daemonMainnetSpec = DockerImage.ReleaseSpec::{
@@ -105,7 +122,19 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         in
 
-        DockerImage.generateStep rosettaSpec
+        DockerImage.generateStep rosettaSpec,
+
+        -- ZkApp test transaction image
+        let zkappTestTxnSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-zkapp-test-transaction",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep zkappTestTxnSpec
 
       ]
     }

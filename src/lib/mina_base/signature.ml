@@ -26,30 +26,25 @@ module Stable = struct
 
     let gen = Quickcheck.Generator.tuple2 Field.gen Inner_curve.Scalar.gen
   end
-
-  module Tests = struct
-    [%%if curve_size = 255]
-
-    let%test "signature serialization v1 (curve_size=255)" =
-      let signature =
-        Quickcheck.random_value ~seed:(`Deterministic "signature serialization")
-          V1.gen
-      in
-      let known_good_digest = "88a094d50a90b5054152af85bd6e60e8" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module V1)
-        signature known_good_digest
-
-    [%%else]
-
-    let%test "signature serialization v1" =
-      failwith "No test for this curve size"
-
-    [%%endif]
-  end
 end]
 
 let dummy = (Field.one, Inner_curve.Scalar.one)
+
+[%%if curve_size = 255]
+
+let%test "signature serialization v1 (curve_size=255)" =
+  let signature =
+    Quickcheck.random_value ~seed:(`Deterministic "signature serialization")
+      Stable.V1.gen
+  in
+  let known_good_digest = "88a094d50a90b5054152af85bd6e60e8" in
+  Test_util.check_serialization (module Stable.V1) signature known_good_digest
+
+[%%else]
+
+let%test "signature serialization v1" = failwith "No test for this curve size"
+
+[%%endif]
 
 module Raw = struct
   open Rosetta_coding.Coding
@@ -75,4 +70,5 @@ type var = Field.Var.t * Inner_curve.Scalar.var
 [%%endif]
 
 [%%define_locally
-Stable.Latest.(of_base58_check_exn, of_base58_check, of_yojson, to_yojson)]
+Stable.Latest.
+  (of_base58_check_exn, of_base58_check, of_yojson, to_yojson, to_base58_check)]
