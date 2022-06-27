@@ -2202,8 +2202,6 @@ module Base = struct
                }
              in
              Fee_excess.assert_equal_checked expected got ) ) ;
-      let `Needs_some_work_for_zkapps_on_mainnet = Mina_base.Util.todo_zkapps in
-      (* TODO: Check various consistency equalities between local and global and the statement *)
       Stdlib.( ! ) zkapp_input
 
     (* Horrible hack :( *)
