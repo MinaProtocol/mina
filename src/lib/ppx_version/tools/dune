@@ -19,6 +19,7 @@
    ppx_variants_conv
    ppx_deriving_yojson
    base_quickcheck.ppx_quickcheck
+   ppx_annot
    ;; local derivers
    ppx_coda
    h_list.ppx
@@ -48,6 +49,7 @@
    ppx_variants_conv
    ppx_deriving_yojson
    base_quickcheck.ppx_quickcheck
+   ppx_annot
    ;; local derivers
    ppx_coda
    h_list.ppx
