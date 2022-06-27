@@ -476,10 +476,6 @@ module Vector_2 = struct
       include Make.Binable (Nat.N2)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -505,10 +501,6 @@ module Vector_4 = struct
       include Make.Binable (Nat.N4)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -534,10 +526,6 @@ module Vector_5 = struct
       include Make.Binable (Nat.N5)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -563,10 +551,6 @@ module Vector_6 = struct
       include Make.Binable (Nat.N6)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -592,10 +576,6 @@ module Vector_7 = struct
       include Make.Binable (Nat.N7)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -621,10 +601,6 @@ module Vector_8 = struct
       include Make.Binable (Nat.N8)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -650,10 +626,6 @@ module Vector_15 = struct
       include Make.Binable (Nat.N15)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -679,10 +651,6 @@ module Vector_16 = struct
       include Make.Binable (Nat.N16)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -708,10 +676,6 @@ module Vector_17 = struct
       include Make.Binable (Nat.N17)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 
@@ -737,10 +701,6 @@ module Vector_18 = struct
       include Make.Binable (Nat.N18)
 
       include (T : module type of T with type 'a t := 'a t)
-
-      module Tests = struct
-        (* TODO *)
-      end
     end
   end]
 

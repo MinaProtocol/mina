@@ -13,7 +13,6 @@
    sexplib0
    bignum
    core
-   ppx_version.runtime
    core_kernel
    base.md5
    base.caml

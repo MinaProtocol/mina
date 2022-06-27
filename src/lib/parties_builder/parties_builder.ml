@@ -129,14 +129,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) :
                     match request with _ -> respond Unhandled
                   in
                   let%map (), (), proof =
-                    prover ?handler:(Some handler)
-                      ( []
-                        : ( unit
-                          , unit
-                          , unit )
-                          Pickles_types.Hlist.H3.T(Pickles.Statement_with_proof)
-                          .t )
-                      txn_stmt
+                    prover ?handler:(Some handler) txn_stmt
                   in
                   Control.Proof proof )
           | None_given ->
