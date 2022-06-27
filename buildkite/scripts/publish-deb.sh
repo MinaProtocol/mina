@@ -17,6 +17,42 @@ DEBS3='deb-s3 upload '\
 
 DEBS='_build/mina-*.deb'
 
+
+## artifacts
+#declare -a component_lst=("alpha" "beta" "stable")
+#declare -a codename_lst=("stretch" "buster" "bullseye" "bookworm" "focal")
+
+
+#for i in "${component_lst[@]}"
+#do
+#  for j in "${codename_lst[@]}"
+#  do
+#    echo $i"-"$j
+#    echo "--"
+#
+#    if ! gcloud artifacts repositories list|grep $i"-"$j
+#    then
+#      echo "repo not found"
+#      gcloud artifacts repositories create $i"-"$j  --location=${LOCATION}  --repository-format=apt
+#    fi
+#
+#    done
+#done
+
+cd _build
+
+for _deb in *.deb; do
+
+  echo $_deb
+   gcloud artifacts apt upload ${REPOSITORY}   --location=${LOCATION} --source=${_deb}
+   #gcloud artifacts tags create ${MINA_DEB_CODENAME} --location=${LOCATION} --repository=${REPOSITORY} --version=${MINA_DEB_RELEASE} --package=${_deb}
+
+done
+
+##/ artifacts
+
+
+
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
