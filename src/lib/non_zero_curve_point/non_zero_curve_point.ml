@@ -36,10 +36,6 @@ module Compressed = struct
         let version_byte =
           Base58_check.Version_bytes.non_zero_curve_point_compressed
       end
-
-      module Tests = struct
-        (* actual tests in Stable below *)
-      end
     end]
   end
 
@@ -76,32 +72,24 @@ module Compressed = struct
         let%map uncompressed = gen_uncompressed in
         compress uncompressed
     end
-
-    module Tests = struct
-      (* these tests check not only whether the serialization of the version-asserted type has changed,
-         but also whether the serializations for the consensus and nonconsensus code are identical
-      *)
-
-      [%%if curve_size = 255]
-
-      let%test "nonzero_curve_point_compressed v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
-        in
-        let known_good_digest = "35c836b0252293061bf974490f5bd515" in
-        Ppx_version_runtime.Serialization.check_serialization
-          (module V1)
-          point known_good_digest
-
-      [%%else]
-
-      let%test "nonzero_curve_point_compressed v1" =
-        failwith "Unknown curve size"
-
-      [%%endif]
-    end
   end]
+
+  [%%if curve_size = 255]
+
+  let%test "nonzero_curve_point_compressed v1" =
+    let point =
+      Quickcheck.random_value
+        ~seed:(`Deterministic "nonzero_curve_point_compressed-seed")
+        Stable.V1.gen
+    in
+    let known_good_digest = "35c836b0252293061bf974490f5bd515" in
+    Test_util.check_serialization (module Stable.V1) point known_good_digest
+
+  [%%else]
+
+  let%test "nonzero_curve_point_compressed v1" = failwith "Unknown curve size"
+
+  [%%endif]
 
   module Poly = Poly
   include Comparable.Make_binable (Stable.Latest)

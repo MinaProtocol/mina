@@ -1755,21 +1755,36 @@ module Choices = struct
       should_verifys 0 tags should_verifys_js
 
     let rec vars_to_public_input :
-        type prev_vars prev_values widths heights.
-           (prev_vars, prev_values, widths, heights) H4.T(Pickles.Tag).t
+        type prev_vars prev_values widths heights width height.
+           public_input_size:int
+        -> self:
+             ( Public_input.t
+             , Public_input.Constant.t
+             , width
+             , height )
+             Pickles.Tag.t
+        -> (prev_vars, prev_values, widths, heights) H4.T(Pickles.Tag).t
         -> prev_vars H1.T(Id).t
         -> Public_input.t list =
-     fun tags inputs ->
+     fun ~public_input_size ~self tags inputs ->
       match (tags, inputs) with
       | [], [] ->
           []
       | tag :: tags, input :: inputs ->
-          let (Typ typ) = Pickles.Types_map.public_input tag in
+          let (Typ typ) =
+            match Type_equal.Id.same_witness tag.id self.id with
+            | None ->
+                Pickles.Types_map.public_input tag
+            | Some T ->
+                public_input_typ public_input_size
+          in
           let input = fst (typ.var_to_fields input) in
-          let inputs = vars_to_public_input tags inputs in
+          let inputs =
+            vars_to_public_input ~public_input_size ~self tags inputs
+          in
           input :: inputs
 
-    let create (rule : pickles_rule_js) :
+    let create ~public_input_size (rule : pickles_rule_js) :
         ( _
         , _
         , _
@@ -1794,7 +1809,8 @@ module Choices = struct
                   rule##.main
                     (Public_input.to_js public_input)
                     (Public_input.list_to_js
-                       (vars_to_public_input prevs previous_public_inputs) )
+                       (vars_to_public_input ~public_input_size ~self prevs
+                          previous_public_inputs ) )
                   |> should_verifys prevs
                 in
                 { previous_proofs_should_verify
@@ -1840,7 +1856,7 @@ module Choices = struct
            , 'auxiliary_value )
            t
 
-  let of_js js_rules =
+  let of_js ~public_input_size js_rules =
     let rec get_rules (Choices rules) index :
         ( _
         , _
@@ -1860,7 +1876,7 @@ module Choices = struct
               raise_errorf
                 "Rules array is sparse; the entry at index %i is missing" index )
         in
-        let (Rule rule) = Inductive_rule.create js_rule in
+        let (Rule rule) = Inductive_rule.create ~public_input_size js_rule in
         let rules ~self : _ H4_6.T(Pickles.Inductive_rule).t =
           rule ~self :: rules ~self
         in
@@ -1945,7 +1961,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   in
   let (module Branches) = nat_module branches in
   let (module Max_proofs_verified) = nat_add_module max_proofs in
-  let (Choices choices) = Choices.of_js choices in
+  let (Choices choices) = Choices.of_js ~public_input_size choices in
   let tag, _cache, p, provers =
     Pickles.compile_promise ~choices
       (module Public_input)

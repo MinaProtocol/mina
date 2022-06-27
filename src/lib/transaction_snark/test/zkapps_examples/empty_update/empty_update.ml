@@ -7,7 +7,6 @@ module Inner_curve = Snark_params.Tick.Inner_curve
 module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
 module Parties_segment = Transaction_snark.Parties_segment
-module Statement = Transaction_snark.Statement
 
 let sk = Private_key.create ()
 
@@ -17,19 +16,24 @@ let pk_compressed = Public_key.compress pk
 
 let account_id = Account_id.create pk_compressed Token_id.default
 
-let tag, _, p_module, Pickles.Provers.[ prover; _ ] =
+module Statement = struct
+  type t = unit
+
+  let to_field_elements () = [||]
+end
+
+let tag, _, p_module, Pickles.Provers.[ prover ] =
   Pickles.compile ~cache:Cache_dir.cache
-    (module Zkapp_statement.Checked)
-    (module Zkapp_statement)
-    ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
-    ~branches:(module Nat.N2)
-    ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
+    (module Statement)
+    (module Statement)
+    ~public_input:(Output Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
+    ~branches:(module Nat.N1)
+    ~max_proofs_verified:(module Nat.N0)
     ~name:"empty_update"
     ~constraint_constants:
       (Genesis_constants.Constraint_constants.to_snark_keys_header
          constraint_constants )
-    ~choices:(fun ~self ->
-      [ Zkapps_empty_update.rule pk_compressed; dummy_rule self ] )
+    ~choices:(fun ~self:_ -> [ Zkapps_empty_update.rule pk_compressed ])
 
 module P = (val p_module)
 
@@ -38,12 +42,9 @@ let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 (* TODO: This should be entirely unnecessary. *)
 let party_body = Zkapps_empty_update.generate_party pk_compressed
 
-let (), (), party_proof =
-  Async.Thread_safe.block_on_async_exn (fun () ->
-      prover []
-        { party = Party.Body.digest party_body
-        ; calls = Parties.Call_forest.empty
-        } )
+let _stmt, (), party_proof = Async.Thread_safe.block_on_async_exn (prover [])
+
+let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
 
 let party : Party.Graphql_repr.t =
   Party.to_graphql_repr ~call_depth:0
