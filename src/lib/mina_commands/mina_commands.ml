@@ -12,6 +12,7 @@ let generate_random_zkapps t
      ; transaction_count = num_of_parties
      ; max_parties_count = parties_size
      ; fee_payer_keypair
+     ; account_states
      } :
       Daemon_rpcs.Generate_random_zkapps.query ) =
   let open Participating_state.Let_syntax in
@@ -26,7 +27,11 @@ let generate_random_zkapps t
         (Public_key.compress public_key, private_key) )
     |> Public_key.Compressed.Map.of_alist_exn
   in
-  let account_state_tbl = Account_id.Table.create () in
+  let account_state_tbl =
+    let tbl = Account_id.Table.of_alist_exn account_states in
+    (*[gen_parties_with_limited_keys] will decide what can be used and what cannot be*)
+    Account_id.Table.map tbl ~f:(fun a -> (a, `Can_be_used_in_other_parties))
+  in
   let rec go n acc : Parties.t list Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     if n > 0 then
@@ -49,8 +54,18 @@ let generate_random_zkapps t
     Public_key.Compressed.Map.add_exn keymap ~key:fee_payer_pk
       ~data:fee_payer_keypair.private_key
   in
-  Deferred.List.map parties_dummy_auth_list ~f:(fun parties_dummy_auth ->
-      Parties_builder.replace_authorizations ~prover ~keymap parties_dummy_auth )
+  let res =
+    let open Deferred.Let_syntax in
+    let%map res =
+      Deferred.List.map parties_dummy_auth_list ~f:(fun parties_dummy_auth ->
+          Parties_builder.replace_authorizations ~prover ~keymap
+            parties_dummy_auth )
+    in
+    ( res
+    , List.map (Account_id.Table.to_alist account_state_tbl)
+        ~f:(fun (k, (acc, _)) -> (k, acc)) )
+  in
+  res
 
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in

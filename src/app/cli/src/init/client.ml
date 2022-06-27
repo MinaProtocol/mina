@@ -458,6 +458,9 @@ let batch_test_zkapps =
            before hitting the rate limit. Used for rate limiting (default: \
            200)"
         (optional_with_default 200 int)
+    and num_txns =
+      flag "--num-txns" ~aliases:[ "num-txns" ]
+        ~doc:"NUM Number of transactions to run" (required int)
     and rate_limit_interval =
       flag "--rate-limit-interval" ~aliases:[ "rate-limit-interval" ]
         ~doc:
@@ -470,7 +473,8 @@ let batch_test_zkapps =
     , parties_size
     , rate_limit
     , rate_limit_level
-    , rate_limit_interval )
+    , rate_limit_interval
+    , num_txns )
   in
   Command.async
     ~summary:
@@ -484,7 +488,8 @@ let batch_test_zkapps =
             , parties_size
             , rate_limit
             , rate_limit_level
-            , rate_limit_interval )
+            , rate_limit_interval
+            , num_txns )
           ->
          let open Deferred.Let_syntax in
          let%bind fee_payer_keypair =
@@ -498,7 +503,7 @@ let batch_test_zkapps =
                |> Secrets.Keypair.Terminal_stdin.read_exn
                     ~which:"Zkapp account keypair" )
          in
-         let transaction_count =
+         let limit_level =
            let constraint_constants =
              Genesis_constants.Constraint_constants.compiled
            in
@@ -507,20 +512,20 @@ let batch_test_zkapps =
            in
            let slot_time = constraint_constants.block_window_duration_ms in
            let fill_rate = 0.75 (*based on current config*) in
-           let transaction_count =
+           let limit_level =
              Float.(
                of_int txns_per_block /. of_int slot_time *. fill_rate
                *. of_int rate_limit_interval)
            in
-           min (Float.to_int transaction_count) rate_limit_level
+           min (Float.to_int limit_level) rate_limit_level
          in
-         let batch_count = ref 0 in
+         let per_batch = 10 in
+         (*Takes as bit to generate these transactions*)
+         let curr_count = ref 0 in
          let limit =
-           (* call this function after a transaction happens *)
-           (* TODO, in the current state of things, this function counts to limit_level of transactions, and then slaps a pause after it.  This happens even if the transactions themselves took far longer than the pause.  It thereby makes the rate slower and more conservative than would appear.  In future, perhaps implement with some sort of Timer *)
            if rate_limit then ( fun () ->
-             incr batch_count ;
-             if !batch_count >= transaction_count then
+             incr curr_count ;
+             if !curr_count >= limit_level then
                let%bind () =
                  Deferred.return
                    (Format.printf
@@ -531,39 +536,56 @@ let batch_test_zkapps =
                let%bind () =
                  Async.after (Time.Span.create ~ms:rate_limit_interval ())
                in
-               Deferred.return (batch_count := 0)
+               Deferred.return (curr_count := 0)
              else Deferred.return () )
            else fun () -> Deferred.return ()
          in
-         Core.printf "Generating %d parties transactions\n%!" transaction_count ;
-         match%bind
-           Daemon_rpcs.Client.dispatch Daemon_rpcs.Generate_random_zkapps.rpc
-             { zkapp_keypairs = keypairs
-             ; transaction_count
-             ; max_parties_count = parties_size
-             ; fee_payer_keypair
-             }
-             port
-           |> Deferred.map ~f:Or_error.join
-         with
-         | Ok parties_list ->
-             Deferred.List.iter parties_list ~f:(fun parties ->
+         let rec go account_states =
+           if !curr_count >= num_txns then Deferred.unit
+           else
+             let batch = min per_batch (num_txns - !curr_count + 1) in
+             Core.printf "Generating %d parties transactions\n%!" batch ;
+             match%bind
+               Daemon_rpcs.Client.dispatch
+                 Daemon_rpcs.Generate_random_zkapps.rpc
+                 { zkapp_keypairs = keypairs
+                 ; transaction_count = batch
+                 ; max_parties_count = parties_size
+                 ; fee_payer_keypair
+                 ; account_states
+                 }
+                 port
+               |> Deferred.map ~f:Or_error.join
+             with
+             | Ok (parties_list, account_states') ->
                  let%bind () =
-                   Daemon_rpcs.Client.dispatch_with_message
-                     Daemon_rpcs.Send_zkapp_command.rpc parties port
-                     ~success:(fun _ ->
-                       sprintf
-                         "%d. Successfully enqueued a zkapp command in pool"
-                         !batch_count )
-                     ~error:(fun e ->
-                       sprintf "Failed to send zkapp command %s"
-                         (Error.to_string_hum e) )
-                     ~join_error:Or_error.join
+                   Deferred.List.iter parties_list ~f:(fun parties ->
+                       Core.printf
+                         !"Sending a zkapp command (count %d)\n%!"
+                         !curr_count ;
+                       let%bind () =
+                         Daemon_rpcs.Client.dispatch_with_message
+                           Daemon_rpcs.Send_zkapp_command.rpc parties port
+                           ~success:(fun _ ->
+                             sprintf
+                               "%d. Successfully enqueued a zkapp command in \
+                                pool\n\
+                                %!"
+                               !curr_count )
+                           ~error:(fun e ->
+                             sprintf "Failed to send zkapp command %s\n%!"
+                               (Error.to_string_hum e) )
+                           ~join_error:Or_error.join
+                       in
+                       limit () )
                  in
-                 limit () )
-         | Error e ->
-             eprintf "Failed to generate zkapps %s" (Error.to_string_hum e) ;
-             exit 1 ) )
+                 go account_states'
+             | Error e ->
+                 eprintf "Failed to generate zkapps %s\n%!"
+                   (Error.to_string_hum e) ;
+                 exit 1
+         in
+         go [] ) )
 
 let batch_send_payments =
   let module Payment_info = struct
