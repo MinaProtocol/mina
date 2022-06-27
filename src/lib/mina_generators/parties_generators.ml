@@ -772,7 +772,7 @@ let gen_party_body_components (type a b c d) ?(limited = false)
                 Account_id.Table.data account_state_tbl
                 |> List.filter_map ~f:(fun (a, use) ->
                        match use with
-                       | `Can_use_in_other_parties ->
+                       | `Can_be_used_in_other_parties ->
                            Some a
                        | `Donot_use_in_other_parties ->
                            None )
@@ -980,7 +980,7 @@ let gen_party_body_components (type a b c d) ?(limited = false)
              ; delegate = delegate account
              ; zkapp = zkapp account
              }
-           , `Can_use_in_other_parties )
+           , `Can_be_used_in_other_parties )
      | Some (updated_account, use) ->
          (* update entry in table *)
          Some
@@ -1117,7 +1117,7 @@ let setup_fee_payer_and_available_keys_and_account_state_tbl
       (*Initialize account states*)
       Account_id.Table.update account_state_tbl acct_id ~f:(function
         | None ->
-            (acct, `Can_use_in_other_parties)
+            (acct, `Can_be_used_in_other_parties)
         | Some a ->
             a ) ;
       if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
@@ -1460,10 +1460,10 @@ let setup_available_keys_and_account_state_tbl_limited
           | Some location ->
               let account = Option.value_exn (Ledger.get ledger location) in
               Account_id.Table.change account_state_tbl acct_id ~f:(function
-                | Some account' ->
-                    Some account'
+                | Some (account', _) ->
+                    Some (account', `Can_be_used_in_other_parties)
                 | None ->
-                    Some (account, `Can_use_in_other_parties) ) ) ;
+                    Some (account, `Can_be_used_in_other_parties) ) ) ;
       (available_public_keys, account_state_tbl)
 
 let gen_parties_with_limited_keys ~keymap ?account_state_tbl ~ledger

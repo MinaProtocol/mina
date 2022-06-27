@@ -47,10 +47,15 @@ module Generate_random_zkapps = struct
     ; transaction_count : int
     ; max_parties_count : int option
     ; fee_payer_keypair : Signature_lib.Keypair.Stable.Latest.t
+    ; account_states :
+        (Account_id.Stable.Latest.t * Account.Stable.Latest.t) list
     }
   [@@deriving bin_io_unversioned]
 
-  type response = Parties.Stable.Latest.t list Or_error.t
+  type response =
+    ( Parties.Stable.Latest.t list
+    * (Account_id.Stable.Latest.t * Account.Stable.Latest.t) list )
+    Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
