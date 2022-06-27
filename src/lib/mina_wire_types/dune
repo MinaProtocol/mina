@@ -1,7 +1,7 @@
 (library
   (name mina_wire_types)
   (public_name mina_wire_types)
-  (libraries integers)
+  (libraries integers marlin_plonk_bindings marlin_plonk_bindings.pasta_fp)
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))
   )

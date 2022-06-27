@@ -1,15 +1,25 @@
 open Utils
 
-module Amount : sig
-  type t
+module Types : sig
+  module type S = sig
+    type fee
+
+    type amount
+
+    type balance
+  end
 end
 
-module Make : sig
-  module Amount
-      (Signature : Signature)
-      (_ : functor
-        (A : sig
-           type t = Unsigned.UInt64.t
-         end)
-        -> Signature(A).S) : Signature(Amount).S
-end
+module type Concrete =
+  Types.S
+    with type fee = Unsigned.UInt64.t
+     and type amount = Unsigned.UInt64.t
+     and type balance = Unsigned.UInt64.t
+
+module M : Types.S
+
+module type Local_sig = Signature(Types).S
+
+module Make
+    (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
+  Signature(M).S
