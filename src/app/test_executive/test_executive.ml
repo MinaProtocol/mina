@@ -304,7 +304,13 @@ let main inputs =
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let open Malleable_error.Let_syntax in
         let%bind network, dsl =
-          let lift = Deferred.bind ~f:Malleable_error.or_hard_error in
+          let lift ?exit_code =
+            match exit_code with
+            | Some code ->
+                Deferred.bind ~f:(Malleable_error.or_hard_error ~exit_code:code)
+            | None ->
+                Deferred.bind ~f:Malleable_error.or_hard_error
+          in
           [%log trace] "initializing network manager" ;
           let%bind net_manager =
             Engine.Network_manager.create ~logger network_config
@@ -314,7 +320,7 @@ let main inputs =
           let%bind network = Engine.Network_manager.deploy net_manager in
           [%log trace] "initializing log engine" ;
           let%map log_engine =
-            lift @@ Engine.Log_engine.create ~logger ~network
+            lift ~exit_code:6 @@ Engine.Log_engine.create ~logger ~network
           in
           log_engine_ref := Some log_engine ;
           let event_router =
