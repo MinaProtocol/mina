@@ -184,21 +184,20 @@ module Inputs = struct
                           | [] ->
                               Deferred.Or_error.error_string
                                 "no witnesses generated"
-                          | (witness, spec, stmt, snapp_statement) :: rest as
+                          | (witness, spec, stmt, _snapp_statement) :: rest as
                             inputs ->
                               let%bind (p1 : Ledger_proof.t) =
                                 log_base_snark
                                   ~statement:{ stmt with sok_digest } ~spec
                                   ~all_inputs:inputs
-                                  (M.of_parties_segment_exn ~snapp_statement
-                                     ~witness )
+                                  (M.of_parties_segment_exn ~witness)
                               in
 
                               let%map (p : Ledger_proof.t) =
                                 Deferred.List.fold ~init:(Ok p1) rest
                                   ~f:(fun
                                        acc
-                                       (witness, spec, stmt, snapp_statement)
+                                       (witness, spec, stmt, _snapp_statement)
                                      ->
                                     let%bind (prev : Ledger_proof.t) =
                                       Deferred.return acc
@@ -207,8 +206,7 @@ module Inputs = struct
                                       log_base_snark
                                         ~statement:{ stmt with sok_digest }
                                         ~spec ~all_inputs:inputs
-                                        (M.of_parties_segment_exn
-                                           ~snapp_statement ~witness )
+                                        (M.of_parties_segment_exn ~witness)
                                     in
                                     log_merge_snark ~sok_digest prev curr
                                       ~all_inputs:inputs )

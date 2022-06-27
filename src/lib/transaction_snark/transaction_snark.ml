@@ -3289,7 +3289,6 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
-    -> snapp_statement:(int * Zkapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -4098,11 +4097,10 @@ struct
     | Signature _ | None_given ->
         None
 
-  let snapp_proof_data ~(snapp_statement : (int * Zkapp_statement.t) option)
-      ~(witness : Transaction_witness.Parties_segment_witness.t) =
+  let snapp_proof_data ~(witness : Transaction_witness.Parties_segment_witness.t)
+      =
     let open Option.Let_syntax in
     let%bind p = first_party witness in
-    let%bind tag, snapp_statement = snapp_statement in
     let%map pi = party_proof p in
     let vk =
       let account_id = Account_id.create p.body.public_key p.body.token_id in
@@ -4120,9 +4118,9 @@ struct
       | Some s ->
           s
     in
-    (snapp_statement, pi, vk, tag)
+    (pi, vk)
 
-  let of_parties_segment_exn ~statement ~snapp_statement ~witness
+  let of_parties_segment_exn ~statement ~witness
       ~(spec : Parties_segment.Basic.t) : t Async.Deferred.t =
     Base.Parties_snark.witness := Some witness ;
     let res =
@@ -4132,13 +4130,13 @@ struct
       | Opt_signed_opt_signed ->
           opt_signed_opt_signed [] statement
       | Proved -> (
-          match snapp_proof_data ~snapp_statement ~witness with
+          match snapp_proof_data ~witness with
           | None ->
               failwith "of_parties_segment: Expected exactly one proof"
-          | Some (_s, p, v, tag) ->
+          | Some (p, v) ->
               (* TODO: We should not have to pass the statement in here. *)
               proved
-                ( Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
+                ( Pickles.Side_loaded.in_prover (Base.side_loaded 0) v.data ;
                   [ p ] )
                 statement )
     in

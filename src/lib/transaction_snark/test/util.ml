@@ -171,21 +171,20 @@ let check_parties_with_merges_exn ?expected_failure
                         match List.rev witnesses with
                         | [] ->
                             failwith "no witnesses generated"
-                        | (witness, spec, stmt, snapp_statement) :: rest ->
+                        | (witness, spec, stmt, _snapp_statement) :: rest ->
                             let open Async.Deferred.Or_error.Let_syntax in
                             let%bind p1 =
                               Async.Deferred.Or_error.try_with (fun () ->
                                   T.of_parties_segment_exn ~statement:stmt
-                                    ~witness ~spec ~snapp_statement )
+                                    ~witness ~spec )
                             in
                             Async.Deferred.List.fold ~init:(Ok p1) rest
-                              ~f:(fun acc (witness, spec, stmt, snapp_statement)
-                                 ->
+                              ~f:(fun acc (witness, spec, stmt) ->
                                 let%bind prev = Async.Deferred.return acc in
                                 let%bind curr =
                                   Async.Deferred.Or_error.try_with (fun () ->
                                       T.of_parties_segment_exn ~statement:stmt
-                                        ~witness ~spec ~snapp_statement )
+                                        ~witness ~spec )
                                 in
                                 let sok_digest =
                                   Sok_message.create ~fee:Fee.zero
