@@ -2026,7 +2026,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let provers = provers |> to_js_provers |> Array.of_list |> Js.array in
   let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
     let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
-    Proof.verify_promise [ (public_input, proof) ] |> Promise_js_helpers.to_js
+    Proof.verify_promise [ (public_input, proof) ]
+    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
   in
   object%js
     val provers = Obj.magic provers
