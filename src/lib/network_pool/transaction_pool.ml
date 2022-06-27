@@ -453,6 +453,46 @@ struct
           (diff_error_of_indexed_pool_error e)
       , indexed_pool_error_metadata e )
 
+    let get_account ~ledger ~accounts_to_check =
+      let empty_state = (Account.Nonce.zero, Currency.Amount.zero) in
+      let existing_account_states_by_id =
+        (* TODO: it occurs to me that this batch logic is duplicated during the staged ledger apply... we should try and share data *)
+        let existing_account_ids, existing_account_locs =
+          Set.to_list accounts_to_check
+          |> Base_ledger.location_of_account_batch ledger
+          |> List.filter_map ~f:(function
+               | id, Some loc ->
+                   Some (id, loc)
+               | _, None ->
+                   None )
+          |> List.unzip
+        in
+        Base_ledger.get_batch ledger existing_account_locs
+        |> List.map ~f:snd
+        |> List.zip_exn existing_account_ids
+        |> List.fold ~init:Account_id.Map.empty
+             ~f:(fun map (id, maybe_account) ->
+               let account =
+                 Option.value_exn maybe_account
+                   ~message:"Somehow a public key has a location but no account"
+               in
+               Map.add_exn map ~key:id
+                 ~data:
+                   ( account.nonce
+                   , Currency.Amount.of_uint64
+                     @@ Currency.Balance.to_uint64 account.balance ) )
+      in
+      fun id ->
+        match Map.find existing_account_states_by_id id with
+        | Some state ->
+            state
+        | None ->
+            if Set.mem accounts_to_check id then empty_state
+            else
+              failwith
+                "did not expect Indexed_pool.revalidate to call get_account on \
+                 account not in accounts_to_check"
+
     let handle_transition_frontier_diff
         ( ({ new_commands; removed_commands; reorg_best_tip = _ } :
             Transition_frontier.best_tip_diff )
@@ -556,45 +596,7 @@ struct
               Set.union set set' )
         in
         let get_account =
-          let empty_state = (Account.Nonce.zero, Currency.Amount.zero) in
-          let existing_account_states_by_id =
-            (* TODO: it occurs to me that this batch logic is duplicated during the staged ledger apply... we should try and share data *)
-            let existing_account_ids, existing_account_locs =
-              Set.to_list accounts_to_check
-              |> Base_ledger.location_of_account_batch best_tip_ledger
-              |> List.filter_map ~f:(function
-                   | id, Some loc ->
-                       Some (id, loc)
-                   | _, None ->
-                       None )
-              |> List.unzip
-            in
-            Base_ledger.get_batch best_tip_ledger existing_account_locs
-            |> List.map ~f:snd
-            |> List.zip_exn existing_account_ids
-            |> List.fold ~init:Account_id.Map.empty
-                 ~f:(fun map (id, maybe_account) ->
-                   let account =
-                     Option.value_exn maybe_account
-                       ~message:
-                         "Somehow a public key has a location but no account"
-                   in
-                   Map.add_exn map ~key:id
-                     ~data:
-                       ( account.nonce
-                       , Currency.Amount.of_uint64
-                         @@ Currency.Balance.to_uint64 account.balance ) )
-          in
-          fun id ->
-            match Map.find existing_account_states_by_id id with
-            | Some state ->
-                state
-            | None ->
-                if Set.mem accounts_to_check id then empty_state
-                else
-                  failwith
-                    "did not expect Indexed_pool.revalidate to call \
-                     get_account on account not in accounts_to_check"
+          get_account ~ledger:best_tip_ledger ~accounts_to_check
         in
         Indexed_pool.revalidate pool' (`Subset accounts_to_check) get_account
       in
@@ -1396,15 +1398,17 @@ struct
                            .to_yojson locally_generated_dropped ) )
                 ]
         in
-        let pool, add_results =
+        let (pool, account_ids_to_revalidate), add_results =
           let open Indexed_pool in
-          List.fold_map ~init:t.pool env.data.accepted
-            ~f:(fun acc (cs, local_state, u) ->
+          List.fold_map ~init:(t.pool, Account_id.Set.empty) env.data.accepted
+            ~f:(fun (acc, account_ids_to_revalidate) (cs, local_state, u) ->
               let sender = Sender_local_state.sender local_state in
               Option.iter (Hashtbl.find t.sender_mutex sender) ~f:Mutex.release ;
               if Sender_local_state.is_remove local_state then
                 Hashtbl.remove t.sender_mutex sender ;
-              (set_sender_local_state acc local_state |> Update.apply u, cs) )
+              ( ( set_sender_local_state acc local_state |> Update.apply u
+                , Account_id.Set.add account_ids_to_revalidate sender )
+              , cs ) )
         in
         let add_results = List.concat add_results in
         let pool, dropped_for_size =
@@ -1416,10 +1420,6 @@ struct
               [ ("cmds", Cs.to_yojson (Sequence.to_list dropped_for_size)) ] ;
         check_dropped dropped_for_size ;
         t.pool <- pool ;
-        Mina_metrics.(
-          Gauge.set Transaction_pool.pool_size
-            (Float.of_int (Indexed_pool.size pool)) ;
-          Counter.inc_one Transaction_pool.transactions_added_to_pool) ;
         let trust_record =
           Trust_system.record_envelope_sender t.config.trust_system t.logger
             sender
@@ -1472,7 +1472,42 @@ struct
                     |> Error.tag ~tag:"Transaction_pool.apply" )
               in
               let%bind () = Interruptible.lift Deferred.unit signal in
-              go add_results
+              (*the pool used for verifying these updates might have been
+                 updated before these updates are applied here and revalidate
+                 the pool and remove any invalid commands*)
+              let get_account =
+                get_account ~ledger ~accounts_to_check:account_ids_to_revalidate
+              in
+              let pool, dropped_invalid =
+                Indexed_pool.revalidate pool (`Subset account_ids_to_revalidate)
+                  get_account
+              in
+              t.pool <- pool ;
+              let dropped_invalid =
+                List.filter (Sequence.to_list dropped_invalid) ~f:(fun cmd ->
+                    Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+                    |> Option.is_some )
+              in
+              if not @@ List.is_empty dropped_invalid then
+                [%log' info t.logger]
+                  "Verified commands $cmds dropped because they conflicted the \
+                   pool. Possibly because the pool was updated after \
+                   verification"
+                  ~metadata:
+                    [ ( "cmds"
+                      , `List
+                          (List.map dropped_invalid
+                             ~f:
+                               Transaction_hash
+                               .User_command_with_valid_signature
+                               .to_yojson ) )
+                    ] ;
+              let%map res = go add_results in
+              Mina_metrics.(
+                Gauge.set Transaction_pool.pool_size
+                  (Float.of_int (Indexed_pool.size pool)) ;
+                Counter.inc_one Transaction_pool.transactions_added_to_pool) ;
+              res
             with
             | Ok res ->
                 res
