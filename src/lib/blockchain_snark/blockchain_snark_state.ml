@@ -90,10 +90,10 @@ let non_pc_registers_equal_var t1 t2 =
 *)
 let%snarkydef step ~(logger : Logger.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    new_state_hash : _ Tick.Checked.t =
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) new_state
+    : _ Tick.Checked.t =
   let new_state_hash =
-    State_hash.var_of_hash_packed (Data_as_hash.hash new_state_hash)
+    State_hash.var_of_hash_packed (Data_as_hash.hash new_state)
   in
   let%bind transition =
     with_label __LOC__
