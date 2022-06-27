@@ -102,7 +102,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Deferred.Or_error.t
 
@@ -111,7 +110,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
