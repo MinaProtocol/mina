@@ -1788,6 +1788,7 @@ module Choices = struct
       | Get_public_input :
           int * (_, 'value, _, _) Pickles.Tag.t
           -> 'value Snarky_backendless.Request.t
+      | Get_prev_proof : int -> _ Pickles.Proof.t Snarky_backendless.Request.t
 
     let create ~public_input_size (rule : pickles_rule_js) :
         ( _
@@ -1865,22 +1866,35 @@ module Choices = struct
                 in
                 let previous_proof_statements =
                   let rec go :
-                      type prev_vars.
-                         prev_vars H1.T(Id).t
+                      type prev_vars prev_values widths heights.
+                         int
+                      -> prev_vars H1.T(Id).t
                       -> prev_vars H1.T(E01(Pickles.Inductive_rule.B)).t
-                      -> prev_vars
-                         H1.T(Pickles.Inductive_rule.Previous_proof_statement).t
+                      -> ( prev_vars
+                         , prev_values
+                         , widths
+                         , heights )
+                         H4.T(Pickles.Tag).t
+                      -> ( prev_vars
+                         , widths )
+                         H2.T(Pickles.Inductive_rule.Previous_proof_statement).t
                       =
-                   fun public_inputs should_verifys ->
-                    match (public_inputs, should_verifys) with
-                    | [], [] ->
+                   fun i public_inputs should_verifys tags ->
+                    match (public_inputs, should_verifys, tags) with
+                    | [], [], [] ->
                         []
                     | ( public_input :: public_inputs
-                      , proof_must_verify :: should_verifys ) ->
-                        { public_input; proof_must_verify }
-                        :: go public_inputs should_verifys
+                      , proof_must_verify :: should_verifys
+                      , _tag :: tags ) ->
+                        let proof =
+                          Impl.exists (Impl.Typ.Internal.ref ())
+                            ~request:(fun () -> Get_prev_proof i)
+                        in
+                        { public_input; proof; proof_must_verify }
+                        :: go (i + 1) public_inputs should_verifys tags
                   in
-                  go previous_public_inputs previous_proofs_should_verify
+                  go 0 previous_public_inputs previous_proofs_should_verify
+                    prevs
                 in
                 { previous_proof_statements
                 ; public_output = ()
@@ -2065,9 +2079,6 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
       let prevs : (Field.Constant.t public_input * Proof.t) array =
         prevs_js |> Js.to_array |> Array.map ~f:to_prev
       in
-      let prev_proofs : (_, _, _) Public_inputs_with_proofs.t =
-        prevs |> Array.map ~f:snd |> Array.to_list |> Obj.magic
-      in
       let public_input =
         Public_input.(public_input_js |> of_js |> to_constant)
       in
@@ -2086,10 +2097,12 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
                     (public_input_fields, typ.constraint_system_auxiliary ())
                 in
                 respond (Provide public_input) )
+        | Choices.Inductive_rule.Get_prev_proof i ->
+            respond (Provide (Obj.magic (snd (Array.get prevs i))))
         | _ ->
             respond Unhandled
       in
-      prover ?handler:(Some handler) prev_proofs public_input
+      prover ?handler:(Some handler) public_input
       |> Promise.map ~f:(fun ((), (), proof) -> proof)
       |> Promise_js_helpers.to_js
     in

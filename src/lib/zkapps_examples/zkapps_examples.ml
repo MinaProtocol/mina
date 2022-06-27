@@ -399,7 +399,8 @@ let dummy_constraints () =
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
-let party_circuit f { Pickles.Inductive_rule.public_input = () } =
+let party_circuit f { Pickles.Inductive_rule.public_input = () } :
+    _ Pickles.Inductive_rule.main_return =
   dummy_constraints () ;
   let party = f () in
   let party = Party_under_construction.In_circuit.to_party party in
