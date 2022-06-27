@@ -50,9 +50,9 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   { identifier = "ring-sig-rule"
   ; prevs = []
   ; main =
-      (fun { previous_public_inputs = []; public_input = x } ->
-        ring_sig_main x |> Run.run_checked ;
-        { previous_proofs_should_verify = []
+      (fun { public_input = x } ->
+        Run.run_checked @@ ring_sig_main x ;
+        { previous_proof_statements = []
         ; public_output = ()
         ; auxiliary_output = ()
         } )

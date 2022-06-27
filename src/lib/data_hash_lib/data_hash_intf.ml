@@ -71,7 +71,11 @@ module type Full_size = sig
 
   val var_of_hash_packed : Random_oracle.Checked.Digest.t -> var
 
+  val var_to_field : var -> Random_oracle.Checked.Digest.t
+
   [%%endif]
 
   val of_hash : Field.t -> t
+
+  val to_field : t -> Field.t
 end

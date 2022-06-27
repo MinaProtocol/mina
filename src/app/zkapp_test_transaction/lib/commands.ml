@@ -98,18 +98,15 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
+      ~f:(fun _ ((witness, spec, statement) as w) ->
         printf "%s"
           (sprintf
              !"current witness \
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
                Transaction_snark.Parties_segment.Basic.t * \
-               Transaction_snark.Statement.With_sok.t * (int * \
-               Zkapp_statement.t)option) }%!"
+               Transaction_snark.Statement.With_sok.t) }%!"
              w ) ;
-        let%map _ =
-          T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
-        in
+        let%map _ = T.of_parties_segment_exn ~statement ~witness ~spec in
         ((), ()) )
   in
   ()
@@ -193,18 +190,15 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
+      ~f:(fun _ ((witness, spec, statement) as w) ->
         printf "%s"
           (sprintf
              !"current witness \
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
                Transaction_snark.Parties_segment.Basic.t * \
-               Transaction_snark.Statement.With_sok.t * (int * \
-               Zkapp_statement.t)option) }%!"
+               Transaction_snark.Statement.With_sok.t) }%!"
              w ) ;
-        let%map _ =
-          T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
-        in
+        let%map _ = T.of_parties_segment_exn ~statement ~witness ~spec in
         ((), ()) )
   in
   ()

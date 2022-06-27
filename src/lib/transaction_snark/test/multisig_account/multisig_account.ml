@@ -204,9 +204,10 @@ let%test_module "multisig_account" =
                   { identifier = "multisig-rule"
                   ; prevs = []
                   ; main =
-                      (fun { previous_public_inputs = []; public_input = x } ->
-                        multisig_main x |> Run.run_checked ;
-                        { previous_proofs_should_verify = []
+                      (fun { public_input = x } ->
+                        Run.run_checked @@ multisig_main x ;
+
+                        { previous_proof_statements = []
                         ; public_output = ()
                         ; auxiliary_output = ()
                         } )
@@ -229,19 +230,27 @@ let%test_module "multisig_account" =
                     ; { identifier = "dummy"
                       ; prevs = [ self; self ]
                       ; main =
-                          (fun { previous_public_inputs = [ _; _ ]
-                               ; public_input = _
-                               } ->
-                            Impl.run_checked
-                              (Transaction_snark.dummy_constraints ()) ;
-                            (* Unsatisfiable. *)
+                          (fun _ ->
                             let s =
                               Run.exists Field.typ ~compute:(fun () ->
                                   Run.Field.Constant.zero )
                             in
+                            let public_input =
+                              Run.exists Zkapp_statement.typ ~compute:(fun () ->
+                                  assert false )
+                            in
+                            Impl.run_checked
+                              (Transaction_snark.dummy_constraints ()) ;
+                            (* Unsatisfiable. *)
                             Run.Field.(Assert.equal s (s + one)) ;
-                            { previous_proofs_should_verify =
-                                [ Boolean.true_; Boolean.true_ ]
+                            { previous_proof_statements =
+                                [ { public_input
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ; { public_input
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
                             ; public_output = ()
                             ; auxiliary_output = ()
                             } )
