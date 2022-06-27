@@ -128,15 +128,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
                   in
                   let (), (), proof =
                     Async_unix.Thread_safe.block_on_async_exn (fun () ->
-                        prover ?handler:(Some handler)
-                          ( []
-                            : ( unit
-                              , unit
-                              , unit )
-                              Pickles_types.Hlist.H3.T
-                                (Pickles.Statement_with_proof)
-                              .t )
-                          txn_stmt )
+                        prover ?handler:(Some handler) txn_stmt )
                   in
                   Control.Proof proof )
           | None_given ->
