@@ -9,7 +9,6 @@
    ppx_inline_test.config
    sexplib0
    yojson
-   ppx_version.runtime
    sexp_diff_kernel
    core_kernel
    base.caml

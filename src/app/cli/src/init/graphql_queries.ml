@@ -2,11 +2,12 @@
 [@@@coverage exclude_file]
 
 module Serializing = Graphql_lib.Serializing
+module Encoders = Mina_graphql.Types.Input
 
 module Get_tracked_accounts =
 [%graphql
 {|
-query {
+query @encoders(module: "Encoders"){
   trackedAccounts {
     public_key: publicKey
     locked
@@ -20,7 +21,7 @@ query {
 module Get_tracked_account =
 [%graphql
 {|
-query ($public_key: PublicKey!, $token: UInt64) {
+query ($public_key: PublicKey!, $token: TokenId) @encoders(module: "Encoders"){
   account(publicKey: $public_key, token: $token) {
     balance {
       total
@@ -32,7 +33,7 @@ query ($public_key: PublicKey!, $token: UInt64) {
 module Get_all_accounts =
 [%graphql
 {|
-query ($public_key: PublicKey!) {
+query ($public_key: PublicKey!) @encoders(module: "Encoders"){
   accounts(publicKey: $public_key) {
     token
   }
@@ -42,7 +43,7 @@ query ($public_key: PublicKey!) {
 module Create_account =
 [%graphql
 {|
-mutation ($password: String!) {
+mutation ($password: String!) @encoders(module: "Encoders"){
   createAccount(input: {password: $password}) {
     public_key: publicKey
   }
@@ -52,7 +53,7 @@ mutation ($password: String!) {
 module Create_hd_account =
 [%graphql
 {|
-mutation ($hd_index: UInt32!) {
+mutation ($hd_index: UInt32!) @encoders(module: "Encoders"){
   createHDAccount(input: {index: $hd_index}) {
     public_key: publicKey
   }
@@ -62,7 +63,7 @@ mutation ($hd_index: UInt32!) {
 module Unlock_account =
 [%graphql
 {|
-mutation ($password: String!, $public_key: PublicKey!) {
+mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
   unlockAccount(input: {password: $password, publicKey: $public_key }) {
     public_key: publicKey
   }
@@ -72,7 +73,7 @@ mutation ($password: String!, $public_key: PublicKey!) {
 module Lock_account =
 [%graphql
 {|
-mutation ($public_key: PublicKey!) {
+mutation ($public_key: PublicKey!) @encoders(module: "Encoders"){
   lockAccount(input: {publicKey: $public_key }) {
     public_key: publicKey
   }
@@ -119,7 +120,7 @@ query pendingSnarkWork {
 module Set_coinbase_receiver =
 [%graphql
 {|
-mutation ($public_key: PublicKey) {
+mutation ($public_key: PublicKey) @encoders(module: "Encoders"){
   setCoinbaseReceiver(input : {publicKey: $public_key}) {
     lastCoinbaseReceiver
     currentCoinbaseReceiver
@@ -130,7 +131,7 @@ mutation ($public_key: PublicKey) {
 module Set_snark_worker =
 [%graphql
 {|
-mutation ($public_key: PublicKey) {
+mutation ($public_key: PublicKey) @encoders(module: "Encoders"){
   setSnarkWorker (input : {publicKey: $public_key}) {
       lastSnarkWorker
     }
@@ -140,7 +141,7 @@ mutation ($public_key: PublicKey) {
 module Set_snark_work_fee =
 [%graphql
 {|
-mutation ($fee: UInt64!) {
+mutation ($fee: UInt64!) @encoders(module: "Encoders"){
   setSnarkWorkFee(input: {fee: $fee}) {
     lastFee
     }
@@ -150,14 +151,8 @@ mutation ($fee: UInt64!) {
 module Send_payment =
 [%graphql
 {|
-mutation ($sender: PublicKey!,
-          $receiver: PublicKey!,
-          $amount: UInt64!,
-          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  sendPayment(input:
-    {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+mutation ($input: SendPaymentInput!) @encoders(module: "Encoders"){
+  sendPayment(input: $input){
     payment {
       id
     }
@@ -172,7 +167,7 @@ mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $fee: UInt64!,
           $nonce: UInt32,
-          $memo: String) {
+          $memo: String) @encoders(module: "Encoders"){
   sendDelegation(input:
     {from: $sender, to: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
     delegation {
@@ -185,7 +180,7 @@ mutation ($sender: PublicKey!,
 module Export_logs =
 [%graphql
 {|
-mutation ($basename: String) {
+mutation ($basename: String) @encoders(module: "Encoders"){
   exportLogs(basename: $basename) {
     exportLogs {
       tarfile
@@ -197,7 +192,7 @@ mutation ($basename: String) {
 module Get_inferred_nonce =
 [%graphql
 {|
-query nonce($public_key: PublicKey!) {
+query nonce($public_key: PublicKey!) @encoders(module: "Encoders"){
   account(publicKey: $public_key) {
     inferredNonce
   }
@@ -207,7 +202,7 @@ query nonce($public_key: PublicKey!) {
 module Pooled_user_commands =
 [%graphql
 {|
-query user_commands($public_key: PublicKey) {
+query user_commands($public_key: PublicKey) @encoders(module: "Encoders"){
   pooledUserCommands(publicKey: $public_key) @bsRecord {
     id
     isDelegation
@@ -244,7 +239,7 @@ query get_peers {
 module Add_peers =
 [%graphql
 {|
-mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
+mutation ($peers: [NetworkPeer!]!, $seed: Boolean) @encoders(module: "Encoders"){
   addPeers(peers: $peers, seed: $seed) {
     host
     libp2pPort
@@ -256,7 +251,7 @@ mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
 module Archive_precomputed_block =
 [%graphql
 {|
-mutation ($block: PrecomputedBlock!) {
+mutation ($block: PrecomputedBlock!) @encoders(module: "Encoders"){
   archivePrecomputedBlock(block: $block) {
       applied
   }
@@ -266,7 +261,7 @@ mutation ($block: PrecomputedBlock!) {
 module Archive_extensional_block =
 [%graphql
 {|
-mutation ($block: ExtensionalBlock!) {
+mutation ($block: ExtensionalBlock!) @encoders(module: "Encoders"){
   archiveExtensionalBlock(block: $block) {
       applied
   }
@@ -276,7 +271,7 @@ mutation ($block: ExtensionalBlock!) {
 module Send_rosetta_transaction =
 [%graphql
 {|
-mutation ($transaction: RosettaTransaction!) {
+mutation ($transaction: RosettaTransaction!) @encoders(module: "Encoders"){
   sendRosettaTransaction(input: $transaction) {
     userCommand {
       id
@@ -288,7 +283,7 @@ mutation ($transaction: RosettaTransaction!) {
 module Import_account =
 [%graphql
 {|
-mutation ($path: String!, $password: String!) {
+mutation ($path: String!, $password: String!) @encoders(module: "Encoders"){
   importAccount (path: $path, password: $password) {
     public_key: publicKey
     already_imported: alreadyImported

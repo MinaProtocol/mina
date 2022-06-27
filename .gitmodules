@@ -16,9 +16,6 @@
 [submodule "src/lib/crypto/proof-systems"]
 	path = src/lib/crypto/proof-systems
 	url = https://github.com/o1-labs/proof-systems.git
-[submodule "src/external/ppx_version"]
-	path = src/external/ppx_version
-	url = https://github.com/o1-labs/ppx_version.git
 [submodule "src/external/prometheus"]
 	path = src/external/prometheus
 	url = https://github.com/MinaProtocol/prometheus.git
