@@ -97,4 +97,25 @@ module Mina_base = struct
     type ('a, 'b, 'c, 'd, 'e, 'f) wire =
       ('a, 'b, 'c, 'd, 'e, 'f) W.Signed_command_payload.common_poly
   end
+
+  module Token_id : Assert_equal0 = struct
+    type orig = O.Token_id.t
+
+    type wire = W.Token_id.t
+  end
 end
+
+(*
+module Mina_numbers = struct
+  module O = Mina_numbers
+  module W = WT.Mina_numbers
+
+  (*
+  module _ : Assert_equal0 = struct
+    module M = O.Nat.Make64()
+    type orig = M.t
+    type wire = W.nat_uint64
+  end
+     *)
+end
+   *)
