@@ -1000,7 +1000,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
 let gen_party_from ?(update = None) ?failure ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
     ?required_balance_change ?required_balance ~authorization
-    ~available_public_keys ~ledger ~account_state_tbl ?vk () =
+    ~available_public_keys ~ledger ~account_state_tbl ?protocol_state_view ?vk
+    () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1019,8 +1020,9 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
   let%bind body_components =
     gen_party_body_components ~update ?failure ~new_account ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
-      ?permissions_auth ?account_id ?vk ~available_public_keys
-      ?required_balance_change ?required_balance ~ledger ~account_state_tbl
+      ?permissions_auth ?account_id ?protocol_state_view ?vk
+      ~available_public_keys ?required_balance_change ?required_balance ~ledger
+      ~account_state_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_predcondition:(gen_account_precondition_from_account ?failure)
@@ -1134,8 +1136,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ?vk
-      ~account_state_tbl ()
+      ~account_id:fee_payer_account_id ~ledger ?vk ~account_state_tbl ()
   in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     let rec go acc n =
@@ -1234,7 +1235,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           gen_party_from ~update ?failure ~authorization
             ~new_account:new_parties ~permissions_auth ~zkapp_account
             ~available_public_keys ~required_balance_change ~ledger
-            ~account_state_tbl ?vk ()
+            ~account_state_tbl ?protocol_state_view ?vk ()
         in
         let%bind party =
           (* authorization according to chosen permissions auth *)
@@ -1306,7 +1307,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           let permissions_auth = Control.Tag.Signature in
           gen_party_from ~update ?failure ~account_id ~authorization
             ~permissions_auth ~zkapp_account ~available_public_keys ~ledger
-            ~account_state_tbl ?vk ()
+            ~account_state_tbl ?protocol_state_view ?vk ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
         go (party :: party0 :: acc) (n - 1)
@@ -1355,7 +1356,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     let authorization = Control.Signature Signature.dummy in
     gen_party_from ?failure ~authorization ~new_account:true
       ~available_public_keys ~ledger ~required_balance_change ?required_balance
-      ~account_state_tbl ?vk ()
+      ~account_state_tbl ?protocol_state_view ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
