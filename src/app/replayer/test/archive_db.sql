@@ -833,11 +833,8 @@ ALTER SEQUENCE public.zkapp_events_id_seq OWNED BY public.zkapp_events.id;
 CREATE TABLE public.zkapp_fee_payer_body (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
-    update_id integer NOT NULL,
     fee text NOT NULL,
-    events_id integer NOT NULL,
-    sequence_events_id integer NOT NULL,
-    zkapp_network_precondition_id integer NOT NULL,
+    valid_until bigint,
     nonce bigint NOT NULL
 );
 
@@ -2403,11 +2400,11 @@ COPY public.zkapp_events (id, element_ids) FROM stdin;
 -- Data for Name: zkapp_fee_payer_body; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.zkapp_fee_payer_body (id, account_identifier_id, update_id, fee, events_id, sequence_events_id, zkapp_network_precondition_id, nonce) FROM stdin;
-1	4	1	1000000000	1	1	1	0
-2	4	4	1000000000	1	1	4	2
-3	4	6	1000000000	1	1	6	3
-4	4	8	1000000000	1	1	8	4
+COPY public.zkapp_fee_payer_body (id, account_identifier_id, fee, valid_until, nonce) FROM stdin;
+1	4	1000000000	\N	0
+2	4	1000000000	\N	2
+3	4	1000000000	\N	3
+4	4	1000000000	\N	4
 \.
 
 
@@ -3837,38 +3834,6 @@ ALTER TABLE ONLY public.zkapp_epoch_ledger
 
 ALTER TABLE ONLY public.zkapp_fee_payer_body
     ADD CONSTRAINT zkapp_fee_payer_body_account_identifier_id_fkey FOREIGN KEY (account_identifier_id) REFERENCES public.account_identifiers(id);
-
-
---
--- Name: zkapp_fee_payer_body zkapp_fee_payer_body_events_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_fee_payer_body
-    ADD CONSTRAINT zkapp_fee_payer_body_events_id_fkey FOREIGN KEY (events_id) REFERENCES public.zkapp_events(id);
-
-
---
--- Name: zkapp_fee_payer_body zkapp_fee_payer_body_sequence_events_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_fee_payer_body
-    ADD CONSTRAINT zkapp_fee_payer_body_sequence_events_id_fkey FOREIGN KEY (sequence_events_id) REFERENCES public.zkapp_events(id);
-
-
---
--- Name: zkapp_fee_payer_body zkapp_fee_payer_body_update_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_fee_payer_body
-    ADD CONSTRAINT zkapp_fee_payer_body_update_id_fkey FOREIGN KEY (update_id) REFERENCES public.zkapp_updates(id);
-
-
---
--- Name: zkapp_fee_payer_body zkapp_fee_payer_body_zkapp_network_precondition_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.zkapp_fee_payer_body
-    ADD CONSTRAINT zkapp_fee_payer_body_zkapp_network_precondition_id_fkey FOREIGN KEY (zkapp_network_precondition_id) REFERENCES public.zkapp_network_precondition(id);
 
 
 --
