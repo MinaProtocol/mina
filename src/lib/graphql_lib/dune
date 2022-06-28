@@ -16,6 +16,12 @@
    graphql
    async_kernel
    result
+   ppx_inline_test.config
+   graphql_parser
+   graphql_wrapper
+   sexplib0
+   base
+   base_quickcheck
    ;; local libraries
    mina_numbers
    currency
@@ -24,5 +30,25 @@
    mina_base
    block_time
  )
+ (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))
+ (preprocess (pps ppx_version ppx_compare ppx_deriving_yojson
+                  ;; ppx_jane except ppx_optcomp
+                  ppx_inline_test ppx_let ppx_custom_printf ppx_here
+ppx_base ppx_assert ppx_bench ppx_bin_prot ppx_custom_printf ppx_fields_conv
+ppx_fixed_literal ppx_here ppx_inline_test ppx_let ppx_module_timer
+ppx_optional ppx_pipebang ppx_sexp_message ppx_sexp_value ppx_string ppx_typerep_conv
+ppx_variants_conv
+                  ;; GraphQL with config
+                  graphql_ppx --
+                  -custom-field PublicKey Scalars.PublicKey
+                  -custom-field UInt64 Scalars.UInt64
+                  -custom-field TokenId Scalars.TokenId
+                  -custom-field Balance Scalars.Balance
+                  -custom-field UInt32 Scalars.UInt32
+                  -custom-field Fee Scalars.Fee
+                  -custom-field Amount Scalars.Amount
+                  -extend-query Serializing.ExtendQuery
+                  -extend-mutation Serializing.ExtendQuery
+                  -future-added-value false
+)))
