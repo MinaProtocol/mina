@@ -11,6 +11,7 @@
    core
    async
    ;; local libraries
+   mina_wire_types
    mina_metrics
    mina_net2
    debug_assert

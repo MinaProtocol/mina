@@ -13,6 +13,7 @@
    integers
    unsigned_extended
    ;; local libraries
+   mina_wire_types
    with_hash
    data_hash_lib
    pickles

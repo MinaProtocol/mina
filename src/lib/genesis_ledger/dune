@@ -6,6 +6,7 @@
    core_kernel
    base
    ;; local libraries
+   mina_wire_types
    mina_base
    signature_lib
    currency

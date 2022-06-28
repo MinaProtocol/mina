@@ -11,6 +11,7 @@
    base.base_internalhash_types
    stdio
    ;;local libraries
+   mina_wire_types
    unsigned_extended
    o1trace
    visualization

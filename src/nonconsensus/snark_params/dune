@@ -12,6 +12,7 @@
    base
    bignum.bigint
    ;; local libraries
+   mina_wire_types
    bignum_bigint
    snarkette
  )

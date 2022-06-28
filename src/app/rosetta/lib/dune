@@ -22,6 +22,7 @@
    core
    sexplib0
    ;;local libraries
+   mina_wire_types
    mina_signature_kind
    graphql_lib
    interpolator_lib

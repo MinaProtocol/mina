@@ -25,6 +25,7 @@
    base.caml
    integers
    ;; local libraries
+   mina_wire_types
    integration_test_lib
    graphql_lib
    coda_runtime_config

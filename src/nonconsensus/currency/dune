@@ -15,8 +15,8 @@
    base
    base.base_internalhash_types
    ppx_inline_test.config
-   mina_wire_types
    ;;local libraries
+   mina_wire_types
    codable
    bignum_bigint
    ppx_dhall_type

@@ -17,6 +17,7 @@
    uri
    async.async_command
    ;; local libraries
+   mina_wire_types
    archive_lib
    data_hash_lib
    signature_lib

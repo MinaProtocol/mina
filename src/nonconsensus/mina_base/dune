@@ -17,6 +17,7 @@
    integers
    base_quickcheck
    ;;local libraries
+   mina_wire_types
    sgn_nonconsensus
    random_oracle_nonconsensus
    unsigned_extended_nonconsensus

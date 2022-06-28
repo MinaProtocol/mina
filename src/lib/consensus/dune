@@ -25,6 +25,7 @@
    async_rpc_kernel
    sexp_diff_kernel
    ;; local libraries
+   mina_wire_types
    unsigned_extended
    fold_lib
    random_oracle_input
