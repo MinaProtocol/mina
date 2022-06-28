@@ -96,6 +96,54 @@ directory, which links to a tarball containing the docker image. You
 can load the image using `docker load -i result`, then note the tag it
 outputs. You can then run Mina from this docker image with `docker run mina:<tag> mina.exe <args>`.
 
+### direnv
+
+It is considered as a good practice to automatically enter the Nix shell instead of keeping in mind that you need to execute the `nix develop mina` command every time you enter the Mina repo directory.  
+One way to do this is by using [`direnv`](https://direnv.net) + [`nix-direnv`](https://github.com/nix-community/nix-direnv)
+
+#### How-To
+
+- Install the `direnv` and add hook into your shell:
+  - [Installation](https://direnv.net/docs/installation.html)
+  - [Configuration](https://direnv.net/docs/hook.html)
+- Reload your shell
+- Configure the [`nix-direnv`](https://github.com/nix-community/nix-direnv)
+  - The `Via home-manager (Recommended)` section
+- Create the `.envrc` file under the Mina repo root path with the following content: `use nix` or `use flake mina`:
+  ```
+  cd mina
+  touch .envrc && echo "use flake mina" >> .envrc
+  ```
+- Execute the following command within the Mina repo root path, in order to activate the `direnv` for current directory (it will read and apply previously created `.envrc` configuration file):
+
+  ```
+  direnv allow
+  ```
+
+- _Optional_: Reload your shell
+- Now you will enter the Nix shell automatically should you `cd` into the Mina repo root path.
+- To build Mina, you can use all the same techniques as from within the `nix develop` shell mentioned above. For example, try `dune build src/app/cli/src/mina.exe`, or `eval "$buildPhase"`.  
+  Please note though that `make` targets invocation won't work as usual, that is why it is preferably to use `Dune`.
+
+#### Check the shell
+
+`direnv` will tell you which variables it added to your shell every time you enter the subject directory.
+
+In addition to that you can:
+
+- Check if `direnv` loaded the configuration for particular directory by invoking the `direnv status` command within subject directory.
+- Check the `IN_NIX_SHELL` environment variable value:
+  ```
+  echo ${IN_NIX_SHELL}
+  ```
+  - Where an empty string means that the Nix shell was not entered.
+
+#### CLI prompt info
+
+- In addition you might want to update your CLI prompt environment information to automatically inform you if you've entered the Nix shell.
+  - [Example](https://gist.github.com/chisui/0d12bd51a5fd8e6bb52e6e6a43d31d5e)
+    - `prompt_nix_shell` method.
+
 ## Miscellaneous
 
 ### Contributing to Nix expressions
@@ -125,66 +173,6 @@ nixpkgs with some overlays applied (see
 [./overlay.nix](./overlay.nix)). All the dependencies are then
 provided to the final Mina derivation. See [./ocaml.nix](./ocaml.nix)
 for more details.
-
-### Utility
-
-It is considered as a good practice to automatically enter the Nix shell instead of keeping in mind that you need to execute the `nix develop mina` command every time you enter the Mina repo directory.  
-One way to do this is by using [`direnv`](https://direnv.net) + [`nix-direnv`](https://github.com/nix-community/nix-direnv)
-
-#### How-To
-
-- Install the `direnv` and add hook into your shell:
-  - [Installation](https://direnv.net/docs/installation.html)
-  - [Configuration](https://direnv.net/docs/hook.html)
-- Reload your shell
-- Configure the [`nix-direnv`](https://github.com/nix-community/nix-direnv)
-  - The `Via home-manager (Recommended)` section
-- Create the `.envrc` file under the Mina repo root path with the following content: `use nix` or `use flake mina`:
-  ```
-  cd mina
-  touch .envrc && echo "use flake mina" >> .envrc
-  ```
-- Execute the following command within the Mina repo root path, in order to activate the `direnv` for current directory (it will read and apply previously created `.envrc` configuration file):
-  ```
-  direnv allow
-  ```
-
-* _Optional_: Reload your shell
-* Now you will enter the Nix shell automatically should you `cd` into the Mina repo root path.  
-  To build the applications please use `Dune` directly, bypassing the `make`:
-  ```
-  MINA_COMMIT_SHA1=$(git rev-parse HEAD) DUNE_PROFILE="testnet_postake_medium_curves" dune build src/app/cli/src/mina.exe src/app/logproc/logproc.exe src/app/archive/archive.exe src/app/test_executive/test_executive.exe src/app/replayer/replayer.exe src/app/zkapp_test_transaction/zkapp_test_transaction.exe
-  ```
-
-#### Check if it worked
-
-- You can check if `direnv` loaded the configuration for particular directory by invoking the `direnv status` command within subject directory.
-- You can also check the `IN_NIX_SHELL` environment variable value:
-  ```
-  echo ${IN_NIX_SHELL}
-  ```
-  - Where an empty string means that the Nix shell was not entered.
-
-* In addition you might want to update your CLI prompt environment information to automatically inform you if you've entered the Nix shell.
-  - [Example](https://gist.github.com/chisui/0d12bd51a5fd8e6bb52e6e6a43d31d5e)
-    - `prompt_nix_shell` method.
-
-#### Configure global Git-ignore
-
-The `.envrc` nor `.direnv/` are not added into the Mina repo `.gitignore` file, hence, you might want to ignore those entities globally.
-
-```
-touch ~/.gitignore
-
-echo "### Direnv ###" >> ~/.gitignore
-echo ".envrc" >> ~/.gitignore
-echo ".direnv/" >> ~/.gitignore
-echo "" >> ~/.gitignore
-echo "### Nix ###" >> ~/.gitignore
-echo ".shell.nix" >> ~/.gitignore
-
-git config --global core.excludesfile ~/.gitignore
-```
 
 ## Troubleshooting
 
