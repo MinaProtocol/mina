@@ -50,9 +50,9 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   { identifier = "ring-sig-rule"
   ; prevs = []
   ; main =
-      (fun { previous_public_inputs = []; public_input = x } ->
-        ring_sig_main x |> Run.run_checked ;
-        { previous_proofs_should_verify = []
+      (fun { public_input = x } ->
+        Run.run_checked @@ ring_sig_main x ;
+        { previous_proof_statements = []
         ; public_output = ()
         ; auxiliary_output = ()
         } )
@@ -268,7 +268,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 respond Unhandled
           in
           let (), (), (pi : Pickles.Side_loaded.Proof.t) =
-            (fun () -> ringsig_prover ~handler [] tx_statement)
+            (fun () -> ringsig_prover ~handler tx_statement)
             |> Async.Thread_safe.block_on_async_exn
           in
           let fee_payer =

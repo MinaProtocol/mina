@@ -42,7 +42,7 @@ let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 (* TODO: This should be entirely unnecessary. *)
 let party_body = Zkapps_empty_update.generate_party pk_compressed
 
-let _stmt, (), party_proof = Async.Thread_safe.block_on_async_exn (prover [])
+let _stmt, (), party_proof = Async.Thread_safe.block_on_async_exn prover
 
 let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
 
