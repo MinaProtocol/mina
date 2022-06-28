@@ -888,71 +888,76 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
      match c with Zkapp_basic.Set_or_keep.Set x -> x | Keep -> default
    in
    let delegate (account : Account.t) =
-     Option.map
-       ~f:(fun delegate -> value_to_be_updated update.delegate ~default:delegate)
-       account.delegate
+     if is_fee_payer then account.delegate
+     else
+       Option.map
+         ~f:(fun delegate ->
+           value_to_be_updated update.delegate ~default:delegate )
+         account.delegate
    in
    let zkapp (account : Account.t) =
-     match account.zkapp with
-     | None ->
-         None
-     | Some zk ->
-         (*TODO: Deduplicate this from what's in parties logic to get the
-            account precondition right*)
-         let app_state =
-           let account_app_state = zk.app_state in
-           List.zip_exn
-             (Zkapp_state.V.to_list update.app_state)
-             (Zkapp_state.V.to_list account_app_state)
-           |> List.map ~f:(fun (to_be_updated, current) ->
-                  value_to_be_updated to_be_updated ~default:current )
-           |> Zkapp_state.V.of_list_exn
-         in
-         let sequence_state =
-           let [ s1'; s2'; s3'; s4'; s5' ] = zk.sequence_state in
-           let last_sequence_slot = zk.last_sequence_slot in
-           (* Push events to s1. *)
-           let is_empty = List.is_empty sequence_events in
-           let s1_updated =
-             Party.Sequence_events.push_events s1' sequence_events
+     if is_fee_payer then account.zkapp
+     else
+       match account.zkapp with
+       | None ->
+           None
+       | Some zk ->
+           (*TODO: Deduplicate this from what's in parties logic to get the
+              account precondition right*)
+           let app_state =
+             let account_app_state = zk.app_state in
+             List.zip_exn
+               (Zkapp_state.V.to_list update.app_state)
+               (Zkapp_state.V.to_list account_app_state)
+             |> List.map ~f:(fun (to_be_updated, current) ->
+                    value_to_be_updated to_be_updated ~default:current )
+             |> Zkapp_state.V.of_list_exn
            in
-           let s1 = if is_empty then s1' else s1_updated in
-           let txn_global_slot =
-             Option.value_map protocol_state_view ~default:last_sequence_slot
-               ~f:(fun ps ->
-                 ps
-                   .Zkapp_precondition.Protocol_state.Poly
-                    .global_slot_since_genesis )
+           let sequence_state =
+             let [ s1'; s2'; s3'; s4'; s5' ] = zk.sequence_state in
+             let last_sequence_slot = zk.last_sequence_slot in
+             (* Push events to s1. *)
+             let is_empty = List.is_empty sequence_events in
+             let s1_updated =
+               Party.Sequence_events.push_events s1' sequence_events
+             in
+             let s1 = if is_empty then s1' else s1_updated in
+             let txn_global_slot =
+               Option.value_map protocol_state_view ~default:last_sequence_slot
+                 ~f:(fun ps ->
+                   ps
+                     .Zkapp_precondition.Protocol_state.Poly
+                      .global_slot_since_genesis )
+             in
+             (* Shift along if last update wasn't this slot  *)
+             let is_this_slot =
+               Mina_numbers.Global_slot.equal txn_global_slot last_sequence_slot
+             in
+             let is_full_and_different_slot = (not is_empty) && is_this_slot in
+             let s5 = if is_full_and_different_slot then s5' else s4' in
+             let s4 = if is_full_and_different_slot then s4' else s3' in
+             let s3 = if is_full_and_different_slot then s3' else s2' in
+             let s2 = if is_full_and_different_slot then s2' else s1' in
+             ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
            in
-           (* Shift along if last update wasn't this slot  *)
-           let is_this_slot =
-             Mina_numbers.Global_slot.equal txn_global_slot last_sequence_slot
+           let proved_state =
+             let keeping_app_state =
+               List.for_all ~f:Fn.id
+                 (List.map ~f:Zkapp_basic.Set_or_keep.is_keep
+                    (Pickles_types.Vector.to_list update.app_state) )
+             in
+             let changing_entire_app_state =
+               List.for_all ~f:Fn.id
+                 (List.map ~f:Zkapp_basic.Set_or_keep.is_set
+                    (Pickles_types.Vector.to_list update.app_state) )
+             in
+             let proof_verifies = Control.Tag.(equal Proof authorization_tag) in
+             if keeping_app_state then zk.proved_state
+             else if proof_verifies then
+               if changing_entire_app_state then true else zk.proved_state
+             else false
            in
-           let is_full_and_different_slot = (not is_empty) && is_this_slot in
-           let s5 = if is_full_and_different_slot then s5' else s4' in
-           let s4 = if is_full_and_different_slot then s4' else s3' in
-           let s3 = if is_full_and_different_slot then s3' else s2' in
-           let s2 = if is_full_and_different_slot then s2' else s1' in
-           ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-         in
-         let proved_state =
-           let keeping_app_state =
-             List.for_all ~f:Fn.id
-               (List.map ~f:Zkapp_basic.Set_or_keep.is_keep
-                  (Pickles_types.Vector.to_list update.app_state) )
-           in
-           let changing_entire_app_state =
-             List.for_all ~f:Fn.id
-               (List.map ~f:Zkapp_basic.Set_or_keep.is_set
-                  (Pickles_types.Vector.to_list update.app_state) )
-           in
-           let proof_verifies = Control.Tag.(equal Proof authorization_tag) in
-           if keeping_app_state then zk.proved_state
-           else if proof_verifies then
-             if changing_entire_app_state then true else zk.proved_state
-           else false
-         in
-         Some { zk with app_state; sequence_state; proved_state }
+           Some { zk with app_state; sequence_state; proved_state }
    in
    Account_id.Table.change account_state_tbl (Account.identifier account)
      ~f:(function
