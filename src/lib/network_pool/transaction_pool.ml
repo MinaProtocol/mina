@@ -68,12 +68,9 @@ module Diff_versioned = struct
       module V2 = struct
         type t =
           | Insufficient_replace_fee
-          | Verification_failed
           | Duplicate
-          | Sender_account_does_not_exist
           | Invalid_nonce
           | Insufficient_funds
-          | Insufficient_fee
           | Overflow
           | Bad_token
           | Unwanted_fee_token
@@ -92,12 +89,9 @@ module Diff_versioned = struct
      * the changes *)
     type t = Stable.Latest.t =
       | Insufficient_replace_fee
-      | Verification_failed
       | Duplicate
-      | Sender_account_does_not_exist
       | Invalid_nonce
       | Insufficient_funds
-      | Insufficient_fee
       | Overflow
       | Bad_token
       | Unwanted_fee_token
@@ -110,18 +104,12 @@ module Diff_versioned = struct
     let to_string_name = function
       | Insufficient_replace_fee ->
           "insufficient_replace_fee"
-      | Verification_failed ->
-          "verification_failed"
       | Duplicate ->
           "duplicate"
-      | Sender_account_does_not_exist ->
-          "sender_account_does_not_exist"
       | Invalid_nonce ->
           "invalid_nonce"
       | Insufficient_funds ->
           "insufficient_funds"
-      | Insufficient_fee ->
-          "insufficient_fee"
       | Overflow ->
           "overflow"
       | Bad_token ->
@@ -141,20 +129,13 @@ module Diff_versioned = struct
       | Insufficient_replace_fee ->
           "This transaction would have replaced an existing transaction in the \
            pool, but the fee was too low"
-      | Verification_failed ->
-          "This transaction had an invalid proof/signature"
       | Duplicate ->
           "This transaction is a duplicate of one already in the pool"
-      | Sender_account_does_not_exist ->
-          "The fee-payer's account for this transaction could not be found in \
-           the ledger"
       | Invalid_nonce ->
           "This transaction had an invalid nonce"
       | Insufficient_funds ->
           "There are not enough funds in the fee-payer's account to execute \
            this transaction"
-      | Insufficient_fee ->
-          "The fee for this transaction is too low"
       | Overflow ->
           "Executing this transaction would result in an integer overflow"
       | Bad_token ->
@@ -191,16 +172,7 @@ module Diff_versioned = struct
 
   type rejected = Rejected.t [@@deriving sexp, yojson, compare]
 
-  type verified =
-    { accepted :
-        ( ( Transaction_hash.User_command_with_valid_signature.t
-          * Transaction_hash.User_command_with_valid_signature.t list )
-          list
-        * Indexed_pool.Sender_local_state.t
-        * Indexed_pool.Update.t )
-        list
-    ; rejected : Rejected.t
-    }
+  type verified = Transaction_hash.User_command_with_valid_signature.t list
   [@@deriving sexp, to_yojson]
 
   let summary t = Printf.sprintf "Transaction diff of length %d" (List.length t)
@@ -269,6 +241,27 @@ struct
 
     let label = "transaction_pool"
 
+    let preload_accounts ledger account_ids =
+      let existing_account_ids, existing_account_locs =
+        Set.to_list account_ids
+        |> Base_ledger.location_of_account_batch ledger
+        |> List.filter_map ~f:(function
+             | id, Some loc ->
+                 Some (id, loc)
+             | _, None ->
+                 None )
+        |> List.unzip
+      in
+      Base_ledger.get_batch ledger existing_account_locs
+      |> List.map ~f:snd
+      |> List.zip_exn existing_account_ids
+      |> List.fold ~init:Account_id.Map.empty ~f:(fun map (id, maybe_account) ->
+             let account =
+               Option.value_exn maybe_account
+                 ~message:"Somehow a public key has a location but no account"
+             in
+             Map.add_exn map ~key:id ~data:account )
+
     module Config = struct
       type t =
         { trust_system : (Trust_system.t[@sexp.opaque])
@@ -332,7 +325,6 @@ struct
 
     type t =
       { mutable pool : Indexed_pool.t
-      ; sender_mutex : (Mutex.t Account_id.Table.t[@sexp.opaque])
       ; recently_seen : (Lru_cache.t[@sexp.opaque])
       ; locally_generated_uncommitted :
           ( Transaction_hash.User_command_with_valid_signature.t
@@ -407,8 +399,6 @@ struct
           Overflow
       | Bad_token ->
           Bad_token
-      | Verification_failed ->
-          Verification_failed
       | Unwanted_fee_token _ ->
           Unwanted_fee_token
       | Expired _ ->
@@ -426,6 +416,7 @@ struct
           [ ("expected_nonce", nonce_json enonce); ("nonce", nonce_json nonce) ]
       | Insufficient_funds (`Balance bal, amt) ->
           let amt_json = Currency.Amount.to_yojson in
+
           [ ("balance", amt_json bal); ("amount", amt_json amt) ]
       | Insufficient_replace_fee (`Replace_fee rfee, fee) ->
           let fee_json = Currency.Fee.to_yojson in
@@ -433,8 +424,6 @@ struct
       | Overflow ->
           []
       | Bad_token ->
-          []
-      | Verification_failed ->
           []
       | Unwanted_fee_token fee_token ->
           [ ("fee_token", Token_id.to_yojson fee_token) ]
@@ -566,39 +555,20 @@ struct
               Set.union set set' )
         in
         let get_account =
+          let account_state (account : Account.t) =
+            ( account.nonce
+            , Currency.Amount.of_uint64
+              @@ Currency.Balance.to_uint64 account.balance )
+          in
           let empty_state = (Account.Nonce.zero, Currency.Amount.zero) in
+          (* TODO: it occurs to me that this batch logic is duplicated during the staged ledger apply... we should try and share data *)
           let existing_account_states_by_id =
-            (* TODO: it occurs to me that this batch logic is duplicated during the staged ledger apply... we should try and share data *)
-            let existing_account_ids, existing_account_locs =
-              Set.to_list accounts_to_check
-              |> Base_ledger.location_of_account_batch best_tip_ledger
-              |> List.filter_map ~f:(function
-                   | id, Some loc ->
-                       Some (id, loc)
-                   | _, None ->
-                       None )
-              |> List.unzip
-            in
-            Base_ledger.get_batch best_tip_ledger existing_account_locs
-            |> List.map ~f:snd
-            |> List.zip_exn existing_account_ids
-            |> List.fold ~init:Account_id.Map.empty
-                 ~f:(fun map (id, maybe_account) ->
-                   let account =
-                     Option.value_exn maybe_account
-                       ~message:
-                         "Somehow a public key has a location but no account"
-                   in
-                   Map.add_exn map ~key:id
-                     ~data:
-                       ( account.nonce
-                       , Currency.Amount.of_uint64
-                         @@ Currency.Balance.to_uint64 account.balance ) )
+            preload_accounts best_tip_ledger accounts_to_check
           in
           fun id ->
             match Map.find existing_account_states_by_id id with
-            | Some state ->
-                state
+            | Some account ->
+                account_state account
             | None ->
                 if Set.mem accounts_to_check id then empty_state
                 else
@@ -697,9 +667,7 @@ struct
               with
               | Some acct -> (
                   match
-                    Indexed_pool.add_from_gossip_exn t.pool (`Checked cmd)
-                      acct.nonce
-                      ~verify:(fun _ -> assert false)
+                    Indexed_pool.add_from_gossip_exn t.pool cmd acct.nonce
                       ( Account.liquid_balance_at_slot ~global_slot acct
                       |> Currency.Balance.to_amount )
                   with
@@ -751,7 +719,6 @@ struct
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
               ~time_controller ~expiry_ns
-        ; sender_mutex = Account_id.Table.create ()
         ; locally_generated_uncommitted =
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -889,23 +856,43 @@ struct
 
       module Diff_error = struct
         type t = Diff_versioned.Diff_error.t =
+          (*Indexed_pool*)
           | Insufficient_replace_fee
-          | Verification_failed
+          (*apply*)
           | Duplicate
-          | Sender_account_does_not_exist
+          (*Indexed_pool*)
           | Invalid_nonce
+          (*Indexed_pool*)
           | Insufficient_funds
-          | Insufficient_fee
+          (*Indexed_pool*)
           | Overflow
+          (*Indexed_pool*)
           | Bad_token
+          (*Indexed_pool*)
           | Unwanted_fee_token
+          (*Indexed_pool*)
           | Expired
+          (*Sink*)
           | Overloaded
+          (*apply*)
           | Fee_payer_account_not_found
           | Fee_payer_not_permitted_to_send
         [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
+
+        let grounds_for_diff_rejection = function
+          | Expired
+          | Invalid_nonce
+          | Insufficient_funds
+          | Insufficient_replace_fee
+          | Duplicate
+          | Overloaded
+          | Fee_payer_account_not_found
+          | Fee_payer_not_permitted_to_send ->
+              false
+          | Overflow | Bad_token | Unwanted_fee_token ->
+              true
       end
 
       module Rejected = struct
@@ -917,31 +904,12 @@ struct
 
       type rejected = Rejected.t [@@deriving sexp, yojson, compare]
 
-      type verified = Diff_versioned.verified =
-        { accepted :
-            ( ( Transaction_hash.User_command_with_valid_signature.t
-              * Transaction_hash.User_command_with_valid_signature.t list )
-              list
-            * Indexed_pool.Sender_local_state.t
-            * Indexed_pool.Update.t )
-            list
-        ; rejected : Rejected.t
-        }
-      [@@deriving sexp, to_yojson]
+      type verified = Diff_versioned.verified [@@deriving sexp, to_yojson]
 
-      let reject_overloaded_diff (diffs : verified) : rejected =
-        diffs.rejected
-        @ List.concat_map diffs.accepted ~f:(fun (cmds, _, _) ->
-              List.map cmds ~f:(fun (c, _) ->
-                  ( Transaction_hash.User_command_with_valid_signature.command c
-                  , Diff_error.Overloaded ) ) )
-
-      let verified_accepted ({ accepted; _ } : verified) =
-        List.concat_map accepted ~f:(fun (cs, _, _) ->
-            List.map cs ~f:(fun (c, _) ->
-                Transaction_hash.User_command_with_valid_signature.command c ) )
-
-      let verified_rejected ({ rejected; _ } : verified) : rejected = rejected
+      let reject_overloaded_diff (diff : verified) : rejected =
+        List.map diff ~f:(fun cmd ->
+            ( Transaction_hash.User_command_with_valid_signature.command cmd
+            , Diff_error.Overloaded ) )
 
       let empty = []
 
@@ -981,400 +949,114 @@ struct
       let of_indexed_pool_error e =
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
-      let handle_command_error t ~trust_record ~is_sender_local tx
+      let report_command_error ~logger ~is_sender_local tx
           (e : Indexed_pool.Command_error.t) =
-        let yojson_fail_reason =
-          Fn.compose
-            (fun s -> `String s)
-            (function
-              | Indexed_pool.Command_error.Invalid_nonce _ ->
-                  "invalid nonce"
-              | Insufficient_funds _ ->
-                  "insufficient funds"
-              | Verification_failed ->
-                  "transaction had bad proof/signature or was malformed"
-              | Insufficient_replace_fee _ ->
-                  "insufficient replace fee"
-              | Overflow ->
-                  "overflow"
-              | Bad_token ->
-                  "bad token"
-              | Unwanted_fee_token _ ->
-                  "unwanted fee token"
-              | Expired _ ->
-                  "expired" )
+        let diff_err, error_extra = of_indexed_pool_error e in
+        if is_sender_local then
+          [%str_log error]
+            (Rejecting_command_for_reason
+               { command = tx; reason = diff_err; error_extra } ) ;
+        let log = if is_sender_local then [%log error] else [%log debug] in
+        match e with
+        | Insufficient_replace_fee (`Replace_fee rfee, fee) ->
+            log
+              "rejecting $cmd because of insufficient replace fee ($rfee > \
+               $fee)"
+              ~metadata:
+                [ ("cmd", User_command.to_yojson tx)
+                ; ("rfee", Currency.Fee.to_yojson rfee)
+                ; ("fee", Currency.Fee.to_yojson fee)
+                ]
+        | Unwanted_fee_token fee_token ->
+            log "rejecting $cmd because we don't accept fees in $token"
+              ~metadata:
+                [ ("cmd", User_command.to_yojson tx)
+                ; ("token", Token_id.to_yojson fee_token)
+                ]
+        | _ ->
+            ()
+
+      let verify (t : pool) (diff : t Envelope.Incoming.t) :
+          verified Envelope.Incoming.t Deferred.Or_error.t =
+        let open Deferred.Or_error.Let_syntax in
+        let ok_if_true cond ~error =
+          Deferred.return
+            (Result.ok_if_true cond ~error:(Error.of_string error))
         in
-        let open Async in
-        let%map () =
-          match e with
-          | Insufficient_replace_fee (`Replace_fee rfee, fee) ->
-              (* We can't punish peers for this, since an
-                  attacker can simultaneously send different
-                  transactions at the same nonce to different
-                  nodes, which will then naturally gossip them.
-              *)
-              let f_log =
-                if is_sender_local then [%log' error t.logger]
-                else [%log' debug t.logger]
-              in
-              f_log
-                "rejecting $cmd because of insufficient replace fee ($rfee > \
-                 $fee)"
+        let%bind () =
+          (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already *)
+          let (`Already_mem already_mem) =
+            Lru_cache.add t.recently_seen (Lru_cache.T.hash diff.data)
+          in
+          ok_if_true (not already_mem) ~error:"Recently seen"
+        in
+        let%bind () =
+          let cmds_with_insufficient_fees =
+            List.filter
+              (Envelope.Incoming.data diff)
+              ~f:User_command.has_insufficient_fee
+          in
+          List.iter cmds_with_insufficient_fees ~f:(fun cmd ->
+              [%log' debug t.logger]
+                "User command $cmd from $sender has insufficient fee."
                 ~metadata:
-                  [ ("cmd", User_command.to_yojson tx)
-                  ; ("rfee", Currency.Fee.to_yojson rfee)
-                  ; ("fee", Currency.Fee.to_yojson fee)
-                  ] ;
-              Deferred.unit
-          | Unwanted_fee_token fee_token ->
-              (* We can't punish peers for this, since these
-                    are our specific preferences.
-              *)
-              let f_log =
-                if is_sender_local then [%log' error t.logger]
-                else [%log' debug t.logger]
-              in
-              f_log "rejecting $cmd because we don't accept fees in $token"
-                ~metadata:
-                  [ ("cmd", User_command.to_yojson tx)
-                  ; ("token", Token_id.to_yojson fee_token)
-                  ] ;
-              Deferred.unit
-          | Verification_failed ->
-              trust_record
+                  [ ("cmd", User_command.to_yojson cmd)
+                  ; ( "sender"
+                    , Envelope.(Sender.to_yojson (Incoming.sender diff)) )
+                  ] ) ;
+          ok_if_true
+            (List.is_empty cmds_with_insufficient_fees)
+            ~error:"Some commands have insufficient fee"
+        in
+        (* TODO: batch `to_verifiable` *)
+        let%bind ledger =
+          match t.best_tip_ledger with
+          | Some ledger ->
+              return ledger
+          | None ->
+              Deferred.Or_error.error_string
+                "We don't have a transition frontier at the moment, so we're \
+                 unable to verify any transactions."
+        in
+        let diff' =
+          Envelope.Incoming.map diff
+            ~f:
+              (List.map
+                 ~f:
+                   (User_command.to_verifiable ~ledger ~get:Base_ledger.get
+                      ~location_of_account:Base_ledger.location_of_account ) )
+        in
+        match%bind.Deferred Batcher.verify t.batcher diff' with
+        | Error e ->
+            [%log' error t.logger] "Transaction verification error: $error"
+              ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+            Deferred.return (Error (Error.tag e ~tag:"Internal_error"))
+        | Ok (Error invalid) ->
+            let msg = Verifier.invalid_to_string invalid in
+            [%log' error t.logger]
+              "Batch verification failed when adding from gossip"
+              ~metadata:[ ("error", `String msg) ] ;
+            let%map.Deferred () =
+              Trust_system.record_envelope_sender t.config.trust_system t.logger
+                (Envelope.Incoming.sender diff)
                 ( Trust_system.Actions.Sent_useless_gossip
                 , Some
                     ( "rejecting command because had invalid signature or was \
                        malformed"
                     , [] ) )
-          | err ->
-              let diff_err, error_extra = of_indexed_pool_error err in
-              if is_sender_local then
-                [%str_log' error t.logger]
-                  (Rejecting_command_for_reason
-                     { command = tx; reason = diff_err; error_extra } ) ;
-              trust_record
-                ( Trust_system.Actions.Sent_useless_gossip
-                , Some
-                    ( "rejecting $cmd because of $reason. ($error_extra)"
-                    , [ ("cmd", User_command.to_yojson tx)
-                      ; ("reason", yojson_fail_reason err)
-                      ; ("error_extra", `Assoc error_extra)
-                      ] ) )
-        in
-        if Indexed_pool.Command_error.grounds_for_diff_rejection e then `Reject
-        else `Ignore
-
-      let verify' ~allow_failures_for_tests (t : pool)
-          (diffs : t Envelope.Incoming.t) :
-          verified Envelope.Incoming.t Deferred.Or_error.t =
-        let open Deferred.Let_syntax in
-        let trust_record =
-          Trust_system.record_envelope_sender t.config.trust_system t.logger
-            diffs.sender
-        in
-        let config = Indexed_pool.config t.pool in
-        let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
-        let pool_max_size = t.config.pool_max_size in
-        let sender = Envelope.Incoming.sender diffs in
-        let is_sender_local = Envelope.Sender.(equal sender Local) in
-        let diffs_are_valid () =
-          List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
-              let is_valid = not (User_command.has_insufficient_fee cmd) in
-              if not is_valid then
-                [%log' debug t.logger]
-                  "Filtering user command with insufficient fee from \
-                   transaction-pool diff $cmd from $sender"
-                  ~metadata:
-                    [ ("cmd", User_command.to_yojson cmd)
-                    ; ( "sender"
-                      , Envelope.(Sender.to_yojson (Incoming.sender diffs)) )
-                    ] ;
-              is_valid )
-        in
-        let h = Lru_cache.T.hash diffs.data in
-        let (`Already_mem already_mem) = Lru_cache.add t.recently_seen h in
-        if (not allow_failures_for_tests) && already_mem && not is_sender_local
-        then
-          (* We only reject here if the command was from the network: the user
-             may want to re-issue a transaction if it is no longer being
-             rebroadcast but also never made it into a block for some reason.
-          *)
-          Deferred.Or_error.error_string "already saw this"
-        else if (not allow_failures_for_tests) && not (diffs_are_valid ()) then
-          Deferred.Or_error.error_string
-            "at least one user command had an insufficient fee"
-        else
-          match t.best_tip_ledger with
-          | None ->
-              Deferred.Or_error.error_string
-                "We don't have a transition frontier at the moment, so we're \
-                 unable to verify any transactions."
-          | Some ledger -> (
-              let data' =
-                List.map diffs.data
-                  ~f:
-                    (User_command.to_verifiable ~ledger ~get:Base_ledger.get
-                       ~location_of_account:Base_ledger.location_of_account )
-              in
-              let by_sender =
-                List.fold data' ~init:Account_id.Map.empty
-                  ~f:(fun by_sender c ->
-                    Map.add_multi by_sender
-                      ~key:(User_command.Verifiable.fee_payer c)
-                      ~data:c )
-                |> Map.map ~f:List.rev |> Map.to_alist
-              in
-              let failures = ref (Ok ()) in
-              let add_failure err =
-                match !failures with
-                | Ok () ->
-                    failures := Error [ err ]
-                | Error errs ->
-                    failures := Error (err :: errs)
-              in
-              let%map diffs' =
-                Deferred.List.map by_sender ~how:`Parallel
-                  ~f:(fun (signer, cs) ->
-                    let account =
-                      Option.bind
-                        (Base_ledger.location_of_account ledger signer)
-                        ~f:(Base_ledger.get ledger)
-                    in
-                    match account with
-                    | None ->
-                        let%map _ =
-                          trust_record
-                            ( Trust_system.Actions.Sent_useless_gossip
-                            , Some
-                                ( "account does not exist for id: $account_id"
-                                , [ ("account_id", Account_id.to_yojson signer)
-                                  ] ) )
-                        in
-                        add_failure
-                          (Command_failure
-                             Diff_error.Fee_payer_account_not_found ) ;
-                        Error `Invalid_command
-                    | Some account ->
-                        if not (Account.has_permission ~to_:`Send account) then (
-                          add_failure
-                            (Command_failure
-                               Diff_error.Fee_payer_not_permitted_to_send ) ;
-                          return (Error `Invalid_command) )
-                        else
-                          let signer_lock =
-                            Hashtbl.find_or_add t.sender_mutex signer
-                              ~default:Mutex.create
-                          in
-                          (*This lock is released in apply function unless
-                            there's an error that causes all the transactions from
-                            this signer to be discarded*)
-                          let%bind () = Mutex.acquire signer_lock in
-                          let rec go sender_local_state u_acc acc
-                              (rejected : Rejected.t) = function
-                            | [] ->
-                                (* We keep the signer lock until this verified diff is applied. *)
-                                return
-                                  (Ok
-                                     ( List.rev acc
-                                     , List.rev rejected
-                                     , sender_local_state
-                                     , u_acc ) )
-                            | c :: cs ->
-                                let uc = User_command.of_verifiable c in
-                                if Result.is_error !failures then (
-                                  Mutex.release signer_lock ;
-                                  return (Error `Other_command_failed) )
-                                else
-                                  let tx' =
-                                    Transaction_hash.User_command.create uc
-                                  in
-                                  if Indexed_pool.member t.pool tx' then
-                                    if is_sender_local then (
-                                      [%log' info t.logger]
-                                        "Received local $cmd already present \
-                                         in the pool"
-                                        ~metadata:
-                                          [ ("cmd", User_command.to_yojson uc) ] ;
-                                      match
-                                        Indexed_pool.find_by_hash t.pool
-                                          (Transaction_hash.User_command.hash
-                                             tx' )
-                                      with
-                                      | Some validated_uc ->
-                                          go sender_local_state
-                                            Indexed_pool.Update.empty
-                                            ((validated_uc, []) :: acc)
-                                            rejected cs
-                                      | None ->
-                                          (*We just checked for membership, fail?*)
-                                          go sender_local_state u_acc acc
-                                            ( ( uc
-                                              , Diff_versioned.Diff_error
-                                                .Duplicate )
-                                            :: rejected )
-                                            cs )
-                                    else
-                                      let%bind _ =
-                                        trust_record
-                                          ( Trust_system.Actions.Sent_old_gossip
-                                          , None )
-                                      in
-                                      go sender_local_state u_acc acc
-                                        ( ( uc
-                                          , Diff_versioned.Diff_error.Duplicate
-                                          )
-                                        :: rejected )
-                                        cs
-                                  else if
-                                    has_sufficient_fee t.pool ~pool_max_size uc
-                                  then
-                                    match%bind
-                                      Indexed_pool.add_from_gossip_exn_async
-                                        ~config ~sender_local_state
-                                        ~verify:(fun c ->
-                                          match%map
-                                            Batcher.verify t.batcher
-                                              { diffs with data = [ c ] }
-                                          with
-                                          | Error e ->
-                                              [%log' error t.logger]
-                                                "Transaction verification \
-                                                 error: $error"
-                                                ~metadata:
-                                                  [ ( "error"
-                                                    , `String
-                                                        (Error.to_string_hum e)
-                                                    )
-                                                  ] ;
-                                              None
-                                          | Ok (Error invalid) ->
-                                              [%log' error t.logger]
-                                                "Batch verification failed \
-                                                 when adding from gossip"
-                                                ~metadata:
-                                                  [ ( "error"
-                                                    , `String
-                                                        (Verifier
-                                                         .invalid_to_string
-                                                           invalid ) )
-                                                  ] ;
-                                              add_failure
-                                                (Invalid_failure invalid) ;
-                                              None
-                                          | Ok (Ok [ c ]) ->
-                                              Some c
-                                          | Ok (Ok _) ->
-                                              assert false )
-                                        (`Unchecked
-                                          ( Transaction_hash.User_command.create
-                                              uc
-                                          , c ) )
-                                        account.nonce
-                                        (Currency.Balance.to_amount
-                                           (Account.liquid_balance_at_slot
-                                              ~global_slot account ) )
-                                    with
-                                    | Error e -> (
-                                        match%bind
-                                          handle_command_error t ~trust_record
-                                            ~is_sender_local uc e
-                                        with
-                                        | `Reject ->
-                                            add_failure
-                                              (Command_failure
-                                                 (diff_error_of_indexed_pool_error
-                                                    e ) ) ;
-                                            Mutex.release signer_lock ;
-                                            return (Error `Invalid_command)
-                                        | `Ignore ->
-                                            go sender_local_state u_acc acc
-                                              ( ( uc
-                                                , diff_error_of_indexed_pool_error
-                                                    e )
-                                              :: rejected )
-                                              cs )
-                                    | Ok (res, sender_local_state, u) ->
-                                        let%bind _ =
-                                          trust_record
-                                            ( Trust_system.Actions
-                                              .Sent_useful_gossip
-                                            , Some
-                                                ( "$cmd"
-                                                , [ ( "cmd"
-                                                    , User_command.to_yojson uc
-                                                    )
-                                                  ] ) )
-                                        in
-                                        go sender_local_state
-                                          (Indexed_pool.Update.merge u_acc u)
-                                          (res :: acc) rejected cs
-                                  else
-                                    let%bind () =
-                                      trust_record
-                                        ( Trust_system.Actions
-                                          .Sent_useless_gossip
-                                        , Some
-                                            ( sprintf
-                                                "rejecting command $cmd due to \
-                                                 insufficient fee."
-                                            , [ ( "cmd"
-                                                , User_command.to_yojson uc )
-                                              ] ) )
-                                    in
-                                    go sender_local_state u_acc acc
-                                      ((uc, Insufficient_fee) :: rejected)
-                                      cs
-                          in
-                          go
-                            (Indexed_pool.get_sender_local_state t.pool signer)
-                            Indexed_pool.Update.empty [] [] cs )
-              in
-              match !failures with
-              | Error errs when not allow_failures_for_tests ->
-                  let errs_string =
-                    List.map errs ~f:(fun err ->
-                        match err with
-                        | Command_failure cmd_err ->
-                            Yojson.Safe.to_string (Diff_error.to_yojson cmd_err)
-                        | Invalid_failure invalid ->
-                            Verifier.invalid_to_string invalid )
-                    |> String.concat ~sep:", "
-                  in
-                  Or_error.errorf "Diff failed with verification failure(s): %s"
-                    errs_string
-              | Error _ | Ok () ->
-                  let data =
-                    List.filter_map diffs' ~f:(function
-                      | Error (`Invalid_command | `Other_command_failed) ->
-                          (* `Invalid_command should be handled in the Error
-                             case above and `Other_command_failed should be
-                             triggered only if there's an `Invalid_command*)
-                          assert false
-                      | Error `Account_not_found ->
-                          (* We can just skip this set of commands *)
-                          None
-                      | Ok t ->
-                          Some t )
-                  in
-                  let data : verified =
-                    { accepted =
-                        List.map data ~f:(fun (cs, _rej, local_state, u) ->
-                            (cs, local_state, u) )
-                    ; rejected =
-                        List.concat_map data ~f:(fun (_, rej, _, _) -> rej)
-                    }
-                  in
-                  Ok { diffs with data } )
-
-      (** The function checks proofs and signatures in the diffs and applies
-      valid diffs to the local sender state (sequence of transactions from the
-      pool) for each sender/fee-payer. The local sender state is then included
-      in the verified diff returned by this function which will be committed to
-      the transaction pool in the apply function*)
-      let verify (t : pool) (diffs : t Envelope.Incoming.t) :
-          verified Envelope.Incoming.t Deferred.Or_error.t =
-        verify' ~allow_failures_for_tests:false t diffs
+            in
+            Error Error.(tag (of_string msg) ~tag:"Verification_failed")
+        | Ok (Ok commands) ->
+            (* TODO: we don't hash this anywhere prior to this? *)
+            Deferred.return
+              (Ok
+                 { diff with
+                   data =
+                     List.map commands
+                       ~f:
+                         Transaction_hash.User_command_with_valid_signature
+                         .create
+                 } )
 
       let register_locally_generated t txn =
         Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
@@ -1395,124 +1077,153 @@ struct
               in
               (Time.now (), `Batch batch_num) )
 
-      let apply t (env : verified Envelope.Incoming.t) =
-        let module Cs = struct
-          type t = Transaction_hash.User_command_with_valid_signature.t list
-          [@@deriving to_yojson]
-        end in
-        let sender = Envelope.Incoming.sender env in
-        let is_sender_local = Envelope.Sender.(equal sender Local) in
-        let pool_max_size = t.config.pool_max_size in
-        let check_dropped dropped =
-          let locally_generated_dropped =
-            Sequence.filter dropped ~f:(fun tx_dropped ->
-                Hashtbl.find_and_remove t.locally_generated_uncommitted
-                  tx_dropped
-                |> Option.is_some )
-            |> Sequence.to_list
-          in
-          if not (List.is_empty locally_generated_dropped) then
-            [%log' info t.logger]
-              "Dropped locally generated commands $cmds from transaction pool \
-               due to replacement or max size"
-              ~metadata:
-                [ ( "cmds"
-                  , `List
-                      (List.map
-                         ~f:
-                           Transaction_hash.User_command_with_valid_signature
-                           .to_yojson locally_generated_dropped ) )
-                ]
+      let apply t (diff : verified Envelope.Incoming.t) =
+        let open Or_error.Let_syntax in
+        let is_sender_local =
+          Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
+        in
+        (* preload fee payer accounts from the best tip ledger *)
+        let%map ledger =
+          match t.best_tip_ledger with
+          | None ->
+              Or_error.error_string
+                "Got transaction pool diff when transitin frontier is \
+                 unavailable, ignoring."
+          | Some ledger ->
+              return ledger
+        in
+        let fee_payer_account_ids =
+          List.map (Envelope.Incoming.data diff) ~f:(fun cmd ->
+              Transaction_hash.User_command_with_valid_signature.command cmd
+              |> User_command.fee_payer )
+          |> Account_id.Set.of_list
+        in
+        (* TODO: do we need to load all of these? or just the ones that aren't already in the Indexed_pool? I think we can compute some of this info from the pool *)
+        let fee_payer_accounts =
+          preload_accounts ledger fee_payer_account_ids
+        in
+        (* add new commands to the pool *)
+        let fee_payer =
+          Fn.compose User_command.fee_payer
+            Transaction_hash.User_command_with_valid_signature.command
+        in
+        let check_command pool cmd =
+          if
+            Indexed_pool.member pool
+              (Transaction_hash.User_command.of_checked cmd)
+          then Error Diff_error.Duplicate
+          else if not (Map.mem fee_payer_accounts (fee_payer cmd)) then
+            Error Diff_error.Fee_payer_account_not_found
+          else Ok ()
         in
         let pool, add_results =
-          let open Indexed_pool in
-          List.fold_map ~init:t.pool env.data.accepted
-            ~f:(fun acc (cs, local_state, u) ->
-              let sender = Sender_local_state.sender local_state in
-              Option.iter (Hashtbl.find t.sender_mutex sender) ~f:Mutex.release ;
-              if Sender_local_state.is_remove local_state then
-                Hashtbl.remove t.sender_mutex sender ;
-              (set_sender_local_state acc local_state |> Update.apply u, cs) )
+          List.fold_map (Envelope.Incoming.data diff) ~init:t.pool
+            ~f:(fun pool cmd ->
+              let result =
+                let%bind.Result () = check_command pool cmd in
+                (* TODO: compute from pool (when possible) *)
+                let account = Map.find_exn fee_payer_accounts (fee_payer cmd) in
+                let balance =
+                  Currency.Amount.of_uint64
+                  @@ Currency.Balance.to_uint64 account.balance
+                in
+                match
+                  Indexed_pool.add_from_gossip_exn pool cmd account.nonce
+                    balance
+                with
+                | Ok x ->
+                    Ok x
+                | Error err ->
+                    report_command_error ~logger:t.logger ~is_sender_local
+                      (Transaction_hash.User_command_with_valid_signature
+                       .command cmd )
+                      err ;
+                    Error (diff_error_of_indexed_pool_error err)
+              in
+              match result with
+              | Ok (cmd', pool', dropped) ->
+                  (pool', Ok (cmd', dropped))
+              | Error err ->
+                  (pool, Error (cmd, err)) )
         in
-        let add_results = List.concat add_results in
+        let dropped_for_add =
+          List.filter_map add_results ~f:(function
+            | Ok (_, dropped) ->
+                Some dropped
+            | Error _ ->
+                None )
+          |> Sequence.of_list |> Sequence.concat
+        in
+        (* drop commands from the pool to retain max size *)
         let pool, dropped_for_size =
-          drop_until_below_max_size pool ~pool_max_size
+          drop_until_below_max_size pool ~pool_max_size:t.config.pool_max_size
         in
-        if not (Sequence.is_empty dropped_for_size) then
-          [%log' debug t.logger] "dropped commands to maintain max size: $cmds"
+        (* handle drops of locally generated commands *)
+        let all_dropped_cmds =
+          Sequence.to_list (Sequence.append dropped_for_add dropped_for_size)
+        in
+        let all_dropped_cmd_hashes =
+          List.map all_dropped_cmds
+            ~f:Transaction_hash.User_command_with_valid_signature.hash
+          |> Transaction_hash.Set.of_list
+        in
+        let locally_generated_dropped =
+          List.filter all_dropped_cmds ~f:(fun cmd ->
+              Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+              |> Option.is_some )
+        in
+        if not (List.is_empty locally_generated_dropped) then
+          [%log' info t.logger]
+            "Dropped locally generated commands $cmds from transaction pool \
+             due to replacement or max size"
             ~metadata:
-              [ ("cmds", Cs.to_yojson (Sequence.to_list dropped_for_size)) ] ;
-        check_dropped dropped_for_size ;
+              [ ( "cmds"
+                , `List
+                    (List.map
+                       ~f:
+                         Transaction_hash.User_command_with_valid_signature
+                         .to_yojson locally_generated_dropped ) )
+              ] ;
+        (* register locally generated commands *)
+        if is_sender_local then
+          List.iter add_results ~f:(function
+            | Ok (cmd, _dropped) ->
+                if
+                  not
+                    (Set.mem all_dropped_cmd_hashes
+                       (Transaction_hash.User_command_with_valid_signature.hash
+                          cmd ) )
+                then register_locally_generated t cmd
+            | Error _ ->
+                () ) ;
+        (* finalize the update to the pool *)
         t.pool <- pool ;
         Mina_metrics.(
           Gauge.set Transaction_pool.pool_size
             (Float.of_int (Indexed_pool.size pool)) ;
           Counter.inc_one Transaction_pool.transactions_added_to_pool) ;
-        let trust_record =
-          Trust_system.record_envelope_sender t.config.trust_system t.logger
-            sender
+        (* partition the results *)
+        let accepted, rejected =
+          List.partition_map add_results ~f:(function
+            | Ok (cmd, _dropped) ->
+                Either.First cmd
+            | Error (cmd, error) ->
+                Either.Second (cmd, error) )
         in
-        let rec go txs =
-          let open Interruptible.Deferred_let_syntax in
-          match txs with
-          | [] ->
-              Interruptible.Or_error.return ()
-          | (verified, dropped) :: txs ->
-              let tx =
-                Transaction_hash.User_command_with_valid_signature.command
-                  verified
-              in
-              let tx' = Transaction_hash.User_command.of_checked verified in
-              if Indexed_pool.member t.pool tx' then
-                if is_sender_local then (
-                  [%log' info t.logger]
-                    "Rebroadcasting $cmd already present in the pool"
-                    ~metadata:[ ("cmd", User_command.to_yojson tx) ] ;
-                  register_locally_generated t verified ;
-                  go txs )
-                else
-                  let%bind _ =
-                    trust_record (Trust_system.Actions.Sent_old_gossip, None)
-                  in
-                  go txs
-              else (
-                if is_sender_local then register_locally_generated t verified ;
-                if not (List.is_empty dropped) then
-                  [%log' debug t.logger]
-                    "dropped commands due to transaction replacement: $dropped"
-                    ~metadata:[ ("dropped", Cs.to_yojson dropped) ] ;
-                check_dropped (Sequence.of_list dropped) ;
-                go txs )
+        (* determine if we should re-broadcast this diff *)
+        let decision =
+          if
+            List.exists rejected ~f:(fun (_, error) ->
+                Diff_error.grounds_for_diff_rejection error )
+          then `Reject
+          else `Accept
         in
-        match t.best_tip_ledger with
-        | None ->
-            Deferred.Or_error.error_string
-              "Got transaction pool diff when transition frontier is \
-               unavailable, ignoring."
-        | Some ledger -> (
-            match%map
-              Interruptible.force
-              @@
-              let open Interruptible.Let_syntax in
-              let signal =
-                Deferred.map (Base_ledger.detached_signal ledger) ~f:(fun () ->
-                    Error.createf "Ledger was detached"
-                    |> Error.tag ~tag:"Transaction_pool.apply" )
-              in
-              let%bind () = Interruptible.lift Deferred.unit signal in
-              go add_results
-            with
-            | Ok res ->
-                res
-            | Error err ->
-                Error err )
+        (decision, accepted, rejected)
 
-      let unsafe_apply (t : pool) (diff : verified Envelope.Incoming.t) :
-          (t * rejected, _) Deferred.Result.t =
-        match%map apply t diff with
-        | Ok () ->
-            let accepted = verified_accepted diff.data in
-            let rejected = verified_rejected diff.data in
+      let unsafe_apply' (t : pool) (diff : verified Envelope.Incoming.t) :
+          ([ `Accept | `Reject ] * t * rejected, _) Result.t =
+        match apply t diff with
+        | Ok (decision, accepted, rejected) ->
             ( if not (List.is_empty accepted) then
               Mina_metrics.(
                 Gauge.set Transaction_pool.useful_transactions_received_time_sec
@@ -1520,9 +1231,17 @@ struct
                      Time.(now () |> to_span_since_epoch |> Span.to_sec)
                    in
                    x -. Mina_metrics.time_offset_sec )) ) ;
-            Ok (accepted, rejected)
+            let forget_cmd =
+              Transaction_hash.User_command_with_valid_signature.command
+            in
+            Ok
+              ( decision
+              , List.map ~f:forget_cmd accepted
+              , List.map ~f:(Tuple2.map_fst ~f:forget_cmd) rejected )
         | Error e ->
             Error (`Other e)
+
+      let unsafe_apply t diff = Deferred.return (unsafe_apply' t diff)
 
       type Structured_log_events.t +=
         | Transactions_received of { txns : t; sender : Envelope.Sender.t }
@@ -1668,6 +1387,9 @@ let%test_module _ =
     let consensus_constants = precomputed_values.consensus_constants
 
     let proof_level = precomputed_values.proof_level
+
+    let minimum_fee =
+      Currency.Fee.to_int Mina_compile_config.minimum_user_command_fee
 
     let logger = Logger.create ()
 
@@ -2115,7 +1837,9 @@ let%test_module _ =
       compare_pool_apply (canonicalize t1) (canonicalize t2)
 
     let assert_pool_apply expected_commands result =
-      let accepted_commands = Result.map result ~f:fst in
+      let accepted_commands =
+        Result.map result ~f:(fun (_, accepted, _) -> accepted)
+      in
       [%test_eq: pool_apply] accepted_commands
         (Ok (List.map ~f:User_command.forget_check expected_commands))
 
@@ -2135,19 +1859,31 @@ let%test_module _ =
       in
       let tm0 = Time.now () in
       let%bind verified =
-        Test.Resource_pool.Diff.verify' ~allow_failures_for_tests:true
-          test.txn_pool
+        Test.Resource_pool.Diff.verify test.txn_pool
           (Envelope.Incoming.wrap
              ~data:(List.map ~f:User_command.forget_check cs)
              ~sender )
         >>| Or_error.ok_exn
       in
-      let result =
+      let%map result =
         Test.Resource_pool.Diff.unsafe_apply test.txn_pool verified
       in
       let tm1 = Time.now () in
       [%log' info test.txn_pool.logger] "Time for add_commands: %0.04f sec"
         (Time.diff tm1 tm0 |> Time.Span.to_sec) ;
+      ( match result with
+      | Ok (`Accept, _, rejects) ->
+          List.iter rejects ~f:(fun (cmd, err) ->
+              Core.Printf.printf
+                !"command was rejected because %s: %{Yojson.Safe}\n%!"
+                (Diff_versioned.Diff_error.to_string_name err)
+                (User_command.to_yojson cmd) )
+      | Ok (`Reject, _, _) ->
+          failwith "diff was rejected during application"
+      | Error (`Other err) ->
+          Core.Printf.printf
+            !"failed to apply diff to pool: %s\n%!"
+            (Error.to_string_hum err) ) ;
       result
 
     let add_commands' ?local test cs =
@@ -2299,11 +2035,11 @@ let%test_module _ =
 
     let mk_now_invalid_test t _cmds ~mk_command =
       let cmd1 =
-        mk_command ~sender_idx:0 ~receiver_idx:5 ~fee:1_000_000_000 ~nonce:0
+        mk_command ~sender_idx:0 ~receiver_idx:5 ~fee:minimum_fee ~nonce:0
           ~amount:99_999_999_999 ()
       in
       let cmd2 =
-        mk_command ~sender_idx:0 ~receiver_idx:5 ~fee:1_000_000_000 ~nonce:0
+        mk_command ~sender_idx:0 ~receiver_idx:5 ~fee:minimum_fee ~nonce:0
           ~amount:999_000_000_000 ()
       in
       assert_pool_txs t [] ;
@@ -2346,12 +2082,12 @@ let%test_module _ =
       in
       let valid_command =
         mk_payment ~valid_until:curr_slot_plus_padding ~sender_idx:1
-          ~fee:1_000_000_000 ~nonce:1 ~receiver_idx:7 ~amount:1_000_000_000 ()
+          ~fee:minimum_fee ~nonce:1 ~receiver_idx:7 ~amount:1_000_000_000 ()
       in
       let expired_commands =
-        [ mk_payment ~valid_until:curr_slot ~sender_idx:0 ~fee:1_000_000_000
+        [ mk_payment ~valid_until:curr_slot ~sender_idx:0 ~fee:minimum_fee
             ~nonce:1 ~receiver_idx:9 ~amount:1_000_000_000 ()
-        ; mk_payment ~sender_idx:0 ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:9
+        ; mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:2 ~receiver_idx:9
             ~amount:1_000_000_000 ()
         ]
       in
@@ -2400,12 +2136,12 @@ let%test_module _ =
           in
           let expires_later1 =
             mk_payment ~valid_until:curr_slot_plus_three ~sender_idx:0
-              ~fee:1_000_000_000 ~nonce:1 ~receiver_idx:9 ~amount:10_000_000_000
+              ~fee:minimum_fee ~nonce:1 ~receiver_idx:9 ~amount:10_000_000_000
               ()
           in
           let expires_later2 =
             mk_payment ~valid_until:curr_slot_plus_seven ~sender_idx:0
-              ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:9 ~amount:10_000_000_000
+              ~fee:minimum_fee ~nonce:2 ~receiver_idx:9 ~amount:10_000_000_000
               ()
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
@@ -2420,13 +2156,12 @@ let%test_module _ =
           assert_pool_txs t (expires_later2 :: List.drop few_now 1) ;
           (* Add new commands, remove old commands some of which are now expired *)
           let expired_command =
-            mk_payment ~valid_until:curr_slot ~sender_idx:9 ~fee:1_000_000_000
+            mk_payment ~valid_until:curr_slot ~sender_idx:9 ~fee:minimum_fee
               ~nonce:0 ~receiver_idx:5 ~amount:1_000_000_000 ()
           in
           let unexpired_command =
             mk_payment ~valid_until:curr_slot_plus_seven ~sender_idx:8
-              ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:9 ~amount:1_000_000_000
-              ()
+              ~fee:minimum_fee ~nonce:0 ~receiver_idx:9 ~amount:1_000_000_000 ()
           in
           let valid_forever = List.nth_exn few_now 0 in
           let removed_commands =
@@ -2499,13 +2234,13 @@ let%test_module _ =
             mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_three }
               ~fee_payer_idx:(0, 1) ~sender_idx:1 ~receiver_idx:9
-              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:1 ()
+              ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:1 ()
           in
           let expires_later2 =
             mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
               ~fee_payer_idx:(0, 2) ~sender_idx:1 ~receiver_idx:9
-              ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:2 ()
+              ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:2 ()
           in
           let valid_commands = few_now @ [ expires_later1; expires_later2 ] in
           let%bind () = add_commands' t valid_commands in
@@ -2522,13 +2257,13 @@ let%test_module _ =
           let expired_zkapp =
             mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time }
-              ~fee_payer_idx:(9, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:3
+              ~fee_payer_idx:(9, 0) ~sender_idx:1 ~fee:minimum_fee ~nonce:3
               ~receiver_idx:5 ~amount:1_000_000_000 ()
           in
           let unexpired_zkapp =
             mk_transfer_parties
               ~valid_period:{ lower = curr_time; upper = curr_time_plus_seven }
-              ~fee_payer_idx:(8, 0) ~sender_idx:1 ~fee:1_000_000_000 ~nonce:4
+              ~fee_payer_idx:(8, 0) ~sender_idx:1 ~fee:minimum_fee ~nonce:4
               ~receiver_idx:9 ~amount:1_000_000_000 ()
           in
           let valid_forever = List.nth_exn few_now 0 in
@@ -2570,7 +2305,7 @@ let%test_module _ =
           assert_pool_txs t [] ;
           let party_transfer =
             mk_transfer_parties ~fee_payer_idx:(0, 0) ~sender_idx:1
-              ~receiver_idx:9 ~fee:1_000_000_000 ~amount:10_000_000_000 ~nonce:0
+              ~receiver_idx:9 ~fee:minimum_fee ~amount:10_000_000_000 ~nonce:0
               ()
           in
           let valid_commands = [ party_transfer ] in
@@ -2627,11 +2362,11 @@ let%test_module _ =
         User_command.Signed_command (Signed_command.sign sender_kp payload)
       in
       let txs0 =
-        [ mk_payment' ~sender_idx:0 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:9
+        [ mk_payment' ~sender_idx:0 ~fee:minimum_fee ~nonce:0 ~receiver_idx:9
             ~amount:20_000_000_000 ()
-        ; mk_payment' ~sender_idx:0 ~fee:1_000_000_000 ~nonce:1 ~receiver_idx:9
+        ; mk_payment' ~sender_idx:0 ~fee:minimum_fee ~nonce:1 ~receiver_idx:9
             ~amount:12_000_000_000 ()
-        ; mk_payment' ~sender_idx:0 ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:9
+        ; mk_payment' ~sender_idx:0 ~fee:minimum_fee ~nonce:2 ~receiver_idx:9
             ~amount:500_000_000_000 ()
         ]
       in
@@ -2643,18 +2378,21 @@ let%test_module _ =
         List.map ~f:(fun x -> User_command.Signed_command x) txs0
         @ txs1 @ txs2 @ txs3
       in
+      Core.Printf.printf !"PHASE 1\n%!" ;
       let%bind () = add_commands' t txs_all in
       assert_pool_txs t txs_all ;
       let replace_txs =
         [ (* sufficient fee *)
-          mk_payment ~sender_idx:0 ~fee:16_000_000_000 ~nonce:0 ~receiver_idx:1
-            ~amount:440_000_000_000 ()
+          mk_payment ~sender_idx:0
+            ~fee:(minimum_fee + Currency.Fee.to_int Indexed_pool.replace_fee)
+            ~nonce:0 ~receiver_idx:1 ~amount:440_000_000_000 ()
         ; (* insufficient fee *)
-          mk_payment ~sender_idx:1 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:1
+          mk_payment ~sender_idx:1 ~fee:minimum_fee ~nonce:0 ~receiver_idx:1
             ~amount:788_000_000_000 ()
         ; (* sufficient *)
-          mk_payment ~sender_idx:2 ~fee:20_000_000_000 ~nonce:1 ~receiver_idx:4
-            ~amount:721_000_000_000 ()
+          mk_payment ~sender_idx:2
+            ~fee:(minimum_fee + Currency.Fee.to_int Indexed_pool.replace_fee)
+            ~nonce:1 ~receiver_idx:4 ~amount:721_000_000_000 ()
         ; (* insufficient *)
           (let amount = 927_000_000_000 in
            let fee =
@@ -2677,6 +2415,7 @@ let%test_module _ =
            mk_payment ~sender_idx:3 ~fee ~nonce:1 ~receiver_idx:4 ~amount () )
         ]
       in
+      Core.Printf.printf !"PHASE 2\n%!" ;
       add_commands t replace_txs
       >>| assert_pool_apply
             [ List.nth_exn replace_txs 0; List.nth_exn replace_txs 2 ]
@@ -2687,16 +2426,16 @@ let%test_module _ =
       @@ fun () ->
       let%bind t = setup_test () in
       let txs =
-        [ mk_payment ~sender_idx:0 ~fee:5_000_000_000 ~nonce:0 ~receiver_idx:9
+        [ mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:0 ~receiver_idx:9
             ~amount:20_000_000_000 ()
-        ; mk_payment ~sender_idx:0 ~fee:6_000_000_000 ~nonce:1 ~receiver_idx:5
+        ; mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:1 ~receiver_idx:5
             ~amount:77_000_000_000 ()
-        ; mk_payment ~sender_idx:0 ~fee:1_000_000_000 ~nonce:2 ~receiver_idx:3
+        ; mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:2 ~receiver_idx:3
             ~amount:891_000_000_000 ()
         ]
       in
       let committed_tx =
-        mk_payment ~sender_idx:0 ~fee:5_000_000_000 ~nonce:0 ~receiver_idx:2
+        mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:0 ~receiver_idx:2
           ~amount:25_000_000_000 ()
       in
       let%bind () = add_commands' t txs in
