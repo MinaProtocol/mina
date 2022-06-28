@@ -28,6 +28,8 @@ module Make () = struct
 
   [%%versioned_binable
   module Stable = struct
+    [@@@with_top_version_tag]
+
     module V1 = struct
       type t = T1.t [@@deriving hash, sexp, compare, equal]
 

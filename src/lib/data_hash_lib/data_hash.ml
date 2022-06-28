@@ -108,6 +108,8 @@ module T0 = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = Field.t
       [@@deriving sexp, compare, hash, version { asserted }, bin_io]
 
@@ -140,7 +142,7 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   include Basic
 
   module Base58_check = Codable.Make_base58_check (struct
-    include T0.Stable.Latest
+    include T0.Stable.Latest.With_all_version_tags
 
     (* the serialization here is only used for the hash impl which is only
        used for hashtbl, it's ok to disagree with the "real" serialization *)

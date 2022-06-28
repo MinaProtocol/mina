@@ -10,7 +10,8 @@ end
 include T
 
 module Base58_check = Codable.Make_base58_check (struct
-  type t = Stable.Latest.t [@@deriving bin_io_unversioned, compare]
+  (* for legacy compatibility *)
+  include Stable.Latest.With_top_version_tag
 
   let version_byte = Base58_check.Version_bytes.transaction_hash
 

@@ -6,6 +6,8 @@ open Snark_params.Tick
 [%%versioned_asserted
 module Stable = struct
   module V1 = struct
+    [@@@with_all_version_tags]
+
     type t = Inner_curve.Scalar.t [@@deriving compare, sexp]
 
     (* deriver not working, apparently *)
@@ -100,9 +102,12 @@ let create () : t =
 
 include Comparable.Make_binable (Stable.Latest)
 
-let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
+(* for compatibility with existing private key serializations *)
+let of_bigstring_exn =
+  Binable.of_bigstring (module Stable.Latest.With_all_version_tags)
 
-let to_bigstring = Binable.to_bigstring (module Stable.Latest)
+let to_bigstring =
+  Binable.to_bigstring (module Stable.Latest.With_all_version_tags)
 
 module Base58_check = Base58_check.Make (struct
   let description = "Private key"
