@@ -116,22 +116,6 @@ module T0 = struct
       let to_latest = Fn.id
     end
   end]
-
-  [%%if curve_size = 255]
-
-  let%test "Binable from stringable V1" =
-    let field =
-      Quickcheck.random_value ~seed:(`Deterministic "Data_hash.T0 tests")
-        Field.gen
-    in
-    let known_good_digest = "fa43c8180f9f3cef1cf5767592e964c1" in
-    Test_util.check_serialization (module Stable.V1) field known_good_digest
-
-  [%%else]
-
-  let%test "Binable from stringable V1" = failwith "No test for this curve size"
-
-  [%%endif]
 end
 
 module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
@@ -142,6 +126,7 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   include Basic
 
   module Base58_check = Codable.Make_base58_check (struct
+    (* for compatibility with legacy Base58Check serializations *)
     include T0.Stable.Latest.With_all_version_tags
 
     (* the serialization here is only used for the hash impl which is only

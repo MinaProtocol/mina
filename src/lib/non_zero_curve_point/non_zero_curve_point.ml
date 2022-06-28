@@ -48,6 +48,7 @@ module Compressed = struct
         let to_latest = Fn.id
 
         module M = struct
+          (* for compatibility with legacy Base58Check serialization *)
           include Arg.Stable.V1.With_all_version_tags
 
           let description = "Non zero curve point compressed"
@@ -74,23 +75,6 @@ module Compressed = struct
         compress uncompressed
     end
   end]
-
-  [%%if curve_size = 255]
-
-  let%test "nonzero_curve_point_compressed v1" =
-    let point =
-      Quickcheck.random_value
-        ~seed:(`Deterministic "nonzero_curve_point_compressed-seed")
-        Stable.V1.gen
-    in
-    let known_good_digest = "35c836b0252293061bf974490f5bd515" in
-    Test_util.check_serialization (module Stable.V1) point known_good_digest
-
-  [%%else]
-
-  let%test "nonzero_curve_point_compressed v1" = failwith "Unknown curve size"
-
-  [%%endif]
 
   module Poly = Poly
   include Comparable.Make_binable (Stable.Latest)

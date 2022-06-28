@@ -90,14 +90,6 @@ end
 
 include Make ()
 
-(* values come from external library digestif, and serialization relies on raw string functions in that library,
-   so check serialization is stable
-*)
-let%test "serialization test V1" =
-  let blake2s = T0.digest_string "serialization test V1" in
-  let known_good_digest = "562733d10582c5832e541fb60e38e7c8" in
-  Test_util.check_serialization (module Stable.V1) blake2s known_good_digest
-
 let%test_unit "bits_to_string" =
   [%test_eq: string]
     (bits_to_string [| true; false |])

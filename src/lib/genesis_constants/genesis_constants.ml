@@ -316,20 +316,6 @@ module Protocol = struct
   end]
 
   [%%define_locally Stable.Latest.(to_yojson)]
-
-  let%test "protocol constants serialization v1" =
-    let t : Stable.V1.t =
-      { k = 1
-      ; delta = 100
-      ; slots_per_sub_window = 10
-      ; slots_per_epoch = 1000
-      ; genesis_state_timestamp =
-          Time.of_string "2019-10-08 17:51:23.050849Z" |> of_time
-      }
-    in
-    (* from the print statement in Serialization.check_serialization *)
-    let known_good_digest = "28b7c3bb5f94351f0afa6ebd83078730" in
-    Test_util.check_serialization (module Stable.V1) t known_good_digest
 end
 
 module T = struct
