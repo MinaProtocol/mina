@@ -143,6 +143,7 @@ In addition to that you can:
 - In addition you might want to update your CLI prompt environment information to automatically inform you if you've entered the Nix shell.
   - [Example](https://gist.github.com/chisui/0d12bd51a5fd8e6bb52e6e6a43d31d5e)
     - `prompt_nix_shell` method.
+    - <img width="335" alt="CLI Prompt info" src="https://user-images.githubusercontent.com/4096154/175948252-aa41dc36-9d98-4986-878a-da5ed8d850dd.png">
 
 ## Miscellaneous
 
