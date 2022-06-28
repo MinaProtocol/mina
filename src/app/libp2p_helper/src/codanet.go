@@ -37,11 +37,11 @@ import (
 	p2pconfig "github.com/libp2p/go-libp2p/config"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	discovery "github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	libp2pmplex "github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	p2pconnmgr "github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	libp2pmplex "github.com/o1-labs/go-libp2p/p2p/muxer/mplex"
 	"golang.org/x/crypto/blake2b"
 )
 
