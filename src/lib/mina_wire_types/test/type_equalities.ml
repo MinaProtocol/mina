@@ -62,3 +62,20 @@ module Snark_params = struct
     type wire = W.tock_inner_curve
   end
 end
+
+module Public_key = struct
+  module O = Signature_lib.Public_key
+  module W = WT.Public_key
+
+  module _ : Assert_equal = struct
+    type orig = O.Compressed.t
+
+    type wire = W.compressed
+  end
+
+  module _ : Assert_equal = struct
+    type orig = O.t
+
+    type wire = W.uncompressed
+  end
+end

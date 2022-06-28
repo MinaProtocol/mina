@@ -4,3 +4,4 @@ module Currency = struct
 end
 
 module Snark_params = Snark_params
+module Public_key = Public_key
