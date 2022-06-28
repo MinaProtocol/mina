@@ -11,7 +11,7 @@ import {
   shutdown,
   addCachedAccount,
   Mina,
-  Ledger,
+  verify,
 } from "snarkyjs";
 
 await isReady;
@@ -96,7 +96,7 @@ if (command === "update") {
   let transaction = await Mina.transaction(() => {
     new SimpleZkapp(zkappAddress).update(Field(2));
   });
-  await transaction.prove();
+  let [proof] = await transaction.prove();
   let partiesJson = transaction.toJSON();
 
   // mina-signer part
@@ -112,14 +112,7 @@ if (command === "update") {
     { parties, feePayer },
     feePayerKeyBase58
   );
-  parties = JSON.parse(data.parties);
-  let proof = parties.otherParties[0].authorization.proof;
-  let publicInput = Ledger.zkappPublicInput(data.parties, 0);
-  let ok = await Ledger.verifyPartyProof(
-    publicInput,
-    proof,
-    verificationKey.data
-  );
+  let ok = await verify(proof, verificationKey.data);
   if (!ok) throw Error("verification failed");
 
   console.log(data.parties);
