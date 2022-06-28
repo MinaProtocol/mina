@@ -4,11 +4,13 @@ GossipQA testnet deployment Instructions
 
 `gcloud container clusters get-credentials --region northamerica-northeast1 mina-infra-canada`
 
-1: Firstly figure out how many unique and total fish, whales, plain nodes, snark coordinators, and how many snark workers per coordinator.  All these must be written out in `automation/terraform/testnets/gossipqa/main.tf`.  use the terraform for-loops to make this process less copy-pasty
+1: Firstly figure out how many unique and total fish, whales, plain nodes, snark coordinators, and how many snark workers per coordinator.  All these must be written out in `automation/terraform/testnets/gossipqa/main.tf`.  use the terraform for-loops to make this process less copy-pasty.  Non unique block producers are separate nodes on the network, but use the same key for block production.
 
 2: Generate the keys and genesis ledger.  If you want there to be thousands and thousands of extra random keys in the genesis ledger, use the efc (extra fish count) flag.  From the /mina base directory, run:
 
-`./automation/scripts/generate-keys-and-ledger.sh --testnet="gossipqa" --wu=<unique whales> --wt=<total whales> --fu=<unique fish> --ft=<total fish> --sc=<seed count> --efc=<extra fish count>`
+`./automation/scripts/gen-keys-ledger.sh --testnet="gossipqa" --whales=<unique whales> --fish=<unique fish> --seeds=<seed count> --privkey-pass <password to the keys generated>`
+
+these keys get generated in ./gossipqa/keys.  the seeds will have a libp2p key but no account key, the whales and fish will have account keys but no libp2p key.  A genesis ledger will also be generated which includes all the whales and fish.
 
 3: Ideally, in the newly generated genesis ledger, grab any bunch of public keys and use those keys for the `snark_worker_public_key` in a snark worker/coordinator set.  You will have to modify the `snark_coordinators` list within `automation/terraform/testnets/gossipqa/main.tf`.  Because each key is different and we haven't written auto selection logic, this bit is unfortunately a process of "copy -> paste -> manual change".
 
