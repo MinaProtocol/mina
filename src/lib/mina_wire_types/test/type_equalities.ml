@@ -105,17 +105,19 @@ module Mina_base = struct
   end
 end
 
-(*
 module Mina_numbers = struct
   module O = Mina_numbers
   module W = WT.Mina_numbers
 
-  (*
-  module _ : Assert_equal0 = struct
-    module M = O.Nat.Make64()
-    type orig = M.t
-    type wire = W.nat_uint64
+  module Account_nonce : Assert_equal0 = struct
+    type orig = O.Account_nonce.t
+
+    type wire = W.Account_nonce.t
   end
-     *)
+
+  module Global_slot : Assert_equal0 = struct
+    type orig = O.Global_slot.t
+
+    type wire = W.Global_slot.t
+  end
 end
-   *)
