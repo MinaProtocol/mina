@@ -1,0 +1,6 @@
+(test
+  (name type_equalities)
+  (libraries mina_wire_types currency)
+  (preprocess (pps ppx_version))
+  (instrumentation (backend bisect_ppx))
+  )
