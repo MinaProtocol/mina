@@ -93,7 +93,7 @@ let otherParties = {
       authorization: {
         proof: null,
         signature:
-          "7mXUeGjU88qsWxLuQg73SZFymiY69bntH4m8uwbtd5KDqpRWedb4T4YJKDkbjq6TtdYox5UhuJ2TPZbaogvkpuyo2H7kFB73",
+          "2Xvuve2hGHS8UTZSKJrqqkySBvsM4gLz3cJns3BoYo3vtEbfKnfZqG3SHU9gLSBpjV3H7Sho3sha7wDUvqvk88wVp6mdLMt",
       },
     },
   ],

@@ -2510,6 +2510,9 @@ module Ledger = struct
       (Random_oracle.Input.Chunked.field (x |> of_js_field |> to_unchecked))
     |> Mina_base.Signature.to_base58_check |> Js.string
 
+  let dummy_signature () =
+    Mina_base.Signature.(dummy |> to_base58_check) |> Js.string
+
   let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
       (party_index : party_index) =
     let tx =
@@ -2731,6 +2734,7 @@ module Ledger = struct
     static_method "transactionCommitments" transaction_commitments ;
     static_method "zkappPublicInput" zkapp_public_input ;
     static_method "signFieldElement" sign_field_element ;
+    static_method "dummySignature" dummy_signature ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
     static_method "verifyPartyProof" verify_party_proof ;
