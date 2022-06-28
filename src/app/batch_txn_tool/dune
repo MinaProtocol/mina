@@ -23,4 +23,11 @@
    unsigned_extended
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version graphql_ppx ppx_let)))
+ (preprocess (pps 
+              ppx_version 
+              ppx_let 
+              graphql_ppx --
+               -extend-query Graphql_lib.Serializing.ExtendQuery
+               -extend-mutation Graphql_lib.Serializing.ExtendQuery
+               -future-added-value false
+)))
