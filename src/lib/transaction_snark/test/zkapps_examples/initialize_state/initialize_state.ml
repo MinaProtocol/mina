@@ -126,8 +126,6 @@ let%test_module "Initialize state test" =
           { body = party_body; authorization = Proof party_proof }
     end
 
-    let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-
     let test_parties ?expected_failure parties =
       let ps =
         (* TODO: This is a pain. *)
@@ -148,7 +146,6 @@ let%test_module "Initialize state test" =
             { Party.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.(of_int 100)
-            ; protocol_state_precondition
             }
         ; authorization = Signature.dummy
         }

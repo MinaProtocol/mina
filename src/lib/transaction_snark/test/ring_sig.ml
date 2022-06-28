@@ -179,12 +179,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let fee_payer : Party.Fee_payer.t =
             { Party.Fee_payer.body =
                 { public_key = sender_pk
-                ; update = Party.Update.noop
                 ; fee = Amount.to_fee fee
-                ; events = []
-                ; sequence_events = []
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
+                ; valid_until = None
                 ; nonce = sender_nonce
                 }
                 (* Real signature added in below *)

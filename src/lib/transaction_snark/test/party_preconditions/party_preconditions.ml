@@ -131,84 +131,6 @@ let%test_module "Protocol state precondition tests" =
             ~snapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
-    let%test_unit "invalid protocol state predicate in fee payer" =
-      let state_body = U.genesis_state_body in
-      let psv = Mina_state.Protocol_state.Body.view state_body in
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind ledger = U.gen_snapp_ledger in
-        let%map network_precondition =
-          Mina_generators.Parties_generators.gen_protocol_state_precondition psv
-        in
-        (ledger, network_precondition)
-      in
-      Quickcheck.test ~trials:1 gen
-        ~f:(fun (({ init_ledger; specs }, new_kp), network_precondition) ->
-          Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              Async.Thread_safe.block_on_async_exn (fun () ->
-                  let fee = Fee.of_int 1_000_000 in
-                  let _amount = Amount.of_int 10_000_000_000 in
-                  let spec = List.hd_exn specs in
-                  let new_slot =
-                    Mina_numbers.Global_slot.succ psv.global_slot_since_genesis
-                  in
-                  let invalid_network_precondition =
-                    { network_precondition with
-                      global_slot_since_genesis =
-                        Zkapp_basic.Or_ignore.(
-                          Check
-                            Zkapp_precondition.Closed_interval.
-                              { lower = new_slot; upper = new_slot })
-                    }
-                  in
-                  let test_spec : Spec.t =
-                    { sender = spec.sender
-                    ; fee
-                    ; fee_payer = None
-                    ; receivers = []
-                    ; amount = Amount.zero
-                    ; zkapp_account_keypairs = [ new_kp ]
-                    ; memo
-                    ; new_zkapp_account = false
-                    ; snapp_update
-                    ; current_auth = Permissions.Auth_required.Signature
-                    ; call_data = Snark_params.Tick.Field.zero
-                    ; events = []
-                    ; sequence_events = []
-                    ; preconditions =
-                        Some
-                          { Party.Preconditions.network =
-                              invalid_network_precondition
-                          ; account = Party.Account_precondition.Accept
-                          }
-                    }
-                  in
-                  let open Async.Deferred.Let_syntax in
-                  let%map parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
-                      ~constraint_constants test_spec
-                  in
-                  Mina_transaction_logic.For_tests.Init_ledger.init
-                    (module Mina_ledger.Ledger.Ledger_inner)
-                    init_ledger ledger ;
-                  match
-                    Mina_ledger.Ledger.apply_parties_unchecked
-                      ~constraint_constants ~state_view:psv ledger parties
-                  with
-                  | Error e ->
-                      assert (
-                        Str.string_match
-                          (Str.regexp
-                             (sprintf {|.*\(%s\).*|}
-                                Transaction_status.Failure.(
-                                  to_string
-                                    Protocol_state_precondition_unsatisfied) ) )
-                          (Error.to_string_hum e) 0 )
-                  | Ok _ ->
-                      failwith
-                        "Expected transaction to fail due to invalid protocol \
-                         state precondition in the fee payer" ) ) )
-
     let%test_unit "invalid protocol state predicate in other parties" =
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
@@ -249,11 +171,8 @@ let%test_module "Protocol state precondition tests" =
                   let fee_payer =
                     { Party.Fee_payer.body =
                         { public_key = sender_pk
-                        ; update = Party.Update.noop
                         ; fee
-                        ; events = []
-                        ; sequence_events = []
-                        ; protocol_state_precondition = network_precondition
+                        ; valid_until = None
                         ; nonce = sender_nonce
                         }
                         (*To be updated later*)
@@ -650,12 +569,8 @@ let%test_module "Account precondition tests" =
               let fee_payer =
                 { Party.Fee_payer.body =
                     { public_key = sender_pk
-                    ; update = Party.Update.noop
                     ; fee
-                    ; events = []
-                    ; sequence_events = []
-                    ; protocol_state_precondition =
-                        Zkapp_precondition.Protocol_state.accept
+                    ; valid_until = None
                     ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
                     }
                     (*To be updated later*)

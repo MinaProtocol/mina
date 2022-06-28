@@ -2046,12 +2046,8 @@ module For_tests = struct
       { fee_payer =
           { Party.Fee_payer.body =
               { public_key = sender_pk
-              ; update = Party.Update.noop
               ; fee
-              ; events = []
-              ; sequence_events = []
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
+              ; valid_until = None
               ; nonce = actual_nonce
               }
               (* Real signature added in below *)
