@@ -22,6 +22,7 @@
    ;; local derivers
    ppx_coda
    h_list.ppx
+   ppx_annot
    ppx_dhall_type
    ppx_version
  )
@@ -51,6 +52,7 @@
    ;; local derivers
    ppx_coda
    h_list.ppx
+   ppx_annot
    ppx_dhall_type
    ppx_version
  )
