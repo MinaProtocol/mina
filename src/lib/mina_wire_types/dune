@@ -1,7 +1,15 @@
 (library
   (name mina_wire_types)
   (public_name mina_wire_types)
-  (libraries integers marlin_plonk_bindings marlin_plonk_bindings.pasta_fp)
+  (libraries
+    ; Keep these dependencies to an absolute minimum
+    integers
+    marlin_plonk_bindings
+    marlin_plonk_bindings.pasta_fp
+    marlin_plonk_bindings.pasta_fq
+    marlin_plonk_bindings.pasta_pallas
+    marlin_plonk_bindings.pasta_vesta
+    )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))
   )

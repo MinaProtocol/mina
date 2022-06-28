@@ -33,3 +33,32 @@ module Currency = struct
     type wire = W.balance
   end
 end
+
+module Snark_params = struct
+  module O = Snark_params
+  module W = WT.Snark_params
+
+  module _ : Assert_equal = struct
+    type orig = O.Tick.Field.t
+
+    type wire = W.tick_field
+  end
+
+  module _ : Assert_equal = struct
+    type orig = O.Tock.Field.t
+
+    type wire = W.tock_field
+  end
+
+  module _ : Assert_equal = struct
+    type orig = O.Tick.Inner_curve.t
+
+    type wire = W.tick_inner_curve
+  end
+
+  module _ : Assert_equal = struct
+    type orig = O.Tock.Inner_curve.t
+
+    type wire = W.tock_inner_curve
+  end
+end

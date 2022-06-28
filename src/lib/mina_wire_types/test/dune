@@ -1,6 +1,15 @@
 (test
   (name type_equalities)
-  (libraries mina_wire_types currency)
+  (libraries
+    mina_wire_types
+    currency
+    snark_params
+    ; Necessary for the type equality
+    marlin_plonk_bindings
+    pickles
+    pickles.backend
+    zexe_backend.pasta
+    )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))
   )
