@@ -41,6 +41,13 @@ module Common : sig
     module Stable : sig
       module V1 : sig
         type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
+              ( 'fee
+              , 'public_key
+              , 'token_id
+              , 'nonce
+              , 'global_slot
+              , 'memo )
+              Mina_wire_types.Mina_base.Signed_command_payload.common_poly =
           { fee : 'fee
           ; fee_token : 'token_id
           ; fee_payer_pk : 'public_key

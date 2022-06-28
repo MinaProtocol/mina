@@ -5,6 +5,7 @@
     currency
     snark_params
     signature_lib
+    mina_base
     ; Necessary for the type equality
     marlin_plonk_bindings
     pickles

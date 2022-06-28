@@ -27,6 +27,7 @@
    async_rpc_kernel
    async_unix
    ;; local libraries
+   mina_wire_types
    run_in_thread
    sgn
    pickles_types
