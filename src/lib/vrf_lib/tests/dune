@@ -25,14 +25,14 @@
    bitstring_lib
    crypto_params
    backend
+   kimchi_backend
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   kimchi_pasta
    snarky_field_extensions
    tuple_lib
    genesis_constants
-   marlin_plonk_bindings_types
-   zexe_backend
-   pasta
-   marlin_plonk_bindings
-   marlin_plonk_bindings_pasta_pallas
 )
  (preprocess
   (pps

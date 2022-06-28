@@ -1,6 +1,8 @@
 module Input = Random_oracle_input
 
 module type S = sig
+  type input
+
   module State : sig
     type _ t
   end
@@ -25,5 +27,5 @@ module type S = sig
 
   val hash : ?init:field_constant State.t -> field array -> Digest.t
 
-  val pack_input : (field, bool) Input.t -> field array
+  val pack_input : input -> field array
 end

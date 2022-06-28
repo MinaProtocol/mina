@@ -1,0 +1,35 @@
+(executable
+ (package snark_work_debugger)
+ (name snark_work_debugger)
+ (public_name snark_work_debugger)
+ (modes native)
+ (libraries
+   ;; opam libraries
+   base
+   async
+   async_kernel
+   async_unix
+   unix
+   core
+   core_kernel
+   sexplib0
+   ;; local libraries
+   mina_base
+   snark_worker
+   snark_work_lib
+   transaction_witness
+   transaction_snark
+   genesis_constants
+   logger
+   error_json
+   transaction_protocol_state
+   mina_state
+   currency
+   mina_ledger
+   signature_lib
+   mina_base_import
+   )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_here ppx_custom_printf ppx_version ppx_coda ppx_let ppx_deriving_yojson ppx_sexp_conv ppx_optcomp))
+ (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60))
+

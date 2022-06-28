@@ -257,7 +257,7 @@ let create_genesis_data () =
     }
   in
   let genesis_transition =
-    External_transition.create
+    Mina_block.create
       ~protocol_state:(With_hash.data genesis_protocol_state)
       ~protocol_state_proof:precomputed_values.base_proof
       ~staged_ledger_diff:empty_diff
@@ -480,7 +480,7 @@ let propose_block_onto_chain ~logger ~keys
   in
   let dummy_delta_transition_chain_proof = (State_hash.dummy, []) in
   let external_transition =
-    External_transition.create ~protocol_state ~protocol_state_proof
+    Mina_block.create ~protocol_state ~protocol_state_proof
       ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
       ~delta_transition_chain_proof:dummy_delta_transition_chain_proof
       ~validation_callback:Fn.ignore ()
@@ -493,7 +493,7 @@ let main () =
   Logger.(
     Consumer_registry.register ~id:"fuzz" ~processor:(Processor.raw ())
       ~transport:
-        (Transport.File_system.dumb_logrotate ~directory:"fuzz_logs"
+        (Transport_file_system.dumb_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
            ~max_size:(500 * 1024 * 1024)
            ~num_rotate:1 )) ;

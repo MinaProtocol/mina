@@ -30,7 +30,6 @@ RUN apt-get -y update \
         postgresql \
         postgresql-contrib \
         apt-utils \
-        procps \
         man \
     && rm -rf /var/lib/apt/lists/*
 
@@ -39,6 +38,9 @@ RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mi
 # archive-node package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
+  || sleep 10s && apt-get -y update \
+  || sleep 10s && apt-get -y update \
+  || sleep 10s && apt-get -y update \
   && apt-get install -y "mina-archive=$deb_version"
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
