@@ -4,10 +4,6 @@ open Signature_lib
 open Txn_tool_graphql
 open Unsigned
 
-(* let gen_secret_keys count =
-   Quickcheck.random_value ~seed:`Nondeterministic
-     (Quickcheck.Generator.list_with_length count Private_key.gen) *)
-
 let gen_keys count =
   Quickcheck.random_value ~seed:`Nondeterministic
     (Quickcheck.Generator.list_with_length count Public_key.Compressed.gen)
@@ -174,7 +170,6 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
 
   (* helper function for getting a keypair from a local path *)
   let get_keypair path pw_option =
-    Format.printf "txn burst tool: grabbing keypair from path= %s@." path ;
     let%bind keypair =
       match pw_option with
       | Some s ->
