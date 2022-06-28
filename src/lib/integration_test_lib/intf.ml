@@ -84,7 +84,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
@@ -98,7 +97,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
@@ -108,7 +106,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Deferred.Or_error.t
 
@@ -117,7 +114,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
@@ -350,6 +346,16 @@ module Dsl = struct
          and module Event_router := Event_router
 
     type t
+
+    type wait_condition_id =
+      | Nodes_to_initialize
+      | Blocks_to_be_produced
+      | Nodes_to_synchronize
+      | Signed_command_to_be_included_in_frontier
+      | Ledger_proofs_emitted_since_genesis
+      | Zkapp_to_be_included_in_frontier
+
+    val wait_condition_id : t -> wait_condition_id
 
     val with_timeouts :
          ?soft_timeout:Network_time_span.t

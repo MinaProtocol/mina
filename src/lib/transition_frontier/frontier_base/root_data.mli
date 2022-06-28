@@ -13,7 +13,7 @@ module Historical : sig
     end
   end]
 
-  val transition : t -> External_transition.Validated.t
+  val transition : t -> Mina_block.Validated.t
 
   val scan_state : t -> Staged_ledger.Scan_state.t
 
@@ -34,7 +34,7 @@ module Limited : sig
     end
   end]
 
-  val transition : t -> External_transition.Validated.t
+  val transition : t -> Mina_block.Validated.t
 
   val hashes : t -> State_hash.State_hashes.t
 
@@ -46,7 +46,7 @@ module Limited : sig
     t -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
 
   val create :
-       transition:External_transition.Validated.t
+       transition:Mina_block.Validated.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
     -> protocol_states:
@@ -77,7 +77,7 @@ module Minimal : sig
 
   val upgrade :
        t
-    -> transition:External_transition.Validated.t
+    -> transition:Mina_block.Validated.t
     -> protocol_states:
          (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list
     -> Limited.t
@@ -90,7 +90,7 @@ module Minimal : sig
 end
 
 type t =
-  { transition : External_transition.Validated.t
+  { transition : Mina_block.Validated.t
   ; staged_ledger : Staged_ledger.t
   ; protocol_states :
       Mina_state.Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t

@@ -165,7 +165,8 @@ let or_hard_error ?exit_code or_error =
 let hard_error_string ?exit_code =
   Fn.compose (hard_error ?exit_code) Error.of_string
 
-let hard_error_format format = Printf.ksprintf hard_error_string format
+let hard_error_format ?exit_code format =
+  Printf.ksprintf (hard_error_string ?exit_code) format
 
 let combine_errors (malleable_errors : 'a t list) : 'a list t =
   let open T.Let_syntax in

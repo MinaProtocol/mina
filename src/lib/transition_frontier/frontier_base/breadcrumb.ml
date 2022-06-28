@@ -90,6 +90,18 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                  (Mina_block.Validated.lift fully_valid_block)
                ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
                ~transition_receipt_time )
+      | Error `Invalid_body_reference ->
+          let message = "invalid body reference" in
+          let%map () =
+            match sender with
+            | None | Some Envelope.Sender.Local ->
+                return ()
+            | Some (Envelope.Sender.Remote peer) ->
+                Trust_system.(
+                  record trust_system logger peer
+                    Actions.(Gossiped_invalid_transition, Some (message, [])))
+          in
+          Error (`Invalid_staged_ledger_diff (Error.of_string message))
       | Error (`Invalid_staged_ledger_diff errors) ->
           let reasons =
             String.concat ~sep:" && "
@@ -164,8 +176,8 @@ let protocol_state b =
   b |> block |> Mina_block.header |> Mina_block.Header.protocol_state
 
 let protocol_state_with_hashes breadcrumb =
-  let x, _ = breadcrumb |> validated_transition in
-  With_hash.map x ~f:(Fn.compose Header.protocol_state Mina_block.header)
+  breadcrumb |> validated_transition |> Mina_block.Validated.forget
+  |> With_hash.map ~f:(Fn.compose Header.protocol_state Mina_block.header)
 
 let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
@@ -224,11 +236,18 @@ module For_tests = struct
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they have at least one coin*)
-  let gen_payments staged_ledger accounts_with_secret_keys :
+  let gen_payments ~send_to_random_pk staged_ledger accounts_with_secret_keys :
       Signed_command.With_valid_signature.t Sequence.t =
     let account_ids =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
           Account.identifier account )
+    in
+    (* One transaction is sent to a random address to make sure generated block
+       contains a transaction to new account, not only to existing *)
+    let random_pk =
+      lazy
+        ( Private_key.create () |> Public_key.of_private_key_exn
+        |> Public_key.compress )
     in
     Sequence.filter_map (accounts_with_secret_keys |> Sequence.of_list)
       ~f:(fun (sender_sk, sender_account) ->
@@ -236,13 +255,16 @@ module For_tests = struct
         let%bind sender_sk = sender_sk in
         let sender_keypair = Keypair.of_private_key_exn sender_sk in
         let token = sender_account.token_id in
-        let%bind receiver =
-          account_ids
-          |> List.filter
-               ~f:(Fn.compose (Token_id.equal token) Account_id.token_id)
-          |> List.random_element
+        (* Send some transactions to the new accounts *)
+        let%bind receiver_pk =
+          if send_to_random_pk && not (Lazy.is_val random_pk) then
+            Some (Lazy.force random_pk)
+          else
+            account_ids
+            |> List.filter
+                 ~f:(Fn.compose (Token_id.equal token) Account_id.token_id)
+            |> List.random_element >>| Account_id.public_key
         in
-        let receiver_pk = Account_id.public_key receiver in
         let nonce =
           let ledger = Staged_ledger.ledger staged_ledger in
           let status, account_location =
@@ -255,7 +277,7 @@ module For_tests = struct
           (Option.value_exn (Mina_ledger.Ledger.get ledger account_location))
             .nonce
         in
-        let send_amount = Currency.Amount.of_int 1 in
+        let send_amount = Currency.Amount.of_int 1000000001 in
         let sender_account_amount =
           sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
@@ -270,9 +292,9 @@ module For_tests = struct
         in
         Signed_command.sign sender_keypair payload )
 
-  let gen ?(logger = Logger.null ())
+  let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier
-      ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
+      ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys () :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let gen_slot_advancement = Int.gen_incl 1 10 in
@@ -287,7 +309,8 @@ module For_tests = struct
       let open Deferred.Let_syntax in
       let parent_staged_ledger = staged_ledger parent_breadcrumb in
       let transactions =
-        gen_payments parent_staged_ledger accounts_with_secret_keys
+        gen_payments ~send_to_random_pk parent_staged_ledger
+          accounts_with_secret_keys
         |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
       in
       let _, largest_account =
@@ -332,6 +355,9 @@ module For_tests = struct
         |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
         |> Or_error.ok_exn
       in
+      let body =
+        Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
+      in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
@@ -372,6 +398,7 @@ module For_tests = struct
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~registers:next_registers ~staged_ledger_hash:next_staged_ledger_hash
           ~genesis_ledger_hash
+          ~body_reference:(Body.compute_reference body)
       in
       let previous_state_hashes =
         Protocol_state.hashes previous_protocol_state
@@ -396,15 +423,11 @@ module For_tests = struct
       in
       Protocol_version.(set_current zero) ;
       let next_block =
-        let body =
-          Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
-        in
-        let body_reference = Mina_block.Body_reference.of_body body in
         let header =
           Mina_block.Header.create ~protocol_state
             ~protocol_state_proof:Proof.blockchain_dummy
             ~delta_block_chain_proof:(previous_state_hashes.state_hash, [])
-            ~body_reference ()
+            ()
         in
         (* We manually created a validated an block *)
         let block =
@@ -446,7 +469,7 @@ module For_tests = struct
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
       gen ?logger ~verifier ~precomputed_values ?trust_system
-        ~accounts_with_secret_keys
+        ~accounts_with_secret_keys ()
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
@@ -456,7 +479,7 @@ module For_tests = struct
     let gen_list =
       List.gen_with_length n
         (gen ?logger ~precomputed_values ~verifier ?trust_system
-           ~accounts_with_secret_keys )
+           ~accounts_with_secret_keys () )
     in
     let%map breadcrumbs_constructors = gen_list in
     fun root ->

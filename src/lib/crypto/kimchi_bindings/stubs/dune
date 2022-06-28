@@ -4,36 +4,44 @@
 
 ;; Ignore target if it exists locally
 
+;; no sandbox, we want the path to the _build directory
 (rule
- (targets cargo-target-path)
- (locks /cargo-lock)
- (action
-  (with-stdout-to cargo-target-path
-   (pipe-stdout
-    (run cargo metadata)
-    (run cargo_target_dir/cargo_target_dir.exe)))))
+  (target dune-build-root)
+  (deps (sandbox none))
+  (action
+   (system "echo -n $(realpath %{workspace_root}/..) > %{target}")))
 
 (rule
  (enabled_if (= %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libwires_15_stubs.a dllwires_15_stubs.so)
+ (targets libwires_15_stubs.a)
  (deps
   Cargo.toml
+  ../../Cargo.toml
+  ../../rust-toolchain.toml
   (source_tree src)
-  (source_tree ../../proof-systems))
- (locks /cargo-lock)
+  (source_tree binding_generation)
+  (source_tree ../wasm)
+  (source_tree ../../proof-systems)
+  (env_var MARLIN_PLONK_STUBS))
+ (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
-   (setenv
-    RUSTFLAGS
-    "-C target-feature=+bmi2,+adx"
-    (run cargo build --release))
-   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.a .)
-   (run cp %{read:cargo-target-path}/release/libwires_15_stubs.so dllwires_15_stubs.so))))
+   (setenv CARGO_TARGET_DIR
+    "%{read:dune-build-root}/cargo_kimchi_stubs"
+    (setenv
+     RUSTFLAGS
+     "-C target-feature=+bmi2,+adx"
+     (run cargo build --release)))
+   (run cp %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a .))))
 
 ;; copy from $MARLIN_PLONK_STUBS if this exists
-(copy_files
-  (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
-  (files %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a))
+(rule
+ (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
+ (targets libwires_15_stubs.a)
+ (deps (env_var MARLIN_PLONK_STUBS))
+ (action
+  (progn
+   (copy %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a libwires_15_stubs.a))))
 
 ;; libraries
 
@@ -82,17 +90,22 @@
  (deps
   Cargo.toml
   ../../../../.ocamlformat
+  ../../Cargo.toml
+  (source_tree ../../stubs)
+  (source_tree ../wasm)
   (source_tree src)
   (source_tree binding_generation)
-  (source_tree ../../proof-systems))
- (locks /cargo-lock)
+  (source_tree ../../proof-systems)
+  (env_var MARLIN_PLONK_STUBS))
+ (locks /cargo-lock) ;; lock for rustup
  (action
   (chdir
    binding_generation
    (progn
     (run rm -rf ./target)
     (run rm -f ./Cargo.lock)
-    (run cargo run %{targets})
+    (setenv CARGO_TARGET_DIR "%{read:dune-build-root}/cargo_kimchi_bindgen"
+     (run cargo run %{targets}))
     (run ocamlformat -i %{targets})))))
 
 ;; run from $MARLIN_PLONK_STUBS if this exists
@@ -100,7 +113,9 @@
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
  (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
- (deps ../../../../.ocamlformat)
+ (deps
+   ../../../../.ocamlformat
+   (env_var MARLIN_PLONK_STUBS))
  (action
   (progn
    (run %{env:MARLIN_PLONK_STUBS=n}/bin/binding_generation %{targets})

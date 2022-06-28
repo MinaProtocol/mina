@@ -23,9 +23,7 @@ let%test_module "Zkapp tokens tests" =
 
     let token_owner = Keypair.create ()
 
-    let token_account1 = Keypair.create ()
-
-    let token_account2 = Keypair.create ()
+    let token_accounts = Array.init 4 ~f:(fun _ -> Keypair.create ())
 
     let custom_token_id =
       Account_id.derive_token_id
@@ -33,6 +31,13 @@ let%test_module "Zkapp tokens tests" =
           (Account_id.create
              (Public_key.compress token_owner.public_key)
              Token_id.default )
+
+    let custom_token_id2 =
+      Account_id.derive_token_id
+        ~owner:
+          (Account_id.create
+             (Public_key.compress token_owner.public_key)
+             custom_token_id )
 
     let ledger_get_exn ledger pk token =
       match
@@ -47,11 +52,11 @@ let%test_module "Zkapp tokens tests" =
     let%test_unit "token operations" =
       Test_util.with_randomness 987654321 (fun () ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let check_token_balance (keypair : Keypair.t) balance =
+              let check_token_balance (keypair : Keypair.t) token_id balance =
                 [%test_eq: Currency.Balance.t]
                   (ledger_get_exn ledger
                      (Public_key.compress keypair.public_key)
-                     custom_token_id )
+                     token_id )
                     .balance
                   (Currency.Balance.of_int balance)
               in
@@ -63,12 +68,9 @@ let%test_module "Zkapp tokens tests" =
                     ledger ;
                   let keymap =
                     List.fold
-                      [ fee_payer_keypair
-                      ; token_owner
-                      ; token_funder
-                      ; token_account1
-                      ; token_account2
-                      ] ~init:Public_key.Compressed.Map.empty
+                      ( [ fee_payer_keypair; token_owner; token_funder ]
+                      @ Array.to_list token_accounts )
+                      ~init:Public_key.Compressed.Map.empty
                       ~f:(fun map { private_key; public_key } ->
                         Public_key.Compressed.Map.add_exn map
                           ~key:(Public_key.compress public_key)
@@ -85,24 +87,23 @@ let%test_module "Zkapp tokens tests" =
                     nonce
                   in
                   let create_token_parties =
+                    let open Parties_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
-                      Parties_builder.mk_forest
-                        [ Parties_builder.mk_node
-                            (Parties_builder.mk_party_body Call token_funder
-                               Token_id.default
-                               (-(4 * account_creation_fee)) )
+                      mk_forest
+                        [ mk_node
+                            (mk_party_body Call token_funder Token_id.default
+                               (-(11 * account_creation_fee)) )
                             []
-                        ; Parties_builder.mk_node
-                            (Parties_builder.mk_party_body Call token_owner
-                               Token_id.default (3 * account_creation_fee) )
+                        ; mk_node
+                            (mk_party_body Call token_owner Token_id.default
+                               (10 * account_creation_fee) )
                             []
                         ]
-                      |> Parties_builder.mk_parties_transaction ~fee:7
-                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+                      |> mk_parties_transaction ~fee:7 ~fee_payer_pk:pk
+                           ~fee_payer_nonce:nonce
                     in
-                    Parties_builder.replace_authorizations ~keymap
-                      with_dummy_signatures
+                    replace_authorizations ~keymap with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger
@@ -114,73 +115,123 @@ let%test_module "Zkapp tokens tests" =
                         Token_id.default
                       : Account.t ) ;
                   let mint_token_parties =
+                    let open Parties_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
-                      Parties_builder.mk_forest
-                        [ Parties_builder.mk_node
-                            (Parties_builder.mk_party_body Call token_owner
-                               Token_id.default (-account_creation_fee) )
-                            [ Parties_builder.mk_node
-                                (Parties_builder.mk_party_body Call
-                                   token_account1 custom_token_id 100 )
+                      mk_forest
+                        [ mk_node
+                            (mk_party_body Call token_owner Token_id.default
+                               (-account_creation_fee) )
+                            [ mk_node
+                                (mk_party_body Call token_accounts.(0)
+                                   custom_token_id 100 )
                                 []
                             ]
                         ]
-                      |> Parties_builder.mk_parties_transaction ~fee:7
-                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+                      |> mk_parties_transaction ~fee:7 ~fee_payer_pk:pk
+                           ~fee_payer_nonce:nonce
                     in
-                    Parties_builder.replace_authorizations ~keymap
-                      with_dummy_signatures
+                    replace_authorizations ~keymap with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger
                       [ mint_token_parties ]
                   in
-                  check_token_balance token_account1 100 ;
-                  let token_transfer_parties =
+                  check_token_balance token_accounts.(0) custom_token_id 100 ;
+                  let mint_token2_parties =
+                    let open Parties_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
-                      Parties_builder.mk_forest
-                        [ Parties_builder.mk_node
-                            (Parties_builder.mk_party_body Call token_owner
-                               Token_id.default (-account_creation_fee) )
-                            [ Parties_builder.mk_node
-                                (Parties_builder.mk_party_body Call
-                                   token_account1 custom_token_id (-30) )
-                                []
-                            ; Parties_builder.mk_node
-                                (Parties_builder.mk_party_body Call
-                                   token_account2 custom_token_id 30 )
-                                []
-                            ; Parties_builder.mk_node
-                                (Parties_builder.mk_party_body Call
-                                   token_account1 custom_token_id (-10) )
-                                []
-                            ; Parties_builder.mk_node
-                                (Parties_builder.mk_party_body Call
-                                   token_account2 custom_token_id 10 )
-                                []
-                            ; Parties_builder.mk_node
-                                (Parties_builder.mk_party_body Call
-                                   token_account2 custom_token_id (-5) )
-                                []
-                            ; Parties_builder.mk_node
-                                (Parties_builder.mk_party_body Call
-                                   token_account1 custom_token_id 5 )
-                                []
+                      mk_forest
+                        [ mk_node
+                            (mk_party_body Call token_owner Token_id.default
+                               (-2 * account_creation_fee) )
+                            [ mk_node
+                                (mk_party_body Call token_owner custom_token_id
+                                   0 )
+                                [ mk_node
+                                    (mk_party_body Call token_accounts.(2)
+                                       custom_token_id2 500 )
+                                    []
+                                ]
                             ]
                         ]
-                      |> Parties_builder.mk_parties_transaction ~fee:7
-                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+                      |> mk_parties_transaction ~fee:7 ~fee_payer_pk:pk
+                           ~fee_payer_nonce:nonce
                     in
-                    Parties_builder.replace_authorizations ~keymap
-                      with_dummy_signatures
+                    replace_authorizations ~keymap with_dummy_signatures
+                  in
+                  let%bind () =
+                    U.check_parties_with_merges_exn ledger
+                      [ mint_token2_parties ]
+                  in
+                  check_token_balance token_accounts.(2) custom_token_id2 500 ;
+                  let token_transfer_parties =
+                    let open Parties_builder in
+                    let nonce = nonce_from_ledger () in
+                    let with_dummy_signatures =
+                      mk_forest
+                        [ mk_node
+                            (mk_party_body Call token_owner Token_id.default
+                               (-2 * account_creation_fee) )
+                            [ mk_node
+                                (mk_party_body Call token_accounts.(0)
+                                   custom_token_id (-30) )
+                                []
+                            ; mk_node
+                                (mk_party_body Call token_accounts.(1)
+                                   custom_token_id 30 )
+                                []
+                            ; mk_node
+                                (mk_party_body Call fee_payer_keypair
+                                   Token_id.default (-50) )
+                                []
+                            ; mk_node
+                                (mk_party_body Call token_funder
+                                   Token_id.default 50 )
+                                []
+                            ; mk_node
+                                (mk_party_body Call token_accounts.(0)
+                                   custom_token_id (-10) )
+                                []
+                            ; mk_node
+                                (mk_party_body Call token_accounts.(1)
+                                   custom_token_id 10 )
+                                []
+                            ; mk_node
+                                (mk_party_body Call token_accounts.(1)
+                                   custom_token_id (-5) )
+                                []
+                            ; mk_node
+                                (mk_party_body Call token_accounts.(0)
+                                   custom_token_id 5 )
+                                []
+                            ; mk_node
+                                (mk_party_body Call token_owner custom_token_id
+                                   0 )
+                                [ mk_node
+                                    (mk_party_body Call token_accounts.(2)
+                                       custom_token_id2 (-210) )
+                                    []
+                                ; mk_node
+                                    (mk_party_body Call token_accounts.(3)
+                                       custom_token_id2 210 )
+                                    []
+                                ]
+                            ]
+                        ]
+                      |> mk_parties_transaction ~fee:7 ~fee_payer_pk:pk
+                           ~fee_payer_nonce:nonce
+                    in
+                    replace_authorizations ~keymap with_dummy_signatures
                   in
                   let%bind () =
                     U.check_parties_with_merges_exn ledger
                       [ token_transfer_parties ]
                   in
-                  check_token_balance token_account1 65 ;
-                  check_token_balance token_account2 35 ;
+                  check_token_balance token_accounts.(0) custom_token_id 65 ;
+                  check_token_balance token_accounts.(1) custom_token_id 35 ;
+                  check_token_balance token_accounts.(2) custom_token_id2 290 ;
+                  check_token_balance token_accounts.(3) custom_token_id2 210 ;
                   Async.Deferred.unit ) ) )
   end )

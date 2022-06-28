@@ -21,24 +21,29 @@ let%test_module "Initialize state test" =
 
     let account_id = Account_id.create pk_compressed Token_id.default
 
+    module Statement = struct
+      type t = unit
+
+      let to_field_elements () = [||]
+    end
+
     let ( tag
         , _
         , p_module
-        , Pickles.Provers.[ initialize_prover; update_state_prover; _ ] ) =
+        , Pickles.Provers.[ initialize_prover; update_state_prover ] ) =
       Pickles.compile ~cache:Cache_dir.cache
-        (module Zkapp_statement.Checked)
-        (module Zkapp_statement)
-        ~typ:Zkapp_statement.typ
-        ~branches:(module Nat.N3)
-        ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
+        (module Statement)
+        (module Statement)
+        ~public_input:(Output Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
+        ~branches:(module Nat.N2)
+        ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants )
-        ~choices:(fun ~self ->
+        ~choices:(fun ~self:_ ->
           [ Zkapps_initialize_state.initialize_rule pk_compressed
           ; Zkapps_initialize_state.update_state_rule pk_compressed
-          ; dummy_rule self
           ] )
 
     module P = (val p_module)
@@ -92,12 +97,10 @@ let%test_module "Initialize state test" =
       let party_body =
         Zkapps_initialize_state.generate_initialize_party pk_compressed
 
-      let party_proof =
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            initialize_prover []
-              { transaction = Party.Body.digest party_body
-              ; at_party = Parties.Call_forest.empty
-              } )
+      let _stmt, (), party_proof =
+        Async.Thread_safe.block_on_async_exn initialize_prover
+
+      let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
 
       let party : Party.Graphql_repr.t =
         Party.to_graphql_repr ~call_depth:0
@@ -111,21 +114,17 @@ let%test_module "Initialize state test" =
         Zkapps_initialize_state.generate_update_state_party pk_compressed
           new_state
 
-      let party_proof =
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            update_state_prover
-              ~handler:(Zkapps_initialize_state.update_state_handler new_state)
-              []
-              { transaction = Party.Body.digest party_body
-              ; at_party = Parties.Call_forest.empty
-              } )
+      let _stmt, (), party_proof =
+        Async.Thread_safe.block_on_async_exn
+          (update_state_prover
+             ~handler:(Zkapps_initialize_state.update_state_handler new_state) )
+
+      let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
 
       let party : Party.Graphql_repr.t =
         Party.to_graphql_repr ~call_depth:0
           { body = party_body; authorization = Proof party_proof }
     end
-
-    let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
 
     let test_parties ?expected_failure parties =
       let ps =
@@ -147,7 +146,6 @@ let%test_module "Initialize state test" =
             { Party.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.(of_int 100)
-            ; protocol_state_precondition
             }
         ; authorization = Signature.dummy
         }

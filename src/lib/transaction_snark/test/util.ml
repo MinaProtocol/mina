@@ -39,11 +39,12 @@ end)
 
 let genesis_state_body =
   let compile_time_genesis =
+    let open Staged_ledger_diff in
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
       ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
       ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   compile_time_genesis.data |> Mina_state.Protocol_state.body
 
@@ -99,19 +100,16 @@ let apply_parties ledger parties =
       (`Ledger ledger) parties
   in
   let open Impl in
-  List.iter (List.rev witnesses)
-    ~f:(fun (witness, spec, statement, snapp_stmt) ->
+  List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
           in
-          let snapp_stmt =
-            Option.value_map ~default:[] snapp_stmt ~f:(fun (i, stmt) ->
-                [ (i, exists Zkapp_statement.typ ~compute:(fun () -> stmt)) ] )
+          let _opt_snapp_stmt =
+            Transaction_snark.Base.Parties_snark.main ~constraint_constants
+              (Parties_segment.Basic.to_single_list spec)
+              s ~witness
           in
-          Transaction_snark.Base.Parties_snark.main ~constraint_constants
-            (Parties_segment.Basic.to_single_list spec)
-            snapp_stmt s ~witness ;
           fun () -> () )
       |> Or_error.ok_exn ) ;
   final_ledger
@@ -172,21 +170,20 @@ let check_parties_with_merges_exn ?expected_failure
                         match List.rev witnesses with
                         | [] ->
                             failwith "no witnesses generated"
-                        | (witness, spec, stmt, snapp_statement) :: rest ->
+                        | (witness, spec, stmt) :: rest ->
                             let open Async.Deferred.Or_error.Let_syntax in
                             let%bind p1 =
                               Async.Deferred.Or_error.try_with (fun () ->
                                   T.of_parties_segment_exn ~statement:stmt
-                                    ~witness ~spec ~snapp_statement )
+                                    ~witness ~spec )
                             in
                             Async.Deferred.List.fold ~init:(Ok p1) rest
-                              ~f:(fun acc (witness, spec, stmt, snapp_statement)
-                                 ->
+                              ~f:(fun acc (witness, spec, stmt) ->
                                 let%bind prev = Async.Deferred.return acc in
                                 let%bind curr =
                                   Async.Deferred.Or_error.try_with (fun () ->
                                       T.of_parties_segment_exn ~statement:stmt
-                                        ~witness ~spec ~snapp_statement )
+                                        ~witness ~spec )
                                 in
                                 let sok_digest =
                                   Sok_message.create ~fee:Fee.zero
@@ -240,20 +237,26 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
   ; prevs = [ self; self ]
   ; main =
-      (fun [ _; _ ] _ ->
-        Transaction_snark.dummy_constraints ()
-        |> Snark_params.Tick.Run.run_checked
-        |> fun () ->
+      (fun { public_input = _ } ->
+        let s =
+          Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
+        in
+        let public_input =
+          Run.exists Zkapp_statement.typ ~compute:(fun () -> assert false)
+        in
+        let proof =
+          Run.exists (Typ.Internal.ref ()) ~compute:(fun () -> assert false)
+        in
+        Impl.run_checked (Transaction_snark.dummy_constraints ()) ;
         (* Unsatisfiable. *)
-        Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
-        |> fun s ->
-        Run.Field.(Assert.equal s (s + one))
-        |> fun () :
-               (Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit))
-               Pickles_types.Hlist0.H1
-                 (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-               .t ->
-        [ Boolean.true_; Boolean.true_ ] )
+        Run.Field.(Assert.equal s (s + one)) ;
+        { previous_proof_statements =
+            [ { public_input; proof; proof_must_verify = Boolean.true_ }
+            ; { public_input; proof; proof_must_verify = Boolean.true_ }
+            ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
   }
 
 let gen_snapp_ledger =

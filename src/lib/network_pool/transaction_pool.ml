@@ -397,7 +397,7 @@ struct
 
     let get_all { pool; _ } = Indexed_pool.get_all pool
 
-    let find_by_hash { pool; _ } hash = Indexed_pool.find_by_hash pool hash
+    let find_by_hash x hash = Indexed_pool.find_by_hash x.pool hash
 
     (** Get the best tip ledger*)
     let get_best_tip_ledger frontier =
@@ -2723,7 +2723,7 @@ let%test_module _ =
           mk_payment ~sender_idx:0 ~fee:16_000_000_000 ~nonce:0 ~receiver_idx:1
             ~amount:440_000_000_000 ()
         ; (* insufficient fee *)
-          mk_payment ~sender_idx:1 ~fee:4_000_000_000 ~nonce:0 ~receiver_idx:1
+          mk_payment ~sender_idx:1 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:1
             ~amount:788_000_000_000 ()
         ; (* sufficient *)
           mk_payment ~sender_idx:2 ~fee:20_000_000_000 ~nonce:1 ~receiver_idx:4

@@ -2,10 +2,10 @@
 -- NOTE: minaToolchainStretch is also used for building Ubuntu Bionic packages in CI
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:1c95b5b4016db7bcf7b4c546fd36e162f90baff0babc0ac3287df19cb33f72db",
-  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:abe7bae009da64f51c9bcce879208c4e1f3faabc3e5fae737c51bf33a6def95a",
-  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:36455abc3733cc5db9e4bd3039afcece958bc363f049ec155044f30e08b49862",
-  minaToolchainFocal = "gcr.io/o1labs-192920/mina-toolchain@sha256:7f8725ccc04ddeff0ee991094e185c3fa501c46fe2b1a92a25a17d9313b948e0",
+  minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:36f1a221486c1ff6ac55fda7dfbcd81fe9992dbda211b25600ff693445d6c985",
+  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:525ade511d01ce66822f11b35893bed69b55d3fc9a4b872914214ddf67cf7e30",
+  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:05b7ab374f3d4b837a27e630dd8aad96d2ec776ec9c21e84924f50ef5a263a74",
+  minaToolchainFocal = "gcr.io/o1labs-192920/mina-toolchain@sha256:f0a96582499cd2a05ba8181b8767866bb928226f0cc369a16102c701def621c7",
   delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:8ca5880845514ef56a36bf766a0f9de96e6200d61b51f80d9f684a0ec9c031f4",
   elixirToolchain = "elixir:1.10-alpine",
   nodeToolchain = "node:14.13.1-stretch-slim",
