@@ -78,8 +78,6 @@ let deploy_party : Party.Graphql_repr.t =
   (* TODO: This is a pain. *)
   { body = deploy_party_body; authorization = Signature Signature.dummy }
 
-let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-
 let ps =
   (* TODO: This is a pain. *)
   Parties.Call_forest.of_parties_list
@@ -101,7 +99,6 @@ let fee_payer =
       { Party.Body.Fee_payer.dummy with
         public_key = pk_compressed
       ; fee = Currency.Fee.(of_int 100)
-      ; protocol_state_precondition
       }
   ; authorization = Signature.dummy
   }
