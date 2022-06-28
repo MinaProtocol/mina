@@ -87,6 +87,7 @@ module "testlabels" {
   mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
+  use_embedded_runtime_config = true
 
   archive_node_count  = 3
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/06691e343be1ddad036c1fc4a6c94afc12afc4ee/src/app/archive/create_schema.sql" 
@@ -139,6 +140,9 @@ module "testlabels" {
       snark_coordinators_host_port = 10401
     }
   ]
+
+  seed_count            = var.seed_count
+  plain_node_count = 0
 
   whales= [
     for i in range(var.whale_count):{

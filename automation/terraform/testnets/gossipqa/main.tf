@@ -145,7 +145,7 @@ module "gossipqa" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
-  snark_coordinators=[
+  snark_coordinators = [
 # gotta manually change the public keys, get them from whatever genesis ledger we're running this with
 # if we want to do this automatically, we would need to modify generate-keys-and-ledger.sh to create a separate batch of files with pulbic keys of all block producer nodes and read those in
     {
@@ -211,7 +211,6 @@ module "gossipqa" {
   ]
 
   seed_count            = var.seed_count
-
   plain_node_count = var.plain_node_count
 
   # whales= [    
@@ -247,7 +246,7 @@ module "gossipqa" {
       }]
   )
   
-  fishes=concat( 
+  fishes= concat( 
     [for i in range(var.fish_count/3):{
         duplicates = 3
         class  = "fish"
