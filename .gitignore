@@ -93,3 +93,8 @@ Cargo.lock
 *.iws
 *.iml
 *.ipr
+
+### Direnv ###
+.env
+.envrc
+.direnv/
