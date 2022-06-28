@@ -25,13 +25,13 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFpPlonkVerifierIndex {
         Self {
             domain: CamlPlonkDomain {
                 log_size_of_group: vi.domain.log_size_of_group as isize,
-                group_gen: CamlFp(vi.domain.group_gen),
+                group_gen: CamlFp::from(vi.domain.group_gen),
             },
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
-            public: vi.public as isize,
             prev_challenges: vi.prev_challenges as isize,
             srs: CamlFpSrs(vi.srs.get().expect("have an srs").clone()),
+            public: vi.public as isize,
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
                 coefficients_comm: vi
@@ -90,7 +90,6 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
             domain,
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
-            public: index.public as usize,
             prev_challenges: index.prev_challenges as usize,
             powers_of_alpha,
             srs: {
@@ -98,6 +97,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
                 res.set(index.srs.0).unwrap();
                 res
             },
+            public: index.public as usize,
 
             sigma_comm,
             coefficients_comm,
@@ -222,9 +222,9 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
         },
         max_poly_size: 0,
         max_quot_size: 0,
-        public: 0,
         prev_challenges: 0,
         srs: CamlFpSrs::new(SRS::create(0)),
+        public: 0,
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),
             coefficients_comm: vec_comm(COLUMNS),

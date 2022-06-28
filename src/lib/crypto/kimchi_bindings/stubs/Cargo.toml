@@ -22,12 +22,14 @@ rayon = { version = "1" }
 serde = "1.0.130"
 sprs = { version = "0.11.0", features = ["multi_thread"] }
 once_cell = "1.10.0"
+zeroize = "1.5.5"
 
 # arkworks
-ark-ff = { version = "0.3.0", features = ["parallel"] }
-ark-serialize = "0.3.0"
 ark-ec = { version = "0.3.0", features = ["parallel"] }
+ark-ff = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
+ark-serialize = "0.3.0"
+ark-std = "0.3.0"
 
 # proof-systems
 commitment_dlog = { path = "../../proof-systems/poly-commitment", features = ["ocaml_types"] }

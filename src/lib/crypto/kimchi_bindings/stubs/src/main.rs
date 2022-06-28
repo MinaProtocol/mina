@@ -4,7 +4,9 @@ use std::fs::File;
 use std::io::Write;
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
-    arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
+    arkworks::{
+        bigint_256::*, fp256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*,
+    },
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
@@ -125,7 +127,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_fake_generic!(T3, 2);
 
     decl_module!(w, env, "BigInt256", {
-        decl_type!(w, env, CamlBigInteger256 => "t");
+        decl_type!(w, env, BigInteger256 => "t");
 
         decl_func!(w, env, caml_bigint_256_of_numeral => "of_numeral");
         decl_func!(w, env, caml_bigint_256_of_decimal_string => "of_decimal_string");
@@ -141,8 +143,12 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_bigint_256_deep_copy => "deep_copy");
     });
 
+    decl_module!(w, env, "Fp256", {
+        decl_type!(w, env, Fp256<T1> => "t");
+    });
+
     decl_module!(w, env, "Fp", {
-        decl_type!(w, env, CamlFp => "t");
+        decl_type_alias!(w, env, "t" => CamlFp);
 
         decl_func!(w, env, caml_pasta_fp_size_in_bits => "size_in_bits");
         decl_func!(w, env, caml_pasta_fp_size => "size");
@@ -178,7 +184,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
     });
 
     decl_module!(w, env, "Fq", {
-        decl_type!(w, env, CamlFq => "t");
+        decl_type_alias!(w, env, "t" => CamlFq);
 
         decl_func!(w, env, caml_pasta_fq_size_in_bits => "size_in_bits");
         decl_func!(w, env, caml_pasta_fq_size => "size");

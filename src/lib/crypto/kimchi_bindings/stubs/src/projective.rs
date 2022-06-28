@@ -53,7 +53,7 @@ macro_rules! impl_projective {
                 x: ocaml::Pointer<$GroupProjective>,
                 y: $CamlScalarField,
             ) -> $GroupProjective {
-                let y: ark_ff::BigInteger256 = y.0.into();
+                let y: ark_ff::BigInteger256 = y.into();
                 x.as_ref().mul(&y).into()
             }
 

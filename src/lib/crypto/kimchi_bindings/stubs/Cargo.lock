@@ -1156,6 +1156,7 @@ dependencies = [
  "ark-ff",
  "ark-poly",
  "ark-serialize",
+ "ark-std",
  "array-init",
  "commitment_dlog",
  "groupmap",
@@ -1174,6 +1175,7 @@ dependencies = [
  "rmp-serde 0.15.5",
  "serde",
  "sprs",
+ "zeroize",
 ]
 
 [[package]]

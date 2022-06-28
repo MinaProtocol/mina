@@ -15,14 +15,13 @@ use o1_utils::hasher::CryptoDigest;
 pub mod fp {
     use super::*;
     use crate::arkworks::CamlFp;
-    use mina_curves::pasta::fp::Fp;
 
     //
     // CamlPastaFpPlonkGateVector
     //
 
     #[derive(ocaml_gen::CustomType)]
-    pub struct CamlPastaFpPlonkGateVector(pub Vec<CircuitGate<Fp>>);
+    pub struct CamlPastaFpPlonkGateVector(pub Vec<CircuitGate<CamlFp>>);
     pub type CamlPastaFpPlonkGateVectorPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPlonkGateVector>;
 
     extern "C" fn caml_pasta_fp_plonk_gate_vector_finalize(v: ocaml::Raw) {
@@ -52,7 +51,7 @@ pub mod fp {
         mut v: CamlPastaFpPlonkGateVectorPtr,
         gate: CamlCircuitGate<CamlFp>,
     ) {
-        let gate: CircuitGate<Fp> = gate.into();
+        let gate: CircuitGate<CamlFp> = gate.into();
         v.as_mut().0.push(gate);
     }
 
@@ -91,14 +90,13 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::arkworks::CamlFq;
-    use mina_curves::pasta::fq::Fq;
 
     //
     // CamlPastaFqPlonkGateVector
     //
 
     #[derive(ocaml_gen::CustomType)]
-    pub struct CamlPastaFqPlonkGateVector(pub Vec<CircuitGate<Fq>>);
+    pub struct CamlPastaFqPlonkGateVector(pub Vec<CircuitGate<CamlFq>>);
     pub type CamlPastaFqPlonkGateVectorPtr<'a> = ocaml::Pointer<'a, CamlPastaFqPlonkGateVector>;
 
     extern "C" fn caml_pasta_fq_plonk_gate_vector_finalize(v: ocaml::Raw) {
