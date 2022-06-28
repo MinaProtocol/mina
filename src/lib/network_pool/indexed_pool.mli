@@ -28,7 +28,6 @@ module Command_error : sig
         | `Timestamp_predicate of string ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Mina_base.Token_id.t
-    | Verification_failed
   [@@deriving sexp, to_yojson]
 
   val grounds_for_diff_rejection : t -> bool
@@ -105,36 +104,9 @@ val get_highest_fee :
     are required to keep the pool in sync with the ledger you are applying
     transactions against.
 *)
-val add_from_gossip_exn_async :
-     config:Config.t
-  -> sender_local_state:Sender_local_state.t
-  -> verify:
-       (   User_command.Verifiable.t
-        -> User_command.Valid.t option Async.Deferred.t )
-  -> [ `Unchecked of Transaction_hash.User_command.t * User_command.Verifiable.t
-     | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
-  -> Account_nonce.t
-  -> Currency.Amount.t
-  -> ( ( Transaction_hash.User_command_with_valid_signature.t
-       * Transaction_hash.User_command_with_valid_signature.t list )
-       * Sender_local_state.t
-       * Update.t
-     , Command_error.t )
-     Async.Deferred.Result.t
-(** Returns the commands dropped as a result of adding the command, which will
-    be empty unless we're replacing one. *)
-
-(** Add a command to the pool. Pass the current nonce for the account and
-    its current balance. Throws if the contents of the pool before adding the
-    new command are invalid given the supplied current nonce and balance - you
-    are required to keep the pool in sync with the ledger you are applying
-    transactions against.
-*)
 val add_from_gossip_exn :
      t
-  -> verify:(User_command.Verifiable.t -> User_command.Valid.t option)
-  -> [ `Unchecked of Transaction_hash.User_command.t * User_command.Verifiable.t
-     | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
+  -> Transaction_hash.User_command_with_valid_signature.t
   -> Account_nonce.t
   -> Currency.Amount.t
   -> ( Transaction_hash.User_command_with_valid_signature.t
@@ -155,6 +127,9 @@ val add_from_backtrack :
 
 (** Check whether a command is in the pool *)
 val member : t -> Transaction_hash.User_command.t -> bool
+
+(** Check whether the pool has any commands for a given fee payer *)
+val has_commands_for_fee_payer : t -> Account_id.t -> bool
 
 (** Get all the user commands sent by a user with a particular account *)
 val all_from_account :
