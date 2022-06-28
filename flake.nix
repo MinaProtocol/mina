@@ -61,9 +61,9 @@
       };
       pipeline = with flake-buildkite-pipeline.lib; {
         steps = flakeSteps {
+          reproduceRepo = "mina";
           commonExtraStepConfig = {
             agents = [ "nix" ];
-            soft_fail = "true";
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
           };
         } self;
