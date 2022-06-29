@@ -91,7 +91,7 @@ module Stable = struct
   end
 end]
 
-(* functions for the versioned json, not the unversioned ones provide by `T` *)
+(* functions for the versioned json, not the unversioned ones provided by `T` *)
 [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
 let of_block ~logger
