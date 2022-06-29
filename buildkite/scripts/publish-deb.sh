@@ -39,6 +39,15 @@ DEBS='_build/mina-*.deb'
 #    done
 #done
 
+DEBS='_build/mina-*.deb'
+DESTINATION_BUCKET_NAME='o1labs-deb-repo'
+REPOSITORY='dune-deb-repo'
+LOCATION='northamerica-northeast2'
+PACKAGES='o1labs-deb-repo'
+#MINA_DEB_CODENAME='buster'
+#MINA_DEB_RELEASE='1.1.7.dfsg-13'
+
+
 cd _build
 
 for _deb in *.deb; do
