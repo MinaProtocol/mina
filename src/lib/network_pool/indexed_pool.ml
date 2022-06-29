@@ -510,6 +510,16 @@ module Update = struct
         let cmd_hash =
           Transaction_hash.User_command_with_valid_signature.hash cmd
         in
+        ( match Transaction_hash.User_command_with_valid_signature.data cmd with
+        | Parties p ->
+            let p = Parties.Valid.forget p in
+            Mina_metrics.Gauge.set
+              Mina_metrics.Transaction_pool.parties_transaction_size
+              (Parties.Stable.Latest.bin_size_t p |> Float.of_int) ;
+            Mina_metrics.Gauge.set Mina_metrics.Transaction_pool.parties_count
+              (List.length (Parties.to_simple p).other_parties |> Float.of_int)
+        | Signed_command _ ->
+            () ) ;
         { acc with
           all_by_fee =
             Map_set.insert

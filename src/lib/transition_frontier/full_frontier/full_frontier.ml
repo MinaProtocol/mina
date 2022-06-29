@@ -761,12 +761,24 @@ let update_metrics_with_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
         in
         Block_time.Span.( <= ) (Block_time.diff now slot_time) two_slots
       in
+      let valid_commands =
+        Breadcrumb.validated_transition best_tip
+        |> Mina_block.Validated.valid_commands
+      in
       Mina_metrics.(
         Gauge.set Transition_frontier.best_tip_user_txns
-          (Int.to_float
-             (List.length
-                ( Breadcrumb.validated_transition best_tip
-                |> Mina_block.Validated.valid_commands ) ) ) ;
+          (Int.to_float (List.length valid_commands)) ;
+        Mina_metrics.(
+          Gauge.set Transition_frontier.best_tip_zkapp_txns
+            (Int.to_float
+               (List.fold ~init:0
+                  ~f:(fun c cmd ->
+                    match cmd.data with
+                    | Mina_base.User_command.Poly.Parties _ ->
+                        c + 1
+                    | _ ->
+                        c )
+                  valid_commands ) )) ;
         if is_recent_block then
           Gauge.set Transition_frontier.best_tip_coinbase
             (if has_coinbase best_tip then 1. else 0.) ;

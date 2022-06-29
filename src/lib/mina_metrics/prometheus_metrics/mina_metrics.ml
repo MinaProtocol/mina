@@ -359,6 +359,14 @@ module Transaction_pool = struct
       "Number of transactions added to the pool since the node start"
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
+
+  let parties_transaction_size : Gauge.t =
+    let help = "Size of valid parties transaction received (bin_size_t)" in
+    Gauge.v "parties_transaction_size" ~help ~namespace ~subsystem
+
+  let parties_count : Gauge.t =
+    let help = "Number of parties in a valid transaction received" in
+    Gauge.v "parties_count" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -1281,6 +1289,10 @@ module Transition_frontier = struct
   let best_tip_user_txns : Gauge.t =
     let help = "# of transactions in the current best tip" in
     Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
+
+  let best_tip_zkapp_txns : Gauge.t =
+    let help = "# of transactions in the current best tip" in
+    Gauge.v "best_tip_zkapp_txns" ~help ~namespace ~subsystem
 
   let best_tip_coinbase : Gauge.t =
     let help =
