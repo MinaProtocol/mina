@@ -28,7 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  use_local_charts   = false
+  use_local_charts   = true
   mina_image         = var.mina_image
   mina_archive_image = var.mina_archive_image
   mina_agent_image   = var.mina_agent_image
@@ -68,8 +68,8 @@ module "kubernetes_testnet" {
       class                  = bp.class
       id                     = bp.total_node_index
       external_port          = bp.port
-      private_key_secret     = "online-${bp.class}-account-${bp.unique_node_index}-key"
-      libp2p_secret          = "online-${bp.class}-libp2p-${bp.total_node_index}-key"
+      private_key_secret     = "${bp.class}-${bp.unique_node_index}-key"
+      libp2p_secret          = ""
       enable_gossip_flooding = false
       run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
       # run_with_user_agent = bp.class =="whale" ? false : true
@@ -88,8 +88,8 @@ module "kubernetes_testnet" {
       id                 = i + 1
       external_port      = local.seed_static_peers[i].port
       external_ip        = google_compute_address.seed_static_ip[i].address
-      private_key_secret = "online-seeds-account-${i + 1}-key"
-      libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
+      # private_key_secret = "online-seeds-account-${i + 1}-key"
+      libp2p_secret      = "seed-${i + 1}-key"
       enableArchive      = length(local.archive_node_configs) > 0
       archiveAddress     = length(local.archive_node_configs) > 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
     }

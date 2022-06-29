@@ -34,6 +34,12 @@ provider "google" {
   zone    = "us-central1-c"
 }
 
+provider "google" {
+  alias   = "mina-infra-canada"
+  project = "o1labs-192920"
+  region  = "northamerica-northeast1"
+  zone    = "northamerica-northeast1-c"
+}
 
 variable "whale_count" {
   type = number
@@ -50,7 +56,7 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default     = 3
+  default     = 6
 }
 
 variable "plain_node_count" {
@@ -59,8 +65,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "gossipqa"
-  mina_image = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta5-feature-gossip-qa-ledger-8e15537-buster-devnet"
-  mina_archive_image = "minaprotocol/mina-archive:1.2.0beta5-feature-gossip-qa-ledger-8e15537-buster-devnet"
+  mina_image = "minaprotocol/mina-daemon:1.3.1beta1-metrics-gossip-data-collection-92db0c6-focal-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.1beta1-metrics-gossip-data-collection-92db0c6-focal"
   seed_region = "us-central1"
   seed_zone = "us-central1-c"
 
@@ -78,14 +84,14 @@ locals {
 }
 
 module "gossipqa" {
-  providers = { google.gke = google.google-us-central1 }
+  providers = { google.gke = google.mina-infra-canada }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "mina-infra-canada"
+  cluster_region = "northamerica-northeast1"
+  k8s_context    = "gke_o1labs-192920_northamerica-northeast1_mina-infra-canada"
   testnet_name   = local.testnet_name
 
   mina_image         = local.mina_image
@@ -94,7 +100,7 @@ module "gossipqa" {
   mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
-  use_embedded_runtime_config = true
+  use_embedded_runtime_config = false
 
   archive_node_count  = 3
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql"
@@ -139,73 +145,72 @@ module "gossipqa" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
-  snark_coordinators=[
+  snark_coordinators = [
 # gotta manually change the public keys, get them from whatever genesis ledger we're running this with
 # if we want to do this automatically, we would need to modify generate-keys-and-ledger.sh to create a separate batch of files with pulbic keys of all block producer nodes and read those in
     {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qjXQcUtWGb2YPnnP7YE9DxgXhAXgWTLdTjuYhXuXegEhXY6LQCj7"
+      snark_worker_public_key = "B62qoYAbgvbVB2QsmhJyZiEC8YHzumYvFDMGKWsu8A1n4bW3M3hv7yz"
       snark_coordinators_host_port = 10401
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qqfus8oqhNEAXdT9FhDXNfFW6SPJgfSSdbNTDaC8YbMmavD7V8z8"
+      snark_worker_public_key = "B62qkesaX38rXheQmochTPmaVEbmzqwzKD6tjVpmuXFMTXxW5Cj5rR8"
       snark_coordinators_host_port = 10402
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qntfBJjRwhvTfvjXu3CDk4LUVqqGRhEs4qGQgwsFvmvcpnzBobBH"
+      snark_worker_public_key = "B62qrTrbQbVoTLrr22CxvDfN6CfvZzzwp36DKBMScy739vn2wpcCKhG"
       snark_coordinators_host_port = 10403
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qkJzX8LAfahyXKR3zZs9tiXy6aRCdz8yYKf1qyjV5VXV4kFfSazo"
+      snark_worker_public_key = "B62qjhpfPJAZCdLu2GAZ4x8Zfty6LuUiiuyEtQypJL4ESmPmgJKeSmH"
       snark_coordinators_host_port = 10404
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qqe4rmDc3BCHmvDyt1bfPWabgu52Sr5xzq6KxZSFGSjdYb8YPcPW"
+      snark_worker_public_key = "B62qqEtDVSH2uiVyGBDfSTwXsFwMgVfH8yoDuApfPxK54fVwdpBVmBT"
       snark_coordinators_host_port = 10405
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qnk8Ev9cVwtLASqDNmwqpjWsdyyCktkGXU6zTidxvYaddhJhoaXd"
+      snark_worker_public_key = "B62qk1aSEpoyWSoxkyR2hsEeA2b6vz8dzWVwCugxeUZydsYDpXomZs4"
       snark_coordinators_host_port = 10406
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qmNay4xNME4JYrb6r58rViE5FJkNkm681WWGau8ybbRuX37WAMXs"
+      snark_worker_public_key = "B62qoZ5hwfauSoVWTG4eHGoEWy4KV1S11vJUEaPwaBF9PbufpNhtfHS"
       snark_coordinators_host_port = 10407
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qpd3VrJCoeK2Fh9CGYTLyjKJBaEHbSgTKzE5z3KnxRakU9b6mCKx"
+      snark_worker_public_key = "B62qjCmmj2T64GiLAsJBhnBEyA28voEJsG3PFbXP1wRakTKNJePCtjS"
       snark_coordinators_host_port = 10408
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qqrF37sCNCwwSdJnMxCfiDifKWnE8dxV7nqoaNYzB2furmbEWqo7"
+      snark_worker_public_key = "B62qjSqjAsjxBJMAY4wnybyCfMHYB9nypLU81wD68PCH8KEZeU4eNjm"
       snark_coordinators_host_port = 10409
     },
         {
       snark_worker_replicas = 5
       snark_worker_fee      = "0.025"
-      snark_worker_public_key = "B62qrD6iWkaUjP3yGLLLTLoV41zeUBEap6GrparAYNV8SuKnYaTLvqC"
+      snark_worker_public_key = "B62qokpZpTafUHAwx8UpR6Rwupz6kGiifmsdmmuq2sg8nMpoBmnjDAL"
       snark_coordinators_host_port = 10410
     }
   ]
 
   seed_count            = var.seed_count
-
   plain_node_count = var.plain_node_count
 
   # whales= [    
@@ -241,7 +246,7 @@ module "gossipqa" {
       }]
   )
   
-  fishes=concat( 
+  fishes= concat( 
     [for i in range(var.fish_count/3):{
         duplicates = 3
         class  = "fish"
