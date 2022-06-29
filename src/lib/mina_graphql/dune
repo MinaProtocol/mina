@@ -75,6 +75,9 @@
    pickles.backend
    pickles_types
    graphql
-   o1trace)
+   o1trace
+   graphql_wrapper
+   either
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))
+ (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))
