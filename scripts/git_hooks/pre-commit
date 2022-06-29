@@ -1,12 +1,59 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# set -x
+
+echo "Executing Pre-Commit Hook..."
 
 ###################################
 ## Check OCaml Formatting
 
-make check-format
-if [ "$?" != 0 ]; then
-  echo '** REFUSING TO COMMIT: "$ make check-format" failed'
-  exit 1
+# make check-format
+# if [ "$?" != 0 ]; then
+#   echo '** REFUSING TO COMMIT: "$ make check-format" failed'
+#   exit 1
+# fi
+
+###################################
+## Apply OCaml Formatting
+
+DUNE_FMT_OUT="./fmt-out.txt"
+USE_NEXT_LINE=false
+# It requires "Reason" package installed in order to process all source files: opam install reason
+dune fmt --profile="dev" --auto-promote --display="progress" --diff-command="-" --root . >${DUNE_FMT_OUT} 2>&1
+
+if [[ -f "${DUNE_FMT_OUT}" ]]; then
+  while read -r line; do
+    file_for_vcs=""
+    if [[ $line == Promoting* && $line == *. ]]; then
+      file_for_vcs=$(echo $line | awk '{split($0,result," "); print result[4]}' | rev | cut -c2- | rev)
+      continue
+    else
+      if [[ $line == Promoting* ]]; then
+        USE_NEXT_LINE=true
+        continue
+      else
+        if [[ $line == _build* ]]; then
+          continue
+        else
+          if [ $USE_NEXT_LINE = true ]; then
+            if [[ $line == to* ]]; then
+              file_for_vcs=$(echo $line | awk '{split($0,result," "); print result[2]}' | rev | cut -c2- | rev)
+              USE_NEXT_LINE=false
+            else
+              file_for_vcs=$(echo $line | rev | cut -c2- | rev)
+              USE_NEXT_LINE=false
+            fi
+          fi
+        fi
+      fi
+    fi
+
+    if [ -n "$file_for_vcs" ]; then
+      echo "Adding formatted file: \"${file_for_vcs}\" to the commit."
+      git add ${file_for_vcs}
+    fi
+  done <"${DUNE_FMT_OUT}"
+
+  rm -rf ${DUNE_FMT_OUT}
 fi
 
 ###################################
@@ -23,8 +70,14 @@ check_staged_file() {
 
 for stat in $(git status --porcelain -uno); do
   case $stat in
-    M*|A*) check_staged_file "$(echo "$stat" | cut -f2-)"; break;;
-    R*|C*) check_staged_file "$(echo "$stat" | cut -d'>' -f2)"; break;;
-    *) break;;
+  M* | A*)
+    check_staged_file "$(echo "$stat" | cut -f2-)"
+    break
+    ;;
+  R* | C*)
+    check_staged_file "$(echo "$stat" | cut -d'>' -f2)"
+    break
+    ;;
+  *) break ;;
   esac
 done
