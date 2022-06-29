@@ -12,6 +12,8 @@ let with_top_version_tag = "with_top_version_tag"
 
 let with_top_version_tag_module = String.capitalize with_top_version_tag
 
+let with_versioned_json = "with_versioned_json"
+
 let no_toplevel_latest_type_str = "no_toplevel_latest_type"
 
 (* option to `deriving version' *)
@@ -293,7 +295,7 @@ let mk_all_version_tags_type_decl =
   end
 
 let version_type ~version_option version stri ~all_version_tagged
-    ~top_version_tag =
+    ~top_version_tag ~json_version_tag =
   let loc = stri.pstr_loc in
   let find_t_stri stri =
     let is_t_stri stri =
@@ -383,6 +385,27 @@ let version_type ~version_option version stri ~all_version_tagged
           (Located.mk (Ldot (Ldot (Lident "Bin_prot", "Type_class"), fld))))
     in
     let open Ast_builder in
+    let yojson_tag_shadows =
+      if not json_version_tag then []
+      else
+        [%str
+          let to_yojson item =
+            `Assoc
+              [ ("version", `Int [%e eint version]); ("data", to_yojson item) ]
+
+          let of_yojson json =
+            match json with
+            | `Assoc [ ("version", `Int n); ("data", data_json) ] ->
+                if n = [%e eint version] then of_yojson data_json
+                else
+                  Error
+                    (Core_kernel.sprintf "In JSON, expected version %d, got %d"
+                       [%e eint version] n )
+            | _ ->
+                Error "Expected versioned JSON"
+
+          let (_ : _) = (to_yojson, of_yojson)]
+    in
     let deriving_bin_io =
       lazy (create_attr ~loc (Located.mk "deriving") (PStr [ [%stri bin_io] ]))
     in
@@ -613,16 +636,16 @@ let version_type ~version_option version stri ~all_version_tagged
         in
         make_tag_module typ_decl with_top_version_tag_module
     in
-    let version_tag_modules =
-      all_version_tag_modules @ top_version_tag_modules
+    let version_tag_items =
+      yojson_tag_shadows @ all_version_tag_modules @ top_version_tag_modules
     in
     let to_latest_guard_modules =
-      (* use of `to_latest`, in case neither all_version_tagged nor top_version_tag *)
-      if empty_params && List.is_empty version_tag_modules then
+      (* use of `to_latest`, in case no version tag items *)
+      if empty_params && List.is_empty version_tag_items then
         [%str let (_ : _) = to_latest]
       else []
     in
-    to_latest_guard_modules @ version_tag_modules
+    to_latest_guard_modules @ version_tag_items
   in
   match stri.pstr_desc with
   | Pstr_type _ ->
@@ -669,7 +692,8 @@ let is_attr_sigitem_with_name name = function
   | _ ->
       false
 
-let convert_module_stri ~version_option ~top_version_tag last_version stri =
+let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
+    last_version stri =
   let module_pattern =
     Ast_pattern.(
       pstr_module (module_binding ~name:(some __') ~expr:(pmod_structure __')))
@@ -724,7 +748,7 @@ let convert_module_stri ~version_option ~top_version_tag last_version stri =
   in
   let should_convert, type_str, extra_stris =
     version_type ~version_option version stri ~all_version_tagged
-      ~top_version_tag
+      ~top_version_tag ~json_version_tag
   in
   (* TODO: If [should_convert] then look for [to_latest]. *)
   let open Ast_builder.Default in
@@ -744,14 +768,21 @@ let convert_modbody ~loc ~version_option body =
     !no_toplevel_latest_type
     || List.exists attrs ~f:(is_attr_stri_with_name no_toplevel_latest_type_str)
   in
+  let json_version_tag =
+    List.exists attrs ~f:(is_attr_stri_with_name with_versioned_json)
+  in
   let top_version_tag =
     List.exists attrs ~f:(is_attr_stri_with_name with_top_version_tag)
   in
-  let _, rev_str, type_stri, top_tag_convs, all_tag_convs =
-    List.fold ~init:(None, [], None, [], []) body_no_attrs
-      ~f:(fun (version, rev_str, type_stri, top_taggeds, all_taggeds) stri ->
+  let _, rev_str, type_stri, top_tag_convs, all_tag_convs, json_tag_convs =
+    List.fold ~init:(None, [], None, [], [], []) body_no_attrs
+      ~f:(fun
+           (version, rev_str, type_stri, top_taggeds, all_taggeds, json_taggeds)
+           stri
+         ->
         let version, stri, should_convert, current_type_stri, is_all_tagged =
-          convert_module_stri ~version_option ~top_version_tag version stri
+          convert_module_stri ~version_option ~top_version_tag ~json_version_tag
+            version stri
         in
         let type_stri =
           if no_toplevel_type then None
@@ -771,7 +802,16 @@ let convert_modbody ~loc ~version_option body =
           if is_all_tagged && should_convert then version :: all_taggeds
           else all_taggeds
         in
-        (Some version, stri :: rev_str, type_stri, top_tag_convs, all_tag_convs) )
+        let json_tag_convs =
+          if json_version_tag && should_convert then version :: json_taggeds
+          else json_taggeds
+        in
+        ( Some version
+        , stri :: rev_str
+        , type_stri
+        , top_tag_convs
+        , all_tag_convs
+        , json_tag_convs ) )
   in
   let (module Ast_builder) = Ast_builder.make loc in
   let rev_str =
@@ -949,7 +989,82 @@ let convert_modbody ~loc ~version_option body =
               in
               [ all_tag_convert_guard; all_tag_convert; all_tag_versions ]
           in
-          top_tag_modules @ all_tag_modules
+          let json_tag_modules =
+            if not json_version_tag then []
+            else
+              let json_tag_versions =
+                [%stri
+                  let (json_tag_versions :
+                        ( int
+                        * (Yojson.Safe.t -> Latest.t Core_kernel.Or_error.t) )
+                        array ) =
+                    [%e
+                      let open Ast_builder in
+                      pexp_array
+                        (List.map json_tag_convs ~f:(fun version ->
+                             let version_module =
+                               Longident.Lident (sprintf "V%i" version)
+                             in
+                             let dot x =
+                               let open Longident in
+                               Located.mk (Ldot (version_module, x))
+                             in
+                             pexp_tuple
+                               [ eint version
+                               ; [%expr
+                                   fun json ->
+                                     match
+                                       [%e
+                                         pexp_apply
+                                           (pexp_ident (dot "of_yojson"))
+                                           [ ( Nolabel
+                                             , pexp_ident
+                                                 (Located.mk (Lident "json")) )
+                                           ]]
+                                     with
+                                     | Ok v ->
+                                         Ok
+                                           [%e
+                                             pexp_apply
+                                               (pexp_ident (dot "to_latest"))
+                                               [ ( Nolabel
+                                                 , pexp_ident
+                                                     (Located.mk (Lident "v"))
+                                                 )
+                                               ]]
+                                     | Error err ->
+                                         Error (Error.of_string err)]
+                               ] ) )]]
+              in
+              let json_tag_convert =
+                [%stri
+                  (** deserializes JSON to the latest module version's type *)
+                  let of_yojson_to_latest (json : Yojson.Safe.t) :
+                      Latest.t Core_kernel.Or_error.t =
+                    match json with
+                    | `Assoc [ ("version", `Int version); ("data", _) ] -> (
+                        match
+                          Array.find_map json_tag_versions ~f:(fun (i, f) ->
+                              if Int.equal i version then Some (f json)
+                              else None )
+                        with
+                        | Some v ->
+                            v
+                        | None ->
+                            Error
+                              (Error.of_string
+                                 (sprintf
+                                    "Could not find json-tagged version %d"
+                                    version ) ) )
+                    | _ ->
+                        Error (Error.of_string "Expected versioned JSON")]
+              in
+              let json_tag_convert_guard =
+                [%stri let (_ : _) = of_yojson_to_latest]
+              in
+              [ json_tag_convert_guard; json_tag_convert; json_tag_versions ]
+          in
+          json_tag_modules @ top_tag_modules @ all_tag_modules
         in
         converter_modules @ rev_str
     | _ ->
@@ -986,8 +1101,9 @@ let version_module ~loc ~version_option ~path:_ modname modbody =
    - add deriving bin_io, version to list of deriving items for the type "t" in versioned modules
    - add "module Latest = Vn" to Stable module
    - if Stable.Latest.t has no parameters:
-     - if "with_top_version_tag" annotation present, add item for "bin_read_top_tagged_to_latest"
-     - if any "with_all_version_tags" annotation present, add "bin_read_all_tagged_to_latest" item
+     - if "with_versioned_json" annotation present, add "of_yojson_to_latest"
+     - if "with_top_version_tag" annotation present, add "bin_read_top_tagged_to_latest"
+     - if any "with_all_version_tags" annotation is present, add "bin_read_all_tagged_to_latest"
 *)
 
 (* parameterless_t means the type t in the module type has no parameters *)
@@ -1174,6 +1290,9 @@ let version_module_decl ~loc ~path:_ modname signature =
     let sig_attrs, { latest; sigitems; convertible; extra_sigitems; _ } =
       convert_module_decls signature.txt
     in
+    let json_version_tag =
+      List.exists sig_attrs ~f:(is_attr_sigitem_with_name with_versioned_json)
+    in
     let top_version_tag =
       List.exists sig_attrs ~f:(is_attr_sigitem_with_name with_top_version_tag)
     in
@@ -1206,6 +1325,14 @@ let version_module_decl ~loc ~path:_ modname signature =
           in
           let defs =
             if convertible then
+              let json_version_modules =
+                if json_version_tag then
+                  [ [%sigi:
+                      val of_yojson_to_latest :
+                        Yojson.Safe.t -> Latest.t Core_kernel.Or_error.t]
+                  ]
+                else []
+              in
               let top_version_modules =
                 if top_version_tag then
                   [ [%sigi:
@@ -1226,7 +1353,7 @@ let version_module_decl ~loc ~path:_ modname signature =
                   ]
                 else []
               in
-              top_version_modules @ all_version_modules
+              json_version_modules @ top_version_modules @ all_version_modules
             else []
           in
           (* insert Latest alias after latest version module decl
