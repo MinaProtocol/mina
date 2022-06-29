@@ -2037,7 +2037,7 @@ let name = "smart-contract"
 
 let constraint_constants =
   (* TODO these are dummy values *)
-  { Constraint_constants.sub_windows_per_window = 0
+  { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
   ; ledger_depth = 0
   ; work_delay = 0
   ; block_window_duration_ms = 0
