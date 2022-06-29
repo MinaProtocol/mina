@@ -3,21 +3,22 @@
  (name migrate_balances_table)
  (public_name migrate_balances_table)
  (libraries
-   ;; opam libraries
-   core
-   base
-   async_kernel
-   caqti-driver-postgresql
-   caqti
-   async
-   core_kernel
-   caqti-async
-   uri
-   async_unix
-   async.async_command
-   ;; local libraries
-   logger
- )
+  ;; opam libraries
+  core
+  base
+  async_kernel
+  caqti-driver-postgresql
+  caqti
+  async
+  core_kernel
+  caqti-async
+  uri
+  async_unix
+  async.async_command
+  ;; local libraries
+  logger)
  (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_let)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_coda ppx_version ppx_let)))

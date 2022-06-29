@@ -17,18 +17,18 @@
 
 open OUnit2
 
-let suite = "Sodium" >::: [
-    Test_random.suite;
-    Test_box.suite;
-    Test_scalar_mult.suite;
-    Test_sign.suite;
-    Test_password_hash.suite;
-    Test_secret_box.suite;
-    Test_stream.suite;
-    Test_auth.suite;
-    Test_hash.suite;
-    Test_generichash.suite;
-  ]
+let suite =
+  "Sodium"
+  >::: [ Test_random.suite
+       ; Test_box.suite
+       ; Test_scalar_mult.suite
+       ; Test_sign.suite
+       ; Test_password_hash.suite
+       ; Test_secret_box.suite
+       ; Test_stream.suite
+       ; Test_auth.suite
+       ; Test_hash.suite
+       ; Test_generichash.suite
+       ]
 
-let _ =
-  run_test_tt_main suite
+let _ = run_test_tt_main suite

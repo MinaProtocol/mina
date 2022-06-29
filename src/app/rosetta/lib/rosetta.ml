@@ -26,7 +26,7 @@ let router ~graphql_uri ~pool ~logger route body =
          | `Connect_rejected _e ->
              `App (Errors.create (`Sql "Connect rejected"))
          | `Post_connect _e ->
-             `App (Errors.create (`Sql "Post connect error")))
+             `App (Errors.create (`Sql "Post connect error")) )
   in
   try
     match route with
@@ -60,7 +60,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
               ~metadata:
                 [ ("num_pg_connections", `String (Int64.to_string num_conns))
                 ; ("num_pg_locks", `String (Int64.to_string num_locks))
-                ])
+                ] )
           pool
       in
       let pg_data_interval =
@@ -207,7 +207,7 @@ let command =
                     "Exception while handling Rosetta server request: $error. \
                      Terminating because environment variable %s is set"
                     env_var ~metadata ;
-                  ignore (exit 1)))
+                  ignore (exit 1) ) )
         (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
         (server_handler ~pool ~graphql_uri ~logger)
     in

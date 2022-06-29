@@ -4,14 +4,14 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   core_kernel
-   async_kernel
-   bignum.bigint
-   ;; local libraries
-   fold_lib
-)
+  ;; opam libraries
+  core_kernel
+  async_kernel
+  bignum.bigint
+  ;; local libraries
+  fold_lib)
  (preprocess
   (pps ppx_version ppx_jane))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Bignum's bigint re-exported as Bignum_bigint"))

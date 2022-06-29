@@ -5,9 +5,10 @@
  (modules rosetta)
  (modes native)
  (libraries lib async core_kernel base async.async_command core async_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
-)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
 
 (executable
  (package rosetta)
@@ -15,10 +16,12 @@
  (public_name rosetta-testnet)
  (modules rosetta_testnet_signatures)
  (modes native)
- (libraries lib mina_signature_kind.testnet async core_kernel base async.async_command core async_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
-)
+ (libraries lib mina_signature_kind.testnet async core_kernel base
+   async.async_command core async_kernel)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
 
 (executable
  (package rosetta)
@@ -26,7 +29,9 @@
  (public_name rosetta-mainnet)
  (modules rosetta_mainnet_signatures)
  (modes native)
- (libraries lib mina_signature_kind.mainnet async core_kernel base async.async_command core async_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
-)
+ (libraries lib mina_signature_kind.mainnet async core_kernel base
+   async.async_command core async_kernel)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

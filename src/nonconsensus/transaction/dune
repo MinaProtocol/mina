@@ -2,23 +2,18 @@
  (name mina_transaction)
  (public_name mina_transaction_nonconsensus)
  (libraries
-   ;; opam libraries
-   base
-   bin_prot.shape
-   core_kernel
-   ;; local libraries
-   base58_check
-   blake2
-   codable
-   mina_base_nonconsensus)
- (instrumentation (backend bisect_ppx))
+  ;; opam libraries
+  base
+  bin_prot.shape
+  core_kernel
+  ;; local libraries
+  base58_check
+  blake2
+  codable
+  mina_base_nonconsensus)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps
-    ppx_coda
-    ppx_compare
-    ppx_deriving_yojson
-    ppx_hash
-    ppx_optcomp
-    ppx_sexp_conv
-    ppx_version)))
+  (pps ppx_coda ppx_compare ppx_deriving_yojson ppx_hash ppx_optcomp
+    ppx_sexp_conv ppx_version)))

@@ -3,12 +3,14 @@
  (public_name ppx_version)
  (kind ppx_deriver)
  (libraries
-   ;; opam libs
-   compiler-libs.common
-   ppxlib
-   ppxlib.astlib
-   ppx_derivers
-   ppx_bin_prot
-   base base.caml
-   core_kernel)
- (preprocess (pps ppx_compare ppxlib.metaquot)))
+  ;; opam libs
+  compiler-libs.common
+  ppxlib
+  ppxlib.astlib
+  ppx_derivers
+  ppx_bin_prot
+  base
+  base.caml
+  core_kernel)
+ (preprocess
+  (pps ppx_compare ppxlib.metaquot)))

@@ -2,22 +2,28 @@
  (name composition_types)
  (public_name pickles.composition_types)
  (flags -warn-error -27)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_coda
+   ppx_jane
+   ppx_deriving.std
+   ppx_deriving_yojson
+   h_list.ppx))
  (libraries
-   ;; opam libraries
-   sexplib0
-   bin_prot.shape
-   core_kernel
-   base.caml
-   ;; local libraries
-   kimchi_backend.pasta
-   snarky.backendless
-   pickles_types
-   pickles.limb_vector
-   kimchi_backend
-   pickles_base
-   pickles.backend
-   kimchi_backend.common
- )
-)
+  ;; opam libraries
+  sexplib0
+  bin_prot.shape
+  core_kernel
+  base.caml
+  ;; local libraries
+  kimchi_backend.pasta
+  snarky.backendless
+  pickles_types
+  pickles.limb_vector
+  kimchi_backend
+  pickles_base
+  pickles.backend
+  kimchi_backend.common))

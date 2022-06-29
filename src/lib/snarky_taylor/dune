@@ -1,16 +1,17 @@
 (library
  (name snarky_taylor)
  (public_name snarky_taylor)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_compare))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_compare))
  (inline_tests)
  (libraries
-   ;; opam libraries
-   bignum.bigint
-   core_kernel
-   bignum
-   sexplib0
-   ;; local libraries
-   snarky.backendless
-   snarky_integer
-   ))
+  ;; opam libraries
+  bignum.bigint
+  core_kernel
+  bignum
+  sexplib0
+  ;; local libraries
+  snarky.backendless
+  snarky_integer))

@@ -7,8 +7,10 @@
  (modules mina)
  (modes native)
  (libraries mina_cli_entrypoint)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
 
 (executable
@@ -18,8 +20,10 @@
  (modules mina_testnet_signatures)
  (modes native)
  (libraries mina_cli_entrypoint mina_signature_kind.testnet)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
 
 (executable
@@ -29,6 +33,8 @@
  (modules mina_mainnet_signatures)
  (modes native)
  (libraries mina_cli_entrypoint mina_signature_kind.mainnet)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))

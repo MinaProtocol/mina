@@ -1,60 +1,36 @@
 (include ../../dune.linker.inc)
 
 (library
-    (name rocks)
-    (public_name rocks)
-    (no_dynlink)
-    (libraries ctypes ctypes.foreign)
-    (modules (:standard \ rocks_linker_flags_gen rocks_test))
-    (c_library_flags (:standard (:include flags.sexp) %{read:dune-linker}))
-    )
+ (name rocks)
+ (public_name rocks)
+ (no_dynlink)
+ (libraries ctypes ctypes.foreign)
+ (modules
+  (:standard \ rocks_linker_flags_gen rocks_test))
+ (c_library_flags
+  (:standard
+   (:include flags.sexp)
+   %{read:dune-linker})))
 
 (executable
  (name rocks_linker_flags_gen)
  (modules rocks_linker_flags_gen)
- (libraries dune.configurator)
- )
+ (libraries dune.configurator))
 
 ;; todo: fails with sandbox, since the generated flags are opaque to dune
+
 (rule
  (targets flags.sexp)
- (deps librocksdb_stubs.a (sandbox none))
- (action (run ./rocks_linker_flags_gen.exe)))
+ (deps
+  librocksdb_stubs.a
+  (sandbox none))
+ (action
+  (run ./rocks_linker_flags_gen.exe)))
 
 (rule
  (targets librocksdb_stubs.a)
- (deps (source_tree rocksdb))
- (action (bash "
-    NATIVE_ROCKSDB=${MINA_ROCKSDB-/usr/local/lib/librocksdb_coda.a}
-    if [ -e $NATIVE_ROCKSDB ]; then
-      cp $NATIVE_ROCKSDB librocksdb_stubs.a
-    else
-      if [ ! -d rocksdb ]; then git clone https://github.com/facebook/rocksdb -b v5.17.2 --depth=1; fi
-      pushd rocksdb
-      git fetch
-      git clean -dxf
-      git checkout v5.17.2
-
-      case $(uname) in
-      'Linux') jobs=$(nproc) ;;
-      'Darwin') jobs=2 ;;
-      *) echo I do not know how to build on $(uname) ; exit 1
-      esac
-      env ROCKSDB_DISABLE_SNAPPY=1 \\
-        ROCKSDB_DISABLE_GFLAGS=1 \\
-        ROCKSDB_DISABLE_LZ4=1 \\
-        ROCKSDB_DISABLE_ZSTD=1 \\
-        ROCKSDB_DISABLE_NUMA=1 \\
-        ROCKSDB_DISABLE_TBB=1 \\
-        ROCKSDB_DISABLE_JEMALLOC=1 \\
-        ROCKSDB_DISABLE_TCMALLOC=1 \\
-        ROCKSDB_DISABLE_BACKTRACE=1 \\
-        PORTABLE=1 \\
-        FORCE_SSE42=1 \\
-        DISABLE_WARNING_AS_ERROR=1 \\
-        make static_lib -j${jobs}
-
-      strip -S librocksdb.a
-      popd
-      cp rocksdb/librocksdb.a librocksdb_stubs.a
-    fi")))
+ (deps
+  (source_tree rocksdb))
+ (action
+  (bash
+   "\n    NATIVE_ROCKSDB=${MINA_ROCKSDB-/usr/local/lib/librocksdb_coda.a}\n    if [ -e $NATIVE_ROCKSDB ]; then\n      cp $NATIVE_ROCKSDB librocksdb_stubs.a\n    else\n      if [ ! -d rocksdb ]; then git clone https://github.com/facebook/rocksdb -b v5.17.2 --depth=1; fi\n      pushd rocksdb\n      git fetch\n      git clean -dxf\n      git checkout v5.17.2\n\n      case $(uname) in\n      'Linux') jobs=$(nproc) ;;\n      'Darwin') jobs=2 ;;\n      *) echo I do not know how to build on $(uname) ; exit 1\n      esac\n      env ROCKSDB_DISABLE_SNAPPY=1 \\\n        ROCKSDB_DISABLE_GFLAGS=1 \\\n        ROCKSDB_DISABLE_LZ4=1 \\\n        ROCKSDB_DISABLE_ZSTD=1 \\\n        ROCKSDB_DISABLE_NUMA=1 \\\n        ROCKSDB_DISABLE_TBB=1 \\\n        ROCKSDB_DISABLE_JEMALLOC=1 \\\n        ROCKSDB_DISABLE_TCMALLOC=1 \\\n        ROCKSDB_DISABLE_BACKTRACE=1 \\\n        PORTABLE=1 \\\n        FORCE_SSE42=1 \\\n        DISABLE_WARNING_AS_ERROR=1 \\\n        make static_lib -j${jobs}\n\n      strip -S librocksdb.a\n      popd\n      cp rocksdb/librocksdb.a librocksdb_stubs.a\n    fi")))

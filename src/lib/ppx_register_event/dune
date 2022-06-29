@@ -3,19 +3,20 @@
  (public_name ppx_register_event)
  (kind ppx_deriver)
  (libraries
-   ;; opam libraries
-   ocaml-compiler-libs.common
-   ppxlib.ast
-   ppx_deriving_yojson
-   core_kernel
-   ppxlib
-   compiler-libs.common
-   ocaml-migrate-parsetree
-   base
-   ;; local libraries
-   interpolator_lib
- )
- (instrumentation (backend bisect_ppx))
+  ;; opam libraries
+  ocaml-compiler-libs.common
+  ppxlib.ast
+  ppx_deriving_yojson
+  core_kernel
+  ppxlib
+  compiler-libs.common
+  ocaml-migrate-parsetree
+  base
+  ;; local libraries
+  interpolator_lib)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_version ppxlib.metaquot))
+ (preprocess
+  (pps ppx_version ppxlib.metaquot))
  (ppx_runtime_libraries structured_log_events yojson))

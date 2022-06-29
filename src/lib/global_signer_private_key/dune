@@ -5,10 +5,11 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; local libraries
-   snark_params
-   pickles)
+  ;; local libraries
+  snark_params
+  pickles)
  (preprocess
   (pps ppx_version ppx_jane ppx_compare))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "fold types"))

@@ -2,26 +2,26 @@
  (name gen_values)
  (link_flags (-linkall))
  (libraries
-   ;; opam libraries
-   async_unix
-   stdio
-   base.caml
-   ocaml-migrate-parsetree
-   core
-   async
-   ppxlib
-   ppxlib.ast
-   ppxlib.astlib
-   core_kernel
-   compiler-libs
-   async_kernel
-   ocaml-compiler-libs.common
-   ;; local libraries
-   pickles_types
-   pickles
-   crypto_params
-)
+  ;; opam libraries
+  async_unix
+  stdio
+  base.caml
+  ocaml-migrate-parsetree
+  core
+  async
+  ppxlib
+  ppxlib.ast
+  ppxlib.astlib
+  core_kernel
+  compiler-libs
+  async_kernel
+  ocaml-compiler-libs.common
+  ;; local libraries
+  pickles_types
+  pickles
+  crypto_params)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (modes native))

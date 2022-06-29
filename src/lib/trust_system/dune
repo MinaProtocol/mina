@@ -3,45 +3,45 @@
  (public_name trust_system)
  (library_flags (-linkall))
  (libraries
-   ;; opam libraries
-   sexplib0
-   core
-   ppx_inline_test.config
-   base.caml
-   async_kernel
-   core_kernel
-   bin_prot.shape
-   base
-   result
-   async
-   async_unix
-   ;; local libraries
-   mina_metrics
-   rocksdb
-   pipe_lib
-   logger
-   key_value_database
-   network_peer
-   run_in_thread
-   test_util
- )
+  ;; opam libraries
+  sexplib0
+  core
+  ppx_inline_test.config
+  base.caml
+  async_kernel
+  core_kernel
+  bin_prot.shape
+  base
+  result
+  async
+  async_unix
+  ;; local libraries
+  mina_metrics
+  rocksdb
+  pipe_lib
+  logger
+  key_value_database
+  network_peer
+  run_in_thread
+  test_util)
  (inline_tests)
  (preprocess
   (pps
-    ppx_assert
-    ppx_base
-    ppx_bin_prot
-    ppx_coda
-    ppx_custom_printf
-    ppx_deriving.std
-    ppx_deriving_yojson
-    ppx_fields_conv
-    ppx_inline_test
-    ppx_let
-    ppx_optcomp
-    ppx_register_event
-    ppx_sexp_conv
-    ppx_snarky
-    ppx_version))
- (instrumentation (backend bisect_ppx))
+   ppx_assert
+   ppx_base
+   ppx_bin_prot
+   ppx_coda
+   ppx_custom_printf
+   ppx_deriving.std
+   ppx_deriving_yojson
+   ppx_fields_conv
+   ppx_inline_test
+   ppx_let
+   ppx_optcomp
+   ppx_register_event
+   ppx_sexp_conv
+   ppx_snarky
+   ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Track how much we trust peers"))

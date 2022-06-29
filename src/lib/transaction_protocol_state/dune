@@ -4,21 +4,21 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   sexplib0
-   core_kernel
-   core
-   bin_prot.shape
-   base.caml
-   ;; local libraries
-   pickles
-   genesis_constants
-   snark_params
-   snarky.backendless
-   mina_state
-   sgn
-   )
+  ;; opam libraries
+  sexplib0
+  core_kernel
+  core
+  bin_prot.shape
+  base.caml
+  ;; local libraries
+  pickles
+  genesis_constants
+  snark_params
+  snarky.backendless
+  mina_state
+  sgn)
  (preprocess
   (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Transaction protocol state library"))

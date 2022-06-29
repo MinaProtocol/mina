@@ -1,9 +1,11 @@
 (library
-  (name mina_wire_types)
-  (public_name mina_wire_types)
-  (libraries integers)
-  (preprocess (pps ppx_version))
-  (instrumentation (backend bisect_ppx))
-  )
+ (name mina_wire_types)
+ (public_name mina_wire_types)
+ (libraries integers)
+ (preprocess
+  (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx)))
 
-(documentation (package mina_wire_types))
+(documentation
+ (package mina_wire_types))

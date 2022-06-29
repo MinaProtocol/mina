@@ -17,30 +17,30 @@
 
 open OUnit2
 
-let test_stir ctxt =
-  Sodium.Random.stir ()
+let test_stir ctxt = Sodium.Random.stir ()
 
 let test_generate ctxt =
   let rnd = Sodium.Random.Bytes.generate 42 in
-  assert_equal ~printer:string_of_int 42 (Bytes.length rnd);
+  assert_equal ~printer:string_of_int 42 (Bytes.length rnd) ;
 
   let rnd = Sodium.Random.Bigbytes.generate 42 in
   assert_equal ~printer:string_of_int 42 (Bigarray.Array1.dim rnd)
 
 let test_generate_into ctxt =
   let str = Bytes.of_string "AAAABBBB" in
-  Sodium.Random.Bytes.generate_into str;
-  assert_bool "changes contents" ((Bytes.of_string "AAAABBBB") <> str);
+  Sodium.Random.Bytes.generate_into str ;
+  assert_bool "changes contents" (Bytes.of_string "AAAABBBB" <> str) ;
 
   let arr = Bigarray.(Array1.create char c_layout 10) in
-  Bigarray.Array1.fill arr 'A';
+  Bigarray.Array1.fill arr 'A' ;
   let arr' = Bigarray.(Array1.create char c_layout 10) in
-  Bigarray.Array1.blit arr arr';
-  Sodium.Random.Bigbytes.generate_into arr';
+  Bigarray.Array1.blit arr arr' ;
+  Sodium.Random.Bigbytes.generate_into arr' ;
   assert_bool "changes contents" (arr <> arr')
 
-let suite = "Random" >::: [
-    "test_stir"          >:: test_stir;
-    "test_generate"      >:: test_generate;
-    "test_generate_into" >:: test_generate_into;
-  ]
+let suite =
+  "Random"
+  >::: [ "test_stir" >:: test_stir
+       ; "test_generate" >:: test_generate
+       ; "test_generate_into" >:: test_generate_into
+       ]

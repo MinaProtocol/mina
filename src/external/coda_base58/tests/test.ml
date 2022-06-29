@@ -1,6 +1,5 @@
 let alphabet =
-  B58.make_alphabet
-    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+  B58.make_alphabet "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 let assert_string_eq got exp =
   if got <> exp then failwith (Printf.sprintf "Error: got:%s, exp:%s" got exp)
@@ -28,9 +27,10 @@ let () =
         ^ "AeRNMCfeMztFdPXjENS9pgp" ^ "4CJ3j8M8GhWt6LBVN6e3BBM"
         ^ "gBw3yoymvnB7HyGD6qSchZi" ^ "K9jM437daWVWWVeg5UDD2Ac"
         ^ "dhMnZyxCh7jF5VRNw5GBBXB" ^ "AtHL4DcZGL1UHvzFMt2MGtW"
-        ^ "YtiLABjNiofWp92s21K2Div" ^ "CTwRXKPJHZ" ) ]
+        ^ "YtiLABjNiofWp92s21K2Div" ^ "CTwRXKPJHZ" )
+    ]
   in
-  let all_encodings = [("alphabet", alphabet)] in
+  let all_encodings = [ ("alphabet", alphabet) ] in
   List.iter
     (fun (bin, exp) ->
       List.iter

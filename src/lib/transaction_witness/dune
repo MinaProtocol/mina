@@ -3,24 +3,25 @@
  (public_name transaction_witness)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   base.caml
-   bin_prot.shape
-   sexplib0
-   core_kernel
-   core
-   ;; local libraries
-   currency
-   signature_lib
-   mina_ledger
-   mina_state
-   mina_base
-   mina_transaction
-   mina_transaction_logic
-   kimchi_backend
-   kimchi_backend.pasta
-   sgn
-   with_hash
-   )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version ppx_coda)))
+  ;; opam libraries
+  base.caml
+  bin_prot.shape
+  sexplib0
+  core_kernel
+  core
+  ;; local libraries
+  currency
+  signature_lib
+  mina_ledger
+  mina_state
+  mina_base
+  mina_transaction
+  mina_transaction_logic
+  kimchi_backend
+  kimchi_backend.pasta
+  sgn
+  with_hash)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_deriving_yojson ppx_version ppx_coda)))

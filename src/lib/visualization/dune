@@ -2,5 +2,7 @@
  (name visualization)
  (public_name visualization)
  (libraries core_kernel async_kernel ocamlgraph yojson sexplib0)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_sexp_conv)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_sexp_conv)))

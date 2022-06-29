@@ -4,33 +4,42 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   result
-   ppx_inline_test.config
-   base.caml
-   caqti
-   core_kernel
-   base
-   async_kernel
-   uri
-   sexplib0
-   integers
-   ;; local libraries
-   hex
-   random_oracle_input
-   mina_numbers
-   signature_lib
-   snark_params
-   rosetta_models
-   mina_base
-   currency
-   mina_compile_config
-   unsigned_extended
-   mina_base.import
- )
+  ;; opam libraries
+  result
+  ppx_inline_test.config
+  base.caml
+  caqti
+  core_kernel
+  base
+  async_kernel
+  uri
+  sexplib0
+  integers
+  ;; local libraries
+  hex
+  random_oracle_input
+  mina_numbers
+  signature_lib
+  snark_params
+  rosetta_models
+  mina_base
+  currency
+  mina_compile_config
+  unsigned_extended
+  mina_base.import)
  (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_assert ppx_let ppx_sexp_conv
-                  ppx_compare ppx_deriving.std ppx_custom_printf
-                  ppx_deriving_yojson ppx_inline_test))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_coda
+   ppx_version
+   ppx_assert
+   ppx_let
+   ppx_sexp_conv
+   ppx_compare
+   ppx_deriving.std
+   ppx_custom_printf
+   ppx_deriving_yojson
+   ppx_inline_test))
  (synopsis "Rosetta-related support code"))

@@ -2,13 +2,15 @@
  (name non_empty_list)
  (public_name non_empty_list)
  (libraries
-   ;; opam libraries
-   base.caml
-   core_kernel
-   async_kernel
-   sexplib0
-   bin_prot.shape
-   ;; local libraries
- )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare)))
+  ;; opam libraries
+  base.caml
+  core_kernel
+  async_kernel
+  sexplib0
+  bin_prot.shape
+  ;; local libraries
+  )
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_coda ppx_version ppx_jane ppx_compare)))

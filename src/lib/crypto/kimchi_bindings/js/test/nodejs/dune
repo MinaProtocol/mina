@@ -1,16 +1,19 @@
 (executable
  (name nodejs_test)
  (modes js)
- (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (js_of_ocaml
+  (flags +toplevel.js +dynlink.js))
  (libraries
-   bindings_js_test
-   kimchi_bindings
-   kimchi_types
-   pasta_bindings
-   js_of_ocaml
-   bindings_js
-   node_backend)
+  bindings_js_test
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  js_of_ocaml
+  bindings_js
+  node_backend)
  (link_deps ../../node_js/plonk_wasm.js ../../node_js/plonk_wasm.wasm)
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (forbidden_libraries core async)
- (preprocess (pps ppx_version js_of_ocaml-ppx)))
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))

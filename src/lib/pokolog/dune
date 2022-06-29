@@ -1,12 +1,13 @@
 (library
  (name pokolog)
  (public_name pokolog)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_compare))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_compare))
  (libraries
-   ;; opam libraries
-   core_kernel
-   bin_prot.shape
-   ;; local libraries
-   snarky.backendless
- ))
+  ;; opam libraries
+  core_kernel
+  bin_prot.shape
+  ;; local libraries
+  snarky.backendless))

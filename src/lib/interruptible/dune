@@ -4,14 +4,15 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   core_kernel
-   async_kernel
-   ppx_inline_test.config
-   ;; local libraries
-   run_in_thread
-   )
+  ;; opam libraries
+  core_kernel
+  async_kernel
+  ppx_inline_test.config
+  ;; local libraries
+  run_in_thread)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.std))
- (instrumentation (backend bisect_ppx))
- (synopsis "Interruptible monad (deferreds, that can be triggered to cancel)"))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis
+  "Interruptible monad (deferreds, that can be triggered to cancel)"))

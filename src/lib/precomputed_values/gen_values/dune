@@ -2,42 +2,42 @@
  (name gen_values)
  (flags -w -32)
  (libraries
-   ;; opam libraries
-   stdio
-   async_kernel
-   compiler-libs
-   core_kernel
-   ppxlib
-   ppxlib.ast
-   ppxlib.astlib
-   async
-   core
-   ocaml-migrate-parsetree
-   base
-   ocaml-compiler-libs.common
-   async_unix
-   base.caml
-   sexplib0
-   ;; local libraries
-   coda_runtime_config
-   consensus
-   transaction_snark
-   mina_state
-   snark_params
-   coda_genesis_proof
-   blockchain_snark
-   mina_base
-   global_signer_private_key
-   ppx_util
-   snarky.backendless
-   genesis_constants
-   pickles
-   test_genesis_ledger
-   coda_genesis_ledger
-   staged_ledger_diff
- )
+  ;; opam libraries
+  stdio
+  async_kernel
+  compiler-libs
+  core_kernel
+  ppxlib
+  ppxlib.ast
+  ppxlib.astlib
+  async
+  core
+  ocaml-migrate-parsetree
+  base
+  ocaml-compiler-libs.common
+  async_unix
+  base.caml
+  sexplib0
+  ;; local libraries
+  coda_runtime_config
+  consensus
+  transaction_snark
+  mina_state
+  snark_params
+  coda_genesis_proof
+  blockchain_snark
+  mina_base
+  global_signer_private_key
+  ppx_util
+  snarky.backendless
+  genesis_constants
+  pickles
+  test_genesis_ledger
+  coda_genesis_ledger
+  staged_ledger_diff)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot ppx_here))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (modes native))

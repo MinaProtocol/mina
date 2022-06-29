@@ -1,17 +1,18 @@
 (library
  (name random_oracle_permutation_ocaml)
  (public_name random_oracle.permutation.ocaml)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (libraries
-   ;; opam libraries
-   base
-   core_kernel
-   ;; local libraries
-   sponge
-   pickles
-   pickles.backend
-   kimchi_backend
-   kimchi_backend.pasta
-)
-(implements random_oracle.permutation))
+  ;; opam libraries
+  base
+  core_kernel
+  ;; local libraries
+  sponge
+  pickles
+  pickles.backend
+  kimchi_backend
+  kimchi_backend.pasta)
+ (implements random_oracle.permutation))

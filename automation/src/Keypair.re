@@ -49,6 +49,5 @@ let load = name => {
  */
 let upload = keypair => {
   let filename = Cache.keypairsDir ++ filename(keypair);
-  Storage.upload(~bucket=Storage.keypairBucket, ~filename)
-  |> ignore;
+  Storage.upload(~bucket=Storage.keypairBucket, ~filename) |> ignore;
 };

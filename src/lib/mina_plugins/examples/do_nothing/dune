@@ -1,13 +1,14 @@
 (library
  (name plugin_do_nothing)
  (libraries
-   ;; opam libraries
-   core_kernel
-   core
-   ;; local libraries
-   mina_plugins
-   mina_lib
-   logger
-)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_coda)))
+  ;; opam libraries
+  core_kernel
+  core
+  ;; local libraries
+  mina_plugins
+  mina_lib
+  logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_coda)))

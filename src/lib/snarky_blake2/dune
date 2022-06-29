@@ -1,16 +1,17 @@
 (library
  (name snarky_blake2)
  (public_name snarky_blake2)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_compare))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_compare))
  (inline_tests)
  (libraries
-   ;; opam libraries
-   core_kernel
-   digestif
-   integers
-   bignum.bigint
-   ;; local libraries
-   blake2
-   snarky.backendless
-))
+  ;; opam libraries
+  core_kernel
+  digestif
+  integers
+  bignum.bigint
+  ;; local libraries
+  blake2
+  snarky.backendless))

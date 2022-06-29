@@ -3,38 +3,30 @@
  (public_name signer.cli)
  (modules signer_cli)
  (libraries
-   ;;opam libraries
-   async_kernel
-   core
-   core_kernel
-   async
-   base
-   lib
-   async_unix
-   async.async_command
-   ;;local libraries
-   kimchi_backend.pasta
-   pickles
-   rosetta_coding
-   rosetta_lib
-   string_sign
-   signature_lib
-   mina_base
-   snark_params
-   pickles.backend
- )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               graphql_ppx
-               ppx_coda
-               ppx_deriving.show
-               ppx_deriving_yojson
-               ppx_base
-               ppx_let
-               ppx_version
-               ppx_compare
- ))
-)
+  ;;opam libraries
+  async_kernel
+  core
+  core_kernel
+  async
+  base
+  lib
+  async_unix
+  async.async_command
+  ;;local libraries
+  kimchi_backend.pasta
+  pickles
+  rosetta_coding
+  rosetta_lib
+  string_sign
+  signature_lib
+  mina_base
+  snark_params
+  pickles.backend)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps graphql_ppx ppx_coda ppx_deriving.show ppx_deriving_yojson ppx_base
+    ppx_let ppx_version ppx_compare)))
 
 (executable
  (package signer)
@@ -43,18 +35,11 @@
  (modes native)
  (modules signer)
  (libraries signer_cli async core_kernel base)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               graphql_ppx
-               ppx_coda
-               ppx_deriving.show
-               ppx_deriving_yojson
-               ppx_base
-               ppx_let
-               ppx_version
-               ppx_compare
- ))
-)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps graphql_ppx ppx_coda ppx_deriving.show ppx_deriving_yojson ppx_base
+    ppx_let ppx_version ppx_compare)))
 
 (executable
  (package signer)
@@ -63,18 +48,11 @@
  (modes native)
  (modules signer_testnet_signatures)
  (libraries signer_cli async core_kernel base)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               graphql_ppx
-               ppx_coda
-               ppx_deriving.show
-               ppx_deriving_yojson
-               ppx_base
-               ppx_let
-               ppx_version
-               ppx_compare
- ))
-)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps graphql_ppx ppx_coda ppx_deriving.show ppx_deriving_yojson ppx_base
+    ppx_let ppx_version ppx_compare)))
 
 (executable
  (package signer)
@@ -83,15 +61,8 @@
  (modes native)
  (modules signer_mainnet_signatures)
  (libraries signer_cli async core_kernel base)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               graphql_ppx
-               ppx_coda
-               ppx_deriving.show
-               ppx_deriving_yojson
-               ppx_base
-               ppx_let
-               ppx_version
-               ppx_compare
- ))
-)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps graphql_ppx ppx_coda ppx_deriving.show ppx_deriving_yojson ppx_base
+    ppx_let ppx_version ppx_compare)))

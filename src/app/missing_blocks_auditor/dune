@@ -3,21 +3,22 @@
  (name missing_blocks_auditor)
  (public_name missing_blocks_auditor)
  (libraries
-   ;; opam libraries
-   core
-   async_kernel
-   uri
-   caqti-driver-postgresql
-   caqti
-   async
-   core_kernel
-   caqti-async
-   base
-   async_unix
-   async.async_command
-   ;; local libraries
-   logger
- )
+  ;; opam libraries
+  core
+  async_kernel
+  uri
+  caqti-driver-postgresql
+  caqti
+  async
+  core_kernel
+  caqti-async
+  base
+  async_unix
+  async.async_command
+  ;; local libraries
+  logger)
  (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_let)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_coda ppx_version ppx_let)))

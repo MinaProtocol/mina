@@ -4,18 +4,25 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   core_kernel
-   base
-   ;; local libraries
-   snark_params
-   random_oracle
-   mina_signature_kind
-   hash_prefixes
-   pickles
-   )
+  ;; opam libraries
+  core_kernel
+  base
+  ;; local libraries
+  snark_params
+  random_oracle
+  mina_signature_kind
+  hash_prefixes
+  pickles)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_custom_printf ppx_snarky ppx_version ppx_inline_test ppx_compare ppx_deriving_yojson))
- (instrumentation (backend bisect_ppx))
- (synopsis "Values corresponding to the internal state of the Pedersen hash function on the prefixes used in Coda"))
+  (pps
+   ppx_custom_printf
+   ppx_snarky
+   ppx_version
+   ppx_inline_test
+   ppx_compare
+   ppx_deriving_yojson))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis
+  "Values corresponding to the internal state of the Pedersen hash function on the prefixes used in Coda"))

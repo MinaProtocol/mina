@@ -4,37 +4,28 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;;opam libraries
-   sexplib0
-   graphql_parser
-   integers
-   graphql
-   fieldslib
-   core_kernel
-   base.caml
-   base
-   ppx_inline_test.config
-   result
-   ;;local libraries
-   fields_derivers.json
-   fields_derivers.graphql
-   fields_derivers
-   unsigned_extended_nonconsensus
-   signature_lib_nonconsensus
-   currency_nonconsensus
-   snark_params_nonconsensus
- )
- (instrumentation (backend bisect_ppx))
+  ;;opam libraries
+  sexplib0
+  graphql_parser
+  integers
+  graphql
+  fieldslib
+  core_kernel
+  base.caml
+  base
+  ppx_inline_test.config
+  result
+  ;;local libraries
+  fields_derivers.json
+  fields_derivers.graphql
+  fields_derivers
+  unsigned_extended_nonconsensus
+  signature_lib_nonconsensus
+  currency_nonconsensus
+  snark_params_nonconsensus)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps
-   ppx_annot
-   ppx_deriving_yojson
-   ppx_optcomp
-   ppx_base
-   ppx_fields_conv
-   ppx_let
-   ppx_inline_test
-   ppx_assert
-   ppx_version
-   ppx_custom_printf)))
+  (pps ppx_annot ppx_deriving_yojson ppx_optcomp ppx_base ppx_fields_conv
+    ppx_let ppx_inline_test ppx_assert ppx_version ppx_custom_printf)))

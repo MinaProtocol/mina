@@ -12,7 +12,8 @@ let () =
         ; "-lz"
         ; "-lbz2"
         ; "-lc++abi"
-        ; "-lc++" ]
+        ; "-lc++"
+        ]
     | "Linux" ->
         [ sprintf "-L%s" cwd
         ; "-Wl,--whole-archive"
@@ -20,6 +21,7 @@ let () =
         ; "-Wl,--no-whole-archive"
         ; "-lz"
         ; "-lbz2"
-        ; "-lstdc++" ]
+        ; "-lstdc++"
+        ]
     | s ->
         failwith (sprintf "don't know how to link on %s yet" s) )

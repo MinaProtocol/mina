@@ -2,20 +2,21 @@
  (name graphql_query)
  (public_name graphql_query)
  (libraries
-   ;;opam libraries
-   base
-   core
-   yojson
-   core_kernel
-   ;;local libraries
-   graphql_lib
-   block_time
-   currency
-   signature_lib
-   mina_base
-   mina_numbers
- )
+  ;;opam libraries
+  base
+  core
+  yojson
+  core_kernel
+  ;;local libraries
+  graphql_lib
+  block_time
+  currency
+  signature_lib
+  mina_base
+  mina_numbers)
  (preprocessor_deps ../../archive_graphql_schema.json)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_base ppx_let ppx_version graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json))
-)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_base ppx_let ppx_version graphql_ppx -- -schema
+    src/app/archive/archive_graphql_schema.json)))

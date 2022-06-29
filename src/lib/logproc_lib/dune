@@ -3,33 +3,37 @@
  (public_name logproc_lib)
  (modules logproc_lib filter)
  (libraries
-   ;; opam libraries
-   core_kernel
-   yojson
-   angstrom
-   re2
-   ppx_inline_test.config
-   ;; local libraries
-   interpolator_lib
-)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
+  ;; opam libraries
+  core_kernel
+  yojson
+  angstrom
+  re2
+  ppx_inline_test.config
+  ;; local libraries
+  interpolator_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving.std))
  (inline_tests))
 
 ;; interpolator is made separately available because
 ;; filter depends on re2, which binds to C++ code,
 ;; making it unusable from js_of_ocaml
+
 (library
  (name interpolator_lib)
  (public_name interpolator_lib)
  (modules interpolator)
  (libraries
-   ;; opam libraries
-   core_kernel
-   yojson
-   angstrom
-   ;; local libraries
-)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
+  ;; opam libraries
+  core_kernel
+  yojson
+  angstrom
+  ;; local libraries
+  )
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving.std))
  (inline_tests))

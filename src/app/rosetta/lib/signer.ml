@@ -9,10 +9,10 @@ module User_command = Mina_base.User_command
 module Signed_command = Mina_base.Signed_command
 
 module Keys = struct
-  type t = {keypair: Keypair.t; public_key_hex_bytes: string}
+  type t = { keypair : Keypair.t; public_key_hex_bytes : string }
 
   let of_keypair keypair =
-    {keypair; public_key_hex_bytes= Coding.of_public_key keypair.public_key}
+    { keypair; public_key_hex_bytes = Coding.of_public_key keypair.public_key }
 
   let to_private_key_bytes t = Coding.of_scalar t.keypair.private_key
 
@@ -27,7 +27,9 @@ module Keys = struct
       |> Option.value_exn ~here:[%here] ?error:None ?message:None
     in
     let output : Bytes.t =
-      Secrets.Secret_box.decrypt ~password:(Bytes.of_string "naughty blue worm") sb
+      Secrets.Secret_box.decrypt
+        ~password:(Bytes.of_string "naughty blue worm")
+        sb
       |> Result.ok
       |> Option.value_exn ~here:[%here] ?error:None ?message:None
     in
@@ -81,8 +83,7 @@ let verify ~public_key_hex_bytes ~signed_transaction_string =
   let public_key : Public_key.t = Coding.to_public_key public_key_hex_bytes in
   let user_command_payload =
     User_command_info.Partial.to_user_command_payload
-      ~nonce:signed_transaction.nonce
-      signed_transaction.command
+      ~nonce:signed_transaction.nonce signed_transaction.command
     |> Result.ok
     |> Option.value_exn ~here:[%here] ?error:None ?message:None
   in

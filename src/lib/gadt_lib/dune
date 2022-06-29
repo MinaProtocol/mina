@@ -2,5 +2,7 @@
  (name gadt_lib)
  (public_name gadt_lib)
  (libraries core_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

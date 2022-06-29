@@ -17,14 +17,13 @@
 
 module Static = Ctypes_static
 
-module C(F: Cstubs.Types.TYPE) = struct
-
+module C (F : Cstubs.Types.TYPE) = struct
   module Generichash = struct
     type state
+
     let state : state Static.structure F.typ =
       F.structure "crypto_generichash_blake2b_state"
 
     let () = F.seal state
   end
-
 end

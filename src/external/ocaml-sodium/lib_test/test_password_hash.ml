@@ -18,11 +18,10 @@
 open OUnit2
 open Sodium
 
-let password str =
-  Password_hash.Bytes.wipe_to_password (Bytes.of_string str)
+let password str = Password_hash.Bytes.wipe_to_password (Bytes.of_string str)
 
 let test_derive_secret_box_keys ctxt =
-  let pw  = password "Correct Horse Battery Staple" in
+  let pw = password "Correct Horse Battery Staple" in
   let pw' = password "Correct Battery Horse Staple" in
   let n = Password_hash.random_salt () in
   let n' = Password_hash.random_salt () in
@@ -36,23 +35,24 @@ let test_derive_secret_box_keys ctxt =
   let sk''2 = derive_moderate pw n in
   let sk''' = derive_interactive pw' n in
   let sk'''2 = derive_interactive pw' n in
-  assert_bool "=" (Secret_box.equal_keys sk sk);
-  assert_bool "=" (Secret_box.equal_keys sk sk2);
-  assert_bool "=" (Secret_box.equal_keys sk' sk'2);
-  assert_bool "=" (Secret_box.equal_keys sk'' sk''2);
-  assert_bool "=" (Secret_box.equal_keys sk''' sk'''2);
-  assert_bool "<>" (not (Secret_box.equal_keys sk sk'));
-  assert_bool "<>" (not (Secret_box.equal_keys sk sk''));
+  assert_bool "=" (Secret_box.equal_keys sk sk) ;
+  assert_bool "=" (Secret_box.equal_keys sk sk2) ;
+  assert_bool "=" (Secret_box.equal_keys sk' sk'2) ;
+  assert_bool "=" (Secret_box.equal_keys sk'' sk''2) ;
+  assert_bool "=" (Secret_box.equal_keys sk''' sk'''2) ;
+  assert_bool "<>" (not (Secret_box.equal_keys sk sk')) ;
+  assert_bool "<>" (not (Secret_box.equal_keys sk sk'')) ;
   assert_bool "<>" (not (Secret_box.equal_keys sk sk'''))
 
 let test_password_hashing ctxt =
-  let pw  = password "Correct Horse Battery Staple" in
+  let pw = password "Correct Horse Battery Staple" in
   let pw' = password "Correct Battery Horse Staple" in
   let h = Password_hash.Bytes.hash_password Password_hash.interactive pw in
-  assert_bool "=" (Password_hash.Bytes.verify_password_hash h pw);
+  assert_bool "=" (Password_hash.Bytes.verify_password_hash h pw) ;
   assert_bool "<>" (not (Password_hash.Bytes.verify_password_hash h pw'))
 
-let suite = "Password_hash" >::: [
-    "test_password_hashing"             >:: test_password_hashing;
-    "test_derive_secret_box_keys"       >:: test_derive_secret_box_keys;
-  ]
+let suite =
+  "Password_hash"
+  >::: [ "test_password_hashing" >:: test_password_hashing
+       ; "test_derive_secret_box_keys" >:: test_derive_secret_box_keys
+       ]

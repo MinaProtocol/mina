@@ -3,15 +3,15 @@
  (public_name sync_status)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   core_kernel
-   bin_prot.shape
-   base.caml
-   sexplib0
-   base.base_internalhash_types
-   ppx_inline_test.config
-   )
+  ;; opam libraries
+  core_kernel
+  bin_prot.shape
+  base.caml
+  sexplib0
+  base.base_internalhash_types
+  ppx_inline_test.config)
  (preprocess
   (pps ppx_jane ppx_version ppx_deriving_yojson ppx_enumerate))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Different kinds of status for Coda "))

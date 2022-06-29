@@ -1,23 +1,26 @@
 (library
  (name bindings_js_test)
- (js_of_ocaml (flags +toplevel.js +dynlink.js))
+ (js_of_ocaml
+  (flags +toplevel.js +dynlink.js))
  (libraries
-   base
-   bindings_js
-   core_kernel
-   digestif.ocaml
-   digestif
-   integers_stubs_js
-   js_of_ocaml
-   kimchi_bindings
-   kimchi_types
-   pasta_bindings
-   kimchi_backend
-   kimchi_backend.common
-   kimchi_pasta
-   mina_metrics.none
-   run_in_thread.fake
-   snarky.backendless
-   snarky.intf)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version js_of_ocaml-ppx)))
+  base
+  bindings_js
+  core_kernel
+  digestif.ocaml
+  digestif
+  integers_stubs_js
+  js_of_ocaml
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  kimchi_backend
+  kimchi_backend.common
+  kimchi_pasta
+  mina_metrics.none
+  run_in_thread.fake
+  snarky.backendless
+  snarky.intf)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))

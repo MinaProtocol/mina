@@ -1,12 +1,13 @@
 (library
  (name one_hot_vector)
  (public_name pickles.one_hot_vector)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane))
  (libraries
-   ;; opam libraries
-   core_kernel
-   ;; local libraries
-   snarky.backendless
-   pickles_types
-))
+  ;; opam libraries
+  core_kernel
+  ;; local libraries
+  snarky.backendless
+  pickles_types))

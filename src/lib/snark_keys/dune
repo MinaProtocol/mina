@@ -2,22 +2,24 @@
  (name snark_keys)
  (public_name snark_keys)
  (libraries
-   ;; opam libraries 
-   core
-   async
-   core_kernel
-   ;; local libraries
-   pickles
-   blockchain_snark
-   transaction_snark
- )
+  ;; opam libraries 
+  core
+  async
+  core_kernel
+  ;; local libraries
+  pickles
+  blockchain_snark
+  transaction_snark)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson))
- (instrumentation (backend bisect_ppx)))
+ (instrumentation
+  (backend bisect_ppx)))
 
 (rule
  (targets snark_keys.ml)
  (deps
   (:< gen_keys/gen_keys.exe))
  (action
-  (with-stdout-to snark_keys.ml (run %{<}))))
+  (with-stdout-to
+   snark_keys.ml
+   (run %{<}))))

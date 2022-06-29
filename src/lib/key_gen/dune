@@ -1,8 +1,10 @@
 (library
  (name key_gen)
  (public_name key_gen)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (libraries core_kernel signature_lib base))
 
 (rule

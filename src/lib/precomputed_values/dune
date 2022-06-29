@@ -3,27 +3,27 @@
  (flags -warn-error -22)
  (public_name precomputed_values)
  (libraries
-   ;; opam libraries
-   core
-   core_kernel
-   ;; local libraries
-   genesis_constants
-   mina_state
-   coda_genesis_proof
-   crypto_params
-   mina_base
-   dummy_values
-   snarky.backendless
-   coda_genesis_ledger
-   consensus
-   coda_runtime_config
-   test_genesis_ledger
-   staged_ledger_diff
- )
+  ;; opam libraries
+  core
+  core_kernel
+  ;; local libraries
+  genesis_constants
+  mina_state
+  coda_genesis_proof
+  crypto_params
+  mina_base
+  dummy_values
+  snarky.backendless
+  coda_genesis_ledger
+  consensus
+  coda_runtime_config
+  test_genesis_ledger
+  staged_ledger_diff)
  (ppx_runtime_libraries base)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
- (instrumentation (backend bisect_ppx)))
+ (instrumentation
+  (backend bisect_ppx)))
 
 (rule
  (targets precomputed_values.ml)

@@ -4,61 +4,67 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   ppx_inline_test.config
-   async_kernel
-   base.base_internalhash_types
-   bin_prot.shape
-   async
-   sexplib0
-   bignum
-   core
-   core_kernel
-   base.md5
-   base.caml
-   async_unix
-   ;; local libraries
-   mina_base.import
-   mina_transaction
-   mina_transaction_logic
-   hash_prefix_states
-   kimchi_backend.common
-   kimchi_backend
-   with_hash
-   bitstring_lib
-   one_or_two
-   snarky_integer
-   pickles.backend
-   signature_lib
-   genesis_constants
-   currency
-   random_oracle
-   snark_params
-   transaction_protocol_state
-   mina_base
-   cache_dir
-   snarky.backendless
-   sgn
-   mina_state
-   o1trace
-   pickles
-   random_oracle_input
-   pickles_types
-   coda_genesis_ledger
-   mina_numbers
-   crypto_params
-   tuple_lib
-   consensus
-   data_hash_lib
-   quickcheck_lib
-   test_util
-   transaction_witness
-   mina_ledger
-   kimchi_backend.pasta
-   merkle_ledger
-   mina_base.util
-   )
+  ;; opam libraries
+  ppx_inline_test.config
+  async_kernel
+  base.base_internalhash_types
+  bin_prot.shape
+  async
+  sexplib0
+  bignum
+  core
+  core_kernel
+  base.md5
+  base.caml
+  async_unix
+  ;; local libraries
+  mina_base.import
+  mina_transaction
+  mina_transaction_logic
+  hash_prefix_states
+  kimchi_backend.common
+  kimchi_backend
+  with_hash
+  bitstring_lib
+  one_or_two
+  snarky_integer
+  pickles.backend
+  signature_lib
+  genesis_constants
+  currency
+  random_oracle
+  snark_params
+  transaction_protocol_state
+  mina_base
+  cache_dir
+  snarky.backendless
+  sgn
+  mina_state
+  o1trace
+  pickles
+  random_oracle_input
+  pickles_types
+  coda_genesis_ledger
+  mina_numbers
+  crypto_params
+  tuple_lib
+  consensus
+  data_hash_lib
+  quickcheck_lib
+  test_util
+  transaction_witness
+  mina_ledger
+  kimchi_backend.pasta
+  merkle_ledger
+  mina_base.util)
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
- (instrumentation (backend bisect_ppx))
+  (pps
+   ppx_snarky
+   ppx_version
+   ppx_jane
+   ppx_deriving.std
+   ppx_deriving_yojson
+   h_list.ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Transaction state transition snarking library"))

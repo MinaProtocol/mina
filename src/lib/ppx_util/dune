@@ -4,11 +4,11 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   core_kernel
-   ppxlib
- )
+  ;; opam libraries
+  core_kernel
+  ppxlib)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "PPX utilities"))

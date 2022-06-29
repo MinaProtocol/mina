@@ -4,33 +4,44 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   ppx_inline_test.config
-   base
-   bin_prot.shape
-   core_kernel
-   base.caml
-   sexplib0
-   integers
-   ;; local libraries
-   unsigned_extended
-   mina_numbers
-   pickles
-   currency
-   blake2
-   data_hash_lib
-   mina_compile_config
-   pickles.backend
-   snark_keys_header
-   kimchi_backend.pasta
-   test_util
-   )
+  ;; opam libraries
+  ppx_inline_test.config
+  base
+  bin_prot.shape
+  core_kernel
+  base.caml
+  sexplib0
+  integers
+  ;; local libraries
+  unsigned_extended
+  mina_numbers
+  pickles
+  currency
+  blake2
+  data_hash_lib
+  mina_compile_config
+  pickles.backend
+  snark_keys_header
+  kimchi_backend.pasta
+  test_util)
  (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
-               ppx_fields_conv ppx_compare ppx_deriving.ord
-               ppx_sexp_conv ppx_let ppx_custom_printf ppx_deriving_yojson
-               h_list.ppx
-               ppx_inline_test))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_coda
+   ppx_version
+   ppx_optcomp
+   ppx_bin_prot
+   ppx_compare
+   ppx_hash
+   ppx_fields_conv
+   ppx_compare
+   ppx_deriving.ord
+   ppx_sexp_conv
+   ppx_let
+   ppx_custom_printf
+   ppx_deriving_yojson
+   h_list.ppx
+   ppx_inline_test))
  (synopsis "Coda genesis constants"))

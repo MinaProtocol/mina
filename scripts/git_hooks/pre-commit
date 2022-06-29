@@ -17,7 +17,7 @@ echo "Executing Pre-Commit Hook..."
 
 DUNE_FMT_OUT="./fmt-out.txt"
 USE_NEXT_LINE=false
-# It requires "Reason" package installed in order to process all source files: opam install reason
+# It requires the "Reason" package to be installed in order to process all source files: opam install reason
 dune fmt --profile="dev" --auto-promote --display="progress" --diff-command="-" --root . >${DUNE_FMT_OUT} 2>&1
 
 if [[ -f "${DUNE_FMT_OUT}" ]]; then

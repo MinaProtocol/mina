@@ -2,21 +2,22 @@
  (name archive_cli)
  (public_name archive.cli)
  (libraries
-   ;;opam libraries
-   async_kernel
-   caqti
-   archive_lib
-   core
-   async
-   caqti-async
-   core_kernel
-   async.async_command
-   ;;local libraries
-   genesis_constants
-   coda_runtime_config
-   cli_lib
-   logger
-   block_time
- )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_coda)))
+  ;;opam libraries
+  async_kernel
+  caqti
+  archive_lib
+  core
+  async
+  caqti-async
+  core_kernel
+  async.async_command
+  ;;local libraries
+  genesis_constants
+  coda_runtime_config
+  cli_lib
+  logger
+  block_time)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_coda)))

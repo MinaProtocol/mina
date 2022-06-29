@@ -41,58 +41,90 @@ open Sodium
    public key and shared key for alice and bob. It asserts that alice and bob
    have the same shared key. *)
 let test_scalarmult ctxt =
-  assert (Scalar_mult.primitive = "curve25519");
+  assert (Scalar_mult.primitive = "curve25519") ;
 
-  let sk  = "\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"^
-            "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"^
-            "\x00\x00\x00\x00\x00\x00\x00\x00" in
-  let sk  = Scalar_mult.Bytes.to_integer (Bytes.of_string sk) in
-  let sk' = "\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"^
-            "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"^
-            "\x00\x00\x00\x00\x00\x00\x00\x00" in
+  let sk =
+    "\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    ^ "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    ^ "\x00\x00\x00\x00\x00\x00\x00\x00"
+  in
+  let sk = Scalar_mult.Bytes.to_integer (Bytes.of_string sk) in
+  let sk' =
+    "\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    ^ "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    ^ "\x00\x00\x00\x00\x00\x00\x00\x00"
+  in
   let sk' = Scalar_mult.Bytes.to_integer (Bytes.of_string sk') in
   (* Get public key for alice and bob. *)
-  let pk  = Scalar_mult.base sk  in
+  let pk = Scalar_mult.base sk in
   let pk' = Scalar_mult.base sk' in
   (* Get the shared key for alice, by using alice's private key and bob's
      public key. *)
-  let ck  = Scalar_mult.mult sk' pk in
+  let ck = Scalar_mult.mult sk' pk in
   (* Get the shared key for bob, by using bob's private key and alice's public
      key. *)
   let ck' = Scalar_mult.mult sk pk' in
   (* Computed shared key of alice and bob should be the same. *)
-  assert_equal ~printer:(fun g -> Printf.sprintf "%S"
-                         (Bytes.to_string (Scalar_mult.Bytes.of_group_elt g))) ck ck';
+  assert_equal
+    ~printer:(fun g ->
+      Printf.sprintf "%S" (Bytes.to_string (Scalar_mult.Bytes.of_group_elt g))
+      )
+    ck ck' ;
   ()
 
 let test_permute ctxt =
-  assert_raises (Size_mismatch "Scalar_mult.to_integer")
-                (fun () -> Scalar_mult.Bytes.to_integer (Bytes.of_string "\x03"));
-  assert_raises (Size_mismatch "Scalar_mult.to_group_elt")
-                (fun () -> Scalar_mult.Bytes.to_group_elt (Bytes.of_string "\x03"))
+  assert_raises (Size_mismatch "Scalar_mult.to_integer") (fun () ->
+      Scalar_mult.Bytes.to_integer (Bytes.of_string "\x03") ) ;
+  assert_raises (Size_mismatch "Scalar_mult.to_group_elt") (fun () ->
+      Scalar_mult.Bytes.to_group_elt (Bytes.of_string "\x03") )
 
 let test_equal ctxt =
-  let sk   = Bytes.of_string (String.make (Scalar_mult.integer_size) 'A') in
-  let sk'  = Bytes.of_string ("B" ^ (String.make (Scalar_mult.integer_size - 1) 'A')) in
-  let sk'' = Bytes.of_string ((String.make (Scalar_mult.integer_size - 1) 'A') ^ "B") in
-  assert_bool "=" (Scalar_mult.equal_integer (Scalar_mult.Bytes.to_integer sk)
-                                            (Scalar_mult.Bytes.to_integer sk));
-  assert_bool "<>" (not (Scalar_mult.equal_integer (Scalar_mult.Bytes.to_integer sk)
-                                                  (Scalar_mult.Bytes.to_integer sk')));
-  assert_bool "<>" (not (Scalar_mult.equal_integer (Scalar_mult.Bytes.to_integer sk)
-                                                  (Scalar_mult.Bytes.to_integer sk'')));
-  let pk   = Bytes.of_string (String.make (Scalar_mult.group_elt_size) 'A') in
-  let pk'  = Bytes.of_string ("B" ^ (String.make (Scalar_mult.group_elt_size - 1) 'A')) in
-  let pk'' = Bytes.of_string ((String.make (Scalar_mult.group_elt_size - 1) 'A') ^ "B") in
-  assert_bool "=" (Scalar_mult.equal_group_elt (Scalar_mult.Bytes.to_group_elt pk)
-                                              (Scalar_mult.Bytes.to_group_elt pk));
-  assert_bool "<>" (not (Scalar_mult.equal_group_elt (Scalar_mult.Bytes.to_group_elt pk)
-                                                    (Scalar_mult.Bytes.to_group_elt pk')));
-  assert_bool "<>" (not (Scalar_mult.equal_group_elt (Scalar_mult.Bytes.to_group_elt pk)
-                                                    (Scalar_mult.Bytes.to_group_elt pk'')))
+  let sk = Bytes.of_string (String.make Scalar_mult.integer_size 'A') in
+  let sk' =
+    Bytes.of_string ("B" ^ String.make (Scalar_mult.integer_size - 1) 'A')
+  in
+  let sk'' =
+    Bytes.of_string (String.make (Scalar_mult.integer_size - 1) 'A' ^ "B")
+  in
+  assert_bool "="
+    (Scalar_mult.equal_integer
+       (Scalar_mult.Bytes.to_integer sk)
+       (Scalar_mult.Bytes.to_integer sk) ) ;
+  assert_bool "<>"
+    (not
+       (Scalar_mult.equal_integer
+          (Scalar_mult.Bytes.to_integer sk)
+          (Scalar_mult.Bytes.to_integer sk') ) ) ;
+  assert_bool "<>"
+    (not
+       (Scalar_mult.equal_integer
+          (Scalar_mult.Bytes.to_integer sk)
+          (Scalar_mult.Bytes.to_integer sk'') ) ) ;
+  let pk = Bytes.of_string (String.make Scalar_mult.group_elt_size 'A') in
+  let pk' =
+    Bytes.of_string ("B" ^ String.make (Scalar_mult.group_elt_size - 1) 'A')
+  in
+  let pk'' =
+    Bytes.of_string (String.make (Scalar_mult.group_elt_size - 1) 'A' ^ "B")
+  in
+  assert_bool "="
+    (Scalar_mult.equal_group_elt
+       (Scalar_mult.Bytes.to_group_elt pk)
+       (Scalar_mult.Bytes.to_group_elt pk) ) ;
+  assert_bool "<>"
+    (not
+       (Scalar_mult.equal_group_elt
+          (Scalar_mult.Bytes.to_group_elt pk)
+          (Scalar_mult.Bytes.to_group_elt pk') ) ) ;
+  assert_bool "<>"
+    (not
+       (Scalar_mult.equal_group_elt
+          (Scalar_mult.Bytes.to_group_elt pk)
+          (Scalar_mult.Bytes.to_group_elt pk'') ) )
 
-let suite = "Scalarmult" >::: [
-    "test_scalarmult" >:: test_scalarmult;
-    "test_permute"    >:: test_permute;
-    "test_equal"      >:: test_equal;
-  ]
+let suite =
+  "Scalarmult"
+  >::: [ "test_scalarmult" >:: test_scalarmult
+       ; "test_permute" >:: test_permute
+       ; "test_equal" >:: test_equal
+       ]

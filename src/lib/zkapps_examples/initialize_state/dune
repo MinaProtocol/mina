@@ -1,28 +1,28 @@
 (library
  (name zkapps_initialize_state)
  (libraries
-   ;; opam libraries
-   base
-   core_kernel
-   ;; local libraries
-   crypto_params
-   currency
-   pasta_bindings
-   kimchi_backend
-   kimchi_backend_common
-   kimchi_pasta
-   mina_base
-   pickles
-   pickles.backend
-   pickles_types
-   random_oracle
-   snarky.backendless
-   snark_params
-   sgn
-   signature_lib
-   tuple_lib
-   zkapps_examples)
- (instrumentation (backend bisect_ppx))
+  ;; opam libraries
+  base
+  core_kernel
+  ;; local libraries
+  crypto_params
+  currency
+  pasta_bindings
+  kimchi_backend
+  kimchi_backend_common
+  kimchi_pasta
+  mina_base
+  pickles
+  pickles.backend
+  pickles_types
+  random_oracle
+  snarky.backendless
+  snark_params
+  sgn
+  signature_lib
+  tuple_lib
+  zkapps_examples)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
-  (pps
-   ppx_version)))
+  (pps ppx_version)))

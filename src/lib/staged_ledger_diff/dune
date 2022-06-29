@@ -2,27 +2,28 @@
  (name staged_ledger_diff)
  (public_name staged_ledger_diff)
  (libraries
-   ;; opam libraries
-   core_kernel
-   sexplib0
-   async
-   bin_prot.shape
-   base.caml
-   blake2
-   stdint
-   ppx_inline_test.config
-   splittable_random
-   stdio
-   async_unix
-   async_kernel
-   ;; local libraries
-   mina_base
-   transaction_snark_work
-   genesis_constants
-   currency
-   allocation_functor
-   consensus
-   logger
-   )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))
+  ;; opam libraries
+  core_kernel
+  sexplib0
+  async
+  bin_prot.shape
+  base.caml
+  blake2
+  stdint
+  ppx_inline_test.config
+  splittable_random
+  stdio
+  async_unix
+  async_kernel
+  ;; local libraries
+  mina_base
+  transaction_snark_work
+  genesis_constants
+  currency
+  allocation_functor
+  consensus
+  logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_coda ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))

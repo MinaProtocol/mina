@@ -3,11 +3,11 @@
 (* you can control which libraries are benchmarked using the environment variable BENCHMARK_LIBRARIES,
    which is either "all" or a comma-delimited list of libraries; if the variable is not present, or empty,
    run benchmarks for all libraries
- *)
+*)
 
 open Core_kernel
 
-let available_libraries = ["vrf_lib_tests"; "mina_base"]
+let available_libraries = [ "vrf_lib_tests"; "mina_base" ]
 
 let run_benchmarks_in_lib libname =
   Core.printf "Running inline tests in library \"%s\"\n%!" libname ;

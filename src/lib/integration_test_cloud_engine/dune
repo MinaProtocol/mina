@@ -2,58 +2,66 @@
  (public_name integration_test_cloud_engine)
  (name integration_test_cloud_engine)
  (inline_tests)
- (instrumentation (backend bisect_ppx))
+ (instrumentation
+  (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)
- (preprocess (pps
-               ppx_coda ppx_version ppx_let ppx_inline_test ppx_pipebang
-               ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving
-               ppx_sexp_conv
-               ; GraphQL with config
-               graphql_ppx --
-               -extend-query Graphql_lib.Serializing.ExtendQuery
-               -extend-mutation Graphql_lib.Serializing.ExtendQuery
-               -future-added-value false
-               ))
+ (preprocess
+  (pps
+   ppx_coda
+   ppx_version
+   ppx_let
+   ppx_inline_test
+   ppx_pipebang
+   ppx_custom_printf
+   ppx_deriving_yojson
+   lens.ppx_deriving
+   ppx_sexp_conv
+   ; GraphQL with config
+   graphql_ppx
+   --
+   -extend-query
+   Graphql_lib.Serializing.ExtendQuery
+   -extend-mutation
+   Graphql_lib.Serializing.ExtendQuery
+   -future-added-value
+   false))
  (libraries
-   ;; opam libraries
-   async_unix
-   async_kernel
-   core_kernel
-   core
-   async
-   cmdliner
-   base
-   uri
-   sexplib0
-   stdio
-   result
-   base.caml
-   ;; local libraries
-   key_gen
-   integration_test_lib
-   graphql_lib
-   coda_runtime_config
-   mina_base
-   genesis_constants
-   genesis_ledger_helper
-   logger
-   mina_base_import
-   signature_lib
-   currency
-   mina_version
-   timeout_lib
-   mina_numbers
-   mina_transaction
-   file_system
-   pickles
-   pickles_types
-   backend
-   kimchi_pasta
-   with_hash
-   data_hash_lib
-   generated_graphql_queries
-   integers
-   mina_graphql
-
-   )
-)
+  ;; opam libraries
+  async_unix
+  async_kernel
+  core_kernel
+  core
+  async
+  cmdliner
+  base
+  uri
+  sexplib0
+  stdio
+  result
+  base.caml
+  ;; local libraries
+  key_gen
+  integration_test_lib
+  graphql_lib
+  coda_runtime_config
+  mina_base
+  genesis_constants
+  genesis_ledger_helper
+  logger
+  mina_base_import
+  signature_lib
+  currency
+  mina_version
+  timeout_lib
+  mina_numbers
+  mina_transaction
+  file_system
+  pickles
+  pickles_types
+  backend
+  kimchi_pasta
+  with_hash
+  data_hash_lib
+  generated_graphql_queries
+  integers
+  mina_graphql))

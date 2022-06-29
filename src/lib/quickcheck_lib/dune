@@ -2,15 +2,16 @@
  (name quickcheck_lib)
  (public_name quickcheck_lib)
  (libraries
-   ;; opam libraries
-   core_kernel
-   base
-   ppx_inline_test.config
-   ;; local libraries
-   currency
-   rose_tree
-)
+  ;; opam libraries
+  core_kernel
+  base
+  ppx_inline_test.config
+  ;; local libraries
+  currency
+  rose_tree)
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_let ppx_inline_test ppx_custom_printf)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_let ppx_inline_test ppx_custom_printf)))

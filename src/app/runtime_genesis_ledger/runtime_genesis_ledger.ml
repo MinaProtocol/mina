@@ -29,8 +29,8 @@ let () =
     (Command.async
        ~summary:
          "Generate the genesis ledger and genesis proof for a given \
-          configuration file, or for the compile-time configuration if none \
-          is provided"
+          configuration file, or for the compile-time configuration if none is \
+          provided"
        Command.(
          let open Let_syntax in
          let open Command.Param in
@@ -43,12 +43,12 @@ let () =
                (sprintf
                   "Dir where the genesis ledger and genesis proof is to be \
                    saved (default: %s)"
-                  Cache_dir.autogen_path)
+                  Cache_dir.autogen_path )
              (optional string)
          and proof_level =
            flag "--proof-level"
              (optional
-                (Arg_type.create Genesis_constants.Proof_level.of_string))
+                (Arg_type.create Genesis_constants.Proof_level.of_string) )
              ~doc:"full|check|none"
          in
-         main ~config_file ~genesis_dir ~proof_level))
+         main ~config_file ~genesis_dir ~proof_level) )

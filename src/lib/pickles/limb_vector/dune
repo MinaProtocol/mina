@@ -2,19 +2,20 @@
  (name limb_vector)
  (public_name pickles.limb_vector)
  (flags -warn-error -27)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (libraries
-   ;; opam libraries
-   bin_prot.shape
-   ppx_inline_test.config
-   sexplib0
-   core_kernel
-   base.caml
-   result
-   ;; local libraries
-   snarky.backendless
-   pickles.backend
-   pickles_types
-   kimchi_backend.pasta
-))
+  ;; opam libraries
+  bin_prot.shape
+  ppx_inline_test.config
+  sexplib0
+  core_kernel
+  base.caml
+  result
+  ;; local libraries
+  snarky.backendless
+  pickles.backend
+  pickles_types
+  kimchi_backend.pasta))

@@ -2,7 +2,7 @@
  (public_name mina_base_nonconsensus.import)
  (name mina_base_import)
  (libraries signature_lib_nonconsensus)
- (preprocess (pps
-    ppx_version
-    ppx_optcomp))
- (instrumentation (backend bisect_ppx)))
+ (preprocess
+  (pps ppx_version ppx_optcomp))
+ (instrumentation
+  (backend bisect_ppx)))

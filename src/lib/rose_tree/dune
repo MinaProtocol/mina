@@ -2,12 +2,13 @@
  (name rose_tree)
  (public_name rose_tree)
  (libraries
-   ;; opam libraries
-   core_kernel
-   async_kernel
-   result
-   ;; local libraries
-   non_empty_list
-)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson)))
+  ;; opam libraries
+  core_kernel
+  async_kernel
+  result
+  ;; local libraries
+  non_empty_list)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving_yojson)))

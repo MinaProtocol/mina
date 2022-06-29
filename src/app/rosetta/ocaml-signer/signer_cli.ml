@@ -9,20 +9,17 @@ open Lib
 let sign_command =
   let open Command.Let_syntax in
   let%map_open unsigned_transaction =
-    flag "--unsigned-transaction" ~aliases:["unsigned-transaction"]
-      ~doc:"Unsigned transaction string returned from Rosetta"
-      (required string)
+    flag "--unsigned-transaction" ~aliases:[ "unsigned-transaction" ]
+      ~doc:"Unsigned transaction string returned from Rosetta" (required string)
   and private_key =
-    flag "--private-key" ~aliases:["private-key"] ~doc:"Private key hex bytes"
+    flag "--private-key" ~aliases:[ "private-key" ] ~doc:"Private key hex bytes"
       (required string)
   in
   let open Deferred.Let_syntax in
   fun () ->
     let keys =
-      try
-        Signer.Keys.of_private_key_bytes private_key
-      with
-      | _ -> Signer.Keys.of_private_key_box private_key
+      try Signer.Keys.of_private_key_bytes private_key
+      with _ -> Signer.Keys.of_private_key_box private_key
     in
     match
       Signer.sign ~keys ~unsigned_transaction_string:unsigned_transaction
@@ -36,22 +33,20 @@ let sign_command =
 let verify_message_command =
   let open Command.Let_syntax in
   let%map_open signature =
-    flag "--signature"
-      ~doc:"Rosetta signature" (required string)
+    flag "--signature" ~doc:"Rosetta signature" (required string)
   and message =
-    flag "--message"
-      ~doc:"Message that was signed" (required string)
+    flag "--message" ~doc:"Message that was signed" (required string)
   and public_key =
-    flag "--public-key" ~aliases:["public-key"] ~doc:"Public key hex bytes"
+    flag "--public-key" ~aliases:[ "public-key" ] ~doc:"Public key hex bytes"
       (required string)
   in
   let open Deferred.Let_syntax in
   fun () ->
-    let signature = Option.value_exn (Mina_base.Signature.Raw.decode signature) in
+    let signature =
+      Option.value_exn (Mina_base.Signature.Raw.decode signature)
+    in
     let pk = Rosetta_coding.Coding.to_public_key public_key in
-    match
-      String_sign.verify signature pk message
-    with
+    match String_sign.verify signature pk message with
     | true ->
         return ()
     | false ->
@@ -61,10 +56,10 @@ let verify_message_command =
 let verify_command =
   let open Command.Let_syntax in
   let%map_open signed_transaction =
-    flag "--signed-transaction" ~aliases:["signed-transaction"]
+    flag "--signed-transaction" ~aliases:[ "signed-transaction" ]
       ~doc:"Signed transaction string returned from Rosetta" (required string)
   and public_key =
-    flag "--public-key" ~aliases:["public-key"] ~doc:"Public key hex bytes"
+    flag "--public-key" ~aliases:[ "public-key" ] ~doc:"Public key hex bytes"
       (required string)
   in
   let open Deferred.Let_syntax in
@@ -85,27 +80,22 @@ let verify_command =
 let derive_command =
   let open Command.Let_syntax in
   let%map_open private_key =
-    flag "--private-key" ~aliases:["private-key"] ~doc:"Private key hex bytes"
+    flag "--private-key" ~aliases:[ "private-key" ] ~doc:"Private key hex bytes"
       (required string)
   in
   let open Deferred.Let_syntax in
   fun () ->
     let keys =
-      try
-        Signer.Keys.of_private_key_bytes private_key
-      with
-      | _ -> Signer.Keys.of_private_key_box private_key
+      try Signer.Keys.of_private_key_bytes private_key
+      with _ -> Signer.Keys.of_private_key_box private_key
     in
-    printf "Private Key:\n";
+    printf "Private Key:\n" ;
+    printf "%s\n" Signer.Keys.(to_private_key_bytes keys) ;
+    printf "Public Key:\n" ;
+    printf "%s\n" keys.public_key_hex_bytes ;
     printf "%s\n"
-      Signer.Keys.(to_private_key_bytes keys);
-    printf "Public Key:\n";
-    printf "%s\n"
-      keys.public_key_hex_bytes ;
-    printf "%s\n"
-      (keys.keypair.public_key
-        |> Public_key.compress
-        |> Public_key.Compressed.to_base58_check) ;
+      ( keys.keypair.public_key |> Public_key.compress
+      |> Public_key.Compressed.to_base58_check ) ;
     return ()
 
 let generate_command =
@@ -119,20 +109,19 @@ let generate_command =
 let convert_signature_command =
   let open Command.Let_syntax in
   let%map_open field_str =
-      flag "--field" ~doc:"Field string in decimal (from client-sdk)"
-        (required string)
+    flag "--field" ~doc:"Field string in decimal (from client-sdk)"
+      (required string)
   and scalar_str =
-      flag "--scalar" ~doc:"Scalar string in decimal (from client-sdk)"
-        (required string)
+    flag "--scalar" ~doc:"Scalar string in decimal (from client-sdk)"
+      (required string)
   in
   fun () ->
-  let open Deferred.Let_syntax in
-  let open Snark_params.Tick in
-  let field = Field.of_string field_str
-  and scalar = Inner_curve.Scalar.of_string scalar_str
-  in
-  printf "%s\n" (Mina_base.Signature.Raw.encode (field, scalar));
-  return ()
+    let open Deferred.Let_syntax in
+    let open Snark_params.Tick in
+    let field = Field.of_string field_str
+    and scalar = Inner_curve.Scalar.of_string scalar_str in
+    printf "%s\n" (Mina_base.Signature.Raw.encode (field, scalar)) ;
+    return ()
 
 let commands =
   [ ("sign", Command.async ~summary:"Sign an unsigned transaction" sign_command)
@@ -148,7 +137,12 @@ let commands =
   ; ( "generate-private-key"
     , Command.async ~summary:"Generate a new private key" generate_command )
   ; ( "convert-signature"
-    , Command.async ~summary:"Convert signature from field,scalar decimal strings into Rosetta Signature" convert_signature_command )
+    , Command.async
+        ~summary:
+          "Convert signature from field,scalar decimal strings into Rosetta \
+           Signature"
+        convert_signature_command )
   ; ( "verify-message"
-    , Command.async ~summary:"Verify a string message was signed properly" verify_message_command )
-    ]
+    , Command.async ~summary:"Verify a string message was signed properly"
+        verify_message_command )
+  ]

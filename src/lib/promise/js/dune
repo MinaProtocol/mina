@@ -1,8 +1,11 @@
 (library
  (public_name promise.js)
  (name promise_js)
- (js_of_ocaml (javascript_files promise.js))
+ (js_of_ocaml
+  (javascript_files promise.js))
  (libraries base async_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
  (implements promise))

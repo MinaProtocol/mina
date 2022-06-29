@@ -1,12 +1,14 @@
 (library
  (name snarky_group_map)
  (public_name snarky_group_map)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_compare))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_compare))
  (inline_tests)
  (libraries
-   ;; opam libraries
-   core_kernel
-   ;; local libraries
-   snarky.backendless
-   group_map))
+  ;; opam libraries
+  core_kernel
+  ;; local libraries
+  snarky.backendless
+  group_map))

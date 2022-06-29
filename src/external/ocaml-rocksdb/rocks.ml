@@ -46,11 +46,7 @@ module WriteBatch = struct
   let put_string ?(key_pos = 0) ?key_len ?(value_pos = 0) ?value_len batch key
       value =
     let key_len =
-      match key_len with
-      | None ->
-          String.length key - key_pos
-      | Some len ->
-          len
+      match key_len with None -> String.length key - key_pos | Some len -> len
     in
     let value_len =
       match value_len with
@@ -131,28 +127,19 @@ module rec Iterator : (Rocks_intf.ITERATOR with type db := RocksDb.t) = struct
       let t = create_no_gc db opts in
       Gc.finalise destroy t ; t
     in
-    match opts with
-    | None ->
-        ReadOptions.with_t inner
-    | Some opts ->
-        inner opts
+    match opts with None -> ReadOptions.with_t inner | Some opts -> inner opts
 
   let with_t ?opts db ~f =
     let inner opts =
       let t = create_no_gc db opts in
       finalize (fun () -> f t) (fun () -> destroy t)
     in
-    match opts with
-    | None ->
-        ReadOptions.with_t inner
-    | Some opts ->
-        inner opts
+    match opts with None -> ReadOptions.with_t inner | Some opts -> inner opts
 
   let is_valid =
     foreign "rocksdb_iter_valid" (t @-> returning Views.bool_to_uchar)
 
-  let seek_to_first =
-    foreign "rocksdb_iter_seek_to_first" (t @-> returning void)
+  let seek_to_first = foreign "rocksdb_iter_seek_to_first" (t @-> returning void)
 
   let seek_to_last = foreign "rocksdb_iter_seek_to_last" (t @-> returning void)
 
@@ -231,9 +218,8 @@ module rec Iterator : (Rocks_intf.ITERATOR with type db := RocksDb.t) = struct
 end
 
 and Transaction :
-  (Rocks_intf.TRANSACTION
-  with type db := RocksDb.t
-   and type iter := Iterator.t) = struct
+  (Rocks_intf.TRANSACTION with type db := RocksDb.t and type iter := Iterator.t) =
+struct
   module ReadOptions = Rocks_options.ReadOptions
   module WriteOptions = Rocks_options.WriteOptions
   module TransactionOptions = Rocks_options.TransactionOptions
@@ -311,16 +297,12 @@ and Transaction :
          (bigarray_start array1 key +@ key_pos)
          key_len
          (bigarray_start array1 value +@ value_pos)
-         value_len)
+         value_len )
 
   let put_string ?(key_pos = 0) ?key_len ?(value_pos = 0) ?value_len ?opts:_ t
       key value =
     let key_len =
-      match key_len with
-      | None ->
-          String.length key - key_pos
-      | Some len ->
-          len
+      match key_len with None -> String.length key - key_pos | Some len -> len
     in
     let value_len =
       match value_len with
@@ -334,7 +316,7 @@ and Transaction :
          (ocaml_string_start key +@ key_pos)
          key_len
          (ocaml_string_start value +@ value_pos)
-         value_len)
+         value_len )
 
   let delete_raw =
     foreign "rocksdb_transaction_delete"
@@ -382,11 +364,7 @@ and Transaction :
         Gc.finalise_last (fun () -> free (to_voidp res)) res' ;
         Some res'
     in
-    match opts with
-    | Some opts ->
-        inner opts
-    | None ->
-        ReadOptions.with_t inner
+    match opts with Some opts -> inner opts | None -> ReadOptions.with_t inner
 
   let get_string ?(pos = 0) ?len ?opts t key =
     let len =
@@ -404,11 +382,7 @@ and Transaction :
         Gc.finalise_last (fun () -> free (to_voidp res)) res' ;
         Some res'
     in
-    match opts with
-    | Some opts ->
-        inner opts
-    | None ->
-        ReadOptions.with_t inner
+    match opts with Some opts -> inner opts | None -> ReadOptions.with_t inner
 
   let get_snapshot =
     foreign "rocksdb_transaction_get_snapshot" (t @-> returning Snapshot.t)
@@ -431,22 +405,14 @@ and Transaction :
       Gc.finalise destroy_iterator t ;
       t
     in
-    match opts with
-    | None ->
-        ReadOptions.with_t inner
-    | Some opts ->
-        inner opts
+    match opts with None -> ReadOptions.with_t inner | Some opts -> inner opts
 
   let with_iterator ?opts txn ~f =
     let inner opts =
       let t = create_iterator_no_gc txn opts in
       finalize (fun () -> f t) (fun () -> destroy_iterator t)
     in
-    match opts with
-    | None ->
-        ReadOptions.with_t inner
-    | Some opts ->
-        inner opts
+    match opts with None -> ReadOptions.with_t inner | Some opts -> inner opts
 end
 
 and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
@@ -507,8 +473,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
     | None ->
         Options.with_t (fun options ->
             with_err_pointer
-              (open_db_for_read_only_raw options name error_if_log_file_exists)
-        )
+              (open_db_for_read_only_raw options name error_if_log_file_exists) )
     | Some opts ->
         with_err_pointer
           (open_db_for_read_only_raw opts name error_if_log_file_exists)
@@ -548,7 +513,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
            (bigarray_start array1 key +@ key_pos)
            key_len
            (bigarray_start array1 value +@ value_pos)
-           value_len)
+           value_len )
     in
     match opts with
     | None ->
@@ -556,14 +521,10 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
     | Some opts ->
         inner opts
 
-  let put_string ?(key_pos = 0) ?key_len ?(value_pos = 0) ?value_len ?opts t
-      key value =
+  let put_string ?(key_pos = 0) ?key_len ?(value_pos = 0) ?value_len ?opts t key
+      value =
     let key_len =
-      match key_len with
-      | None ->
-          String.length key - key_pos
-      | Some len ->
-          len
+      match key_len with None -> String.length key - key_pos | Some len -> len
     in
     let value_len =
       match value_len with
@@ -578,7 +539,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
            (ocaml_string_start key +@ key_pos)
            key_len
            (ocaml_string_start value +@ value_pos)
-           value_len)
+           value_len )
     in
     match opts with
     | None ->
@@ -662,11 +623,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
         Gc.finalise_last (fun () -> free (to_voidp res)) res' ;
         Some res'
     in
-    match opts with
-    | Some opts ->
-        inner opts
-    | None ->
-        ReadOptions.with_t inner
+    match opts with Some opts -> inner opts | None -> ReadOptions.with_t inner
 
   let get_string ?(pos = 0) ?len ?opts t key =
     let len =
@@ -684,17 +641,11 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
         Gc.finalise_last (fun () -> free (to_voidp res)) res' ;
         Some res'
     in
-    match opts with
-    | Some opts ->
-        inner opts
-    | None ->
-        ReadOptions.with_t inner
+    match opts with Some opts -> inner opts | None -> ReadOptions.with_t inner
 
   let multi_get_raw =
     foreign "rocksdb_multi_get"
-      ( t
-      @-> ReadOptions.t
-      @-> Views.int_to_size_t
+      ( t @-> ReadOptions.t @-> Views.int_to_size_t
       @-> ptr (ptr char)
       @-> ptr size_t
       @-> ptr (ptr char)
@@ -704,7 +655,9 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
 
   let multi_get ?opts t keys =
     let inner opts =
-      let cast_array_ptr typ arr = arr |> bigarray_start array1 |> to_voidp |> from_voidp typ in
+      let cast_array_ptr typ arr =
+        arr |> bigarray_start array1 |> to_voidp |> from_voidp typ
+      in
       let count = List.length keys in
       (* could optimize this into a single allocation *)
       let inputs = Bigarray.(Array1.create Nativeint C_layout) count in
@@ -712,9 +665,12 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
       let outputs = Bigarray.(Array1.create Nativeint C_layout) count in
       let output_lengths = Bigarray.(Array1.create Nativeint C_layout) count in
       let errors = Bigarray.(Array1.create Nativeint C_layout) count in
-      keys |> List.iteri (fun i key ->
-        Bigarray.Array1.unsafe_set inputs i (bigarray_start array1 key |> to_voidp |> raw_address_of_ptr) ;
-        Bigarray.Array1.unsafe_set input_lengths i (Bigarray.Array1.dim key |> Nativeint.of_int) ) ;
+      keys
+      |> List.iteri (fun i key ->
+             Bigarray.Array1.unsafe_set inputs i
+               (bigarray_start array1 key |> to_voidp |> raw_address_of_ptr) ;
+             Bigarray.Array1.unsafe_set input_lengths i
+               (Bigarray.Array1.dim key |> Nativeint.of_int) ) ;
       multi_get_raw t opts count
         (cast_array_ptr (ptr char) inputs)
         (cast_array_ptr size_t input_lengths)
@@ -725,27 +681,31 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
       let results = ref [] in
       for i = count - 1 downto 0 do
         let res =
-          let error_ptr = Bigarray.Array1.unsafe_get errors i |> ptr_of_raw_address in
+          let error_ptr =
+            Bigarray.Array1.unsafe_get errors i |> ptr_of_raw_address
+          in
           if is_null error_ptr then (
-            let output_length = Nativeint.to_int (Bigarray.Array1.unsafe_get output_lengths i) in
-            let output_ptr = Bigarray.Array1.unsafe_get outputs i |> ptr_of_raw_address in
-            if output_ptr = null then None else (
-              let output = bigarray_of_ptr array1 output_length Bigarray.char (from_voidp char output_ptr) in
+            let output_length =
+              Nativeint.to_int (Bigarray.Array1.unsafe_get output_lengths i)
+            in
+            let output_ptr =
+              Bigarray.Array1.unsafe_get outputs i |> ptr_of_raw_address
+            in
+            if output_ptr = null then None
+            else
+              let output =
+                bigarray_of_ptr array1 output_length Bigarray.char
+                  (from_voidp char output_ptr)
+              in
               Gc.finalise_last (fun () -> free output_ptr) output ;
-              Some output ))
-          else (
-            free error_ptr ;
-            None )
+              Some output )
+          else (free error_ptr ; None)
         in
         results := res :: !results
       done ;
       !results
     in
-    match opts with
-    | Some opts ->
-        inner opts
-    | None ->
-        ReadOptions.with_t inner
+    match opts with Some opts -> inner opts | None -> ReadOptions.with_t inner
 
   let flush_raw =
     foreign "rocksdb_flush" (t @-> FlushOptions.t @-> returning_error void)
@@ -797,8 +757,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
         @-> ptr string_opt @-> returning void )
     in
     CheckpointObject.with_t db (fun checkpoint_object ->
-        with_err_pointer
-          (checkpoint_create_raw checkpoint_object dir l) )
+        with_err_pointer (checkpoint_create_raw checkpoint_object dir l) )
 
   let property_value db name =
     (* Ugly hack. Is there a better way to retrieve string from C? *)

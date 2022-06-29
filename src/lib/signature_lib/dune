@@ -4,43 +4,54 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   ;; opam libraries
-   bignum.bigint
-   ppx_inline_test.config
-   base
-   sexplib0
-   yojson
-   core_kernel
-   bin_prot.shape
-   base.caml
-   result
-   ;; local libraries
-   crypto_params
-   kimchi_backend.pasta
-   random_oracle_input
-   bitstring_lib
-   codable
-   snark_params
-   mina_signature_kind
-   blake2
-   hash_prefix_states
-   non_zero_curve_point
-   random_oracle
-   snarky.backendless
-   bignum_bigint
-   base58_check
-   snarky_curves
-   pickles
-   fold_lib
-   pickles.backend
-   kimchi_backend
-   h_list
-   test_util
- )
+  ;; opam libraries
+  bignum.bigint
+  ppx_inline_test.config
+  base
+  sexplib0
+  yojson
+  core_kernel
+  bin_prot.shape
+  base.caml
+  result
+  ;; local libraries
+  crypto_params
+  kimchi_backend.pasta
+  random_oracle_input
+  bitstring_lib
+  codable
+  snark_params
+  mina_signature_kind
+  blake2
+  hash_prefix_states
+  non_zero_curve_point
+  random_oracle
+  snarky.backendless
+  bignum_bigint
+  base58_check
+  snarky_curves
+  pickles
+  fold_lib
+  pickles.backend
+  kimchi_backend
+  h_list
+  test_util)
  (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps
-               ppx_snarky ppx_coda ppx_version ppx_custom_printf ppx_optcomp ppx_sexp_conv
-               ppx_bin_prot ppx_hash ppx_compare ppx_compare ppx_deriving_yojson
-               ppx_inline_test ppx_let))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_snarky
+   ppx_coda
+   ppx_version
+   ppx_custom_printf
+   ppx_optcomp
+   ppx_sexp_conv
+   ppx_bin_prot
+   ppx_hash
+   ppx_compare
+   ppx_compare
+   ppx_deriving_yojson
+   ppx_inline_test
+   ppx_let))
  (synopsis "Schnorr signatures using the tick and tock curves"))

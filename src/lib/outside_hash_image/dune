@@ -3,5 +3,7 @@
  (public_name outside_hash_image)
  (libraries snark_params)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_version))
- (instrumentation (backend bisect_ppx)))
+ (preprocess
+  (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx)))

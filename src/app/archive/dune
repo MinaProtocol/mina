@@ -5,8 +5,10 @@
  (modules archive)
  (modes native)
  (libraries archive_cli async core_kernel base)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
 
 (executable
  (package archive)
@@ -15,8 +17,10 @@
  (modules archive_testnet_signatures)
  (modes native)
  (libraries archive_cli mina_signature_kind.testnet async core_kernel base)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
 
 (executable
  (package archive)
@@ -25,5 +29,7 @@
  (modules archive_mainnet_signatures)
  (modes native)
  (libraries archive_cli mina_signature_kind.mainnet async core_kernel base)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
