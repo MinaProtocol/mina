@@ -824,6 +824,23 @@ let has_locked_tokens ~global_slot (account : t) =
       in
       Balance.(curr_min_balance > zero)
 
+let balance_at_slot ~global_slot (account : t) =
+  match account.timing with
+  | Untimed ->
+      account.balance
+  | Timed
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      } ->
+      Balance.sub_amount account.balance
+        (Balance.to_amount
+           (min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
+              ~vesting_period ~vesting_increment ~initial_minimum_balance ) )
+      |> Option.value_exn
+
 let gen =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in

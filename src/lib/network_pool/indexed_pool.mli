@@ -28,7 +28,6 @@ module Command_error : sig
         | `Timestamp_predicate of string ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Mina_base.Token_id.t
-    | Verification_failed
   [@@deriving sexp, to_yojson]
 
   val grounds_for_diff_rejection : t -> bool
@@ -83,6 +82,9 @@ val size : t -> int
 (* The least fee per weight unit of all transactions in the transaction pool *)
 val min_fee : t -> Currency.Fee_rate.t option
 
+val transactions :
+  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
+
 (** Remove the command from the pool with the lowest fee per wu,
     along with any others from the same account with higher nonces. *)
 val remove_lowest_fee :
@@ -96,50 +98,6 @@ val remove_expired :
 val get_highest_fee :
   t -> Transaction_hash.User_command_with_valid_signature.t option
 
-(** Call this when a transaction is added to the best tip or when generating a
-    sequence of transactions to apply. This will drop any transactions at that
-    nonce from the pool. May also drop queued commands for that sender if there
-    was a different queued transaction from that sender at that nonce, and the
-    committed one consumes more currency than the queued one. In that case it'll
-    return the dropped ones in the sequence, including the one with the same
-    nonce as the committed one if it's different.
-*)
-val handle_committed_txn :
-     t
-  -> Transaction_hash.User_command_with_valid_signature.t
-  -> fee_payer_balance:Currency.Amount.t
-  -> fee_payer_nonce:Mina_base.Account.Nonce.t
-  -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
-     , [ `Queued_txns_by_sender of
-         string
-         * Transaction_hash.User_command_with_valid_signature.t Sequence.t ] )
-     Result.t
-
-(** Add a command to the pool. Pass the current nonce for the account and
-    its current balance. Throws if the contents of the pool before adding the
-    new command are invalid given the supplied current nonce and balance - you
-    are required to keep the pool in sync with the ledger you are applying
-    transactions against.
-*)
-val add_from_gossip_exn_async :
-     config:Config.t
-  -> sender_local_state:Sender_local_state.t
-  -> verify:
-       (   User_command.Verifiable.t
-        -> User_command.Valid.t option Async.Deferred.t )
-  -> [ `Unchecked of Transaction_hash.User_command.t * User_command.Verifiable.t
-     | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
-  -> Account_nonce.t
-  -> Currency.Amount.t
-  -> ( ( Transaction_hash.User_command_with_valid_signature.t
-       * Transaction_hash.User_command_with_valid_signature.t list )
-       * Sender_local_state.t
-       * Update.t
-     , Command_error.t )
-     Async.Deferred.Result.t
-(** Returns the commands dropped as a result of adding the command, which will
-    be empty unless we're replacing one. *)
-
 (** Add a command to the pool. Pass the current nonce for the account and
     its current balance. Throws if the contents of the pool before adding the
     new command are invalid given the supplied current nonce and balance - you
@@ -148,9 +106,7 @@ val add_from_gossip_exn_async :
 *)
 val add_from_gossip_exn :
      t
-  -> verify:(User_command.Verifiable.t -> User_command.Valid.t option)
-  -> [ `Unchecked of Transaction_hash.User_command.t * User_command.Verifiable.t
-     | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
+  -> Transaction_hash.User_command_with_valid_signature.t
   -> Account_nonce.t
   -> Currency.Amount.t
   -> ( Transaction_hash.User_command_with_valid_signature.t
@@ -172,6 +128,9 @@ val add_from_backtrack :
 (** Check whether a command is in the pool *)
 val member : t -> Transaction_hash.User_command.t -> bool
 
+(** Check whether the pool has any commands for a given fee payer *)
+val has_commands_for_fee_payer : t -> Account_id.t -> bool
+
 (** Get all the user commands sent by a user with a particular account *)
 val all_from_account :
   t -> Account_id.t -> Transaction_hash.User_command_with_valid_signature.t list
@@ -189,6 +148,7 @@ val find_by_hash :
 *)
 val revalidate :
      t
+  -> [ `Entire_pool | `Subset of Account_id.Set.t ]
   -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t

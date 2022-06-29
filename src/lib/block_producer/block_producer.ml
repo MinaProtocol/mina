@@ -658,7 +658,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                   @@ Mina_block.header (With_hash.data previous_transition) )
             in
             let transactions =
-              Network_pool.Transaction_pool.Resource_pool.transactions ~logger
+              Network_pool.Transaction_pool.Resource_pool.transactions
                 transaction_resource_pool
               |> Sequence.map
                    ~f:Transaction_hash.User_command_with_valid_signature.data
