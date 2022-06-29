@@ -279,6 +279,19 @@
           ];
         };
 
+        devShells.rust-wasm-impure-with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-rust-wasm-shell";
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.kimchi-rust-wasm
+            pkgs.kimchi-rust.cargo
+            pkgs.wasm-pack
+            pkgs.wasm-bindgen-cli
+            pkgs.rust-analyzer
+            pkgs.rustfmt
+          ];
+          MARLIN_PLONK_STUBS = "n";
+        });
+
         inherit checks;
       });
 }
