@@ -2158,7 +2158,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let provers = provers |> to_js_provers |> Array.of_list |> Js.array in
   let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
     let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
-    Proof.verify_promise [ (public_input, proof) ] |> Promise_js_helpers.to_js
+    Proof.verify_promise [ (public_input, proof) ]
+    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
   in
   object%js
     val provers = Obj.magic provers
@@ -2186,9 +2187,42 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
           (Pickles.Verification_key.index key)
   end
 
-let proof_to_string (proof : proof) =
-  proof |> Pickles.Side_loaded.Proof.of_proof
-  |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
+module Proof0 = Pickles.Proof.Make (Pickles_types.Nat.N0) (Pickles_types.Nat.N0)
+module Proof1 = Pickles.Proof.Make (Pickles_types.Nat.N1) (Pickles_types.Nat.N1)
+module Proof2 = Pickles.Proof.Make (Pickles_types.Nat.N2) (Pickles_types.Nat.N2)
+
+type some_proof = Proof0 of Proof0.t | Proof1 of Proof1.t | Proof2 of Proof2.t
+
+let proof_to_base64 = function
+  | Proof0 proof ->
+      Proof0.to_base64 proof |> Js.string
+  | Proof1 proof ->
+      Proof1.to_base64 proof |> Js.string
+  | Proof2 proof ->
+      Proof2.to_base64 proof |> Js.string
+
+let proof_of_base64 str i : some_proof =
+  let str = Js.to_string str in
+  match i with
+  | 0 ->
+      Proof0 (Proof0.of_base64 str |> Result.ok_or_failwith)
+  | 1 ->
+      Proof1 (Proof1.of_base64 str |> Result.ok_or_failwith)
+  | 2 ->
+      Proof2 (Proof2.of_base64 str |> Result.ok_or_failwith)
+  | _ ->
+      failwith "invalid proof index"
+
+let verify (public_input : public_input_js) (proof : proof)
+    (vk : Js.js_string Js.t) =
+  let public_input = Public_input.Constant.of_js public_input in
+  let typ = public_input_typ (Array.length public_input) in
+  let proof = Pickles.Side_loaded.Proof.of_proof proof in
+  let vk =
+    Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
+  in
+  Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
+  |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
 let pickles =
   object%js
@@ -2196,7 +2230,16 @@ let pickles =
 
     val circuitDigest = pickles_digest
 
-    val proofToString = proof_to_string
+    val verify = verify
+
+    val proofToBase64 = proof_to_base64
+
+    val proofOfBase64 = proof_of_base64
+
+    val proofToBase64Transaction =
+      fun (proof : proof) ->
+        proof |> Pickles.Side_loaded.Proof.of_proof
+        |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
   end
 
 module Ledger = struct
@@ -2542,6 +2585,9 @@ module Ledger = struct
       (Random_oracle.Input.Chunked.field (x |> of_js_field |> to_unchecked))
     |> Mina_base.Signature.to_base58_check |> Js.string
 
+  let dummy_signature () =
+    Mina_base.Signature.(dummy |> to_base58_check) |> Js.string
+
   let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
       (party_index : party_index) =
     let tx =
@@ -2612,20 +2658,6 @@ module Ledger = struct
               commitment
         | Proof _ | None_given ->
             () )
-
-  let verify_party_proof (public_input : public_input_js)
-      (proof : Js.js_string Js.t) (vk : Js.js_string Js.t) =
-    let public_input = Public_input.Constant.of_js public_input in
-    let proof =
-      Result.ok_or_failwith
-        (Pickles.Side_loaded.Proof.of_base64 (Js.to_string proof))
-    in
-    let vk =
-      Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
-    in
-    Pickles.Side_loaded.verify_promise ~typ:(public_input_typ 2)
-      [ (vk, public_input, proof) ]
-    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
@@ -2763,9 +2795,9 @@ module Ledger = struct
     static_method "transactionCommitments" transaction_commitments ;
     static_method "zkappPublicInput" zkapp_public_input ;
     static_method "signFieldElement" sign_field_element ;
+    static_method "dummySignature" dummy_signature ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
-    static_method "verifyPartyProof" verify_party_proof ;
 
     static_method "publicKeyToString" public_key_to_string ;
     static_method "publicKeyOfString" public_key_of_string ;

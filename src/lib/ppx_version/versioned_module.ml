@@ -4,8 +4,19 @@ open Versioned_util
 
 let no_toplevel_latest_type = ref false
 
+let with_all_version_tags = "with_all_version_tags"
+
+let with_all_version_tags_module = String.capitalize with_all_version_tags
+
+let with_top_version_tag = "with_top_version_tag"
+
+let with_top_version_tag_module = String.capitalize with_top_version_tag
+
+let no_toplevel_latest_type_str = "no_toplevel_latest_type"
+
 (* option to `deriving version' *)
 type version_option = No_version_option | Asserted | Binable
+[@@deriving equal]
 
 let create_attr ~loc attr_name attr_payload =
   { attr_name; attr_payload; attr_loc = loc }
@@ -195,14 +206,126 @@ let erase_stable_versions =
       }
   end
 
-let version_type ~version_option version stri =
+let mk_all_version_tags_type_decl =
+  object
+    inherit Ast_traverse.map as super
+
+    method! core_type typ =
+      match typ.ptyp_desc with
+      | Ptyp_constr
+          ({ txt = Ldot (Ldot (Ldot (lid, "Stable"), vn), "t"); loc }, typs)
+        when try
+               validate_module_version vn loc ;
+               true
+             with _ -> false ->
+          (* Change [.Stable.Vn.t] to [.Stable.Vn.With_all_version_tags.t] *)
+          let typ =
+            { typ with
+              ptyp_desc =
+                Ptyp_constr
+                  ( { txt =
+                        Ldot
+                          ( Ldot
+                              ( Ldot (Ldot (lid, "Stable"), vn)
+                              , with_all_version_tags_module )
+                          , "t" )
+                    ; loc
+                    }
+                  , typs )
+            }
+          in
+          super#core_type typ
+      | _ ->
+          super#core_type typ
+
+    method! type_declaration type_decl =
+      if String.equal type_decl.ptype_name.txt "t" then
+        let loc = type_decl.ptype_name.loc in
+        { (super#type_declaration type_decl) with
+          ptype_name = { txt = "typ"; loc }
+        ; ptype_manifest =
+            (* type typ = t = ... *)
+            ( match type_decl.ptype_manifest with
+            | Some
+                ( { ptyp_desc =
+                      Ptyp_constr
+                        ( { txt = Ldot (Ldot (Ldot (lid, "Stable"), vn), "t")
+                          ; loc
+                          }
+                        , params )
+                  ; _
+                  } as manifest_ty ) ->
+                (* type typ = Foo.Stable.Vn.t becomes type typ = Foo.Stable.Vn.With_all_version_tags.t *)
+                Some
+                  { manifest_ty with
+                    ptyp_desc =
+                      Ptyp_constr
+                        ( { txt =
+                              Ldot
+                                ( Ldot
+                                    ( Ldot (Ldot (lid, "Stable"), vn)
+                                    , with_all_version_tags_module )
+                                , "t" )
+                          ; loc
+                          }
+                        , params )
+                  }
+            | Some m ->
+                Some m
+            | None ->
+                let params =
+                  List.map type_decl.ptype_params ~f:(fun (ty, _invariance) ->
+                      ty )
+                in
+                Some
+                  { ptyp_desc = Ptyp_constr ({ txt = Lident "t"; loc }, params)
+                  ; ptyp_loc = loc
+                  ; ptyp_loc_stack = []
+                  ; ptyp_attributes = []
+                  } )
+        ; ptype_attributes =
+            (let (module Ast_builder) = Ast_builder.make loc in
+             let open Ast_builder in
+             [ create_attr ~loc (Located.mk "deriving") (PStr [ [%stri bin_io] ])
+             ] )
+        }
+      else type_decl
+  end
+
+let version_type ~version_option version stri ~all_version_tagged
+    ~top_version_tag =
   let loc = stri.pstr_loc in
+  let find_t_stri stri =
+    let is_t_stri stri =
+      match stri.pstr_desc with
+      | Pstr_type
+          ( _rec_flag
+          , [ { ptype_name = { txt = "t"; _ }; ptype_private = Public; _ } ] )
+        ->
+          true
+      | _ ->
+          false
+    in
+    if is_t_stri stri then stri
+    else
+      match stri.pstr_desc with
+      | Pstr_module { pmb_expr = { pmod_desc = Pmod_structure str; _ }; _ } -> (
+          match List.find str ~f:is_t_stri with
+          | Some stri ->
+              stri
+          | None ->
+              Location.raise_errorf ~loc:stri.pstr_loc
+                "Expected module to contain a type t." )
+      | _ ->
+          Location.raise_errorf ~loc:stri.pstr_loc
+            "Expected a module containing a type t."
+  in
   let t, params =
-    let subst_type stri =
+    let subst_type t_stri =
       (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
          types..
       *)
-      match stri.pstr_desc with
+      match t_stri.pstr_desc with
       | Pstr_type
           ( rec_flag
           , [ ( { ptype_name = { txt = "t"; _ }; ptype_private = Public; _ } as
@@ -219,193 +342,295 @@ let version_type ~version_option version stri =
           let t = { stri with pstr_desc = Pstr_type (rec_flag, [ typ ]) } in
           (t, params)
       | _ ->
+          (* should be unreachable *)
           (* TODO: Handle rpc types. *)
           Location.raise_errorf ~loc:stri.pstr_loc
             "Expected a single public type t."
     in
-    match stri.pstr_desc with
-    | Pstr_type _ ->
-        subst_type stri
-    | Pstr_module
-        { pmb_expr = { pmod_desc = Pmod_structure (stri :: _); _ }; _ } ->
-        subst_type stri
-    | _ ->
-        (* TODO: Handle rpc types. *)
-        Location.raise_errorf ~loc:stri.pstr_loc
-          "Expected a single public type t, or a module T."
+    let t_stri = find_t_stri stri in
+    subst_type t_stri
   in
+  let empty_params = List.is_empty params in
   let (module Ast_builder) = Ast_builder.make loc in
-  let with_version =
+  let extra_stris =
+    let arg_names = List.mapi params ~f:(fun i _ -> sprintf "x%i" i) in
+    let apply_args =
+      let args =
+        List.map arg_names ~f:(fun x ->
+            (Nolabel, Ast_builder.(pexp_ident (Located.lident x))) )
+      in
+      match args with
+      | [] ->
+          fun ?f:_ e -> e
+      | _ ->
+          fun ?f e ->
+            let args =
+              match f with
+              | None ->
+                  args
+              | Some f ->
+                  List.map args ~f:(fun (lbl, x) -> (lbl, f x))
+            in
+            Ast_builder.(pexp_apply e args)
+    in
+    let fun_args e =
+      List.fold_right arg_names ~init:e ~f:(fun name e ->
+          Ast_builder.(pexp_fun Nolabel None (ppat_var (Located.mk name)) e) )
+    in
+    let mk_field fld e =
+      Ast_builder.(
+        pexp_field e
+          (Located.mk (Ldot (Ldot (Lident "Bin_prot", "Type_class"), fld))))
+    in
     let open Ast_builder in
-    let typ =
-      type_declaration ~name:(Located.mk "typ") ~params ~cstrs:[]
-        ~private_:Public
-        ~manifest:
-          (Some (ptyp_constr (Located.lident "t") (List.map ~f:fst params)))
-        ~kind:Ptype_abstract
+    let deriving_bin_io =
+      lazy (create_attr ~loc (Located.mk "deriving") (PStr [ [%stri bin_io] ]))
     in
-    let t_deriving =
-      create_attr ~loc (Located.mk "deriving") (PStr [ [%stri bin_io] ])
+    let make_tag_module typ_decl mod_name =
+      let t_tagged =
+        (* type `t_tagged` is a record containing a version and an instance of `typ`,
+           when serializing, take a `typ`, add the version number
+           when deserializing, return just the `typ` part
+        *)
+        let ty_decl =
+          type_declaration ~name:(Located.mk "t_tagged") ~params ~cstrs:[]
+            ~private_:Public ~manifest:None
+            ~kind:
+              (Ptype_record
+                 [ label_declaration ~name:(Located.mk "version")
+                     ~mutable_:Immutable
+                     ~type_:(ptyp_constr (Located.lident "int") [])
+                 ; label_declaration ~name:(Located.mk "t") ~mutable_:Immutable
+                     ~type_:
+                       (ptyp_constr (Located.lident "typ")
+                          (List.map ~f:fst params) )
+                 ] )
+        in
+        { ty_decl with ptype_attributes = [ Lazy.force deriving_bin_io ] }
+      in
+      let t =
+        (* type `t` is equal to `typ`, but serialized/deserialized as `t_tagged` *)
+        let ty_decl =
+          type_declaration ~name:(Located.mk "t") ~params ~cstrs:[]
+            ~private_:Public
+            ~manifest:
+              (Some
+                 (ptyp_constr (Located.lident "typ") (List.map ~f:fst params))
+              )
+            ~kind:Ptype_abstract
+        in
+        { ty_decl with ptype_attributes = [ Lazy.force deriving_bin_io ] }
+      in
+      let create = [%stri let create t = { t; version = [%e eint version] }] in
+      let bin_io_tagged_shadows =
+        [ [%stri
+            let bin_read_t_tagged =
+              [%e
+                fun_args
+                  [%expr
+                    fun buf ~pos_ref ->
+                      let { version = read_version; t } =
+                        [%e apply_args [%expr bin_read_t_tagged]] buf ~pos_ref
+                      in
+                      (* sanity check *)
+                      if
+                        not
+                          (Core_kernel.Int.equal read_version [%e eint version])
+                      then
+                        failwith
+                          (Core_kernel.sprintf
+                             "bin_read_t_tagged: version read %d does not \
+                              match expected version %d"
+                             read_version [%e eint version] ) ;
+                      t]]]
+        ; [%stri
+            let __bin_read_t_tagged__ =
+              [%e
+                fun_args
+                  [%expr
+                    fun buf ~pos_ref i ->
+                      let { version = read_version; t } =
+                        [%e apply_args [%expr __bin_read_t_tagged__]]
+                          buf ~pos_ref i
+                      in
+                      (* sanity check *)
+                      if
+                        not
+                          (Core_kernel.Int.equal read_version [%e eint version])
+                      then
+                        failwith
+                          (Core_kernel.sprintf
+                             "__bin_read_t_tagged__: version read %d does not \
+                              match expected version %d"
+                             read_version version ) ;
+                      t]]]
+        ; [%stri
+            let bin_reader_t_tagged =
+              [%e
+                fun_args
+                  [%expr
+                    { Bin_prot.Type_class.read =
+                        [%e
+                          apply_args ~f:(mk_field "read")
+                            [%expr bin_read_t_tagged]]
+                    ; vtag_read =
+                        [%e
+                          apply_args ~f:(mk_field "read")
+                            [%expr __bin_read_t_tagged__]]
+                    }]]]
+        ; [%stri
+            let bin_size_t_tagged =
+              [%e
+                fun_args
+                  [%expr
+                    fun t ->
+                      create t |> [%e apply_args [%expr bin_size_t_tagged]]]]]
+        ; [%stri let bin_shape_t_tagged = bin_shape_t_tagged]
+        ; [%stri
+            let bin_write_t_tagged =
+              [%e
+                fun_args
+                  [%expr
+                    fun buf ~pos t ->
+                      create t
+                      |> [%e apply_args [%expr bin_write_t_tagged]] buf ~pos]]]
+        ; [%stri
+            let bin_writer_t_tagged =
+              [%e
+                fun_args
+                  [%expr
+                    { Bin_prot.Type_class.size =
+                        [%e
+                          apply_args ~f:(mk_field "size")
+                            [%expr bin_size_t_tagged]]
+                    ; write =
+                        [%e
+                          apply_args ~f:(mk_field "write")
+                            [%expr bin_write_t_tagged]]
+                    }]]]
+        ; [%stri
+            let bin_t_tagged =
+              [%e
+                fun_args
+                  [%expr
+                    { Bin_prot.Type_class.shape =
+                        [%e
+                          apply_args ~f:(mk_field "shape")
+                            [%expr bin_shape_t_tagged]]
+                    ; writer =
+                        [%e
+                          apply_args ~f:(mk_field "writer")
+                            [%expr bin_writer_t_tagged]]
+                    ; reader =
+                        [%e
+                          apply_args ~f:(mk_field "reader")
+                            [%expr bin_reader_t_tagged]]
+                    }]]]
+        ; [%stri
+            let (_ : _) =
+              ( bin_read_t_tagged
+              , __bin_read_t_tagged__
+              , bin_reader_t_tagged
+              , bin_size_t_tagged
+              , bin_shape_t_tagged
+              , bin_write_t_tagged
+              , bin_writer_t_tagged
+              , bin_t_tagged )]
+        ]
+      in
+      let bin_io_t =
+        [ [%stri let bin_read_t = bin_read_t_tagged]
+        ; [%stri let __bin_read_t__ = __bin_read_t_tagged__]
+        ; [%stri let bin_reader_t = bin_reader_t_tagged]
+        ; [%stri let bin_size_t = bin_size_t_tagged]
+        ; [%stri let bin_shape_t = bin_shape_t_tagged]
+        ; [%stri let bin_write_t = bin_write_t_tagged]
+        ; [%stri let bin_writer_t = bin_writer_t_tagged]
+        ; [%stri let bin_t = bin_t_tagged]
+        ; [%stri
+            let (_ : _) =
+              ( bin_read_t
+              , __bin_read_t__
+              , bin_reader_t
+              , bin_size_t
+              , bin_shape_t
+              , bin_write_t
+              , bin_writer_t
+              , bin_t )]
+        ]
+      in
+      [ pstr_module
+          (module_binding
+             ~name:(some_loc (Located.mk mod_name))
+             ~expr:
+               (pmod_structure
+                  ( [ pstr_type Recursive [ typ_decl ]
+                    ; pstr_type Recursive [ t_tagged ]
+                    ; pstr_type Recursive [ t ]
+                    ; create
+                    ]
+                  @ bin_io_tagged_shadows @ bin_io_t ) ) )
+      ]
     in
-    let typ =
-      { typ with ptype_attributes = t_deriving :: typ.ptype_attributes }
+    let all_version_tag_modules =
+      if not all_version_tagged then []
+      else (
+        if equal_version_option version_option Binable then
+          Location.raise_errorf ~loc
+            "Cannot all-tag types in %%versioned_binable modules" ;
+        let t_stri = find_t_stri stri in
+        let typ_decl =
+          (* type `typ` is equal to `t` from the surrounding versioned type; but all contained
+             occurrences of the form `M.Stable.Vn.t` become `M.Stable.Vn.With_all_version_tags.t`, so
+             those types get version tags when serialized
+          *)
+          let typ_stri = mk_all_version_tags_type_decl#structure_item t_stri in
+          match typ_stri.pstr_desc with
+          | Pstr_type (Recursive, [ typ_decl ]) ->
+              typ_decl
+          | _ ->
+              Location.raise_errorf ~loc
+                "Expected type declaration for type `typ`"
+        in
+        make_tag_module typ_decl with_all_version_tags_module )
     in
-    let t =
-      type_declaration ~name:(Located.mk "t") ~params ~cstrs:[] ~private_:Public
-        ~manifest:None
-        ~kind:
-          (Ptype_record
-             [ label_declaration ~name:(Located.mk "version")
-                 ~mutable_:Immutable
-                 ~type_:(ptyp_constr (Located.lident "int") [])
-             ; label_declaration ~name:(Located.mk "t") ~mutable_:Immutable
-                 ~type_:
-                   (ptyp_constr (Located.lident "typ") (List.map ~f:fst params))
-             ] )
-    in
-    let t = { t with ptype_attributes = t_deriving :: t.ptype_attributes } in
-    let create = [%stri let create t = { t; version = [%e eint version] }] in
-    pstr_module
-      (module_binding
-         ~name:(some_loc (Located.mk "With_version"))
-         ~expr:
-           (pmod_structure
-              [ pstr_type Recursive [ typ ]; pstr_type Recursive [ t ]; create ] ) )
-  in
-  let arg_names = List.mapi params ~f:(fun i _ -> sprintf "x%i" i) in
-  let apply_args =
-    let args =
-      List.map arg_names ~f:(fun x ->
-          (Nolabel, Ast_builder.(pexp_ident (Located.lident x))) )
-    in
-    match args with
-    | [] ->
-        fun ?f:_ e -> e
-    | _ ->
-        fun ?f e ->
-          let args =
-            match f with
-            | None ->
-                args
-            | Some f ->
-                List.map args ~f:(fun (lbl, x) -> (lbl, f x))
+    let top_version_tag_modules =
+      if not top_version_tag then []
+      else
+        let open Ast_builder in
+        let typ_decl =
+          (* type `typ` is equal to the type `t` from the surrounding module *)
+          let ty_decl =
+            type_declaration ~name:(Located.mk "typ") ~params ~cstrs:[]
+              ~private_:Public
+              ~manifest:
+                (Some
+                   (ptyp_constr (Located.lident "t") (List.map ~f:fst params))
+                )
+              ~kind:Ptype_abstract
           in
-          Ast_builder.(pexp_apply e args)
-  in
-  let fun_args e =
-    List.fold_right arg_names ~init:e ~f:(fun name e ->
-        Ast_builder.(pexp_fun Nolabel None (ppat_var (Located.mk name)) e) )
-  in
-  let mk_field fld e =
-    Ast_builder.(
-      pexp_field e
-        (Located.mk (Ldot (Ldot (Lident "Bin_prot", "Type_class"), fld))))
-  in
-  let bin_io_shadows =
-    [ [%stri
-        let bin_read_t =
-          [%e
-            fun_args
-              [%expr
-                fun buf ~pos_ref ->
-                  let With_version.{ version = read_version; t } =
-                    [%e apply_args [%expr With_version.bin_read_t]] buf ~pos_ref
-                  in
-                  (* sanity check *)
-                  if not (Core_kernel.Int.equal read_version version) then
-                    failwith
-                      (Core_kernel.sprintf
-                         "bin_read_t: version read %d does not match expected \
-                          version %d"
-                         read_version version ) ;
-                  t]]]
-    ; [%stri
-        let __bin_read_t__ =
-          [%e
-            fun_args
-              [%expr
-                fun buf ~pos_ref i ->
-                  let With_version.{ version = read_version; t } =
-                    [%e apply_args [%expr With_version.__bin_read_t__]]
-                      buf ~pos_ref i
-                  in
-                  (* sanity check *)
-                  if not (Core_kernel.Int.equal read_version version) then
-                    failwith
-                      (Core_kernel.sprintf
-                         "__bin_read_t__: version read %d does not match \
-                          expected version %d"
-                         read_version version ) ;
-                  t]]]
-    ; [%stri
-        let bin_size_t =
-          [%e
-            fun_args
-              [%expr
-                fun t ->
-                  With_version.create t
-                  |> [%e apply_args [%expr With_version.bin_size_t]]]]]
-    ; [%stri
-        let bin_write_t =
-          [%e
-            fun_args
-              [%expr
-                fun buf ~pos t ->
-                  With_version.create t
-                  |> [%e apply_args [%expr With_version.bin_write_t]] buf ~pos]]]
-    ; [%stri let bin_shape_t = With_version.bin_shape_t]
-    ; [%stri
-        let bin_reader_t =
-          [%e
-            fun_args
-              [%expr
-                { Bin_prot.Type_class.read =
-                    [%e apply_args ~f:(mk_field "read") [%expr bin_read_t]]
-                ; vtag_read =
-                    [%e apply_args ~f:(mk_field "read") [%expr __bin_read_t__]]
-                }]]]
-    ; [%stri
-        let bin_writer_t =
-          [%e
-            fun_args
-              [%expr
-                { Bin_prot.Type_class.size =
-                    [%e apply_args ~f:(mk_field "size") [%expr bin_size_t]]
-                ; write =
-                    [%e apply_args ~f:(mk_field "write") [%expr bin_write_t]]
-                }]]]
-    ; [%stri
-        let bin_t =
-          [%e
-            fun_args
-              [%expr
-                { Bin_prot.Type_class.shape =
-                    [%e apply_args ~f:(mk_field "shape") [%expr bin_shape_t]]
-                ; writer =
-                    [%e apply_args ~f:(mk_field "writer") [%expr bin_writer_t]]
-                ; reader =
-                    [%e apply_args ~f:(mk_field "reader") [%expr bin_reader_t]]
-                }]]]
-    ; [%stri
-        (* ppx_js_style rejects a single underscore *)
-        let __ =
-          ( bin_read_t
-          , __bin_read_t__
-          , bin_size_t
-          , bin_write_t
-          , bin_shape_t
-          , bin_reader_t
-          , bin_writer_t
-          , bin_t )]
-    ]
+          { ty_decl with ptype_attributes = [ Lazy.force deriving_bin_io ] }
+        in
+        make_tag_module typ_decl with_top_version_tag_module
+    in
+    let version_tag_modules =
+      all_version_tag_modules @ top_version_tag_modules
+    in
+    let to_latest_guard_modules =
+      (* use of `to_latest`, in case neither all_version_tagged nor top_version_tag *)
+      if empty_params && List.is_empty version_tag_modules then
+        [%str let (_ : _) = to_latest]
+      else []
+    in
+    to_latest_guard_modules @ version_tag_modules
   in
   match stri.pstr_desc with
   | Pstr_type _ ->
-      (List.is_empty params, [ t ], with_version :: bin_io_shadows)
+      (empty_params, [ t ], extra_stris)
   | Pstr_module
       ( { pmb_expr = { pmod_desc = Pmod_structure (stri :: str); _ } as pmod; _ }
       as pmb ) ->
-      ( List.is_empty params
+      ( empty_params
       , [ { stri with
             pstr_desc =
               Pstr_module
@@ -414,11 +639,37 @@ let version_type ~version_option version stri =
                 }
           }
         ]
-      , with_version :: bin_io_shadows )
+      , extra_stris )
   | _ ->
       assert false
 
-let convert_module_stri ~version_option last_version stri =
+let is_attr_stri = function
+  | { pstr_desc = Pstr_attribute _; _ } ->
+      true
+  | _ ->
+      false
+
+let is_attr_stri_with_name name = function
+  | { pstr_desc = Pstr_attribute { attr_name = { txt; _ }; _ }; _ }
+    when String.equal txt name ->
+      true
+  | _ ->
+      false
+
+let is_attr_sigitem = function
+  | { psig_desc = Psig_attribute _; _ } ->
+      true
+  | _ ->
+      false
+
+let is_attr_sigitem_with_name name = function
+  | { psig_desc = Psig_attribute { attr_name = { txt; _ }; _ }; _ }
+    when String.equal txt name ->
+      true
+  | _ ->
+      false
+
+let convert_module_stri ~version_option ~top_version_tag last_version stri =
   let module_pattern =
     Ast_pattern.(
       pstr_module (module_binding ~name:(some __') ~expr:(pmod_structure __')))
@@ -441,8 +692,12 @@ let convert_module_stri ~version_option last_version stri =
       else if version >= last_version then
         Location.raise_errorf ~loc
           "Versioned modules must be listed in decreasing order." ) ;
+  let attrs, str_no_attrs = List.partition_tf str.txt ~f:is_attr_stri in
+  let all_version_tagged =
+    List.exists attrs ~f:(is_attr_stri_with_name with_all_version_tags)
+  in
   let stri, type_stri, str_rest =
-    match str.txt with
+    match str_no_attrs with
     | [] ->
         Location.raise_errorf ~loc:str.loc
           "Expected a type declaration in this structure."
@@ -467,46 +722,56 @@ let convert_module_stri ~version_option last_version stri =
     | type_stri :: str ->
         (type_stri, type_stri, str)
   in
-  let should_convert, type_str, with_version_bin_io_shadows =
-    version_type ~version_option version stri
+  let should_convert, type_str, extra_stris =
+    version_type ~version_option version stri ~all_version_tagged
+      ~top_version_tag
   in
   (* TODO: If [should_convert] then look for [to_latest]. *)
   let open Ast_builder.Default in
   ( version
   , pstr_module ~loc
       (module_binding ~loc ~name:(some_loc name)
-         ~expr:
-           (pmod_structure ~loc:str.loc
-              (type_str @ str_rest @ with_version_bin_io_shadows) ) )
+         ~expr:(pmod_structure ~loc:str.loc (type_str @ str_rest @ extra_stris)) )
   , should_convert
-  , type_stri )
+  , type_stri
+  , all_version_tagged )
 
 let convert_modbody ~loc ~version_option body =
   let may_convert_latest = ref None in
   let latest_version = ref None in
-  let _, rev_str, convs, type_stri, _no_toplevel_type =
-    List.fold ~init:(None, [], [], None, !no_toplevel_latest_type) body
-      ~f:(fun (version, rev_str, convs, type_stri, no_toplevel_type) stri ->
-        match stri.pstr_desc with
-        | Pstr_attribute { attr_name; _ }
-          when String.equal attr_name.txt "no_toplevel_latest_type" ->
-            (version, rev_str, convs, None, true)
-        | _ ->
-            let version, stri, should_convert, current_type_stri =
-              convert_module_stri ~version_option version stri
-            in
-            let type_stri =
-              if no_toplevel_type then None
-              else Some (Option.value ~default:current_type_stri type_stri)
-            in
-            ( match !may_convert_latest with
-            | None ->
-                may_convert_latest := Some should_convert ;
-                latest_version := Some version
-            | Some _ ->
-                () ) ;
-            let convs = if should_convert then version :: convs else convs in
-            (Some version, stri :: rev_str, convs, type_stri, no_toplevel_type) )
+  let attrs, body_no_attrs = List.partition_tf body ~f:is_attr_stri in
+  let no_toplevel_type =
+    !no_toplevel_latest_type
+    || List.exists attrs ~f:(is_attr_stri_with_name no_toplevel_latest_type_str)
+  in
+  let top_version_tag =
+    List.exists attrs ~f:(is_attr_stri_with_name with_top_version_tag)
+  in
+  let _, rev_str, type_stri, top_tag_convs, all_tag_convs =
+    List.fold ~init:(None, [], None, [], []) body_no_attrs
+      ~f:(fun (version, rev_str, type_stri, top_taggeds, all_taggeds) stri ->
+        let version, stri, should_convert, current_type_stri, is_all_tagged =
+          convert_module_stri ~version_option ~top_version_tag version stri
+        in
+        let type_stri =
+          if no_toplevel_type then None
+          else Some (Option.value ~default:current_type_stri type_stri)
+        in
+        ( match !may_convert_latest with
+        | None ->
+            may_convert_latest := Some should_convert ;
+            latest_version := Some version
+        | Some _ ->
+            () ) ;
+        let top_tag_convs =
+          if top_version_tag && should_convert then version :: top_taggeds
+          else top_taggeds
+        in
+        let all_tag_convs =
+          if is_all_tagged && should_convert then version :: all_taggeds
+          else all_taggeds
+        in
+        (Some version, stri :: rev_str, type_stri, top_tag_convs, all_tag_convs) )
   in
   let (module Ast_builder) = Ast_builder.make loc in
   let rev_str =
@@ -535,51 +800,158 @@ let convert_modbody ~loc ~version_option body =
   let rev_str =
     match !may_convert_latest with
     | Some true ->
-        let versions =
-          [%stri
-            (* NOTE: This will give a type error if any of the [to_latest]
-               values do not convert to [Latest.t].
-            *)
-            let (versions :
-                  ( int
-                  * (Core_kernel.Bigstring.t -> pos_ref:int ref -> Latest.t) )
-                  array ) =
-              [%e
-                let open Ast_builder in
-                pexp_array
-                  (List.map convs ~f:(fun version ->
-                       let version_module =
-                         Longident.Lident (sprintf "V%i" version)
-                       in
-                       let dot x =
-                         Located.mk (Longident.Ldot (version_module, x))
-                       in
-                       pexp_tuple
-                         [ eint version
-                         ; [%expr
-                             fun buf ~pos_ref ->
-                               [%e pexp_ident (dot "bin_read_t")] buf ~pos_ref
-                               |> [%e pexp_ident (dot "to_latest")]]
-                         ] ) )]]
+        let converter_modules =
+          let top_tag_modules =
+            if not top_version_tag then []
+            else
+              let top_tag_versions =
+                [%stri
+                  (* NOTE: This will give a type error if any of the [to_latest]
+                     values do not convert to [Latest.t].
+                  *)
+                  let (top_tag_versions :
+                        ( int
+                        * (   Core_kernel.Bigstring.t
+                           -> pos_ref:int ref
+                           -> Latest.t ) )
+                        array ) =
+                    [%e
+                      let open Ast_builder in
+                      pexp_array
+                        (List.map top_tag_convs ~f:(fun version ->
+                             let version_module =
+                               Longident.Lident (sprintf "V%i" version)
+                             in
+                             let dot x =
+                               let open Longident in
+                               Located.mk (Ldot (version_module, x))
+                             in
+                             let dot_with_module module_ x =
+                               let open Longident in
+                               Located.mk
+                                 (Ldot (Ldot (version_module, module_), x))
+                             in
+                             pexp_tuple
+                               [ eint version
+                               ; [%expr
+                                   fun buf ~pos_ref ->
+                                     [%e
+                                       pexp_ident
+                                         (dot_with_module
+                                            with_top_version_tag_module
+                                            "bin_read_t" )]
+                                       buf ~pos_ref
+                                     |> [%e pexp_ident (dot "to_latest")]]
+                               ] ) )]]
+              in
+              let top_tag_convert =
+                [%stri
+                  (** deserializes data to the latest module version's type *)
+                  let bin_read_top_tagged_to_latest buf ~pos_ref =
+                    let open Core_kernel in
+                    (* Rely on layout, assume that the first element of the record is
+                       at pos_ref in the buffer
+                       The reader `f` will re-read the version, so we save the
+                       position and restore pos_ref
+                    *)
+                    let saved_pos = !pos_ref in
+                    let version = Bin_prot.Std.bin_read_int ~pos_ref buf in
+                    let pos_ref = ref saved_pos in
+                    match
+                      Array.find_map top_tag_versions ~f:(fun (i, f) ->
+                          if Int.equal i version then Some (f buf ~pos_ref)
+                          else None )
+                    with
+                    | Some v ->
+                        Ok v
+                    | None ->
+                        Error
+                          (Error.of_string
+                             (sprintf "Could not find top-tagged version %d"
+                                version ) )]
+              in
+              let top_tag_convert_guard =
+                [%stri let (_ : _) = bin_read_top_tagged_to_latest]
+              in
+              [ top_tag_convert_guard; top_tag_convert; top_tag_versions ]
+          in
+          let all_tag_modules =
+            if List.is_empty all_tag_convs then []
+            else
+              let all_tag_versions =
+                [%stri
+                  (* NOTE: This will give a type error if any of the [to_latest]
+                     values do not convert to [Latest.t].
+                  *)
+                  let (all_tag_versions :
+                        ( int
+                        * (   Core_kernel.Bigstring.t
+                           -> pos_ref:int ref
+                           -> Latest.t ) )
+                        array ) =
+                    [%e
+                      let open Ast_builder in
+                      pexp_array
+                        (List.map all_tag_convs ~f:(fun version ->
+                             let version_module =
+                               Longident.Lident (sprintf "V%i" version)
+                             in
+                             let dot x =
+                               let open Longident in
+                               Located.mk (Ldot (version_module, x))
+                             in
+                             let dot_with_module module_ x =
+                               let open Longident in
+                               Located.mk
+                                 (Ldot (Ldot (version_module, module_), x))
+                             in
+                             pexp_tuple
+                               [ eint version
+                               ; [%expr
+                                   fun buf ~pos_ref ->
+                                     [%e
+                                       pexp_ident
+                                         (dot_with_module
+                                            with_all_version_tags_module
+                                            "bin_read_t" )]
+                                       buf ~pos_ref
+                                     |> [%e pexp_ident (dot "to_latest")]]
+                               ] ) )]]
+              in
+              let all_tag_convert =
+                [%stri
+                  (** deserializes data to the latest module version's type *)
+                  let bin_read_all_tagged_to_latest buf ~pos_ref =
+                    let open Core_kernel in
+                    (* Rely on layout, assume that the first element of the record is
+                       at pos_ref in the buffer
+                       The reader `f` will re-read the version, so we save the
+                       position and restore pos_ref
+                    *)
+                    let saved_pos = !pos_ref in
+                    let version = Bin_prot.Std.bin_read_int ~pos_ref buf in
+                    let pos_ref = ref saved_pos in
+                    match
+                      Array.find_map all_tag_versions ~f:(fun (i, f) ->
+                          if Int.equal i version then Some (f buf ~pos_ref)
+                          else None )
+                    with
+                    | Some v ->
+                        Ok v
+                    | None ->
+                        Error
+                          (Error.of_string
+                             (sprintf "Could not find all-tagged version %d"
+                                version ) )]
+              in
+              let all_tag_convert_guard =
+                [%stri let (_ : _) = bin_read_all_tagged_to_latest]
+              in
+              [ all_tag_convert_guard; all_tag_convert; all_tag_versions ]
+          in
+          top_tag_modules @ all_tag_modules
         in
-        let convert =
-          [%stri
-            (** deserializes data to the latest module version's type *)
-            let bin_read_to_latest_opt buf ~pos_ref =
-              let open Core_kernel in
-              (* Rely on layout, assume that the first element of the record is
-                 at pos_ref in the buffer
-                 The reader `f` will re-read the version, so we save the
-                 position and restore pos_ref
-              *)
-              let saved_pos = !pos_ref in
-              let version = Bin_prot.Std.bin_read_int ~pos_ref buf in
-              let pos_ref = ref saved_pos in
-              Array.find_map versions ~f:(fun (i, f) ->
-                  if Int.equal i version then Some (f buf ~pos_ref) else None )]
-        in
-        let convert_guard = [%stri let __ = bin_read_to_latest_opt] in
-        convert_guard :: convert :: versions :: rev_str
+        converter_modules @ rev_str
     | _ ->
         rev_str
   in
@@ -613,7 +985,9 @@ let version_module ~loc ~version_option ~path:_ modname modbody =
 
    - add deriving bin_io, version to list of deriving items for the type "t" in versioned modules
    - add "module Latest = Vn" to Stable module
-   - if Stable.Latest.t has no parameters, add signature items for "versions" and "bin_read_to_latest_opt"
+   - if Stable.Latest.t has no parameters:
+     - if "with_top_version_tag" annotation present, add item for "bin_read_top_tagged_to_latest"
+     - if any "with_all_version_tags" annotation present, add "bin_read_all_tagged_to_latest" item
 *)
 
 (* parameterless_t means the type t in the module type has no parameters *)
@@ -662,14 +1036,52 @@ type module_type_with_convertible =
   }
 
 (* add deriving items to type t in module type *)
-let convert_module_type mod_ty =
+let convert_module_type ~loc ~top_version_tagged mod_ty =
   match mod_ty.pmty_desc with
   | Pmty_signature signature ->
+      let attrs = List.filter signature ~f:is_attr_sigitem in
+      let make_tag_module_decl mod_name =
+        let (module Ast_builder) = Ast_builder.make loc in
+        let open Ast_builder in
+        (* mod_name : Bin_prot.Binable.S with type t = t *)
+        psig_module
+          (module_declaration
+             ~name:(Located.mk @@ Some mod_name)
+             ~type_:
+               (pmty_with
+                  (pmty_ident
+                     ( Located.mk
+                     @@ Ldot (Ldot (Lident "Bin_prot", "Binable"), "S") ) )
+                  [ Pwith_type
+                      ( Located.mk (Lident "t")
+                      , Ast_builder.type_declaration ~name:(Located.mk "t")
+                          ~params:[] ~cstrs:[] ~kind:Ptype_abstract
+                          ~private_:Public
+                          ~manifest:(Some (ptyp_constr (Located.lident "t") []))
+                      )
+                  ] ) )
+      in
+      let with_top_version_tag_decl =
+        if top_version_tagged then
+          [ make_tag_module_decl with_top_version_tag_module ]
+        else []
+      in
+      let all_version_tagged =
+        List.exists attrs ~f:(is_attr_sigitem_with_name with_all_version_tags)
+      in
+      let with_all_version_tags_decl =
+        if all_version_tagged then
+          [ make_tag_module_decl with_all_version_tags_module ]
+        else []
+      in
+      let with_version_tags_decls =
+        with_top_version_tag_decl @ with_all_version_tags_decl
+      in
       let { sigitems; parameterless_t; type_decl } =
         convert_module_type_signature signature
       in
-      { module_type =
-          { mod_ty with pmty_desc = Pmty_signature (List.rev sigitems) }
+      let sigitems' = List.rev sigitems @ with_version_tags_decls in
+      { module_type = { mod_ty with pmty_desc = Pmty_signature sigitems' }
       ; convertible = parameterless_t
       ; extra_items = Option.to_list type_decl
       }
@@ -688,28 +1100,20 @@ type module_accum =
   ; convertible : bool
   ; sigitems : signature
   ; extra_sigitems : signature
-  ; no_toplevel_latest : bool
   }
 
 (* convert modules Vn ... V1 contained in Stable *)
-let convert_module_decls ~loc:_ signature =
+let convert_module_decls signature =
   let init =
     { latest = None
     ; last = None
     ; convertible = false
     ; sigitems = []
     ; extra_sigitems = []
-    ; no_toplevel_latest = !no_toplevel_latest_type
     }
   in
-  let f
-      { latest
-      ; last
-      ; convertible
-      ; sigitems
-      ; extra_sigitems
-      ; no_toplevel_latest
-      } sigitem =
+  let convert ~no_toplevel_latest ~top_version_tagged
+      { latest; last; convertible; sigitems; extra_sigitems } sigitem =
     match sigitem.psig_desc with
     | Psig_module ({ pmd_name = { txt = Some name; loc }; pmd_type; _ } as pmd)
       ->
@@ -725,7 +1129,7 @@ let convert_module_decls ~loc:_ signature =
         let in_latest = Option.is_none latest in
         let latest = if in_latest then Some name else latest in
         let { module_type; convertible = module_convertible; extra_items } =
-          convert_module_type pmd_type
+          convert_module_type ~loc ~top_version_tagged pmd_type
         in
         let psig_desc' = Psig_module { pmd with pmd_type = module_type } in
         let sigitem' = { sigitem with psig_desc = psig_desc' } in
@@ -742,30 +1146,46 @@ let convert_module_decls ~loc:_ signature =
         ; convertible
         ; sigitems = sigitem' :: sigitems
         ; extra_sigitems
-        ; no_toplevel_latest
-        }
-    | Psig_attribute { attr_name; _ }
-      when String.equal attr_name.txt "no_toplevel_latest_type" ->
-        { latest
-        ; last = None
-        ; convertible
-        ; sigitems
-        ; extra_sigitems = []
-        ; no_toplevel_latest = true
         }
     | _ ->
         Location.raise_errorf ~loc:sigitem.psig_loc
           "Expected versioned module declaration"
   in
-  List.fold signature ~init ~f
+  let sig_attrs, signature_no_attrs =
+    List.partition_tf signature ~f:is_attr_sigitem
+  in
+  let no_toplevel_latest =
+    !no_toplevel_latest_type
+    || List.exists sig_attrs
+         ~f:(is_attr_sigitem_with_name no_toplevel_latest_type_str)
+  in
+  let top_version_tagged =
+    List.exists sig_attrs ~f:(is_attr_sigitem_with_name with_top_version_tag)
+  in
+  ( sig_attrs
+  , List.fold signature_no_attrs ~init
+      ~f:(convert ~no_toplevel_latest ~top_version_tagged) )
 
 let version_module_decl ~loc ~path:_ modname signature =
   Printexc.record_backtrace true ;
   try
     let open Ast_helper in
     let modname = map_loc ~f:(check_modname ~loc:modname.loc) modname in
-    let { txt = { latest; sigitems; convertible; extra_sigitems; _ }; _ } =
-      map_loc ~f:(convert_module_decls ~loc:signature.loc) signature
+    let sig_attrs, { latest; sigitems; convertible; extra_sigitems; _ } =
+      convert_module_decls signature.txt
+    in
+    let top_version_tag =
+      List.exists sig_attrs ~f:(is_attr_sigitem_with_name with_top_version_tag)
+    in
+    let all_version_tagged =
+      List.exists sigitems ~f:(fun sigitem ->
+          match sigitem.psig_desc with
+          | Psig_module
+              { pmd_type = { pmty_desc = Pmty_signature items; _ }; _ } ->
+              List.exists items
+                ~f:(is_attr_sigitem_with_name with_all_version_tags)
+          | _ ->
+              false )
     in
     let mk_module_decl name ty_desc =
       Sig.mk ~loc
@@ -786,14 +1206,27 @@ let version_module_decl ~loc ~path:_ modname signature =
           in
           let defs =
             if convertible then
-              [%sig:
-                val versions :
-                  ( int
-                  * (Core_kernel.Bigstring.t -> pos_ref:int ref -> Latest.t) )
-                  array
-
-                val bin_read_to_latest_opt :
-                  Bin_prot.Common.buf -> pos_ref:int ref -> Latest.t option]
+              let top_version_modules =
+                if top_version_tag then
+                  [ [%sigi:
+                      val bin_read_top_tagged_to_latest :
+                           Bin_prot.Common.buf
+                        -> pos_ref:int ref
+                        -> Latest.t Core_kernel.Or_error.t]
+                  ]
+                else []
+              in
+              let all_version_modules =
+                if all_version_tagged then
+                  [ [%sigi:
+                      val bin_read_all_tagged_to_latest :
+                           Bin_prot.Common.buf
+                        -> pos_ref:int ref
+                        -> Latest.t Core_kernel.Or_error.t]
+                  ]
+                else []
+              in
+              top_version_modules @ all_version_modules
             else []
           in
           (* insert Latest alias after latest version module decl
