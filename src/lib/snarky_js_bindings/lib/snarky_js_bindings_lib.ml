@@ -2063,11 +2063,11 @@ let pickles_digest (choices : pickles_rule_js Js.js_array Js.t)
   let (Choices choices) = Choices.of_js ~public_input_size choices in
   try
     let _ =
-      Pickles.compile_promise ~choices:(Obj.magic choices)
-        ~return_early_digest_exception:true
-        (module Zkapp_statement)
-        (module Zkapp_statement.Constant)
-        ~typ:zkapp_statement_typ
+      Pickles.compile_promise ~choices ~return_early_digest_exception:true
+        (module Public_input)
+        (module Public_input.Constant)
+        ~public_input:(Input (public_input_typ public_input_size))
+        ~auxiliary_typ:Typ.unit
         ~branches:(module Branches)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
           (* ^ TODO make max_branching configurable -- needs refactor in party types *)
