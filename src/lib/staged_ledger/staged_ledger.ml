@@ -238,12 +238,14 @@ module T = struct
     target
 
   let verify_scan_state_after_apply ~constraint_constants
-      ~pending_coinbase_stack ledger (scan_state : Scan_state.t) =
+      ~pending_coinbase_stack ledger other_parties_ledger
+      (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
     let registers_end : _ Mina_state.Registers.t =
       { ledger
+      ; other_parties_ledger
       ; local_state = Mina_state.Local_state.empty ()
       ; pending_coinbase_stack
       }
@@ -284,6 +286,7 @@ module T = struct
           { local_state = Mina_state.Local_state.empty ()
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+          ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
           ; pending_coinbase_stack
           }
     in
@@ -310,6 +313,7 @@ module T = struct
           { local_state = Mina_state.Local_state.empty ()
           ; ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+          ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
           ; pending_coinbase_stack
           }
     in
@@ -368,6 +372,7 @@ module T = struct
     f ~constraint_constants
       ~snarked_registers:
         ( { ledger = snarked_frozen_ledger_hash
+          ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
           ; local_state = snarked_local_state
           ; pending_coinbase_stack
           }
@@ -527,11 +532,13 @@ module T = struct
     ( applied_txn
     , { Transaction_snark.Statement.source =
           { ledger = source_merkle_root
+          ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
           ; pending_coinbase_stack = pending_coinbase_stack_state.pc.source
           ; local_state = empty_local_state
           }
       ; target =
           { ledger = target_merkle_root
+          ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
           ; pending_coinbase_stack = pending_coinbase_target
           ; local_state = empty_local_state
           }
@@ -945,6 +952,7 @@ module T = struct
               verify_scan_state_after_apply ~constraint_constants
                 (Frozen_ledger_hash.of_ledger_hash
                    (Ledger.merkle_root new_ledger) )
+                (* TODO *) Frozen_ledger_hash.empty_hash
                 ~pending_coinbase_stack:latest_pending_coinbase_stack
                 scan_state'
               >>| to_staged_ledger_or_error) )
@@ -2250,7 +2258,9 @@ let%test_module "staged ledger tests" =
      fun stmts ->
       let prover_seed =
         One_or_two.fold stmts ~init:"P" ~f:(fun p stmt ->
-            p ^ Frozen_ledger_hash.to_bytes stmt.target.ledger )
+            p
+            ^ Frozen_ledger_hash.to_bytes stmt.target.ledger
+            ^ Frozen_ledger_hash.to_bytes stmt.target.other_parties_ledger )
       in
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen

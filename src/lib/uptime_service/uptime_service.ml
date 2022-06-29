@@ -327,6 +327,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   match transition with
                   | Snark_work_lib.Work.Single.Spec.Transition ({ target; _ }, _)
                     ->
+                      (* TODO: Change this to other_parties_ledger *)
                       Pasta_bindings.Fp.equal target.ledger
                         (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->

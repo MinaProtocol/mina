@@ -145,18 +145,21 @@ module Statement = struct
     end]
 
     let with_empty_local_state ~supply_increase ~fee_excess ~sok_digest ~source
-        ~target ~pending_coinbase_stack_state : _ t =
+        ~target ~other_parties_source ~other_parties_target
+        ~pending_coinbase_stack_state : _ t =
       { supply_increase
       ; fee_excess
       ; sok_digest
       ; source =
           { ledger = source
+          ; other_parties_ledger = other_parties_source
           ; pending_coinbase_stack =
               pending_coinbase_stack_state.Pending_coinbase_stack_state.source
           ; local_state = Local_state.empty ()
           }
       ; target =
           { ledger = target
+          ; other_parties_ledger = other_parties_target
           ; pending_coinbase_stack = pending_coinbase_stack_state.target
           ; local_state = Local_state.empty ()
           }
@@ -167,7 +170,7 @@ module Statement = struct
       let registers =
         let open Registers in
         Tick.Typ.of_hlistable
-          [ ledger_hash; pending_coinbase; local_state_typ ]
+          [ ledger_hash; ledger_hash; pending_coinbase; local_state_typ ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
       in
@@ -339,6 +342,7 @@ module Statement = struct
       end in
       Registers.Fields.to_list
         ~ledger:(check (module Ledger_hash))
+        ~other_parties_ledger:(check (module Ledger_hash))
         ~pending_coinbase_stack:(check (module PC))
         ~local_state:(check (module Local_state))
       |> Or_error.combine_errors_unit
@@ -3079,6 +3083,9 @@ module Base = struct
     Checked.all_unit
       [ [%with_label "equal roots"]
           (Frozen_ledger_hash.assert_equal root_after statement.target.ledger)
+      ; [%with_label "equal other_parties_ledger roots"]
+          (Frozen_ledger_hash.assert_equal statement.source.other_parties_ledger
+             statement.target.other_parties_ledger )
       ; [%with_label "equal supply_increases"]
           (Currency.Amount.Checked.assert_equal supply_increase
              statement.supply_increase )
@@ -3200,6 +3207,15 @@ module Merge = struct
             (Frozen_ledger_hash.assert_equal s1.target.ledger s2.source.ledger)
         ; [%with_label "equal target ledger hashes"]
             (Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger)
+        ; [%with_label "equal source other_parties_ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s.source.other_parties_ledger
+               s1.source.other_parties_ledger )
+        ; [%with_label "equal target, source other_parties_ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s1.target.other_parties_ledger
+               s2.source.other_parties_ledger )
+        ; [%with_label "equal target other_parties_ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s2.target.other_parties_ledger
+               s.target.other_parties_ledger )
         ]
     in
     (s1, s2)
@@ -3336,6 +3352,8 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
   in
   let statement : Statement.With_sok.t =
     Statement.Poly.with_empty_local_state ~source ~target
+      ~other_parties_source:Frozen_ledger_hash.empty_hash (* TODO *)
+      ~other_parties_target:Frozen_ledger_hash.empty_hash (* TODO *)
       ~supply_increase:(Transaction_union.supply_increase transaction)
       ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
@@ -3395,6 +3413,8 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
   in
   let statement : Statement.With_sok.t =
     Statement.Poly.with_empty_local_state ~source ~target
+      ~other_parties_source:Frozen_ledger_hash.empty_hash (* TODO *)
+      ~other_parties_target:Frozen_ledger_hash.empty_hash (* TODO *)
       ~supply_increase:(Transaction_union.supply_increase transaction)
       ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
@@ -3998,6 +4018,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           in
           { source =
               { ledger = Sparse_ledger.merkle_root source_global.ledger
+              ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
               ; pending_coinbase_stack = pending_coinbase_stack_state.source
               ; local_state =
                   { source_local with
@@ -4009,6 +4030,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
               }
           ; target =
               { ledger = Sparse_ledger.merkle_root target_global.ledger
+              ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
               ; pending_coinbase_stack = pending_coinbase_stack_state.target
               ; local_state =
                   { target_local with

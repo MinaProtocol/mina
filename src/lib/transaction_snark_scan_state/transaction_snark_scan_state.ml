@@ -225,11 +225,13 @@ let create_expected_statement ~constraint_constants
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source =
       { ledger = source_merkle_root
+      ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; local_state = empty_local_state
       }
   ; target =
       { ledger = target_merkle_root
+      ; other_parties_ledger = Frozen_ledger_hash.empty_hash (* TODO *)
       ; pending_coinbase_stack = pending_coinbase_after
       ; local_state = empty_local_state
       }
@@ -539,6 +541,11 @@ struct
         clarify_error
           (Frozen_ledger_hash.equal reg1.ledger reg2.ledger)
           "did not connect with snarked ledger hash"
+      and () =
+        clarify_error
+          (Frozen_ledger_hash.equal reg1.other_parties_ledger
+             reg2.other_parties_ledger )
+          "did not connect with snarked other_parties_ledger hash"
       and () =
         clarify_error
           (Pending_coinbase.Stack.connected ~first:reg1.pending_coinbase_stack

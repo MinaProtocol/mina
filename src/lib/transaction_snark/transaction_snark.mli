@@ -98,6 +98,8 @@ module Statement : sig
       -> sok_digest:'sok_digest
       -> source:'ledger_hash
       -> target:'ledger_hash
+      -> other_parties_source:'ledger_hash
+      -> other_parties_target:'ledger_hash
       -> pending_coinbase_stack_state:
            'pending_coinbase Pending_coinbase_stack_state.poly
       -> ( 'ledger_hash

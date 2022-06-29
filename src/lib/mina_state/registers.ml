@@ -7,6 +7,7 @@ module Stable = struct
   module V1 = struct
     type ('ledger, 'pending_coinbase_stack, 'local_state) t =
       { ledger : 'ledger
+      ; other_parties_ledger : 'ledger
       ; pending_coinbase_stack : 'pending_coinbase_stack
       ; local_state : 'local_state
       }
@@ -17,13 +18,16 @@ end]
 let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%map ledger = Frozen_ledger_hash.gen
+  and other_parties_ledger = Frozen_ledger_hash.gen
   and pending_coinbase_stack = Pending_coinbase.Stack.gen
   and local_state = Local_state.gen in
-  { ledger; pending_coinbase_stack; local_state }
+  { ledger; other_parties_ledger; pending_coinbase_stack; local_state }
 
-let to_input { ledger; pending_coinbase_stack; local_state } =
+let to_input
+    { ledger; other_parties_ledger; pending_coinbase_stack; local_state } =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| Frozen_ledger_hash.to_input ledger
+     ; Frozen_ledger_hash.to_input other_parties_ledger
      ; Pending_coinbase.Stack.to_input pending_coinbase_stack
      ; Local_state.to_input local_state
     |]
@@ -56,9 +60,11 @@ module Checked = struct
   type nonrec t =
     (Ledger_hash.var, Pending_coinbase.Stack.var, Local_state.Checked.t) t
 
-  let to_input { ledger; pending_coinbase_stack; local_state } =
+  let to_input
+      { ledger; other_parties_ledger; pending_coinbase_stack; local_state } =
     Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
       [| Frozen_ledger_hash.var_to_input ledger
+       ; Frozen_ledger_hash.var_to_input other_parties_ledger
        ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack
        ; Local_state.Checked.to_input local_state
       |]
@@ -67,6 +73,7 @@ module Checked = struct
     let ( ! ) eq x1 x2 = Impl.run_checked (eq x1 x2) in
     let f eq acc field = eq (Field.get field t1) (Field.get field t2) :: acc in
     Fields.fold ~init:[] ~ledger:(f !Frozen_ledger_hash.equal_var)
+      ~other_parties_ledger:(f !Frozen_ledger_hash.equal_var)
       ~pending_coinbase_stack:(f !Pending_coinbase.Stack.equal_var)
       ~local_state:(fun acc f ->
         Local_state.Checked.equal' (Field.get f t1) (Field.get f t2) @ acc )

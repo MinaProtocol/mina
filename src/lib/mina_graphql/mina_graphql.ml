@@ -596,7 +596,8 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              Frozen_ledger_hash.to_base58_check target.ledger )
+              Frozen_ledger_hash.to_base58_check target.ledger
+              (* TODO: change this to other_parties_ledger *) )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \

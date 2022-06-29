@@ -74,6 +74,7 @@ let non_pc_registers_equal_var t1 t2 =
       let f eq acc field = eq (F.get field t1) (F.get field t2) :: acc in
       Registers.Fields.fold ~init:[]
         ~ledger:(f !Frozen_ledger_hash.equal_var)
+        ~other_parties_ledger:(f !Frozen_ledger_hash.equal_var)
         ~pending_coinbase_stack:(fun acc f ->
           let () = F.get f t1 and () = F.get f t2 in
           acc )
