@@ -49,7 +49,7 @@ let display
   ; success
   ; failure_status_tbl =
       Transaction_status.Failure.Collection.to_display failure_status_tbl
-      |> Transaction_status.Failure.Collection.display_to_yojson
+      |> Transaction_status.Failure.Collection.Display.to_yojson
       |> Yojson.Safe.to_string
   }
 

@@ -398,11 +398,12 @@ let version_type ~version_option version stri ~all_version_tagged
             | `Assoc [ ("version", `Int n); ("data", data_json) ] ->
                 if n = [%e eint version] then of_yojson data_json
                 else
-                  Error
+                  Ppx_deriving_yojson_runtime.Result.Error
                     (Core_kernel.sprintf "In JSON, expected version %d, got %d"
                        [%e eint version] n )
             | _ ->
-                Error "Expected versioned JSON"
+                Ppx_deriving_yojson_runtime.Result.Error
+                  "Expected versioned JSON"
 
           let (_ : _) = (to_yojson, of_yojson)]
     in
@@ -1022,7 +1023,8 @@ let convert_modbody ~loc ~version_option body =
                                                  (Located.mk (Lident "json")) )
                                            ]]
                                      with
-                                     | Ok v ->
+                                     | Ppx_deriving_yojson_runtime.Result.Ok v
+                                       ->
                                          Ok
                                            [%e
                                              pexp_apply
@@ -1032,7 +1034,8 @@ let convert_modbody ~loc ~version_option body =
                                                      (Located.mk (Lident "v"))
                                                  )
                                                ]]
-                                     | Error err ->
+                                     | Ppx_deriving_yojson_runtime.Result.Error
+                                         err ->
                                          Error (Error.of_string err)]
                                ] ) )]]
               in

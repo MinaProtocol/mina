@@ -771,7 +771,7 @@ module Node = struct
                           f.failures
                         |> Array.to_list |> List.rev )
                       :: acc )
-            |> Mina_base.Transaction_status.Failure.Collection.display_to_yojson
+            |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
             |> Yojson.Safe.to_string )
     in
     let zkapp_id = sent_zkapp_obj.internalSendZkapp.zkapp.id in
