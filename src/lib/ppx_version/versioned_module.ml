@@ -1282,7 +1282,7 @@ let convert_module_decls signature =
   , List.fold signature_no_attrs ~init
       ~f:(convert ~no_toplevel_latest ~top_version_tagged) )
 
-let version_module_decl ~loc ~path modname signature =
+let version_module_decl ~loc ~path:_ modname signature =
   Printexc.record_backtrace true ;
   try
     let open Ast_helper in
