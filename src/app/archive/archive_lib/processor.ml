@@ -1482,18 +1482,15 @@ end
 module Zkapp_fee_payer_body = struct
   type t =
     { account_identifier_id : int
-    ; update_id : int
     ; fee : string
-    ; events_id : int
-    ; sequence_events_id : int
-    ; zkapp_network_precondition_id : int
+    ; valid_until : int64 option
     ; nonce : int64
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; string; int; int; int; int64 ]
+      Caqti_type.[ int; string; option int64; int64 ]
 
   let table_name = "zkapp_fee_payer_body"
 
@@ -1506,39 +1503,19 @@ module Zkapp_fee_payer_body = struct
     let%bind account_identifier_id =
       Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
-    let%bind update_id =
-      Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
-    in
-    let%bind events_id =
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.events
-    in
-    let%bind sequence_events_id =
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
-    in
-    let%bind zkapp_network_precondition_id =
-      Zkapp_network_precondition.add_if_doesn't_exist
-        (module Conn)
-        body.protocol_state_precondition
+    let valid_until =
+      let open Option.Let_syntax in
+      body.valid_until >>| Mina_numbers.Global_slot.to_uint32
+      >>| Unsigned.UInt32.to_int64
     in
     let nonce =
       body.nonce |> Mina_numbers.Account_nonce.to_uint32
       |> Unsigned.UInt32.to_int64
     in
     let fee = Currency.Fee.to_string body.fee in
-    let value =
-      { account_identifier_id
-      ; update_id
-      ; fee
-      ; events_id
-      ; sequence_events_id
-      ; zkapp_network_precondition_id
-      ; nonce
-      }
-    in
+    let value = { account_identifier_id; fee; valid_until; nonce } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
-      ~tannot:(function
-        | "events_ids" | "sequence_events_ids" -> Some "int[]" | _ -> None )
       (module Conn)
       value
 
