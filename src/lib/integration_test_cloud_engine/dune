@@ -48,5 +48,6 @@
    with_hash
    data_hash_lib
    unsigned_extended
+   mina_graphql
    )
 )

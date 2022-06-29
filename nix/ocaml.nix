@@ -25,14 +25,24 @@ let
     pkgs.lib.filterAttrs (name: _: !builtins.elem name (builtins.attrNames b))
     a;
 
-  extra-packages = {
-    ocaml-lsp-server = "1.4.1";
-    ocaml-system = "4.11.2";
+  export-installed = opam-nix.opamListToQuery export.installed;
+
+  extra-packages = with implicit-deps; {
+    dune-rpc = dune;
+    dyn = dune;
+    fiber = dune;
+    ocaml-lsp-server = "1.11.6";
+    ocaml-system = ocaml;
+    ocamlformat-rpc-lib = "0.22.4";
+    omd = "1.3.1";
+    ordering = dune;
+    pp = "1.1.2";
     ppx_yojson_conv_lib = "v0.15.0";
+    stdune = dune;
+    xdg = dune;
   };
 
-  implicit-deps = (opam-nix.opamListToQuery export.installed)
-    // external-packages;
+  implicit-deps = export-installed // external-packages;
 
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
 
@@ -177,6 +187,7 @@ let
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
+        shellHook = "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
       } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; }
         // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
           OCAMLPARAM = "_,cclib=-lc++";

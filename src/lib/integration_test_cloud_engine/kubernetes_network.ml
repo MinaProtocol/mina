@@ -106,16 +106,18 @@ module Node = struct
 
     (* graphql_ppx uses Stdlib symbols instead of Base *)
     open Stdlib
+    module Encoders = Mina_graphql.Types.Input
 
     module Unlock_account =
     [%graphql
-    {|
-      mutation ($password: String!, $public_key: PublicKey!) {
+    ({|
+      mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
           public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
         }
       }
-    |}]
+    |}
+    [@encoders Encoders] )]
 
     module Send_test_payments =
     [%graphql
@@ -125,26 +127,19 @@ module Node = struct
       $amount: UInt64!,
       $fee: UInt64!,
       $repeat_count: UInt32!,
-      $repeat_delay_ms: UInt32!) {
+      $repeat_delay_ms: UInt32!) @encoders(module: "Encoders"){
         sendTestPayments(
           senders: $senders, receiver: $receiver, amount: $amount, fee: $fee,
           repeat_count: $repeat_count,
-          repeat_delay_ms: $repeat_delay_ms) 
+          repeat_delay_ms: $repeat_delay_ms)
       }
     |}]
 
     module Send_payment =
     [%graphql
     {|
-      mutation ($sender: PublicKey!,
-      $receiver: PublicKey!,
-      $amount: UInt64!,
-      $token: UInt64,
-      $fee: UInt64!,
-      $nonce: UInt32,
-      $memo: String) {
-        sendPayment(input:
-          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+     mutation ($input: SendPaymentInput!)@encoders(module: "Encoders"){
+        sendPayment(input: $input){
             payment {
               id
               nonce
@@ -157,23 +152,13 @@ module Node = struct
     module Send_payment_with_raw_sig =
     [%graphql
     {|
-      mutation (
-        $sender: PublicKey!,
-        $receiver: PublicKey!,
-        $amount: UInt64!,
-        $token: UInt64!,
-        $fee: UInt64!,
-        $nonce: UInt32!,
-        $memo: String!,
-        $validUntil: UInt32!,
-        $rawSignature: String!
-      )
+     mutation (
+     $input:SendPaymentInput!,
+     $rawSignature: String!
+     )@encoders(module: "Encoders")
       {
         sendPayment(
-          input:
-          {
-            from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo, validUntil: $validUntil
-          },
+          input:$input,
           signature: {rawSignature: $rawSignature}
         )
         {
@@ -189,15 +174,8 @@ module Node = struct
     module Send_delegation =
     [%graphql
     {|
-      mutation ($sender: PublicKey!,
-      $receiver: PublicKey!,
-      $amount: UInt64!,
-      $token: UInt64,
-      $fee: UInt64!,
-      $nonce: UInt32,
-      $memo: String) {
-        sendDelegation(input:
-          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+      mutation ($input: SendDelegationInput!) @encoders(module: "Encoders"){
+        sendDelegation(input:$input){
             delegation {
               id
               nonce
@@ -210,7 +188,7 @@ module Node = struct
     module Get_account_data =
     [%graphql
     {|
-      query ($public_key: PublicKey!) {
+      query ($public_key: PublicKey!) @encoders(module: "Encoders"){
         account(publicKey: $public_key) {
           nonce
           balance {
@@ -239,7 +217,7 @@ module Node = struct
     module Best_chain =
     [%graphql
     {|
-      query ($max_length: Int) {
+      query ($max_length: Int) @encoders(module: "Encoders"){
         bestChain (maxLength: $max_length) {
           stateHash
           commandTransactionCount
@@ -392,8 +370,7 @@ module Node = struct
     let get_balance_obj =
       Graphql.Get_account_data.(
         make
-        @@ makeVariables
-             ~public_key:(Graphql_lib.Encoders.public_key public_key)
+        @@ makeVariables ~public_key
              (* ~token:(Graphql_lib.Encoders.token token) *)
              ())
     in
@@ -436,23 +413,19 @@ module Node = struct
         Graphql.Unlock_account.(
           make
           @@ makeVariables ~password:"naughty blue worm"
-               ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ())
+               ~public_key:sender_pub_key ())
       in
       exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
     let send_payment_graphql () =
+      let input =
+        Mina_graphql.Types.Input.SendPaymentInput.make_input
+          ~from:sender_pub_key ~to_:receiver_pub_key ~amount ~fee ()
+      in
       let send_payment_obj =
-        Graphql.Send_payment.(
-          make
-          @@ makeVariables
-               ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-               ~amount:(Graphql_lib.Encoders.amount amount)
-               ~fee:(Graphql_lib.Encoders.fee fee)
-               ())
+        Graphql.Send_payment.(make @@ makeVariables ~input ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
         send_payment_obj
@@ -478,7 +451,7 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+  let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
     let sender_pk_str =
@@ -491,23 +464,19 @@ module Node = struct
         Graphql.Unlock_account.(
           make
           @@ makeVariables ~password:"naughty blue worm"
-               ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ())
+               ~public_key:sender_pub_key ())
       in
       exec_graphql_request ~logger ~node:t
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
     let send_delegation_graphql () =
+      let input =
+        Mina_graphql.Types.Input.SendDelegationInput.make_input
+          ~from:sender_pub_key ~to_:receiver_pub_key ~fee ()
+      in
       let send_delegation_obj =
-        Graphql.Send_delegation.(
-          make
-          @@ makeVariables
-               ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-               ~amount:(Graphql_lib.Encoders.amount amount)
-               ~fee:(Graphql_lib.Encoders.fee fee)
-               ())
+        Graphql.Send_delegation.(make @@ makeVariables ~input ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_delegation_graphql"
         send_delegation_obj
@@ -535,18 +504,12 @@ module Node = struct
     let open Deferred.Or_error.Let_syntax in
     let send_payment_graphql () =
       let open Graphql.Send_payment_with_raw_sig in
-      let variables =
-        makeVariables
-          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-          ~amount:(Graphql_lib.Encoders.amount amount)
-          ~token:(Graphql_lib.Encoders.token token)
-          ~fee:(Graphql_lib.Encoders.fee fee)
-          ~nonce:(Graphql_lib.Encoders.nonce nonce)
-          ~memo
-          ~validUntil:(Graphql_lib.Encoders.uint32 valid_until)
-          ~rawSignature:raw_signature ()
+      let input =
+        Mina_graphql.Types.Input.SendPaymentInput.make_input
+          ~from:sender_pub_key ~to_:receiver_pub_key ~amount ~token ~fee ~memo
+          ~nonce ~valid_until ()
       in
+      let variables = makeVariables ~input ~rawSignature:raw_signature () in
       let send_payment_obj = make variables in
       let variables_json_basic =
         variablesToJson (serializeVariables variables)
@@ -582,9 +545,8 @@ module Node = struct
       ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
-      ~fee =
-    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
+    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
@@ -596,16 +558,10 @@ module Node = struct
       let send_payment_obj =
         Graphql.Send_test_payments.(
           make
-          @@ makeVariables
-               ~senders:
-                 (Array.of_list
-                    (List.map ~f:Signature_lib.Private_key.to_yojson senders) )
-               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-               ~amount:(Graphql_lib.Encoders.amount amount)
-               ~fee:(Graphql_lib.Encoders.fee fee)
-               ~repeat_count:(Graphql_lib.Encoders.uint32 repeat_count)
-               ~repeat_delay_ms:(Graphql_lib.Encoders.uint32 repeat_delay_ms)
-               ())
+          @@ makeVariables ~senders ~receiver:receiver_pub_key
+               ~amount:(Currency.Amount.to_uint64 amount)
+               ~fee:(Currency.Fee.to_uint64 fee)
+               ~repeat_count ~repeat_delay_ms ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
         send_payment_obj
