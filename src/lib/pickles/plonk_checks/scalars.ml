@@ -225,8 +225,7 @@ module Tick : S = struct
                    - cell (var (Witness 2, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 3, Curr))
-               + cell (var (Witness 3, Curr))
+               double (cell (var (Witness 3, Curr)))
                - (x_1 * cell (var (Witness 7, Next)))
              in
              let x_3 =
@@ -251,8 +250,7 @@ module Tick : S = struct
                    - cell (var (Witness 7, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 8, Curr))
-               + cell (var (Witness 8, Curr))
+               double (cell (var (Witness 8, Curr)))
                - (x_4 * cell (var (Witness 8, Next)))
              in
              let x_6 =
@@ -277,8 +275,7 @@ module Tick : S = struct
                    - cell (var (Witness 9, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 10, Curr))
-               + cell (var (Witness 10, Curr))
+               double (cell (var (Witness 10, Curr)))
                - (x_7 * cell (var (Witness 9, Next)))
              in
              let x_9 =
@@ -303,8 +300,7 @@ module Tick : S = struct
                    - cell (var (Witness 11, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 12, Curr))
-               + cell (var (Witness 12, Curr))
+               double (cell (var (Witness 12, Curr)))
                - (x_10 * cell (var (Witness 10, Next)))
              in
              let x_12 =
@@ -329,8 +325,7 @@ module Tick : S = struct
                    - cell (var (Witness 13, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 14, Curr))
-               + cell (var (Witness 14, Curr))
+               double (cell (var (Witness 14, Curr)))
                - (x_13 * cell (var (Witness 11, Next)))
              in
              cell (var (Witness 5, Curr))
@@ -352,8 +347,7 @@ module Tick : S = struct
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 7, Next))
                  - ( cell (var (Witness 3, Curr))
-                   - ( cell (var (Witness 2, Next))
-                     + cell (var (Witness 2, Next))
+                   - ( double (cell (var (Witness 2, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -376,8 +370,7 @@ module Tick : S = struct
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 8, Next))
                  - ( cell (var (Witness 8, Curr))
-                   - ( cell (var (Witness 3, Next))
-                     + cell (var (Witness 3, Next))
+                   - ( double (cell (var (Witness 3, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -400,8 +393,7 @@ module Tick : S = struct
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 9, Next))
                  - ( cell (var (Witness 10, Curr))
-                   - ( cell (var (Witness 4, Next))
-                     + cell (var (Witness 4, Next))
+                   - ( double (cell (var (Witness 4, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -425,8 +417,7 @@ module Tick : S = struct
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 10, Next))
                  - ( cell (var (Witness 12, Curr))
-                   - ( cell (var (Witness 5, Next))
-                     + cell (var (Witness 5, Next))
+                   - ( double (cell (var (Witness 5, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -451,8 +442,7 @@ module Tick : S = struct
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 11, Next))
                  - ( cell (var (Witness 14, Curr))
-                   - ( cell (var (Witness 6, Next))
-                     + cell (var (Witness 6, Next))
+                   - ( double (cell (var (Witness 6, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -1208,8 +1198,7 @@ module Tock : S = struct
                    - cell (var (Witness 2, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 3, Curr))
-               + cell (var (Witness 3, Curr))
+               double (cell (var (Witness 3, Curr)))
                - (x_1 * cell (var (Witness 7, Next)))
              in
              let x_3 =
@@ -1234,8 +1223,7 @@ module Tock : S = struct
                    - cell (var (Witness 7, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 8, Curr))
-               + cell (var (Witness 8, Curr))
+               double (cell (var (Witness 8, Curr)))
                - (x_4 * cell (var (Witness 8, Next)))
              in
              let x_6 =
@@ -1260,8 +1248,7 @@ module Tock : S = struct
                    - cell (var (Witness 9, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 10, Curr))
-               + cell (var (Witness 10, Curr))
+               double (cell (var (Witness 10, Curr)))
                - (x_7 * cell (var (Witness 9, Next)))
              in
              let x_9 =
@@ -1286,8 +1273,7 @@ module Tock : S = struct
                    - cell (var (Witness 11, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 12, Curr))
-               + cell (var (Witness 12, Curr))
+               double (cell (var (Witness 12, Curr)))
                - (x_10 * cell (var (Witness 10, Next)))
              in
              let x_12 =
@@ -1312,8 +1298,7 @@ module Tock : S = struct
                    - cell (var (Witness 13, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
-               cell (var (Witness 14, Curr))
-               + cell (var (Witness 14, Curr))
+               double (cell (var (Witness 14, Curr)))
                - (x_13 * cell (var (Witness 11, Next)))
              in
              cell (var (Witness 5, Curr))
@@ -1335,8 +1320,7 @@ module Tock : S = struct
                * ( (cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 7, Next))
                  - ( cell (var (Witness 3, Curr))
-                   - ( cell (var (Witness 2, Next))
-                     + cell (var (Witness 2, Next))
+                   - ( double (cell (var (Witness 2, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -1359,8 +1343,7 @@ module Tock : S = struct
                * ( (cell (var (Witness 7, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 8, Next))
                  - ( cell (var (Witness 8, Curr))
-                   - ( cell (var (Witness 3, Next))
-                     + cell (var (Witness 3, Next))
+                   - ( double (cell (var (Witness 3, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -1383,8 +1366,7 @@ module Tock : S = struct
                * ( (cell (var (Witness 9, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 9, Next))
                  - ( cell (var (Witness 10, Curr))
-                   - ( cell (var (Witness 4, Next))
-                     + cell (var (Witness 4, Next))
+                   - ( double (cell (var (Witness 4, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -1408,8 +1390,7 @@ module Tock : S = struct
                * ( (cell (var (Witness 11, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 10, Next))
                  - ( cell (var (Witness 12, Curr))
-                   - ( cell (var (Witness 5, Next))
-                     + cell (var (Witness 5, Next))
+                   - ( double (cell (var (Witness 5, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
@@ -1434,8 +1415,7 @@ module Tock : S = struct
                * ( (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Curr)))
                    * cell (var (Witness 11, Next))
                  - ( cell (var (Witness 14, Curr))
-                   - ( cell (var (Witness 6, Next))
-                     + cell (var (Witness 6, Next))
+                   - ( double (cell (var (Witness 6, Next)))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )

@@ -5,14 +5,23 @@ open Poly_types
 open Hlist
 
 (* Compute the domains corresponding to wrap_main *)
-module Make (A : T0) (A_value : T0) = struct
-  module I = Inductive_rule.T (A) (A_value)
+module Make
+    (A : T0)
+    (A_value : T0)
+    (Ret_var : T0)
+    (Ret_value : T0)
+    (Auxiliary_var : T0)
+    (Auxiliary_value : T0) =
+struct
+  module I =
+    Inductive_rule.T (A) (A_value) (Ret_var) (Ret_value) (Auxiliary_var)
+      (Auxiliary_value)
 
-  let prev (type xs ys ws hs) ~self ~(choices : (xs, ys, ws, hs) H4.T(I).t) =
+  let prev (type a1 a2 ws hs) ~self ~(choices : (a1, a2, ws, hs) H4.T(I).t) =
     let module M_inner =
       H4.Map (Tag) (E04 (Domains))
         (struct
-          let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
+          let f : type a1 a2 a3 a4. (a1, a2, a3, a4) Tag.t -> Domains.t =
            fun t ->
             Types_map.lookup_map t ~self:self.Tag.id
               ~default:(fun () -> assert false)

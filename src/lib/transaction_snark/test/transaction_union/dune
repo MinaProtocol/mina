@@ -37,6 +37,7 @@
    quickcheck_lib
    mina_transaction
    mina_transaction_logic
+   staged_ledger_diff
    )
   (library_flags -linkall)
   (inline_tests)

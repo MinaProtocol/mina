@@ -7,3 +7,4 @@ authors = ["opensource@o1labs.org"]
 [dependencies]
 ocaml-gen = { path = "../../../proof-systems/ocaml/ocaml-gen" }
 wires_15_stubs = { path = "../" }
+kimchi = { path = "../../../proof-systems/kimchi", features = [ "ocaml_types" ] }
