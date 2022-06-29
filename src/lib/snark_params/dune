@@ -12,6 +12,7 @@
    base
    sexplib0
    ;; local libraries
+   kimchi_backend.pasta
    bignum_bigint
    pickles.backend
    snarky_curves
@@ -26,9 +27,7 @@
    crypto_params
    snarky_field_extensions
    snarky.intf
-   pasta
-   zexe_backend
-   tuple_lib
+   kimchi_backend
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

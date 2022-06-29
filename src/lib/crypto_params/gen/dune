@@ -18,6 +18,7 @@
    bin_prot.shape
    ocaml-compiler-libs.common
    ;; local libraries
+   kimchi_backend.pasta
    group_map
    tuple_lib
    snarky.backendless
@@ -25,8 +26,7 @@
    crs
    pickles
    pickles.backend
-   pasta
-   zexe_backend
+   kimchi_backend
  )
  (preprocessor_deps ../../../config.mlh)
  (preprocess

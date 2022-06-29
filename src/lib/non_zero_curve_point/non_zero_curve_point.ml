@@ -36,10 +36,6 @@ module Compressed = struct
         let version_byte =
           Base58_check.Version_bytes.non_zero_curve_point_compressed
       end
-
-      module Tests = struct
-        (* actual tests in Stable below *)
-      end
     end]
   end
 
@@ -76,32 +72,24 @@ module Compressed = struct
         let%map uncompressed = gen_uncompressed in
         compress uncompressed
     end
-
-    module Tests = struct
-      (* these tests check not only whether the serialization of the version-asserted type has changed,
-         but also whether the serializations for the consensus and nonconsensus code are identical
-      *)
-
-      [%%if curve_size = 255]
-
-      let%test "nonzero_curve_point_compressed v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
-        in
-        let known_good_digest = "35c836b0252293061bf974490f5bd515" in
-        Ppx_version_runtime.Serialization.check_serialization
-          (module V1)
-          point known_good_digest
-
-      [%%else]
-
-      let%test "nonzero_curve_point_compressed v1" =
-        failwith "Unknown curve size"
-
-      [%%endif]
-    end
   end]
+
+  [%%if curve_size = 255]
+
+  let%test "nonzero_curve_point_compressed v1" =
+    let point =
+      Quickcheck.random_value
+        ~seed:(`Deterministic "nonzero_curve_point_compressed-seed")
+        Stable.V1.gen
+    in
+    let known_good_digest = "35c836b0252293061bf974490f5bd515" in
+    Test_util.check_serialization (module Stable.V1) point known_good_digest
+
+  [%%else]
+
+  let%test "nonzero_curve_point_compressed v1" = failwith "Unknown curve size"
+
+  [%%endif]
 
   module Poly = Poly
   include Comparable.Make_binable (Stable.Latest)
@@ -117,7 +105,12 @@ module Compressed = struct
   let empty = Poly.{ x = Field.zero; is_odd = false }
 
   let to_input { Poly.x; is_odd } =
-    { Random_oracle.Input.field_elements = [| x |]
+    { Random_oracle.Input.Chunked.field_elements = [| x |]
+    ; packeds = [| (Field.project [ is_odd ], 1) |]
+    }
+
+  let to_input_legacy { Poly.x; is_odd } =
+    { Random_oracle.Input.Legacy.field_elements = [| x |]
     ; bitstrings = [| [ is_odd ] |]
     }
 
@@ -146,7 +139,12 @@ module Compressed = struct
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
       Boolean.(x_eq && odd_eq)
 
-    let to_input = to_input
+    let to_input ({ x; is_odd } : var) =
+      { Random_oracle.Input.Chunked.field_elements = [| x |]
+      ; packeds = [| ((is_odd :> Field.Var.t), 1) |]
+      }
+
+    let to_input_legacy = to_input_legacy
 
     let if_ cond ~then_:t1 ~else_:t2 =
       let%map x = Field.Checked.if_ cond ~then_:t1.Poly.x ~else_:t2.Poly.x
@@ -293,7 +291,7 @@ module Uncompressed = struct
     and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
     (x, y)
 
-  let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
+  let%snarkydef compress_var ((x, y) : var) : Compressed.var Checked.t =
     let open Compressed_poly in
     let%map is_odd = parity_var y in
     { Poly.x; is_odd }

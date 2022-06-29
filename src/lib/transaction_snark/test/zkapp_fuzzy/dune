@@ -1,0 +1,43 @@
+(executable
+  (name zkapp_fuzzy)
+ (libraries
+   ;; opam libraries
+   ppx_inline_test.config
+   async
+   async_kernel
+   async_unix
+   core
+   base
+   core_kernel
+   yojson
+   ;; local libraries
+   logger
+   mina_base.import
+   data_hash_lib
+   mina_generators
+   pickles
+   pickles.backend
+   kimchi_backend.pasta
+   transaction_snark
+   snark_params
+   mina_ledger
+   mina_base
+   currency
+   mina_state
+   signature_lib
+   genesis_constants
+   transaction_protocol_state
+   pickles_types
+   mina_numbers
+   sgn
+   transaction_snark_tests
+   test_util
+   mina_transaction_logic
+   with_hash
+   random_oracle
+   sexplib0
+   )
+  (link_flags (-linkall))
+  (preprocess
+    (pps ppx_coda ppx_snarky ppx_version ppx_jane))
+  (instrumentation (backend bisect_ppx)))

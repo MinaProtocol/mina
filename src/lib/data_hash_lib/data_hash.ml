@@ -28,7 +28,7 @@ struct
 
   let () = assert (Int.(length_in_bits <= Field.size_in_bits))
 
-  let to_input t = Random_oracle.Input.field t
+  let to_input t = Random_oracle.Input.Chunked.field t
 
   [%%ifdef consensus_mechanism]
 
@@ -80,7 +80,7 @@ struct
         t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
         bits
 
-  let var_to_input (t : var) = Random_oracle.Input.field t.digest
+  let var_to_input (t : var) = Random_oracle.Input.Chunked.field t.digest
 
   (* TODO : use Random oracle.Digest to satisfy Bits_intf.S, move out of
      consensus_mechanism guard
@@ -113,35 +113,23 @@ module T0 = struct
 
       let to_latest = Fn.id
     end
-
-    module Tests = struct end
   end]
 
-  module Tests = struct
-    (* these test the stability of the serialization derived from the
-       string representation of Field.t, not the direct serialization of
-       Field.t
-    *)
+  [%%if curve_size = 255]
 
+  let%test "Binable from stringable V1" =
     let field =
       Quickcheck.random_value ~seed:(`Deterministic "Data_hash.T0 tests")
         Field.gen
+    in
+    let known_good_digest = "fa43c8180f9f3cef1cf5767592e964c1" in
+    Test_util.check_serialization (module Stable.V1) field known_good_digest
 
-    [%%if curve_size = 255]
+  [%%else]
 
-    let%test "Binable from stringable V1" =
-      let known_good_digest = "fa43c8180f9f3cef1cf5767592e964c1" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module Stable.V1)
-        field known_good_digest
+  let%test "Binable from stringable V1" = failwith "No test for this curve size"
 
-    [%%else]
-
-    let%test "Binable from stringable V1" =
-      failwith "No test for this curve size"
-
-    [%%endif]
-  end
+  [%%endif]
 end
 
 module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
@@ -173,9 +161,13 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   let of_hash = Fn.id
 
+  let to_field = Fn.id
+
   [%%ifdef consensus_mechanism]
 
   let var_of_hash_packed digest = { digest; bits = None }
+
+  let var_to_field { digest; _ } = digest
 
   let if_ cond ~then_ ~else_ =
     let%map digest =
