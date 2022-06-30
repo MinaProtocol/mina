@@ -8,3 +8,5 @@ if [ -z "${MARLIN_PLONK_STUBS-}" ]; then
 fi
 
 cp "$MARLIN_PLONK_STUBS/libmarlin_plonk_stubs.a" .
+cp "$MARLIN_PLONK_STUBS/libmarlin_plonk_stubs.so" ./dllmarlin_plonk_stubs.so ||
+    cp "$MARLIN_PLONK_STUBS/libmarlin_plonk_stubs.dylib" ./dllmarlin_plonk_stubs.so

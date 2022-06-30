@@ -2,7 +2,7 @@
 (dirs :standard \ target) ;; Ignore target if it exists locally
 
 (rule
- (targets libmarlin_plonk_stubs.a)
+ (targets libmarlin_plonk_stubs.a dllmarlin_plonk_stubs.so)
  (deps
    Cargo.toml
    rust-toolchain.toml

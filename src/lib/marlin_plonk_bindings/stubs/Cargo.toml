@@ -9,7 +9,7 @@ edition = "2018"
 
 [lib]
 name = "marlin_plonk_stubs"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "cdylib"]
 
 ################################# Dependencies ################################
 
