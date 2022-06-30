@@ -11,3 +11,5 @@ let if_ b ~then_ ~else_ =
       get (if Impl.As_prover.read Boolean.typ b then then_ else else_) )
 
 let map t ~f = create (fun () -> f (get t))
+
+let typ = Typ.Internal.ref
