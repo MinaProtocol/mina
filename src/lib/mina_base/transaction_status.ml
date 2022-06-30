@@ -56,9 +56,17 @@ module Failure = struct
   end]
 
   module Collection = struct
-    (* bin_io used to archive extensional blocks, doesn't need versioning *)
-    type display = (int * Stable.Latest.t list) list
-    [@@deriving equal, yojson, sexp, bin_io_unversioned]
+    module Display = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = (int * Stable.V2.t list) list
+          [@@deriving equal, compare, yojson, sexp, hash]
+
+          let to_latest = Fn.id
+        end
+      end]
+    end
 
     [%%versioned
     module Stable = struct
@@ -70,7 +78,7 @@ module Failure = struct
       end
     end]
 
-    let to_display t =
+    let to_display t : Display.t =
       let _, display =
         List.fold_right t ~init:(0, []) ~f:(fun bucket (index, acc) ->
             if List.is_empty bucket then (index + 1, acc)
