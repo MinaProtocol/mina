@@ -29,7 +29,7 @@ Pipeline.build
           , label = "Verifies references in markdown"
           , key = "xrefcheck"
           , target = Size.Small
-          , soft_fail = ExitStatus.Code 1
+          , soft_fail = True
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).xrefcheck,
               shell = None (List Text)
