@@ -63,11 +63,12 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
   in
   let state_body =
     let compile_time_genesis =
+      let open Staged_ledger_diff in
       (*not using Precomputed_values.for_unit_test because of dependency cycle*)
       Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
         ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-        ~constraint_constants ~consensus_constants
+        ~constraint_constants ~consensus_constants ~genesis_body_reference
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
@@ -97,18 +98,15 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
+      ~f:(fun _ ((witness, spec, statement) as w) ->
         printf "%s"
           (sprintf
              !"current witness \
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
                Transaction_snark.Parties_segment.Basic.t * \
-               Transaction_snark.Statement.With_sok.t * (int * \
-               Zkapp_statement.t)option) }%!"
+               Transaction_snark.Statement.With_sok.t) }%!"
              w ) ;
-        let%map _ =
-          T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
-        in
+        let%map _ = T.of_parties_segment_exn ~statement ~witness ~spec in
         ((), ()) )
   in
   ()
@@ -132,12 +130,13 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:Genesis_constants.compiled.protocol
   in
+  let open Staged_ledger_diff in
   let compile_time_genesis =
     (*not using Precomputed_values.for_unit_test because of dependency cycle*)
     Mina_state.Genesis_protocol_state.t
       ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
       ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-      ~constraint_constants ~consensus_constants
+      ~constraint_constants ~consensus_constants ~genesis_body_reference
   in
   let protocol_state_predicate =
     let protocol_state_predicate_view =
@@ -191,18 +190,15 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
+      ~f:(fun _ ((witness, spec, statement) as w) ->
         printf "%s"
           (sprintf
              !"current witness \
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
                Transaction_snark.Parties_segment.Basic.t * \
-               Transaction_snark.Statement.With_sok.t * (int * \
-               Zkapp_statement.t)option) }%!"
+               Transaction_snark.Statement.With_sok.t) }%!"
              w ) ;
-        let%map _ =
-          T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
-        in
+        let%map _ = T.of_parties_segment_exn ~statement ~witness ~spec in
         ((), ()) )
   in
   ()
@@ -674,7 +670,7 @@ let%test_module "ZkApps test transaction" =
       go path expected got ; !success
 
     let hit_server (parties : Parties.t) query =
-      let typ = Mina_graphql.Types.Input.send_zkapp in
+      let typ = Mina_graphql.Types.Input.SendZkappInput.arg_typ.arg_typ in
       let query_top_level =
         Graphql_async.Schema.(
           io_field "sendZkapp" ~typ:(non_null string)

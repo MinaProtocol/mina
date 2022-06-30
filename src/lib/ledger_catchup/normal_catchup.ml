@@ -1043,7 +1043,6 @@ let%test_module "Ledger_catchup tests" =
             in
             downcast_transition
               ( Frontier_base.Root_data.Historical.transition failing_root_data
-              |> Mina_block.External_transition.Validated.lower
               |> Mina_block.Validated.remember )
           in
           Thread_safe.block_on_async_exn (fun () ->
@@ -1101,7 +1100,7 @@ let%test_module "Ledger_catchup tests" =
                     (downcast_breadcrumb breadcrumb)
                 in
                 Core.Printf.printf "$job = %s --> %s\n"
-                  (State_hash.to_base58_check @@ External_transition.Initial_validated.state_hash @@ Envelope.Incoming.data @@ Cached.peek cached_transition)
+                  (State_hash.to_base58_check @@ Mina_block.state_hash @@ Envelope.Incoming.data @@ Cached.peek cached_transition)
                   (State_hash.to_base58_check parent_hash);
                 (parent_hash, [Rose_tree.T (cached_transition, [])]))
             in

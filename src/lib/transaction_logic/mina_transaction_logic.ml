@@ -947,7 +947,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           (* Raise a more useful error message if we have a failure
              description. *)
           Error.raise @@ Error.of_string @@ Yojson.Safe.to_string
-          @@ Transaction_status.Failure.Collection.display_to_yojson
+          @@ Transaction_status.Failure.Collection.Display.to_yojson
           @@ Transaction_status.Failure.Collection.to_display failure_status_tbl
         else assert b
     end
@@ -2046,12 +2046,8 @@ module For_tests = struct
       { fee_payer =
           { Party.Fee_payer.body =
               { public_key = sender_pk
-              ; update = Party.Update.noop
               ; fee
-              ; events = []
-              ; sequence_events = []
-              ; protocol_state_precondition =
-                  Zkapp_precondition.Protocol_state.accept
+              ; valid_until = None
               ; nonce = actual_nonce
               }
               (* Real signature added in below *)

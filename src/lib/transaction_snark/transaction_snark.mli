@@ -337,7 +337,6 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
-    -> snapp_statement:(int * Zkapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -369,7 +368,6 @@ module Parties_intermediate_state : sig
     ; spec : Parties_segment.Basic.t
     ; state_before : state
     ; state_after : state
-    ; use_full_commitment : [ `Others | `Proved_use_full_commitment of bool ]
     }
 end
 
@@ -430,10 +428,7 @@ val parties_witnesses_exn :
      * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
      * Parties.t )
      list
-  -> ( Parties_segment.Witness.t
-     * Parties_segment.Basic.t
-     * Statement.With_sok.t
-     * (int * Zkapp_statement.t) option )
+  -> (Parties_segment.Witness.t * Parties_segment.Basic.t * Statement.With_sok.t)
      list
      * Mina_ledger.Sparse_ledger.t
 
@@ -491,9 +486,8 @@ module Base : sig
          ?witness:Parties_segment.Witness.t
       -> Parties_segment.Spec.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
-      -> (int * Zkapp_statement.Checked.t) list
       -> Statement.With_sok.var
-      -> unit
+      -> Zkapp_statement.Checked.t option
   end
 end
 
@@ -531,7 +525,8 @@ module For_tests : sig
          , unit
          , unit
          , Zkapp_statement.t
-         , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
+         , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t) Async.Deferred.t
+         )
          Pickles.Prover.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
@@ -567,7 +562,8 @@ module For_tests : sig
             , unit
             , unit
             , Zkapp_statement.t
-            , (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Async.Deferred.t )
+            , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+              Async.Deferred.t )
             Pickles.Prover.t ]
 
   val multiple_transfers : Spec.t -> Parties.t

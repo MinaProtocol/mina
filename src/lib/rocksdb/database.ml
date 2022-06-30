@@ -13,11 +13,11 @@ let create directory =
   { uuid = Uuid_unix.create (); db = Rocks.open_db ~opts directory }
 
 let create_checkpoint t dir =
-  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ;
+  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None () ;
   create dir
 
 let make_checkpoint t dir =
-  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None
+  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ()
 
 let get_uuid t = t.uuid
 

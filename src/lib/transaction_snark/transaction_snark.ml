@@ -906,9 +906,7 @@ module Base = struct
         let open Zkapp_statement in
         Pickles.Side_loaded.create ~typ ~name:(sprintf "zkapp_%d" i)
           ~max_proofs_verified:
-            (module Pickles.Side_loaded.Verification_key.Max_width)
-          ~value_to_field_elements:to_field_elements
-          ~var_to_field_elements:Checked.to_field_elements )
+            (module Pickles.Side_loaded.Verification_key.Max_width) )
 
   let signature_verifies ~shifted ~payload_digest signature pk =
     let%bind pk =
@@ -971,7 +969,7 @@ module Base = struct
 
       val spec : single
 
-      val snapp_statement : (int * Zkapp_statement.Checked.t) option
+      val set_zkapp_input : Zkapp_statement.Checked.t -> unit
     end
 
     type party =
@@ -1650,6 +1648,18 @@ module Base = struct
       end
     end
 
+    type _ Snarky_backendless.Request.t +=
+      | Zkapp_proof :
+          (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Snarky_backendless.Request.t
+
+    let handle_zkapp_proof (proof : _ Pickles.Proof.t)
+        (Snarky_backendless.Request.With { request; respond }) =
+      match request with
+      | Zkapp_proof ->
+          respond (Provide proof)
+      | _ ->
+          respond Unhandled
+
     module Single (I : Single_inputs) = struct
       open I
 
@@ -1665,7 +1675,8 @@ module Base = struct
           include Account
 
           let register_verification_key ({ data = a; _ } : t) =
-            Option.iter snapp_statement ~f:(fun (tag, _) ->
+            match spec.auth_type with
+            | Proof ->
                 let vk =
                   exists Side_loaded_verification_key.typ ~compute:(fun () ->
                       Option.value_exn
@@ -1678,7 +1689,9 @@ module Base = struct
                 in
                 let actual_hash = Zkapp_account.Checked.digest_vk vk in
                 Field.Assert.equal expected_hash actual_hash ;
-                Pickles.Side_loaded.in_circuit (side_loaded tag) vk )
+                Pickles.Side_loaded.in_circuit (side_loaded 0) vk
+            | Signature | None_given ->
+                ()
         end
 
         module Controller = struct
@@ -1813,19 +1826,15 @@ module Base = struct
               ~at_party:({ hash = at_party; _ } : Parties.t)
               ({ party; control; _ } : t) =
             let proof_verifies =
-              match (auth_type, snapp_statement) with
-              | Proof, Some (_i, s) ->
-                  with_label __LOC__ (fun () ->
-                      Zkapp_statement.Checked.Assert.equal
-                        { transaction = commitment
-                        ; at_party = (at_party :> Field.t)
-                        }
-                        s ) ;
+              match auth_type with
+              | Proof ->
+                  set_zkapp_input
+                    { party = (party.hash :> Field.t)
+                    ; calls = (at_party :> Field.t)
+                    } ;
                   Boolean.true_
-              | (Signature | None_given), None ->
+              | Signature | None_given ->
                   Boolean.false_
-              | Proof, None | (Signature | None_given), Some _ ->
-                  assert false
             in
             let signature_verifies =
               match auth_type with
@@ -2016,7 +2025,7 @@ module Base = struct
               [ correct_coinbase_target_stack; valid_init_state ] ) )
 
     let main ?(witness : Witness.t option) (spec : Spec.t) ~constraint_constants
-        snapp_statements (statement : Statement.With_sok.Checked.t) =
+        (statement : Statement.With_sok.Checked.t) =
       let open Impl in
       run_checked (dummy_constraints ()) ;
       let ( ! ) x = Option.value_exn x in
@@ -2073,26 +2082,15 @@ module Base = struct
       let start_parties =
         As_prover.Ref.create (fun () -> !witness.start_parties)
       in
-      let (global, local), snapp_statements =
-        List.fold_left spec ~init:(init, snapp_statements)
-          ~f:(fun (((_, local) as acc), statements) party_spec ->
-            let snapp_statement, statements =
-              match party_spec.auth_type with
-              | Signature | None_given ->
-                  (None, statements)
-              | Proof -> (
-                  match statements with
-                  | [] ->
-                      assert false
-                  | s :: ss ->
-                      (Some s, ss) )
-            in
+      let zkapp_input = ref None in
+      let global, local =
+        List.fold_left spec ~init ~f:(fun ((_, local) as acc) party_spec ->
             let module S = Single (struct
               let constraint_constants = constraint_constants
 
               let spec = party_spec
 
-              let snapp_statement = snapp_statement
+              let set_zkapp_input x = zkapp_input := Some x
             end) in
             let finish v =
               let open Mina_transaction_logic.Parties_logic.Start_data in
@@ -2176,9 +2174,8 @@ module Base = struct
                           `Start p )
                   |> finish
             in
-            (acc', statements) )
+            acc' )
       in
-      with_label __LOC__ (fun () -> assert (List.is_empty snapp_statements)) ;
       let local_state_ledger =
         (* The actual output ledger may differ from the one generated by
            transaction logic, because we handle failures differently between
@@ -2217,9 +2214,7 @@ module Base = struct
                }
              in
              Fee_excess.assert_equal_checked expected got ) ) ;
-      let `Needs_some_work_for_zkapps_on_mainnet = Mina_base.Util.todo_zkapps in
-      (* TODO: Check various consistency equalities between local and global and the statement *)
-      ()
+      Stdlib.( ! ) zkapp_input
 
     (* Horrible hack :( *)
     let witness : Witness.t option ref = ref None
@@ -2231,7 +2226,11 @@ module Base = struct
         , c
         , d
         , Statement.With_sok.var
-        , Statement.With_sok.t )
+        , Statement.With_sok.t
+        , unit
+        , unit
+        , unit
+        , unit )
         Pickles.Inductive_rule.t =
       let open Hlist in
       let open Basic in
@@ -2250,27 +2249,51 @@ module Base = struct
           { identifier = "proved"
           ; prevs = M.[ side_loaded 0 ]
           ; main =
-              (fun [ snapp_statement ] stmt ->
-                main ?witness:!witness s ~constraint_constants
-                  (List.mapi [ snapp_statement ] ~f:(fun i x -> (i, x)))
-                  stmt ;
-                [ b ] )
+              (fun { public_input = stmt } ->
+                let zkapp_input =
+                  main ?witness:!witness s ~constraint_constants stmt
+                in
+                let proof =
+                  Run.exists (Typ.Internal.ref ()) ~request:(fun () ->
+                      Zkapp_proof )
+                in
+                { previous_proof_statements =
+                    [ { public_input = Option.value_exn zkapp_input
+                      ; proof
+                      ; proof_must_verify = b
+                      }
+                    ]
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
           ; prevs = M.[]
           ; main =
-              (fun [] stmt ->
-                main ?witness:!witness s ~constraint_constants [] stmt ;
-                [] )
+              (fun { public_input = stmt } ->
+                let zkapp_input_opt =
+                  main ?witness:!witness s ~constraint_constants stmt
+                in
+                assert (Option.is_none zkapp_input_opt) ;
+                { previous_proof_statements = []
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
       | Opt_signed ->
           { identifier = "opt_signed"
           ; prevs = M.[]
           ; main =
-              (fun [] stmt ->
-                main ?witness:!witness s ~constraint_constants [] stmt ;
-                [] )
+              (fun { public_input = stmt } ->
+                let zkapp_input_opt =
+                  main ?witness:!witness s ~constraint_constants stmt
+                in
+                assert (Option.is_none zkapp_input_opt) ;
+                { previous_proof_statements = []
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
           }
   end
 
@@ -3067,9 +3090,12 @@ module Base = struct
     { identifier = "transaction"
     ; prevs = []
     ; main =
-        (fun [] x ->
+        (fun { public_input = x } ->
           Run.run_checked (main ~constraint_constants x) ;
-          [] )
+          { previous_proof_statements = []
+          ; public_output = ()
+          ; auxiliary_output = ()
+          } )
     }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3102,6 +3128,27 @@ end
 module Merge = struct
   open Tick
 
+  type _ Snarky_backendless.Request.t +=
+    | Statements_to_merge :
+        (Statement.With_sok.t * Statement.With_sok.t)
+        Snarky_backendless.Request.t
+    | Proofs_to_merge :
+        ( (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+        * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t )
+        Snarky_backendless.Request.t
+
+  let handle
+      ((left_stmt, right_stmt) : Statement.With_sok.t * Statement.With_sok.t)
+      ((left_proof, right_proof) : _ Pickles.Proof.t * _ Pickles.Proof.t)
+      (Snarky_backendless.Request.With { request; respond }) =
+    match request with
+    | Statements_to_merge ->
+        respond (Provide (left_stmt, right_stmt))
+    | Proofs_to_merge ->
+        respond (Provide (left_proof, right_proof))
+    | _ ->
+        respond Unhandled
+
   (* spec for [main top_hash]:
      constraints pass iff
      there exist digest, s1, s3, fee_excess, supply_increase pending_coinbase_stack12.source, pending_coinbase_stack23.target, tock_vk such that
@@ -3109,10 +3156,12 @@ module Merge = struct
      verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
      verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
   *)
-  let%snarkydef main
-      ([ s1; s2 ] :
-        (Statement.With_sok.var * (Statement.With_sok.var * _))
-        Pickles_types.Hlist.HlistId.t ) (s : Statement.With_sok.Checked.t) =
+  let%snarkydef main (s : Statement.With_sok.Checked.t) =
+    let%bind s1, s2 =
+      exists
+        Typ.(Statement.With_sok.typ * Statement.With_sok.typ)
+        ~request:(As_prover.return Statements_to_merge)
+    in
     let%bind fee_excess =
       Fee_excess.combine_checked s1.Statement.fee_excess s2.Statement.fee_excess
     in
@@ -3139,18 +3188,21 @@ module Merge = struct
           Local_state.Checked.assert_equal s.target.local_state
             s2.target.local_state )
     in
-    Checked.all_unit
-      [ [%with_label "equal fee excesses"]
-          (Fee_excess.assert_equal_checked fee_excess s.fee_excess)
-      ; [%with_label "equal supply increases"]
-          (Amount.Checked.assert_equal supply_increase s.supply_increase)
-      ; [%with_label "equal source ledger hashes"]
-          (Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger)
-      ; [%with_label "equal target, source ledger hashes"]
-          (Frozen_ledger_hash.assert_equal s1.target.ledger s2.source.ledger)
-      ; [%with_label "equal target ledger hashes"]
-          (Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger)
-      ]
+    let%map () =
+      Checked.all_unit
+        [ [%with_label "equal fee excesses"]
+            (Fee_excess.assert_equal_checked fee_excess s.fee_excess)
+        ; [%with_label "equal supply increases"]
+            (Amount.Checked.assert_equal supply_increase s.supply_increase)
+        ; [%with_label "equal source ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger)
+        ; [%with_label "equal target, source ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s1.target.ledger s2.source.ledger)
+        ; [%with_label "equal target ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger)
+        ]
+    in
+    (s1, s2)
 
   let rule ~proof_level self : _ Pickles.Inductive_rule.t =
     let prev_should_verify =
@@ -3164,9 +3216,20 @@ module Merge = struct
     { identifier = "merge"
     ; prevs = [ self; self ]
     ; main =
-        (fun ps x ->
-          Run.run_checked (main ps x) ;
-          [ b; b ] )
+        (fun { public_input = x } ->
+          let s1, s2 = Run.run_checked (main x) in
+          let p1, p2 =
+            Run.exists
+              Typ.(Internal.ref () * Internal.ref ())
+              ~request:(fun () -> Proofs_to_merge)
+          in
+          { previous_proof_statements =
+              [ { public_input = s1; proof = p1; proof_must_verify = b }
+              ; { public_input = s2; proof = p2; proof_must_verify = b }
+              ]
+          ; public_output = ()
+          ; auxiliary_output = ()
+          } )
     }
 end
 
@@ -3191,7 +3254,7 @@ let system ~proof_level ~constraint_constants =
       Pickles.compile ~cache:Cache_dir.cache
         (module Statement.With_sok.Checked)
         (module Statement.With_sok)
-        ~typ:Statement.With_sok.typ
+        ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
         ~branches:(module Nat.N5)
         ~max_proofs_verified:(module Nat.N2)
         ~name:"transaction-snark"
@@ -3255,7 +3318,6 @@ module type S = sig
 
   val of_parties_segment_exn :
        statement:Statement.With_sok.t
-    -> snapp_statement:(int * Zkapp_statement.t) option
     -> witness:Parties_segment.Witness.t
     -> spec:Parties_segment.Basic.t
     -> t Async.Deferred.t
@@ -3386,9 +3448,7 @@ let constraint_system_digests ~constraint_constants () =
           Tick.constraint_system ~exposing:[ Statement.With_sok.typ ]
             ~return_typ:(Snarky_backendless.Typ.unit ()) (fun x ->
               let open Tick in
-              let%bind x1 = exists Statement.With_sok.typ in
-              let%bind x2 = exists Statement.With_sok.typ in
-              main [ x1; x2 ] x )) )
+              Checked.map ~f:ignore @@ main x )) )
   ; ( "transaction-base"
     , digest
         Base.(
@@ -3418,7 +3478,6 @@ module Parties_intermediate_state = struct
     ; spec : Parties_segment.Basic.t
     ; state_before : state
     ; state_after : state
-    ; use_full_commitment : [ `Others | `Proved_use_full_commitment of bool ]
     }
 end
 
@@ -3446,19 +3505,11 @@ end
 let group_by_parties_rev (partiess : Party.t list list)
     (stmtss : (global_state * local_state) list list) :
     Parties_intermediate_state.t list =
-  let use_full_commitment (p : Party.t) =
-    match p.authorization with
-    | Proof _ ->
-        `Proved_use_full_commitment p.body.use_full_commitment
-    | _ ->
-        `Others
-  in
-  let intermediate_state p ~kind ~spec ~before ~after =
+  let intermediate_state ~kind ~spec ~before ~after =
     { Parties_intermediate_state.kind
     ; spec
     ; state_before = { global = fst before; local = snd before }
     ; state_after = { global = fst after; local = snd after }
-    ; use_full_commitment = use_full_commitment p
     }
   in
   let rec group_by_parties_rev (partiess : Party.t list list) stmtss acc =
@@ -3466,64 +3517,62 @@ let group_by_parties_rev (partiess : Party.t list list)
     | ([] | [ [] ]), [ _ ] ->
         (* We've associated statements with all given parties. *)
         acc
-    | [ [ ({ authorization = a1; _ } as p) ] ], [ [ before; after ] ] ->
+    | [ [ { authorization = a1; _ } ] ], [ [ before; after ] ] ->
         (* There are no later parties to pair this one with. Prove it on its
            own.
         *)
-        intermediate_state p ~kind:`Same
+        intermediate_state ~kind:`Same
           ~spec:(Parties_segment.Basic.of_controls [ a1 ])
           ~before ~after
         :: acc
-    | [ []; [ ({ authorization = a1; _ } as p) ] ], [ [ _ ]; [ before; after ] ]
-      ->
+    | [ []; [ { authorization = a1; _ } ] ], [ [ _ ]; [ before; after ] ] ->
         (* This party is part of a new transaction, and there are no later
            parties to pair it with. Prove it on its own.
         *)
-        intermediate_state p ~kind:`New
+        intermediate_state ~kind:`New
           ~spec:(Parties_segment.Basic.of_controls [ a1 ])
           ~before ~after
         :: acc
-    | ( (({ authorization = Proof _ as a1; _ } as p) :: parties) :: partiess
+    | ( ({ authorization = Proof _ as a1; _ } :: parties) :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party contains a proof, don't pair it with other parties. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`Same
+          ( intermediate_state ~kind:`Same
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( []
-        :: (({ authorization = Proof _ as a1; _ } as p) :: parties) :: partiess
+    | ( [] :: ({ authorization = Proof _ as a1; _ } :: parties) :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* This party is part of a new transaction, and contains a proof, don't
            pair it with other parties.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`New
+          ( intermediate_state ~kind:`New
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( (({ authorization = a1; _ } as p)
+    | ( ({ authorization = a1; _ }
         :: ({ authorization = Proof _; _ } :: _ as parties) )
         :: partiess
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party contains a proof, don't pair it with this party. *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`Same
+          ( intermediate_state ~kind:`Same
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( (({ authorization = a1; _ } as p) :: ([] as parties))
+    | ( ({ authorization = a1; _ } :: ([] as parties))
         :: (({ authorization = Proof _; _ } :: _) :: _ as partiess)
       , (before :: (after :: _ as stmts)) :: stmtss ) ->
         (* The next party is in the next transaction and contains a proof,
            don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`Same
+          ( intermediate_state ~kind:`Same
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
-    | ( (({ authorization = (Signature _ | None_given) as a1; _ } as p)
+    | ( ({ authorization = (Signature _ | None_given) as a1; _ }
         :: { authorization = (Signature _ | None_given) as a2; _ } :: parties )
         :: partiess
       , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
@@ -3533,12 +3582,12 @@ let group_by_parties_rev (partiess : Party.t list list)
            contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`Same
+          ( intermediate_state ~kind:`Same
               ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
     | ( []
-        :: (({ authorization = a1; _ } as p)
+        :: ({ authorization = a1; _ }
            :: ({ authorization = Proof _; _ } :: _ as parties) )
            :: partiess
       , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -3546,12 +3595,12 @@ let group_by_parties_rev (partiess : Party.t list list)
            proof, don't pair it with this party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`New
+          ( intermediate_state ~kind:`New
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
     | ( []
-        :: (({ authorization = (Signature _ | None_given) as a1; _ } as p)
+        :: ({ authorization = (Signature _ | None_given) as a1; _ }
            :: { authorization = (Signature _ | None_given) as a2; _ } :: parties
            )
            :: partiess
@@ -3562,11 +3611,11 @@ let group_by_parties_rev (partiess : Party.t list list)
            contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`New
+          ( intermediate_state ~kind:`New
               ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
-    | ( [ ({ authorization = (Signature _ | None_given) as a1; _ } as p) ]
+    | ( [ { authorization = (Signature _ | None_given) as a1; _ } ]
         :: ({ authorization = (Signature _ | None_given) as a2; _ } :: parties)
            :: partiess
       , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
@@ -3577,24 +3626,24 @@ let group_by_parties_rev (partiess : Party.t list list)
            contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`New
+          ( intermediate_state ~kind:`New
               ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
     | ( []
-        :: (({ authorization = a1; _ } as p) :: parties)
+        :: ({ authorization = a1; _ } :: parties)
            :: (({ authorization = Proof _; _ } :: _) :: _ as partiess)
       , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
         (* The next transaction contains a proof, and this party is in a new
            transaction, don't pair it with the next party.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`New
+          ( intermediate_state ~kind:`New
               ~spec:(Parties_segment.Basic.of_controls [ a1 ])
               ~before ~after
           :: acc )
     | ( []
-        :: [ ({ authorization = (Signature _ | None_given) as a1; _ } as p) ]
+        :: [ { authorization = (Signature _ | None_given) as a1; _ } ]
            :: ({ authorization = (Signature _ | None_given) as a2; _ }
               :: parties )
               :: partiess
@@ -3608,22 +3657,22 @@ let group_by_parties_rev (partiess : Party.t list list)
            contain a proof.
         *)
         group_by_parties_rev (parties :: partiess) (stmts :: stmtss)
-          ( intermediate_state p ~kind:`Two_new
+          ( intermediate_state ~kind:`Two_new
               ~spec:(Parties_segment.Basic.of_controls [ a1; a2 ])
               ~before ~after
           :: acc )
-    | [ [ ({ authorization = a1; _ } as p) ] ], (before :: after :: _) :: _ ->
+    | [ [ { authorization = a1; _ } ] ], (before :: after :: _) :: _ ->
         (* This party is the final party given. Prove it on its own. *)
-        intermediate_state p ~kind:`Same
+        intermediate_state ~kind:`Same
           ~spec:(Parties_segment.Basic.of_controls [ a1 ])
           ~before ~after
         :: acc
-    | ( [] :: [ ({ authorization = a1; _ } as p) ] :: [] :: _
+    | ( [] :: [ { authorization = a1; _ } ] :: [] :: _
       , [ _ ] :: (before :: after :: _) :: _ ) ->
         (* This party is the final party given, in a new transaction. Prove it
            on its own.
         *)
-        intermediate_state p ~kind:`New
+        intermediate_state ~kind:`New
           ~spec:(Parties_segment.Basic.of_controls [ a1 ])
           ~before ~after
         :: acc
@@ -3722,21 +3771,6 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
            partiess )
       ([ List.hd_exn (List.hd_exn states) ] :: states)
   in
-  let tx_statement commitment full_commitment use_full_commitment
-      (remaining_parties : (Party.t, _, _) Parties.Call_forest.t) :
-      Zkapp_statement.t =
-    let at_party =
-      Parties.Call_forest.(hash (accumulate_hashes' remaining_parties))
-    in
-    let transaction =
-      match use_full_commitment with
-      | `Proved_use_full_commitment b ->
-          if b then full_commitment else commitment
-      | _ ->
-          failwith "Expected `Proof for party that has a proof"
-    in
-    { transaction; at_party = (at_party :> Field.t) }
-  in
   let commitment = ref (Local_state.dummy ()).transaction_commitment in
   let full_commitment =
     ref (Local_state.dummy ()).full_transaction_commitment
@@ -3778,7 +3812,6 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
            ; spec
            ; state_before = { global = source_global; local = source_local }
            ; state_after = { global = target_global; local = target_local }
-           ; use_full_commitment
            }
            witnesses
          ->
@@ -3787,19 +3820,6 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
         let target_local = { target_local with failure_status_tbl = [] } in
         let current_commitment = !commitment in
         let current_full_commitment = !full_commitment in
-        let snapp_stmt =
-          match spec with
-          | Proved ->
-              (* NB: This is only correct if we assume that a proved party will
-                 never appear first in a transaction.
-              *)
-              Some
-                ( 0
-                , tx_statement current_commitment current_full_commitment
-                    use_full_commitment source_local.stack_frame.calls )
-          | _ ->
-              None
-        in
         let ( start_parties
             , next_commitment
             , next_full_commitment
@@ -4003,7 +4023,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           ; sok_digest = Sok_message.Digest.default
           }
         in
-        (w, spec, statement, snapp_stmt) :: witnesses )
+        (w, spec, statement) :: witnesses )
   , final_ledger )
 
 module Make (Inputs : sig
@@ -4060,11 +4080,10 @@ struct
     | Signature _ | None_given ->
         None
 
-  let snapp_proof_data ~(snapp_statement : (int * Zkapp_statement.t) option)
-      ~(witness : Transaction_witness.Parties_segment_witness.t) =
+  let snapp_proof_data ~(witness : Transaction_witness.Parties_segment_witness.t)
+      =
     let open Option.Let_syntax in
     let%bind p = first_party witness in
-    let%bind tag, snapp_statement = snapp_statement in
     let%map pi = party_proof p in
     let vk =
       let account_id = Account_id.create p.body.public_key p.body.token_id in
@@ -4082,38 +4101,37 @@ struct
       | Some s ->
           s
     in
-    (snapp_statement, pi, vk, tag)
+    (pi, vk)
 
-  let of_parties_segment_exn ~statement ~snapp_statement ~witness
+  let of_parties_segment_exn ~statement ~witness
       ~(spec : Parties_segment.Basic.t) : t Async.Deferred.t =
     Base.Parties_snark.witness := Some witness ;
     let res =
       match spec with
       | Opt_signed ->
-          opt_signed [] statement
+          opt_signed statement
       | Opt_signed_opt_signed ->
-          opt_signed_opt_signed [] statement
+          opt_signed_opt_signed statement
       | Proved -> (
-          match snapp_proof_data ~snapp_statement ~witness with
+          match snapp_proof_data ~witness with
           | None ->
               failwith "of_parties_segment: Expected exactly one proof"
-          | Some (s, p, v, tag) ->
-              (* TODO: We should not have to pass the statement in here. *)
+          | Some (p, v) ->
+              Pickles.Side_loaded.in_prover (Base.side_loaded 0) v.data ;
               proved
-                ( Pickles.Side_loaded.in_prover (Base.side_loaded tag) v.data ;
-                  [ (s, p) ] )
+                ~handler:(Base.Parties_snark.handle_zkapp_proof p)
                 statement )
     in
     let open Async in
-    let%map proof = res in
+    let%map (), (), proof = res in
     Base.Parties_snark.witness := None ;
     { proof; statement }
 
   let of_transaction_union ~statement ~init_stack transaction state_body handler
       =
     let open Async in
-    let%map proof =
-      base []
+    let%map (), (), proof =
+      base
         ~handler:
           (Base.transaction_union_handler handler transaction state_body
              init_stack )
@@ -4163,8 +4181,11 @@ struct
     let%bind s = Async.return (Statement.merge t12 t23) in
     let s = { s with sok_digest } in
     let open Async in
-    let%map proof =
-      merge [ (x12.statement, x12.proof); (x23.statement, x23.proof) ] s
+    let%map (), (), proof =
+      merge
+        ~handler:
+          (Merge.handle (x12.statement, x23.statement) (x12.proof, x23.proof))
+        s
     in
     Ok { statement = s; proof }
 
@@ -4208,20 +4229,18 @@ module For_tests = struct
         { identifier = "trivial-rule"
         ; prevs = []
         ; main =
-            (fun [] x ->
-              trivial_main x |> Run.run_checked
-              |> fun _ :
-                     unit
-                     Pickles_types.Hlist0.H1
-                       (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                     .t ->
-              [] )
+            (fun { public_input = x } ->
+              let () = Impl.run_checked (trivial_main x) in
+              { previous_proof_statements = []
+              ; public_output = ()
+              ; auxiliary_output = ()
+              } )
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
         (module Zkapp_statement.Checked)
         (module Zkapp_statement)
-        ~typ:Zkapp_statement.typ
+        ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)
         ~name:"trivial"
@@ -4233,21 +4252,35 @@ module For_tests = struct
           ; { identifier = "dummy"
             ; prevs = [ self; self ]
             ; main =
-                (fun [ _; _ ] _ ->
-                  Impl.run_checked (dummy_constraints ())
-                  |> fun () ->
+                (fun { public_input = _ } ->
+                  let s =
+                    Run.exists Field.typ ~compute:(fun () ->
+                        Run.Field.Constant.zero )
+                  in
+                  let public_input =
+                    Run.exists Zkapp_statement.typ ~compute:(fun () ->
+                        assert false )
+                  in
+                  let proof =
+                    Run.exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                        assert false )
+                  in
+                  Impl.run_checked (dummy_constraints ()) ;
                   (* Unsatisfiable. *)
-                  Run.exists Field.typ ~compute:(fun () ->
-                      Run.Field.Constant.zero )
-                  |> fun s ->
-                  Run.Field.(Assert.equal s (s + one))
-                  |> fun () :
-                         ( Zkapp_statement.Checked.t
-                         * (Zkapp_statement.Checked.t * unit) )
-                         Pickles_types.Hlist0.H1
-                           (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-                         .t ->
-                  [ Boolean.true_; Boolean.true_ ] )
+                  Run.Field.(Assert.equal s (s + one)) ;
+                  { previous_proof_statements =
+                      [ { public_input
+                        ; proof
+                        ; proof_must_verify = Boolean.true_
+                        }
+                      ; { public_input
+                        ; proof
+                        ; proof_must_verify = Boolean.true_
+                        }
+                      ]
+                  ; public_output = ()
+                  ; auxiliary_output = ()
+                  } )
             }
           ] )
     in
@@ -4285,13 +4318,14 @@ module For_tests = struct
       in
       { body =
           { public_key
-          ; update = Party.Update.noop
           ; fee
-          ; events = []
-          ; sequence_events = []
-          ; protocol_state_precondition =
-              Option.map preconditions ~f:(fun { network; _ } -> network)
-              |> Option.value ~default:Zkapp_precondition.Protocol_state.accept
+          ; valid_until =
+              Option.bind preconditions ~f:(fun { network; _ } ->
+                  match network.global_slot_since_genesis with
+                  | Ignore ->
+                      None
+                  | Check { upper; _ } ->
+                      Some upper )
           ; nonce
           }
       ; authorization = Signature.dummy
@@ -4301,7 +4335,9 @@ module For_tests = struct
       Option.value preconditions
         ~default:
           { Party.Preconditions.network =
-              fee_payer.body.protocol_state_precondition
+              Option.value_map preconditions
+                ~f:(fun { network; _ } -> network)
+                ~default:Zkapp_precondition.Protocol_state.accept
           ; account =
               ( if Option.is_none fee_payer_opt then
                 Nonce (Account.Nonce.succ sender_nonce)
@@ -4531,32 +4567,23 @@ module For_tests = struct
     assert (List.is_empty other_parties) ;
     assert (Option.is_none sender_party) ;
     assert (not @@ List.is_empty snapp_parties) ;
+    let snapp_parties =
+      snapp_parties
+      |> List.map ~f:(fun p -> (p, p))
+      |> Parties.Call_forest.With_hashes.of_parties_simple_list
+      |> Zkapp_statement.zkapp_statements_of_forest
+      |> Parties.Call_forest.to_parties_list
+    in
     let snapp_parties_keypairs =
       List.zip_exn snapp_parties spec.zkapp_account_keypairs
     in
     let%map.Async.Deferred snapp_parties =
-      Async.Deferred.List.mapi snapp_parties_keypairs
-        ~f:(fun ndx (snapp_party, snapp_keypair) ->
+      Async.Deferred.List.map snapp_parties_keypairs
+        ~f:(fun
+             ((snapp_party, (simple_snapp_party, tx_statement)), snapp_keypair)
+           ->
           match spec.current_auth with
           | Permissions.Auth_required.Proof ->
-              let proof_party =
-                let ps =
-                  Parties.Call_forest.With_hashes.of_parties_simple_list
-                    (List.map
-                       ~f:(fun p -> (p, ()))
-                       (List.drop snapp_parties ndx) )
-                in
-                Parties.Call_forest.hash ps
-              in
-              let tx_statement : Zkapp_statement.t =
-                let commitment =
-                  if snapp_party.body.use_full_commitment then full_commitment
-                  else commitment
-                in
-                { transaction = commitment
-                ; at_party = (proof_party :> Field.t)
-                }
-              in
               let handler (Snarky_backendless.Request.With { request; respond })
                   =
                 match request with _ -> respond Unhandled
@@ -4571,10 +4598,11 @@ module For_tests = struct
                     in
                     p
               in
-              let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
-                prover ~handler [] tx_statement
+              let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t)
+                  =
+                prover ~handler tx_statement
               in
-              ( { body = snapp_party.body; authorization = Proof pi }
+              ( { body = simple_snapp_party.body; authorization = Proof pi }
                 : Party.Simple.t )
           | Signature ->
               let commitment =
@@ -4586,13 +4614,13 @@ module For_tests = struct
                   (Random_oracle.Input.Chunked.field commitment)
               in
               Async.Deferred.return
-                ( { body = snapp_party.body
+                ( { body = simple_snapp_party.body
                   ; authorization = Signature signature
                   }
                   : Party.Simple.t )
           | None ->
               Async.Deferred.return
-                ( { body = snapp_party.body; authorization = None_given }
+                ( { body = simple_snapp_party.body; authorization = None_given }
                   : Party.Simple.t )
           | _ ->
               failwith
@@ -4688,11 +4716,8 @@ module For_tests = struct
     let fee_payer : Party.Fee_payer.t =
       { body =
           { public_key = sender_pk
-          ; update = Party.Update.noop
           ; fee
-          ; events = []
-          ; sequence_events = []
-          ; protocol_state_precondition = protocol_state_predicate
+          ; valid_until = None
           ; nonce = sender_nonce
           }
           (* Real signature added in below *)
@@ -4752,20 +4777,23 @@ module For_tests = struct
       Parties.Transaction_commitment.create ~other_parties_hash
     in
     let proof_party =
-      let ps =
+      let tree =
         Parties.Call_forest.With_hashes.of_parties_simple_list
           [ (snapp_party_data, ()) ]
+        |> List.hd_exn
       in
-      Parties.Call_forest.hash ps
+      tree.elt.party_digest
     in
     let tx_statement : Zkapp_statement.t =
-      { transaction; at_party = (proof_party :> Field.t) }
+      { party = (proof_party :> Field.t)
+      ; calls = (Parties.Digest.Forest.empty :> Field.t)
+      }
     in
     let handler (Snarky_backendless.Request.With { request; respond }) =
       match request with _ -> respond Unhandled
     in
-    let%map.Async.Deferred (pi : Pickles.Side_loaded.Proof.t) =
-      trivial_prover ~handler [] tx_statement
+    let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t) =
+      trivial_prover ~handler tx_statement
     in
     let fee_payer_signature_auth =
       let txn_comm =

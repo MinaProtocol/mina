@@ -2,8 +2,14 @@
 
 open Core_kernel
 
-type t = Canonical | Orphaned | Pending
-[@@deriving yojson, equal, bin_io_unversioned]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t = Canonical | Orphaned | Pending [@@deriving yojson, equal]
+
+    let to_latest = Fn.id
+  end
+end]
 
 let to_string = function
   | Canonical ->

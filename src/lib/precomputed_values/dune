@@ -18,6 +18,7 @@
    consensus
    coda_runtime_config
    test_genesis_ledger
+   staged_ledger_diff
  )
  (ppx_runtime_libraries base)
  (preprocess

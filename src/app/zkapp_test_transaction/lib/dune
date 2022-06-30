@@ -47,6 +47,7 @@
    kimchi_backend
    mina_base.import
    mina_transaction_logic
+   staged_ledger_diff
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

@@ -266,6 +266,11 @@ let of_js_field (x : field_class Js.t) : Field.t = x##.value
 let to_js_field_unchecked x : field_class Js.t =
   x |> Field.constant |> to_js_field
 
+let to_unchecked (x : Field.t) =
+  match x with Constant y -> y | y -> Impl.As_prover.read_var y
+
+let of_js_field_unchecked (x : field_class Js.t) = to_unchecked @@ of_js_field x
+
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
   let to_string (x : Field.t) =
@@ -534,7 +539,8 @@ let () =
   let from f x = new%js field_constr (As_field.of_field (f x)) in
   static_method "fromNumber" (from As_field.of_number_exn) ;
   static_method "fromString" (from As_field.of_string_exn) ;
-  static_method "fromBigInt" (from As_field.of_bigint_exn)
+  static_method "fromBigInt" (from As_field.of_bigint_exn) ;
+  static_method "check" (fun _x -> ())
 
 let () =
   let handle_constants2 f f_constant (x : Boolean.var) (y : Boolean.var) =
@@ -858,6 +864,7 @@ let () =
      The only one of these whose behavior depends on the bit values of the input scalars
      is Group.scale, and that function boolean constrains the scalar input itself.
   *)
+  static_method "check" (fun _x -> ()) ;
   constant_op1 "neg" Other_backend.Field.negate ;
   constant_op2 "add" Other_backend.Field.add ;
   constant_op2 "mul" Other_backend.Field.mul ;
@@ -1085,9 +1092,6 @@ let sponge_params =
 type sponge =
   | Checked of Poseidon_sponge_checked.t
   | Unchecked of Poseidon_sponge.t
-
-let to_unchecked (x : Field.t) =
-  match x with Constant y -> y | y -> Impl.As_prover.read_var y
 
 let poseidon =
   object%js
@@ -1408,7 +1412,9 @@ module Circuit = struct
       Impl.exists (typ_ typ) ~compute:(fun () : a -> Js.Unsafe.fun_call f [||])
     in
     if Js.Optdef.test (Js.Unsafe.coerce typ)##.check then
-      (Js.Unsafe.coerce typ)##check a ;
+      let () = (Js.Unsafe.coerce typ)##check a in
+      ()
+    else failwith "Circuit.witness: input does not have a `check` method" ;
     a
 
   module Circuit_main = struct
@@ -1455,37 +1461,6 @@ module Circuit = struct
   let circuit = Js.Unsafe.eval_string {js|(function() { return this })|js}
 
   let () =
-    let array (type a) (typ : a as_field_elements Js.t) (length : int) :
-        a Js.js_array Js.t as_field_elements Js.t =
-      let elt_len = typ##sizeInFields in
-      let len = length * elt_len in
-      object%js
-        method sizeInFields = len
-
-        method toFields (xs : a Js.js_array Js.t) =
-          let res = new%js Js.array_empty in
-          for i = 0 to xs##.length - 1 do
-            let x = typ##toFields (array_get_exn xs i) in
-            for j = 0 to x##.length - 1 do
-              res##push (array_get_exn x j) |> ignore
-            done
-          done ;
-          res
-
-        method ofFields (xs : field_class Js.t Js.js_array Js.t) =
-          let res = new%js Js.array_empty in
-          for i = 0 to length - 1 do
-            let a = new%js Js.array_empty in
-            let offset = i * elt_len in
-            for j = 0 to elt_len - 1 do
-              a##push (array_get_exn xs (offset + j)) |> ignore
-            done ;
-            res##push (typ##ofFields a) |> ignore
-          done ;
-          res
-      end
-    in
-
     circuit##.runAndCheck :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
           Impl.run_and_check (fun () -> f) |> Or_error.ok_exn ) ;
@@ -1494,7 +1469,6 @@ module Circuit = struct
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
     circuit##.witness := Js.wrap_callback witness ;
-    circuit##.array := Js.wrap_callback array ;
     circuit##.generateKeypair :=
       Js.wrap_meth_callback
         (fun (this : _ Circuit_main.t) : keypair_class Js.t ->
@@ -1590,61 +1564,42 @@ let () =
 
 (* helpers for pickles_compile *)
 
-type 'a zkapp_statement = { transaction : 'a; at_party : 'a }
+type 'a public_input = 'a array
 
-let zkapp_statement_to_fields { transaction; at_party } =
-  [| transaction; at_party |]
+type public_input_js = field_class Js.t Js.js_array Js.t
 
-type zkapp_statement_js =
-  < transaction : field_class Js.t Js.readonly_prop
-  ; atParty : field_class Js.t Js.readonly_prop >
-  Js.t
+type 'proof public_input_with_proof_js =
+  < publicInput : public_input_js Js.prop ; proof : 'proof Js.prop > Js.t
 
-module Zkapp_statement = struct
-  type t = Field.t zkapp_statement
+module Public_input = struct
+  type t = Field.t public_input
 
-  let to_field_elements = zkapp_statement_to_fields
+  let to_field_elements (t : t) : Field.t array = t
 
-  let to_constant ({ transaction; at_party } : t) =
-    { transaction = to_unchecked transaction; at_party = to_unchecked at_party }
+  let to_constant (t : t) = Array.map ~f:to_unchecked t
 
-  let to_js ({ transaction; at_party } : t) =
-    object%js
-      val transaction = to_js_field transaction
+  let to_js (t : t) : public_input_js = Array.map ~f:to_js_field t |> Js.array
 
-      val atParty = to_js_field at_party
-    end
+  let of_js (a : public_input_js) : t =
+    Js.to_array a |> Array.map ~f:of_js_field
 
-  let of_js (statement : zkapp_statement_js) : t =
-    { transaction = of_js_field statement##.transaction
-    ; at_party = of_js_field statement##.atParty
-    }
+  let list_to_js (public_inputs : t list) =
+    List.map ~f:to_js public_inputs |> Array.of_list |> Js.array
 
   module Constant = struct
-    type t = Field.Constant.t zkapp_statement
+    type t = Field.Constant.t public_input
 
-    let to_field_elements = zkapp_statement_to_fields
+    let to_field_elements (t : t) : Field.Constant.t array = t
 
-    let to_js ({ transaction; at_party } : t) =
-      to_js
-        { transaction = Field.constant transaction
-        ; at_party = Field.constant at_party
-        }
+    let to_js (t : t) : public_input_js =
+      Array.map ~f:to_js_field_unchecked t |> Js.array
 
-    let of_js (statement : zkapp_statement_js) : t =
-      { transaction = of_js_field statement##.transaction |> to_unchecked
-      ; at_party = of_js_field statement##.atParty |> to_unchecked
-      }
+    let of_js (a : public_input_js) : t =
+      Js.to_array a |> Array.map ~f:of_js_field_unchecked
   end
 end
 
-let zkapp_statement_typ =
-  let to_hlist { transaction; at_party } = H_list.[ transaction; at_party ] in
-  let of_hlist ([ transaction; at_party ] : (unit, _) H_list.t) =
-    { transaction; at_party }
-  in
-  Typ.of_hlistable [ Field.typ; Field.typ ] ~var_to_hlist:to_hlist
-    ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+let public_input_typ (i : int) = Typ.array ~length:i Field.typ
 
 let dummy_constraints =
   let module Inner_curve = Kimchi_pasta.Pasta.Pallas in
@@ -1672,25 +1627,346 @@ let dummy_constraints =
           (Kimchi_backend_common.Scalar_challenge.create x)
         : Field.t * Field.t )
 
-type ('a_var, 'a_value, 'a_weird) pickles_rule =
-  { identifier : string
-  ; prevs : 'a_weird list
-  ; main : 'a_var list -> 'a_var -> Boolean.var list
-  ; main_value : 'a_value list -> 'a_value -> bool list
-  }
+type pickles_rule_js =
+  < identifier : Js.js_string Js.t Js.prop
+  ; main :
+      (   public_input_js
+       -> public_input_js Js.js_array Js.t
+       -> bool_class Js.t Js.js_array Js.t )
+      Js.prop
+  ; proofsToVerify :
+      < isSelf : bool Js.t Js.prop ; tag : Js.Unsafe.any Js.t Js.prop > Js.t
+      Js.js_array
+      Js.t
+      Js.prop >
+  Js.t
 
-type pickles_rule_js = Js.js_string Js.t * (zkapp_statement_js -> unit)
+module Choices = struct
+  open Pickles_types
+  open Hlist
 
-let create_pickles_rule ((identifier, main) : pickles_rule_js) =
-  { identifier = Js.to_string identifier
-  ; prevs = []
-  ; main =
-      (fun _ statement ->
-        dummy_constraints () ;
-        main (Zkapp_statement.to_js statement) ;
-        [] )
-  ; main_value = (fun _ _ -> [])
-  }
+  module Prevs = struct
+    type ('var, 'value, 'width, 'height) t =
+      | Prevs :
+          (   self:('var, 'value, 'width, 'height) Pickles.Tag.t
+           -> ('prev_var, 'prev_values, 'widths, 'heights) H4.T(Pickles.Tag).t
+          )
+          -> ('var, 'value, 'width, 'height) t
+
+    let of_rule (rule : pickles_rule_js) =
+      let js_prevs = rule##.proofsToVerify in
+      let rec get_tags (Prevs prevs) index =
+        if index < 0 then Prevs prevs
+        else
+          let js_tag =
+            Js.Optdef.get (Js.array_get js_prevs index) (fun () ->
+                raise_errorf
+                  "proofsToVerify array is sparse; the entry at index %i is \
+                   missing"
+                  index )
+          in
+          (* We introduce new opaque types to make sure that the type in the tag
+             doesn't escape into the environment or have other ill effects.
+          *)
+          let module Types = struct
+            type var
+
+            type value
+
+            type width
+
+            type height
+          end in
+          let open Types in
+          let to_tag ~self tag : (var, value, width, height) Pickles.Tag.t =
+            (* The magic here isn't ideal, but it's safe enough if we immediately
+               hide it behind [Types].
+            *)
+            if Js.to_bool tag##.isSelf then Obj.magic self
+            else Obj.magic tag##.tag
+          in
+          let tag = to_tag js_tag in
+          let prevs ~self : _ H4.T(Pickles.Tag).t = tag ~self :: prevs ~self in
+          get_tags (Prevs prevs) (index - 1)
+      in
+      get_tags (Prevs (fun ~self:_ -> [])) (js_prevs##.length - 1)
+  end
+
+  module Inductive_rule = struct
+    type ( 'var
+         , 'value
+         , 'width
+         , 'height
+         , 'arg_var
+         , 'arg_value
+         , 'ret_var
+         , 'ret_value
+         , 'auxiliary_var
+         , 'auxiliary_value )
+         t =
+      | Rule :
+          (   self:('var, 'value, 'width, 'height) Pickles.Tag.t
+           -> ( 'prev_vars
+              , 'prev_values
+              , 'widths
+              , 'heights
+              , 'arg_var
+              , 'arg_value
+              , 'ret_var
+              , 'ret_value
+              , 'auxiliary_var
+              , 'auxiliary_value )
+              Pickles.Inductive_rule.t )
+          -> ( 'var
+             , 'value
+             , 'width
+             , 'height
+             , 'arg_var
+             , 'arg_value
+             , 'ret_var
+             , 'ret_value
+             , 'auxiliary_var
+             , 'auxiliary_value )
+             t
+
+    let rec should_verifys :
+        type prev_vars prev_values widths heights.
+           int
+        -> (prev_vars, prev_values, widths, heights) H4.T(Pickles.Tag).t
+        -> bool_class Js.t Js.js_array Js.t
+        -> prev_vars H1.T(E01(Pickles.Inductive_rule.B)).t =
+     fun index tags should_verifys_js ->
+      match tags with
+      | [] ->
+          []
+      | _ :: tags ->
+          let js_bool =
+            Js.Optdef.get (Js.array_get should_verifys_js index) (fun () ->
+                raise_errorf
+                  "Returned array is sparse; the entry at index %i is missing"
+                  index )
+          in
+          let should_verifys =
+            should_verifys (index + 1) tags should_verifys_js
+          in
+          js_bool##.value :: should_verifys
+
+    let should_verifys tags should_verifys_js =
+      should_verifys 0 tags should_verifys_js
+
+    let rec vars_to_public_input :
+        type prev_vars prev_values widths heights width height.
+           public_input_size:int
+        -> self:
+             ( Public_input.t
+             , Public_input.Constant.t
+             , width
+             , height )
+             Pickles.Tag.t
+        -> (prev_vars, prev_values, widths, heights) H4.T(Pickles.Tag).t
+        -> prev_vars H1.T(Id).t
+        -> Public_input.t list =
+     fun ~public_input_size ~self tags inputs ->
+      match (tags, inputs) with
+      | [], [] ->
+          []
+      | tag :: tags, input :: inputs ->
+          let (Typ typ) =
+            match Type_equal.Id.same_witness tag.id self.id with
+            | None ->
+                Pickles.Types_map.public_input tag
+            | Some T ->
+                public_input_typ public_input_size
+          in
+          let input = fst (typ.var_to_fields input) in
+          let inputs =
+            vars_to_public_input ~public_input_size ~self tags inputs
+          in
+          input :: inputs
+
+    type _ Snarky_backendless.Request.t +=
+      | Get_public_input :
+          int * (_, 'value, _, _) Pickles.Tag.t
+          -> 'value Snarky_backendless.Request.t
+      | Get_prev_proof : int -> _ Pickles.Proof.t Snarky_backendless.Request.t
+
+    let create ~public_input_size (rule : pickles_rule_js) :
+        ( _
+        , _
+        , _
+        , _
+        , Public_input.t
+        , Public_input.Constant.t
+        , unit
+        , unit
+        , unit
+        , unit )
+        t =
+      let (Prevs prevs) = Prevs.of_rule rule in
+      Rule
+        (fun ~self ->
+          let prevs = prevs ~self in
+          { Pickles.Inductive_rule.identifier = Js.to_string rule##.identifier
+          ; prevs
+          ; main =
+              (fun { public_input } ->
+                dummy_constraints () ;
+                (* TODO: Push this down into SnarkyJS so that it controls the
+                   public inputs of prev proofs, and we can delete this
+                   annoying logic.
+                *)
+                let previous_public_inputs =
+                  let rec go :
+                      type prev_vars prev_values widths heights.
+                         int
+                      -> ( prev_vars
+                         , prev_values
+                         , widths
+                         , heights )
+                         H4.T(Pickles.Tag).t
+                      -> prev_vars H1.T(Id).t =
+                   fun i tags ->
+                    match tags with
+                    | [] ->
+                        []
+                    | tag :: tags ->
+                        let typ =
+                          (fun (type a1 a2 a3 a4 b3 b4)
+                               (tag : (a1, a2, a3, a4) Pickles.Tag.t)
+                               (self :
+                                 ( Field.t public_input
+                                 , Impl.field public_input
+                                 , b3
+                                 , b4 )
+                                 Pickles.Tag.t ) ->
+                            match Type_equal.Id.same_witness tag.id self.id with
+                            | None ->
+                                Pickles.Types_map.public_input tag
+                            | Some T ->
+                                public_input_typ public_input_size )
+                            tag self
+                        in
+                        let public_input =
+                          Impl.exists typ ~request:(fun () ->
+                              Get_public_input (i, tag) )
+                        in
+                        let public_inputs = go (i + 1) tags in
+                        public_input :: public_inputs
+                  in
+
+                  go 0 prevs
+                in
+                let previous_proofs_should_verify =
+                  rule##.main
+                    (Public_input.to_js public_input)
+                    (Public_input.list_to_js
+                       (vars_to_public_input ~public_input_size ~self prevs
+                          previous_public_inputs ) )
+                  |> should_verifys prevs
+                in
+                let previous_proof_statements =
+                  let rec go :
+                      type prev_vars prev_values widths heights.
+                         int
+                      -> prev_vars H1.T(Id).t
+                      -> prev_vars H1.T(E01(Pickles.Inductive_rule.B)).t
+                      -> ( prev_vars
+                         , prev_values
+                         , widths
+                         , heights )
+                         H4.T(Pickles.Tag).t
+                      -> ( prev_vars
+                         , widths )
+                         H2.T(Pickles.Inductive_rule.Previous_proof_statement).t
+                      =
+                   fun i public_inputs should_verifys tags ->
+                    match (public_inputs, should_verifys, tags) with
+                    | [], [], [] ->
+                        []
+                    | ( public_input :: public_inputs
+                      , proof_must_verify :: should_verifys
+                      , _tag :: tags ) ->
+                        let proof =
+                          Impl.exists (Impl.Typ.Internal.ref ())
+                            ~request:(fun () -> Get_prev_proof i)
+                        in
+                        { public_input; proof; proof_must_verify }
+                        :: go (i + 1) public_inputs should_verifys tags
+                  in
+                  go 0 previous_public_inputs previous_proofs_should_verify
+                    prevs
+                in
+                { previous_proof_statements
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
+          } )
+  end
+
+  type ( 'var
+       , 'value
+       , 'width
+       , 'height
+       , 'arg_var
+       , 'arg_value
+       , 'ret_var
+       , 'ret_value
+       , 'auxiliary_var
+       , 'auxiliary_value )
+       t =
+    | Choices :
+        (   self:('var, 'value, 'width, 'height) Pickles.Tag.t
+         -> ( 'prev_vars
+            , 'prev_values
+            , 'widths
+            , 'heights
+            , 'arg_var
+            , 'arg_value
+            , 'ret_var
+            , 'ret_value
+            , 'auxiliary_var
+            , 'auxiliary_value )
+            H4_6.T(Pickles.Inductive_rule).t )
+        -> ( 'var
+           , 'value
+           , 'width
+           , 'height
+           , 'arg_var
+           , 'arg_value
+           , 'ret_var
+           , 'ret_value
+           , 'auxiliary_var
+           , 'auxiliary_value )
+           t
+
+  let of_js ~public_input_size js_rules =
+    let rec get_rules (Choices rules) index :
+        ( _
+        , _
+        , _
+        , _
+        , Public_input.t
+        , Public_input.Constant.t
+        , unit
+        , unit
+        , unit
+        , unit )
+        t =
+      if index < 0 then Choices rules
+      else
+        let js_rule =
+          Js.Optdef.get (Js.array_get js_rules index) (fun () ->
+              raise_errorf
+                "Rules array is sparse; the entry at index %i is missing" index )
+        in
+        let (Rule rule) = Inductive_rule.create ~public_input_size js_rule in
+        let rules ~self : _ H4_6.T(Pickles.Inductive_rule).t =
+          rule ~self :: rules ~self
+        in
+        get_rules (Choices rules) (index - 1)
+    in
+    get_rules (Choices (fun ~self:_ -> [])) (js_rules##.length - 1)
+end
 
 let other_verification_key_constr :
     (Other_impl.Verification_key.t -> verification_key_class Js.t) Js.constr =
@@ -1698,7 +1974,7 @@ let other_verification_key_constr :
 
 type proof = (Pickles_types.Nat.N0.n, Pickles_types.Nat.N0.n) Pickles.Proof.t
 
-module Statement_with_proof =
+module Public_inputs_with_proofs =
   Pickles_types.Hlist.H3.T (Pickles.Statement_with_proof)
 
 let nat_modules_list : (module Pickles_types.Nat.Intf) list =
@@ -1726,69 +2002,171 @@ let nat_modules_list : (module Pickles_types.Nat.Intf) list =
   ; (module N20)
   ]
 
+let nat_add_modules_list : (module Pickles_types.Nat.Add.Intf) list =
+  let open Pickles_types.Nat in
+  [ (module N0)
+  ; (module N1)
+  ; (module N2)
+  ; (module N3)
+  ; (module N4)
+  ; (module N5)
+  ; (module N6)
+  ; (module N7)
+  ; (module N8)
+  ; (module N9)
+  ; (module N10)
+  ; (module N11)
+  ; (module N12)
+  ; (module N13)
+  ; (module N14)
+  ; (module N15)
+  ; (module N16)
+  ; (module N17)
+  ; (module N18)
+  ; (module N19)
+  ; (module N20)
+  ]
+
 let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
   List.nth_exn nat_modules_list i
 
-let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
-  let choices = choices |> Js.to_array |> Array.to_list in
-  let branches = List.length choices in
-  let choices ~self:_ = List.map choices ~f:create_pickles_rule in
+let nat_add_module (i : int) : (module Pickles_types.Nat.Add.Intf) =
+  List.nth_exn nat_add_modules_list i
+
+let name = "smart-contract"
+
+let constraint_constants =
+  (* TODO these are dummy values *)
+  { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
+  ; ledger_depth = 0
+  ; work_delay = 0
+  ; block_window_duration_ms = 0
+  ; transaction_capacity = Log_2 0
+  ; pending_coinbase_depth = 0
+  ; coinbase_amount = Unsigned.UInt64.of_int 0
+  ; supercharged_coinbase_factor = 0
+  ; account_creation_fee = Unsigned.UInt64.of_int 0
+  ; fork = None
+  }
+
+let pickles_digest (choices : pickles_rule_js Js.js_array Js.t)
+    (public_input_size : int) =
+  let branches = choices##.length in
+  let max_proofs =
+    let choices = choices |> Js.to_array |> Array.to_list in
+    List.map choices ~f:(fun c ->
+        c##.proofsToVerify |> Js.to_array |> Array.length )
+    |> List.max_elt ~compare |> Option.value ~default:0
+  in
   let (module Branches) = nat_module branches in
-  (* TODO get rid of Obj.magic for choices *)
+  let (module Max_proofs_verified) = nat_add_module max_proofs in
+  let (Choices choices) = Choices.of_js ~public_input_size choices in
+  try
+    let _ =
+      Pickles.compile_promise ~choices ~return_early_digest_exception:true
+        (module Public_input)
+        (module Public_input.Constant)
+        ~public_input:(Input (public_input_typ public_input_size))
+        ~auxiliary_typ:Typ.unit
+        ~branches:(module Branches)
+        ~max_proofs_verified:(module Pickles_types.Nat.N0)
+          (* ^ TODO make max_branching configurable -- needs refactor in party types *)
+        ~name ~constraint_constants
+    in
+    failwith "Unexpected: The exception will always fire"
+  with Pickles.Return_digest md5 -> Md5.to_hex md5 |> Js.string
+
+let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
+    (public_input_size : int) =
+  let branches = choices##.length in
+  let max_proofs =
+    let choices = choices |> Js.to_array |> Array.to_list in
+    List.map choices ~f:(fun c ->
+        c##.proofsToVerify |> Js.to_array |> Array.length )
+    |> List.max_elt ~compare |> Option.value ~default:0
+  in
+  let (module Branches) = nat_module branches in
+  let (module Max_proofs_verified) = nat_add_module max_proofs in
+  let (Choices choices) = Choices.of_js ~public_input_size choices in
   let tag, _cache, p, provers =
-    Pickles.compile_promise ~choices:(Obj.magic choices)
-      (module Zkapp_statement)
-      (module Zkapp_statement.Constant)
-      ~typ:zkapp_statement_typ
+    Pickles.compile_promise ~choices
+      (module Public_input)
+      (module Public_input.Constant)
+      ~public_input:(Input (public_input_typ public_input_size))
+      ~auxiliary_typ:Typ.unit
       ~branches:(module Branches)
-      ~max_proofs_verified:(module Pickles_types.Nat.N0)
+      ~max_proofs_verified:(module Max_proofs_verified)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
-      ~name:"smart-contract"
-      ~constraint_constants:
-        (* TODO these are dummy values *)
-        { sub_windows_per_window = 0
-        ; ledger_depth = 0
-        ; work_delay = 0
-        ; block_window_duration_ms = 0
-        ; transaction_capacity = Log_2 0
-        ; pending_coinbase_depth = 0
-        ; coinbase_amount = Unsigned.UInt64.of_int 0
-        ; supercharged_coinbase_factor = 0
-        ; account_creation_fee = Unsigned.UInt64.of_int 0
-        ; fork = None
-        }
+      ~name ~constraint_constants
   in
   let module Proof = (val p) in
   let to_js_prover prover =
-    let prove (statement_js : zkapp_statement_js) =
-      (* TODO: get rid of Obj.magic, this should be an empty "H3.T" *)
-      let prevs = Obj.magic [] in
-      let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
-      prover ?handler:None prevs statement
-      |> Promise.map ~f:Pickles.Side_loaded.Proof.of_proof
+    let prove (public_input_js : public_input_js)
+        (prevs_js : Proof.t public_input_with_proof_js Js.js_array Js.t) =
+      let to_prev (previous : Proof.t public_input_with_proof_js) =
+        (Public_input.Constant.of_js previous##.publicInput, previous##.proof)
+      in
+      let prevs : (Field.Constant.t public_input * Proof.t) array =
+        prevs_js |> Js.to_array |> Array.map ~f:to_prev
+      in
+      let public_input =
+        Public_input.(public_input_js |> of_js |> to_constant)
+      in
+      let handler (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | Choices.Inductive_rule.Get_public_input (i, prev_tag) -> (
+            match Type_equal.Id.same_witness tag.id prev_tag.id with
+            | Some T ->
+                let public_input = fst (Array.get prevs i) in
+                respond (Provide public_input)
+            | None ->
+                let (Typ typ) = Pickles.Types_map.public_input prev_tag in
+                let public_input_fields = fst (Array.get prevs i) in
+                let public_input =
+                  typ.value_of_fields
+                    (public_input_fields, typ.constraint_system_auxiliary ())
+                in
+                respond (Provide public_input) )
+        | Choices.Inductive_rule.Get_prev_proof i ->
+            respond (Provide (Obj.magic (snd (Array.get prevs i))))
+        | _ ->
+            respond Unhandled
+      in
+      prover ?handler:(Some handler) public_input
+      |> Promise.map ~f:(fun ((), (), proof) -> proof)
       |> Promise_js_helpers.to_js
     in
     prove
   in
   let rec to_js_provers :
       type a b c.
-         (a, b, c, Zkapp_statement.Constant.t, proof Promise.t) Pickles.Provers.t
-      -> (   zkapp_statement_js
-          -> Pickles.Side_loaded.Proof.t Promise_js_helpers.js_promise )
+         ( a
+         , b
+         , c
+         , Public_input.Constant.t
+         , (unit * unit * Proof.t) Promise.t )
+         Pickles.Provers.t
+      -> (   public_input_js
+          -> Proof.t public_input_with_proof_js Js.js_array Js.t
+          -> Proof.t Promise_js_helpers.js_promise )
          list = function
     | [] ->
         []
     | p :: ps ->
         to_js_prover p :: to_js_provers ps
   in
-  let verify (statement_js : zkapp_statement_js) (proof : proof) =
-    let statement = Zkapp_statement.(statement_js |> of_js |> to_constant) in
-    Proof.verify_promise [ (statement, proof) ] |> Promise_js_helpers.to_js
+  let provers = provers |> to_js_provers |> Array.of_list |> Js.array in
+  let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
+    let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
+    Proof.verify_promise [ (public_input, proof) ]
+    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
   in
   object%js
-    val provers = provers |> to_js_provers |> Array.of_list |> Js.array
+    val provers = Obj.magic provers
 
-    val verify = verify
+    val verify = Obj.magic verify
+
+    val tag = Obj.magic tag
 
     val getVerificationKeyArtifact =
       fun () ->
@@ -1809,14 +2187,59 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t) =
           (Pickles.Verification_key.index key)
   end
 
-let proof_to_string proof =
-  proof |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
+module Proof0 = Pickles.Proof.Make (Pickles_types.Nat.N0) (Pickles_types.Nat.N0)
+module Proof1 = Pickles.Proof.Make (Pickles_types.Nat.N1) (Pickles_types.Nat.N1)
+module Proof2 = Pickles.Proof.Make (Pickles_types.Nat.N2) (Pickles_types.Nat.N2)
+
+type some_proof = Proof0 of Proof0.t | Proof1 of Proof1.t | Proof2 of Proof2.t
+
+let proof_to_base64 = function
+  | Proof0 proof ->
+      Proof0.to_base64 proof |> Js.string
+  | Proof1 proof ->
+      Proof1.to_base64 proof |> Js.string
+  | Proof2 proof ->
+      Proof2.to_base64 proof |> Js.string
+
+let proof_of_base64 str i : some_proof =
+  let str = Js.to_string str in
+  match i with
+  | 0 ->
+      Proof0 (Proof0.of_base64 str |> Result.ok_or_failwith)
+  | 1 ->
+      Proof1 (Proof1.of_base64 str |> Result.ok_or_failwith)
+  | 2 ->
+      Proof2 (Proof2.of_base64 str |> Result.ok_or_failwith)
+  | _ ->
+      failwith "invalid proof index"
+
+let verify (public_input : public_input_js) (proof : proof)
+    (vk : Js.js_string Js.t) =
+  let public_input = Public_input.Constant.of_js public_input in
+  let typ = public_input_typ (Array.length public_input) in
+  let proof = Pickles.Side_loaded.Proof.of_proof proof in
+  let vk =
+    Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
+  in
+  Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
+  |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
 let pickles =
   object%js
     val compile = pickles_compile
 
-    val proofToString = proof_to_string
+    val circuitDigest = pickles_digest
+
+    val verify = verify
+
+    val proofToBase64 = proof_to_base64
+
+    val proofOfBase64 = proof_of_base64
+
+    val proofToBase64Transaction =
+      fun (proof : proof) ->
+        proof |> Pickles.Side_loaded.Proof.of_proof
+        |> Pickles.Side_loaded.Proof.to_base64 |> Js.string
   end
 
 module Ledger = struct
@@ -2147,21 +2570,23 @@ module Ledger = struct
       val fullCommitment = to_js_field_unchecked full_commitment
     end
 
-  let transaction_statement (tx_json : Js.js_string Js.t) (party_index : int) =
+  let zkapp_public_input (tx_json : Js.js_string Js.t) (party_index : int) =
     let tx =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    let at_party =
-      let ps = List.drop tx.other_parties party_index in
-      (Parties.Call_forest.hash ps :> Impl.field)
-    in
-    let transaction = transaction_commitment tx (Other_party party_index) in
-    Zkapp_statement.Constant.to_js { transaction; at_party }
+    let party = List.nth_exn tx.other_parties party_index in
+    Public_input.Constant.to_js
+      [| (party.elt.party_digest :> Impl.field)
+       ; (Parties.Digest.Forest.empty :> Impl.field)
+      |]
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
     Signature_lib.Schnorr.Chunked.sign (private_key key)
       (Random_oracle.Input.Chunked.field (x |> of_js_field |> to_unchecked))
     |> Mina_base.Signature.to_base58_check |> Js.string
+
+  let dummy_signature () =
+    Mina_base.Signature.(dummy |> to_base58_check) |> Js.string
 
   let sign_party (tx_json : Js.js_string Js.t) (key : private_key)
       (party_index : party_index) =
@@ -2233,21 +2658,6 @@ module Ledger = struct
               commitment
         | Proof _ | None_given ->
             () )
-
-  let verify_party_proof (statement : zkapp_statement_js)
-      (proof : Js.js_string Js.t) (vk : Js.js_string Js.t) =
-    let statement = Zkapp_statement.Constant.of_js statement in
-    let proof =
-      Result.ok_or_failwith
-        (Pickles.Side_loaded.Proof.of_base64 (Js.to_string proof))
-    in
-    let vk =
-      Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
-    in
-    Pickles.Side_loaded.verify_promise
-      [ (vk, statement, proof) ]
-      ~value_to_field_elements:Zkapp_statement.Constant.to_field_elements
-    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
 
   let public_key_to_string (pk : public_key) : Js.js_string Js.t =
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
@@ -2383,11 +2793,11 @@ module Ledger = struct
     static_method "hashTransactionChecked" hash_transaction_checked ;
 
     static_method "transactionCommitments" transaction_commitments ;
-    static_method "transactionStatement" transaction_statement ;
+    static_method "zkappPublicInput" zkapp_public_input ;
     static_method "signFieldElement" sign_field_element ;
+    static_method "dummySignature" dummy_signature ;
     static_method "signFeePayer" sign_fee_payer ;
     static_method "signOtherParty" sign_other_party ;
-    static_method "verifyPartyProof" verify_party_proof ;
 
     static_method "publicKeyToString" public_key_to_string ;
     static_method "publicKeyOfString" public_key_of_string ;

@@ -611,11 +611,17 @@ module Party_body_components = struct
 
   let to_fee_payer t : Party.Body.Fee_payer.t =
     { public_key = t.public_key
-    ; update = t.update
     ; fee = t.balance_change
-    ; events = t.events
-    ; sequence_events = t.sequence_events
-    ; protocol_state_precondition = t.protocol_state_precondition
+    ; valid_until =
+        ( match
+            t.protocol_state_precondition
+              .Zkapp_precondition.Protocol_state.Poly.global_slot_since_genesis
+          with
+        | Zkapp_basic.Or_ignore.Ignore ->
+            None
+        | Zkapp_basic.Or_ignore.Check
+            { Zkapp_precondition.Closed_interval.upper; _ } ->
+            Some upper )
     ; nonce = t.account_precondition
     }
 
@@ -882,71 +888,76 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
      match c with Zkapp_basic.Set_or_keep.Set x -> x | Keep -> default
    in
    let delegate (account : Account.t) =
-     Option.map
-       ~f:(fun delegate -> value_to_be_updated update.delegate ~default:delegate)
-       account.delegate
+     if is_fee_payer then account.delegate
+     else
+       Option.map
+         ~f:(fun delegate ->
+           value_to_be_updated update.delegate ~default:delegate )
+         account.delegate
    in
    let zkapp (account : Account.t) =
-     match account.zkapp with
-     | None ->
-         None
-     | Some zk ->
-         (*TODO: Deduplicate this from what's in parties logic to get the
-            account precondition right*)
-         let app_state =
-           let account_app_state = zk.app_state in
-           List.zip_exn
-             (Zkapp_state.V.to_list update.app_state)
-             (Zkapp_state.V.to_list account_app_state)
-           |> List.map ~f:(fun (to_be_updated, current) ->
-                  value_to_be_updated to_be_updated ~default:current )
-           |> Zkapp_state.V.of_list_exn
-         in
-         let sequence_state =
-           let [ s1'; s2'; s3'; s4'; s5' ] = zk.sequence_state in
-           let last_sequence_slot = zk.last_sequence_slot in
-           (* Push events to s1. *)
-           let is_empty = List.is_empty sequence_events in
-           let s1_updated =
-             Party.Sequence_events.push_events s1' sequence_events
+     if is_fee_payer then account.zkapp
+     else
+       match account.zkapp with
+       | None ->
+           None
+       | Some zk ->
+           (*TODO: Deduplicate this from what's in parties logic to get the
+              account precondition right*)
+           let app_state =
+             let account_app_state = zk.app_state in
+             List.zip_exn
+               (Zkapp_state.V.to_list update.app_state)
+               (Zkapp_state.V.to_list account_app_state)
+             |> List.map ~f:(fun (to_be_updated, current) ->
+                    value_to_be_updated to_be_updated ~default:current )
+             |> Zkapp_state.V.of_list_exn
            in
-           let s1 = if is_empty then s1' else s1_updated in
-           let txn_global_slot =
-             Option.value_map protocol_state_view ~default:last_sequence_slot
-               ~f:(fun ps ->
-                 ps
-                   .Zkapp_precondition.Protocol_state.Poly
-                    .global_slot_since_genesis )
+           let sequence_state =
+             let [ s1'; s2'; s3'; s4'; s5' ] = zk.sequence_state in
+             let last_sequence_slot = zk.last_sequence_slot in
+             (* Push events to s1. *)
+             let is_empty = List.is_empty sequence_events in
+             let s1_updated =
+               Party.Sequence_events.push_events s1' sequence_events
+             in
+             let s1 = if is_empty then s1' else s1_updated in
+             let txn_global_slot =
+               Option.value_map protocol_state_view ~default:last_sequence_slot
+                 ~f:(fun ps ->
+                   ps
+                     .Zkapp_precondition.Protocol_state.Poly
+                      .global_slot_since_genesis )
+             in
+             (* Shift along if last update wasn't this slot  *)
+             let is_this_slot =
+               Mina_numbers.Global_slot.equal txn_global_slot last_sequence_slot
+             in
+             let is_full_and_different_slot = (not is_empty) && is_this_slot in
+             let s5 = if is_full_and_different_slot then s5' else s4' in
+             let s4 = if is_full_and_different_slot then s4' else s3' in
+             let s3 = if is_full_and_different_slot then s3' else s2' in
+             let s2 = if is_full_and_different_slot then s2' else s1' in
+             ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
            in
-           (* Shift along if last update wasn't this slot  *)
-           let is_this_slot =
-             Mina_numbers.Global_slot.equal txn_global_slot last_sequence_slot
+           let proved_state =
+             let keeping_app_state =
+               List.for_all ~f:Fn.id
+                 (List.map ~f:Zkapp_basic.Set_or_keep.is_keep
+                    (Pickles_types.Vector.to_list update.app_state) )
+             in
+             let changing_entire_app_state =
+               List.for_all ~f:Fn.id
+                 (List.map ~f:Zkapp_basic.Set_or_keep.is_set
+                    (Pickles_types.Vector.to_list update.app_state) )
+             in
+             let proof_verifies = Control.Tag.(equal Proof authorization_tag) in
+             if keeping_app_state then zk.proved_state
+             else if proof_verifies then
+               if changing_entire_app_state then true else zk.proved_state
+             else false
            in
-           let is_full_and_different_slot = (not is_empty) && is_this_slot in
-           let s5 = if is_full_and_different_slot then s5' else s4' in
-           let s4 = if is_full_and_different_slot then s4' else s3' in
-           let s3 = if is_full_and_different_slot then s3' else s2' in
-           let s2 = if is_full_and_different_slot then s2' else s1' in
-           ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-         in
-         let proved_state =
-           let keeping_app_state =
-             List.for_all ~f:Fn.id
-               (List.map ~f:Zkapp_basic.Set_or_keep.is_keep
-                  (Pickles_types.Vector.to_list update.app_state) )
-           in
-           let changing_entire_app_state =
-             List.for_all ~f:Fn.id
-               (List.map ~f:Zkapp_basic.Set_or_keep.is_set
-                  (Pickles_types.Vector.to_list update.app_state) )
-           in
-           let proof_verifies = Control.Tag.(equal Proof authorization_tag) in
-           if keeping_app_state then zk.proved_state
-           else if proof_verifies then
-             if changing_entire_app_state then true else zk.proved_state
-           else false
-         in
-         Some { zk with app_state; sequence_state; proved_state }
+           Some { zk with app_state; sequence_state; proved_state }
    in
    Account_id.Table.change account_state_tbl (Account.identifier account)
      ~f:(function
@@ -989,7 +1000,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
 let gen_party_from ?(update = None) ?failure ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
     ?required_balance_change ?required_balance ~authorization
-    ~available_public_keys ~ledger ~account_state_tbl ?vk () =
+    ~available_public_keys ~ledger ~account_state_tbl ?protocol_state_view ?vk
+    () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1008,8 +1020,9 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
   let%bind body_components =
     gen_party_body_components ~update ?failure ~new_account ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
-      ?permissions_auth ?account_id ?vk ~available_public_keys
-      ?required_balance_change ?required_balance ~ledger ~account_state_tbl
+      ?permissions_auth ?account_id ?protocol_state_view ?vk
+      ~available_public_keys ?required_balance_change ?required_balance ~ledger
+      ~account_state_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_predcondition:(gen_account_precondition_from_account ?failure)
@@ -1124,8 +1137,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
   in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ?vk
-      ~account_state_tbl ()
+      ~account_id:fee_payer_account_id ~ledger ?vk ~account_state_tbl ()
   in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     let rec go acc n =
@@ -1224,7 +1236,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
           gen_party_from ~update ?failure ~authorization
             ~new_account:new_parties ~permissions_auth ~zkapp_account
             ~available_public_keys ~required_balance_change ~ledger
-            ~account_state_tbl ?vk ()
+            ~account_state_tbl ?protocol_state_view ?vk ()
         in
         let%bind party =
           (* authorization according to chosen permissions auth *)
@@ -1296,7 +1308,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
           let permissions_auth = Control.Tag.Signature in
           gen_party_from ~update ?failure ~account_id ~authorization
             ~permissions_auth ~zkapp_account ~available_public_keys ~ledger
-            ~account_state_tbl ?vk ()
+            ~account_state_tbl ?protocol_state_view ?vk ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
         go (party :: party0 :: acc) (n - 1)
@@ -1345,7 +1357,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     let authorization = Control.Signature Signature.dummy in
     gen_party_from ?failure ~authorization ~new_account:true
       ~available_public_keys ~ledger ~required_balance_change ?required_balance
-      ~account_state_tbl ?vk ()
+      ~account_state_tbl ?protocol_state_view ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in

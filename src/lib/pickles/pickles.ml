@@ -26,10 +26,13 @@ module Tick_field_sponge = Tick_field_sponge
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
+module Types_map = Types_map
 module Dirty = Dirty
 module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
 module Step_verifier = Step_verifier
+
+exception Return_digest of Md5.t
 
 let profile_constraints = false
 
@@ -72,15 +75,15 @@ let verify max_proofs_verified statement key proofs =
       not equal to the scalar field.
 
       Schematically, from the circuit point-of-view, we can say a proof is
-      - a sequence of F_0 elements xs_0
-      - a sequence of F_1 elelements xs_1
+   - a sequence of F_0 elements xs_0
+   - a sequence of F_1 elelements xs_1
       and a verifier is a pair of "snarky functions"
-      - check_0 : F_0 list -> F_1 list -> unit which uses the Impl with Field.t = F_0
-      - check_1 : F_0 list -> F_1 list -> unit which uses the Impl with Field.t = F_1
-      - subset_00 : 'a list -> 'a list
-      - subset_01 : 'a list -> 'a list
-      - subset_10 : 'a list -> 'a list
-      - subset_11 : 'a list -> 'a list
+   - check_0 : F_0 list -> F_1 list -> unit which uses the Impl with Field.t = F_0
+   - check_1 : F_0 list -> F_1 list -> unit which uses the Impl with Field.t = F_1
+   - subset_00 : 'a list -> 'a list
+   - subset_01 : 'a list -> 'a list
+   - subset_10 : 'a list -> 'a list
+   - subset_11 : 'a list -> 'a list
       and a proof verifies if
       ( check_0 (subset_00 xs_0) (subset_01 xs_1)  ;
         check_1 (subset_10 xs_0) (subset_11 xs_1) )
@@ -163,7 +166,7 @@ module Proof = P
 module Statement_with_proof = struct
   type ('s, 'max_width, _) t =
     (* TODO: use Max local max proofs verified instead of max_width *)
-    's * ('max_width, 'max_width) Proof.t
+    ('max_width, 'max_width) Proof.t
 end
 
 let pad_pass_throughs
@@ -264,44 +267,21 @@ module Prover = struct
        ?handler:
          (   Snarky_backendless.Request.request
           -> Snarky_backendless.Request.response )
-    -> ( 'prev_values
-       , 'local_widths
-       , 'local_heights )
-       H3.T(Statement_with_proof).t
     -> 'a_value
     -> 'proof
 end
 
-module Proof_system = struct
-  type ( 'a_var
-       , 'a_value
-       , 'max_proofs_verified
-       , 'branches
-       , 'prev_valuess
-       , 'widthss
-       , 'heightss )
-       t =
-    | T :
-        ('a_var, 'a_value, 'max_proofs_verified, 'branches) Tag.t
-        * (module Proof_intf with type t = 'proof and type statement = 'a_value)
-        * ( 'prev_valuess
-          , 'widthss
-          , 'heightss
-          , 'a_value
-          , 'proof )
-          H3_2.T(Prover).t
-        -> ( 'a_var
-           , 'a_value
-           , 'max_proofs_verified
-           , 'branches
-           , 'prev_valuess
-           , 'widthss
-           , 'heightss )
-           t
-end
-
-module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
-  module IR = Inductive_rule.T (A) (A_value)
+module Make
+    (Arg_var : Statement_var_intf)
+    (Arg_value : Statement_value_intf)
+    (Ret_var : T0)
+    (Ret_value : T0)
+    (Auxiliary_var : T0)
+    (Auxiliary_value : T0) =
+struct
+  module IR =
+    Inductive_rule.T (Arg_var) (Arg_value) (Ret_var) (Ret_value) (Auxiliary_var)
+      (Auxiliary_value)
   module HIR = H4.T (IR)
 
   let max_local_max_proofs_verifieds ~self (type n)
@@ -396,33 +376,46 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         log
 
   let compile :
-      type prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-         self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
+      type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
+         self:(var, value, max_proofs_verified, branches) Tag.t
       -> cache:Key_cache.Spec.t list
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
+      -> ?return_early_digest_exception:bool
       -> branches:(module Nat.Intf with type n = branches)
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
       -> name:string
       -> constraint_constants:Snark_keys_header.Constraint_constants.t
-      -> typ:(A.t, A_value.t) Impls.Step.Typ.t
+      -> public_input:
+           ( var
+           , value
+           , Arg_var.t
+           , Arg_value.t
+           , Ret_var.t
+           , Ret_value.t )
+           Inductive_rule.public_input
+      -> auxiliary_typ:(Auxiliary_var.t, Auxiliary_value.t) Impls.Step.Typ.t
       -> choices:
-           (   self:(A.t, A_value.t, max_proofs_verified, branches) Tag.t
+           (   self:(var, value, max_proofs_verified, branches) Tag.t
             -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
+      -> unit
       -> ( prev_valuess
          , widthss
          , heightss
-         , A_value.t
-         , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
+         , Arg_value.t
+         , ( Ret_value.t
+           * Auxiliary_value.t
+           * (max_proofs_verified, max_proofs_verified) Proof.t )
+           Promise.t )
          H3_2.T(Prover).t
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ~branches:(module Branches)
-       ~max_proofs_verified:(module Max_proofs_verified) ~name
-       ~constraint_constants ~typ ~choices ->
+   fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
+       ~branches:(module Branches) ~max_proofs_verified ~name
+       ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -440,19 +433,28 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       }
     in
     Timer.start __LOC__ ;
+    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                         with type n = max_proofs_verified )
+    in
     let T = Max_proofs_verified.eq in
     let choices = choices ~self in
     let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
     let T = Nat.eq_exn prev_varss_n Branches.n in
     let padded, (module Maxes) =
       max_local_max_proofs_verifieds
-        (module Max_proofs_verified)
+        ( module struct
+          include Max_proofs_verified
+        end )
         prev_varss_length choices ~self:self.id
     in
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
     Timer.clock __LOC__ ;
     let wrap_domains =
-      let module M = Wrap_domains.Make (A) (A_value) in
+      let module M =
+        Wrap_domains.Make (Arg_var) (Arg_value) (Ret_var) (Ret_value)
+          (Auxiliary_var)
+          (Auxiliary_value)
+      in
       let rec f :
           type a b c d. (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t =
         function
@@ -462,14 +464,17 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             x :: f xs
       in
       M.f full_signature prev_varss_n prev_varss_length ~self
-        ~choices:(f choices)
-        ~max_proofs_verified:(module Max_proofs_verified)
+        ~choices:(f choices) ~max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let module Branch_data = struct
       type ('vars, 'vals, 'n, 'm) t =
-        ( A.t
-        , A_value.t
+        ( Arg_var.t
+        , Arg_value.t
+        , Ret_var.t
+        , Ret_value.t
+        , Auxiliary_var.t
+        , Auxiliary_value.t
         , Max_proofs_verified.n
         , Branches.n
         , 'vars
@@ -507,9 +512,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i
                       ~max_proofs_verified:Max_proofs_verified.n
-                      ~branches:Branches.n ~self ~typ A.to_field_elements
-                      A_value.to_field_elements rule ~wrap_domains
-                      ~proofs_verifieds )
+                      ~branches:Branches.n ~self ~public_input ~auxiliary_typ
+                      Arg_var.to_field_elements Arg_value.to_field_elements rule
+                      ~wrap_domains ~proofs_verifieds )
               in
               Timer.clock __LOC__ ; incr i ; res
           end)
@@ -549,6 +554,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               in
               let () = if true then log_step main typ name b.index in
               let open Impls.Step in
+              (* HACK: TODO docs *)
+              if return_early_digest_exception then
+                raise
+                  (Return_digest
+                     ( constraint_system ~exposing:[] ~return_typ:typ main
+                     |> R1CS_constraint_system.digest ) ) ;
+
               let k_p =
                 lazy
                   (let cs =
@@ -636,8 +648,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       Timer.clock __LOC__ ;
       Wrap_main.wrap_main full_signature prev_varss_length step_vks
-        proofs_verifieds step_domains prev_wrap_domains
-        (module Max_proofs_verified)
+        proofs_verifieds step_domains prev_wrap_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
@@ -687,7 +698,21 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
-    let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
+    let module S =
+      Step.Make (Arg_var) (Arg_value)
+        (struct
+          include Max_proofs_verified
+        end)
+    in
+    let (typ : (var, value) Impls.Step.Typ.t) =
+      match public_input with
+      | Input typ ->
+          typ
+      | Output typ ->
+          typ
+      | Input_and_output (input_typ, output_typ) ->
+          Impls.Step.Typ.(input_typ * output_typ)
+    in
     let provers =
       let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
       let f :
@@ -697,44 +722,27 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           -> ?handler:
                (   Snarky_backendless.Request.request
                 -> Snarky_backendless.Request.response )
-          -> ( prev_values
-             , local_widths
-             , local_heights )
-             H3.T(Statement_with_proof).t
-          -> A_value.t
-          -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t =
+          -> Arg_value.t
+          -> ( Ret_value.t
+             * Auxiliary_value.t
+             * (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t )
+             Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
         let _, prev_vars_length = b.proofs_verified in
-        let step handler prev_values prev_proofs next_state =
+        let step handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
+            ~public_input ~auxiliary_typ
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
-            wrap_vk.index prev_values prev_proofs
+            wrap_vk.index
         in
         let step_vk = fst (Lazy.force step_vk) in
-        let wrap ?handler prevs next_state =
+        let wrap ?handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
-          let app_states, prevs =
-            let rec go :
-                type prev_values local_widths local_heights.
-                   ( prev_values
-                   , local_widths
-                   , local_heights )
-                   H3.T(Statement_with_proof).t
-                -> prev_values H1.T(Id).t
-                   * (local_widths, local_widths) H2.T(Proof).t = function
-              | [] ->
-                  ([], [])
-              | (app_state, proof) :: tl ->
-                  let app_states, proofs = go tl in
-                  (app_state :: app_states, proof :: proofs)
-            in
-            go prevs
-          in
-          let%bind.Promise proof =
-            step handler ~maxes:(module Maxes) app_states prevs next_state
+          let%bind.Promise proof, return_value, auxiliary_value =
+            step handler ~maxes:(module Maxes) next_state
           in
           let proof =
             { proof with
@@ -750,32 +758,36 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           let%map.Promise proof =
             Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
               full_signature.maxes wrap_requests
-              ~dlog_plonk_index:wrap_vk.commitments wrap_main
-              A_value.to_field_elements ~step_vk
+              ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
               ~step_plonk_indices:(Lazy.force step_vks) ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in
-          Proof.T
-            { proof with
-              statement =
-                { proof.statement with
-                  pass_through =
-                    { proof.statement.pass_through with app_state = () }
-                }
-            }
+          ( return_value
+          , auxiliary_value
+          , Proof.T
+              { proof with
+                statement =
+                  { proof.statement with
+                    pass_through =
+                      { proof.statement.pass_through with app_state = () }
+                  }
+              } )
         in
         wrap
       in
       let rec go :
-          type xs1 xs2 xs3 xs4.
+          type xs1 xs2 xs3 xs4 xs5 xs6.
              (xs1, xs2, xs3, xs4) H4.T(Branch_data).t
           -> (xs1, xs2, xs3, xs4) H4.T(E04(Lazy_keys)).t
           -> ( xs2
              , xs3
              , xs4
-             , A_value.t
-             , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
+             , Arg_value.t
+             , ( Ret_value.t
+               * Auxiliary_value.t
+               * (max_proofs_verified, max_proofs_verified) Proof.t )
+               Promise.t )
              H3_2.T(Prover).t =
        fun bs ks ->
         match (bs, ks) with
@@ -790,10 +802,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let data : _ Types_map.Compiled.t =
       { branches = Branches.n
       ; proofs_verifieds
-      ; max_proofs_verified = (module Max_proofs_verified)
-      ; typ
-      ; value_to_field_elements = A_value.to_field_elements
-      ; var_to_field_elements = A.to_field_elements
+      ; max_proofs_verified
+      ; public_input = typ
       ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
       ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
       ; wrap_domains
@@ -829,13 +839,10 @@ module Side_loaded = struct
 
   let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
-  let create ~name ~max_proofs_verified ~value_to_field_elements
-      ~var_to_field_elements ~typ =
+  let create ~name ~max_proofs_verified ~typ =
     Types_map.add_side_loaded ~name
       { max_proofs_verified
-      ; value_to_field_elements
-      ; var_to_field_elements
-      ; typ
+      ; public_input = typ
       ; branches = Verification_key.Max_branches.n
       }
 
@@ -845,13 +852,15 @@ module Side_loaded = struct
     let of_proof : _ Proof.t -> t = Wrap_hack.pad_proof
   end
 
-  let verify_promise (type t) ~(value_to_field_elements : t -> _)
+  let verify_promise (type t) ~(typ : (_, t) Impls.Step.Typ.t)
       (ts : (Verification_key.t * t * Proof.t) list) =
     let m =
       ( module struct
         type nonrec t = t
 
-        let to_field_elements = value_to_field_elements
+        let to_field_elements =
+          let (Typ typ) = typ in
+          fun x -> fst (typ.value_to_fields x)
       end : Intf.Statement_value
         with type t = t )
     in
@@ -878,8 +887,7 @@ module Side_loaded = struct
             Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
         |> Verify.verify_heterogenous )
 
-  let verify ~value_to_field_elements ts =
-    verify_promise ~value_to_field_elements ts |> Promise.to_deferred
+  let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
 
   let srs_precomputation () : unit =
     let srs = Tock.Keypair.load_urs () in
@@ -889,42 +897,59 @@ module Side_loaded = struct
 end
 
 let compile_promise :
-    type a_var a_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-       ?self:(a_var, a_value, max_proofs_verified, branches) Tag.t
+    type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
+       ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
+    -> ?return_early_digest_exception:bool
     -> (module Statement_var_intf with type t = a_var)
     -> (module Statement_value_intf with type t = a_value)
-    -> typ:(a_var, a_value) Impls.Step.Typ.t
+    -> public_input:
+         ( var
+         , value
+         , a_var
+         , a_value
+         , ret_var
+         , ret_value )
+         Inductive_rule.public_input
+    -> auxiliary_typ:(auxiliary_var, auxiliary_value) Impls.Step.Typ.t
     -> branches:(module Nat.Intf with type n = branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
     -> constraint_constants:Snark_keys_header.Constraint_constants.t
     -> choices:
-         (   self:(a_var, a_value, max_proofs_verified, branches) Tag.t
+         (   self:(var, value, max_proofs_verified, branches) Tag.t
           -> ( prev_varss
              , prev_valuess
              , widthss
              , heightss
              , a_var
-             , a_value )
-             H4_2.T(Inductive_rule).t )
-    -> (a_var, a_value, max_proofs_verified, branches) Tag.t
+             , a_value
+             , ret_var
+             , ret_value
+             , auxiliary_var
+             , auxiliary_value )
+             H4_6.T(Inductive_rule).t )
+    -> (var, value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
        * (module Proof_intf
             with type t = (max_proofs_verified, max_proofs_verified) Proof.t
-             and type statement = a_value )
+             and type statement = value )
        * ( prev_valuess
          , widthss
          , heightss
          , a_value
-         , (max_proofs_verified, max_proofs_verified) Proof.t Promise.t )
+         , ( ret_value
+           * auxiliary_value
+           * (max_proofs_verified, max_proofs_verified) Proof.t )
+           Promise.t )
          H3_2.T(Prover).t =
- fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices ->
+ fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
+     (module A_var) (module A_value) ~public_input ~auxiliary_typ ~branches
+     ~max_proofs_verified ~name ~constraint_constants ~choices ->
   let self =
     match self with
     | None ->
@@ -932,10 +957,35 @@ let compile_promise :
     | Some self ->
         self
   in
-  let module M = Make (A_var) (A_value) in
+  let module Ret_var = struct
+    type t = ret_var
+  end in
+  let module Ret_value = struct
+    type t = ret_value
+  end in
+  let module Auxiliary_var = struct
+    type t = auxiliary_var
+  end in
+  let module Auxiliary_value = struct
+    type t = auxiliary_value
+  end in
+  let module M =
+    Make (A_var) (A_value) (Ret_var) (Ret_value) (Auxiliary_var)
+      (Auxiliary_value)
+  in
   let rec conv_irs :
-      type v1ss v2ss wss hss.
-         (v1ss, v2ss, wss, hss, a_var, a_value) H4_2.T(Inductive_rule).t
+      type v1ss v2ss v3ss v4ss wss hss.
+         ( v1ss
+         , v2ss
+         , wss
+         , hss
+         , a_var
+         , a_value
+         , ret_var
+         , ret_value
+         , auxiliary_var
+         , auxiliary_value )
+         H4_6.T(Inductive_rule).t
       -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
     | [] ->
         []
@@ -943,17 +993,49 @@ let compile_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~self ~cache ?disk_keys ~branches ~max_proofs_verified ~name ~typ
-      ~constraint_constants ~choices:(fun ~self -> conv_irs (choices ~self))
+    M.compile ~return_early_digest_exception ~self ~cache ?disk_keys ~branches
+      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
+      ~constraint_constants
+      ~choices:(fun ~self -> conv_irs (choices ~self))
+      ()
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
+  let module Value = struct
+    type t = value
+
+    let typ : (var, value) Impls.Step.Typ.t =
+      match public_input with
+      | Input typ ->
+          typ
+      | Output typ ->
+          typ
+      | Input_and_output (input_typ, output_typ) ->
+          Impls.Step.Typ.(input_typ * output_typ)
+
+    let to_field_elements =
+      let (Typ typ) = typ in
+      fun x -> fst (typ.value_to_fields x)
+  end in
   let module P = struct
-    type statement = A_value.t
+    type statement = value
+
+    type return_type = ret_value
 
     module Max_local_max_proofs_verified = Max_proofs_verified
-    module Max_proofs_verified_vec = Nvector (Max_proofs_verified)
-    include Proof.Make (Max_proofs_verified) (Max_local_max_proofs_verified)
+
+    module Max_proofs_verified_vec = Nvector (struct
+      include Max_proofs_verified
+    end)
+
+    include
+      Proof.Make
+        (struct
+          include Max_proofs_verified
+        end)
+        (struct
+          include Max_local_max_proofs_verified
+        end)
 
     let id = wrap_disk_key
 
@@ -961,8 +1043,10 @@ let compile_promise :
 
     let verify_promise ts =
       verify_promise
-        (module Max_proofs_verified)
-        (module A_value)
+        ( module struct
+          include Max_proofs_verified
+        end )
+        (module Value)
         (Lazy.force verification_key)
         ts
 
@@ -972,21 +1056,22 @@ let compile_promise :
   end in
   (self, cache_handle, (module P), provers)
 
-let compile ?self ?cache ?disk_keys a_var a_value ~typ ~branches
-    ~max_proofs_verified ~name ~constraint_constants ~choices =
+let compile ?self ?cache ?disk_keys a_var a_value ~public_input ~auxiliary_typ
+    ~branches ~max_proofs_verified ~name ~constraint_constants ~choices =
   let self, cache_handle, proof_module, provers =
-    compile_promise ?self ?cache ?disk_keys a_var a_value ~typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices
+    compile_promise ?self ?cache ?disk_keys a_var a_value ~public_input
+      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+      ~choices
   in
   let rec adjust_provers :
-      type a1 a2 a3 s1 s2_inner.
+      type a1 a2 a3 a4 s1 s2_inner.
          (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
       -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
     | [] ->
         []
     | prover :: tl ->
-        (fun ?handler stmt_with_proof public_input ->
-          Promise.to_deferred (prover ?handler stmt_with_proof public_input) )
+        (fun ?handler public_input ->
+          Promise.to_deferred (prover ?handler public_input) )
         :: adjust_provers tl
   in
   (self, cache_handle, proof_module, adjust_provers provers)
@@ -1000,6 +1085,7 @@ let%test_module "test no side-loaded" =
 
     let () = Tick.Keypair.set_urs_info []
 
+    (*
     let%test_unit "test deserialization and verification for side-loaded keys" =
       Side_loaded.srs_precomputation () ;
       let pi =
@@ -1034,7 +1120,8 @@ let%test_module "test no side-loaded" =
       assert (
         Promise.block_on_async_exn (fun () ->
             Side_loaded.verify_promise ~value_to_field_elements:Fn.id
-              [ (vk, statement, pi) ] ) )
+              ~return_typ:Impls.Step.Typ.unit
+              [ (vk, (statement, ()), pi) ] ) )*)
 
     open Impls.Step
 
@@ -1085,7 +1172,7 @@ let%test_module "test no side-loaded" =
             compile_promise
               (module Statement)
               (module Statement.Constant)
-              ~typ:Field.typ
+              ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
               ~name:"blockchain-snark"
@@ -1106,35 +1193,118 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = []
                   ; main =
-                      (fun [] self ->
+                      (fun { public_input = self } ->
                         dummy_constraints () ;
                         Field.Assert.equal self Field.zero ;
-                        [] )
+                        { previous_proof_statements = []
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
       module Proof = (val p)
 
       let example =
-        let b0 =
+        let (), (), b0 =
           Common.time "b0" (fun () ->
-              Promise.block_on_async_exn (fun () -> step [] Field.Constant.zero) )
+              Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
         in
         assert (
           Promise.block_on_async_exn (fun () ->
               Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
         (Field.Constant.zero, b0)
+
+      let example_input, example_proof = example
     end
 
-    module Simple_chain = struct
-      module Statement = Statement
+    module No_recursion_return = struct
+      module Statement = struct
+        type t = unit
+
+        let to_field_elements () = [||]
+
+        module Constant = struct
+          type t = unit [@@deriving bin_io]
+
+          let to_field_elements () = [||]
+        end
+      end
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
             compile_promise
               (module Statement)
               (module Statement.Constant)
-              ~typ:Field.typ
+              ~public_input:(Output Field.typ) ~auxiliary_typ:Typ.unit
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = []
+                  ; main =
+                      (fun _ ->
+                        dummy_constraints () ;
+                        { previous_proof_statements = []
+                        ; public_output = Field.zero
+                        ; auxiliary_output = ()
+                        } )
+                  }
+                ] ) )
+
+      module Proof = (val p)
+
+      let example =
+        let res, (), b0 =
+          Common.time "b0" (fun () ->
+              Promise.block_on_async_exn (fun () -> step ()) )
+        in
+        assert (Field.Constant.(equal zero) res) ;
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (res, b0) ] ) ) ;
+        (res, b0)
+
+      let example_input, example_proof = example
+    end
+
+    module Simple_chain = struct
+      module Statement = Statement
+
+      type _ Snarky_backendless.Request.t +=
+        | Prev_input : Field.Constant.t Snarky_backendless.Request.t
+        | Proof : (Nat.N1.n, Nat.N1.n) Proof.t Snarky_backendless.Request.t
+
+      let handler (prev_input : Field.Constant.t) (proof : _ Proof.t)
+          (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | Prev_input ->
+            respond (Provide prev_input)
+        | Proof ->
+            respond (Provide proof)
+        | _ ->
+            respond Unhandled
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N1)
               ~name:"blockchain-snark"
@@ -1155,12 +1325,24 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ self ]
                   ; main =
-                      (fun [ prev ] self ->
+                      (fun { public_input = self } ->
+                        let prev =
+                          exists Field.typ ~request:(fun () -> Prev_input)
+                        in
+                        let proof =
+                          exists (Typ.Internal.ref ()) ~request:(fun () ->
+                              Proof )
+                        in
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ proof_must_verify ] )
+                        { previous_proof_statements =
+                            [ { public_input = prev; proof; proof_must_verify }
+                            ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
@@ -1171,32 +1353,63 @@ let%test_module "test no side-loaded" =
         let b_neg_one : (Nat.N1.n, Nat.N1.n) Proof0.t =
           Proof0.dummy Nat.N1.n Nat.N1.n Nat.N1.n ~domain_log2:14
         in
-        let b0 =
+        let (), (), b0 =
           Common.time "b0" (fun () ->
               Promise.block_on_async_exn (fun () ->
-                  step [ (s_neg_one, b_neg_one) ] Field.Constant.zero ) )
+                  step
+                    ~handler:(handler s_neg_one b_neg_one)
+                    Field.Constant.zero ) )
         in
         assert (
           Promise.block_on_async_exn (fun () ->
               Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
-        let b1 =
+        let (), (), b1 =
           Common.time "b1" (fun () ->
               Promise.block_on_async_exn (fun () ->
-                  step [ (Field.Constant.zero, b0) ] Field.Constant.one ) )
+                  step
+                    ~handler:(handler Field.Constant.zero b0)
+                    Field.Constant.one ) )
         in
         assert (
           Promise.block_on_async_exn (fun () ->
               Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
         (Field.Constant.one, b1)
+
+      let example_input, example_proof = example
     end
 
     module Tree_proof = struct
+      type _ Snarky_backendless.Request.t +=
+        | No_recursion_input : Field.Constant.t Snarky_backendless.Request.t
+        | No_recursion_proof :
+            (Nat.N0.n, Nat.N0.n) Proof.t Snarky_backendless.Request.t
+        | Recursive_input : Field.Constant.t Snarky_backendless.Request.t
+        | Recursive_proof :
+            (Nat.N2.n, Nat.N2.n) Proof.t Snarky_backendless.Request.t
+
+      let handler
+          ((no_recursion_input, no_recursion_proof) :
+            Field.Constant.t * _ Proof.t )
+          ((recursion_input, recursion_proof) : Field.Constant.t * _ Proof.t)
+          (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | No_recursion_input ->
+            respond (Provide no_recursion_input)
+        | No_recursion_proof ->
+            respond (Provide no_recursion_proof)
+        | Recursive_input ->
+            respond (Provide recursion_input)
+        | Recursive_proof ->
+            respond (Provide recursion_proof)
+        | _ ->
+            respond Unhandled
+
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
             compile_promise
               (module Statement)
               (module Statement.Constant)
-              ~typ:Field.typ
+              ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"blockchain-snark"
@@ -1217,46 +1430,368 @@ let%test_module "test no side-loaded" =
                 [ { identifier = "main"
                   ; prevs = [ No_recursion.tag; self ]
                   ; main =
-                      (fun [ _; prev ] self ->
+                      (fun { public_input = self } ->
+                        let no_recursive_input =
+                          exists Field.typ ~request:(fun () ->
+                              No_recursion_input )
+                        in
+                        let no_recursive_proof =
+                          exists (Typ.Internal.ref ()) ~request:(fun () ->
+                              No_recursion_proof )
+                        in
+                        let prev =
+                          exists Field.typ ~request:(fun () -> Recursive_input)
+                        in
+                        let prev_proof =
+                          exists (Typ.Internal.ref ()) ~request:(fun () ->
+                              Recursive_proof )
+                        in
                         let is_base_case = Field.equal Field.zero self in
                         let proof_must_verify = Boolean.not is_base_case in
                         let self_correct = Field.(equal (one + prev) self) in
                         Boolean.Assert.any [ self_correct; is_base_case ] ;
-                        [ Boolean.true_; proof_must_verify ] )
+                        { previous_proof_statements =
+                            [ { public_input = no_recursive_input
+                              ; proof = no_recursive_proof
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ; { public_input = prev
+                              ; proof = prev_proof
+                              ; proof_must_verify
+                              }
+                            ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
+                  }
+                ] ) )
+
+      module Proof = (val p)
+
+      let example1, example2 =
+        let s_neg_one = Field.Constant.(negate one) in
+        let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
+          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+        in
+        let (), (), b0 =
+          Common.time "tree b0" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step
+                    ~handler:
+                      (handler No_recursion.example (s_neg_one, b_neg_one))
+                    Field.Constant.zero ) )
+        in
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+        let (), (), b1 =
+          Common.time "tree b1" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step
+                    ~handler:
+                      (handler No_recursion.example (Field.Constant.zero, b0))
+                    Field.Constant.one ) )
+        in
+        ((Field.Constant.zero, b0), (Field.Constant.one, b1))
+
+      let examples = [ example1; example2 ]
+
+      let example1_input, example_proof = example1
+
+      let example2_input, example2_proof = example2
+    end
+
+    let%test_unit "verify" =
+      assert (
+        Promise.block_on_async_exn (fun () ->
+            Tree_proof.Proof.verify_promise Tree_proof.examples ) )
+
+    module Tree_proof_return = struct
+      module Statement = No_recursion_return.Statement
+
+      type _ Snarky_backendless.Request.t +=
+        | Is_base_case : bool Snarky_backendless.Request.t
+        | No_recursion_input : Field.Constant.t Snarky_backendless.Request.t
+        | No_recursion_proof :
+            (Nat.N0.n, Nat.N0.n) Proof.t Snarky_backendless.Request.t
+        | Recursive_input : Field.Constant.t Snarky_backendless.Request.t
+        | Recursive_proof :
+            (Nat.N2.n, Nat.N2.n) Proof.t Snarky_backendless.Request.t
+
+      let handler (is_base_case : bool)
+          ((no_recursion_input, no_recursion_proof) :
+            Field.Constant.t * _ Proof.t )
+          ((recursion_input, recursion_proof) : Field.Constant.t * _ Proof.t)
+          (Snarky_backendless.Request.With { request; respond }) =
+        match request with
+        | Is_base_case ->
+            respond (Provide is_base_case)
+        | No_recursion_input ->
+            respond (Provide no_recursion_input)
+        | No_recursion_proof ->
+            respond (Provide no_recursion_proof)
+        | Recursive_input ->
+            respond (Provide recursion_input)
+        | Recursive_proof ->
+            respond (Provide recursion_proof)
+        | _ ->
+            respond Unhandled
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~public_input:(Output Field.typ) ~auxiliary_typ:Typ.unit
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N2)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = [ No_recursion_return.tag; self ]
+                  ; main =
+                      (fun { public_input = () } ->
+                        let no_recursive_input =
+                          exists Field.typ ~request:(fun () ->
+                              No_recursion_input )
+                        in
+                        let no_recursive_proof =
+                          exists (Typ.Internal.ref ()) ~request:(fun () ->
+                              No_recursion_proof )
+                        in
+                        let prev =
+                          exists Field.typ ~request:(fun () -> Recursive_input)
+                        in
+                        let prev_proof =
+                          exists (Typ.Internal.ref ()) ~request:(fun () ->
+                              Recursive_proof )
+                        in
+                        let is_base_case =
+                          exists Boolean.typ ~request:(fun () -> Is_base_case)
+                        in
+                        let proof_must_verify = Boolean.not is_base_case in
+                        let self =
+                          Field.(
+                            if_ is_base_case ~then_:zero ~else_:(one + prev))
+                        in
+                        { previous_proof_statements =
+                            [ { public_input = no_recursive_input
+                              ; proof = no_recursive_proof
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ; { public_input = prev
+                              ; proof = prev_proof
+                              ; proof_must_verify
+                              }
+                            ]
+                        ; public_output = self
+                        ; auxiliary_output = ()
+                        } )
+                  }
+                ] ) )
+
+      module Proof = (val p)
+
+      let example1, example2 =
+        let s_neg_one = Field.Constant.(negate one) in
+        let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
+          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+        in
+        let s0, (), b0 =
+          Common.time "tree b0" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step
+                    ~handler:
+                      (handler true No_recursion_return.example
+                         (s_neg_one, b_neg_one) )
+                    () ) )
+        in
+        assert (Field.Constant.(equal zero) s0) ;
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ (s0, b0) ] ) ) ;
+        let s1, (), b1 =
+          Common.time "tree b1" (fun () ->
+              Promise.block_on_async_exn (fun () ->
+                  step
+                    ~handler:
+                      (handler false No_recursion_return.example (s0, b0))
+                    () ) )
+        in
+        assert (Field.Constant.(equal one) s1) ;
+        ((s0, b0), (s1, b1))
+
+      let examples = [ example1; example2 ]
+
+      let example1_input, example1_proof = example1
+
+      let example2_input, example2_proof = example2
+    end
+
+    let%test_unit "verify" =
+      assert (
+        Promise.block_on_async_exn (fun () ->
+            Tree_proof_return.Proof.verify_promise Tree_proof_return.examples ) )
+
+    module Add_one_return = struct
+      module Statement = struct
+        type t = Field.t
+
+        let to_field_elements x = [| x |]
+
+        module Constant = struct
+          type t = Field.Constant.t [@@deriving bin_io]
+
+          let to_field_elements x = [| x |]
+        end
+      end
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~public_input:(Input_and_output (Field.typ, Field.typ))
+              ~auxiliary_typ:Typ.unit
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = []
+                  ; main =
+                      (fun { public_input = x } ->
+                        dummy_constraints () ;
+                        { previous_proof_statements = []
+                        ; public_output = Field.(add one) x
+                        ; auxiliary_output = ()
+                        } )
                   }
                 ] ) )
 
       module Proof = (val p)
 
       let example =
-        let s_neg_one = Field.Constant.(negate one) in
-        let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
-          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+        let input = Field.Constant.of_int 42 in
+        let res, (), b0 =
+          Common.time "b0" (fun () ->
+              Promise.block_on_async_exn (fun () -> step input) )
         in
-        let b0 =
-          Common.time "tree b0" (fun () ->
-              Promise.block_on_async_exn (fun () ->
-                  step
-                    [ No_recursion.example; (s_neg_one, b_neg_one) ]
-                    Field.Constant.zero ) )
-        in
+        assert (Field.Constant.(equal (of_int 43)) res) ;
         assert (
           Promise.block_on_async_exn (fun () ->
-              Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
-        let b1 =
-          Common.time "tree b1" (fun () ->
-              Promise.block_on_async_exn (fun () ->
-                  step
-                    [ No_recursion.example; (Field.Constant.zero, b0) ]
-                    Field.Constant.one ) )
-        in
-        [ (Field.Constant.zero, b0); (Field.Constant.one, b1) ]
+              Proof.verify_promise [ ((input, res), b0) ] ) ) ;
+        ((input, res), b0)
+
+      let example_input, example_proof = example
     end
 
-    let%test_unit "verify" =
-      assert (
-        Promise.block_on_async_exn (fun () ->
-            Tree_proof.Proof.verify_promise Tree_proof.example ) )
+    module Auxiliary_return = struct
+      module Statement = struct
+        type t = Field.t
+
+        let to_field_elements x = [| x |]
+
+        module Constant = struct
+          type t = Field.Constant.t [@@deriving bin_io]
+
+          let to_field_elements x = [| x |]
+        end
+      end
+
+      let tag, _, p, Provers.[ step ] =
+        Common.time "compile" (fun () ->
+            compile_promise
+              (module Statement)
+              (module Statement.Constant)
+              ~public_input:(Input_and_output (Field.typ, Field.typ))
+              ~auxiliary_typ:Field.typ
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
+              ~name:"blockchain-snark"
+              ~constraint_constants:
+                (* Dummy values *)
+                { sub_windows_per_window = 0
+                ; ledger_depth = 0
+                ; work_delay = 0
+                ; block_window_duration_ms = 0
+                ; transaction_capacity = Log_2 0
+                ; pending_coinbase_depth = 0
+                ; coinbase_amount = Unsigned.UInt64.of_int 0
+                ; supercharged_coinbase_factor = 0
+                ; account_creation_fee = Unsigned.UInt64.of_int 0
+                ; fork = None
+                }
+              ~choices:(fun ~self ->
+                [ { identifier = "main"
+                  ; prevs = []
+                  ; main =
+                      (fun { public_input = input } ->
+                        dummy_constraints () ;
+                        let sponge =
+                          Step_main_inputs.Sponge.create
+                            Step_main_inputs.sponge_params
+                        in
+                        let blinding_value =
+                          exists Field.typ ~compute:Field.Constant.random
+                        in
+                        Step_main_inputs.Sponge.absorb sponge (`Field input) ;
+                        Step_main_inputs.Sponge.absorb sponge
+                          (`Field blinding_value) ;
+                        let result = Step_main_inputs.Sponge.squeeze sponge in
+                        { previous_proof_statements = []
+                        ; public_output = result
+                        ; auxiliary_output = blinding_value
+                        } )
+                  }
+                ] ) )
+
+      module Proof = (val p)
+
+      let example =
+        let input = Field.Constant.of_int 42 in
+        let result, blinding_value, b0 =
+          Common.time "b0" (fun () ->
+              Promise.block_on_async_exn (fun () -> step input) )
+        in
+        let sponge = Tick_field_sponge.Field.create Tick_field_sponge.params in
+        Tick_field_sponge.Field.absorb sponge input ;
+        Tick_field_sponge.Field.absorb sponge blinding_value ;
+        let result' = Tick_field_sponge.Field.squeeze sponge in
+        assert (Field.Constant.equal result result') ;
+        assert (
+          Promise.block_on_async_exn (fun () ->
+              Proof.verify_promise [ ((input, result), b0) ] ) ) ;
+        ((input, result), b0)
+
+      let example_input, example_proof = example
+    end
   end )
 
 (*
@@ -1308,6 +1843,7 @@ let%test_module "test" =
             (module Statement)
             (module Statement.Constant)
             ~typ:Field.typ
+            ~return_typ:Typ.unit
             ~branches:(module Nat.N2) (* Should be able to set to 1 *)
             ~max_proofs_verified:
               (module Nat.N2) (* TODO: Should be able to set this to 0 *)
@@ -1357,6 +1893,7 @@ let%test_module "test" =
           (module Statement)
           (module Statement.Constant)
           ~typ:Field.typ
+          ~return_typ:Typ.unit
           ~branches:(module Nat.N3)
           ~max_proofs_verified:(module Nat.N2)
           ~name:"txn-snark"
@@ -1457,7 +1994,7 @@ let%test_module "test" =
             compile
               (module Statement)
               (module Statement.Constant)
-              ~typ:Field.typ
+              ~return_typ:(Input Field.typ)
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"blockchain-snark"
