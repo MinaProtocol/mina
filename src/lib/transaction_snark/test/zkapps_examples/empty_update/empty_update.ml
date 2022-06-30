@@ -26,7 +26,8 @@ let tag, _, p_module, Pickles.Provers.[ prover ] =
   Pickles.compile ~cache:Cache_dir.cache
     (module Statement)
     (module Statement)
-    ~public_input:(Output Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
+    ~public_input:(Output Zkapp_statement.typ)
+    ~auxiliary_typ:(Prover_value.typ ())
     ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
     ~name:"empty_update"
@@ -42,7 +43,7 @@ let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 (* TODO: This should be entirely unnecessary. *)
 let party_body = Zkapps_empty_update.generate_party pk_compressed
 
-let _stmt, (), party_proof = Async.Thread_safe.block_on_async_exn prover
+let _stmt, _res, party_proof = Async.Thread_safe.block_on_async_exn prover
 
 let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
 

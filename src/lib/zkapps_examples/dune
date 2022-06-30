@@ -19,7 +19,8 @@
    snark_params
    sgn
    signature_lib
-   tuple_lib)
+   tuple_lib
+   with_hash)
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps

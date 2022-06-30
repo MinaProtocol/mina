@@ -401,19 +401,46 @@ let dummy_constraints () =
         (Kimchi_backend_common.Scalar_challenge.create x)
       : Field.t * Field.t )
 
+type return_type =
+  { party : Party.Body.t
+  ; party_digest : Parties.Digest.Party.t
+  ; calls :
+      ( ( Party.t
+        , Parties.Digest.Party.t
+        , Parties.Digest.Forest.t )
+        Parties.Call_forest.Tree.t
+      , Parties.Digest.Forest.t )
+      With_stack_hash.t
+      list
+  }
+
 (* TODO: Should be able to *return* stmt instead of consuming it.
          Modify snarky to do this.
 *)
 let party_circuit f { Pickles.Inductive_rule.public_input = () } :
-    (_, _, Zkapp_statement.Checked.t, _) Pickles.Inductive_rule.main_return =
+    ( _
+    , _
+    , Zkapp_statement.Checked.t
+    , return_type Prover_value.t )
+    Pickles.Inductive_rule.main_return =
   dummy_constraints () ;
   let party = f () in
   let party, calls =
     Party_under_construction.In_circuit.to_party_and_calls party
   in
+  let party_digest = Parties.Call_forest.Digest.Party.Checked.create party in
   let public_output : Zkapp_statement.Checked.t =
-    { party = Party.Checked.digest party
+    { party = (party_digest :> Field.t)
     ; calls = (Zkapp_call_forest.Checked.hash calls :> Field.t)
     }
   in
-  { previous_proof_statements = []; public_output; auxiliary_output = () }
+  let auxiliary_output =
+    Prover_value.create (fun () ->
+        let party = As_prover.read (Party.Body.typ ()) party in
+        let party_digest =
+          As_prover.read Parties.Call_forest.Digest.Party.typ party_digest
+        in
+        let calls = Prover_value.get calls.data in
+        { party; calls; party_digest } )
+  in
+  { previous_proof_statements = []; public_output; auxiliary_output }
