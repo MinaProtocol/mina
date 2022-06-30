@@ -7,7 +7,7 @@ module Poly : sig
         ( 'public_key
         , 'token_id
         , 'amount )
-        Mina_wire_types.Mina_base.Payment_payload.poly =
+        Mina_wire_types.Mina_base.Payment_payload.Poly.V1.t =
     { source_pk : 'public_key
     ; receiver_pk : 'public_key
     ; token_id : 'token_id

@@ -13,6 +13,7 @@
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))
+  (flags -w -22) ; Allow using versioned types outside of ppx
   )
 
 (documentation (package mina_wire_types))

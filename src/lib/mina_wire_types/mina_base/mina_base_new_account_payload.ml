@@ -1,6 +1,8 @@
-type t =
-  { token_id : Mina_base_token_id.t
-  ; token_owner_pk : Public_key.Compressed.t
-  ; receiver_pk : Public_key.Compressed.t
-  ; account_disabled : bool
-  }
+module V1 = struct
+  type t =
+    { token_id : Mina_base_token_id.V1.t
+    ; token_owner_pk : Public_key.Compressed.V1.t
+    ; receiver_pk : Public_key.Compressed.V1.t
+    ; account_disabled : bool
+    }
+end

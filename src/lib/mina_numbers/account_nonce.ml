@@ -4,7 +4,7 @@ module Wire_types = Mina_wire_types.Mina_numbers.Account_nonce
 
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S = sig
-    include Nat.Intf.UInt32_A with type Stable.V1.t = A.t
+    include Nat.Intf.UInt32_A with type Stable.V1.t = A.V1.t
 
     include Codable.S with type t := t
   end

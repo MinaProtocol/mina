@@ -1,36 +1,46 @@
 module Common = struct
   module Poly = struct
-    type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
-      { fee : 'fee
-      ; fee_token : 'token_id
-      ; fee_payer_pk : 'public_key
-      ; nonce : 'nonce
-      ; valid_until : 'global_slot
-      ; memo : 'memo
-      }
+    module V1 = struct
+      type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
+        { fee : 'fee
+        ; fee_token : 'token_id
+        ; fee_payer_pk : 'public_key
+        ; nonce : 'nonce
+        ; valid_until : 'global_slot
+        ; memo : 'memo
+        }
+    end
   end
 
-  type t =
-    ( Currency.Fee.t
-    , Public_key.Compressed.t
-    , Mina_base_token_id.t
-    , Mina_numbers.Account_nonce.t
-    , Mina_numbers.Global_slot.t
-    , Mina_base_signed_command_memo.t )
-    Poly.t
+  module V1 = struct
+    type t =
+      ( Currency.Fee.V1.t
+      , Public_key.Compressed.V1.t
+      , Mina_base_token_id.V1.t
+      , Mina_numbers.Account_nonce.V1.t
+      , Mina_numbers.Global_slot.V1.t
+      , Mina_base_signed_command_memo.V1.t )
+      Poly.V1.t
+  end
 end
 
 module Body = struct
-  type t =
-    | Payment of Mina_base_payment_payload.t
-    | Stake_delegation of Mina_base_stake_delegation.t
-    | Create_new_token of Mina_base_new_token_payload.t
-    | Create_token_account of Mina_base_new_account_payload.t
-    | Mint_tokens of Mina_base_minting_payload.t
+  module V1 = struct
+    type t =
+      | Payment of Mina_base_payment_payload.V1.t
+      | Stake_delegation of Mina_base_stake_delegation.V1.t
+      | Create_new_token of Mina_base_new_token_payload.V1.t
+      | Create_token_account of Mina_base_new_account_payload.V1.t
+      | Mint_tokens of Mina_base_minting_payload.V1.t
+  end
 end
 
 module Poly = struct
-  type ('common, 'body) t = { common : 'common; body : 'body }
+  module V1 = struct
+    type ('common, 'body) t = { common : 'common; body : 'body }
+  end
 end
 
-type t = (Common.t, Body.t) Poly.t
+module V1 = struct
+  type t = (Common.V1.t, Body.V1.t) Poly.V1.t
+end

@@ -5,7 +5,7 @@ open Import
 open Snark_params.Tick
 
 module Body : sig
-  type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.t =
+  type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V1.t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
     | Create_new_token of New_token_payload.t
@@ -47,7 +47,7 @@ module Common : sig
               , 'nonce
               , 'global_slot
               , 'memo )
-              Mina_wire_types.Mina_base.Signed_command_payload.Common.Poly.t =
+              Mina_wire_types.Mina_base.Signed_command_payload.Common.Poly.V1.t =
           { fee : 'fee
           ; fee_token : 'token_id
           ; fee_payer_pk : 'public_key
@@ -112,7 +112,7 @@ module Poly : sig
       type ('common, 'body) t =
             ( 'common
             , 'body )
-            Mina_wire_types.Mina_base.Signed_command_payload.Poly.t =
+            Mina_wire_types.Mina_base.Signed_command_payload.Poly.V1.t =
         { common : 'common; body : 'body }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
 

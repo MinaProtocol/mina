@@ -35,7 +35,7 @@ val of_private_key_exn : Private_key.t -> t
 module Compressed : sig
   module Poly : sig
     type ('field, 'boolean) t =
-          ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.t =
+          ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.V1.t =
       { x : 'field; is_odd : 'boolean }
 
     module Stable : sig

@@ -2,19 +2,19 @@ open Utils
 
 module Types : sig
   module type S = sig
-    module Fee : S0
+    module Fee : V1S0
 
-    module Amount : S0
+    module Amount : V1S0
 
-    module Balance : S0
+    module Balance : V1S0
   end
 end
 
 module type Concrete =
   Types.S
-    with type Fee.t = Unsigned.UInt64.t
-     and type Amount.t = Unsigned.UInt64.t
-     and type Balance.t = Unsigned.UInt64.t
+    with type Fee.V1.t = Unsigned.UInt64.t
+     and type Amount.V1.t = Unsigned.UInt64.t
+     and type Balance.V1.t = Unsigned.UInt64.t
 
 module M : Types.S
 

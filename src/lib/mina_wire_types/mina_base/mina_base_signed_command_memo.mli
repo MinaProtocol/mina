@@ -1,10 +1,10 @@
 open Utils
 
 module Types : sig
-  module type S = S0
+  module type S = V1S0
 end
 
-module type Concrete = Types.S with type t = string
+module type Concrete = Types.S with type V1.t = string
 
 module M : Types.S
 
@@ -14,4 +14,4 @@ module Make
     (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
   Signature(M).S
 
-include Types.S with type t = M.t
+include Types.S with module V1 = M.V1

@@ -2,13 +2,15 @@ open Utils
 
 module Account_nonce = struct
   module Types = struct
-    module type S = S0
+    module type S = V1S0
   end
 
-  module type Concrete = Types.S with type t = Unsigned.UInt32.t
+  module type Concrete = Types.S with type V1.t = Unsigned.UInt32.t
 
   module M = struct
-    type t = Unsigned.UInt32.t
+    module V1 = struct
+      type t = Unsigned.UInt32.t
+    end
   end
 
   module type Local_sig = Signature(Types).S
@@ -21,13 +23,15 @@ end
 
 module Global_slot = struct
   module Types = struct
-    module type S = S0
+    module type S = V1S0
   end
 
-  module type Concrete = Types.S with type t = Unsigned.UInt32.t
+  module type Concrete = Types.S with type V1.t = Unsigned.UInt32.t
 
   module M = struct
-    type t = Unsigned.UInt32.t
+    module V1 = struct
+      type t = Unsigned.UInt32.t
+    end
   end
 
   module type Local_sig = Signature(Types).S

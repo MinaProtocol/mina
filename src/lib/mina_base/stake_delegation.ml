@@ -6,7 +6,7 @@ open Signature_lib
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Mina_wire_types.Mina_base.Stake_delegation.t =
+    type t = Mina_wire_types.Mina_base.Stake_delegation.V1.t =
       | Set_delegate of
           { delegator : Public_key.Compressed.Stable.V1.t
           ; new_delegate : Public_key.Compressed.Stable.V1.t

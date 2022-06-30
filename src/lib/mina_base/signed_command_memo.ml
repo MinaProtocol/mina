@@ -13,7 +13,7 @@ open Crypto_params
 module Wire_types = Mina_wire_types.Mina_base.Signed_command_memo
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Signed_command_memo_intf.S with type t = A.t
+  module type S = Signed_command_memo_intf.S with type t = A.V1.t
 end
 
 module Make_str (_ : Wire_types.Concrete) = struct

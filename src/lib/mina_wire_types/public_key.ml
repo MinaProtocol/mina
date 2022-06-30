@@ -1,9 +1,15 @@
 module Compressed = struct
   module Poly = struct
-    type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
+    module V1 = struct
+      type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
+    end
   end
 
-  type t = (Snark_params.Tick.Field.t, bool) Poly.t
+  module V1 = struct
+    type t = (Snark_params.Tick.Field.t, bool) Poly.V1.t
+  end
 end
 
-type t = Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
+module V1 = struct
+  type t = Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
+end
