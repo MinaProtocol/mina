@@ -565,10 +565,12 @@ module Genesis_proof = struct
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
     in
+    let open Staged_ledger_diff in
     let protocol_state_with_hashes =
       Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
+        ~genesis_body_reference
     in
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants
@@ -580,6 +582,7 @@ module Genesis_proof = struct
     ; protocol_state_with_hashes
     ; constraint_system_digests = None
     ; genesis_constants
+    ; genesis_body_reference
     }
 
   let generate (inputs : Genesis_proof.Inputs.t) =
@@ -597,6 +600,7 @@ module Genesis_proof = struct
              ; genesis_constants = inputs.genesis_constants
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
+             ; genesis_body_reference = inputs.genesis_body_reference
              }
     | _ ->
         Deferred.return (Genesis_proof.create_values_no_proof inputs)
@@ -703,6 +707,7 @@ module Genesis_proof = struct
                   ; constraint_system_digests
                   ; proof_data =
                       Some { blockchain_proof_system_id; genesis_proof }
+                  ; genesis_body_reference = inputs.genesis_body_reference
                   }
                 , file )
           | Error err ->
@@ -748,6 +753,7 @@ module Genesis_proof = struct
           ; protocol_state_with_hashes = inputs.protocol_state_with_hashes
           ; constraint_system_digests = compiled.constraint_system_digests
           ; proof_data = Some proof_data
+          ; genesis_body_reference = inputs.genesis_body_reference
           }
         in
         let%map () =

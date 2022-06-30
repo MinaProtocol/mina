@@ -35,7 +35,8 @@
    o1trace
    mina_base.import
    kimchi_backend.pasta
-   with_hash)
+   with_hash
+   snarky.backendless)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_version ppx_compare ppx_hash ppx_coda ppx_version ppx_here ppx_bin_prot ppx_let
                   ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv)))

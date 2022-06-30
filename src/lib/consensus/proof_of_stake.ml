@@ -4608,3 +4608,5 @@ module Exported = struct
   module Block_data = Data.Block_data
   module Consensus_state = Data.Consensus_state
 end
+
+module Body_reference = Body_reference

@@ -8,4 +8,6 @@ module Logger_id = struct
   let rejected_blocks = "rejected_blocks"
 
   let snark_worker = "snark_worker"
+
+  let oversized_logs = "oversized_logs"
 end
