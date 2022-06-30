@@ -515,9 +515,11 @@ let batch_test_zkapps =
          let per_batch = 10 in
          (*Takes as bit to generate these transactions*)
          let curr_count = ref 0 in
+         let total_count = ref 0 in
          let limit =
            if rate_limit then ( fun () ->
              incr curr_count ;
+             incr total_count ;
              if !curr_count >= limit_level then
                let%bind () =
                  Deferred.return
@@ -534,9 +536,9 @@ let batch_test_zkapps =
            else fun () -> Deferred.return ()
          in
          let rec go account_states =
-           if !curr_count >= num_txns then Deferred.unit
+           if !total_count >= num_txns then Deferred.unit
            else
-             let batch = min per_batch (num_txns - !curr_count + 1) in
+             let batch = min per_batch (num_txns - !total_count + 1) in
              Core.printf "Generating %d parties transactions\n%!" batch ;
              match%bind
                Daemon_rpcs.Client.dispatch
@@ -555,7 +557,7 @@ let batch_test_zkapps =
                    Deferred.List.iter parties_list ~f:(fun parties ->
                        Core.printf
                          !"Sending a zkapp command (count %d)\n%!"
-                         !curr_count ;
+                         !total_count ;
                        let%bind () =
                          Daemon_rpcs.Client.dispatch_with_message
                            Daemon_rpcs.Send_zkapp_command.rpc parties port
@@ -564,7 +566,7 @@ let batch_test_zkapps =
                                "%d. Successfully enqueued a zkapp command in \
                                 pool\n\
                                 %!"
-                               !curr_count )
+                               !total_count )
                            ~error:(fun e ->
                              sprintf "Failed to send zkapp command %s\n%!"
                                (Error.to_string_hum e) )
