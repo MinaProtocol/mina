@@ -17,6 +17,8 @@
    result
    core.uuid
    ;;local libraries
+   o1trace
+   mina_metrics
    merkle_ledger
    staged_ledger
    mina_state
