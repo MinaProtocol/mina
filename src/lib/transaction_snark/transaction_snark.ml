@@ -1290,7 +1290,7 @@ module Base = struct
           Flagged_option.data x
       end
 
-      module Parties = struct
+      module Call_forest = struct
         module F = Parties.Digest.Forest.Checked
 
         type t =
@@ -1358,7 +1358,7 @@ module Base = struct
       end
 
       module Stack_frame = struct
-        type frame = (Token_id.Checked.t, Parties.t) Stack_frame.t
+        type frame = (Token_id.Checked.t, Call_forest.t) Stack_frame.t
 
         type t = (frame, Stack_frame.Digest.Checked.t Lazy.t) With_hash.t
 
@@ -1368,7 +1368,7 @@ module Base = struct
                 (Stack_frame.Digest.Checked.if_ b ~then_:(Lazy.force t1.hash)
                    ~else_:(Lazy.force t2.hash) )
           ; data =
-              Stack_frame.Checked.if_ Parties.if_ b ~then_:t1.data
+              Stack_frame.Checked.if_ Call_forest.if_ b ~then_:t1.data
                 ~else_:t2.data
           }
 
@@ -1383,7 +1383,7 @@ module Base = struct
           ; hash =
               lazy
                 (Stack_frame.Digest.Checked.create
-                   ~hash_parties:(fun (calls : Parties.t) -> calls.hash)
+                   ~hash_parties:(fun (calls : Call_forest.t) -> calls.hash)
                    frame )
           }
 
@@ -1475,7 +1475,7 @@ module Base = struct
         let exists_elt (elt_ref : (Value.frame, _) With_hash.t V.t) :
             Stack_frame.t =
           let elt : Stack_frame.frame =
-            let calls : Parties.t =
+            let calls : Call_forest.t =
               { hash =
                   exists Mina_base.Parties.Digest.Forest.typ ~compute:(fun () ->
                       (V.get elt_ref).data.calls
@@ -1799,7 +1799,7 @@ module Base = struct
         module Party = struct
           type t = party
 
-          type parties = Parties.t
+          type call_forest = Call_forest.t
 
           type 'a or_ignore = 'a Zkapp_basic.Or_ignore.Checked.t
 
@@ -1823,14 +1823,14 @@ module Base = struct
           let increment_nonce (t : t) = t.party.data.increment_nonce
 
           let check_authorization ~commitment
-              ~at_party:({ hash = at_party; _ } : Parties.t)
+              ~calls:({ hash = calls; _ } : Call_forest.t)
               ({ party; control; _ } : t) =
             let proof_verifies =
               match auth_type with
               | Proof ->
                   set_zkapp_input
                     { party = (party.hash :> Field.t)
-                    ; calls = (at_party :> Field.t)
+                    ; calls = (calls :> Field.t)
                     } ;
                   Boolean.true_
               | Signature | None_given ->

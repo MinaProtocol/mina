@@ -1302,7 +1302,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
 
-      type parties =
+      type call_forest =
         ( Party.t
         , Parties.Digest.Party.t
         , Parties.Digest.Forest.t )
@@ -1312,7 +1312,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let caller (p : t) = p.body.caller
 
-      let check_authorization ~commitment:_ ~at_party:_ (party : t) =
+      let check_authorization ~commitment:_ ~calls:_ (party : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
@@ -1398,8 +1398,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push x ~onto : t = x :: onto
     end
 
-    module Parties = struct
-      type t = Party.parties
+    module Call_forest = struct
+      type t = Party.call_forest
 
       let empty () = []
 
@@ -1419,7 +1419,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type t = value
 
-      let if_ = Parties.if_
+      let if_ = Parties.value_if
 
       let make = Stack_frame.make
     end
