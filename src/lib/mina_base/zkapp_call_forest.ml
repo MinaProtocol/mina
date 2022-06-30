@@ -22,8 +22,9 @@ let push ~party ~calls t = Parties.Call_forest.cons ~calls party t
 
 let hash (t : t) = Parties.Call_forest.hash t
 
+open Snark_params.Tick.Run
+
 module Checked = struct
-  open Snark_params.Tick.Run
   module F = Parties.Digest.Forest.Checked
   module V = Prover_value
 
@@ -140,3 +141,16 @@ module Checked = struct
 
   let hash ({ hash; _ } : t) = hash
 end
+
+let typ : (Checked.t, t) Typ.t =
+  Typ.(Parties.Digest.Forest.typ * Prover_value.typ ())
+  |> Typ.transport
+       ~back:(fun (_digest, forest) ->
+         Parties.Call_forest.map ~f:(fun (party, ()) -> party) forest )
+       ~there:(fun forest ->
+         ( Parties.Call_forest.hash forest
+         , Parties.Call_forest.map ~f:(fun party -> (party, ())) forest ) )
+  |> Typ.transport_var
+       ~back:(fun (digest, forest) -> { With_hash.hash = digest; data = forest })
+       ~there:(fun { With_hash.hash = digest; data = forest } ->
+         (digest, forest) )
