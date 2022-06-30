@@ -920,32 +920,6 @@ module Base = struct
     open Parties_segment
     open Spec
 
-    module Prover_value : sig
-      type 'a t
-
-      val get : 'a t -> 'a
-
-      val create : (unit -> 'a) -> 'a t
-
-      val map : 'a t -> f:('a -> 'b) -> 'b t
-
-      val if_ : Boolean.var -> then_:'a t -> else_:'a t -> 'a t
-    end = struct
-      open Impl
-
-      type 'a t = 'a As_prover.Ref.t
-
-      let get = As_prover.Ref.get
-
-      let create = As_prover.Ref.create
-
-      let if_ b ~then_ ~else_ =
-        create (fun () ->
-            get (if Impl.As_prover.read Boolean.typ b then then_ else else_) )
-
-      let map t ~f = create (fun () -> f (get t))
-    end
-
     module Global_state = struct
       type t =
         { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t

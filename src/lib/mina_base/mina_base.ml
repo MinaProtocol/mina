@@ -34,6 +34,7 @@ module Pending_coinbase_witness = Pending_coinbase_witness
 module Permissions = Permissions
 module Proof = Proof
 module Protocol_constants_checked = Protocol_constants_checked
+module Prover_value = Prover_value
 module Receipt = Receipt
 module Side_loaded_verification_key = Side_loaded_verification_key
 module Signature = Signature
