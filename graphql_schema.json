@@ -466,11 +466,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5521,7 +5517,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Balance",
                   "ofType": null
                 }
               },
@@ -5538,7 +5534,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -6013,11 +6009,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -6032,7 +6024,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -6171,7 +6163,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -6368,11 +6360,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -6436,11 +6424,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -6968,16 +6952,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "BlockTime",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "BlockTimeInterval",
           "description": null,
@@ -7262,16 +7236,6 @@
         {
           "kind": "SCALAR",
           "name": "GlobalSlot",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "Balance",
           "description": null,
           "fields": null,
           "inputFields": null,
@@ -8018,16 +7982,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Fee",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "FeePayerPartyBody",
           "description": null,
@@ -8425,7 +8379,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -8456,11 +8410,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8785,7 +8735,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -8816,11 +8766,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -9093,7 +9039,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -9124,11 +9070,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -9344,7 +9286,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -9629,6 +9571,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "UInt64",
+          "description": "String representing a uint64 number in base 10",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "ConsensusState",
           "description": null,
@@ -9846,7 +9798,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "BlockTime",
                   "ofType": null
                 }
               },
@@ -9863,7 +9815,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "BlockTime",
                   "ofType": null
                 }
               },
@@ -10157,6 +10109,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Fee",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "SnarkWorker",
           "description": null,
@@ -10201,11 +10163,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -10718,7 +10676,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Balance",
                   "ofType": null
                 }
               },
@@ -10735,7 +10693,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Balance",
                   "ofType": null
                 }
               },
@@ -10747,7 +10705,7 @@
               "description":
                 "The amount of MINA owned by the account which is currently available. Can be null if bootstrapping.",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Balance", "ofType": null },
               "isDeprecated": true,
               "deprecationReason": null
             },
@@ -10756,7 +10714,7 @@
               "description":
                 "The amount of MINA owned by the account which is currently locked. Can be null if bootstrapping.",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Balance", "ofType": null },
               "isDeprecated": true,
               "deprecationReason": null
             },
@@ -10793,8 +10751,18 @@
         },
         {
           "kind": "SCALAR",
-          "name": "UInt64",
-          "description": "String representing a uint64 number in base 10",
+          "name": "Amount",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Balance",
+          "description": null,
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -10811,7 +10779,7 @@
               "description":
                 "The initial minimum balance for a time-locked account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Balance", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -10827,7 +10795,7 @@
               "name": "cliffAmount",
               "description": "The cliff amount for a time-locked account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Amount", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -10844,7 +10812,7 @@
               "description":
                 "The vesting increment for a time-locked account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Amount", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -11398,6 +11366,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Time",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "ConsensusConfiguration",
           "description": null,
@@ -11471,7 +11449,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "Time",
                   "ofType": null
                 }
               },
@@ -11620,6 +11598,16 @@
         },
         {
           "kind": "SCALAR",
+          "name": "BlockTime",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "UInt32",
           "description": "String representing a uint32 number in base 10",
           "fields": null,
@@ -11690,7 +11678,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "BlockTime",
                   "ofType": null
                 }
               },
@@ -11706,7 +11694,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "BlockTime",
                   "ofType": null
                 }
               },
