@@ -51,7 +51,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind { hash; _ } =
            Network.Node.must_send_delegation ~logger delegation_sender
              ~sender_pub_key:delegation_sender_pub_key
-             ~receiver_pub_key:delegation_receiver_pub_key ~amount ~fee
+             ~receiver_pub_key:delegation_receiver_pub_key ~fee
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier

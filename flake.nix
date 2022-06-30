@@ -5,6 +5,7 @@
     allow-import-from-derivation = "true";
     extra-substituters = [ "https://storage.googleapis.com/mina-nix-cache" ];
     extra-trusted-public-keys = [
+      "nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4="
       "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
     ];
   };
@@ -61,13 +62,10 @@
       };
       pipeline = with flake-buildkite-pipeline.lib; {
         steps = flakeSteps {
-          pushToBinaryCaches =
-            [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
-          signWithKeys = [ "/var/secrets/nix-cache-key.sec" ];
           commonExtraStepConfig = {
             agents = [ "nix" ];
             soft_fail = "true";
-            env.BUILDKITE_REPO = "";
+            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
           };
         } self;
       };

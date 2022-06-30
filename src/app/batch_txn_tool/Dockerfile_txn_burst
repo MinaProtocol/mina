@@ -30,7 +30,6 @@ RUN eval $(opam config env) \
     src/app/archive/archive.exe \
     src/app/rosetta/rosetta.exe \
     src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    src/app/generate_keypair/generate_keypair.exe \
     src/app/rosetta/ocaml-signer/signer.exe \
   && rm -rf _build \
   && dune build --profile=${DUNE_PROFILE} src/app/batch_txn_tool/batch_txn_tool.exe
