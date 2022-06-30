@@ -11,6 +11,10 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('payload, 'pk, 'signature) t =
+            ( 'payload
+            , 'pk
+            , 'signature )
+            Mina_wire_types.Mina_base.Signed_command.poly =
         { payload : 'payload; signer : 'pk; signature : 'signature }
       [@@deriving compare, sexp, hash, yojson, equal]
     end

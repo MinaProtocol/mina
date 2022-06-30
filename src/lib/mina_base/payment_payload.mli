@@ -4,6 +4,10 @@ open Import
 
 module Poly : sig
   type ('public_key, 'token_id, 'amount) t =
+        ( 'public_key
+        , 'token_id
+        , 'amount )
+        Mina_wire_types.Mina_base.Payment_payload.poly =
     { source_pk : 'public_key
     ; receiver_pk : 'public_key
     ; token_id : 'token_id

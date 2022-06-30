@@ -7,6 +7,10 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('payload, 'pk, 'signature) t =
+            ( 'payload
+            , 'pk
+            , 'signature )
+            Mina_wire_types.Mina_base.Signed_command.poly =
         { payload : 'payload; signer : 'pk; signature : 'signature }
       [@@deriving sexp, hash, yojson, equal, compare]
     end

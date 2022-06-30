@@ -201,7 +201,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
+        type t = Mina_wire_types.Mina_base.Signed_command_payload.body =
           | Payment of Payment_payload.Stable.V1.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
           | Create_new_token of New_token_payload.Stable.V1.t
@@ -406,7 +406,11 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('common, 'body) t = { common : 'common; body : 'body }
+      type ('common, 'body) t =
+            ( 'common
+            , 'body )
+            Mina_wire_types.Mina_base.Signed_command_payload.poly =
+        { common : 'common; body : 'body }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
 
       let of_latest common_latest body_latest { common; body } =

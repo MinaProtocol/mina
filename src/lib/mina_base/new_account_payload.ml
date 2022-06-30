@@ -4,7 +4,7 @@ open Import
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t =
+    type t = Mina_wire_types.Mina_base.New_account_payload.t =
       { token_id : Token_id.Stable.V1.t
       ; token_owner_pk : Public_key.Compressed.Stable.V1.t
       ; receiver_pk : Public_key.Compressed.Stable.V1.t

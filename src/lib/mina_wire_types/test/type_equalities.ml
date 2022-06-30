@@ -67,6 +67,18 @@ module Snark_params = struct
 
     type wire = W.tock_inner_curve
   end
+
+  module _ : Assert_equal0 = struct
+    type orig = O.Tick.Inner_curve.Scalar.t
+
+    type wire = W.tick_inner_curve_scalar
+  end
+
+  module _ : Assert_equal0 = struct
+    type orig = O.Tock.Inner_curve.Scalar.t
+
+    type wire = W.tock_inner_curve_scalar
+  end
 end
 
 module Public_key = struct
@@ -90,18 +102,76 @@ module Mina_base = struct
   module O = Mina_base
   module W = WT.Mina_base
 
-  module Signed_command_payload : Assert_equal6 = struct
-    type ('a, 'b, 'c, 'd, 'e, 'f) orig =
-      ('a, 'b, 'c, 'd, 'e, 'f) O.Signed_command_payload.Common.Poly.t
+  module Signed_command_payload_common : Assert_equal0 = struct
+    type orig = O.Signed_command_payload.Common.t
 
-    type ('a, 'b, 'c, 'd, 'e, 'f) wire =
-      ('a, 'b, 'c, 'd, 'e, 'f) W.Signed_command_payload.common_poly
+    type wire = W.Signed_command_payload.common
+  end
+
+  module Signed_command_payload_body : Assert_equal0 = struct
+    type orig = O.Signed_command_payload.Body.t
+
+    type wire = W.Signed_command_payload.body
+  end
+
+  module Signed_command_payload : Assert_equal0 = struct
+    type orig = O.Signed_command_payload.t
+
+    type wire = W.Signed_command_payload.t
+  end
+
+  module Signed_command_memo : Assert_equal0 = struct
+    type orig = O.Signed_command_memo.t
+
+    type wire = W.Signed_command_memo.t
+  end
+
+  module Signed_command : Assert_equal0 = struct
+    type orig = O.Signed_command.t
+
+    type wire = W.Signed_command.t
   end
 
   module Token_id : Assert_equal0 = struct
     type orig = O.Token_id.t
 
     type wire = W.Token_id.t
+  end
+
+  module Payment_payload : Assert_equal0 = struct
+    type orig = O.Payment_payload.t
+
+    type wire = W.Payment_payload.t
+  end
+
+  module Stake_delegation : Assert_equal0 = struct
+    type orig = O.Stake_delegation.t
+
+    type wire = W.Stake_delegation.t
+  end
+
+  module New_token_payload : Assert_equal0 = struct
+    type orig = O.New_token_payload.t
+
+    type wire = W.New_token_payload.t
+  end
+
+  module New_account_payload : Assert_equal0 = struct
+    type orig = O.New_account_payload.t
+
+    type wire = W.New_account_payload.t
+  end
+
+  module Minting_payload : Assert_equal0 = struct
+    type orig = O.Minting_payload.t
+
+    type wire = W.Minting_payload.t
+  end
+
+  module Signature : Assert_equal0 = struct
+    type orig = O.Signature.t
+
+    type wire = W.Signature.t
   end
 end
 
