@@ -1005,14 +1005,18 @@ struct
                  unable to verify any transactions."
         in
         let diff' =
-          Envelope.Incoming.map diff
-            ~f:
-              (List.map
-                 ~f:
-                   (User_command.to_verifiable ~ledger ~get:Base_ledger.get
-                      ~location_of_account:Base_ledger.location_of_account ) )
+          O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
+              Envelope.Incoming.map diff
+                ~f:
+                  (List.map
+                     ~f:
+                       (User_command.to_verifiable ~ledger ~get:Base_ledger.get
+                          ~location_of_account:Base_ledger.location_of_account ) ) )
         in
-        match%bind.Deferred Batcher.verify t.batcher diff' with
+        match%bind.Deferred
+          O1trace.thread "batching_transaction_verification" (fun () ->
+              Batcher.verify t.batcher diff' )
+        with
         | Error e ->
             [%log' error t.logger] "Transaction verification error: $error"
               ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
@@ -1034,15 +1038,16 @@ struct
             Error Error.(tag (of_string msg) ~tag:"Verification_failed")
         | Ok (Ok commands) ->
             (* TODO: we don't hash this anywhere prior to this? *)
-            Deferred.return
-              (Ok
-                 { diff with
-                   data =
-                     List.map commands
-                       ~f:
-                         Transaction_hash.User_command_with_valid_signature
-                         .create
-                 } )
+            O1trace.thread "hashing_transactions_after_verification" (fun () ->
+                Deferred.return
+                  (Ok
+                     { diff with
+                       data =
+                         List.map commands
+                           ~f:
+                             Transaction_hash.User_command_with_valid_signature
+                             .create
+                     } ) )
 
       let register_locally_generated t txn =
         Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
