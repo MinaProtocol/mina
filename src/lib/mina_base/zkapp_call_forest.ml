@@ -18,6 +18,8 @@ let pop_exn : t -> (Party.t * t) * t = function
   | _ ->
       failwith "pop_exn"
 
+let push ~party ~calls t = Parties.Call_forest.cons ~calls party t
+
 module Checked = struct
   open Snark_params.Tick.Run
   module F = Parties.Digest.Forest.Checked
@@ -50,7 +52,7 @@ module Checked = struct
   let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
   let pop_exn ({ hash = h; data = r } : t) : (party * t) * t =
-    with_label "Parties.pop_exn" (fun () ->
+    with_label "Zkapp_call_forest.pop_exn" (fun () ->
         let hd_r =
           V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
         in
@@ -85,4 +87,38 @@ module Checked = struct
             ; data = V.(create (fun () -> List.tl_exn (get r)))
             } )
           : (party * t) * t ) )
+
+  let push
+      ~party:{ party = { hash = party_hash; data = party }; control = auth }
+      ~calls:({ hash = calls_hash; data = calls } : t)
+      ({ hash = tl_hash; data = tl_data } : t) : t =
+    with_label "Zkapp_call_forest.push" (fun () ->
+        let tree_hash =
+          Parties.Digest.Tree.Checked.create ~party:party_hash ~calls:calls_hash
+        in
+        let hash_cons = Parties.Digest.Forest.Checked.cons tree_hash tl_hash in
+        let data =
+          V.create (fun () ->
+              let body = As_prover.read (Party.Body.typ ()) party in
+              let authorization = V.get auth in
+              let tl = V.get tl_data in
+              let party : Party.t * unit = ({ body; authorization }, ()) in
+              let calls = V.get calls in
+              let res =
+                Parties.Call_forest.cons_aux
+                  ~digest_party:(fun (party, ()) ->
+                    Parties.Call_forest.Digest.Party.create party )
+                  ~calls party tl
+              in
+              (* Sanity check; we're re-hashing anyway, might as well make sure it's
+                 consistent.
+              *)
+              assert (
+                Parties.Digest.Forest.(
+                  equal
+                    (As_prover.read typ hash_cons)
+                    (Parties.Call_forest.hash res)) ) ;
+              res )
+        in
+        ({ hash = hash_cons; data } : t) )
 end
