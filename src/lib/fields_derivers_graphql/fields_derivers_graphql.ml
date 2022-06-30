@@ -500,7 +500,15 @@ module IO = struct
   end
 end
 
-module Schema = Graphql_schema.Make (IO)
+module Field_error = struct
+  type t = string
+
+  let message_of_field_error t = t
+
+  let extensions_of_field_error _t = None
+end
+
+module Schema = Graphql_schema.Make (IO) (Field_error)
 module Graphql = Graphql_raw.Make (Schema)
 
 module Test = struct
@@ -536,7 +544,7 @@ let%test_module "Test" =
       end
     end
 
-    module Schema = Graphql_schema.Make (IO)
+    module Schema = Graphql_schema.Make (IO) (Field_error)
     module Graphql = Graphql_raw.Make (Schema)
     module Graphql_fields = Graphql.Fields
     module Graphql_args = Graphql.Args
