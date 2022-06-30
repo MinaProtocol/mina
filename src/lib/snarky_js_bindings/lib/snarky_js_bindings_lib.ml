@@ -1357,7 +1357,7 @@ module Circuit = struct
          let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
          let ctor2 : _ Js.Optdef.t = (Obj.magic t2)##.constructor in
          let has_methods ctor =
-           let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
+           let has s = Js.Optdef.test (Js.Unsafe.get ctor (Js.string s)) in
            has "toFields" && has "ofFields"
          in
          if not (js_equal ctor1 ctor2) then
@@ -1377,7 +1377,10 @@ module Circuit = struct
              array_iter2 ks1 ks2 ~f:(fun k1 k2 ->
                  if not (js_equal k1 k2) then
                    raise_error "if: Arguments had mismatched types" ) ;
-             let result = new%js ctor1 in
+             let result =
+               Js.Unsafe.global ##. Object##create
+                 (Js.Unsafe.coerce ctor1)##.prototype
+             in
              array_iter ks1 ~f:(fun k ->
                  Js.Unsafe.set result k
                    (if_magic b (Js.Unsafe.get t1 k) (Js.Unsafe.get t2 k)) ) ;
