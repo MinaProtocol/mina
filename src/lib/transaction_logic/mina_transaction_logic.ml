@@ -1302,11 +1302,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
 
-      type call_forest =
-        ( Party.t
-        , Parties.Digest.Party.t
-        , Parties.Digest.Forest.t )
-        Parties.Call_forest.t
+      type call_forest = Zkapp_call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
@@ -1398,21 +1394,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push x ~onto : t = x :: onto
     end
 
-    module Call_forest = struct
-      type t = Party.call_forest
-
-      let empty () = []
-
-      let if_ = Parties.value_if
-
-      let is_empty = List.is_empty
-
-      let pop_exn : t -> (Party.t * t) * t = function
-        | { stack_hash = _; elt = { party; calls; party_digest = _ } } :: xs ->
-            ((party, calls), xs)
-        | _ ->
-            failwith "pop_exn"
-    end
+    module Call_forest = Zkapp_call_forest
 
     module Stack_frame = struct
       include Stack_frame

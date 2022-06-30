@@ -44,6 +44,7 @@ module Signed_command_memo = Signed_command_memo
 module Signed_command_payload = Signed_command_payload
 module Zkapp_account = Zkapp_account
 module Zkapp_basic = Zkapp_basic
+module Zkapp_call_forest = Zkapp_call_forest
 module Zkapp_precondition = Zkapp_precondition
 module Zkapp_state = Zkapp_state
 module Zkapp_statement = Zkapp_statement
