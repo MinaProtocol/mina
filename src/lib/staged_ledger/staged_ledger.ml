@@ -2013,18 +2013,18 @@ module T = struct
     List.map block_transactions_applied ~f:(function
       | Command (Signed_command cmd) -> (
           match cmd.body with
-          | Payment { previous_empty_accounts } ->
-              previous_empty_accounts
+          | Payment { new_accounts } ->
+              new_accounts
           | Stake_delegation _ ->
               []
           | Failed ->
               [] )
-      | Command (Parties { previous_empty_accounts; _ }) ->
-          previous_empty_accounts
-      | Fee_transfer { previous_empty_accounts; _ } ->
-          previous_empty_accounts
-      | Coinbase { previous_empty_accounts; _ } ->
-          previous_empty_accounts )
+      | Command (Parties { new_accounts; _ }) ->
+          new_accounts
+      | Fee_transfer { new_accounts; _ } ->
+          new_accounts
+      | Coinbase { new_accounts; _ } ->
+          new_accounts )
     |> List.concat
 end
 
