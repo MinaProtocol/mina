@@ -7,66 +7,6 @@ open Mina_base
 (** For status *)
 let txn_count = ref 0
 
-let generate_random_zkapps t
-    ({ zkapp_keypairs = kps
-     ; transaction_count = num_of_parties
-     ; max_parties_count = parties_size
-     ; fee_payer_keypair
-     ; account_states
-     } :
-      Daemon_rpcs.Generate_random_zkapps.query ) =
-  let open Participating_state.Let_syntax in
-  let config = Mina_lib.config t in
-  let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:config.precomputed_values.constraint_constants ()
-  in
-  let%map ledger = Mina_lib.best_ledger t in
-  let keymap =
-    List.map kps ~f:(fun { public_key; private_key } ->
-        (Public_key.compress public_key, private_key) )
-    |> Public_key.Compressed.Map.of_alist_exn
-  in
-  let account_state_tbl =
-    let tbl = Account_id.Table.of_alist_exn account_states in
-    (*[gen_parties_with_limited_keys] will decide what can be used and what cannot be*)
-    Account_id.Table.map tbl ~f:(fun a -> (a, `Can_be_used_in_other_parties))
-  in
-  let rec go n acc : Parties.t list Quickcheck.Generator.t =
-    let open Quickcheck.Generator.Let_syntax in
-    if n > 0 then
-      let%bind parties =
-        Mina_generators.Parties_generators.gen_parties_with_limited_keys ~ledger
-          ~keymap ~account_state_tbl ?parties_size ~vk ~fee_payer_keypair ()
-      in
-      go (n - 1) (parties :: acc)
-    else return (List.rev acc)
-  in
-  let parties_dummy_auth_list =
-    Quickcheck.Generator.generate (go num_of_parties []) ~size:num_of_parties
-      ~random:(Splittable_random.State.create Random.State.default)
-  in
-  (*Add fee payer to the keymap to generate signature*)
-  let fee_payer_pk =
-    Signature_lib.Public_key.compress fee_payer_keypair.public_key
-  in
-  let keymap =
-    Public_key.Compressed.Map.add_exn keymap ~key:fee_payer_pk
-      ~data:fee_payer_keypair.private_key
-  in
-  let res =
-    let open Deferred.Let_syntax in
-    let%map res =
-      Deferred.List.map parties_dummy_auth_list ~f:(fun parties_dummy_auth ->
-          Parties_builder.replace_authorizations ~prover ~keymap
-            parties_dummy_auth )
-    in
-    ( res
-    , List.map (Account_id.Table.to_alist account_state_tbl)
-        ~f:(fun (k, (acc, _)) -> (k, acc)) )
-  in
-  res
-
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Mina_lib.best_ledger t in
@@ -224,6 +164,119 @@ let setup_and_submit_zkapp_command t (snapp_parties : Parties.t) =
         (Error.of_string "Internal error while scheduling a Snapp transaction")
   | Error e ->
       Error e
+
+let generate_random_zkapps t
+    ({ zkapp_keypairs = kps
+     ; max_transactions
+     ; max_parties_count = parties_size
+     ; fee_payer_keypair
+     ; rate_limit
+     ; limit_level
+     ; rate_limit_interval
+     } :
+      Daemon_rpcs.Generate_random_zkapps.query ) =
+  let open Participating_state.Let_syntax in
+  let%bind () = return () in
+  let config = Mina_lib.config t in
+  let logger = Mina_lib.top_level_logger t in
+  let `VK vk, `Prover prover =
+    Transaction_snark.For_tests.create_trivial_snapp
+      ~constraint_constants:config.precomputed_values.constraint_constants ()
+  in
+  let%map ledger = Mina_lib.best_ledger t in
+  let open Deferred.Let_syntax in
+  let keymap =
+    List.map kps ~f:(fun { public_key; private_key } ->
+        (Public_key.compress public_key, private_key) )
+    |> Public_key.Compressed.Map.of_alist_exn
+  in
+  let account_state_tbl = Account_id.Table.create () in
+  let per_batch = 10 in
+  (*Takes as bit to generate these transactions*)
+  let curr_count = ref 0 in
+  let total_count = ref 0 in
+  let limit =
+    if rate_limit then ( fun () ->
+      incr curr_count ;
+      incr total_count ;
+      if !curr_count >= limit_level then
+        let%bind () =
+          Deferred.return
+            (Format.printf
+               "zkapp txn burst: rate limiting, pausing for %d milliseconds... \
+                @."
+               rate_limit_interval )
+        in
+        let%bind () =
+          Async.after (Time.Span.create ~ms:rate_limit_interval ())
+        in
+        Deferred.return (curr_count := 0)
+      else Deferred.return () )
+    else fun () -> Deferred.return ()
+  in
+  let rec gen_parties n acc : Parties.t list Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    if n > 0 then
+      let%bind parties =
+        Mina_generators.Parties_generators.gen_parties_with_limited_keys ~ledger
+          ~keymap ~account_state_tbl ?parties_size ~vk ~fee_payer_keypair ()
+      in
+      gen_parties (n - 1) (parties :: acc)
+    else return (List.rev acc)
+  in
+  let gen_transactions num_of_parties =
+    let parties_dummy_auth_list =
+      Quickcheck.Generator.generate
+        (gen_parties num_of_parties [])
+        ~size:num_of_parties
+        ~random:(Splittable_random.State.create Random.State.default)
+    in
+    (*Add fee payer to the keymap to generate signature*)
+    let fee_payer_pk =
+      Signature_lib.Public_key.compress fee_payer_keypair.public_key
+    in
+    let keymap =
+      Public_key.Compressed.Map.add_exn keymap ~key:fee_payer_pk
+        ~data:fee_payer_keypair.private_key
+    in
+    Deferred.List.map parties_dummy_auth_list ~f:(fun parties_dummy_auth ->
+        Parties_builder.replace_authorizations ~prover ~keymap
+          parties_dummy_auth )
+  in
+  let rec send_txns = function
+    | [] ->
+        Deferred.unit
+    | parties :: txns -> (
+        [%log info] "Sending zkapp transaction # %d" !txn_count ;
+        match setup_and_submit_zkapp_command t parties with
+        | `Bootstrapping ->
+            [%log error] "Node bootstrpping" ;
+            Deferred.unit
+        | `Active res ->
+            let%bind _ =
+              match%map res with
+              | Ok _ ->
+                  ()
+              | Error e ->
+                  [%log error] "Failed to send zkapp transaction #%d" !txn_count
+                    ~metadata:[ ("error", `String (Error.to_string_hum e)) ]
+            in
+            let%bind () = limit () in
+            send_txns txns )
+  in
+  let rec go () =
+    [%log info]
+      "starting batch transaction. Total count so far %d. Remaining %d"
+      !total_count
+      (max_transactions - !total_count) ;
+    if !total_count >= max_transactions then Deferred.unit
+    else
+      let batch_size = min per_batch (max_transactions - !total_count + 1) in
+      let%bind txns = gen_transactions batch_size in
+      let%bind () = send_txns txns in
+      go ()
+  in
+  go ()
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t

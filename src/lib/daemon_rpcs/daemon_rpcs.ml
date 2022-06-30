@@ -45,19 +45,16 @@ end
 module Generate_random_zkapps = struct
   type query =
     { zkapp_keypairs : Signature_lib.Keypair.Stable.Latest.t list
-    ; transaction_count : int
+    ; max_transactions : int
     ; max_parties_count : int option
     ; fee_payer_keypair : Signature_lib.Keypair.Stable.Latest.t
-    ; account_states :
-        (Account_id.Stable.Latest.t * Account.Stable.Latest.t) list
+    ; rate_limit : bool
+    ; limit_level : int
+    ; rate_limit_interval : int
     }
   [@@deriving bin_io_unversioned]
 
-  type response =
-    ( Parties.Stable.Latest.t list
-    * (Account_id.Stable.Latest.t * Account.Stable.Latest.t) list )
-    Or_error.t
-  [@@deriving bin_io_unversioned]
+  type response = unit Or_error.t [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Generate_random_zkapps" ~version:0 ~bin_query
