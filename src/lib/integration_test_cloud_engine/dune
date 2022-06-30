@@ -48,6 +48,6 @@
    data_hash_lib
    generated_graphql_queries
    integers
-
+   mina_graphql
    )
 )

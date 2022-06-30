@@ -260,22 +260,6 @@ module Range = struct
                   (current_node, (next_node, `Don't_stop)) ) )
 end
 
-let%test "Bitstring bin_io serialization does not change" =
-  (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations
-     of that type haven't changed
-
-     The Bin_prot shape is an int, string pair, which isn't necessarily stable
-  *)
-  let text =
-    "Contrary to popular belief, Lorem Ipsum is not simply random text. It has \
-     roots in a piece of classical Latin literature."
-  in
-  let bitstring = Bitstring.bitstring_of_string text in
-  let known_good_digest = "c4c7ade09ba305b69ffac494a6eab60e" in
-  Test_util.check_serialization
-    (module Stable.Latest)
-    bitstring known_good_digest
-
 module Make_test (Input : sig
   val depth : int
 end) =

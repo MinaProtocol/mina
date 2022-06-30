@@ -35,12 +35,9 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
     other_parties : Parties.t =
   let fee_payer : Party.Fee_payer.t =
     { body =
-        { update = Party.Update.noop
-        ; public_key = fee_payer_pk
+        { public_key = fee_payer_pk
         ; fee = Currency.Fee.of_int fee
-        ; events = []
-        ; sequence_events = []
-        ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+        ; valid_until = None
         ; nonce = fee_payer_nonce
         }
     ; authorization = Signature.dummy
@@ -128,15 +125,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
                   in
                   let (), (), proof =
                     Async_unix.Thread_safe.block_on_async_exn (fun () ->
-                        prover ?handler:(Some handler)
-                          ( []
-                            : ( unit
-                              , unit
-                              , unit )
-                              Pickles_types.Hlist.H3.T
-                                (Pickles.Statement_with_proof)
-                              .t )
-                          txn_stmt )
+                        prover ?handler:(Some handler) txn_stmt )
                   in
                   Control.Proof proof )
           | None_given ->

@@ -42,7 +42,7 @@ let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 (* TODO: This should be entirely unnecessary. *)
 let party_body = Zkapps_empty_update.generate_party pk_compressed
 
-let _stmt, (), party_proof = Async.Thread_safe.block_on_async_exn (prover [])
+let _stmt, (), party_proof = Async.Thread_safe.block_on_async_exn prover
 
 let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
 
@@ -78,8 +78,6 @@ let deploy_party : Party.Graphql_repr.t =
   (* TODO: This is a pain. *)
   { body = deploy_party_body; authorization = Signature Signature.dummy }
 
-let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-
 let ps =
   (* TODO: This is a pain. *)
   Parties.Call_forest.of_parties_list
@@ -101,7 +99,6 @@ let fee_payer =
       { Party.Body.Fee_payer.dummy with
         public_key = pk_compressed
       ; fee = Currency.Fee.(of_int 100)
-      ; protocol_state_precondition
       }
   ; authorization = Signature.dummy
   }

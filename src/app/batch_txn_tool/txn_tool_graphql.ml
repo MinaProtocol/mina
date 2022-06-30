@@ -1,6 +1,7 @@
 open Core
 open Async
 open Signature_lib
+module Serializing = Graphql_lib.Serializing
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -72,7 +73,6 @@ mutation ($sender: PublicKey!,
 module Get_account_data =
 [%graphql
 {|
-
 query ($public_key: PublicKey!) {
   account(publicKey: $public_key) {
     nonce
@@ -83,7 +83,6 @@ query ($public_key: PublicKey!) {
     }
   }
 }
-
 |}]
 
 let get_account_data ~public_key ~graphql_target_node =

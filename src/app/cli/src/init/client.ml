@@ -1701,10 +1701,7 @@ let add_peers_graphql =
                  |> Mina_net2.Multiaddr.to_peer
                with
                | Some peer ->
-                   { Graphql_queries.Add_peers.host = peer.host
-                   ; libp2pPort = peer.libp2p_port
-                   ; peerId = peer.peer_id
-                   }
+                   peer
                | None ->
                    eprintf
                      "Could not parse %s as a peer address. It should use the \
@@ -1921,7 +1918,6 @@ let archive_blocks =
                archive_dispatch archive_process_location block
            | None ->
                (* Send the requests over GraphQL. *)
-               (* let block = block_to_yojson block |> Yojson.Safe.to_basic in *)
                let%map.Deferred.Or_error _res =
                  (* Don't catch this error: [query_exn] already handles
                     printing etc.
