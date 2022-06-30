@@ -6,6 +6,8 @@ open Snark_params.Tick
 [%%versioned_asserted
 module Stable = struct
   module V1 = struct
+    [@@@with_all_version_tags]
+
     type t = Inner_curve.Scalar.t [@@deriving compare, sexp]
 
     (* deriver not working, apparently *)
@@ -29,22 +31,6 @@ module Stable = struct
     [%%endif]
   end
 end]
-
-[%%if curve_size = 255]
-
-let%test "private key serialization v1" =
-  let pk =
-    Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
-      Stable.V1.gen
-  in
-  let known_good_digest = "86b85ec8a4a965c25cab59c5cb1f44ed" in
-  Test_util.check_serialization (module Stable.V1) pk known_good_digest
-
-[%%else]
-
-let%test "private key serialization v1" = failwith "No test for this curve size"
-
-[%%endif]
 
 [%%define_locally Stable.Latest.(gen)]
 
@@ -100,9 +86,12 @@ let create () : t =
 
 include Comparable.Make_binable (Stable.Latest)
 
-let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
+(* for compatibility with existing private key serializations *)
+let of_bigstring_exn =
+  Binable.of_bigstring (module Stable.Latest.With_all_version_tags)
 
-let to_bigstring = Binable.to_bigstring (module Stable.Latest)
+let to_bigstring =
+  Binable.to_bigstring (module Stable.Latest.With_all_version_tags)
 
 module Base58_check = Base58_check.Make (struct
   let description = "Private key"

@@ -15,6 +15,8 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
+  [@@@with_versioned_json]
+
   module V3 : sig
     type nonrec t =
       { scheduled_time : Block_time.Stable.V1.t

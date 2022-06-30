@@ -64,7 +64,7 @@ locals {
         name             = config.name
         class            = config.class
         libp2pSecret     = config.libp2p_secret
-        privateKeySecret = config.private_key_secret
+        # privateKeySecret = config.private_key_secret
         externalPort     = config.external_port
         externalIp       = config.external_ip
         enableArchive    = config.enableArchive
@@ -108,7 +108,7 @@ locals {
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
         privateKeySecret     = config.private_key_secret
-        libp2pSecret         = config.libp2p_secret
+        # libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
         isolated             = config.isolated
         enableArchive        = config.enableArchive
