@@ -37,7 +37,7 @@ import (
 	p2pconfig "github.com/libp2p/go-libp2p/config"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	discovery "github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	libp2pmplex "github.com/libp2p/go-libp2p/p2p/muxer/mplex"
+	libp2pyamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	p2pconnmgr "github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
@@ -799,7 +799,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	gs := NewCodaGatingState(gatingConfig, knownPrivateAddrFilters)
 	host, err := p2p.New(
 		p2p.Transport(tcp.NewTCPTransport),
-		p2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
+		p2p.Muxer("/coda/yamux/1.0.0", libp2pyamux.DefaultTransport),
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
