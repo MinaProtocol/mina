@@ -16,7 +16,6 @@ module Transaction_applied = struct
         module V2 = struct
           type t =
             { user_command : Signed_command.Stable.V2.t With_status.Stable.V2.t
-            ; previous_receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
             }
           [@@deriving sexp]
 
@@ -30,8 +29,7 @@ module Transaction_applied = struct
       module Stable = struct
         module V2 = struct
           type t =
-            | Payment of
-                { previous_empty_accounts : Account_id.Stable.V2.t list }
+            | Payment of { new_accounts : Account_id.Stable.V2.t list }
             | Stake_delegation of
                 { previous_delegate : Public_key.Compressed.Stable.V1.t option }
             | Failed
@@ -61,7 +59,7 @@ module Transaction_applied = struct
           { accounts :
               (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
           ; command : Parties.Stable.V1.t With_status.Stable.V2.t
-          ; previous_empty_accounts : Account_id.Stable.V2.t list
+          ; new_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp]
 
@@ -90,7 +88,7 @@ module Transaction_applied = struct
       module V2 = struct
         type t =
           { fee_transfer : Fee_transfer.Stable.V2.t
-          ; previous_empty_accounts : Account_id.Stable.V2.t list
+          ; new_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp]
 
@@ -105,7 +103,7 @@ module Transaction_applied = struct
       module V2 = struct
         type t =
           { coinbase : Coinbase.Stable.V1.t
-          ; previous_empty_accounts : Account_id.Stable.V2.t list
+          ; new_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp]
 
@@ -177,15 +175,13 @@ module type S = sig
     module Signed_command_applied : sig
       module Common : sig
         type t = Transaction_applied.Signed_command_applied.Common.t =
-          { user_command : Signed_command.t With_status.t
-          ; previous_receipt_chain_hash : Receipt.Chain_hash.t
-          }
+          { user_command : Signed_command.t With_status.t }
         [@@deriving sexp]
       end
 
       module Body : sig
         type t = Transaction_applied.Signed_command_applied.Body.t =
-          | Payment of { previous_empty_accounts : Account_id.t list }
+          | Payment of { new_accounts : Account_id.t list }
           | Stake_delegation of
               { previous_delegate : Public_key.Compressed.t option }
           | Failed
@@ -201,7 +197,7 @@ module type S = sig
       type t = Transaction_applied.Parties_applied.t =
         { accounts : (Account_id.t * Account.t option) list
         ; command : Parties.t With_status.t
-        ; previous_empty_accounts : Account_id.t list
+        ; new_accounts : Account_id.t list
         }
       [@@deriving sexp]
     end
@@ -215,15 +211,13 @@ module type S = sig
 
     module Fee_transfer_applied : sig
       type t = Transaction_applied.Fee_transfer_applied.t =
-        { fee_transfer : Fee_transfer.t
-        ; previous_empty_accounts : Account_id.t list
-        }
+        { fee_transfer : Fee_transfer.t; new_accounts : Account_id.t list }
       [@@deriving sexp]
     end
 
     module Coinbase_applied : sig
       type t = Transaction_applied.Coinbase_applied.t =
-        { coinbase : Coinbase.t; previous_empty_accounts : Account_id.t list }
+        { coinbase : Coinbase.t; new_accounts : Account_id.t list }
       [@@deriving sexp]
     end
 
@@ -571,7 +565,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Applied
   end
 
-  let previous_empty_accounts action pk =
+  let get_new_accounts action pk =
     if Ledger_intf.equal_account_state action `Added then [ pk ] else []
 
   let has_locked_tokens ~global_slot ~account_id ledger =
@@ -622,7 +616,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ~account
     in
     ( location
-    , account
     , { account with
         balance
       ; nonce = Account.Nonce.succ account.nonce
@@ -663,17 +656,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       in
       ()
     in
-    let%map loc, account, account' =
+    let%map loc, account' =
       pay_fee' ~command:(Signed_command user_command.payload) ~nonce ~fee_payer
         ~fee:(Signed_command.fee user_command)
         ~ledger ~current_global_slot
     in
-    let applied_common : Transaction_applied.Signed_command_applied.Common.t =
-      { user_command = { data = user_command; status = Applied }
-      ; previous_receipt_chain_hash = account.receipt_chain_hash
-      }
-    in
-    (loc, account', applied_common)
+    (loc, account')
 
   (* someday: It would probably be better if we didn't modify the receipt chain hash
      in the case that the sender is equal to the receiver, but it complicates the SNARK, so
@@ -692,7 +680,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     (* Fee-payer information *)
     let fee_payer = Signed_command.fee_payer user_command in
-    let%bind fee_payer_location, fee_payer_account, applied_common =
+    let%bind fee_payer_location, fee_payer_account =
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
     (* Charge the fee. This must happen, whether or not the command itself
@@ -820,7 +808,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           let%map receiver_account =
             incr_balance receiver_account receiver_amount
           in
-          let previous_empty_accounts =
+          let new_accounts =
             match receiver_location with
             | `Existing _ ->
                 []
@@ -831,7 +819,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ; (source_location, source_account)
             ]
           , Transaction_applied.Signed_command_applied.Body.Payment
-              { previous_empty_accounts } )
+              { new_accounts } )
     in
     match compute_updates () with
     | Ok (located_accounts, applied_body) ->
@@ -842,19 +830,18 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let%bind () = acc in
               set_with_location ledger location account )
         in
-        let applied_common =
-          { applied_common with
-            user_command = { data = user_command; status = Applied }
-          }
+        let applied_common : Transaction_applied.Signed_command_applied.Common.t
+            =
+          { user_command = { data = user_command; status = Applied } }
         in
         return
           ( { common = applied_common; body = applied_body }
             : Transaction_applied.Signed_command_applied.t )
     | Error failure ->
         (* Do not update the ledger. Except for the fee payer which is already updated *)
-        let applied_common =
-          { applied_common with
-            user_command =
+        let applied_common : Transaction_applied.Signed_command_applied.Common.t
+            =
+          { user_command =
               { data = user_command
               ; status =
                   Failed
@@ -1604,7 +1591,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Transaction_status.Failure.Collection.is_empty failure_status_tbl
         in
         (* accounts not originally in ledger, now present in ledger *)
-        let previous_empty_accounts =
+        let new_accounts =
           List.filter_map account_ids_originally_not_in_ledger
             ~f:(fun acct_id ->
               let open Option.Let_syntax in
@@ -1625,7 +1612,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
                       ( if successfully_applied then Applied
                       else Failed failure_status_tbl )
                   }
-              ; previous_empty_accounts
+              ; new_accounts
               }
             , s )
         in
@@ -1647,10 +1634,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               ~finish:Fn.id
           in
           (*Other parties failed, therefore, updates in those should not get applied*)
-          if
-            List.is_empty previous_empty_accounts
-            && other_party_accounts_unchanged
-          then valid_result
+          if List.is_empty new_accounts && other_party_accounts_unchanged then
+            valid_result
           else
             Or_error.error_string
               "Parties application failed but new accounts created or some of \
@@ -1686,11 +1671,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
            thus the creation fee has been paid.
         *)
         let%bind action, a, loc = get_or_create t account_id in
-        let emptys = previous_empty_accounts action account_id in
+        let new_accounts = get_new_accounts action account_id in
         let%bind timing = modify_timing a in
         let%map balance = modify_balance action account_id a.balance ft.fee in
         set t loc { a with balance; timing } ;
-        emptys
+        new_accounts
     | `Two (ft1, ft2) ->
         let account_id1 = Fee_transfer.Single.receiver ft1 in
         (* TODO(#4496): Do not use get_or_create here; we should not create a
@@ -1698,21 +1683,21 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
            thus the creation fee has been paid.
         *)
         let%bind action1, a1, l1 = get_or_create t account_id1 in
-        let emptys1 = previous_empty_accounts action1 account_id1 in
+        let new_accounts1 = get_new_accounts action1 account_id1 in
         let account_id2 = Fee_transfer.Single.receiver ft2 in
         if Account_id.equal account_id1 account_id2 then (
           let%bind fee = error_opt "overflow" (Fee.add ft1.fee ft2.fee) in
           let%bind timing = modify_timing a1 in
           let%map balance = modify_balance action1 account_id1 a1.balance fee in
           set t l1 { a1 with balance; timing } ;
-          emptys1 )
+          new_accounts1 )
         else
           (* TODO(#4496): Do not use get_or_create here; we should not create a
              new account before we know that the transaction will go through
              and thus the creation fee has been paid.
           *)
           let%bind action2, a2, l2 = get_or_create t account_id2 in
-          let emptys2 = previous_empty_accounts action2 account_id2 in
+          let new_accounts2 = get_new_accounts action2 account_id2 in
           let%bind balance1 =
             modify_balance action1 account_id1 a1.balance ft1.fee
           in
@@ -1723,11 +1708,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           set t l1 { a1 with balance = balance1 } ;
           set t l2 { a2 with balance = balance2; timing = timing2 } ;
-          emptys1 @ emptys2
+          new_accounts1 @ new_accounts2
 
   let apply_fee_transfer ~constraint_constants ~txn_global_slot t transfer =
     let open Or_error.Let_syntax in
-    let%map previous_empty_accounts =
+    let%map new_accounts =
       process_fee_transfer t transfer
         ~modify_balance:(fun action _ b f ->
           let%bind amount =
@@ -1739,15 +1724,17 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           update_timing_when_no_deduction ~txn_global_slot acc )
     in
     Transaction_applied.Fee_transfer_applied.
-      { fee_transfer = transfer; previous_empty_accounts }
+      { fee_transfer = transfer; new_accounts }
 
   let apply_coinbase ~constraint_constants ~txn_global_slot t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
         ({ receiver; fee_transfer; amount = coinbase_amount } as cb : Coinbase.t)
       =
     let open Or_error.Let_syntax in
-    let%bind receiver_reward, emptys1, transferee_update, transferee_timing_prev
-        =
+    let%bind ( receiver_reward
+             , new_accounts1
+             , transferee_update
+             , transferee_timing_prev ) =
       match fee_transfer with
       | None ->
           return (coinbase_amount, [], None, None)
@@ -1766,7 +1753,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             *)
             get_or_create t transferee_id
           in
-          let emptys = previous_empty_accounts action transferee_id in
+          let new_accounts = get_new_accounts action transferee_id in
           let%bind timing =
             update_timing_when_no_deduction ~txn_global_slot transferee_account
           in
@@ -1777,7 +1764,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             add_amount transferee_account.balance amount
           in
           ( receiver_reward
-          , emptys
+          , new_accounts
           , Some
               (transferee_location, { transferee_account with balance; timing })
           , Some transferee_account.timing )
@@ -1790,7 +1777,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       *)
       get_or_create t receiver_id
     in
-    let emptys2 = previous_empty_accounts action2 receiver_id in
+    let new_accounts2 = get_new_accounts action2 receiver_id in
     (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
     let%bind coinbase_receiver_timing =
       match transferee_timing_prev with
@@ -1815,7 +1802,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       } ;
     Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
     Transaction_applied.Coinbase_applied.
-      { coinbase = cb; previous_empty_accounts = emptys1 @ emptys2 }
+      { coinbase = cb; new_accounts = new_accounts1 @ new_accounts2 }
 
   let apply_transaction ~constraint_constants
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
