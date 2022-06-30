@@ -2178,7 +2178,7 @@ module Block_and_zkapp_command = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
       ~zkapp_command_id ~sequence_no ~status
-      ~(failure_reasons : Transaction_status.Failure.Collection.display option)
+      ~(failure_reasons : Transaction_status.Failure.Collection.Display.t option)
       =
     let open Deferred.Result.Let_syntax in
     let%bind failure_reasons_ids =

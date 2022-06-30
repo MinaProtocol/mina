@@ -570,7 +570,15 @@ let%test_module "Test" =
       end
     end
 
-    module Schema = Graphql_schema.Make (IO)
+    module Field_error = struct
+      type t = string
+
+      let message_of_field_error t = t
+
+      let extensions_of_field_error _t = None
+    end
+
+    module Schema = Graphql_schema.Make (IO) (Field_error)
     module Derivers = Make (Schema)
     include Derivers
     module Public_key = Signature_lib.Public_key.Compressed
