@@ -22,6 +22,7 @@
    sexplib0
    base
    base_quickcheck
+   base.caml
    ;; local libraries
    mina_numbers
    currency

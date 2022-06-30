@@ -141,9 +141,12 @@ module Time = struct
   type t = Core_kernel.Time.t
 
   let parse json =
+    let () = Stdlib.Format.printf "parsing %s\n" (Yojson.Basic.to_string json) in
     Yojson.Basic.Util.to_string json |> Core_kernel.Time.of_string
 
-  let serialize t = `String (Core_kernel.Time.to_string t)
+  let serialize t =
+    (* let () = Stdlib.Format.printf "t=%a\nserializing: %s\n" (Core.Time.pp) t (Core_kernel.Time.to_string t) in *)
+    `String (Core_kernel.Time.to_string t)
 
   let typ () = scalar "Time" ~coerce:serialize
 end

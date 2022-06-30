@@ -7982,16 +7982,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Fee",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "FeePayerPartyBody",
           "description": null,
