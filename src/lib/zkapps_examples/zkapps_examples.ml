@@ -1,3 +1,4 @@
+open Async_kernel
 open Snark_params.Tick
 open Snark_params.Tick.Run
 open Currency
@@ -414,17 +415,8 @@ type return_type =
       list
   }
 
-(* TODO: Should be able to *return* stmt instead of consuming it.
-         Modify snarky to do this.
-*)
-let party_circuit f { Pickles.Inductive_rule.public_input = () } :
-    ( _
-    , _
-    , Zkapp_statement.Checked.t
-    , return_type Prover_value.t )
-    Pickles.Inductive_rule.main_return =
+let to_party party : Zkapp_statement.Checked.t * return_type Prover_value.t =
   dummy_constraints () ;
-  let party = f () in
   let party, calls =
     Party_under_construction.In_circuit.to_party_and_calls party
   in
@@ -443,4 +435,182 @@ let party_circuit f { Pickles.Inductive_rule.public_input = () } :
         let calls = Prover_value.get calls.data in
         { party; calls; party_digest } )
   in
-  { previous_proof_statements = []; public_output; auxiliary_output }
+  (public_output, auxiliary_output)
+
+open Pickles_types
+open Hlist
+
+let wrap_main f { Pickles.Inductive_rule.public_input = () } =
+  { Pickles.Inductive_rule.previous_proof_statements = []
+  ; public_output = f ()
+  ; auxiliary_output = ()
+  }
+
+let compile :
+    type auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
+       ?self:
+         ( Zkapp_statement.Checked.t
+         , Zkapp_statement.t
+         , max_proofs_verified
+         , branches )
+         Pickles.Tag.t
+    -> ?cache:_
+    -> ?disk_keys:(_, branches) Vector.t * _
+    -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
+    -> branches:(module Nat.Intf with type n = branches)
+    -> max_proofs_verified:
+         (module Nat.Add.Intf with type n = max_proofs_verified)
+    -> name:string
+    -> constraint_constants:_
+    -> choices:
+         (   self:
+               ( Zkapp_statement.Checked.t
+               , Zkapp_statement.t
+               , max_proofs_verified
+               , branches )
+               Pickles.Tag.t
+          -> ( prev_varss
+             , prev_valuess
+             , widthss
+             , heightss
+             , unit
+             , unit
+             , Party_under_construction.In_circuit.t
+             , unit (* TODO: Remove? *)
+             , auxiliary_var
+             , auxiliary_value )
+             H4_6.T(Pickles.Inductive_rule).t )
+    -> unit
+    -> ( Zkapp_statement.Checked.t
+       , Zkapp_statement.t
+       , max_proofs_verified
+       , branches )
+       Pickles.Tag.t
+       * _
+       * (module Pickles.Proof_intf
+            with type t = ( max_proofs_verified
+                          , max_proofs_verified )
+                          Pickles.Proof.t
+             and type statement = Zkapp_statement.t )
+       * ( prev_valuess
+         , widthss
+         , heightss
+         , unit
+         , ( ( Party.t
+             , Parties.Digest.Party.t
+             , Parties.Digest.Forest.t )
+             Parties.Call_forest.Tree.t
+           * auxiliary_value )
+           Deferred.t )
+         H3_2.T(Pickles.Prover).t =
+ fun ?self ?cache ?disk_keys ~auxiliary_typ ~branches ~max_proofs_verified ~name
+     ~constraint_constants ~choices () ->
+  let choices ~self =
+    let rec go :
+        type prev_varss prev_valuess widthss heightss.
+           ( prev_varss
+           , prev_valuess
+           , widthss
+           , heightss
+           , unit
+           , unit
+           , Party_under_construction.In_circuit.t
+           , unit
+           , auxiliary_var
+           , auxiliary_value )
+           H4_6.T(Pickles.Inductive_rule).t
+        -> ( prev_varss
+           , prev_valuess
+           , widthss
+           , heightss
+           , unit
+           , unit
+           , Zkapp_statement.Checked.t
+           , Zkapp_statement.t
+           , return_type Prover_value.t * auxiliary_var
+           , return_type * auxiliary_value )
+           H4_6.T(Pickles.Inductive_rule).t = function
+      | [] ->
+          []
+      | { identifier; prevs; main } :: choices ->
+          { identifier
+          ; prevs
+          ; main =
+              (fun main_input ->
+                let { Pickles.Inductive_rule.previous_proof_statements
+                    ; public_output = party_under_construction
+                    ; auxiliary_output
+                    } =
+                  main main_input
+                in
+                let public_output, party_tree =
+                  to_party party_under_construction
+                in
+                { previous_proof_statements
+                ; public_output
+                ; auxiliary_output = (party_tree, auxiliary_output)
+                } )
+          }
+          :: go choices
+    in
+    go (choices ~self)
+  in
+  let module Statement = struct
+    type t = unit
+
+    let to_field_elements () = [||]
+  end in
+  let tag, cache_handle, proof, provers =
+    Pickles.compile ?self ?cache ?disk_keys
+      (module Statement)
+      (module Statement)
+      ~public_input:(Output Zkapp_statement.typ)
+      ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
+      ~branches ~max_proofs_verified ~name ~constraint_constants ~choices
+  in
+  let provers =
+    let rec go :
+        type prev_valuess widthss heightss.
+           ( prev_valuess
+           , widthss
+           , heightss
+           , unit
+           , ( Zkapp_statement.t
+             * (return_type * auxiliary_value)
+             * (max_proofs_verified, max_proofs_verified) Pickles.Proof.t )
+             Deferred.t )
+           H3_2.T(Pickles.Prover).t
+        -> ( prev_valuess
+           , widthss
+           , heightss
+           , unit
+           , ( ( Party.t
+               , Parties.Digest.Party.t
+               , Parties.Digest.Forest.t )
+               Parties.Call_forest.Tree.t
+             * auxiliary_value )
+             Deferred.t )
+           H3_2.T(Pickles.Prover).t = function
+      | [] ->
+          []
+      | prover :: provers ->
+          let prover ?handler () =
+            let open Async_kernel in
+            let%map ( _stmt
+                    , ({ party; party_digest; calls }, auxiliary_value)
+                    , proof ) =
+              prover ?handler ()
+            in
+            let party : Party.t =
+              { body = party
+              ; authorization = Proof (Pickles.Side_loaded.Proof.of_proof proof)
+              }
+            in
+            ( { Parties.Call_forest.Tree.party; party_digest; calls }
+            , auxiliary_value )
+          in
+          prover :: go provers
+    in
+    go provers
+  in
+  (tag, cache_handle, proof, provers)

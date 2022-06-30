@@ -21,21 +21,12 @@ let%test_module "Initialize state test" =
 
     let account_id = Account_id.create pk_compressed Token_id.default
 
-    module Statement = struct
-      type t = unit
-
-      let to_field_elements () = [||]
-    end
-
     let ( tag
         , _
         , p_module
         , Pickles.Provers.[ initialize_prover; update_state_prover ] ) =
-      Pickles.compile ~cache:Cache_dir.cache
-        (module Statement)
-        (module Statement)
-        ~public_input:(Output Zkapp_statement.typ)
-        ~auxiliary_typ:(Prover_value.typ ())
+      Zkapps_examples.compile () ~cache:Cache_dir.cache
+        ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
@@ -52,8 +43,8 @@ let%test_module "Initialize state test" =
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
     module Deploy_party = struct
-      let party_body : Party.Body.Graphql_repr.t =
-        { Party.Body.Graphql_repr.dummy with
+      let party_body : Party.Body.t =
+        { Party.Body.dummy with
           public_key = pk_compressed
         ; update =
             { Party.Update.dummy with
@@ -89,57 +80,29 @@ let%test_module "Initialize state test" =
             }
         }
 
-      let party : Party.Graphql_repr.t =
+      let party : Party.t =
         (* TODO: This is a pain. *)
         { body = party_body; authorization = Signature Signature.dummy }
     end
 
     module Initialize_party = struct
-      let party_body =
-        Zkapps_initialize_state.generate_initialize_party pk_compressed
-
-      let _stmt, _res, party_proof =
-        Async.Thread_safe.block_on_async_exn initialize_prover
-
-      let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
-
-      let party : Party.Graphql_repr.t =
-        Party.to_graphql_repr ~call_depth:0
-          { body = party_body; authorization = Proof party_proof }
+      let party, () = Async.Thread_safe.block_on_async_exn initialize_prover
     end
 
     module Update_state_party = struct
       let new_state = List.init 8 ~f:(fun _ -> Snark_params.Tick.Field.one)
 
-      let party_body =
-        Zkapps_initialize_state.generate_update_state_party pk_compressed
-          new_state
-
-      let _stmt, _res, party_proof =
+      let party, () =
         Async.Thread_safe.block_on_async_exn
           (update_state_prover
              ~handler:(Zkapps_initialize_state.update_state_handler new_state) )
-
-      let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
-
-      let party : Party.Graphql_repr.t =
-        Party.to_graphql_repr ~call_depth:0
-          { body = party_body; authorization = Proof party_proof }
     end
 
     let test_parties ?expected_failure parties =
-      let ps =
-        (* TODO: This is a pain. *)
-        Parties.Call_forest.of_parties_list
-          ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
-          parties
-        |> Parties.Call_forest.map ~f:Party.of_graphql_repr
-        |> Parties.Call_forest.accumulate_hashes_predicated
-      in
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Parties.Transaction_commitment.t =
         (* TODO: This is a pain. *)
-        let other_parties_hash = Parties.Call_forest.hash ps in
+        let other_parties_hash = Parties.Call_forest.hash parties in
         Parties.Transaction_commitment.create ~other_parties_hash
       in
       let fee_payer : Party.Fee_payer.t =
@@ -196,7 +159,7 @@ let%test_module "Initialize state test" =
         { fee_payer; other_parties; memo }
       in
       let parties : Parties.t =
-        sign_all { fee_payer; other_parties = ps; memo }
+        sign_all { fee_payer; other_parties = parties; memo }
       in
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           let account =
@@ -214,7 +177,10 @@ let%test_module "Initialize state test" =
 
     let%test_unit "Initialize" =
       let account =
-        test_parties [ Deploy_party.party; Initialize_party.party ]
+        []
+        |> Parties.Call_forest.cons_tree Initialize_party.party
+        |> Parties.Call_forest.cons Deploy_party.party
+        |> test_parties
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -225,11 +191,11 @@ let%test_module "Initialize state test" =
 
     let%test_unit "Initialize and update" =
       let account =
-        test_parties
-          [ Deploy_party.party
-          ; Initialize_party.party
-          ; Update_state_party.party
-          ]
+        []
+        |> Parties.Call_forest.cons_tree Update_state_party.party
+        |> Parties.Call_forest.cons_tree Initialize_party.party
+        |> Parties.Call_forest.cons Deploy_party.party
+        |> test_parties
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -240,12 +206,12 @@ let%test_module "Initialize state test" =
 
     let%test_unit "Initialize and multiple update" =
       let account =
-        test_parties
-          [ Deploy_party.party
-          ; Initialize_party.party
-          ; Update_state_party.party
-          ; Update_state_party.party
-          ]
+        []
+        |> Parties.Call_forest.cons_tree Update_state_party.party
+        |> Parties.Call_forest.cons_tree Update_state_party.party
+        |> Parties.Call_forest.cons_tree Initialize_party.party
+        |> Parties.Call_forest.cons Deploy_party.party
+        |> test_parties
       in
       let zkapp_state =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
@@ -256,29 +222,34 @@ let%test_module "Initialize state test" =
 
     let%test_unit "Update without initialize fails" =
       let account =
-        test_parties
-          ~expected_failure:Account_proved_state_precondition_unsatisfied
-          [ Deploy_party.party; Update_state_party.party ]
+        []
+        |> Parties.Call_forest.cons_tree Update_state_party.party
+        |> Parties.Call_forest.cons Deploy_party.party
+        |> test_parties
+             ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Double initialize fails" =
       let account =
-        test_parties
-          ~expected_failure:Account_proved_state_precondition_unsatisfied
-          [ Deploy_party.party; Initialize_party.party; Initialize_party.party ]
+        []
+        |> Parties.Call_forest.cons_tree Initialize_party.party
+        |> Parties.Call_forest.cons_tree Initialize_party.party
+        |> Parties.Call_forest.cons Deploy_party.party
+        |> test_parties
+             ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Initialize after update fails" =
       let account =
-        test_parties
-          ~expected_failure:Account_proved_state_precondition_unsatisfied
-          [ Deploy_party.party
-          ; Initialize_party.party
-          ; Update_state_party.party
-          ; Initialize_party.party
-          ]
+        []
+        |> Parties.Call_forest.cons_tree Initialize_party.party
+        |> Parties.Call_forest.cons_tree Update_state_party.party
+        |> Parties.Call_forest.cons_tree Initialize_party.party
+        |> Parties.Call_forest.cons Deploy_party.party
+        |> test_parties
+             ~expected_failure:Account_proved_state_precondition_unsatisfied
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
@@ -288,7 +259,10 @@ let%test_module "Initialize state test" =
             (* Raises an exception due to verifying a proof without a valid vk
                in the account.
             *)
-            test_parties [ Initialize_party.party; Update_state_party.party ] )
+            []
+            |> Parties.Call_forest.cons_tree Update_state_party.party
+            |> Parties.Call_forest.cons_tree Initialize_party.party
+            |> test_parties )
       in
       assert (Or_error.is_error account)
   end )
