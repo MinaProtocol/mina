@@ -115,7 +115,7 @@ module Node = struct
     ({|
       mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+          public_key: publicKey
         }
       }
     |}
@@ -214,7 +214,7 @@ module Node = struct
           stateHash
           commandTransactionCount
           creatorAccount {
-            publicKey
+            publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           }
         }
       }
@@ -241,9 +241,9 @@ module Node = struct
     {|
       query ($public_key: PublicKey!, $token: UInt64) {
         account (publicKey : $public_key, token : $token) {
-          balance { liquid @ppxCustom(module: "Serializing.Balance")
-                    locked @ppxCustom(module: "Serializing.Balance")
-                    total @ppxCustom(module: "Serializing.Balance")
+          balance { liquid
+                    locked
+                    total
                   }
           delegate
           nonce
@@ -530,14 +530,8 @@ module Node = struct
         in
         let%bind delegate =
           match account.delegate with
-          | Some (`String s) ->
-              return
-                (Set (Signature_lib.Public_key.Compressed.of_base58_check_exn s))
-          | Some json ->
-              fail
-                (Error.of_string
-                   (sprintf "Expected string encoding of delegate, got %s"
-                      (Yojson.Basic.to_string json) ) )
+          | Some s ->
+              return @@ Set s
           | None ->
               fail (Error.of_string "Expected delegate in account")
         in
@@ -597,15 +591,7 @@ module Node = struct
           | None, None, None, None, None ->
               return @@ Keep
           | Some amt, Some tm, Some period, Some incr, Some bal ->
-              let%bind cliff_amount =
-                match amt with
-                | `String s ->
-                    return @@ Currency.Amount.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for cliff amount in account timing" )
-              in
+              let cliff_amount = amt in
               let%bind cliff_time =
                 match tm with
                 | `String s ->
@@ -624,26 +610,8 @@ module Node = struct
                       (Error.of_string
                          "Expected string for vesting period in account timing" )
               in
-              let%bind vesting_increment =
-                match incr with
-                | `String s ->
-                    return @@ Currency.Amount.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for vesting increment in account \
-                          timing" )
-              in
-              let%bind initial_minimum_balance =
-                match bal with
-                | `String s ->
-                    return @@ Currency.Balance.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for vesting increment in account \
-                          timing" )
-              in
+              let vesting_increment = incr in
+              let initial_minimum_balance = bal in
               return
                 (Set
                    ( { initial_minimum_balance
