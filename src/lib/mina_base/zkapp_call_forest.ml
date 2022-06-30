@@ -30,6 +30,20 @@ module Checked = struct
     ; control : Control.t Prover_value.t
     }
 
+  let party_typ () :
+      (party, (Party.t, Parties.Digest.Party.t) With_hash.t) Typ.t =
+    Typ.(Party.Body.typ () * Prover_value.typ () * Parties.Digest.Party.typ)
+    |> Typ.transport
+         ~back:(fun ((body, authorization), hash) ->
+           { With_hash.data = { Party.body; authorization }; hash } )
+         ~there:(fun { With_hash.data = { Party.body; authorization }; hash } ->
+           ((body, authorization), hash) )
+    |> Typ.transport_var
+         ~back:(fun ((party, control), hash) ->
+           { party = { hash; data = party }; control } )
+         ~there:(fun { party = { hash; data = party }; control } ->
+           ((party, control), hash) )
+
   type t =
     ( ( Party.t * unit
       , Parties.Digest.Party.t
