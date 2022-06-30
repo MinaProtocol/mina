@@ -20,6 +20,8 @@ let pop_exn : t -> (Party.t * t) * t = function
 
 let push ~party ~calls t = Parties.Call_forest.cons ~calls party t
 
+let hash (t : t) = Parties.Call_forest.hash t
+
 module Checked = struct
   open Snark_params.Tick.Run
   module F = Parties.Digest.Forest.Checked
@@ -135,4 +137,6 @@ module Checked = struct
               res )
         in
         ({ hash = hash_cons; data } : t) )
+
+  let hash ({ hash; _ } : t) = hash
 end
