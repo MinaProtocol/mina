@@ -1,44 +1,38 @@
 #build with: 
-# cat /home/helenl1/work/mina/dockerfiles/Dockerfile-rosetta | docker build -t gcr.io/o1labs-192920/mina-rosetta-builder:latest --target builder --build-arg deb_codename=stretch --build-arg MINA_BRANCH=<this branch> -
 # docker build -t txn_burst_util -f Dockerfile_txn_burst .
 
-#or run with:
+#or directly run with:
 # docker run -v <local keypath>:/keys --entrypoint ./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe txn_burst_util --num-txn-per-acct 10 --origin-sender-sk-path "/keys/<origin key path>" --origin-sender-sk-pw "some password" --returner-sk-path "/keys/<origin key path>" --returner-sk-pw "some password"
 
-FROM gcr.io/o1labs-192920/mina-rosetta-builder
+FROM minaprotocol/mina-toolchain:1.3.1beta1-compatible-9839d34-bullseye
 
-USER root
+USER opam
 
-#install devnet mina
-RUN apt-get -y update && apt-get -y install man
-RUN apt-get update && apt-get install -y apt-transport-https ca-certificates postgresql-client-9.6 postgresql-9.6 postgresql-contrib-9.6
-
-RUN echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/mina.list \
-  && apt-get update \
-  && apt-get install -y curl unzip mina-testnet-postake-medium-curves=1.0.5-68200c7
+#install mina
+RUN sudo apt-get -y update && sudo apt-get -y install man
+RUN sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
+RUN sudo echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) unstable" | sudo tee /etc/apt/sources.list.d/mina.list \
+  && sudo apt-get update\
+  && sudo apt-get install -y --allow-downgrades mina-devnet=1.3.1beta1-metrics-gossip-data-collection-92db0c6
 
 # compile txn burst tool
-ENV DUNE_PROFILE devnet
-COPY ./batch_txn_tool.ml /
+COPY ./batch_txn_tool.ml /home/opam
+COPY ./txn_tool_graphql.ml /home/opam
+COPY ./dune /home/opam
+ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 RUN eval $(opam config env) \
+  && git config pull.rebase false \
   && git pull \
-  && git checkout feature/generate-txns-create-many-accounts-2 \
-  && mv /batch_txn_tool.ml src/app/batch_txn_tool \
-  && dune build --profile=${DUNE_PROFILE} \
-    src/app/generate_keypair/generate_keypair.exe \
-    src/app/cli/src/mina.exe \
-    src/app/archive/archive.exe \
-    src/app/rosetta/rosetta.exe \
-    src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    src/app/generate_keypair/generate_keypair.exe \
-    src/app/rosetta/ocaml-signer/signer.exe \
-  && rm -rf _build \
-  && dune build --profile=${DUNE_PROFILE} src/app/batch_txn_tool/batch_txn_tool.exe
+  && git checkout compatible \
+  && git submodule update --init --recursive \
+  && mv /home/opam/batch_txn_tool.ml src/app/batch_txn_tool \
+  && mv /home/opam/txn_tool_graphql.ml src/app/batch_txn_tool \
+  && mv /home/opam/dune src/app/batch_txn_tool \
+  && dune build src/app/batch_txn_tool/batch_txn_tool.exe
 
+USER root
 # prepare the key directories
-RUN mkdir /keys && chmod 700 /keys \ 
-  && mkdir /keys/whale-key/ && chmod 700 /keys/whale-key/ \
-  && mkdir /keys/fish-key/ && chmod 700 /keys/fish-key/
+RUN mkdir /keys && chmod 700 /keys
 ENV MINA_PRIVKEY_PASS ""
 
 ENTRYPOINT ["./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe"]

@@ -23,18 +23,15 @@ module Compressed = struct
   open Compressed_poly
 
   module Arg = struct
-    (* module with same type t as Stable below, to give as functor argument *)
+    (* module with same type t as Stable below, to build functor argument *)
     [%%versioned_asserted
     module Stable = struct
       module V1 = struct
+        [@@@with_all_version_tags]
+
         type t = (Field.t, bool) Poly.Stable.V1.t
 
         let to_latest = Fn.id
-
-        let description = "Non zero curve point compressed"
-
-        let version_byte =
-          Base58_check.Version_bytes.non_zero_curve_point_compressed
       end
     end]
   end
@@ -48,14 +45,19 @@ module Compressed = struct
         type t = (Field.t, bool) Poly.Stable.V1.t
         [@@deriving equal, compare, hash]
 
-        (* dummy type for inserting constraint
-           adding constraint to t produces "unused rec" error
-        *)
-        type unused = unit constraint t = Arg.Stable.V1.t
-
         let to_latest = Fn.id
 
-        module Base58 = Codable.Make_base58_check (Arg.Stable.V1)
+        module M = struct
+          (* for compatibility with legacy Base58Check serialization *)
+          include Arg.Stable.V1.With_all_version_tags
+
+          let description = "Non zero curve point compressed"
+
+          let version_byte =
+            Base58_check.Version_bytes.non_zero_curve_point_compressed
+        end
+
+        module Base58 = Codable.Make_base58_check (M)
         include Base58
 
         (* sexp representation is a Base58Check string, like the yojson representation *)
@@ -73,23 +75,6 @@ module Compressed = struct
         compress uncompressed
     end
   end]
-
-  [%%if curve_size = 255]
-
-  let%test "nonzero_curve_point_compressed v1" =
-    let point =
-      Quickcheck.random_value
-        ~seed:(`Deterministic "nonzero_curve_point_compressed-seed")
-        Stable.V1.gen
-    in
-    let known_good_digest = "35c836b0252293061bf974490f5bd515" in
-    Test_util.check_serialization (module Stable.V1) point known_good_digest
-
-  [%%else]
-
-  let%test "nonzero_curve_point_compressed v1" = failwith "Unknown curve size"
-
-  [%%endif]
 
   module Poly = Poly
   include Comparable.Make_binable (Stable.Latest)

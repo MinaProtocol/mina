@@ -12,6 +12,8 @@ end)
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
+  [@@@with_all_version_tags]
+
   module V1 = struct
     module T = struct
       type t = Snark_params.Tick.Field.t

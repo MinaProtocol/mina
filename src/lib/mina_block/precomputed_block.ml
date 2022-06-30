@@ -69,6 +69,8 @@ include T
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
+  [@@@with_versioned_json]
+
   module V3 = struct
     type t = T.t =
       { scheduled_time : Block_time.Stable.V1.t
@@ -88,6 +90,9 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+(* functions for the versioned json, not the unversioned ones provided by `T` *)
+[%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
 let of_block ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
