@@ -48,7 +48,7 @@ module Checked = struct
            ((party, control), hash) )
 
   type t =
-    ( ( Party.t * unit
+    ( ( Party.t
       , Parties.Digest.Party.t
       , Parties.Digest.Forest.t )
       Parties.Call_forest.t
@@ -73,7 +73,7 @@ module Checked = struct
         let hd_r =
           V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
         in
-        let party = V.create (fun () -> (V.get hd_r).party |> fst) in
+        let party = V.create (fun () -> (V.get hd_r).party) in
         let auth = V.(create (fun () -> (V.get party).authorization)) in
         let party =
           exists (Party.Body.typ ()) ~compute:(fun () -> (V.get party).body)
@@ -119,14 +119,9 @@ module Checked = struct
               let body = As_prover.read (Party.Body.typ ()) party in
               let authorization = V.get auth in
               let tl = V.get tl_data in
-              let party : Party.t * unit = ({ body; authorization }, ()) in
+              let party : Party.t = { body; authorization } in
               let calls = V.get calls in
-              let res =
-                Parties.Call_forest.cons_aux
-                  ~digest_party:(fun (party, ()) ->
-                    Parties.Call_forest.Digest.Party.create party )
-                  ~calls party tl
-              in
+              let res = Parties.Call_forest.cons ~calls party tl in
               (* Sanity check; we're re-hashing anyway, might as well make sure it's
                  consistent.
               *)
@@ -146,10 +141,10 @@ let typ : (Checked.t, t) Typ.t =
   Typ.(Parties.Digest.Forest.typ * Prover_value.typ ())
   |> Typ.transport
        ~back:(fun (_digest, forest) ->
-         Parties.Call_forest.map ~f:(fun (party, ()) -> party) forest )
+         Parties.Call_forest.map ~f:(fun party -> party) forest )
        ~there:(fun forest ->
          ( Parties.Call_forest.hash forest
-         , Parties.Call_forest.map ~f:(fun party -> (party, ())) forest ) )
+         , Parties.Call_forest.map ~f:(fun party -> party) forest ) )
   |> Typ.transport_var
        ~back:(fun (digest, forest) -> { With_hash.hash = digest; data = forest })
        ~there:(fun { With_hash.hash = digest; data = forest } ->

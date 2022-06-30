@@ -1304,7 +1304,7 @@ module Base = struct
         let unhash (h : Stack_frame.Digest.Checked.t)
             (frame :
               ( Mina_base.Token_id.Stable.V1.t
-              , unit Mina_base.Parties.Call_forest.With_hashes.Stable.V1.t )
+              , Mina_base.Parties.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
               V.t ) : t =
           with_label "unhash" (fun () ->
@@ -1338,7 +1338,7 @@ module Base = struct
 
           type frame =
             ( caller
-            , ( Party.t * unit
+            , ( Party.t
               , Parties.Digest.Party.t
               , Parties.Digest.Forest.t )
               Parties.Call_forest.t )
@@ -2008,8 +2008,7 @@ module Base = struct
                   | `Skip ->
                       []
                   | `Start p ->
-                      Parties.parties p.parties
-                      |> Parties.Call_forest.map ~f:(fun party -> (party, ())) )
+                      Parties.parties p.parties )
               in
               let h =
                 exists Parties.Digest.Forest.typ ~compute:(fun () ->
@@ -3833,18 +3832,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
               , _
               , _ )
               Mina_transaction_logic.Parties_logic.Local_state.t ) =
-          let stack_frame (stack_frame : Stack_frame.value) =
-            { stack_frame with
-              calls =
-                Parties.Call_forest.map stack_frame.calls ~f:(fun p -> (p, ()))
-            }
-          in
           { local with
-            stack_frame = stack_frame local.stack_frame
+            stack_frame = local.stack_frame
           ; call_stack =
-              List.map local.call_stack ~f:(fun f ->
-                  With_hash.of_data (stack_frame f)
-                    ~hash_data:Stack_frame.Digest.create )
+              List.map local.call_stack
+                ~f:(With_hash.of_data ~hash_data:Stack_frame.Digest.create)
               |> accumulate_call_stack_hashes ~hash_frame:(fun x ->
                      x.With_hash.hash )
           }
@@ -3980,7 +3972,7 @@ struct
                   s.parties.other_parties ) ;
             None )
     | xs ->
-        Parties.Call_forest.hd_party xs |> Option.map ~f:fst
+        Parties.Call_forest.hd_party xs
 
   let party_proof (p : Party.t) =
     match p.authorization with
@@ -4363,8 +4355,7 @@ module For_tests = struct
       @ snapp_parties @ other_receivers
     in
     let ps =
-      Parties.Call_forest.With_hashes.of_parties_simple_list
-        (List.map ~f:(fun p -> (p, ())) other_parties_data)
+      Parties.Call_forest.With_hashes.of_parties_simple_list other_parties_data
     in
     let other_parties_hash = Parties.Call_forest.hash ps in
     let commitment : Parties.Transaction_commitment.t =
@@ -4479,7 +4470,7 @@ module For_tests = struct
     let snapp_parties =
       snapp_parties
       |> List.map ~f:(fun p -> (p, p))
-      |> Parties.Call_forest.With_hashes.of_parties_simple_list
+      |> Parties.Call_forest.With_hashes_and_data.of_parties_simple_list
       |> Zkapp_statement.zkapp_statements_of_forest
       |> Parties.Call_forest.to_parties_list
     in
@@ -4489,7 +4480,7 @@ module For_tests = struct
     let%map.Async.Deferred snapp_parties =
       Async.Deferred.List.map snapp_parties_keypairs
         ~f:(fun
-             ((snapp_party, (simple_snapp_party, tx_statement)), snapp_keypair)
+             (((snapp_party, simple_snapp_party), tx_statement), snapp_keypair)
            ->
           match spec.current_auth with
           | Permissions.Auth_required.Proof ->
@@ -4678,7 +4669,7 @@ module For_tests = struct
     let memo = Signed_command_memo.empty in
     let ps =
       Parties.Call_forest.With_hashes.of_parties_simple_list
-        [ (sender_party_data, ()); (snapp_party_data, ()) ]
+        [ sender_party_data; snapp_party_data ]
     in
     let other_parties_hash = Parties.Call_forest.hash ps in
     let transaction : Parties.Transaction_commitment.t =
@@ -4688,7 +4679,7 @@ module For_tests = struct
     let proof_party =
       let tree =
         Parties.Call_forest.With_hashes.of_parties_simple_list
-          [ (snapp_party_data, ()) ]
+          [ snapp_party_data ]
         |> List.hd_exn
       in
       tree.elt.party_digest
