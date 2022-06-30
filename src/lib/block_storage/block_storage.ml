@@ -123,15 +123,8 @@ let read_body_impl blocks logger txn body_ref =
         pos := !pos + Bigstring.length data ;
         Queue.enqueue_all q links
   done ;
-  let%bind.Option () = if !exited_early then None else Some () in
-  let res =
-    Staged_ledger_diff.Body.Stable.bin_read_to_latest_opt buf ~pos_ref:(ref 0)
-  in
-  if Option.is_none res then
-    [%log error] "Failed to deserialize body for $body_reference"
-      ~metadata:
-        [ ("body_reference", Consensus.Body_reference.to_yojson body_ref) ] ;
-  res
+  let%map.Option () = if !exited_early then None else Some () in
+  Staged_ledger_diff.Body.Stable.Latest.bin_read_t buf ~pos_ref:(ref 0)
 
 let read_body { statuses; logger; blocks; env } body_ref =
   let impl txn =
