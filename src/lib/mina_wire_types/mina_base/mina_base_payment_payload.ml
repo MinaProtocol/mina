@@ -5,4 +5,4 @@ type ('public_key, 'token_id, 'amount) poly =
   ; amount : 'amount
   }
 
-type t = (Public_key.compressed, Mina_base_token_id.M.t, Currency.M.amount) poly
+type t = (Public_key.Compressed.t, Mina_base_token_id.t, Currency.Amount.t) poly

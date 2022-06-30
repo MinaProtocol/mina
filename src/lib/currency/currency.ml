@@ -19,9 +19,9 @@ type uint64 = Unsigned.uint64
 module Make_sig (T : Mina_wire_types.Currency.Types.S) = struct
   module type S =
     Intf.Full
-      with type Fee.Stable.V1.t = T.fee
-       and type Amount.Stable.V1.t = T.amount
-       and type Balance.Stable.V1.t = T.balance
+      with type Fee.Stable.V1.t = T.Fee.t
+       and type Amount.Stable.V1.t = T.Amount.t
+       and type Balance.Stable.V1.t = T.Balance.t
 end
 
 module Make_str (T : Mina_wire_types.Currency.Concrete) = struct

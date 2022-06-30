@@ -27,7 +27,7 @@ module Common = struct
               , 'nonce
               , 'global_slot
               , 'memo )
-              Mina_wire_types.Mina_base.Signed_command_payload.common_poly =
+              Mina_wire_types.Mina_base.Signed_command_payload.Common.Poly.t =
           { fee : 'fee
           ; fee_token : 'token_id
           ; fee_payer_pk : 'public_key
@@ -201,7 +201,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Mina_wire_types.Mina_base.Signed_command_payload.body =
+        type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.t =
           | Payment of Payment_payload.Stable.V1.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
           | Create_new_token of New_token_payload.Stable.V1.t
@@ -409,7 +409,7 @@ module Poly = struct
       type ('common, 'body) t =
             ( 'common
             , 'body )
-            Mina_wire_types.Mina_base.Signed_command_payload.poly =
+            Mina_wire_types.Mina_base.Signed_command_payload.Poly.t =
         { common : 'common; body : 'body }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
 

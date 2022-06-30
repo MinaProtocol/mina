@@ -12,6 +12,6 @@ type uint64 = Unsigned.uint64
 
 include
   Intf.Full
-    with type Fee.Stable.V1.t = Mina_wire_types.Currency.fee
-     and type Amount.Stable.V1.t = Mina_wire_types.Currency.amount
-     and type Balance.Stable.V1.t = Mina_wire_types.Currency.balance
+    with type Fee.Stable.V1.t = Mina_wire_types.Currency.Fee.t
+     and type Amount.Stable.V1.t = Mina_wire_types.Currency.Amount.t
+     and type Balance.Stable.V1.t = Mina_wire_types.Currency.Balance.t

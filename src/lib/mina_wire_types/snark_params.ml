@@ -1,11 +1,27 @@
-type tick_field = Marlin_plonk_bindings_pasta_fp.t
+module Tick = struct
+  module Field = struct
+    type t = Marlin_plonk_bindings_pasta_fp.t
+  end
 
-type tock_field = Marlin_plonk_bindings_pasta_fq.t
+  module Inner_curve = struct
+    type t = Marlin_plonk_bindings_pasta_pallas.t
 
-type tick_inner_curve = Marlin_plonk_bindings_pasta_pallas.t
+    module Scalar = struct
+      type t = Marlin_plonk_bindings_pasta_fq.t
+    end
+  end
+end
 
-type tock_inner_curve = Marlin_plonk_bindings_pasta_vesta.t
+module Tock = struct
+  module Field = struct
+    type t = Marlin_plonk_bindings_pasta_fq.t
+  end
 
-type tick_inner_curve_scalar = tock_field
+  module Inner_curve = struct
+    type t = Marlin_plonk_bindings_pasta_vesta.t
 
-type tock_inner_curve_scalar = tick_field
+    module Scalar = struct
+      type t = Marlin_plonk_bindings_pasta_fp.t
+    end
+  end
+end

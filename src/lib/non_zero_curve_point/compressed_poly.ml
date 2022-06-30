@@ -9,7 +9,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('field, 'boolean) t =
-            ('field, 'boolean) Mina_wire_types.Public_key.compressed_poly =
+            ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.t =
         { x : 'field; is_odd : 'boolean }
       [@@deriving compare, equal, hash, hlist]
     end

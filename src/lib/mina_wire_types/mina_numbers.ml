@@ -16,6 +16,7 @@ module Account_nonce = struct
   module Make
       (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
+  include M
 end
 
 module Global_slot = struct
@@ -34,4 +35,5 @@ module Global_slot = struct
   module Make
       (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) =
     F (M)
+  include M
 end
