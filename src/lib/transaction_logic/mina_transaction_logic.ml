@@ -657,7 +657,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ()
     in
     let%map loc, account' =
-      pay_fee' ~command:(Signed_command user_command.payload) ~nonce ~fee_payer
+      pay_fee' ~command:(Signed_command_payload user_command.payload) ~nonce
+        ~fee_payer
         ~fee:(Signed_command.fee user_command)
         ~ledger ~current_global_slot
     in
