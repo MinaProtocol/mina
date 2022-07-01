@@ -97,7 +97,8 @@ let dummy_of_tag : Tag.t -> t = function
 let signature_deriver obj =
   Fields_derivers_zkapps.Derivers.iso_string obj ~name:"Signature"
     ~js_type:String ~to_string:Signature.to_base58_check
-    ~of_string:Signature.of_base58_check_exn
+    ~of_string:
+      (Fields_derivers_zkapps.except ~f:Signature.of_base58_check_exn `Signature)
 
 module As_record = struct
   type t =

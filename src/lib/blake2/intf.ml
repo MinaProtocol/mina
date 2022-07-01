@@ -7,6 +7,8 @@ module type S = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@with_top_version_tag]
+
     module V1 : sig
       type t [@@deriving sexp, compare, hash, equal, yojson]
     end

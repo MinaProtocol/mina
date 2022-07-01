@@ -192,8 +192,6 @@ module Types = struct
 
   let block_time = Graphql_lib.Scalars.BlockTime.typ ()
 
-  (* let time = Graphql_lib.Scalars.Time.typ () *)
-
   let account_id : (Mina_lib.t, Account_id.t option) typ =
     obj "AccountId" ~fields:(fun _ ->
         [ field "publicKey" ~typ:(non_null public_key)

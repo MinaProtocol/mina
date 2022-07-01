@@ -1,4 +1,9 @@
-(** scalars.ml -- Define GraphQL scalar types alongside decoders and encoders for use with graphql-ppx.*)
+(** scalars.ml -- Define GraphQL scalar types alongside decoders and encoders for use with graphql-ppx.
+
+    WIP: Some fields of the graphql schema still use type UInt32, UInt64 or string, but could use a more precise scalar type.
+    This way graphql_ppx could automatically use the correct decoder for the field.
+
+ *)
 
 open Graphql_async
 open Schema
@@ -141,15 +146,9 @@ module Time = struct
   type t = Core_kernel.Time.t
 
   let parse json =
-    let () =
-      Stdlib.Format.printf "parsing %s\n" (Yojson.Basic.to_string json)
-    in
     Yojson.Basic.Util.to_string json |> Core_kernel.Time.of_string
 
-  let serialize t =
-    (* let () = Stdlib.Format.printf "t=%a\nserializing: %s\n" (Core.Time.pp) t (Core_kernel.Time.to_string t) in *)
-    (* `String (Core_kernel.Time.to_string t) *)
-    `String (Stdlib.Format.asprintf "%a" Core_kernel.Time.pp t)
+  let serialize t = `String (Core_kernel.Time.to_string t)
 
   let typ () = scalar "Time" ~coerce:serialize
 end
