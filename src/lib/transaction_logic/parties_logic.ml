@@ -1157,9 +1157,12 @@ module Make (Inputs : Inputs_intf) = struct
             *)
             (`Invalid_timing invalid_timing, timing)
       in
+      let positive_balance_change =
+        Amount.Signed.is_pos @@ Party.balance_change party
+      in
       let local_state =
         Local_state.add_check local_state Source_minimum_balance_violation
-          (Bool.not invalid_timing)
+          Bool.(not (positive_balance_change &&& invalid_timing))
       in
       let a = Account.set_timing a timing in
       (a, local_state)
