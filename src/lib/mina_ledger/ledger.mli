@@ -108,15 +108,13 @@ module Transaction_applied : sig
   module Signed_command_applied : sig
     module Common : sig
       type t = Transaction_applied.Signed_command_applied.Common.t =
-        { user_command : Signed_command.t With_status.t
-        ; previous_receipt_chain_hash : Receipt.Chain_hash.t
-        }
+        { user_command : Signed_command.t With_status.t }
       [@@deriving sexp]
     end
 
     module Body : sig
       type t = Transaction_applied.Signed_command_applied.Body.t =
-        | Payment of { previous_empty_accounts : Account_id.t list }
+        | Payment of { new_accounts : Account_id.t list }
         | Stake_delegation of
             { previous_delegate : Public_key.Compressed.t option }
         | Failed
@@ -132,7 +130,7 @@ module Transaction_applied : sig
     type t = Transaction_applied.Parties_applied.t =
       { accounts : (Account_id.t * Account.t option) list
       ; command : Parties.t With_status.t
-      ; previous_empty_accounts : Account_id.t list
+      ; new_accounts : Account_id.t list
       }
     [@@deriving sexp]
   end
@@ -146,15 +144,13 @@ module Transaction_applied : sig
 
   module Fee_transfer_applied : sig
     type t = Transaction_applied.Fee_transfer_applied.t =
-      { fee_transfer : Fee_transfer.t
-      ; previous_empty_accounts : Account_id.t list
-      }
+      { fee_transfer : Fee_transfer.t; new_accounts : Account_id.t list }
     [@@deriving sexp]
   end
 
   module Coinbase_applied : sig
     type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase : Coinbase.t; previous_empty_accounts : Account_id.t list }
+      { coinbase : Coinbase.t; new_accounts : Account_id.t list }
     [@@deriving sexp]
   end
 
