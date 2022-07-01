@@ -1038,7 +1038,7 @@ struct
             Error Error.(tag (of_string msg) ~tag:"Verification_failed")
         | Ok (Ok commands) ->
             (* TODO: we don't hash this anywhere prior to this? *)
-            O1trace.thread "hashing_transactions_after_verification" (fun () ->
+            O1trace.sync_thread "hashing_transactions_after_verification" (fun () ->
                 Deferred.return
                   (Ok
                      { diff with
