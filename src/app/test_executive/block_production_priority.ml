@@ -15,13 +15,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_extra_keys = 1000
 
+  let num_sender_nodes = 4
+
   let config =
     let open Test_config in
     { default with
       requires_graphql = true
     ; block_producers =
         { Wallet.balance = "9999999"; timing = Untimed }
-        :: List.init 4 ~f:(const { Wallet.balance = "0"; timing = Untimed })
+        :: List.init (num_sender_nodes + 1)
+             ~f:(const { Wallet.balance = "0"; timing = Untimed })
     ; num_snark_workers = 25
     ; extra_genesis_accounts =
         List.init num_extra_keys ~f:(fun _ ->
@@ -43,15 +46,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let%bind receiver, senders =
+    (* Receiver receives transactions and produces blocks,
+       senders send transactions and retrieve blocks, observer is shutdown
+       at the start and is launched at the end to run the catchup. *)
+    let%bind receiver, observer, senders =
       match Network.block_producers network with
-      | [] ->
-          Malleable_error.hard_error_string "no block producers"
-      | [ r ] ->
-          (* Sender and receiver are the same node *)
-          return (r, [ r ])
-      | r :: rs ->
-          return (r, rs)
+      | receiver :: observer :: rs ->
+          return (receiver, observer, rs)
+      | _ ->
+          Malleable_error.hard_error_string "no block producer / observer"
     in
     let%bind receiver_pub_key = Util.pub_key_of_node receiver in
     let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
@@ -75,6 +78,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"
         (wait_for t (Wait_condition.blocks_to_be_produced 3))
+    in
+    let%bind () =
+      section_hard "stop observer"
+        (let%map () = Network.Node.stop observer in
+         [%log info]
+           "Observer %s stopped, will now wait for blocks to be produced"
+           (Network.Node.id observer) )
     in
     let end_t =
       Time.add (Time.now ())
@@ -170,11 +180,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          (* First two slots might be delayed because of test's bootstrap, so we have 2 as a threshold *)
          ok_if_true "block production was delayed" (rcv_delay_rest <= 2) )
     in
-    section "retrieve metrics of tx sender nodes"
-      (* We omit the result because we just want to query senders to see some useful
-          output in test logs *)
-      (Malleable_error.List.iter senders
-         ~f:
-           (Fn.compose Malleable_error.soften_error
-              (Fn.compose Malleable_error.ignore_m get_metrics) ) )
+    let%bind () =
+      section "retrieve metrics of tx sender nodes"
+        (* We omit the result because we just want to query senders to see some useful
+            output in test logs *)
+        (Malleable_error.List.iter senders
+           ~f:
+             (Fn.compose Malleable_error.soften_error
+                (Fn.compose Malleable_error.ignore_m get_metrics) ) )
+    in
+    section "catchup observer"
+      (let%bind () = Network.Node.start ~fresh_state:false observer in
+       [%log info]
+         "Observer %s started again, will now wait for this node to initialize"
+         (Network.Node.id observer) ;
+       let%bind () = wait_for t (Wait_condition.node_to_initialize observer) in
+       wait_for t
+         ( Wait_condition.nodes_to_synchronize [ receiver; observer ]
+         |> Wait_condition.with_timeouts
+              ~soft_timeout:(Network_time_span.Slots 3)
+              ~hard_timeout:
+                (Network_time_span.Literal
+                   (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
 end
