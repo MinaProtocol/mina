@@ -30,17 +30,23 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_signed_command =
-  Fn.compose digest_string Signed_command.to_base58_check
+let hash_signed_command cmd =
+  cmd
+  |> Binable.to_string (module Signed_command.Stable.Latest)
+  |> digest_string
 
 [%%ifdef consensus_mechanism]
 
-let hash_command = Fn.compose digest_string User_command.to_base58_check
+let hash_command cmd =
+  cmd |> Binable.to_string (module User_command.Stable.Latest) |> digest_string
 
-let hash_fee_transfer =
-  Fn.compose digest_string Fee_transfer.Single.to_base58_check
+let hash_fee_transfer fee_transfer =
+  fee_transfer
+  |> Binable.to_string (module Fee_transfer.Single.Stable.Latest)
+  |> digest_string
 
-let hash_coinbase = Fn.compose digest_string Coinbase.to_base58_check
+let hash_coinbase coinbase =
+  coinbase |> Binable.to_string (module Coinbase.Stable.Latest) |> digest_string
 
 module User_command_with_valid_signature = struct
   type hash = T.t [@@deriving sexp, compare, hash]
