@@ -153,8 +153,7 @@ let%test_module "Command line tests" =
       let port = 1337 in
       let client_delay = 40. in
       let retry_delay = 30. in
-      let kill_delay = 30. in
-      let retry_attempts = 30 in
+      let retry_attempts = 5 in
       let config_dir, genesis_ledger_dir = create_config_directories () in
       Monitor.protect
         ~finally:(fun () ->
@@ -193,10 +192,8 @@ let%test_module "Command line tests" =
             in
             let%bind _ = call_client retry_attempts in
             Process.send_signal p Core.Signal.kill ;
-            let%bind () =
-              Deferred.map
-                (after @@ Time.Span.of_sec kill_delay)
-                ~f:Or_error.return
+            let%bind (_ : Unix.Exit_or_signal.t) =
+              Deferred.map (Process.wait p) ~f:Or_error.return
             in
             let%bind _ = start_daemon config_dir genesis_ledger_dir port in
             let%bind () =
