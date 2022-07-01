@@ -13,6 +13,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
+  let num_extra_keys = 1000
+
   let config =
     let open Test_config in
     { default with
@@ -22,8 +24,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         :: List.init 4 ~f:(const { Wallet.balance = "0"; timing = Untimed })
     ; num_snark_workers = 25
     ; extra_genesis_accounts =
-        [ { balance = "1000"; timing = Untimed } ]
-        (* ; aux_account_balance = Some "1000" *)
+        List.init num_extra_keys ~f:(fun _ ->
+            { Wallet.balance = "1000"; timing = Untimed } )
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
     }
@@ -83,6 +85,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let num_senders = List.length senders in
          let sender_keys =
            List.map ~f:snd
+           @@ Fn.flip List.take num_extra_keys
            @@ List.drop
                 (Array.to_list @@ Lazy.force @@ Key_gen.Sample_keypairs.keypairs)
                 (num_senders + 2)
