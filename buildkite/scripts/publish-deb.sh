@@ -21,7 +21,7 @@ DEBS='_build/mina-*.deb'
 ## artifacts
 DEBS='_build/mina-*.deb'
 DESTINATION_BUCKET_NAME='o1labs-deb-repo'
-REPOSITORY='dune-deb-repo'
+#REPOSITORY='dune-deb-repo'
 LOCATION='northamerica-northeast2'
 PACKAGES='o1labs-deb-repo'
 #MINA_DEB_CODENAME='buster'
@@ -45,10 +45,11 @@ do
     for _deb in *.deb; do
 
       echo $_deb
+      REPOSITORY=$i"-"$j
        gcloud artifacts apt upload ${REPOSITORY}   --location=${LOCATION} --source=${_deb}
        #gcloud artifacts tags create ${MINA_DEB_CODENAME} --location=${LOCATION} --repository=${REPOSITORY} --version=${MINA_DEB_RELEASE} --package=${_deb}
 
-    done    
+    done
 
 #    if ! gcloud artifacts repositories list|grep $i"-"$j
 #    then
