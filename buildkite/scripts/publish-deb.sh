@@ -19,26 +19,6 @@ DEBS='_build/mina-*.deb'
 
 
 ## artifacts
-#declare -a component_lst=("alpha" "beta" "stable")
-#declare -a codename_lst=("stretch" "buster" "bullseye" "bookworm" "focal")
-
-
-#for i in "${component_lst[@]}"
-#do
-#  for j in "${codename_lst[@]}"
-#  do
-#    echo $i"-"$j
-#    echo "--"
-#
-#    if ! gcloud artifacts repositories list|grep $i"-"$j
-#    then
-#      echo "repo not found"
-#      gcloud artifacts repositories create $i"-"$j  --location=${LOCATION}  --repository-format=apt
-#    fi
-#
-#    done
-#done
-
 DEBS='_build/mina-*.deb'
 DESTINATION_BUCKET_NAME='o1labs-deb-repo'
 REPOSITORY='dune-deb-repo'
@@ -48,15 +28,41 @@ PACKAGES='o1labs-deb-repo'
 #MINA_DEB_RELEASE='1.1.7.dfsg-13'
 
 
+declare -a component_lst=("alpha" "beta" "stable")
+declare -a codename_lst=("stretch" "buster" "bullseye" "bookworm" "focal")
+
+
 cd _build
 
-for _deb in *.deb; do
 
-  echo $_deb
-   gcloud artifacts apt upload ${REPOSITORY}   --location=${LOCATION} --source=${_deb}
-   #gcloud artifacts tags create ${MINA_DEB_CODENAME} --location=${LOCATION} --repository=${REPOSITORY} --version=${MINA_DEB_RELEASE} --package=${_deb}
+for i in "${component_lst[@]}"
+do
+  for j in "${codename_lst[@]}"
+  do
+    echo $i"-"$j
+    echo "--"
 
+    for _deb in *.deb; do
+
+      echo $_deb
+       gcloud artifacts apt upload ${REPOSITORY}   --location=${LOCATION} --source=${_deb}
+       #gcloud artifacts tags create ${MINA_DEB_CODENAME} --location=${LOCATION} --repository=${REPOSITORY} --version=${MINA_DEB_RELEASE} --package=${_deb}
+
+    done    
+
+#    if ! gcloud artifacts repositories list|grep $i"-"$j
+#    then
+#      echo "repo not found"
+#      gcloud artifacts repositories create $i"-"$j  --location=${LOCATION}  --repository-format=apt
+#    fi
+
+    done
 done
+
+
+
+
+
 
 ##/ artifacts
 
