@@ -1473,7 +1473,7 @@ module Circuit = struct
       Impl.constraint_system ~exposing:spec
         ~return_typ:Snark_params.Tick.Typ.unit (fun x -> main x)
     in
-    let kp = Impl.Keypair.generate cs in
+    let kp = Impl.Keypair.generate ~prev_challenges:0 cs in
     new%js keypair_constr kp
 
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
