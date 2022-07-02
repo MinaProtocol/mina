@@ -171,6 +171,7 @@ module VerifierIndex = struct
     { domain : 'fr domain
     ; max_poly_size : int
     ; max_quot_size : int
+    ; public : int
     ; srs : 'srs
     ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array
