@@ -130,7 +130,7 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
 
 # Debugging Tests
 
-[test bad link](https://console.cloud.google.com/asdfasfdasfasfasdfasdfasdf)
+[test bad link](https://asdfasfdasfasfasdfasdfasdf.com)
 
 <!-- - how to process test executive logs
     - logproc examples -->
