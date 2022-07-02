@@ -1,4 +1,5 @@
 let Prelude = ../../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
@@ -10,7 +11,7 @@ let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
--- let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in
 
@@ -31,7 +32,7 @@ Pipeline.build
           , label = "Verifies references in markdown"
           , key = "xrefcheck"
           , target = Size.Small
-          , soft_fail = Some (Boolean (True))
+          , soft_fail = Some (B/SoftFail.Boolean(True))
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).xrefcheck,
               shell = None (List Text)
