@@ -148,31 +148,49 @@ let verify_heterogenous (ts : Instance.t list) =
           in
           (absorb sponge, squeeze)
         in
-        ( absorb evals.ft_eval1 ;
-          let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
-          let x1, x2 = evals.evals.public_input in
-          absorb x1 ;
-          absorb x2 ;
-          List.iter xs ~f:(fun (x1, x2) ->
-              Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
+        let old_bulletproof_challenges =
+          Vector.map ~f:Ipa.Step.compute_challenges
+            statement.pass_through.old_bulletproof_challenges
+        in
+        let sg_evals1, sg_evals2 =
+          let challenge_polys =
+            let vec =
+              Vector.map
+                ~f:(fun chals ->
+                  unstage (Wrap.challenge_polynomial (Vector.to_array chals)) )
+                old_bulletproof_challenges
+            in
+            fun pt -> Vector.map vec ~f:(fun f -> f pt)
+          in
+          (challenge_polys zeta, challenge_polys zetaw)
+        in
+        (let sg_eval_digest =
+           let open Tick_field_sponge.Field in
+           let sponge = create Tick_field_sponge.params in
+           Vector.iter2 sg_evals1 sg_evals2 ~f:(fun sg_eval1 sg_eval2 ->
+               absorb sponge sg_eval1 ; absorb sponge sg_eval2 ) ;
+           squeeze sponge
+         in
+         absorb sg_eval_digest ;
+         absorb evals.ft_eval1 ;
+         let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
+         let x1, x2 = evals.evals.public_input in
+         absorb x1 ;
+         absorb x2 ;
+         List.iter xs ~f:(fun (x1, x2) ->
+             Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
         let xi_actual = squeeze () in
         let r_actual = squeeze () in
         Timer.clock __LOC__ ;
         (* TODO: The deferred values "bulletproof_challenges" should get routed
            into a "batch dlog Tick acc verifier" *)
-        let actual_proofs_verified =
-          Vector.length statement.pass_through.old_bulletproof_challenges
-        in
+        let actual_proofs_verified = Vector.length old_bulletproof_challenges in
         Timer.clock __LOC__ ;
         let combined_inner_product_actual =
           Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
             ~domain:tick_domain ~ft_eval1:evals.ft_eval1
             ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-            evals.evals
-            ~old_bulletproof_challenges:
-              (Vector.map ~f:Ipa.Step.compute_challenges
-                 statement.pass_through.old_bulletproof_challenges )
-            ~r:r_actual ~xi ~zeta ~zetaw
+            evals.evals ~old_bulletproof_challenges ~r:r_actual ~xi ~zeta ~zetaw
         in
         let check_eq lab x y =
           check
