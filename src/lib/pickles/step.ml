@@ -62,7 +62,7 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~self_dlog_plonk_index
+      ~uses_lookup ~self_dlog_plonk_index
       ~(public_input :
          ( var
          , value
@@ -103,7 +103,10 @@ struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
-        , Tock.Field.t
+        , ( Challenge.Constant.t Scalar_challenge.t
+          , Tick.Field.t Shifted_value.Type1.t )
+          Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+          option
         , Digest.Constant.t
         , Digest.Constant.t
         , Digest.Constant.t
@@ -169,6 +172,7 @@ struct
           ; alpha
           ; beta = Challenge.Constant.to_tick_field plonk0.beta
           ; gamma = Challenge.Constant.to_tick_field plonk0.gamma
+          ; joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
           }
         in
         let env =
@@ -231,6 +235,12 @@ struct
                     ; alpha = plonk0.alpha
                     ; beta = plonk0.beta
                     ; gamma = plonk0.gamma
+                    ; lookup =
+                        Option.map (Opt.to_option plonk.lookup) ~f:(fun l ->
+                            { l with
+                              joint_combiner =
+                                Option.value_exn plonk0.joint_combiner
+                            } )
                     }
                 }
             ; me_only =
@@ -273,6 +283,10 @@ struct
         ; beta = O.beta o
         ; gamma = O.gamma o
         ; zeta = scalar_chal O.zeta
+        ; joint_combiner =
+            Option.map
+              ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tock_field)
+              (O.joint_combiner_chal o)
         }
       in
       let xi = scalar_chal O.v in
@@ -291,6 +305,8 @@ struct
         let zeta = to_field plonk0.zeta
 
         let alpha = to_field plonk0.alpha
+
+        let joint_combiner = O.joint_combiner o
       end in
       let w =
         Tock.Field.domain_generator
@@ -361,7 +377,11 @@ struct
         |> Plonk_types.Evals.to_in_circuit
       in
       let tock_plonk_minimal =
-        { plonk0 with zeta = As_field.zeta; alpha = As_field.alpha }
+        { plonk0 with
+          zeta = As_field.zeta
+        ; alpha = As_field.alpha
+        ; joint_combiner = As_field.joint_combiner
+        }
       in
       let tock_env =
         Plonk_checks.scalars_env
@@ -400,7 +420,7 @@ struct
           Plonk_checks.Type2.ft_eval0
             (module Tock.Field)
             ~domain:tock_domain ~env:tock_env tock_plonk_minimal
-            tock_combined_evals x_hat_1
+            tock_combined_evals x_hat_1 ~lookup_constant_term_part:None
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
@@ -424,6 +444,12 @@ struct
                 ; alpha = plonk0.alpha
                 ; beta = chal plonk0.beta
                 ; gamma = chal plonk0.gamma
+                ; lookup =
+                    Option.map (Opt.to_option plonk.lookup) ~f:(fun l ->
+                        { l with
+                          joint_combiner =
+                            Option.value_exn plonk0.joint_combiner
+                        } )
                 }
             ; combined_inner_product = shifted_value combined_inner_product
             ; xi
@@ -652,7 +678,7 @@ struct
     let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-          ~wrap_rounds:Tock.Rounds.n
+          ~wrap_rounds:Tock.Rounds.n ~uses_lookup
       in
       let { Domains.h } =
         List.nth_exn (Vector.to_list step_domains) branch_data.index
