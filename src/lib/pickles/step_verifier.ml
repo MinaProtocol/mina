@@ -707,7 +707,9 @@ struct
                 (Pow_2_roots_of_unity ds.h) ~shifts:Common.tick_shifts
                 ~domain_generator:Backend.Tick.Field.domain_generator
             in
-            let checked_domain () = side_loaded_domain (Field.of_int ds.h) in
+            let checked_domain () =
+              side_loaded_domain ~log2_size:(Field.of_int ds.h)
+            in
             [%test_eq: Field.Constant.t]
               (d_unchecked#vanishing_polynomial pt)
               (run (fun () ->
@@ -777,7 +779,7 @@ struct
         | e :: es ->
             List.fold ~init:e es ~f:(fun acc fx -> Field.(fx + (pt_to_n * acc)))
         | [] ->
-            failwith "empty list" )
+            Field.zero )
 
   open Plonk_types
 
@@ -803,7 +805,15 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-    include Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
+
+    include
+      Plonk_checks.Make
+        (Shifted_value.Type1)
+        (struct
+          let constant_term = Plonk_checks.Scalars.Tick.constant_term
+
+          let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
+        end)
   end
 
   let domain_for_compiled (type branches)
@@ -844,6 +854,7 @@ struct
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
+      ~(step_uses_lookup : Plonk_types.Opt.Flag.t)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -859,7 +870,6 @@ struct
         ( Field.t
         , _
         , Field.t Shifted_value.Type1.t
-        , _
         , _
         , _
         , Field.Constant.t Branch_data.Checked.t )
@@ -939,6 +949,23 @@ struct
         with_label "ft_eval0" (fun () ->
             Plonk_checks.ft_eval0
               (module Field)
+              ~lookup_constant_term_part:
+                ( match step_uses_lookup with
+                | No ->
+                    None
+                | Yes ->
+                    Some Plonk_checks.tick_lookup_constant_term_part
+                | Maybe -> (
+                    match plonk.lookup with
+                    | Maybe ((b : Boolean.var), _) ->
+                        Some
+                          (fun env ->
+                            Field.(
+                              (b :> t)
+                              * Plonk_checks.tick_lookup_constant_term_part env)
+                            )
+                    | None | Some _ ->
+                        assert false ) )
               ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in
       print_fp "ft_eval0" ft_eval0 ;
@@ -1103,7 +1130,7 @@ struct
       proof new_accumulator : Boolean.var =
     Boolean.false_
 
-  let verify ~proofs_verified ~is_base_case ~sg_old ~lookup_config
+  let verify ~proofs_verified ~is_base_case ~sg_old ~lookup_parameters
       ~(proof : Wrap_proof.Checked.t) ~wrap_domain ~wrap_verification_key
       statement
       (unfinalized :
@@ -1120,7 +1147,9 @@ struct
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
-            (Types.Wrap.Statement.In_circuit.spec lookup_config)
+            (Types.Wrap.Statement.In_circuit.spec
+               (module Impl)
+               lookup_parameters )
             (Types.Wrap.Statement.In_circuit.to_data
                ~option_map:Plonk_types.Opt.map statement ) )
       |> Array.map ~f:(function
