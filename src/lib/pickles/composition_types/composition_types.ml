@@ -7,6 +7,8 @@ module Spec = Spec
 module Opt = Plonk_types.Opt
 open Core_kernel
 
+type 'f impl = 'f Spec.impl
+
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
 
@@ -196,7 +198,6 @@ module Wrap = struct
           type ( 'plonk
                , 'scalar_challenge
                , 'fp
-               , 'fq
                , 'bulletproof_challenges
                , 'branch_data )
                t =
@@ -223,14 +224,12 @@ module Wrap = struct
       type ( 'plonk
            , 'scalar_challenge
            , 'fp
-           , 'fq
            , 'bulletproof_challenges
            , 'branch_data )
            t =
             ( 'plonk
             , 'scalar_challenge
             , 'fp
-            , 'fq
             , 'bulletproof_challenges
             , 'branch_data )
             Stable.Latest.t =
@@ -247,14 +246,12 @@ module Wrap = struct
         type ( 'challenge
              , 'scalar_challenge
              , 'fp
-             , 'fq
              , 'bulletproof_challenges
              , 'index )
              t =
           ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
           , 'scalar_challenge
           , 'fp
-          , 'fq
           , 'bulletproof_challenges
           , 'index )
           Stable.Latest.t
@@ -282,14 +279,12 @@ module Wrap = struct
              , 'scalar_challenge
              , 'fp
              , 'lookup_opt
-             , 'fq
              , 'bulletproof_challenges
              , 'branch_data )
              t =
           ( ('challenge, 'scalar_challenge, 'fp, 'lookup_opt) Plonk.In_circuit.t
           , 'scalar_challenge
           , 'fp
-          , 'fq
           , 'bulletproof_challenges
           , 'branch_data )
           Stable.Latest.t
@@ -301,8 +296,7 @@ module Wrap = struct
             (impl :
               (module Snarky_backendless.Snark_intf.Run with type field = f) )
             ~lookup ~dummy_scalar ~dummy_scalar_challenge ~challenge
-            ~scalar_challenge (fp : (fp, _, f) Snarky_backendless.Typ.t) fq
-            index =
+            ~scalar_challenge (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
           Snarky_backendless.Typ.of_hlistable
             [ Plonk.In_circuit.typ impl ~lookup ~dummy_scalar
                 ~dummy_scalar_challenge ~challenge ~scalar_challenge fp
@@ -358,7 +352,6 @@ module Wrap = struct
         type ( 'plonk
              , 'scalar_challenge
              , 'fp
-             , 'fq
              , 'me_only
              , 'digest
              , 'bp_chals
@@ -368,7 +361,6 @@ module Wrap = struct
               ( 'plonk
               , 'scalar_challenge
               , 'fp
-              , 'fq
               , 'bp_chals
               , 'index )
               Deferred_values.Stable.V1.t
@@ -386,7 +378,6 @@ module Wrap = struct
            , 'scalar_challenge
            , 'scalar_challenge_opt
            , 'fp
-           , 'fq
            , 'me_only
            , 'digest
            , 'bp_chals
@@ -395,7 +386,6 @@ module Wrap = struct
         ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
         , 'scalar_challenge
         , 'fp
-        , 'fq
         , 'me_only
         , 'digest
         , 'bp_chals
@@ -409,7 +399,6 @@ module Wrap = struct
            , 'scalar_challenge
            , 'fp
            , 'lookup_opt
-           , 'fq
            , 'me_only
            , 'digest
            , 'bp_chals
@@ -422,7 +411,6 @@ module Wrap = struct
           Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
         , 'fp
-        , 'fq
         , 'me_only
         , 'digest
         , 'bp_chals
@@ -435,11 +423,11 @@ module Wrap = struct
       let typ (type f fp)
           (impl : (module Snarky_backendless.Snark_intf.Run with type field = f))
           ~lookup ~dummy_scalar ~dummy_scalar_challenge ~challenge
-          ~scalar_challenge (fp : (fp, _, f) Snarky_backendless.Typ.t) fq
-          me_only digest index =
+          ~scalar_challenge (fp : (fp, _, f) Snarky_backendless.Typ.t) me_only
+          digest index =
         Snarky_backendless.Typ.of_hlistable
           [ Deferred_values.In_circuit.typ impl ~lookup ~dummy_scalar
-              ~dummy_scalar_challenge ~challenge ~scalar_challenge fp fq index
+              ~dummy_scalar_challenge ~challenge ~scalar_challenge fp index
           ; digest
           ; me_only
           ]
@@ -539,28 +527,21 @@ module Wrap = struct
         ~value_of_hlist:of_hlist
   end
 
-  module Lookup_config = struct
+  module Lookup_parameters = struct
+    (* Values needed for computing lookup parts of the verifier circuit. *)
     type ('chal, 'chal_var, 'fp, 'fp_var) t =
       { zero : ('chal, 'chal_var, 'fp, 'fp_var) Zero_values.t
       ; use : Opt.Flag.t
       }
 
-    (*
-    let dummy t : _ Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t =
-      { joint_combiner = Spec.Sc.create t.zero_challenge
-      ; lookup_gate = t.zero_scalar }
-
-    let dummy_var t : _ Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t =
-      { joint_combiner = Spec.Sc.create t.zero_challenge_var
-      ; lookup_gate = t.zero_scalar_var }
-       *)
-
-    let opt_spec { zero = { value; var }; use } =
+    let opt_spec (type f) ((module Impl) : f impl)
+        { zero = { value; var }; use } =
       Spec.Opt
         { inner = Struct [ Scalar Challenge; B Field ]
         ; flag = use
         ; dummy1 = [ Spec.Sc.create value.challenge; value.scalar ]
         ; dummy2 = [ Spec.Sc.create var.challenge; var.scalar ]
+        ; bool = (module Impl.Boolean)
         }
   end
 
@@ -576,7 +557,6 @@ module Wrap = struct
         type ( 'plonk
              , 'scalar_challenge
              , 'fp
-             , 'fq
              , 'me_only
              , 'digest
              , 'pass_through
@@ -587,7 +567,6 @@ module Wrap = struct
               ( 'plonk
               , 'scalar_challenge
               , 'fp
-              , 'fq
               , 'me_only
               , 'digest
               , 'bp_chals
@@ -606,7 +585,6 @@ module Wrap = struct
           type ( 'challenge
                , 'scalar_challenge
                , 'fp
-               , 'fq
                , 'me_only
                , 'digest
                , 'pass_through
@@ -618,7 +596,6 @@ module Wrap = struct
               Proof_state.Deferred_values.Plonk.Minimal.Stable.V1.t
             , 'scalar_challenge
             , 'fp
-            , 'fq
             , 'me_only
             , 'digest
             , 'pass_through
@@ -635,7 +612,6 @@ module Wrap = struct
            , 'scalar_challenge
            , 'fp
            , 'lookup_opt
-           , 'fq
            , 'me_only
            , 'digest
            , 'pass_through
@@ -649,7 +625,6 @@ module Wrap = struct
           Proof_state.Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
         , 'fp
-        , 'fq
         , 'me_only
         , 'digest
         , 'pass_through
@@ -660,7 +635,7 @@ module Wrap = struct
 
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
-      let spec lookup =
+      let spec impl lookup =
         let open Spec in
         Struct
           [ Vector (B Field, Nat.N19.n)
@@ -669,7 +644,7 @@ module Wrap = struct
           ; Vector (B Digest, Nat.N3.n)
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Branch_data, Nat.N1.n)
-          ; Lookup_config.opt_spec lookup
+          ; Lookup_parameters.opt_spec impl lookup
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
@@ -955,7 +930,7 @@ module Step = struct
 
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
-        let spec bp_log2 lookup =
+        let spec impl bp_log2 lookup =
           let open Spec in
           Struct
             [ Vector (B Field, Nat.N19.n)
@@ -964,7 +939,7 @@ module Step = struct
             ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
-            ; Wrap.Lookup_config.opt_spec lookup
+            ; Wrap.Lookup_parameters.opt_spec impl lookup
             ]
 
         let to_data
@@ -1076,10 +1051,12 @@ module Step = struct
 
       let typ impl fq ~assert_16_bits ~zero ~uses_lookup =
         let open Deferred_values.Plonk.In_circuit.Lookup in
-        let lookup_config = { Wrap.Lookup_config.use = uses_lookup; zero } in
+        let lookup_config =
+          { Wrap.Lookup_parameters.use = uses_lookup; zero }
+        in
         let open In_circuit in
         Spec.typ impl fq ~assert_16_bits
-          (spec Backend.Tock.Rounds.n lookup_config)
+          (spec impl Backend.Tock.Rounds.n lookup_config)
         |> Snarky_backendless.Typ.transport
              ~there:(to_data ~option_map:Option.map)
              ~back:(of_data ~option_map:Option.map)
@@ -1168,9 +1145,11 @@ module Step = struct
       ; pass_through
       }
 
-    let spec proofs_verified bp_log2 lookup =
+    let spec impl proofs_verified bp_log2 lookup =
       let open Spec in
-      let per_proof = Proof_state.Per_proof.In_circuit.spec bp_log2 lookup in
+      let per_proof =
+        Proof_state.Per_proof.In_circuit.spec impl bp_log2 lookup
+      in
       Struct
         [ Vector (per_proof, proofs_verified)
         ; B Digest

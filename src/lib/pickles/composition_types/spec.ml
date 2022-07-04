@@ -65,6 +65,14 @@ type ('a, 'b, 'c) basic = ('a, 'b, 'c) Basic.t =
         )
         basic
 
+module type Bool_intf = sig
+  type var
+
+  val true_ : var
+
+  val false_ : var
+end
+
 module rec T : sig
   type (_, _, _) t =
     | B : ('a, 'b, 'env) Basic.t -> ('a, 'b, 'env) t
@@ -83,6 +91,7 @@ module rec T : sig
         ; flag : Plonk_types.Opt.Flag.t
         ; dummy1 : 'a1
         ; dummy2 : 'a2
+        ; bool : (module Bool_intf with type var = 'bool)
         }
         -> ('a1 option, ('a2, 'bool) Plonk_types.Opt.t, 'env) t
 end =
@@ -163,11 +172,12 @@ let rec typ :
         |> transport_var
              ~there:(fun (x :: xs) -> (x, xs))
              ~back:(fun (x, xs) -> x :: xs)
-    | Opt { inner; flag; dummy1; dummy2 = _ } ->
+    | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
         let bool = typ t (B Bool) in
+        let open B in
         (* Always use the same "maybe" layout which is a boolean and then the value *)
         Plonk_types.Opt.constant_layout_typ bool flag ~dummy:dummy1
-          (typ t inner)
+          ~dummy_var:dummy2 ~true_ ~false_ (typ t inner)
 
 type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
 
@@ -223,7 +233,7 @@ let rec etyp :
                  ~back:(fun (x, xs) -> x :: xs)
           , (fun (x, xs) -> f1 x :: f2 xs)
           , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
-    | Opt { inner; flag; dummy1; dummy2 = _ } ->
+    | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
         let (T (bool, f_bool, f_bool')) = etyp e (B Bool) in
         let (T (a, f_a, f_a')) = etyp e inner in
         let opt_map ~f1 ~f2 (x : _ Plonk_types.Opt.t) : _ Plonk_types.Opt.t =
@@ -237,7 +247,12 @@ let rec etyp :
         in
         let f = opt_map ~f1:f_a ~f2:f_bool in
         let f' = opt_map ~f1:f_a' ~f2:f_bool' in
-        T (Plonk_types.Opt.typ bool flag ~dummy:dummy1 a, f, f')
+        T
+          ( Plonk_types.Opt.constant_layout_typ ~dummy:dummy1
+              ~dummy_var:(f_a' dummy2) ~true_:(f_bool' B.true_)
+              ~false_:(f_bool' B.false_) bool flag a
+          , f
+          , f' )
 
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
