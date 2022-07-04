@@ -75,7 +75,7 @@ struct
     let t =
       Fix_domains.domains
         (module Impls.Wrap)
-        (Impls.Wrap.input ~lookup)
+        (Impls.Wrap.input ())
         (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
         main
     in

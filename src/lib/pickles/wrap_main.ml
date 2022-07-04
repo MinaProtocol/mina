@@ -88,7 +88,9 @@ let pack_statement max_proofs_verified ~lookup t =
   let open Types.Step in
   Spec.pack
     (module Impl)
-    (Statement.spec max_proofs_verified Backend.Tock.Rounds.n lookup)
+    (Statement.spec
+       (module Impl)
+       max_proofs_verified Backend.Tock.Rounds.n lookup )
     (Statement.to_data t ~option_map:Plonk_types.Opt.map)
 
 let shifts ~log2_size =
@@ -135,7 +137,9 @@ let commitment_lookup_config =
   { Plonk_types.Lookup_config.lookup = No; runtime = No }
 
 let lookup_config_for_pack =
-  { Types.Wrap.Lookup_config.zero = Common.Lookup_config.tock_zero; use = No }
+  { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.tock_zero
+  ; use = No
+  }
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
@@ -158,7 +162,6 @@ let wrap_main
     * (   ( _
           , _
           , _ Shifted_value.Type1.t
-          , _
           , _
           , _
           , _
@@ -206,7 +209,6 @@ let wrap_main
         , _
         , _
         , _
-        , _
         , Field.t )
         Types.Wrap.Statement.In_circuit.t ) =
     with_label __LOC__ (fun () ->
@@ -249,7 +251,7 @@ let wrap_main
               let typ =
                 typ
                   (module Impl)
-                  Common.Lookup_config.tock_zero
+                  Common.Lookup_parameters.tock_zero
                   ~assert_16_bits:(assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                        Plonk_types.Opt.Flag.No ) )

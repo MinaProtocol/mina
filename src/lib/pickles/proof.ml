@@ -51,7 +51,6 @@ module Base = struct
                 Vector.Vector_2.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
               , Tick.Field.Stable.V1.t Shifted_value.Type1.Stable.V1.t
-              , Tock.Field.Stable.V1.t
               , 'dlog_me_only
               , Digest.Constant.Stable.V1.t
               , 'step_me_only
@@ -78,7 +77,6 @@ module Base = struct
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
           , Tick.Field.t Shifted_value.Type1.t
-          , Tock.Field.t
           , 'dlog_me_only
           , Digest.Constant.t
           , 'step_me_only

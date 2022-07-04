@@ -103,4 +103,4 @@ let typ ~wrap_rounds ~uses_lookup : (t, Constant.t) Typ.t =
     (module Impl)
     (Shifted_value.typ Other_field.typ)
     ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
-    ~zero:Common.Lookup_config.tick_zero ~uses_lookup
+    ~zero:Common.Lookup_parameters.tick_zero ~uses_lookup

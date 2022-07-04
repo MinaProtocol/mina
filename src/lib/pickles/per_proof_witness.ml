@@ -61,7 +61,6 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
         , Impl.Boolean.var )
         Plonk_types.Opt.t
-      , Step_verifier.Make(Step_main_inputs).Other_field.t
       , unit
       , Digest.Make(Impl).t
       , Challenge.Make(Impl).t Scalar_challenge.t Types.Bulletproof_challenge.t
@@ -112,7 +111,6 @@ module Constant = struct
           , Tick.Field.t Shifted_value.Type1.t )
           Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
-        , Tock.Field.t
         , unit
         , Digest.Constant.t
         , Challenge.Constant.t Scalar_challenge.t Types.Bulletproof_challenge.t
@@ -156,7 +154,6 @@ let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
         ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
-        Other_field.typ
         (Snarky_backendless.Typ.unit ())
         Digest.typ
         (Branch_data.typ

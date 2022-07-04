@@ -128,9 +128,28 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds ~lookup =
+  let input ~proofs_verified ~wrap_rounds ~uses_lookup =
     let open Types.Step.Statement in
-    let spec = spec proofs_verified wrap_rounds lookup in
+    let lookup :
+        ( Challenge.Constant.t
+        , Impl.Field.t
+        , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
+        , Other_field.t Pickles_types.Shifted_value.Type2.t )
+        Types.Wrap.Lookup_parameters.t =
+      { use = uses_lookup
+      ; zero =
+          { value =
+              { challenge = Limb_vector.Challenge.Constant.zero
+              ; scalar = Shifted_value Other_field.Constant.zero
+              }
+          ; var =
+              { challenge = Field.zero
+              ; scalar = Shifted_value (Field.zero, Boolean.false_)
+              }
+          }
+      }
+    in
+    let spec = spec (module Impl) proofs_verified wrap_rounds lookup in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
@@ -232,8 +251,25 @@ module Wrap = struct
     let to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
-  let input ~lookup =
-    let fp : ('a, Other_field.Constant.t) Typ.t = Other_field.typ_unchecked in
+  let input () =
+    let lookup =
+      { Types.Wrap.Lookup_parameters.use = No
+      ; zero =
+          { value =
+              { challenge = Limb_vector.Challenge.Constant.zero
+              ; scalar =
+                  Shifted_value.Type1.Shifted_value Other_field.Constant.zero
+              }
+          ; var =
+              { challenge = Impl.Field.zero
+              ; scalar = Shifted_value.Type1.Shifted_value Impl.Field.zero
+              }
+          }
+      }
+    in
+    let fp : (Impl.Field.t, Other_field.Constant.t) Typ.t =
+      Other_field.typ_unchecked
+    in
     let open Types.Wrap.Statement in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
@@ -244,7 +280,7 @@ module Wrap = struct
                Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
-        (In_circuit.spec lookup)
+        (In_circuit.spec (module Impl) lookup)
     in
     let typ =
       Typ.transport typ
