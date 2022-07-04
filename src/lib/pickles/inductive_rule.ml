@@ -103,6 +103,7 @@ type ( 'prev_vars
   ; main :
          ('prev_vars, 'a_var) main_input
       -> ('prev_vars, 'ret_var, 'auxiliary_var) main_return
+  ; uses_lookup : bool
   }
 
 module T
