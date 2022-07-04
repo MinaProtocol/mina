@@ -29,17 +29,17 @@ module Get_transactions_by_hash =
         fee @ppxCustom(module: "Scalars.UInt64")
         kind
         feeToken @ppxCustom(module: "Decoders.Token_s")
-        validUntil @ppxCustom(module: "Scalars.UInt32")
+        validUntil
         memo
         feePayer {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         nonce
         receiver {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         source {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         token  @ppxCustom(module: "Decoders.Token_s")
       }
@@ -58,7 +58,7 @@ module All = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql: unit -> ('gql, Errors.t) M.t
-        ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
+       ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
 
     (* The real environment does things asynchronously *)

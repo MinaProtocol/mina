@@ -262,9 +262,9 @@ module Node = struct
           sequenceEvents
           zkappState
           zkappUri
-          timing { cliffTime
+          timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
                    cliffAmount
-                   vestingPeriod
+                   vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
                    vestingIncrement
                    initialMinimumBalance
                  }
