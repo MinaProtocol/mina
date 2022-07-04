@@ -498,6 +498,25 @@ struct
       let module V = H4.To_vector (Int) in
       V.f prev_varss_length (M.f choices)
     in
+    let step_uses_lookup =
+      let rec go :
+          type a b c d. (a, b, c, d) H4.T(IR).t -> Plonk_types.Opt.Flag.t =
+       fun rules ->
+        match rules with
+        | [] ->
+            No
+        | r :: rules -> (
+            let rest_usage = go rules in
+            match (r.uses_lookup, rest_usage) with
+            | true, Yes ->
+                Yes
+            | false, No ->
+                No
+            | _, Maybe | true, No | false, Yes ->
+                Maybe )
+      in
+      go choices
+    in
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
@@ -510,7 +529,7 @@ struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:!i
+                    Step_branch_data.create ~index:!i ~step_uses_lookup
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                       Arg_var.to_field_elements Arg_value.to_field_elements rule
@@ -544,7 +563,8 @@ struct
           (struct
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n
+                ~wrap_rounds:Tock.Rounds.n ~uses_lookup:Maybe
+            (* TODO *)
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, _conv, conv_inv)) = etyp in
@@ -732,6 +752,7 @@ struct
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
             ~public_input ~auxiliary_typ
+            ~uses_lookup:(if b.rule.uses_lookup then Yes else No)
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index prev_values prev_proofs
         in
@@ -822,6 +843,7 @@ struct
       ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
       ; wrap_domains
       ; step_domains
+      ; step_uses_lookup
       }
     in
     Timer.clock __LOC__ ;
@@ -853,11 +875,12 @@ module Side_loaded = struct
 
   let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
-  let create ~name ~max_proofs_verified ~typ =
+  let create ~name ~max_proofs_verified ~uses_lookup ~typ =
     Types_map.add_side_loaded ~name
       { max_proofs_verified
       ; public_input = typ
       ; branches = Verification_key.Max_branches.n
+      ; step_uses_lookup = uses_lookup
       }
 
   module Proof = struct
@@ -1204,6 +1227,7 @@ let%test_module "test no side-loaded" =
               ~choices:(fun ~self ->
                 [ { identifier = "main"
                   ; prevs = []
+                  ; uses_lookup = false
                   ; main =
                       (fun { previous_public_inputs = []; public_input = self } ->
                         dummy_constraints () ;
@@ -1266,6 +1290,7 @@ let%test_module "test no side-loaded" =
               ~choices:(fun ~self ->
                 [ { identifier = "main"
                   ; prevs = []
+                  ; uses_lookup = false
                   ; main =
                       (fun _ ->
                         dummy_constraints () ;
@@ -1318,6 +1343,7 @@ let%test_module "test no side-loaded" =
               ~choices:(fun ~self ->
                 [ { identifier = "main"
                   ; prevs = [ self ]
+                  ; uses_lookup = false
                   ; main =
                       (fun { previous_public_inputs = [ prev ]
                            ; public_input = self
@@ -1384,6 +1410,7 @@ let%test_module "test no side-loaded" =
                 }
               ~choices:(fun ~self ->
                 [ { identifier = "main"
+                  ; uses_lookup = false
                   ; prevs = [ No_recursion.tag; self ]
                   ; main =
                       (fun { previous_public_inputs = [ _; prev ]
@@ -1471,6 +1498,7 @@ let%test_module "test no side-loaded" =
                 }
               ~choices:(fun ~self ->
                 [ { identifier = "main"
+                  ; uses_lookup = false
                   ; prevs = [ No_recursion_return.tag; self ]
                   ; main =
                       (fun { previous_public_inputs = [ _; prev ]
@@ -1564,6 +1592,7 @@ let%test_module "test no side-loaded" =
                 }
               ~choices:(fun ~self ->
                 [ { identifier = "main"
+                  ; uses_lookup = false
                   ; prevs = []
                   ; main =
                       (fun { previous_public_inputs = []; public_input = x } ->
@@ -1628,6 +1657,7 @@ let%test_module "test no side-loaded" =
                 }
               ~choices:(fun ~self ->
                 [ { identifier = "main"
+                  ; uses_lookup = false
                   ; prevs = []
                   ; main =
                       (fun { previous_public_inputs = []; public_input = input } ->

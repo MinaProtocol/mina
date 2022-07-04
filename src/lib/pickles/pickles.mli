@@ -201,6 +201,7 @@ module Side_loaded : sig
   val create :
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
+    -> uses_lookup:Plonk_types.Opt.Flag.t
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
