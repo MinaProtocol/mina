@@ -115,11 +115,12 @@ module Opt = struct
            | Maybe (b, x) ->
                (b, x)
            | None | Some _ ->
-               failwith "Opt.some_typ: expected Maybe" )
+               failwith "Opt.maybe_typ: expected Maybe" )
          ~back:(fun (b, x) -> Maybe (b, x))
 
-  let constant_layout_typ (type a a_var f) (bool_typ : _ Typ.t) (flag : Flag.t)
-      (a_typ : (a_var, a, f) Typ.t) ~(dummy : a) =
+  let constant_layout_typ (type a a_var f) (bool_typ : _ Typ.t) ~true_ ~false_
+      (flag : Flag.t) (a_typ : (a_var, a, f) Typ.t) ~(dummy : a)
+      ~(dummy_var : a_var) =
     let (Typ bool_typ) = bool_typ in
     let bool_typ : _ Typ.t =
       let check =
@@ -142,8 +143,10 @@ module Opt = struct
            match t with
            | Maybe (b, x) ->
                (b, x)
-           | None | Some _ ->
-               failwith "Opt.some_typ: expected Maybe" )
+           | None ->
+               (false_, dummy_var)
+           | Some x ->
+               (true_, x) )
          ~back:(fun (b, x) ->
            match flag with No -> None | Yes -> Some x | Maybe -> Maybe (b, x) )
 
@@ -250,13 +253,6 @@ module Evals = struct
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
-
-    module Flag = struct
-      type 'total_evaluations_length t =
-        | No : Nat.N24.n t
-        | Yes : Nat.N31.n t
-        | Maybe : Nat.N31.n t
-    end
 
     let opt_typ impl ({ lookup; runtime } : Lookup_config.t) ~dummy:z elt =
       Opt.typ impl lookup
@@ -679,13 +675,6 @@ module Messages = struct
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
-
-    module Flag = struct
-      type 'total_evaluations_length t =
-        | No : Nat.N24.n t
-        | Yes : Nat.N31.n t
-        | Maybe : Nat.N31.n t
-    end
 
     let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime : Opt.Flag.t) ~dummy:z
         elt =
