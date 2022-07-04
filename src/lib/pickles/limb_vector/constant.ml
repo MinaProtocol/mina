@@ -99,5 +99,5 @@ module Make (N : Vector.Nat_intf) = struct
 
   let dummy : t = Vector.init N.n ~f:(fun _ -> Int64.one)
 
-  let zero : t = Vector.init N.n ~f:(fun _ -> Int64.one)
+  let zero : t = Vector.init N.n ~f:(fun _ -> Int64.zero)
 end
