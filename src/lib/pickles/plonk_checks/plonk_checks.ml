@@ -78,7 +78,7 @@ let actual_evaluation (type f) (module Field : Field_intf with type t = f)
   | e :: es ->
       List.fold ~init:e es ~f:(fun acc fx -> Field.(fx + (pt_n * acc)))
   | [] ->
-      failwith "empty list"
+      Field.of_int 0
 
 let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
     =
@@ -217,6 +217,114 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
 (see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
 let perm_alpha0 : int = 21
 
+let tick_lookup_constant_term_part (type a)
+    ({ add = ( + )
+     ; sub = ( - )
+     ; mul = ( * )
+     ; square = _
+     ; mds = _
+     ; endo_coefficient = _
+     ; pow
+     ; var
+     ; field
+     ; cell
+     ; alpha_pow
+     ; double = _
+     ; zk_polynomial = _
+     ; omega_to_minus_3 = _
+     ; zeta_to_n_minus_1 = _
+     ; srs_length_log2 = _
+     ; vanishes_on_last_4_rows
+     ; joint_combiner
+     ; beta
+     ; gamma
+     ; unnormalized_lagrange_basis
+     } :
+      a Scalars.Env.t ) =
+  alpha_pow 24
+  * ( vanishes_on_last_4_rows
+    * ( cell (var (LookupAggreg, Next))
+        * ( ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupSorted 0, Curr))
+            + (beta * cell (var (LookupSorted 0, Next))) )
+          * ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupSorted 1, Next))
+            + (beta * cell (var (LookupSorted 1, Curr))) )
+          * ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupSorted 2, Curr))
+            + (beta * cell (var (LookupSorted 2, Next))) )
+          * ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupSorted 3, Next))
+            + (beta * cell (var (LookupSorted 3, Curr))) ) )
+      - cell (var (LookupAggreg, Curr))
+        * ( ( gamma
+            + pow (joint_combiner, 2)
+              * field
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+          * ( gamma
+            + pow (joint_combiner, 2)
+              * field
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+          * ( gamma
+            + pow (joint_combiner, 2)
+              * field
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+          * pow
+              ( field
+                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                + beta
+              , 3 )
+          * ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupTable, Curr))
+            + (beta * cell (var (LookupTable, Next))) ) ) ) )
+  + alpha_pow 25
+    * ( unnormalized_lagrange_basis 0
+      * ( cell (var (LookupAggreg, Curr))
+        - field
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+        ) )
+  + alpha_pow 26
+    * ( unnormalized_lagrange_basis (-4)
+      * ( cell (var (LookupAggreg, Curr))
+        - field
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+        ) )
+  + alpha_pow 27
+    * ( unnormalized_lagrange_basis (-4)
+      * (cell (var (LookupSorted 0, Curr)) - cell (var (LookupSorted 1, Curr)))
+      )
+  + alpha_pow 28
+    * ( unnormalized_lagrange_basis 0
+      * (cell (var (LookupSorted 1, Curr)) - cell (var (LookupSorted 2, Curr)))
+      )
+  + alpha_pow 29
+    * ( unnormalized_lagrange_basis (-4)
+      * (cell (var (LookupSorted 2, Curr)) - cell (var (LookupSorted 3, Curr)))
+      )
+
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta. 
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
@@ -224,7 +332,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
       ~(env : t Scalars.Env.t)
       ({ alpha = _; beta; gamma; zeta; joint_combiner = _ } : _ Minimal.t)
-      (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
+      (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0
+      ~(lookup_constant_term_part : (F.t Scalars.Env.t -> F.t) option) =
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in
     let e1 field = snd (field e) in
@@ -260,7 +369,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     in
     let denominator = (zeta - env.omega_to_minus_3) * (zeta - one) in
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
-    let constant_term = Sc.constant_term env in
+    let constant_term =
+      let c = Sc.constant_term env in
+      Option.value_map lookup_constant_term_part ~default:c ~f:(fun x ->
+          c + x env )
+    in
     ft_eval0 - constant_term
 
   (** Computes the list of scalars used in the linearization. *)
