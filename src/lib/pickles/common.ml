@@ -87,7 +87,7 @@ module Shifts = struct
     Shifted_value.Type2.Shift.create (module Tick.Field)
 end
 
-module Lookup_config = struct
+module Lookup_parameters = struct
   let tick_zero : _ Composition_types.Zero_values.t =
     { value =
         { challenge = Challenge.Constant.zero
@@ -114,7 +114,7 @@ module Lookup_config = struct
         }
     }
 
-  let tick ~lookup:flag : _ Composition_types.Wrap.Lookup_config.t =
+  let tick ~lookup:flag : _ Composition_types.Wrap.Lookup_parameters.t =
     { use = No; zero = tick_zero }
 end
 
@@ -198,9 +198,9 @@ module Ipa = struct
   end
 end
 
-let tock_unpadded_public_input_of_statement prev_statement ~lookup =
+let tock_unpadded_public_input_of_statement prev_statement =
   let input =
-    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input ~lookup in
+    let (T (typ, _conv, _conv_inv)) = Impls.Wrap.input () in
     Impls.Wrap.generate_public_input [ typ ] prev_statement
   in
   List.init
@@ -209,12 +209,12 @@ let tock_unpadded_public_input_of_statement prev_statement ~lookup =
 
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_proofs_verified ~lookup
+let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n ~lookup
+        ~wrap_rounds:Tock.Rounds.n ~uses_lookup
     in
     Impls.Step.generate_public_input [ input ] prev_statement
   in
