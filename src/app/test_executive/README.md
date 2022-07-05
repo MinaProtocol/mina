@@ -130,8 +130,6 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
 
 # Debugging Tests
 
-[test bad link](https://asdfasfdasfasfasdfasdfasdf.com)
-
 <!-- - how to process test executive logs
     - logproc examples -->
 - make sure to use the `--debug` flag so that the testnet doesn't automatically self-teardown after the test run
