@@ -6,6 +6,8 @@ type t =
   , Parties.Digest.Forest.t )
   Parties.Call_forest.t
 
+type party = (Party.t, Parties.Digest.Party.t) With_hash.t
+
 let empty () = []
 
 let if_ = Parties.value_if

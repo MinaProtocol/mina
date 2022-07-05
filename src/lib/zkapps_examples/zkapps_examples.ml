@@ -389,7 +389,8 @@ module Party_under_construction = struct
     let set_full_state app_state (t : t) =
       { t with update = Update.set_full_state app_state t.update }
 
-    let call (t : t) call_data = { t with rev_calls = call_data :: t.rev_calls }
+    let call party calls (t : t) =
+      { t with rev_calls = (party, calls) :: t.rev_calls }
 
     let set_call_data call_data (t : t) = { t with call_data = Some call_data }
   end
