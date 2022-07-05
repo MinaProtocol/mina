@@ -43,7 +43,7 @@ labels.
 
 ## Pull Requests
 
-Our branching workflow is [documented on the wiki](https://www.notion.so/minaprotocol/Compatible-vs-Develop-branch-management-31c845b2924b4c518740eb9da4514dcc).
+Our branching workflow is [documented on the wiki](https://minaprotocol.notion.site/minaprotocol/Compatible-vs-Develop-branch-management-31c845b2924b4c518740eb9da4514dcc).
 
 All pull requests go through Buildkite CI, which makes sure the code doesn't need to
 be reformatted, builds Mina in its various configurations, and runs all the
@@ -59,8 +59,8 @@ source code they touch. See the [CODEOWNERS](./CODEOWNERS) file to
 find out who they are.
 
 Maintainers should assign reviewers to pull requests, and tag them with any
-relevant labels. You can skip this step by asking reviewers directly
-in the #review-requests channel on slack, if you have access.
+relevant labels. If you happen to have access to the development slack,
+you can skip this step by asking reviewers directly in the #review-requests channel.
 
 If you are PRing from the main remote, add `ci-build-me` label when you want to run CI. If you are PRing from a fork, ask a core contributor to `!ci-build-me` when you're ready for CI to run. Note: You will need the `!ci-build-me` comment for each and every run of CI.
 
