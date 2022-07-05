@@ -72,8 +72,7 @@ struct
          , ret_value )
          Inductive_rule.public_input )
       ~(auxiliary_typ : (auxiliary_var, auxiliary_value) Impls.Step.Typ.t) pk
-      self_dlog_vk (prev_values : prev_values H1.T(Id).t)
-      (prev_proofs : (local_widths, local_widths) H2.T(P).t) :
+      self_dlog_vk :
       ( ( value
         , (_, Max_proofs_verified.n) Vector.t
         , (_, prevs_length) Vector.t
@@ -469,20 +468,22 @@ struct
     let statements_with_hashes = ref None in
     let x_hats = ref None in
     let witnesses = ref None in
+    let prev_proofs = ref None in
     let return_value = ref None in
     let auxiliary_value = ref None in
-    let compute_prev_proof_parts inners_must_verify =
+    let compute_prev_proof_parts prev_proof_requests =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
           , x_hats'
-          , witnesses' ) =
+          , witnesses'
+          , prev_proofs' ) =
         let rec go :
             type vars values ns ms k.
-               values H1.T(Id).t
-            -> (ns, ns) H2.T(Proof).t
-            -> (vars, values, ns, ms) H4.T(Tag).t
-            -> values H1.T(E01(Bool)).t
+               (vars, values, ns, ms) H4.T(Tag).t
+            -> ( values
+               , ns )
+               H2.T(Inductive_rule.Previous_proof_statement.Constant).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t
@@ -491,15 +492,18 @@ struct
                * ( values
                  , ns
                  , ms )
-                 H3.T(Per_proof_witness.Constant.No_app_state).t =
-         fun app_states ps ts must_verifys l ->
-          match (app_states, ps, ts, must_verifys, l) with
-          | [], [], [], [], Z ->
-              ([], [], [], [], [])
-          | ( app_state :: app_states
-            , p :: ps
-            , t :: ts
-            , must_verify :: must_verifys
+                 H3.T(Per_proof_witness.Constant.No_app_state).t
+               * (ns, ns) H2.T(Proof).t =
+         fun ts prev_proof_stmts l ->
+          match (ts, prev_proof_stmts, l) with
+          | [], [], Z ->
+              ([], [], [], [], [], [])
+          | ( t :: ts
+            , { public_input = app_state
+              ; proof = p
+              ; proof_must_verify = must_verify
+              }
+              :: prev_proof_stmts
             , S l ) ->
               let dlog_vk, dlog_index =
                 if Type_equal.Id.same self.Tag.id t.id then
@@ -510,21 +514,21 @@ struct
               in
               let `Sg sg, u, s, x, w =
                 expand_proof dlog_vk dlog_index app_state p t ~must_verify
-              and sgs, us, ss, xs, ws = go app_states ps ts must_verifys l in
-              (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
-          | _ :: _, [], _, _, _ ->
+              and sgs, us, ss, xs, ws, ps = go ts prev_proof_stmts l in
+              (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws, p :: ps)
+          | _, _ :: _, _ ->
               .
-          | [], _ :: _, _, _, _ ->
+          | _, [], _ ->
               .
         in
-        go prev_values prev_proofs branch_data.rule.prevs inners_must_verify
-          prev_vars_length
+        go branch_data.rule.prevs prev_proof_requests prev_vars_length
       in
       challenge_polynomial_commitments := Some challenge_polynomial_commitments' ;
       unfinalized_proofs := Some unfinalized_proofs' ;
       statements_with_hashes := Some statements_with_hashes' ;
       x_hats := Some x_hats' ;
-      witnesses := Some witnesses'
+      witnesses := Some witnesses' ;
+      prev_proofs := Some prev_proofs'
     in
     let unfinalized_proofs_extended =
       lazy
@@ -555,7 +559,9 @@ struct
         | t :: prevs, _ :: tags, S len ->
             Extract.f t :: go prevs tags len
       in
-      go prev_proofs branch_data.rule.prevs prev_values_length
+      go
+        (Option.value_exn !prev_proofs)
+        branch_data.rule.prevs prev_values_length
     in
     let next_statement_me_only : _ Reduced_me_only.Step.t Lazy.t =
       lazy
@@ -626,11 +632,9 @@ struct
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
       match request with
-      | Req.Compute_prev_proof_parts inners_must_verify ->
-          compute_prev_proof_parts inners_must_verify ;
+      | Req.Compute_prev_proof_parts prev_proof_requests ->
+          compute_prev_proof_parts prev_proof_requests ;
           k ()
-      | Req.Prev_inputs ->
-          k prev_values
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
@@ -718,7 +722,7 @@ struct
         | T t :: tl ->
             t.statement.proof_state.me_only :: go tl
       in
-      go prev_proofs
+      go (Option.value_exn !prev_proofs)
     in
     let next_statement : _ Types.Step.Statement.t =
       { proof_state =

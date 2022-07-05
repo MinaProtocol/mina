@@ -221,7 +221,7 @@ val check_commands :
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
      Deferred.Or_error.t
 
-(** account ids created in the latest block, taken from the previous_empty_accounts
+(** account ids created in the latest block, taken from the new_accounts
     in the latest and next-to-latest trees of the scan state
 *)
 val latest_block_accounts_created :

@@ -3,18 +3,13 @@
  (name integration_test_cloud_engine)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../../graphql_schema.json)
+ (preprocessor_deps ../../graphql-ppx-config.inc ../../../graphql_schema.json)
  (preprocess (pps
                ppx_coda ppx_version ppx_let ppx_inline_test ppx_pipebang
                ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving
                ppx_sexp_conv
-               ; GraphQL with config
-               graphql_ppx --
-               -extend-query Graphql_lib.Serializing.ExtendQuery
-               -extend-mutation Graphql_lib.Serializing.ExtendQuery
-               -future-added-value false
-               ))
- (libraries
+               graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
+(libraries
    ;; opam libraries
    async_unix
    async_kernel
@@ -53,6 +48,6 @@
    data_hash_lib
    generated_graphql_queries
    integers
-
+   mina_graphql
    )
 )

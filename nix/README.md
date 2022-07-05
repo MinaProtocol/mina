@@ -35,8 +35,7 @@ mkdir -p "${XDG_CONFIG_HOME-${HOME}/.config}/nix"
 echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-${HOME}/.config}/nix/nix.conf"
 ```
 
-You can check that your flake support is working by running `nix flake
-metadata github:nixos/nixpkgs` for example.
+You can check that your flake support is working by running `nix flake metadata github:nixos/nixpkgs` for example.
 
 ## 3. Add a nix registry entry
 
@@ -77,12 +76,12 @@ dependencies, including OCaml, Rust and Go ones available, so the only
 thing you have to do is run `dune build src/app/cli/src/mina.exe`. You
 can also just run `eval "$buildPhase"` to run the same command as
 would be run inside the nix sandbox. Note that `opam` will **not** be available in that shell, since Nix takes over the job of computing and installing dependencies. If you need to modify the opam switch, use the impure build (next section).
+
 ### "Impure" build
 
 You can also use Nix to only fetch the "system" (native) dependencies of
 Mina, and let `opam`, `cargo` and `go` figure out the relevant
-language-specific dependencies. To do so, run `nix-shell` (or `nix
-develop mina#impure` if you have flakes).
+language-specific dependencies. To do so, run `nix-shell` (or `nix develop mina#impure` if you have flakes).
 
 It will drop you in a shell with all the relevant libraries and
 binaries available, and show you the instructions for building Mina.
@@ -91,16 +90,63 @@ binaries available, and show you the instructions for building Mina.
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we
 can use its result to produce other useful artifacts with Nix. For
-example, you can build a slim docker image. Run `nix-build
-packages.x86_64-linux.mina-docker` (or `nix build mina#mina-docker` if
+example, you can build a slim docker image. Run `nix-build packages.x86_64-linux.mina-docker` (or `nix build mina#mina-docker` if
 you're using flakes). You will get a `result` symlink in the current
 directory, which links to a tarball containing the docker image. You
 can load the image using `docker load -i result`, then note the tag it
-outputs. You can then run Mina from this docker image with `docker run
-mina:<tag> mina.exe <args>`.
+outputs. You can then run Mina from this docker image with `docker run mina:<tag> mina.exe <args>`.
 
+### direnv
+
+It is considered as a good practice to automatically enter the Nix shell instead of keeping in mind that you need to execute the `nix develop mina` command every time you enter the Mina repo directory.  
+One way to do this is by using [`direnv`](https://direnv.net) + [`nix-direnv`](https://github.com/nix-community/nix-direnv)
+
+#### How-To
+
+- Install the `direnv` and add hook into your shell:
+  - [Installation](https://direnv.net/docs/installation.html)
+  - [Configuration](https://direnv.net/docs/hook.html)
+- Reload your shell
+- Configure the [`nix-direnv`](https://github.com/nix-community/nix-direnv)
+  - The `Via home-manager (Recommended)` section
+- Create the `.envrc` file under the Mina repo root path with the following content: `use nix` or `use flake mina`:
+  ```
+  cd mina
+  touch .envrc && echo "use flake mina" >> .envrc
+  ```
+- Execute the following command within the Mina repo root path, in order to activate the `direnv` for current directory (it will read and apply previously created `.envrc` configuration file):
+
+  ```
+  direnv allow
+  ```
+
+- _Optional_: Reload your shell
+- Now you will enter the Nix shell automatically should you `cd` into the Mina repo root path.
+- To build Mina, you can use all the same techniques as from within the `nix develop` shell mentioned above. For example, try `dune build src/app/cli/src/mina.exe`, or `eval "$buildPhase"`.  
+  Please note though that `make` targets invocation won't work as usual, that is why it is preferably to use `Dune`.
+
+#### Check the shell
+
+`direnv` will tell you which variables it added to your shell every time you enter the subject directory.
+
+In addition to that you can:
+
+- Check if `direnv` loaded the configuration for particular directory by invoking the `direnv status` command within subject directory.
+- Check the `IN_NIX_SHELL` environment variable value:
+  ```
+  echo ${IN_NIX_SHELL}
+  ```
+  - Where an empty string means that the Nix shell was not entered.
+
+#### CLI prompt info
+
+- In addition you might want to update your CLI prompt environment information to automatically inform you if you've entered the Nix shell.
+  - [Example](https://gist.github.com/chisui/0d12bd51a5fd8e6bb52e6e6a43d31d5e)
+    - `prompt_nix_shell` method.
+    - <img width="335" alt="CLI Prompt info" src="https://user-images.githubusercontent.com/4096154/175948252-aa41dc36-9d98-4986-878a-da5ed8d850dd.png">
 
 ## Miscellaneous
+
 ### Contributing to Nix expressions
 
 You probably want to [enable flakes](#2-enable-flakes-optional-but-recommended) if you plan
@@ -114,9 +160,7 @@ compatibility with pre-flake Nix.
 
 ### Updating inputs
 
-If you wish to update all the inputs of this flake, run `nix flake
-update` . If you want to update a particular input, run `nix flake lock
---update-input <input>` .
+If you wish to update all the inputs of this flake, run `nix flake update` . If you want to update a particular input, run `nix flake lock --update-input <input>` .
 
 ### Notes on the "pure" build
 
@@ -132,7 +176,6 @@ provided to the final Mina derivation. See [./ocaml.nix](./ocaml.nix)
 for more details.
 
 ## Troubleshooting
-
 
 ### Submodules
 
@@ -173,4 +216,16 @@ You can fix this by setting `GIT_LFS_SKIP_SMUDGE=1` env variable, e.g. by runnin
 ```
 export GIT_LFS_SKIP_SMUDGE=1
 ```
+
 Before running any `nix` commands.
+
+### Warning: ignoring untrusted substituter
+
+Update your `/etc/nix/nix.conf` with the following content (concatenating new values with possibly already existing):
+
+```
+trusted-substituters = "https://storage.googleapis.com/mina-nix-cache"
+trusted-public-keys = "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4= nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+```
+
+And then reload your `nix-daemon` service.

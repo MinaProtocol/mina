@@ -10,9 +10,9 @@ roots: [
   "cohttp-async.5.0.0"
   "core_extended.v0.14.0"
   "extlib.1.7.8"
-  "graphql-async.0.9.0"
-  "graphql-cohttp.0.12.1"
-  "graphql-lwt.0.9.0"
+  "graphql-async.0.13.0"
+  "graphql-cohttp.0.13.0"
+  "graphql-lwt.0.13.0"
   "graphql_ppx.1.2.2"
   "js_of_ocaml.4.0.0"
   "js_of_ocaml-ppx.4.0.0"
@@ -95,7 +95,7 @@ installed: [
   "digestif.0.9.0"
   "domain-name.0.3.0"
   "dot-merlin-reader.4.2"
-  "dune.3.2.0"
+  "dune.3.3.1"
   "dune-build-info.3.1.1"
   "dune-configurator.2.8.2"
   "dune-private-libs.2.6.2"
@@ -107,10 +107,10 @@ installed: [
   "fix.20201120"
   "fmt.0.8.6"
   "fpath.0.7.3"
-  "graphql.0.9.0"
-  "graphql-async.0.9.0"
-  "graphql-cohttp.0.12.1"
-  "graphql-lwt.0.9.0"
+  "graphql.0.13.0"
+  "graphql-async.0.13.0"
+  "graphql-cohttp.0.13.0"
+  "graphql-lwt.0.13.0"
   "graphql_parser.0.12.2"
   "graphql_ppx.1.2.2"
   "incremental.v0.14.0"
@@ -266,9 +266,9 @@ package "graphql_ppx" {
     ["dune" "build" "-p" name "-j" jobs]
     ["dune" "runtest" "-p" name "-j" jobs] {with-test}
   ]
-  dev-repo: "git+https://github.com/reasonml-community/graphql-ppx.git"
+  dev-repo: "git+https://github.com/o1-labs/graphql_ppx.git"
   url {
-    src: "https://github.com/reasonml-community/graphql-ppx/archive/eb8648d1552fbc11989b9197ef41a7a958b2545f.tar.gz"
-    checksum: "sha256=f2aa35f1de4a9c7ef6fac9766a72e2d8bd112036fcf23c3e0906e74d5eb4be7b"
+    src: "https://github.com/o1-labs/graphql_ppx/archive/f3ba4f7622240a2299f622b0c1d910f734579c25.tar.gz"
+         checksum: "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
   }
 }

@@ -193,33 +193,6 @@ let step_main :
         Per_proof_witness.Constant.No_app_state.t )
       Typ.t
   end in
-  let prev_values_typs =
-    let rec join :
-        type pvars pvals ns1 ns2.
-        (pvars, pvals, ns1, ns2) H4.T(Tag).t -> (pvars, pvals) H2.T(Typ).t =
-      function
-      | [] ->
-          []
-      | d :: ds ->
-          let typ =
-            (fun (type var value n m) (d : (var, value, n, m) Tag.t) ->
-              let typ : (var, value) Typ.t =
-                match Type_equal.Id.same_witness self.id d.id with
-                | Some T ->
-                    basic.public_input
-                | None ->
-                    Types_map.public_input d
-              in
-              typ )
-              d
-          in
-          let typs_tl = join ds in
-          typ :: typs_tl
-    in
-    let module Mk_typ = H2.Typ (Impls.Step) in
-    let typs = join rule.prevs in
-    Mk_typ.f typs
-  in
   let uses_lookup (d : _ Tag.t) =
     if Type_equal.Id.same self.id d.id then basic.step_uses_lookup
     else Types_map.uses_lookup d
@@ -297,21 +270,14 @@ let step_main :
                                          )
         in
         let T = Max_proofs_verified.eq in
-        let prev_statements =
-          exists prev_values_typs ~request:(fun () -> Req.Prev_inputs)
-        in
         let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-        let { Inductive_rule.previous_proofs_should_verify =
-                proofs_should_verify
+        let { Inductive_rule.previous_proof_statements
             ; public_output = ret_var
             ; auxiliary_output = auxiliary_var
             } =
           (* Run the application logic of the rule on the predecessor statements *)
           with_label "rule_main" (fun () ->
-              rule.main
-                { previous_public_inputs = prev_statements
-                ; public_input = app_state
-                } )
+              rule.main { public_input = app_state } )
         in
         let () =
           exists Typ.unit ~request:(fun () ->
@@ -328,22 +294,45 @@ let step_main :
         (* Compute proof parts outside of the prover before requesting values.
         *)
         exists Typ.unit ~request:(fun () ->
-            let inners_must_verify =
+            let previous_proof_statements =
               let rec go :
                   type prev_vars prev_values ns1 ns2.
-                     prev_vars H1.T(E01(B)).t
+                     ( prev_vars
+                     , ns1 )
+                     H2.T(Inductive_rule.Previous_proof_statement).t
                   -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
-                  -> prev_values H1.T(E01(Bool)).t =
-               fun bs tags ->
-                match (bs, tags) with
+                  -> ( prev_values
+                     , ns1 )
+                     H2.T(Inductive_rule.Previous_proof_statement.Constant).t =
+               fun previous_proof_statement tags ->
+                match (previous_proof_statement, tags) with
                 | [], [] ->
                     []
-                | b :: bs, _tag :: tags ->
-                    As_prover.read Boolean.typ b :: go bs tags
+                | ( { public_input; proof; proof_must_verify } :: stmts
+                  , tag :: tags ) ->
+                    let public_input =
+                      (fun (type var value n m) (tag : (var, value, n, m) Tag.t)
+                           (var : var) : value ->
+                        let typ : (var, value) Typ.t =
+                          match Type_equal.Id.same_witness self.id tag.id with
+                          | Some T ->
+                              basic.public_input
+                          | None ->
+                              Types_map.public_input tag
+                        in
+                        As_prover.read typ var )
+                        tag public_input
+                    in
+                    { public_input
+                    ; proof = As_prover.Ref.get proof
+                    ; proof_must_verify =
+                        As_prover.read Boolean.typ proof_must_verify
+                    }
+                    :: go stmts tags
               in
-              go proofs_should_verify rule.prevs
+              go previous_proof_statements rule.prevs
             in
-            Req.Compute_prev_proof_parts inners_must_verify ) ;
+            Req.Compute_prev_proof_parts previous_proof_statements ) ;
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
@@ -369,16 +358,16 @@ let step_main :
           let rec go :
               type vars ns1 ns2.
                  (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
-              -> vars H1.T(Id).t
+              -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
               -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
-           fun proofs app_states ->
-            match (proofs, app_states) with
+           fun proofs stmts ->
+            match (proofs, stmts) with
             | [], [] ->
                 []
-            | proof :: proofs, app_state :: app_states ->
-                { proof with app_state } :: go proofs app_states
+            | proof :: proofs, stmt :: stmts ->
+                { proof with app_state = stmt.public_input } :: go proofs stmts
           in
-          go prevs prev_statements
+          go prevs previous_proof_statements
         in
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
@@ -388,17 +377,12 @@ let step_main :
                   -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t
                   -> vars H1.T(E01(Unfinalized)).t
-                  -> vars H1.T(E01(B)).t
+                  -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
                   -> (vars, n) Length.t
                   -> (_, n) Vector.t * B.t list =
-               fun proofs datas pass_throughs unfinalizeds should_verifys pi ->
+               fun proofs datas pass_throughs unfinalizeds stmts pi ->
                 match
-                  ( proofs
-                  , datas
-                  , pass_throughs
-                  , unfinalizeds
-                  , should_verifys
-                  , pi )
+                  (proofs, datas, pass_throughs, unfinalizeds, stmts, pi)
                 with
                 | [], [], [], [], [], Z ->
                     ([], [])
@@ -406,14 +390,13 @@ let step_main :
                   , d :: datas
                   , pass_through :: pass_throughs
                   , unfinalized :: unfinalizeds
-                  , should_verify :: should_verifys
+                  , { proof_must_verify = should_verify; _ } :: stmts
                   , S pi ) ->
                     let chals, v =
                       verify_one p d pass_through unfinalized should_verify
                     in
                     let chalss, vs =
-                      go proofs datas pass_throughs unfinalizeds should_verifys
-                        pi
+                      go proofs datas pass_throughs unfinalizeds stmts pi
                     in
                     (chals :: chalss, v :: vs)
               in
@@ -468,7 +451,7 @@ let step_main :
                   M.f rule.prevs
                 in
                 go prevs datas pass_throughs unfinalized_proofs
-                  proofs_should_verify proofs_verified
+                  previous_proof_statements proofs_verified
               in
               Boolean.Assert.all vs ; chalss )
         in
