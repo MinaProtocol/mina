@@ -1,3 +1,4 @@
+open Core_kernel
 open Async_kernel
 open Snark_params.Tick
 open Snark_params.Tick.Run
@@ -176,7 +177,7 @@ module Party_under_construction = struct
           let open Snark_params.Tick in
           let (Typ typ) = typ in
           let fields, aux = typ.value_to_fields x in
-          let fields = Array.map Field.Var.constant fields in
+          let fields = Array.map ~f:Field.Var.constant fields in
           typ.var_of_fields (fields, aux)
         in
         let default =
@@ -242,7 +243,7 @@ module Party_under_construction = struct
           let open Snark_params.Tick in
           let (Typ typ) = typ in
           let fields, aux = typ.value_to_fields x in
-          let fields = Array.map Field.Var.constant fields in
+          let fields = Array.map ~f:Field.Var.constant fields in
           typ.var_of_fields (fields, aux)
         in
         let default =
@@ -292,6 +293,8 @@ module Party_under_construction = struct
       ; token_id : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
+      ; rev_calls :
+          (Zkapp_call_forest.Checked.party * Zkapp_call_forest.Checked.t) list
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default)) ()
@@ -300,6 +303,7 @@ module Party_under_construction = struct
       ; token_id
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
+      ; rev_calls = []
       }
 
     let to_party_and_calls (t : t) :
@@ -310,7 +314,7 @@ module Party_under_construction = struct
         let open Snark_params.Tick in
         let (Typ typ) = typ in
         let fields, aux = typ.value_to_fields x in
-        let fields = Array.map Field.Var.constant fields in
+        let fields = Array.map ~f:Field.Var.constant fields in
         typ.var_of_fields (fields, aux)
       in
       let party : Party.Body.Checked.t =
@@ -361,7 +365,11 @@ module Party_under_construction = struct
         ; caller = t.token_id
         }
       in
-      let calls = exists Zkapp_call_forest.typ ~compute:(fun () -> []) in
+      let calls =
+        List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) t.rev_calls
+          ~f:(fun acc (party, calls) ->
+            Zkapp_call_forest.Checked.push ~party ~calls acc )
+      in
       (party, calls)
 
     let assert_state_unproved (t : t) =
@@ -378,6 +386,8 @@ module Party_under_construction = struct
 
     let set_full_state app_state (t : t) =
       { t with update = Update.set_full_state app_state t.update }
+
+    let call (t : t) call_data = { t with rev_calls = call_data :: t.rev_calls }
   end
 end
 
