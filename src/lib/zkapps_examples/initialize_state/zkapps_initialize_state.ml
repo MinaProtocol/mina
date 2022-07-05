@@ -27,8 +27,11 @@ let initialize public_key =
       let initial_state =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
-      party |> Party_under_construction.In_circuit.assert_state_unproved
-      |> Party_under_construction.In_circuit.set_full_state initial_state )
+      let party =
+        party |> Party_under_construction.In_circuit.assert_state_unproved
+        |> Party_under_construction.In_circuit.set_full_state initial_state
+      in
+      (party, ()) )
 
 type _ Snarky_backendless.Request.t +=
   | New_state : Field.Constant.t list Snarky_backendless.Request.t
@@ -52,8 +55,11 @@ let update_state public_key =
       let new_state =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
       in
-      party |> Party_under_construction.In_circuit.assert_state_proved
-      |> Party_under_construction.In_circuit.set_full_state new_state )
+      let party =
+        party |> Party_under_construction.In_circuit.assert_state_proved
+        |> Party_under_construction.In_circuit.set_full_state new_state
+      in
+      (party, ()) )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize snapp"; prevs = []; main = initialize public_key }

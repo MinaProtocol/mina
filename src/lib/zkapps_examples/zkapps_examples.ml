@@ -295,6 +295,7 @@ module Party_under_construction = struct
       ; update : Update.t
       ; rev_calls :
           (Zkapp_call_forest.Checked.party * Zkapp_call_forest.Checked.t) list
+      ; call_data : Field.t option
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default)) ()
@@ -304,6 +305,7 @@ module Party_under_construction = struct
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
       ; rev_calls = []
+      ; call_data = None
       }
 
     let to_party_and_calls (t : t) :
@@ -326,7 +328,7 @@ module Party_under_construction = struct
         ; increment_nonce = Boolean.false_
         ; events = var_of_t Zkapp_account.Events.typ []
         ; sequence_events = var_of_t Zkapp_account.Events.typ []
-        ; call_data = Field.zero
+        ; call_data = Option.value ~default:Field.zero t.call_data
         ; preconditions =
             { Party.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
@@ -388,6 +390,8 @@ module Party_under_construction = struct
       { t with update = Update.set_full_state app_state t.update }
 
     let call (t : t) call_data = { t with rev_calls = call_data :: t.rev_calls }
+
+    let set_call_data call_data (t : t) = { t with call_data = Some call_data }
   end
 end
 
@@ -451,9 +455,10 @@ open Pickles_types
 open Hlist
 
 let wrap_main f { Pickles.Inductive_rule.public_input = () } =
+  let public_output, auxiliary_output = f () in
   { Pickles.Inductive_rule.previous_proof_statements = []
-  ; public_output = f ()
-  ; auxiliary_output = ()
+  ; public_output
+  ; auxiliary_output
   }
 
 let compile :

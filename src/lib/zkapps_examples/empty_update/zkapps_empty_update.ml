@@ -7,10 +7,13 @@ open Zkapps_examples
 *)
 let main public_key =
   Zkapps_examples.wrap_main (fun () ->
-      Party_under_construction.In_circuit.create
-        ~public_key:(Public_key.Compressed.var_of_t public_key)
-        ~token_id:Token_id.(Checked.constant default)
-        () )
+      let party =
+        Party_under_construction.In_circuit.create
+          ~public_key:(Public_key.Compressed.var_of_t public_key)
+          ~token_id:Token_id.(Checked.constant default)
+          ()
+      in
+      (party, ()) )
 
 let rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Empty update"; prevs = []; main = main public_key }
