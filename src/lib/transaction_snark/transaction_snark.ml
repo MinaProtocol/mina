@@ -905,6 +905,7 @@ module Base = struct
       (fun i ->
         let open Zkapp_statement in
         Pickles.Side_loaded.create ~typ ~name:(sprintf "zkapp_%d" i)
+          ~uses_lookup:Maybe
           ~max_proofs_verified:
             (module Pickles.Side_loaded.Verification_key.Max_width) )
 
@@ -2266,6 +2267,7 @@ module Base = struct
                 ; public_output = ()
                 ; auxiliary_output = ()
                 } )
+          ; uses_lookup = false
           }
       | Opt_signed_opt_signed ->
           { identifier = "opt_signed-opt_signed"
@@ -2280,6 +2282,7 @@ module Base = struct
                 ; public_output = ()
                 ; auxiliary_output = ()
                 } )
+          ; uses_lookup = false
           }
       | Opt_signed ->
           { identifier = "opt_signed"
@@ -2294,6 +2297,7 @@ module Base = struct
                 ; public_output = ()
                 ; auxiliary_output = ()
                 } )
+          ; uses_lookup = false
           }
   end
 
@@ -3096,6 +3100,7 @@ module Base = struct
           ; public_output = ()
           ; auxiliary_output = ()
           } )
+    ; uses_lookup = false
     }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3230,6 +3235,7 @@ module Merge = struct
           ; public_output = ()
           ; auxiliary_output = ()
           } )
+    ; uses_lookup = false
     }
 end
 
@@ -4235,6 +4241,7 @@ module For_tests = struct
               ; public_output = ()
               ; auxiliary_output = ()
               } )
+        ; uses_lookup = false
         }
       in
       Pickles.compile ~cache:Cache_dir.cache
@@ -4281,6 +4288,7 @@ module For_tests = struct
                   ; public_output = ()
                   ; auxiliary_output = ()
                   } )
+            ; uses_lookup = false
             }
           ] )
     in
