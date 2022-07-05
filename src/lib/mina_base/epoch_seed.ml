@@ -12,6 +12,8 @@ end)
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
+  [@@@with_all_version_tags]
+
   module V1 = struct
     module T = struct
       type t = Snark_params.Tick.Field.t
@@ -20,7 +22,7 @@ module Stable = struct
 
     include T
 
-    let to_latest = Core.Fn.id
+    let to_latest = Fn.id
 
     [%%define_from_scope to_yojson, of_yojson]
 
