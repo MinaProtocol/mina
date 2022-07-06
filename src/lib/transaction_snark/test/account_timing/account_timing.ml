@@ -1169,20 +1169,16 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              match
+              let _state_body, state_view =
+                state_body_and_view_at_slot Mina_numbers.Global_slot.(succ zero)
+              in
+              let result =
                 Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
                   ~state_view ledger parties
-              with
-              | Ok _txn_applied ->
-                  failwith "Should have failed with min balance violation"
-              | Error err ->
-                  let err_str = Error.to_string_hum err in
-                  (* error is tagged *)
-                  if
-                    not
-                      (String.is_substring err_str
-                         ~substring:"Source_minimum_balance_violation" )
-                  then failwithf "Unexpected transaction error: %s" err_str () ) )
+              in
+              check_zkapp_failure
+                Transaction_status.Failure.Source_minimum_balance_violation
+                result ) )
 
     let%test_unit "zkApp command, non-negative balance change, min_balance > \
                    balance" =
