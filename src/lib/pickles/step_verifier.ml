@@ -443,6 +443,7 @@ struct
          | `Side_loaded of
            _ Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
          ) ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~sponge_after_index
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
       ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice
@@ -465,13 +466,7 @@ struct
         let absorb_g gs = absorb sponge without gs in
         let index_digest =
           with_label "absorb verifier index" (fun () ->
-              let index_sponge = Sponge.create sponge_params in
-              Array.iter
-                (Types.index_to_field_elements
-                   ~g:(fun (z : Inputs.Inner_curve.t) ->
-                     List.to_array (Inner_curve.to_field_elements z) )
-                   m )
-                ~f:(fun x -> Sponge.absorb index_sponge (`Field x)) ;
+              let index_sponge = Sponge.copy sponge_after_index in
               Sponge.squeeze_field index_sponge )
         in
         absorb sponge Field index_digest ;
@@ -995,19 +990,20 @@ struct
         ]
     , bulletproof_challenges )
 
+  let sponge_after_index index =
+    let sponge = Sponge.create sponge_params in
+    Array.iter
+      (Types.index_to_field_elements
+         ~g:(fun (z : Inputs.Inner_curve.t) ->
+           List.to_array (Inner_curve.to_field_elements z) )
+         index )
+      ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
+    sponge
+
   let hash_me_only (type s) ~index (state_to_field_elements : s -> Field.t array)
       =
     let open Types.Step.Proof_state.Me_only in
-    let after_index =
-      let sponge = Sponge.create sponge_params in
-      Array.iter
-        (Types.index_to_field_elements
-           ~g:(fun (z : Inputs.Inner_curve.t) ->
-             List.to_array (Inner_curve.to_field_elements z) )
-           index )
-        ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
-      sponge
-    in
+    let after_index = sponge_after_index index in
     stage (fun (t : _ Types.Step.Proof_state.Me_only.t) ->
         let sponge = Sponge.copy after_index in
         Array.iter
@@ -1019,64 +1015,56 @@ struct
   let hash_me_only_opt (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
     let open Types.Step.Proof_state.Me_only in
-    let after_index =
-      let sponge = Sponge.create sponge_params in
-      Array.iter
-        (Types.index_to_field_elements
-           ~g:(fun (z : Inputs.Inner_curve.t) ->
-             List.to_array (Inner_curve.to_field_elements z) )
-           index )
-        ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
-      sponge
-    in
-    stage (fun t ~widths ~max_width ~proofs_verified_mask ->
-        let sponge = Sponge.copy after_index in
-        let t =
-          { t with
-            old_bulletproof_challenges =
-              Vector.map2 proofs_verified_mask t.old_bulletproof_challenges
-                ~f:(fun b v -> Vector.map v ~f:(fun x -> `Opt (b, x)))
-          ; challenge_polynomial_commitments =
-              Vector.map2 proofs_verified_mask
-                t.challenge_polynomial_commitments ~f:(fun b g -> (b, g))
-          }
-        in
-        let not_opt x = `Not_opt x in
-        let hash_inputs =
-          to_field_elements_without_index t
-            ~app_state:
-              (Fn.compose (Array.map ~f:not_opt) state_to_field_elements)
-            ~g:(fun (b, g) ->
-              List.map
-                ~f:(fun x -> `Opt (b, x))
-                (Inner_curve.to_field_elements g) )
-        in
-        match
-          Array.fold hash_inputs ~init:(`Not_opt sponge) ~f:(fun acc t ->
-              match (acc, t) with
-              | `Not_opt sponge, `Not_opt t ->
-                  Sponge.absorb sponge (`Field t) ;
-                  acc
-              | `Not_opt sponge, `Opt t ->
-                  let sponge = Opt_sponge.of_sponge sponge in
-                  Opt_sponge.absorb sponge t ; `Opt sponge
-              | `Opt sponge, `Opt t ->
-                  Opt_sponge.absorb sponge t ; acc
-              | `Opt _, `Not_opt _ ->
-                  assert false )
-        with
-        | `Not_opt sponge ->
-            (* This means there were no optional inputs. *)
-            Sponge.squeeze_field sponge
-        | `Opt sponge ->
-            Opt_sponge.squeeze sponge )
+    let after_index = sponge_after_index index in
+    ( after_index
+    , stage (fun t ~widths ~max_width ~proofs_verified_mask ->
+          let sponge = Sponge.copy after_index in
+          let t =
+            { t with
+              old_bulletproof_challenges =
+                Vector.map2 proofs_verified_mask t.old_bulletproof_challenges
+                  ~f:(fun b v -> Vector.map v ~f:(fun x -> `Opt (b, x)))
+            ; challenge_polynomial_commitments =
+                Vector.map2 proofs_verified_mask
+                  t.challenge_polynomial_commitments ~f:(fun b g -> (b, g))
+            }
+          in
+          let not_opt x = `Not_opt x in
+          let hash_inputs =
+            to_field_elements_without_index t
+              ~app_state:
+                (Fn.compose (Array.map ~f:not_opt) state_to_field_elements)
+              ~g:(fun (b, g) ->
+                List.map
+                  ~f:(fun x -> `Opt (b, x))
+                  (Inner_curve.to_field_elements g) )
+          in
+          match
+            Array.fold hash_inputs ~init:(`Not_opt sponge) ~f:(fun acc t ->
+                match (acc, t) with
+                | `Not_opt sponge, `Not_opt t ->
+                    Sponge.absorb sponge (`Field t) ;
+                    acc
+                | `Not_opt sponge, `Opt t ->
+                    let sponge = Opt_sponge.of_sponge sponge in
+                    Opt_sponge.absorb sponge t ; `Opt sponge
+                | `Opt sponge, `Opt t ->
+                    Opt_sponge.absorb sponge t ; acc
+                | `Opt _, `Not_opt _ ->
+                    assert false )
+          with
+          | `Not_opt sponge ->
+              (* This means there were no optional inputs. *)
+              Sponge.squeeze_field sponge
+          | `Opt sponge ->
+              Opt_sponge.squeeze sponge ) )
 
   let accumulation_verifier
       (accumulator_verification_key : _ Types_map.For_step.t) prev_accumulators
       proof new_accumulator : Boolean.var =
     Boolean.false_
 
-  let verify ~proofs_verified ~is_base_case ~sg_old
+  let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
       ~(proof : Wrap_proof.Checked.t) ~wrap_domain ~wrap_verification_key
       statement
       (unfinalized :
@@ -1108,7 +1096,8 @@ struct
     let ( sponge_digest_before_evaluations_actual
         , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
       incrementally_verify_proof proofs_verified ~domain:wrap_domain ~xi
-        ~verification_key:wrap_verification_key ~sponge ~public_input ~sg_old
+        ~verification_key:wrap_verification_key ~sponge ~sponge_after_index
+        ~public_input ~sg_old
         ~advice:{ b; combined_inner_product }
         ~proof ~plonk:unfinalized.deferred_values.plonk
     in
