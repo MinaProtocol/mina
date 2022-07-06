@@ -65,7 +65,7 @@ for i in $(seq 60); do
   sleep 30
 done
 
-cat Dockerfile | docker build --no-cache \
+cat Dockerfile | docker build --no-cache --platform linux/amd64 \
   -t "${hub_baked_tag}" \
   --build-arg "BAKE_VERSION=${DOCKER_TAG}" \
   --build-arg "COMMIT_HASH=${GIT_PATHSPEC}" \
