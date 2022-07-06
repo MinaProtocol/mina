@@ -903,7 +903,8 @@ pub mod to_test {
         let mut srs = SRS::create(n);
         srs.add_lagrange_basis(cs.domain.d1);
         let srs = std::sync::Arc::new(srs);
-        let index = ProverIndex::<Affine>::create(cs, fq_sponge_params, endo_q, srs);
+        let mut index = ProverIndex::<Affine>::create(cs, fq_sponge_params, endo_q, srs);
+        index.compute_verifier_index_digest();
 
         // witness
         let witness = {

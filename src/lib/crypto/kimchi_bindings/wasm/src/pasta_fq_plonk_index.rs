@@ -5,7 +5,12 @@ use crate::srs::fq::WasmFqSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex as DlogIndex;
-use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+use mina_curves::pasta::{
+    fq::Fq,
+    pallas::{Affine as GAffine, PallasParameters},
+    vesta::Affine as GAffineOther,
+};
+use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -74,15 +79,17 @@ pub fn caml_pasta_fq_plonk_index_create(
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
+    let mut index = DlogIndex::<GAffine>::create(
+        cs,
+        oracle::pasta::fp_kimchi::params(),
+        endo_q,
+        srs.0.clone(),
+    );
+    // Compute and cache the verifier index digest
+    index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
+
     // create index
-    Ok(WasmPastaFqPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(
-            cs,
-            oracle::pasta::fp_kimchi::params(),
-            endo_q,
-            srs.0.clone(),
-        ),
-    )))
+    Ok(WasmPastaFqPlonkIndex(Box::new(index)))
 }
 
 #[wasm_bindgen]

@@ -489,11 +489,23 @@ struct
         let sample_scalar () : Scalar_challenge.t =
           Opt.scalar_challenge sponge
         in
+        let index_digest =
+          with_label "absorb verifier index" (fun () ->
+              let index_sponge = Sponge.create sponge_params in
+              Array.iter
+                (Types.index_to_field_elements
+                   ~g:(fun (z : Inputs.Inner_curve.t) ->
+                     List.to_array (Inner_curve.to_field_elements z) )
+                   m )
+                ~f:(fun x -> Sponge.absorb index_sponge x) ;
+              Sponge.squeeze_field index_sponge )
+        in
         let open Plonk_types.Messages in
         let without = Type.Without_degree_bound in
         let absorb_g gs =
           absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
         in
+        absorb sponge Field (Boolean.true_, index_digest) ;
         Vector.iter ~f:(Array.iter ~f:(absorb sponge PC)) sg_old ;
         let x_hat =
           with_label __LOC__ (fun () ->

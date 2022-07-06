@@ -463,6 +463,18 @@ struct
         let open Plonk_types.Messages.In_circuit in
         let without = Type.Without_degree_bound in
         let absorb_g gs = absorb sponge without gs in
+        let index_digest =
+          with_label "absorb verifier index" (fun () ->
+              let index_sponge = Sponge.create sponge_params in
+              Array.iter
+                (Types.index_to_field_elements
+                   ~g:(fun (z : Inputs.Inner_curve.t) ->
+                     List.to_array (Inner_curve.to_field_elements z) )
+                   m )
+                ~f:(fun x -> Sponge.absorb index_sponge (`Field x)) ;
+              Sponge.squeeze_field index_sponge )
+        in
+        absorb sponge Field index_digest ;
         let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
           Wrap_hack.Checked.pad_commitments sg_old
         in
