@@ -1162,7 +1162,7 @@ let%test_module "account timing check" =
             "zkapp command, non-negative balance change, min_balance > balance"
             )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        (gen_timed_and_untimed_accounts ~balance:100_000_000_000_000
+        (gen_timed_account_and_transfer ~balance:100_000_000_000_000
            ~min_balance:200_000_000_000_000 ~amount:100_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
@@ -1192,7 +1192,7 @@ let%test_module "account timing check" =
             "zkapp command, non-negative balance change, min_balance > balance"
             )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        (gen_timed_and_untimed_accounts ~balance:100_000_000_000_000
+        (gen_timed_account_and_transfer ~balance:100_000_000_000_000
            ~min_balance:100_000_000_000_000 ~amount:0 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
@@ -1211,7 +1211,7 @@ let%test_module "account timing check" =
             "zkapp command, non-negative balance change, min_balance < balace"
             )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        (gen_timed_and_untimed_accounts ~balance:200_000_000_000_000
+        (gen_timed_account_and_transfer ~balance:200_000_000_000_000
            ~min_balance:100_000_000_000_000 ~amount:100_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
