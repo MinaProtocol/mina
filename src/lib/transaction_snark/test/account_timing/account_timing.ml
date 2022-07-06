@@ -1093,6 +1093,135 @@ let%test_module "account timing check" =
                               Source_minimum_balance_violation ) )
                   then failwithf "Unexpected transaction error: %s" err_str () ) )
 
+    let gen_timed_account_and_transfer ~balance ~min_balance ~amount =
+      let open Quickcheck.Generator.Let_syntax in
+      let timed =
+        let keypair = List.nth_exn keypairs 0 in
+        let balance = Currency.Balance.of_int balance in
+        let nonce = Mina_numbers.Account_nonce.zero in
+        let (timing : Account_timing.t) =
+          Timed
+            { initial_minimum_balance = Currency.Balance.of_int min_balance
+            ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+            ; cliff_amount = Currency.Amount.of_int 100_000_000_000_000
+            ; vesting_period = Mina_numbers.Global_slot.of_int 1000
+            ; vesting_increment = Currency.Amount.of_int 10
+            }
+        in
+        let balance_as_amount = Currency.Balance.to_amount balance in
+        (keypair, balance_as_amount, nonce, timing)
+      in
+      let untimed =
+        let keypair = List.nth_exn keypairs 1 in
+        let balance = Currency.Balance.of_int 200_000_000_000_000 in
+        let nonce = Mina_numbers.Account_nonce.zero in
+        let balance_as_amount = Currency.Balance.to_amount balance in
+        (keypair, balance_as_amount, nonce, Account_timing.Untimed)
+      in
+      let ledger_init_state = Array.of_list [ untimed; timed ] in
+      let parties_command =
+        let open Mina_base in
+        let fee = Currency.Fee.of_int 1_000_000 in
+        let amount = Currency.Amount.of_int amount in
+        let nonce = Account.Nonce.zero in
+        let memo =
+          Signed_command_memo.create_from_string_exn
+            "zkApp transfer, timed account"
+        in
+        let sender_keypair = List.nth_exn keypairs 0 in
+        let zkapp_keypair = List.nth_exn keypairs 1 in
+        let receiver_key =
+          zkapp_keypair.public_key |> Signature_lib.Public_key.compress
+        in
+        let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+          { sender = (sender_keypair, nonce)
+          ; fee
+          ; fee_payer = None
+          ; receivers = [ (receiver_key, amount) ]
+          ; amount
+          ; zkapp_account_keypairs = []
+          ; memo
+          ; new_zkapp_account = false
+          ; snapp_update = Party.Update.dummy
+          ; current_auth = Permissions.Auth_required.Signature
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; sequence_events = []
+          ; preconditions = None
+          }
+        in
+        Transaction_snark.For_tests.multiple_transfers parties_spec
+      in
+      return (ledger_init_state, parties_command)
+
+    let%test_unit "zkApp command, non-negative balance change, not enough \
+                   balance" =
+      Quickcheck.test
+        ~seed:
+          (`Deterministic
+            "zkapp command, non-negative balance change, min_balance > balance"
+            )
+        ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
+        (gen_timed_and_untimed_accounts ~balance:100_000_000_000_000
+           ~min_balance:200_000_000_000_000 ~amount:100_000_000 )
+        ~f:(fun (ledger_init_state, parties) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              match
+                Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
+                  ~state_view ledger parties
+              with
+              | Ok _txn_applied ->
+                  failwith "Should have failed with min balance violation"
+              | Error err ->
+                  let err_str = Error.to_string_hum err in
+                  (* error is tagged *)
+                  if
+                    not
+                      (String.is_substring err_str
+                         ~substring:"Source_minimum_balance_violation" )
+                  then failwithf "Unexpected transaction error: %s" err_str () ) )
+
+    let%test_unit "zkApp command, non-negative balance change, min_balance > \
+                   balance" =
+      Quickcheck.test
+        ~seed:
+          (`Deterministic
+            "zkapp command, non-negative balance change, min_balance > balance"
+            )
+        ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
+        (gen_timed_and_untimed_accounts ~balance:100_000_000_000_000
+           ~min_balance:100_000_000_000_000 ~amount:0 )
+        ~f:(fun (ledger_init_state, parties) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              apply_zkapp_commands_at_slot ledger
+                Mina_numbers.Global_slot.(succ zero)
+                [ parties ] ) )
+
+    let%test_unit "zkApp command, non-negative balance change, min_balance < \
+                   balance" =
+      Quickcheck.test
+        ~seed:
+          (`Deterministic
+            "zkapp command, non-negative balance change, min_balance < balace"
+            )
+        ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
+        (gen_timed_and_untimed_accounts ~balance:200_000_000_000_000
+           ~min_balance:100_000_000_000_000 ~amount:100_000_000 )
+        ~f:(fun (ledger_init_state, parties) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              apply_zkapp_commands_at_slot ledger
+                Mina_numbers.Global_slot.(succ zero)
+                [ parties ] ) )
+
     let%test_unit "zkApp command, just before cliff time, insufficient balance"
         =
       let gen =
