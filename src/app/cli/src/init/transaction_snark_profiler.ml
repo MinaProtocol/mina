@@ -5,6 +5,12 @@ open Mina_transaction
 
 let name = "transaction-snark-profiler"
 
+let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+let genesis_constants = Genesis_constants.compiled
+
+let proof_level = Genesis_constants.Proof_level.compiled
+
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct
   include Mina_ledger.Sparse_ledger
@@ -111,10 +117,13 @@ let create_ledger_and_zkapps num_transactions :
     let min_max = Mina_generators.Parties_generators.max_other_parties in
     Quickcheck.random_value (Int.gen_incl min_max 20)
   in
+  let `VK vk, `Prover prover =
+    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+  in
   let cmd_infos, ledger =
     Quickcheck.random_value
       (Mina_generators.User_command_generators.sequence_parties_with_ledger
-         ~max_other_parties ~length () )
+         ~max_other_parties ~length ~vk ~prover () )
   in
   let zkapps =
     List.map cmd_infos ~f:(fun (user_cmd, _keypair, _keymap) -> user_cmd)
@@ -249,7 +258,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
   let%map total_time = merge_all base_proof_time base_proofs in
   format_time_span total_time
 
-let profile_zkapps ledger partiess =
+let profile_zkapps ~verifier ledger partiess =
   let open Async.Deferred.Let_syntax in
   let tm0 = Core.Unix.gettimeofday () in
   let%map () =
@@ -258,7 +267,16 @@ let profile_zkapps ledger partiess =
         printf "Processing zkApp %d of %d, other_parties length: %d\n" (ndx + 1)
           num_partiess
           (List.length @@ Parties.other_parties_list parties) ;
+        let%bind res =
+          Verifier.verify_commands verifier
+            [ User_command.to_verifiable ~ledger ~get:Mina_ledger.Ledger.get
+                ~location_of_account:Mina_ledger.Ledger.location_of_account
+                (Parties parties)
+            ]
+        in
+        let _a = Or_error.ok_exn res in
         let tm_zkapp0 = Core.Unix.gettimeofday () in
+        (*verify*)
         let%map () =
           match%map
             Async_kernel.Monitor.try_with (fun () ->
@@ -267,8 +285,9 @@ let profile_zkapps ledger partiess =
           with
           | Ok () ->
               ()
-          | Error _exn ->
+          | Error exn ->
               (* workaround for SNARK failures *)
+              printf !"Error: %s\n%!" (Exn.to_string exn) ;
               printf "zkApp failed, continuing ...\n" ;
               ()
         in
@@ -366,13 +385,19 @@ let generate_base_snarks_witness sparse_ledger0
 
 let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
     use_zkapps : unit Async.Deferred.t =
+  let open Async.Deferred.Let_syntax in
+  let logger = Logger.null () in
+  Parallel.init_master () ;
+  let%bind verifier =
+    Verifier.create ~logger ~proof_level ~constraint_constants ~conf_dir:None
+      ~pids:(Child_processes.Termination.create_pid_table ())
+  in
   if use_zkapps then
     let ledger, transactions = create_ledger_and_zkapps num_transactions in
     let rec go n =
       if n <= 0 then Async.Deferred.unit
       else
-        let open Async.Deferred.Let_syntax in
-        let%bind message = zkapp_profiler ledger transactions in
+        let%bind message = zkapp_profiler ~verifier ledger transactions in
         printf !"[%i] %s\n%!" n message ;
         go (n - 1)
     in
@@ -414,13 +439,15 @@ let main num_transactions repeats preeval use_zkapps () =
         use_zkapps )
 
 let dry num_transactions repeats preeval use_zkapps () =
-  let zkapp_profiler _ _ = failwith "Can't check base SNARKs on zkApps" in
+  let zkapp_profiler ~verifier:_ _ _ =
+    failwith "Can't check base SNARKs on zkApps"
+  in
   Test_util.with_randomness 123456789 (fun () ->
       run ~user_command_profiler:check_base_snarks ~zkapp_profiler
         num_transactions repeats preeval use_zkapps )
 
 let witness num_transactions repeats preeval use_zkapps () =
-  let zkapp_profiler _ _ =
+  let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't generate witnesses for base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->

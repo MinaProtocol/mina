@@ -99,6 +99,15 @@
    snark_work_lib
    mina_compile_config
    mina_transaction_logic
+   verifier
+   parallel
+   random_oracle
+   kimchi_backend
+   kimchi_backend.pasta
+   pickles_types
+   pickles
+   pickles.backend
+   snark_params
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh
