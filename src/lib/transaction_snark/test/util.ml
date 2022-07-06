@@ -257,6 +257,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
         ; public_output = ()
         ; auxiliary_output = ()
         } )
+  ; uses_lookup = false
   }
 
 let gen_snapp_ledger =

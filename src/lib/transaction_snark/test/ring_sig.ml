@@ -56,6 +56,7 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
+  ; uses_lookup = false
   }
 
 let%test_unit "1-of-1" =
