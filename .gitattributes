@@ -13,3 +13,4 @@ frontend/website/static/presskit.zip filter=lfs diff=lfs merge=lfs -text
 frontend/website/static/*.bc.js filter=lfs diff=lfs merge=lfs -text
 src/app/archive/archive_graphql_schema.json linguist-generated=true
 docs/res/block_production_fsm.dot.png filter=lfs diff=lfs merge=lfs -text
+*.json filter=lfs diff=lfs merge=lfs -text
