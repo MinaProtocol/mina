@@ -1158,7 +1158,7 @@ let%test_module "account timing check" =
           (`Deterministic
             "zkapp command, timed account creation, min_balance > balance" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        (gen_timed_account_and_transfer ~balance:100_000_000
+        (gen_untimed_account_and_create_timed_account ~balance:100_000_000
            ~min_balance:100_000_000_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
@@ -1182,8 +1182,8 @@ let%test_module "account timing check" =
           (`Deterministic
             "zkApp command, account creation, min_balance = balance" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        (gen_timed_account_and_transfer ~balance:100_000_000_000_000
-           ~min_balance:100_000_000_000_000 )
+        (gen_untimed_account_and_create_timed_account
+           ~balance:100_000_000_000_000 ~min_balance:100_000_000_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
@@ -1199,8 +1199,8 @@ let%test_module "account timing check" =
           (`Deterministic
             "zkapp command, account creation, min_balance < balace" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        (gen_timed_account_and_transfer ~balance:200_000_000_000_000
-           ~min_balance:100_000_000_000_000 )
+        (gen_untimed_account_and_create_timed_account
+           ~balance:200_000_000_000_000 ~min_balance:100_000_000_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
