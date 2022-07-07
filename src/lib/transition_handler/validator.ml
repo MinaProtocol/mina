@@ -17,7 +17,7 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-let validate_transition ~context:(module Context : CONTEXT) ~frontier
+let verify_transition_is_relevant ~context:(module Context : CONTEXT) ~frontier
     ~unprocessed_transition_cache enveloped_transition =
   let module Context = struct
     include Context
@@ -84,7 +84,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
           let transition = With_hash.data transition_with_hash in
           let sender = Envelope.Incoming.sender transition_env in
           match
-            validate_transition
+            verify_transition_is_relevant
               ~context:(module Context)
               ~frontier ~unprocessed_transition_cache transition_env
           with
@@ -111,6 +111,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
               Writer.write valid_transition_writer
                 (`Block cached_transition, `Valid_cb vc)
           | Error (`In_frontier _) | Error (`In_process _) ->
+              (* Send_old_gossip isn't necessary true, there is a possibility of race condition when the
+                 process retrieved the transition via catchup mechanism slightly before the gossip reached *)
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Sent_old_gossip
                 , Some
