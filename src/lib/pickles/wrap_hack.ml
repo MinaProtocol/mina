@@ -23,7 +23,9 @@ open Pickles_types
 
 module Padded_length = Nat.N2
 
-(* Pad up to length 2 by preprending dummy values. *)
+(** Pads a vector with `dummy` element to make it of size 2.
+    Warning: panics if the vector has more than one element.
+    *)
 let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
   let v = Vector.to_array v in
   let n = Array.length v in
@@ -32,11 +34,11 @@ let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
   Vector.init Padded_length.n ~f:(fun i ->
       if i < padding then dummy else v.(i - padding) )
 
-(* Specialized padding function. *)
+(** Specialized padding function. *)
 let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
   pad_vector ~dummy:Dummy.Ipa.Wrap.challenges_computed chalss
 
-(* Specialized padding function. *)
+(** Specialized padding function. *)
 let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
   pad_vector xs
     ~dummy:
@@ -46,7 +48,7 @@ let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
       }
   |> Vector.to_list
 
-(* Hash the me only, padding first. *)
+(** Hash the me only, padding first. *)
 let hash_dlog_me_only (type n) (max_proofs_verified : n Nat.t)
     (t :
       ( Tick.Curve.Affine.t
@@ -61,7 +63,7 @@ let hash_dlog_me_only (type n) (max_proofs_verified : n Nat.t)
     (Composition_types.Wrap.Proof_state.Me_only.to_field_elements t
        ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]) )
 
-(* Pad the me_only of a proof *)
+(** Pad the me_only of a proof *)
 let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
     Proof.Proofs_verified_max.t =
   T
@@ -89,12 +91,13 @@ module Checked = struct
            Dummy.Ipa.Wrap.challenges_computed )
       chalss
 
+  (** pads `commitments` up to length 2 *)
   let pad_commitments (commitments : _ Vector.t) =
-    pad_vector
-      ~dummy:
-        (Tuple_lib.Double.map ~f:Impls.Step.Field.constant
-           (Lazy.force Dummy.Ipa.Wrap.sg) )
-      commitments
+    (* use dummy sg to pad the commitments vector to a length 2 *)
+    let sg = Lazy.force Dummy.Ipa.Wrap.sg in
+    let f = Impls.Step.Field.constant in
+    let dummy = Tuple_lib.Double.map ~f sg in
+    pad_vector ~dummy commitments
 
   (* We precompute the sponge states that would result from absorbing
      0, 1, or 2 dummy challenge vectors. This is used to speed up hashing

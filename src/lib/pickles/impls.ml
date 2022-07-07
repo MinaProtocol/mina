@@ -36,11 +36,15 @@ module Step = struct
   module Verification_key = Tick.Verification_key
   module Proving_key = Tick.Proving_key
 
+  (** Contains types and functions to handle the prover and verifier keys. *)
   module Keypair = struct
+    (** a keypair is a prover and verifier key *)
     type t = { pk : Proving_key.t; vk : Verification_key.t } [@@deriving fields]
 
+    (** alias to generate the prover and verifier keys *)
     let create = Fields.create
 
+    (** generates the prover and verifier keys from a constraint system [Plonk_constraint_system.t] *)
     let generate cs =
       let open Tick.Keypair in
       let keypair = create cs in

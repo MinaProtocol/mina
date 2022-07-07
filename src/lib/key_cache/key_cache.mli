@@ -17,6 +17,7 @@ end) : sig
   type ('a, 'b) t = { write : 'a -> 'b -> unit M.t; read : 'a -> 'b M.t }
 end
 
+(** Represents a type that can be cached, and serialized/deserialized from disk. *)
 module Disk_storable (M : sig
   type _ t
 end) : sig

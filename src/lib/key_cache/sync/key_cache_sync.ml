@@ -72,6 +72,7 @@ module Disk_storable = struct
     in
     { to_string; read; write }
 
+  (** constructor for [Disk_storable.t] *)
   let simple to_string read write =
     { to_string
     ; read = (fun k ~path -> read k ~path)

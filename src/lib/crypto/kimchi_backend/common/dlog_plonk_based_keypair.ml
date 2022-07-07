@@ -153,12 +153,17 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
+  (** Creates a prover index [Inputs.Index.t] from a constraint system [Inputs.Constraint_system.t] *)
   let create cs =
+    (* compile the circuit into gates*)
     let gates = Inputs.Constraint_system.finalize_and_get_gates cs in
+
+    (* compile the gates into the prover index *)
     let public_input_size = Set_once.get_exn cs.public_input_size [%here] in
     let index = Inputs.Index.create gates public_input_size (load_urs ()) in
     { index; cs }
 
+  (* create a verifier key from a prover key *)
   let vk t = Inputs.Verifier_index.create t.index
 
   let pk t = t

@@ -3,12 +3,14 @@ open Core_kernel
 module Step = struct
   module Key = struct
     module Proving = struct
+      (** A type containing metadata related to a prover key. *)
       type t =
         Type_equal.Id.Uid.t
         * Snark_keys_header.t
         * int
         * Backend.Tick.R1CS_constraint_system.t
 
+      (** Produces a cache key for a prover key. *)
       let to_string : t -> _ = function
         | _id, header, n, h ->
             sprintf !"step-%s-%s-%d-%s" header.kind.type_ header.kind.identifier
@@ -19,6 +21,7 @@ module Step = struct
       type t = Type_equal.Id.Uid.t * Snark_keys_header.t * int * Md5.t
       [@@deriving sexp]
 
+      (** Produces a cache key for a verifier key. *)
       let to_string : t -> _ = function
         | _id, header, n, h ->
             sprintf !"vk-step-%s-%s-%d-%s" header.kind.type_
@@ -27,32 +30,35 @@ module Step = struct
   end
 
   let storable =
-    Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
-      (fun (_, header, _, cs) ~path ->
-        Or_error.try_with_join (fun () ->
-            let open Or_error.Let_syntax in
-            let%map header_read, index =
-              Snark_keys_header.read_with_header
-                ~read_data:(fun ~offset ->
-                  Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
-                    (Backend.Tick.Keypair.load_urs ()) )
-                path
-            in
-            [%test_eq: int] header.header_version header_read.header_version ;
-            [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
-            [%test_eq: Snark_keys_header.Constraint_constants.t]
-              header.constraint_constants header_read.constraint_constants ;
-            [%test_eq: string] header.constraint_system_hash
-              header_read.constraint_system_hash ;
-            { Backend.Tick.Keypair.index; cs } ) )
-      (fun (_, header, _, _) t path ->
-        Or_error.try_with (fun () ->
-            Snark_keys_header.write_with_header
-              ~expected_max_size_log2:33 (* 8 GB should be enough *)
-              ~append_data:
-                (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
-                   t.Backend.Tick.Keypair.index )
-              header path ) )
+    let to_string = Key.Proving.to_string in
+    let read (_, header, _, cs) ~path =
+      Or_error.try_with_join (fun () ->
+          let open Or_error.Let_syntax in
+          let%map header_read, index =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset ->
+                Kimchi_bindings.Protocol.Index.Fp.read (Some offset)
+                  (Backend.Tick.Keypair.load_urs ()) )
+              path
+          in
+          [%test_eq: int] header.header_version header_read.header_version ;
+          [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
+          [%test_eq: Snark_keys_header.Constraint_constants.t]
+            header.constraint_constants header_read.constraint_constants ;
+          [%test_eq: string] header.constraint_system_hash
+            header_read.constraint_system_hash ;
+          { Backend.Tick.Keypair.index; cs } )
+    in
+    let write (_, header, _, _) t path =
+      Or_error.try_with (fun () ->
+          Snark_keys_header.write_with_header
+            ~expected_max_size_log2:33 (* 8 GB should be enough *)
+            ~append_data:
+              (Kimchi_bindings.Protocol.Index.Fp.write (Some true)
+                 t.Backend.Tick.Keypair.index )
+            header path )
+    in
+    Key_cache.Sync.Disk_storable.simple to_string read write
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
