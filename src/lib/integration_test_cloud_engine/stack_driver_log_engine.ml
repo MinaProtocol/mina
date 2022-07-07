@@ -152,7 +152,14 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      run_cmd_or_error "." prog [ "pubsub"; "topics"; "create"; name ]
+      run_cmd_or_error "." prog
+        [ "pubsub"
+        ; "topics"
+        ; "create"
+        ; name
+        ; "--message-retention-duration"
+        ; "3d"
+        ]
     in
     let create_subscription name topic =
       run_cmd_or_error "." prog
@@ -164,6 +171,8 @@ module Subscription = struct
         ; topic
         ; "--topic-project"
         ; project_id
+        ; "--expiration-period"
+        ; "3d"
         ]
     in
     let t = resource_names name in
