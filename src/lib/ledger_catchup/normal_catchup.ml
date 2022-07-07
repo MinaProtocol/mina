@@ -634,7 +634,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~unprocessed_transition_cache : unit =
   let open Context in
   let hash_tree =
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Hash t ->
         t
     | Full _ ->

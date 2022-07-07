@@ -398,11 +398,11 @@ let get_node_state t =
     | None ->
         None
     | Some tf -> (
-        match Transition_frontier.catchup_tree tf with
-        | Full catchup_tree ->
+        match Transition_frontier.catchup_state tf with
+        | Full catchup_state ->
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree )
+                 catchup_state )
         | _ ->
             None )
   in
