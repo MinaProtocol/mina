@@ -1128,8 +1128,8 @@ let%test_module "account timing check" =
           Signed_command_memo.create_from_string_exn
             "zkApp transfer, timed account"
         in
-        let sender_keypair = List.nth_exn keypairs 0 in
-        let zkapp_keypair = List.nth_exn keypairs 1 in
+        let sender_keypair = List.nth_exn keypairs 1 in
+        let zkapp_keypair = List.nth_exn keypairs 0 in
         let receiver_key =
           zkapp_keypair.public_key |> Signature_lib.Public_key.compress
         in
@@ -1154,16 +1154,15 @@ let%test_module "account timing check" =
       in
       return (ledger_init_state, parties_command)
 
-    let%test_unit "zkApp command, non-negative balance change, not enough \
-                   balance" =
+    let%test_unit "zkApp command, timed account creation, min_balance > balance"
+        =
       Quickcheck.test
         ~seed:
           (`Deterministic
-            "zkapp command, non-negative balance change, min_balance > balance"
-            )
+            "zkapp command, timed account creation, min_balance > balance" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        (gen_timed_account_and_transfer ~balance:100_000_000_000_000
-           ~min_balance:200_000_000_000_000 ~amount:100_000_000 )
+        (gen_timed_account_and_transfer ~balance:0
+           ~min_balance:100_000_000_000_000 ~amount:100_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
@@ -1180,13 +1179,11 @@ let%test_module "account timing check" =
                 Transaction_status.Failure.Source_minimum_balance_violation
                 result ) )
 
-    let%test_unit "zkApp command, non-negative balance change, min_balance > \
-                   balance" =
+    let%test_unit "zkApp command, account creation, min_balance = balance" =
       Quickcheck.test
         ~seed:
           (`Deterministic
-            "zkapp command, non-negative balance change, min_balance > balance"
-            )
+            "zkApp command, account creation, min_balance = balance" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
         (gen_timed_account_and_transfer ~balance:100_000_000_000_000
            ~min_balance:100_000_000_000_000 ~amount:0 )
@@ -1199,13 +1196,11 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot.(succ zero)
                 [ parties ] ) )
 
-    let%test_unit "zkApp command, non-negative balance change, min_balance < \
-                   balance" =
+    let%test_unit "zkApp command, account creation, min_balance < balance" =
       Quickcheck.test
         ~seed:
           (`Deterministic
-            "zkapp command, non-negative balance change, min_balance < balace"
-            )
+            "zkapp command, account creation, min_balance < balace" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
         (gen_timed_account_and_transfer ~balance:200_000_000_000_000
            ~min_balance:100_000_000_000_000 ~amount:100_000_000 )
