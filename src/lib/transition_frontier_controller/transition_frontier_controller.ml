@@ -13,9 +13,10 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~time_controller ~collected_transitions ~frontier ~network_transition_reader
-    ~producer_transition_reader ~clear_reader =
+let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
+    ~trust_system ~verifier ~network ~time_controller ~collected_transitions
+    ~frontier ~network_transition_reader ~producer_transition_reader
+    ~clear_reader ~verified_transition_writer =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
@@ -139,4 +140,25 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         [%log error] "Ivar.fill bug is here!" ;
       Ivar.fill clean_up_catchup_scheduler () )
   |> don't_wait_for ;
-  processed_transition_reader
+  Strict_pipe.Reader.iter processed_transition_reader
+    ~f:
+      (Fn.compose Deferred.return
+         (Strict_pipe.Writer.write verified_transition_writer) )
+  |> don't_wait_for
+
+let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+    ~time_controller ~collected_transitions ~frontier ~network_transition_reader
+    ~producer_transition_reader ~clear_reader ~verified_transition_writer =
+  match Transition_frontier.catchup_state frontier with
+  | Hash _ ->
+      run_with_normal_or_super_catchup
+        ~context:(module Context)
+        ~trust_system ~verifier ~network ~time_controller ~collected_transitions
+        ~frontier ~network_transition_reader ~producer_transition_reader
+        ~clear_reader ~verified_transition_writer
+  | Full _ ->
+      run_with_normal_or_super_catchup
+        ~context:(module Context)
+        ~trust_system ~verifier ~network ~time_controller ~collected_transitions
+        ~frontier ~network_transition_reader ~producer_transition_reader
+        ~clear_reader ~verified_transition_writer

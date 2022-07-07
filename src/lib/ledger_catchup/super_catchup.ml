@@ -1019,7 +1019,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
        Strict_pipe.Writer.t ) =
   let open Context in
   let t =
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Full t ->
         t
     | Hash _ ->
@@ -1749,9 +1749,10 @@ let%test_module "Ledger_catchup tests" =
                   | `Success _ ->
                       failwith "final state should be at `Failed"
                   | `Failed ->
-                      let catchup_tree =
+                      let catchup_state =
                         match
-                          Transition_frontier.catchup_tree my_net.state.frontier
+                          Transition_frontier.catchup_state
+                            my_net.state.frontier
                         with
                         | Full tr ->
                             tr
@@ -1761,24 +1762,24 @@ let%test_module "Ledger_catchup tests" =
                                should always be Full_catchup_tree, but it is \
                                Catchup_hash_tree for some reason"
                       in
-                      let catchup_tree_node_list =
-                        State_hash.Table.data catchup_tree.nodes
+                      let catchup_state_node_list =
+                        State_hash.Table.data catchup_state.nodes
                       in
-                      let catchup_tree_node =
-                        List.hd_exn catchup_tree_node_list
+                      let catchup_state_node =
+                        List.hd_exn catchup_state_node_list
                       in
                       let num_attempts =
-                        Peer.Map.length catchup_tree_node.attempts
+                        Peer.Map.length catchup_state_node.attempts
                       in
                       if num_attempts < 2 then
                         let failstring =
                           Format.sprintf
                             "UNIT TEST FAILED.  catchup should have made more \
                              attempts after failing to download a block.  \
-                             attempts= %d.  length of catchup_tree_node_list= \
+                             attempts= %d.  length of catchup_state_node_list= \
                              %d"
                             num_attempts
-                            (List.length catchup_tree_node_list)
+                            (List.length catchup_state_node_list)
                         in
                         failwith failstring
                       else () ) ) )
@@ -1865,9 +1866,9 @@ let%test_module "Ledger_catchup tests" =
                          "validation fails unit test: correctly failed, running \
                           checks" ;
 
-                       let catchup_tree =
+                       let catchup_state =
                          match
-                           Transition_frontier.catchup_tree my_net.state.frontier
+                           Transition_frontier.catchup_state my_net.state.frontier
                          with
                          | Full tr ->
                              tr
@@ -1877,10 +1878,10 @@ let%test_module "Ledger_catchup tests" =
                                 should always be Full_catchup_tree, but it is \
                                 Catchup_hash_tree for some reason"
                        in
-                       let catchup_tree_node_list =
-                         State_hash.Table.data catchup_tree.nodes
+                       let catchup_state_node_list =
+                         State_hash.Table.data catchup_state.nodes
                        in
-                       List.iter catchup_tree_node_list ~f:(fun catchup_node ->
+                       List.iter catchup_state_node_list ~f:(fun catchup_node ->
                            let hash = catchup_node.state_hash in
                            if
                              Marlin_plonk_bindings_pasta_fp.equal hash
@@ -1964,9 +1965,9 @@ let%test_module "Ledger_catchup tests" =
                    | `Success _ ->
                        failwith "final state should be at `Failed"
                    | `Failed ->
-                       let catchup_tree =
+                       let catchup_state =
                          match
-                           Transition_frontier.catchup_tree my_net.state.frontier
+                           Transition_frontier.catchup_state my_net.state.frontier
                          with
                          | Full tr ->
                              tr
@@ -1976,10 +1977,10 @@ let%test_module "Ledger_catchup tests" =
                                 should always be Full_catchup_tree, but it is \
                                 Catchup_hash_tree for some reason"
                        in
-                       let catchup_tree_node_list =
-                         State_hash.Table.data catchup_tree.nodes
+                       let catchup_state_node_list =
+                         State_hash.Table.data catchup_state.nodes
                        in
-                       List.iter catchup_tree_node_list ~f:(fun catchup_node ->
+                       List.iter catchup_state_node_list ~f:(fun catchup_node ->
                            let hash = catchup_node.state_hash in
                            if
                              Marlin_plonk_bindings_pasta_fp.equal hash
@@ -2064,9 +2065,9 @@ let%test_module "Ledger_catchup tests" =
                    | `Success _ ->
                        failwith "final state should be at `Failed"
                    | `Failed ->
-                       let catchup_tree =
+                       let catchup_state =
                          match
-                           Transition_frontier.catchup_tree my_net.state.frontier
+                           Transition_frontier.catchup_state my_net.state.frontier
                          with
                          | Full tr ->
                              tr
@@ -2076,10 +2077,10 @@ let%test_module "Ledger_catchup tests" =
                                 should always be Full_catchup_tree, but it is \
                                 Catchup_hash_tree for some reason"
                        in
-                       let catchup_tree_node_list =
-                         State_hash.Table.data catchup_tree.nodes
+                       let catchup_state_node_list =
+                         State_hash.Table.data catchup_state.nodes
                        in
-                       List.iter catchup_tree_node_list ~f:(fun catchup_node ->
+                       List.iter catchup_state_node_list ~f:(fun catchup_node ->
                            let hash = catchup_node.state_hash in
                            if
                              Marlin_plonk_bindings_pasta_fp.equal hash
