@@ -272,7 +272,8 @@ module type S = sig
            , Amount.Signed.t
            , ledger
            , bool
-           , unit
+           , Parties.Transaction_commitment.t
+           , Mina_numbers.Length.t
            , Transaction_status.Failure.Collection.t )
            Parties_logic.Local_state.t
          * Amount.Signed.t ) )
@@ -305,7 +306,8 @@ module type S = sig
                , Amount.Signed.t
                , ledger
                , bool
-               , unit
+               , Parties.Transaction_commitment.t
+               , Mina_numbers.Length.t
                , Transaction_status.Failure.Collection.t )
                Parties_logic.Local_state.t
           -> 'acc )
@@ -620,7 +622,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         balance
       ; nonce = Account.Nonce.succ account.nonce
       ; receipt_chain_hash =
-          Receipt.Chain_hash.cons command account.receipt_chain_hash
+          Receipt.Chain_hash.cons_signed_command_payload command
+            account.receipt_chain_hash
       ; timing
       } )
 
@@ -975,15 +978,31 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Transaction_commitment = struct
-      type t = unit
+      type t = Field.t
 
-      let empty = ()
+      let empty = Parties.Transaction_commitment.empty
+
+      let commitment ~other_parties =
+        let other_parties_hash =
+          Mina_base.Parties.Call_forest.hash other_parties
+        in
+        Parties.Transaction_commitment.create ~other_parties_hash
+
+      let full_commitment ~party ~memo_hash ~commitment =
+        (* when called from Parties_logic.apply, the party is the fee payer *)
+        let fee_payer_hash = Parties.Digest.Party.create party in
+        Parties.Transaction_commitment.create_complete commitment ~memo_hash
+          ~fee_payer_hash
 
       let if_ = Parties.value_if
+    end
 
-      let commitment ~other_parties:_ = ()
+    module Length = struct
+      type t = Mina_numbers.Length.t
 
-      let full_commitment ~party:_ ~memo_hash:_ ~commitment:_ = ()
+      let zero, succ = Mina_numbers.Length.(zero, succ)
+
+      let if_ = Parties.value_if
     end
 
     module Public_key = struct
@@ -1020,6 +1039,21 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
 
       let succ = Account.Nonce.succ
+    end
+
+    module Receipt_chain_hash = struct
+      type t = Receipt.Chain_hash.t
+
+      module Elt = struct
+        type t = Receipt.Parties_elt.t
+
+        let of_transaction_commitment tc =
+          Receipt.Parties_elt.Parties_commitment tc
+      end
+
+      let cons_parties_commitment = Receipt.Chain_hash.cons_parties_commitment
+
+      let if_ = Parties.value_if
     end
 
     module State_hash = struct
@@ -1139,6 +1173,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ~txn_global_slot ~account
         in
         (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
+
+      let receipt_chain_hash (a : t) : Receipt.Chain_hash.t =
+        a.receipt_chain_hash
+
+      let set_receipt_chain_hash (a : t) hash =
+        { a with receipt_chain_hash = hash }
 
       let make_zkapp (a : t) =
         let zkapp =
@@ -1290,6 +1330,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
 
+      (* same as the type of the field other_parties in Mina_base.Parties.t *)
       type parties =
         ( Party.t
         , Parties.Digest.Party.t
@@ -1311,6 +1352,20 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (`Proof_verifies true, `Signature_verifies false)
         | None_given ->
             (`Proof_verifies false, `Signature_verifies false)
+
+      let has_signature_authorization (party : t) =
+        match party.authorization with
+        | Signature _ ->
+            true
+        | Proof _ | None_given ->
+            false
+
+      let has_proof_authorization (party : t) =
+        match party.authorization with
+        | Proof _ ->
+            true
+        | Signature _ | None_given ->
+            false
 
       module Update = struct
         open Zkapp_basic
@@ -1423,6 +1478,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
+        , Length.t
         , Bool.failure_status_tbl )
         Parties_logic.Local_state.t
 
@@ -1476,11 +1532,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , L.t
           , bool
           , Transaction_commitment.t
+          , Length.t
           , Transaction_status.Failure.Collection.t )
           Parties_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
-      ; transaction_commitment : unit
-      ; full_transaction_commitment : unit
+      ; transaction_commitment : Transaction_commitment.t
+      ; full_transaction_commitment : Transaction_commitment.t
       ; field : Snark_params.Tick.Field.t
       ; failure : Transaction_status.Failure.t option >
 
@@ -1550,12 +1607,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
              ; caller_caller = Token_id.default
              } : Inputs.Stack_frame.t)
         ; call_stack = []
-        ; transaction_commitment = ()
-        ; full_transaction_commitment = ()
+        ; transaction_commitment = Inputs.Transaction_commitment.empty
+        ; full_transaction_commitment = Inputs.Transaction_commitment.empty
         ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger
         ; success = true
+        ; party_index = Inputs.Length.zero
         ; failure_status_tbl = []
         } )
     in
