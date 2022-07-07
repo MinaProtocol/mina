@@ -1095,18 +1095,39 @@ type sponge =
 
 let poseidon =
   object%js
-    method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
+    (* this could be removed eventually since it's easily implemented using `update` *)
+    method hash (xs : field_class Js.t Js.js_array Js.t)
+        (is_checked : bool Js.t) : field_class Js.t =
       let input = Array.map (Js.to_array xs) ~f:of_js_field in
       let digest =
-        try Random_oracle.Checked.hash input
-        with _ ->
+        if Js.to_bool is_checked then Random_oracle.Checked.hash input
+        else
           Random_oracle.hash (Array.map ~f:to_unchecked input) |> Field.constant
       in
       to_js_field digest
 
+    method update (state : field_class Js.t Js.js_array Js.t)
+        (xs : field_class Js.t Js.js_array Js.t) (is_checked : bool Js.t)
+        : field_class Js.t Js.js_array Js.t =
+      let state : Field.t Random_oracle.State.t =
+        Array.map (Js.to_array state) ~f:of_js_field |> Obj.magic
+      in
+      let input = Array.map (Js.to_array xs) ~f:of_js_field in
+      let new_state : field_class Js.t array =
+        ( if Js.to_bool is_checked then Random_oracle.Checked.update ~state input
+        else
+          Random_oracle.update
+            ~state:(Random_oracle.State.map ~f:to_unchecked state)
+            (Array.map ~f:to_unchecked input)
+          |> Random_oracle.State.map ~f:Field.constant )
+        |> Random_oracle.State.map ~f:to_js_field
+        |> Obj.magic
+      in
+      new_state |> Js.array
+
     (* returns a "sponge" that stays opaque to JS *)
-    method spongeCreate () : sponge =
-      if Impl.in_checked_computation () then
+    method spongeCreate (is_checked : bool Js.t) =
+      if Js.to_bool is_checked then
         Checked
           (Poseidon_sponge_checked.create ?init:None sponge_params_checked)
       else Unchecked (Poseidon_sponge.create ?init:None sponge_params)
@@ -1124,6 +1145,16 @@ let poseidon =
           Poseidon_sponge_checked.squeeze s |> to_js_field
       | Unchecked s ->
           Poseidon_sponge.squeeze s |> Field.constant |> to_js_field
+
+    val prefixes =
+      let open Hash_prefixes in
+      object%js
+        val event = Js.string (zkapp_event :> string)
+
+        val events = Js.string (zkapp_events :> string)
+
+        val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+      end
   end
 
 class type verification_key_class =
@@ -2033,6 +2064,49 @@ let nat_module (i : int) : (module Pickles_types.Nat.Intf) =
 let nat_add_module (i : int) : (module Pickles_types.Nat.Add.Intf) =
   List.nth_exn nat_add_modules_list i
 
+let name = "smart-contract"
+
+let constraint_constants =
+  (* TODO these are dummy values *)
+  { Snark_keys_header.Constraint_constants.sub_windows_per_window = 0
+  ; ledger_depth = 0
+  ; work_delay = 0
+  ; block_window_duration_ms = 0
+  ; transaction_capacity = Log_2 0
+  ; pending_coinbase_depth = 0
+  ; coinbase_amount = Unsigned.UInt64.of_int 0
+  ; supercharged_coinbase_factor = 0
+  ; account_creation_fee = Unsigned.UInt64.of_int 0
+  ; fork = None
+  }
+
+let pickles_digest (choices : pickles_rule_js Js.js_array Js.t)
+    (public_input_size : int) =
+  let branches = choices##.length in
+  let max_proofs =
+    let choices = choices |> Js.to_array |> Array.to_list in
+    List.map choices ~f:(fun c ->
+        c##.proofsToVerify |> Js.to_array |> Array.length )
+    |> List.max_elt ~compare |> Option.value ~default:0
+  in
+  let (module Branches) = nat_module branches in
+  let (module Max_proofs_verified) = nat_add_module max_proofs in
+  let (Choices choices) = Choices.of_js ~public_input_size choices in
+  try
+    let _ =
+      Pickles.compile_promise ~choices ~return_early_digest_exception:true
+        (module Public_input)
+        (module Public_input.Constant)
+        ~public_input:(Input (public_input_typ public_input_size))
+        ~auxiliary_typ:Typ.unit
+        ~branches:(module Branches)
+        ~max_proofs_verified:(module Pickles_types.Nat.N0)
+          (* ^ TODO make max_branching configurable -- needs refactor in party types *)
+        ~name ~constraint_constants
+    in
+    failwith "Unexpected: The exception will always fire"
+  with Pickles.Return_digest md5 -> Md5.to_hex md5 |> Js.string
+
 let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
     (public_input_size : int) =
   let branches = choices##.length in
@@ -2054,20 +2128,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
         (* ^ TODO make max_branching configurable -- needs refactor in party types *)
-      ~name:"smart-contract"
-      ~constraint_constants:
-        (* TODO these are dummy values *)
-        { sub_windows_per_window = 0
-        ; ledger_depth = 0
-        ; work_delay = 0
-        ; block_window_duration_ms = 0
-        ; transaction_capacity = Log_2 0
-        ; pending_coinbase_depth = 0
-        ; coinbase_amount = Unsigned.UInt64.of_int 0
-        ; supercharged_coinbase_factor = 0
-        ; account_creation_fee = Unsigned.UInt64.of_int 0
-        ; fork = None
-        }
+      ~name ~constraint_constants
   in
   let module Proof = (val p) in
   let to_js_prover prover =
@@ -2197,6 +2258,8 @@ let verify (public_input : public_input_js) (proof : proof)
 let pickles =
   object%js
     val compile = pickles_compile
+
+    val circuitDigest = pickles_digest
 
     val verify = verify
 
