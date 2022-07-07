@@ -1093,66 +1093,63 @@ let%test_module "account timing check" =
                               Source_minimum_balance_violation ) )
                   then failwithf "Unexpected transaction error: %s" err_str () ) )
 
-    let gen_timed_account_and_transfer ~balance ~min_balance ~amount =
+    let gen_untimed_account_and_create_timed_account ~balance ~min_balance =
       let open Quickcheck.Generator.Let_syntax in
-      let timed =
-        let keypair = List.nth_exn keypairs 0 in
-        let balance = Currency.Balance.of_int balance in
-        let nonce = Mina_numbers.Account_nonce.zero in
-        let (timing : Account_timing.t) =
-          Timed
-            { initial_minimum_balance = Currency.Balance.of_int min_balance
-            ; cliff_time = Mina_numbers.Global_slot.of_int 10000
-            ; cliff_amount = Currency.Amount.of_int 100_000_000_000_000
-            ; vesting_period = Mina_numbers.Global_slot.of_int 1000
-            ; vesting_increment = Currency.Amount.of_int 10
-            }
-        in
-        let balance_as_amount = Currency.Balance.to_amount balance in
-        (keypair, balance_as_amount, nonce, timing)
-      in
       let untimed =
-        let keypair = List.nth_exn keypairs 1 in
+        let keypair = List.nth_exn keypairs 0 in
         let balance = Currency.Balance.of_int 200_000_000_000_000 in
         let nonce = Mina_numbers.Account_nonce.zero in
         let balance_as_amount = Currency.Balance.to_amount balance in
         (keypair, balance_as_amount, nonce, Account_timing.Untimed)
       in
-      let ledger_init_state = Array.of_list [ untimed; timed ] in
-      let parties_command =
-        let open Mina_base in
-        let fee = Currency.Fee.of_int 1_000_000 in
-        let amount = Currency.Amount.of_int amount in
-        let nonce = Account.Nonce.zero in
-        let memo =
-          Signed_command_memo.create_from_string_exn
-            "zkApp transfer, timed account"
-        in
-        let sender_keypair = List.nth_exn keypairs 1 in
-        let zkapp_keypair = List.nth_exn keypairs 0 in
-        let receiver_key =
-          zkapp_keypair.public_key |> Signature_lib.Public_key.compress
-        in
-        let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-          { sender = (sender_keypair, nonce)
-          ; fee
-          ; fee_payer = None
-          ; receivers = [ (receiver_key, amount) ]
-          ; amount
-          ; zkapp_account_keypairs = []
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update = Party.Update.dummy
-          ; current_auth = Permissions.Auth_required.Signature
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; sequence_events = []
-          ; preconditions = None
-          }
-        in
-        Transaction_snark.For_tests.multiple_transfers parties_spec
+      let ledger_init_state = Array.of_list [ untimed ] in
+      let sender_keypair = List.nth_exn keypairs 0 in
+      let zkapp_keypair = Signature_lib.Keypair.create () in
+      let fee = 1_000_000 in
+      let (create_timed_account_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (sender_keypair, Account.Nonce.zero)
+        ; fee = Currency.Fee.of_int fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.of_int (balance + fee)
+        ; zkapp_account_keypairs = [ zkapp_keypair ]
+        ; memo =
+            Signed_command_memo.create_from_string_exn
+              "zkApp create timed account"
+        ; new_zkapp_account = true
+        ; snapp_update =
+            (let timing =
+               Zkapp_basic.Set_or_keep.Set
+                 ( { initial_minimum_balance =
+                       Currency.Balance.of_int min_balance
+                   ; cliff_time = Mina_numbers.Global_slot.of_int 1000
+                   ; cliff_amount = Currency.Amount.of_int 100_000_000
+                   ; vesting_period = Mina_numbers.Global_slot.of_int 10
+                   ; vesting_increment = Currency.Amount.of_int 100_000_000
+                   }
+                   : Party.Update.Timing_info.value )
+             in
+             { Party.Update.dummy with timing } )
+        ; current_auth = Permissions.Auth_required.Proof
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        ; preconditions = None
+        }
       in
-      return (ledger_init_state, parties_command)
+      let timed_account_id =
+        Account_id.create
+          (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
+          Token_id.default
+      in
+      let parties, _, _, _ =
+        ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+            create_timed_account_spec
+        , timed_account_id
+        , create_timed_account_spec.snapp_update
+        , zkapp_keypair )
+      in
+      return (ledger_init_state, parties)
 
     let%test_unit "zkApp command, timed account creation, min_balance > balance"
         =
@@ -1161,8 +1158,8 @@ let%test_module "account timing check" =
           (`Deterministic
             "zkapp command, timed account creation, min_balance > balance" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
-        (gen_timed_account_and_transfer ~balance:0
-           ~min_balance:100_000_000_000_000 ~amount:100_000_000 )
+        (gen_timed_account_and_transfer ~balance:100_000_000
+           ~min_balance:100_000_000_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
@@ -1186,7 +1183,7 @@ let%test_module "account timing check" =
             "zkApp command, account creation, min_balance = balance" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
         (gen_timed_account_and_transfer ~balance:100_000_000_000_000
-           ~min_balance:100_000_000_000_000 ~amount:0 )
+           ~min_balance:100_000_000_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
@@ -1203,7 +1200,7 @@ let%test_module "account timing check" =
             "zkapp command, account creation, min_balance < balace" )
         ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
         (gen_timed_account_and_transfer ~balance:200_000_000_000_000
-           ~min_balance:100_000_000_000_000 ~amount:100_000_000 )
+           ~min_balance:100_000_000_000_000 )
         ~f:(fun (ledger_init_state, parties) ->
           Mina_ledger.Ledger.with_ephemeral_ledger
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
