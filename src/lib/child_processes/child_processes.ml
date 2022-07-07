@@ -429,7 +429,7 @@ let%test_module _ =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let lock_path = conf_dir ^/ name ^ ".lock" in
-          let%bind () = Async.Writer.save lock_path ~contents:"abc" in
+          let%bind () = Async.Writer.save lock_path ~contents:"123" in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:[ "exit" ] ~stdout:`Chunks ~stderr:`Chunks
