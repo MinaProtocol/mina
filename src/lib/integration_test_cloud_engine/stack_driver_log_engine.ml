@@ -157,8 +157,7 @@ module Subscription = struct
         ; "topics"
         ; "create"
         ; name
-        ; "--message-retention-duration"
-        ; "3d"
+        ; "--message-retention-duration=3d"
         ]
     in
     let create_subscription name topic =
@@ -171,8 +170,7 @@ module Subscription = struct
         ; topic
         ; "--topic-project"
         ; project_id
-        ; "--expiration-period"
-        ; "3d"
+        ; "--expiration-period=3d"
         ]
     in
     let t = resource_names name in
