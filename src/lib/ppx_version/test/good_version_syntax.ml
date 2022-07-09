@@ -23,5 +23,15 @@ module M = struct
   end
 end
 
+module M2 = struct 
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type bar = GG
+      type t = bar = GG
+      let to_latest x = x 
+    end
+  end]
+end
 (* deliberately unversioned *)
 type t = int [@@bin_io_unversioned]

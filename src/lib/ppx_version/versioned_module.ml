@@ -679,11 +679,12 @@ let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
       else if version >= last_version then
         Location.raise_errorf ~loc
           "Versioned modules must be listed in decreasing order." ) ;
+
   let attrs, str_no_attrs = List.partition_tf str.txt ~f:is_attr_stri in
   let all_version_tagged =
     List.exists attrs ~f:(is_attr_stri_with_name with_all_version_tags)
   in
-  let stri, type_stri, str_rest =
+  let stri, type_stri, str_rest, manifest =
     match str_no_attrs with
     | [] ->
         Location.raise_errorf ~loc:str.loc
@@ -705,20 +706,34 @@ let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
            ; _
            }
            :: _ as str ) ->
-        (stri, type_stri, str)
+        (stri, type_stri, str, None)
+    | ( { pstr_desc =
+            Pstr_type (_, [ { ptype_name = t1_actual;
+                                 ptype_private = Public;
+                                 ptype_manifest = _; _ } ]);  _ } as manifest)
+      :: ( { pstr_desc =
+            Pstr_type (_, [ { ptype_name = { txt = "t"; _ };
+                                 ptype_private = Public;
+                                 ptype_manifest =
+                                   Some { ptyp_desc = Ptyp_constr ({ txt = t1_expected; _ }, _); _ } 
+                                 ; _ }])
+            ; _ } as type_stri )
+      ::  str when Poly.(Longident.name t1_expected = t1_actual.txt) ->
+       (type_stri, type_stri, str, Some manifest)
     | type_stri :: str ->
-        (type_stri, type_stri, str)
+       (type_stri, type_stri, str, None)
   in
   let should_convert, type_str, extra_stris =
     version_type ~version_option version stri ~all_version_tagged
       ~top_version_tag ~json_version_tag
   in
+  let manifest = Option.to_list manifest in
   (* TODO: If [should_convert] then look for [to_latest]. *)
   let open Ast_builder.Default in
   ( version
   , pstr_module ~loc
       (module_binding ~loc ~name:(some_loc name)
-         ~expr:(pmod_structure ~loc:str.loc (type_str @ str_rest @ extra_stris)) )
+         ~expr:(pmod_structure ~loc:str.loc (manifest @ type_str @ str_rest @ extra_stris)) )
   , should_convert
   , type_stri
   , all_version_tagged )
