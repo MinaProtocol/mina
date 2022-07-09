@@ -1095,13 +1095,21 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
       Option.map ~f:erase_stable_versions#structure_item type_stri
       |> Option.to_list
     in
+    let attr s =
+      Str.attribute @@
+        Attr.mk ~loc
+          Location.{ txt = "warning"; loc }
+          (PStr ([s |> Const.string |> Exp.constant |> Str.eval]))
+    in 
     Str.include_ ~loc
       (Incl.mk ~loc
          (Ast_helper.Mod.structure ~loc
-            ( Str.module_ ~loc
+            ( attr "-60"
+              :: Str.module_ ~loc
                 (Mb.mk ~loc:modname.loc (some_loc modname)
-                   (Mod.structure ~loc:modbody.loc modbody.txt) )
-            :: type_stri ) ) )
+                   (Mod.structure ~loc:modbody.loc modbody.txt)) ::
+             attr "+60"
+            :: type_stri)))
   with exn ->
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
