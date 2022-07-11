@@ -1,6 +1,8 @@
 final: prev:
-let pkgs = final;
+let
+  pkgs = final;
 in {
+  vend = final.callPackage ./vend {};
   # nixpkgs + musl problems
   postgresql =
     (prev.postgresql.override { enableSystemd = false; }).overrideAttrs
@@ -14,16 +16,15 @@ in {
   else
     prev.openssh);
 
-  # jemalloc = prev.jemalloc.overrideAttrs (_: {
-  #   nativeBuildInputs = [ final.autoconf ];
-  #   preConfigure = "./autogen.sh";
-  #   src = final.fetchFromGitHub {
-  #     owner = "jemalloc";
-  #     repo = "jemalloc";
-  #     rev = "011449f17bdddd4c9e0510b27a3fb34e88d072ca";
-  #     sha256 = "FwMs8m/yYsXCEOd94ZWgpwqtVrTLncEQCSDj/FqGewE=";
-  #   };
-  # });
+  jemalloc = if final.stdenv.isDarwin && final.stdenv.isAarch64 then
+    (prev.jemalloc.override {
+      stdenv = final.llvmPackages_11.stdenv;
+    }).overrideAttrs (oa: {
+      doCheck = false;
+      configureFlags = oa.configureFlags ++ [ "--with-lg-vaddr=48" ];
+    })
+  else
+    prev.jemalloc;
 
   git = prev.git.overrideAttrs
     (o: { doCheck = o.doCheck && !prev.stdenv.hostPlatform.isMusl; });
@@ -127,7 +128,6 @@ in {
     pname = "libp2p_helper";
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
-    runVend = true; # missing some schema files
     doCheck = false; # TODO: tests hang
     vendorSha256 =
       # sanity check, to make sure the fixed output drv doesn't keep working
@@ -146,6 +146,10 @@ in {
       # remove libp2p_ipc from go.mod, inject it back in postconfigure
       postConfigure = ''
         sed -i 's/.*libp2p_ipc.*//' go.mod
+      '';
+      postBuild = ''
+        rm vendor -rf
+        ${final.vend}/bin/vend
       '';
     };
     postConfigure = ''

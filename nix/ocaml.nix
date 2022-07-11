@@ -151,7 +151,11 @@ let
         MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
         configurePhase = ''
           export MINA_ROOT="$PWD"
-          patchShebangs .
+          export -f patchShebangs stopNest isScript
+          fd . --type executable -x bash -c "patchShebangs {}"
+          export -n patchShebangs stopNest isScript
+        '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+          export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation $NIX_LDFLAGS"
         '';
 
         buildPhase = ''
