@@ -2599,10 +2599,12 @@ module Ledger = struct
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let party = List.nth_exn tx.other_parties party_index in
-    Public_input.Constant.to_js
-      [| (party.elt.party_digest :> Impl.field)
-       ; (Parties.Digest.Forest.empty :> Impl.field)
-      |]
+    object%js
+      val party = to_js_field_unchecked (party.elt.party_digest :> Impl.field)
+
+      val calls =
+        to_js_field_unchecked (Parties.Digest.Forest.empty :> Impl.field)
+    end
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
     Signature_lib.Schnorr.Chunked.sign (private_key key)
