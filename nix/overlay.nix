@@ -13,7 +13,6 @@ let
     # copy this line with the correct toolchain name
     "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
-  cargoHashes = narHashesFromCargoLock ../src/lib/crypto/Cargo.lock;
   rustChannelFromToolchainFileOf = file: with pkgs.lib; let
     inherit (pkgs.lib) hasPrefix removePrefix readFile warn;
     toolchain = (builtins.fromTOML (readFile file)).toolchain;
@@ -102,42 +101,31 @@ in {
     ];
   });
 
-  # Rust stuff (for marlin_plonk_bindings_stubs)
-  crypto-rust-musl = ((final.crypto-rust.override {
-    targets = [ "x86_64-unknown-linux-musl" ];
-  }).overrideAttrs (oa: {
-    nativeBuildInputs = [ final.makeWrapper ];
-    buildCommand = oa.buildCommand + ''
-      for exe in $(find "$out/bin" -type f -or -type l); do
-        wrapProgram "$exe" --prefix LD_LIBRARY_PATH : ${final.gcc-unwrapped.lib}/lib
-      done
-    '';
-  })) // {
-    inherit (prev.rust) toRustTarget toRustTargetSpec;
-  };
-
-  crypto-rust = (rustChannelFromToolchainFileOf ../src/lib/crypto/rust-toolchain.toml).rust;
-
+  #
   # Dependencies which aren't in nixpkgs and local packages which need networking to build
-  kimchi_bindings_stubs = (rustPlatformFor
-    (if pkgs.stdenv.hostPlatform.isMusl then
-      final.crypto-rust-musl
-    else
-      final.crypto-rust)).buildRustPackage {
-        pname = "kimchi_bindings_stubs";
-        version = "0.1.0";
-        src = final.lib.sourceByRegex ../src [
-          "^lib(/crypto(/.*)?)?$"
-          "^external(/wasm-bindgen-rayon(/.*)?)?"
-        ];
-        cargoBuildFlags = ["-p wires_15_stubs" "-p binding_generation"];
-        sourceRoot = "source/lib/crypto";
-        nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
-        # FIXME: tests fail
-        doCheck = false;
-        cargoLock.lockFile = ../src/lib/crypto/Cargo.lock;
-        cargoLock.outputHashes = cargoHashes;
+  #
+
+  # the kimchi bindings static library
+  kimchi_bindings_stubs = 
+    let 
+      toolchain = rustChannelFromToolchainFileOf ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
+      rust_platform = rustPlatformFor toolchain.rust;
+    in
+    rust_platform.buildRustPackage {
+      pname = "kimchi_bindings_stubs";
+      version = "0.1.0";
+      src = ../src/lib/crypto/kimchi_bindings/stubs;
+      cargoBuildFlags = ["-p wires_15_stubs" "-p binding_generation"];
+      sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
+      nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
+      cargoLock = let
+        fixupLockFile = path: builtins.readFile path;
+      in {
+        lockFileContents = fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
       };
+      # FIXME: tests fail
+      doCheck = false;
+    };
 
   go-capnproto2 = pkgs.buildGoModule rec {
     pname = "capnpc-go";
