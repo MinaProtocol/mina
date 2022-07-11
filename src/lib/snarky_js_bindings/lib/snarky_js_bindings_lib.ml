@@ -1377,6 +1377,7 @@ module Circuit = struct
              array_iter2 ks1 ks2 ~f:(fun k1 k2 ->
                  if not (js_equal k1 k2) then
                    raise_error "if: Arguments had mismatched types" ) ;
+             (* we use Object.create to avoid calling the constructor with the wrong number of arguments *)
              let result =
                Js.Unsafe.global ##. Object##create
                  (Js.Unsafe.coerce ctor1)##.prototype
