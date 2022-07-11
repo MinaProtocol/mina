@@ -63,11 +63,11 @@ module Chain_hash = struct
     |> of_hash
 
   (* prepend party index computed by Parties_logic.apply *)
-  let cons_parties_commitment (index : Mina_numbers.Length.t)
-      (e : Parties_elt.t) (t : t) =
+  let cons_parties_commitment (index : Mina_numbers.Index.t) (e : Parties_elt.t)
+      (t : t) =
     let open Random_oracle.Legacy in
     let x = match e with Parties_commitment s -> Input.field s in
-    let index_input = Mina_numbers.Length.to_input_legacy index in
+    let index_input = Mina_numbers.Index.to_input_legacy index in
     Input.(append index_input (append x (field (t :> Field.t))))
     |> pack_input
     |> hash ~init:Hash_prefix.receipt_chain_user_command
@@ -110,16 +110,14 @@ module Chain_hash = struct
           |> var_of_hash_packed )
 
     (* prepend party index *)
-    let cons_parties_commitment (index : Mina_numbers.Length.Checked.t)
+    let cons_parties_commitment (index : Mina_numbers.Index.Checked.t)
         (e : Parties_elt.t) (t : t) =
       let open Random_oracle.Legacy in
       let open Checked in
       let%bind x =
         match e with Parties_commitment s -> Let_syntax.return (Input.field s)
       in
-      let%bind index_input =
-        Mina_numbers.Length.Checked.to_input_legacy index
-      in
+      let%bind index_input = Mina_numbers.Index.Checked.to_input_legacy index in
       make_checked (fun () ->
           hash ~init:Hash_prefix.receipt_chain_user_command
             (pack_input
@@ -158,14 +156,14 @@ module Chain_hash = struct
       ~f:(fun (base, commitment) ->
         let index_int = 17 in
         let unchecked =
-          let index = Mina_numbers.Length.of_int index_int in
+          let index = Mina_numbers.Index.of_int index_int in
           cons_parties_commitment index (Parties_commitment commitment) base
         in
         let checked =
           let open Snark_params.Tick.Checked.Let_syntax in
           let comp =
             let%bind index =
-              let open Mina_numbers.Length.Checked in
+              let open Mina_numbers.Index.Checked in
               let rec go acc (n : int) =
                 if Int.equal n 0 then return acc
                 else

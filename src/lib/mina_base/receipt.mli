@@ -28,7 +28,7 @@ module Chain_hash : sig
 
   val cons_signed_command_payload : Signed_command_elt.t -> t -> t
 
-  val cons_parties_commitment : Mina_numbers.Length.t -> Parties_elt.t -> t -> t
+  val cons_parties_commitment : Mina_numbers.Index.t -> Parties_elt.t -> t -> t
 
   [%%ifdef consensus_mechanism]
 
@@ -54,7 +54,7 @@ module Chain_hash : sig
     val cons_signed_command_payload : Signed_command_elt.t -> t -> t Checked.t
 
     val cons_parties_commitment :
-      Mina_numbers.Length.Checked.t -> Parties_elt.t -> t -> t Checked.t
+      Mina_numbers.Index.Checked.t -> Parties_elt.t -> t -> t Checked.t
   end
 
   [%%endif]

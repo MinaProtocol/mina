@@ -1388,7 +1388,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     | `Ok keymap' ->
         keymap'
   in
-  (* update receipt chain hashes in accounts table, once per account id *)
+  (* update receipt chain hashes in accounts table *)
   let receipt_elt =
     let _txn_commitment, full_txn_commitment =
       (* also computed in replace_authorizations, but easier just to re-compute here *)
@@ -1404,7 +1404,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
         failwith "Expected fee payer account id to be in table"
     | Some account ->
         let receipt_chain_hash =
-          Receipt.Chain_hash.cons_parties_commitment Mina_numbers.Length.zero
+          Receipt.Chain_hash.cons_parties_commitment Mina_numbers.Index.zero
             receipt_elt account.Account.Poly.receipt_chain_hash
         in
         Some { account with receipt_chain_hash } ) ;
@@ -1421,7 +1421,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
                 failwith "Expected other party account id to be in table"
             | Some account ->
                 let receipt_chain_hash =
-                  let party_index = Mina_numbers.Length.of_int (ndx + 1) in
+                  let party_index = Mina_numbers.Index.of_int (ndx + 1) in
                   Receipt.Chain_hash.cons_parties_commitment party_index
                     receipt_elt account.Account.Poly.receipt_chain_hash
                 in

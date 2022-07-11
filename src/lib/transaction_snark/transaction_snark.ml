@@ -1013,8 +1013,8 @@ module Base = struct
           Assert.is_true b
       end
 
-      module Length = struct
-        open Mina_numbers.Length.Checked
+      module Index = struct
+        open Mina_numbers.Index.Checked
 
         type t = var
 
@@ -1669,7 +1669,7 @@ module Base = struct
           , Ledger_hash.var * Sparse_ledger.t V.t
           , Bool.t
           , Transaction_commitment.t
-          , Length.t
+          , Index.t
           , Bool.failure_status_tbl )
           Mina_transaction_logic.Parties_logic.Local_state.t
 
@@ -2002,7 +2002,7 @@ module Base = struct
               , Ledger.t
               , Bool.t
               , Transaction_commitment.t
-              , Length.t
+              , Index.t
               , unit )
               Mina_transaction_logic.Parties_logic.Local_state.t
           ; protocol_state_precondition :
@@ -3518,7 +3518,7 @@ type local_state =
   , Sparse_ledger.t
   , bool
   , Parties.Transaction_commitment.t
-  , Mina_numbers.Length.t
+  , Mina_numbers.Index.t
   , Transaction_status.Failure.Collection.t )
   Mina_transaction_logic.Parties_logic.Local_state.t
 

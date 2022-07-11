@@ -353,7 +353,7 @@ type local_state =
   , Mina_ledger.Sparse_ledger.t
   , bool
   , Parties.Transaction_commitment.t
-  , Mina_numbers.Length.t
+  , Mina_numbers.Index.t
   , Transaction_status.Failure.Collection.t )
   Mina_transaction_logic.Parties_logic.Local_state.t
 

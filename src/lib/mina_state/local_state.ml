@@ -49,7 +49,7 @@ let display
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_base58_check ledger
   ; success
-  ; party_index = Mina_numbers.Length.to_int party_index
+  ; party_index = Mina_numbers.Index.to_int party_index
   ; failure_status_tbl =
       Transaction_status.Failure.Collection.to_display failure_status_tbl
       |> Transaction_status.Failure.Collection.Display.to_yojson
@@ -66,7 +66,7 @@ let dummy : unit -> t =
       ; excess = Amount.(Signed.of_unsigned zero)
       ; ledger = Frozen_ledger_hash.empty_hash
       ; success = true
-      ; party_index = Mina_numbers.Length.zero
+      ; party_index = Mina_numbers.Index.zero
       ; failure_status_tbl = []
       } )
 
@@ -82,7 +82,7 @@ let gen : t Quickcheck.Generator.t =
   and token_id = Token_id.gen
   and success = Bool.quickcheck_generator
   and party_index =
-    Mina_numbers.Length.gen
+    Mina_numbers.Index.gen
     (*
   and failure_status =
     let%bind failure = Transaction_status.Failure.gen in
@@ -124,7 +124,7 @@ let to_input
      ; Token_id.to_input token_id
      ; Amount.Signed.to_input excess
      ; Ledger_hash.to_input ledger
-     ; Mina_numbers.Length.to_input party_index
+     ; Mina_numbers.Index.to_input party_index
      ; packed (Mina_base.Util.field_of_bool success, 1)
     |]
 
@@ -148,7 +148,7 @@ module Checked = struct
       ~excess:(f !Currency.Amount.Signed.Checked.assert_equal)
       ~ledger:(f !Ledger_hash.assert_equal)
       ~success:(f Impl.Boolean.Assert.( = ))
-      ~party_index:(f !Mina_numbers.Length.Checked.Assert.equal)
+      ~party_index:(f !Mina_numbers.Index.Checked.Assert.equal)
       ~failure_status_tbl:(f (fun () () -> ()))
 
   let equal' (t1 : t) (t2 : t) =
@@ -162,7 +162,7 @@ module Checked = struct
       ~token_id:(f Token_id.Checked.equal)
       ~excess:(f !Currency.Amount.Signed.Checked.equal)
       ~ledger:(f !Ledger_hash.equal_var) ~success:(f Impl.Boolean.equal)
-      ~party_index:(f !Mina_numbers.Length.Checked.equal)
+      ~party_index:(f !Mina_numbers.Index.Checked.equal)
       ~failure_status_tbl:(f (fun () () -> Impl.Boolean.true_))
 
   let to_input
@@ -189,7 +189,7 @@ module Checked = struct
        ; Token_id.Checked.to_input token_id
        ; run_checked (Amount.Signed.Checked.to_input excess)
        ; Ledger_hash.var_to_input ledger
-       ; Mina_numbers.Length.Checked.to_input party_index
+       ; Mina_numbers.Index.Checked.to_input party_index
        ; packed ((success :> t), 1)
       |]
 end
@@ -217,7 +217,7 @@ let typ : (Checked.t, t) Impl.Typ.t =
     ; Amount.Signed.typ
     ; Ledger_hash.typ
     ; Boolean.typ
-    ; Mina_numbers.Length.typ
+    ; Mina_numbers.Index.typ
     ; failure_status_tbl_typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist

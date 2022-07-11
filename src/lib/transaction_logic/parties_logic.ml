@@ -223,7 +223,7 @@ module Local_state = struct
           , Ledger_hash.Stable.V1.t
           , bool
           , Parties.Transaction_commitment.Stable.V1.t
-          , Mina_numbers.Length.Stable.V1.t
+          , Mina_numbers.Index.Stable.V1.t
           , Transaction_status.Failure.Collection.Stable.V1.t )
           Stable.V1.t
         [@@deriving equal, compare, hash, yojson, sexp]
@@ -244,7 +244,7 @@ module Local_state = struct
       , Ledger_hash.var
       , Boolean.var
       , Parties.Transaction_commitment.Checked.t
-      , Mina_numbers.Length.Checked.t
+      , Mina_numbers.Index.Checked.t
       , unit )
       Stable.Latest.t
   end
@@ -677,7 +677,7 @@ module type Inputs_intf = sig
     (Receipt_chain_hash_intf
       with type bool := Bool.t
        and type transaction_commitment := Transaction_commitment.t
-       and type index := Length.t)
+       and type index := Index.t)
 
   and Account :
     (Account_intf
@@ -756,7 +756,7 @@ module type Inputs_intf = sig
       party:Party.t -> memo_hash:Field.t -> commitment:t -> t
   end
 
-  and Length : sig
+  and Index : sig
     include Iffable with type bool := Bool.t
 
     val zero : t
@@ -780,7 +780,7 @@ module type Inputs_intf = sig
       , Ledger.t
       , Bool.t
       , Transaction_commitment.t
-      , Length.t
+      , Index.t
       , Bool.failure_status_tbl )
       Local_state.t
 
@@ -1601,7 +1601,7 @@ module Make (Inputs : Inputs_intf) = struct
          - token_id = Token_id.default
          - ledger = Frozen_ledger_hash.empty_hash
          - success = true
-         - party_index = Length.zero
+         - party_index = Index.zero
       *)
       { local_state with
         token_id =
@@ -1615,8 +1615,8 @@ module Make (Inputs : Inputs_intf) = struct
       ; success =
           Bool.if_ is_last_party ~then_:Bool.true_ ~else_:local_state.success
       ; party_index =
-          Inputs.Length.if_ is_last_party ~then_:Inputs.Length.zero
-            ~else_:(Inputs.Length.succ local_state.party_index)
+          Inputs.Index.if_ is_last_party ~then_:Inputs.Index.zero
+            ~else_:(Inputs.Index.succ local_state.party_index)
       }
     in
     (global_state, local_state)

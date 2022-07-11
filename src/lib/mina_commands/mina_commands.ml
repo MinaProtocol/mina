@@ -169,7 +169,7 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   (* TODO: apply cons_parties_commitment operation for all occurrences of a party
 
      let elt = Receipt.Parties_elt.Parties_commitment (Parties.commitment parties) in
-     let fee_payer_index = Mina_numbers.Length.zero in
+     let fee_payer_index = Mina_numbers.Index.zero in
      Receipt.Chain_hash.cons_parties_commitment fee_payer_index elt parent_hash *)
 end)
 

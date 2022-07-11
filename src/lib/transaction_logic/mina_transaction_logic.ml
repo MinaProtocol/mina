@@ -273,7 +273,7 @@ module type S = sig
            , ledger
            , bool
            , Parties.Transaction_commitment.t
-           , Mina_numbers.Length.t
+           , Mina_numbers.Index.t
            , Transaction_status.Failure.Collection.t )
            Parties_logic.Local_state.t
          * Amount.Signed.t ) )
@@ -307,7 +307,7 @@ module type S = sig
                , ledger
                , bool
                , Parties.Transaction_commitment.t
-               , Mina_numbers.Length.t
+               , Mina_numbers.Index.t
                , Transaction_status.Failure.Collection.t )
                Parties_logic.Local_state.t
           -> 'acc )
@@ -997,10 +997,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = Parties.value_if
     end
 
-    module Length = struct
-      type t = Mina_numbers.Length.t
+    module Index = struct
+      type t = Mina_numbers.Index.t
 
-      let zero, succ = Mina_numbers.Length.(zero, succ)
+      let zero, succ = Mina_numbers.Index.(zero, succ)
 
       let if_ = Parties.value_if
     end
@@ -1478,7 +1478,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
-        , Length.t
+        , Index.t
         , Bool.failure_status_tbl )
         Parties_logic.Local_state.t
 
@@ -1532,7 +1532,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , L.t
           , bool
           , Transaction_commitment.t
-          , Length.t
+          , Index.t
           , Transaction_status.Failure.Collection.t )
           Parties_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
@@ -1613,7 +1613,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger
         ; success = true
-        ; party_index = Inputs.Length.zero
+        ; party_index = Inputs.Index.zero
         ; failure_status_tbl = []
         } )
     in
