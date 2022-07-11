@@ -13,7 +13,6 @@ let
     # copy this line with the correct toolchain name
     "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
-  cargoHashes = narHashesFromCargoLock ../src/lib/crypto/Cargo.lock;
   rustChannelFromToolchainFileOf = file: with pkgs.lib; let
     inherit (pkgs.lib) hasPrefix removePrefix readFile warn;
     toolchain = (builtins.fromTOML (readFile file)).toolchain;
@@ -102,42 +101,35 @@ in {
     ];
   });
 
-  # Rust stuff (for marlin_plonk_bindings_stubs)
-  crypto-rust-musl = ((final.crypto-rust.override {
-    targets = [ "x86_64-unknown-linux-musl" ];
-  }).overrideAttrs (oa: {
-    nativeBuildInputs = [ final.makeWrapper ];
-    buildCommand = oa.buildCommand + ''
-      for exe in $(find "$out/bin" -type f -or -type l); do
-        wrapProgram "$exe" --prefix LD_LIBRARY_PATH : ${final.gcc-unwrapped.lib}/lib
-      done
-    '';
-  })) // {
-    inherit (prev.rust) toRustTarget toRustTargetSpec;
-  };
-
-  crypto-rust = (rustChannelFromToolchainFileOf ../src/lib/crypto/rust-toolchain.toml).rust;
-
+  #
   # Dependencies which aren't in nixpkgs and local packages which need networking to build
-  kimchi_bindings_stubs = (rustPlatformFor
-    (if pkgs.stdenv.hostPlatform.isMusl then
-      final.crypto-rust-musl
-    else
-      final.crypto-rust)).buildRustPackage {
-        pname = "kimchi_bindings_stubs";
-        version = "0.1.0";
-        src = final.lib.sourceByRegex ../src [
-          "^lib(/crypto(/.*)?)?$"
-          "^external(/wasm-bindgen-rayon(/.*)?)?"
-        ];
-        cargoBuildFlags = ["-p wires_15_stubs" "-p binding_generation"];
-        sourceRoot = "source/lib/crypto";
-        nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
-        # FIXME: tests fail
-        doCheck = false;
-        cargoLock.lockFile = ../src/lib/crypto/Cargo.lock;
-        cargoLock.outputHashes = cargoHashes;
+  #
+
+  # the kimchi bindings static library
+  kimchi_bindings_stubs = 
+    let 
+      toolchain = rustChannelFromToolchainFileOf ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
+      rust_platform = rustPlatformFor toolchain.rust;
+    in
+    rust_platform.buildRustPackage {
+      pname = "kimchi_bindings_stubs";
+      version = "0.1.0";
+      src = final.lib.sourceByRegex ../src [
+      "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
+      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+    ];
+#      srcs = [../src/lib/crypto/proof-systems ../src/lib/crypto/kimchi_bindings/stubs];
+      cargoBuildFlags = ["-p wires_15_stubs" "-p binding_generation"];
+      sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
+      nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
+      cargoLock = let
+        fixupLockFile = path: builtins.readFile path;
+      in {
+        lockFileContents = fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
       };
+      # FIXME: tests fail
+      doCheck = false;
+    };
 
   go-capnproto2 = pkgs.buildGoModule rec {
     pname = "capnpc-go";
@@ -214,7 +206,7 @@ in {
 
   plonk_wasm = let
 
-    lock = ../src/lib/crypto/Cargo.lock;
+    lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -248,14 +240,16 @@ in {
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
       "^lib(/crypto(/.*)?)?$"
-      "^lib/crypto/Cargo\.(lock|toml)$"
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
     ];
-    sourceRoot = "source/lib/crypto";
+    sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
     nativeBuildInputs = [ pkgs.wasm-pack wasm-bindgen-cli ];
     cargoLock.lockFile = lock;
-    cargoLock.outputHashes = cargoHashes;
+    cargoLock.outputHashes = 
+      let cargoHashes = narHashesFromCargoLock lock;
+      in
+      cargoHashes;
 
     # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
     # Want to run after cargoSetupPostUnpackHook
@@ -271,7 +265,6 @@ in {
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
-      cd kimchi_bindings/wasm
       wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
       wasm-pack build --mode no-install --target web --out-dir $out/web ./.
       )

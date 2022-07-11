@@ -11,4 +11,4 @@
 # 4. figure out the hashes of the (now obsolete) docker images used in CI rules that are failing, grep for these hashes and replace them with the new hashes
 
 [toolchain]
-channel = "1.58.1"
+channel = "1.58.0"
