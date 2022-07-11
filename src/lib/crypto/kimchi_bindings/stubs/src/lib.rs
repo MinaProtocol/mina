@@ -16,6 +16,9 @@ pub mod caml;
 /// Arkworks types
 pub mod arkworks;
 
+/// Back end of snarky
+pub mod constraint_system;
+
 /// Utils
 pub mod urs_utils; // TODO: move this logic to proof-systems
 

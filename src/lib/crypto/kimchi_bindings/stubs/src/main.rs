@@ -33,6 +33,7 @@ use wires_15_stubs::{
     CamlWire,
     CurrOrNext,
     GateType,
+    constraint_system::{CamlConstraintSystemFp, CamlConstraintSystemFq}
 };
 
 fn main() {
@@ -277,6 +278,16 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
 }
 
 fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
+    decl_module!(w, env, "Snarky", {
+        decl_module!(w, env, "Fq", {
+            decl_type!(w, env, CamlConstraintSystemFq => "t");
+        });
+
+        decl_module!(w, env, "Fp", {
+            decl_type!(w, env, CamlConstraintSystemFp => "t");
+        });
+    });
+
     decl_module!(w, env, "FieldVectors", {
         decl_module!(w, env, "Fp", {
             decl_type!(w, env, CamlFpVector => "t");

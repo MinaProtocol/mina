@@ -33,7 +33,8 @@ module Verification_key = struct
 end
 
 (* TODO: change name *)
-module R1CS_constraint_system =
+module R1CS_constraint_system = Kimchi_bindings.Snarky.Fq.t
+(*
   Plonk_constraint_system.Make
     (Field)
     (Kimchi_bindings.Protocol.Gates.Vector.Fq)
@@ -42,7 +43,7 @@ module R1CS_constraint_system =
         Sponge.Params.(
           map pasta_q_kimchi ~f:(fun x ->
               Field.of_bigint (Bigint256.of_decimal_string x) ))
-    end)
+    end) *)
 
 module Var = Var
 
