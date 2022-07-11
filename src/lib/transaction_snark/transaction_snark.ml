@@ -1901,20 +1901,6 @@ module Base = struct
             ( `Proof_verifies proof_verifies
             , `Signature_verifies signature_verifies )
 
-          let has_signature_authorization (_party : t) =
-            match auth_type with
-            | Signature ->
-                Boolean.true_
-            | Proof | None_given ->
-                Boolean.false_
-
-          let has_proof_authorization (_party : t) =
-            match auth_type with
-            | Proof ->
-                Boolean.true_
-            | Signature | None_given ->
-                Boolean.false_
-
           module Update = struct
             open Zkapp_basic
 

@@ -309,10 +309,6 @@ module type Party_intf = sig
     -> t
     -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
 
-  val has_signature_authorization : t -> bool
-
-  val has_proof_authorization : t -> bool
-
   module Update : sig
     type _ set_or_keep
 
@@ -1439,9 +1435,7 @@ module Make (Inputs : Inputs_intf) = struct
         let old_hash = Account.receipt_chain_hash a in
         Receipt_chain_hash.if_
           (let open Inputs.Bool in
-          Party.has_signature_authorization party
-          &&& signature_verifies
-          ||| (Party.has_proof_authorization party &&& proof_verifies))
+          signature_verifies ||| proof_verifies)
           ~then_:
             (let elt =
                local_state.full_transaction_commitment

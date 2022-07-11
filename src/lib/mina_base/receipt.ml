@@ -59,16 +59,16 @@ module Chain_hash = struct
     in
     Input.(append x (field (t :> Field.t)))
     |> pack_input
-    |> hash ~init:Hash_prefix.receipt_chain_user_command
+    |> hash ~init:Hash_prefix.receipt_chain_user_command_legacy
     |> of_hash
 
   (* prepend party index computed by Parties_logic.apply *)
   let cons_parties_commitment (index : Mina_numbers.Index.t) (e : Parties_elt.t)
       (t : t) =
-    let open Random_oracle.Legacy in
-    let x = match e with Parties_commitment s -> Input.field s in
-    let index_input = Mina_numbers.Index.to_input_legacy index in
-    Input.(append index_input (append x (field (t :> Field.t))))
+    let open Random_oracle in
+    let x = match e with Parties_commitment s -> Input.Chunked.field s in
+    let index_input = Mina_numbers.Index.to_input index in
+    Input.Chunked.(append index_input (append x (field (t :> Field.t))))
     |> pack_input
     |> hash ~init:Hash_prefix.receipt_chain_user_command
     |> of_hash
@@ -95,7 +95,6 @@ module Chain_hash = struct
 
     let cons_signed_command_payload (e : Signed_command_elt.t) t =
       let open Random_oracle.Legacy in
-      let open Checked in
       let%bind x =
         match e with
         | Signed_command_payload payload ->
@@ -105,23 +104,24 @@ module Chain_hash = struct
             payload
       in
       make_checked (fun () ->
-          hash ~init:Hash_prefix.receipt_chain_user_command
-            (pack_input Input.(append x (field (var_to_hash_packed t))))
+          Checked.hash ~init:Hash_prefix.receipt_chain_user_command_legacy
+            (Checked.pack_input Input.(append x (field (var_to_hash_packed t))))
           |> var_of_hash_packed )
 
     (* prepend party index *)
     let cons_parties_commitment (index : Mina_numbers.Index.Checked.t)
         (e : Parties_elt.t) (t : t) =
-      let open Random_oracle.Legacy in
-      let open Checked in
+      let open Random_oracle in
       let%bind x =
-        match e with Parties_commitment s -> Let_syntax.return (Input.field s)
+        match e with
+        | Parties_commitment s ->
+            Let_syntax.return (Input.Chunked.field s)
       in
-      let%bind index_input = Mina_numbers.Index.Checked.to_input_legacy index in
+      let index_input = Mina_numbers.Index.Checked.to_input index in
       make_checked (fun () ->
-          hash ~init:Hash_prefix.receipt_chain_user_command
-            (pack_input
-               Input.(
+          Checked.hash ~init:Hash_prefix.receipt_chain_user_command
+            (Checked.pack_input
+               Input.Chunked.(
                  append index_input (append x (field (var_to_hash_packed t)))) )
           |> var_of_hash_packed )
   end

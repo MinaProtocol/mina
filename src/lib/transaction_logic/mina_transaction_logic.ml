@@ -892,12 +892,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   module Inputs = struct
     let with_label ~label:_ f = f ()
 
+    let value_if b ~then_ ~else_ = if b then then_ else else_
+
     module Global_state = Global_state
 
     module Field = struct
       type t = Snark_params.Tick.Field.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Bool = struct
@@ -909,7 +911,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let any bs = List.exists ~f:Fn.id bs |> is_true
       end
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let true_ = true
 
@@ -946,13 +948,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Account_id = struct
       include Account_id
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Ledger = struct
       type t = L.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let empty = L.empty
 
@@ -994,7 +996,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         Parties.Transaction_commitment.create_complete commitment ~memo_hash
           ~fee_payer_hash
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Index = struct
@@ -1002,19 +1004,19 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let zero, succ = Mina_numbers.Index.(zero, succ)
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Public_key = struct
       type t = Public_key.Compressed.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Controller = struct
       type t = Permissions.Auth_required.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let check ~proof_verifies ~signature_verifies perm =
         (* Invariant: We either have a proof, a signature, or neither. *)
@@ -1030,13 +1032,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Global_slot = struct
       include Mina_numbers.Global_slot
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Nonce = struct
       type t = Account.Nonce.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let succ = Account.Nonce.succ
     end
@@ -1053,19 +1055,19 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let cons_parties_commitment = Receipt.Chain_hash.cons_parties_commitment
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module State_hash = struct
       include State_hash
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Timing = struct
       type t = Party.Update.Timing_info.t option
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let vesting_period (t : t) =
         match t with
@@ -1078,13 +1080,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Balance = struct
       include Balance
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Verification_key = struct
       type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Events = struct
@@ -1098,13 +1100,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Zkapp_uri = struct
       type t = string
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Token_symbol = struct
       type t = Account.Token_symbol.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Account = struct
@@ -1143,7 +1145,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
         type t = Permissions.t
 
-        let if_ = Parties.value_if
+        let if_ = value_if
       end
 
       type timing = Party.Update.Timing_info.t option
@@ -1273,12 +1275,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type t = unsigned
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       module Signed = struct
         include Signed
 
-        let if_ = Parties.value_if
+        let if_ = value_if
 
         let is_pos (t : t) = Sgn.equal t.sgn Pos
       end
@@ -1312,7 +1314,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Token_id = struct
       include Token_id
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Protocol_state_precondition = struct
@@ -1352,20 +1354,6 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             (`Proof_verifies true, `Signature_verifies false)
         | None_given ->
             (`Proof_verifies false, `Signature_verifies false)
-
-      let has_signature_authorization (party : t) =
-        match party.authorization with
-        | Signature _ ->
-            true
-        | Proof _ | None_given ->
-            false
-
-      let has_proof_authorization (party : t) =
-        match party.authorization with
-        | Proof _ ->
-            true
-        | Signature _ | None_given ->
-            false
 
       module Update = struct
         open Zkapp_basic
@@ -1420,7 +1408,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     struct
       type t = Elt.t list
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let empty () = []
 
@@ -1446,7 +1434,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let empty () = []
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let is_empty = List.is_empty
 
