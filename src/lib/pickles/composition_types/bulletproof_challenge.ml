@@ -16,5 +16,5 @@ let typ chal =
   let there { prechallenge } = prechallenge in
   let back prechallenge = { prechallenge } in
   let open Snarky_backendless in
-  Typ.transport ~there ~back (Pickles_types.Scalar_challenge.typ chal)
+  Typ.transport ~there ~back (Kimchi_backend_common.Scalar_challenge.typ chal)
   |> Typ.transport_var ~there ~back

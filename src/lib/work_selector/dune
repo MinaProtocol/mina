@@ -27,6 +27,7 @@
    snark_work_lib
    mina_state
    mina_base
+   mina_transaction
    network_pool
    staged_ledger
    logger
@@ -38,6 +39,7 @@
    with_hash
    mina_metrics
    transition_frontier_extensions
+   mina_ledger
    )
  (preprocess
   (pps ppx_coda ppx_version ppx_assert ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot

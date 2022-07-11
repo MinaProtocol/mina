@@ -1,5 +1,5 @@
 open Core
-open Async
+open Async_kernel
 open Pipe_lib
 
 let tmp_bans_are_disabled = false
@@ -298,7 +298,7 @@ let%test_module "peer_trust" =
     let%test "Insta-bans actually do so" =
       if tmp_bans_are_disabled then true
       else
-        Thread_safe.block_on_async_exn (fun () ->
+        Run_in_thread.block_on_async_exn (fun () ->
             let db = setup_mock_db () in
             let%map () = Peer_trust_test.record db nolog 0 Insta_ban in
             match Peer_trust_test.lookup_ip db peer0 with
@@ -311,7 +311,7 @@ let%test_module "peer_trust" =
                 false )
 
     let%test "trust decays by half in 24 hours" =
-      Thread_safe.block_on_async_exn (fun () ->
+      Run_in_thread.block_on_async_exn (fun () ->
           let db = setup_mock_db () in
           let%map () = Peer_trust_test.record db nolog 0 Action.Big_credit in
           match Peer_trust_test.lookup_ip db peer0 with
@@ -347,7 +347,7 @@ let%test_module "peer_trust" =
       do_constant_rate rate (fun () -> Peer_trust_test.record db nolog 0 act)
 
     let%test "peers don't get banned for acting at the maximum rate" =
-      Thread_safe.block_on_async_exn (fun () ->
+      Run_in_thread.block_on_async_exn (fun () ->
           let db = setup_mock_db () in
           let%map () = act_constant_rate db 1. Action.Slow_punish in
           match Peer_trust_test.lookup_ip db peer0 with
@@ -361,7 +361,7 @@ let%test_module "peer_trust" =
     let%test "peers do get banned for acting faster than the maximum rate" =
       if tmp_bans_are_disabled then true
       else
-        Thread_safe.block_on_async_exn (fun () ->
+        Run_in_thread.block_on_async_exn (fun () ->
             let db = setup_mock_db () in
             let%map () = act_constant_rate db 1.1 Action.Slow_punish in
             match Peer_trust_test.lookup_ip db peer0 with
@@ -374,7 +374,7 @@ let%test_module "peer_trust" =
                 false )
 
     let%test "good cancels bad" =
-      Thread_safe.block_on_async_exn (fun () ->
+      Run_in_thread.block_on_async_exn (fun () ->
           let db = setup_mock_db () in
           let%map () =
             do_constant_rate 1.1 (fun () ->
@@ -394,7 +394,7 @@ let%test_module "peer_trust" =
     let%test "insta-bans ignore positive trust" =
       if tmp_bans_are_disabled then true
       else
-        Thread_safe.block_on_async_exn (fun () ->
+        Run_in_thread.block_on_async_exn (fun () ->
             let db = setup_mock_db () in
             let%bind () = act_constant_rate db 1. Action.Big_credit in
             ( match Peer_trust_test.lookup_ip db peer0 with
@@ -420,7 +420,7 @@ let%test_module "peer_trust" =
     let%test "multiple peers getting banned causes multiple ban events" =
       if tmp_bans_are_disabled then true
       else
-        Thread_safe.block_on_async_exn (fun () ->
+        Run_in_thread.block_on_async_exn (fun () ->
             let db = setup_mock_db () in
             let%bind () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
             let%map () = Peer_trust_test.record db nolog 1 Action.Insta_ban in
@@ -428,7 +428,7 @@ let%test_module "peer_trust" =
             true )
 
     let%test_unit "actions are written to the pipe" =
-      Thread_safe.block_on_async_exn (fun () ->
+      Run_in_thread.block_on_async_exn (fun () ->
           let db = setup_mock_db () in
           let pipe = Peer_trust_test.For_tests.get_action_pipe db in
           let%bind () = Peer_trust_test.record db nolog 0 Action.Insta_ban in

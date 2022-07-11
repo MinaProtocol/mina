@@ -3,7 +3,6 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_block
 open Pipe_lib
 open Signature_lib
 
@@ -38,10 +37,10 @@ let sign_blake2_hash ~private_key s =
   let bitstrings =
     [| Blake2.to_raw_string blake2 |> Blake2.string_to_bits |> Array.to_list |]
   in
-  let input : (Field.t, bool) Random_oracle.Input.t =
+  let input : (Field.t, bool) Random_oracle.Legacy.Input.t =
     { field_elements; bitstrings }
   in
-  Schnorr.sign private_key input
+  Schnorr.Legacy.sign private_key input
 
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
@@ -192,12 +191,9 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
     breadcrumb |> Transition_frontier.Breadcrumb.block
-    |> External_transition.compose
   in
   let block_string =
-    Binable.to_string
-      (module External_transition.Raw.Stable.Latest)
-      external_transition
+    Binable.to_string (module Mina_block.Stable.Latest) external_transition
   in
   (* raises only on errors from invalid optional arguments *)
   Base64.encode_exn block_string
@@ -329,9 +325,9 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
             match
               List.find transitions ~f:(fun transition ->
                   match transition with
-                  | Snark_work_lib.Work.Single.Spec.Transition
-                      ({ target; _ }, _, _) ->
-                      Marlin_plonk_bindings_pasta_fp.equal target
+                  | Snark_work_lib.Work.Single.Spec.Transition ({ target; _ }, _)
+                    ->
+                      Pasta_bindings.Fp.equal target.ledger
                         (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->
                       (* unreachable *)
