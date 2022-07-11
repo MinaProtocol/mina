@@ -34,7 +34,7 @@ module Step_verifier = Step_verifier
 
 exception Return_digest of Md5.t
 
-let profile_constraints = false
+let profile_constraints = true
 
 let verify_promise = Verify.verify
 
@@ -1175,7 +1175,7 @@ let%test_module "test no side-loaded" =
               ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
-              ~name:"blockchain-snark"
+              ~name:"no-recursion"
               ~constraint_constants:
                 (* Dummy values *)
                 { sub_windows_per_window = 0
@@ -1239,7 +1239,7 @@ let%test_module "test no side-loaded" =
               ~public_input:(Output Field.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
-              ~name:"blockchain-snark"
+              ~name:"no-recursion-return"
               ~constraint_constants:
                 (* Dummy values *)
                 { sub_windows_per_window = 0
@@ -1307,7 +1307,7 @@ let%test_module "test no side-loaded" =
               ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N1)
-              ~name:"blockchain-snark"
+              ~name:"simple-chain"
               ~constraint_constants:
                 (* Dummy values *)
                 { sub_windows_per_window = 0
@@ -1412,7 +1412,7 @@ let%test_module "test no side-loaded" =
               ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
-              ~name:"blockchain-snark"
+              ~name:"tree-proof"
               ~constraint_constants:
                 (* Dummy values *)
                 { sub_windows_per_window = 0
@@ -1545,7 +1545,7 @@ let%test_module "test no side-loaded" =
               ~public_input:(Output Field.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
-              ~name:"blockchain-snark"
+              ~name:"tree-proof-return"
               ~constraint_constants:
                 (* Dummy values *)
                 { sub_windows_per_window = 0
@@ -1668,7 +1668,7 @@ let%test_module "test no side-loaded" =
               ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
-              ~name:"blockchain-snark"
+              ~name:"add-one-return"
               ~constraint_constants:
                 (* Dummy values *)
                 { sub_windows_per_window = 0
@@ -1734,7 +1734,7 @@ let%test_module "test no side-loaded" =
               ~auxiliary_typ:Field.typ
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
-              ~name:"blockchain-snark"
+              ~name:"auxiliary-return"
               ~constraint_constants:
                 (* Dummy values *)
                 { sub_windows_per_window = 0
@@ -1988,6 +1988,7 @@ let%test_module "test" =
 
     module Blockchain_snark = struct
       module Statement = Txn_snark.Statement
+
 
       let tag, _, p, Provers.[step] =
         Common.time "compile" (fun () ->
