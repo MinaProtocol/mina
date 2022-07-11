@@ -202,8 +202,6 @@ in {
     '';
   };
 
-  # ocaml -> kimchi bindings (static lib) -> glibc (dlib)
-
   plonk_wasm = let
 
     lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
