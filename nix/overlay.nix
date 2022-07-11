@@ -115,11 +115,9 @@ in {
       pname = "kimchi_bindings_stubs";
       version = "0.1.0";
       src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
-      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
-    ];
-#      srcs = [../src/lib/crypto/proof-systems ../src/lib/crypto/kimchi_bindings/stubs];
-      cargoBuildFlags = ["-p wires_15_stubs" "-p binding_generation"];
+        "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
+        "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+      ];
       sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
       nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
       cargoLock = let
@@ -203,6 +201,8 @@ in {
       cp ${pkgs.kimchi-rust.rust-src}/lib/rustlib/src/rust/Cargo.lock $out
     '';
   };
+
+  # ocaml -> kimchi bindings (static lib) -> glibc (dlib)
 
   plonk_wasm = let
 
