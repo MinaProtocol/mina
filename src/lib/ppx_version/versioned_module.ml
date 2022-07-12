@@ -1095,18 +1095,30 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
       Option.map ~f:erase_stable_versions#structure_item type_stri
       |> Option.to_list
     in
-    let warning s =
-      Attr.mk ~loc
-        Location.{ txt = "warning"; loc }
-        (PStr ([s |> Const.string |> Exp.constant |> Str.eval]))
-    in 
+    let empty_signature = "Empty_signature" in
+    let stable_latest = "Stable.Latest" in
+    let empty_sig =
+      (mk_loc ~loc empty_signature)
+      |> Mtd.mk ~typ:(Mty.signature [])
+      |> Str.modtype
+    in
+    let empty_bind =
+      let pattern = Pat.constraint_ (Pat.mk Ppat_any) (Typ.mk Ptyp_any)
+      and expression =
+        let latest = stable_latest |> Longident.parse |> Loc.make ~loc |> Mod.ident in
+        let core_kernel = empty_signature |> Longident.parse |> Loc.make ~loc in
+        Exp.constraint_ (Exp.pack latest) (Typ.package core_kernel [])
+      in
+      let binding = Vb.mk pattern expression in
+      Str.value Nonrecursive [binding]
+    in
     Str.include_ ~loc
       (Incl.mk ~loc
-         (Ast_helper.Mod.structure ~loc ~attrs:[warning "-60"]
-            (Str.module_ ~loc
+         (Ast_helper.Mod.structure ~loc
+             ((Str.module_ ~loc
                 (Mb.mk ~loc:modname.loc (some_loc modname)
                    (Mod.structure ~loc:modbody.loc modbody.txt))
-            :: type_stri)))
+            :: type_stri) @ [empty_sig; empty_bind])))
   with exn ->
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
