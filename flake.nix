@@ -94,7 +94,6 @@
             (final: prev: {
               ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
                 inherit inputs pkgs;
-                static = final.stdenv.hostPlatform.isStatic;
               });
             })
           ]);
@@ -118,7 +117,6 @@
         checks = import ./nix/checks.nix inputs pkgs;
 
         ocamlPackages = pkgs.ocamlPackages_mina;
-        ocamlPackages_static = pkgs.pkgsStatic.ocamlPackages_mina;
       in {
 
         # Jobs/Lint/Rust.dhall
@@ -192,7 +190,7 @@
           '';
         };
 
-        inherit ocamlPackages ocamlPackages_static;
+        inherit ocamlPackages;
         packages.mina = ocamlPackages.mina;
         packages.mina_tests = ocamlPackages.mina_tests;
         packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
@@ -224,8 +222,6 @@
         packages.marlin_plonk_bindings_stubs = pkgs.marlin_plonk_bindings_stubs;
         packages.go-capnproto2 = pkgs.go-capnproto2;
         packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.marlin_plonk_bindings_stubs_static =
-          pkgs.pkgsMusl.marlin_plonk_bindings_stubs;
         packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;

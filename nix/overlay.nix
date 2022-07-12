@@ -1,24 +1,6 @@
 final: prev:
 let pkgs = final;
 in {
-  # nixpkgs + musl problems
-  postgresql =
-    (prev.postgresql.override { enableSystemd = false; }).overrideAttrs
-    (o: { doCheck = false; });
-
-  openssh = (if prev.stdenv.hostPlatform.isMusl then
-    (prev.openssh.override {
-      # todo: fix libredirect musl
-      libredirect = "";
-    }).overrideAttrs (o: { doCheck = !prev.stdenv.hostPlatform.isMusl; })
-  else
-    prev.openssh);
-
-  git = prev.git.overrideAttrs
-    (o: { doCheck = o.doCheck && !prev.stdenv.hostPlatform.isMusl; });
-
-  # Overrides for dependencies
-
   sodium-static =
     pkgs.libsodium.overrideAttrs (o: { dontDisableStatic = true; });
 
@@ -45,34 +27,9 @@ in {
     ];
   });
 
-  # Rust stuff (for marlin_plonk_bindings_stubs)
-  rust-musl = (((final.rustChannelOf {
-    channel = "nightly";
-    sha256 = "sha256-eKL7cdPXGBICoc9FGMSHgUs6VGMg+3W2y/rXN8TuuAI=";
-    date = "2021-12-27";
-  }).rust.override { targets = [ "x86_64-unknown-linux-musl" ]; }).overrideAttrs
-    (oa: {
-      nativeBuildInputs = [ final.makeWrapper ];
-      buildCommand = oa.buildCommand + ''
-        for exe in $(find "$out/bin" -type f -or -type l); do
-          wrapProgram "$exe" --prefix LD_LIBRARY_PATH : ${final.gcc-unwrapped.lib}/lib
-        done
-      '';
-    })) // {
-      inherit (prev.rust) toRustTarget toRustTargetSpec;
-    };
-
-  rustPlatform-musl = prev.makeRustPlatform {
-    cargo = final.rust-musl;
-    rustc = final.rust-musl;
-  };
-
   # Dependencies which aren't in nixpkgs and local packages which need networking to build
 
-  marlin_plonk_bindings_stubs = (if pkgs.stdenv.hostPlatform.isMusl then
-    pkgs.rustPlatform-musl
-  else
-    pkgs.rustPlatform).buildRustPackage {
+  marlin_plonk_bindings_stubs = pkgs.rustPlatform.buildRustPackage {
       pname = "marlin_plonk_bindings_stubs";
       version = "0.1.0";
       srcs = [ ../src/lib/marlin_plonk_bindings/stubs ../src/lib/marlin ];
