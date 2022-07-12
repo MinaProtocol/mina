@@ -10,3 +10,5 @@ for pkg in $PACKAGES; do
     echo "Pinning package" $pkg
     opam pin -y add src/external/$pkg
 done
+
+opam pin -y add src/app/check_opam_switch

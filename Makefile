@@ -69,7 +69,11 @@ ocaml_version:
 ocaml_word_size:
 	@if ! ocamlopt -config | grep "word_size:" | grep $(WORD_SIZE); then echo "invalid machine word size, expected $(WORD_SIZE)" ; exit 1; fi
 
-ocaml_checks: ocaml_version ocaml_word_size
+
+check_opam_switch:
+	@if which check_opam_switch; then check_opam_switch src/opam.export; fi
+
+ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
 	make -C src/app/libp2p_helper

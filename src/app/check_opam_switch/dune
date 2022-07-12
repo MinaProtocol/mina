@@ -1,0 +1,15 @@
+(executable
+ (name dune_wrapper)
+ (package check_opam_switch)
+ (public_name dune_wrapper)
+ (modes native)
+ (modules Dune_wrapper)
+ (libraries opam-format opam-core compare_switch))
+
+(executable
+ (name check_opam_switch)
+ (package check_opam_switch)
+ (public_name check_opam_switch)
+ (modes native)
+ (modules Check_opam_switch)
+ (libraries opam-format opam-core compare_switch))
