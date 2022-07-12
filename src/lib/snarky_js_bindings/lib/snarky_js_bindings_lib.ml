@@ -2248,11 +2248,19 @@ let proof_of_base64 str i : some_proof =
   | _ ->
       failwith "invalid proof index"
 
-let verify (public_input : public_input_js) (proof : proof)
+let verify (public_input : public_input_js) (proof : some_proof)
     (vk : Js.js_string Js.t) =
   let public_input = Public_input.Constant.of_js public_input in
   let typ = public_input_typ (Array.length public_input) in
-  let proof = Pickles.Side_loaded.Proof.of_proof proof in
+  let proof =
+    match proof with
+    | Proof0 p ->
+        Pickles.Side_loaded.Proof.of_proof p
+    | Proof1 p ->
+        Pickles.Side_loaded.Proof.of_proof p
+    | Proof2 p ->
+        Pickles.Side_loaded.Proof.of_proof p
+  in
   let vk =
     Pickles.Side_loaded.Verification_key.of_base58_check_exn (Js.to_string vk)
   in
