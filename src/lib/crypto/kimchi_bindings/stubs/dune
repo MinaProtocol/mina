@@ -21,7 +21,6 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
-  (source_tree binding_generation)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
@@ -105,16 +104,14 @@
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
-  (chdir
-   binding_generation
-   (progn
-    (run rm -rf ./target)
-    (run rm -f ./Cargo.lock)
-    (setenv
-     CARGO_TARGET_DIR
-     "%{read:dune-build-root}/cargo_kimchi_bindgen"
-     (run cargo run %{targets}))
-    (run ocamlformat -i %{targets})))))
+  (progn
+   (run rm -rf ./target)
+   (run rm -f ./Cargo.lock)
+   (setenv
+    CARGO_TARGET_DIR
+    "%{read:dune-build-root}/cargo_kimchi_bindgen"
+    (run cargo run %{targets}))
+   (run ocamlformat -i %{targets}))))
 
 ;; run from $MARLIN_PLONK_STUBS if this exists
 
@@ -128,5 +125,5 @@
   (env_var MARLIN_PLONK_STUBS))
  (action
   (progn
-   (run %{env:MARLIN_PLONK_STUBS=n}/bin/binding_generation %{targets})
+   (run %{env:MARLIN_PLONK_STUBS=n}/bin/main %{targets})
    (run ocamlformat -i %{targets}))))
