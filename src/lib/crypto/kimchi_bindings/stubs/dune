@@ -14,7 +14,7 @@
   ; no sandbox, we want the path to the _build directory
   (sandbox none))
  (action
-  (system "print \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
+  (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
 
 ;;
 ;; rules to build the static library for kimchi
