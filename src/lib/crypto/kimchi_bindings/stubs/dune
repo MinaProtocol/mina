@@ -1,17 +1,26 @@
-(data_only_dirs src)
+;; src/ contains no dune-related files
 
-(dirs :standard \ target)
+(data_only_dirs src)
 
 ;; Ignore target if it exists locally
 
-;; no sandbox, we want the path to the _build directory
+(dirs :standard \ target)
+
+;; we first create a `dune-build-root` file that contains the dune workspace root
 
 (rule
  (target dune-build-root)
  (deps
+  ; no sandbox, we want the path to the _build directory
   (sandbox none))
  (action
   (system "echo -n $(realpath %{workspace_root}/..) > %{target}")))
+
+;;
+;; rules to build the static library for kimchi
+;;
+
+;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
 
 (rule
  (enabled_if
@@ -38,7 +47,7 @@
     %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
     .))))
 
-;; copy from $MARLIN_PLONK_STUBS if this exists
+;; this is used by nix
 
 (rule
  (enabled_if
@@ -52,7 +61,9 @@
     %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a
     libwires_15_stubs.a))))
 
-;; libraries
+;;
+;; declare the libraries we're going to generate to match the bindings
+;;
 
 (library
  (public_name kimchi_types)
@@ -88,7 +99,11 @@
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
+;;
 ;; generate the OCaml bindings
+;;
+
+;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
 
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
@@ -113,7 +128,7 @@
     (run cargo run %{targets}))
    (run ocamlformat -i %{targets}))))
 
-;; run from $MARLIN_PLONK_STUBS if this exists
+;; this is used by nix
 
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
