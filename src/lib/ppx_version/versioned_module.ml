@@ -1106,8 +1106,8 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
       let pattern = Pat.constraint_ (Pat.mk Ppat_any) (Typ.mk Ptyp_any)
       and expression =
         let latest = stable_latest |> Longident.parse |> Loc.make ~loc |> Mod.ident in
-        let core_kernel = empty_signature |> Longident.parse |> Loc.make ~loc in
-        Exp.constraint_ (Exp.pack latest) (Typ.package core_kernel [])
+        let empty_signature = empty_signature |> Longident.parse |> Loc.make ~loc in
+        Exp.constraint_ (Exp.pack latest) (Typ.package empty_signature [])
       in
       let binding = Vb.mk pattern expression in
       Str.value Nonrecursive [binding]
