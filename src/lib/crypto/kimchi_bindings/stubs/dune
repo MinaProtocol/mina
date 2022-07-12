@@ -125,5 +125,5 @@
   (env_var MARLIN_PLONK_STUBS))
  (action
   (progn
-   (run %{env:MARLIN_PLONK_STUBS=n}/bin/main %{targets})
+   (run %{env:MARLIN_PLONK_STUBS=n}/bin/wires_15_stubs %{targets})
    (run ocamlformat -i %{targets}))))
