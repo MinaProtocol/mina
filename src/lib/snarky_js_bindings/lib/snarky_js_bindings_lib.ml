@@ -1469,6 +1469,34 @@ module Circuit = struct
     let kp = Impl.Keypair.generate cs in
     new%js keypair_constr kp
 
+  let constraint_system (main : unit -> unit) =
+    let cs =
+      Impl.constraint_system
+        ~exposing:Impl.Data_spec.[]
+        ~return_typ:Snark_params.Tick.Typ.unit main
+    in
+    let rows = List.length cs.rows_rev in
+    let digest =
+      Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
+    in
+    (* TODO: to_json doesn't return anything; call into kimchi instead *)
+    let json =
+      Js.Unsafe.(
+        fun_call
+          global ##. JSON##.parse
+          [| inject
+               ( Backend.R1CS_constraint_system.to_json cs
+               |> Yojson.Safe.to_string |> Js.string )
+          |])
+    in
+    object%js
+      val rows = rows
+
+      val digest = digest
+
+      val json = json
+    end
+
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
     let main, spec = main_and_input c in
@@ -1515,6 +1543,7 @@ module Circuit = struct
     := Js.wrap_callback (fun () : bool Js.t ->
            Js.bool (Impl.in_checked_computation ()) ) ;
     Js.Unsafe.set circuit (Js.string "if") if_ ;
+    Js.Unsafe.set circuit (Js.string "_constraintSystem") constraint_system ;
     circuit##.getVerificationKey
     := fun (vk : Verification_key.t) -> new%js verification_key_constr vk
 end
