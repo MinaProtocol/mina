@@ -6,24 +6,20 @@ let
 
   inherit (builtins) filterSource path;
 
-  inherit (pkgs.lib) hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath;
+  inherit (pkgs.lib)
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam ../src/opam.export;
-  external-packages = getAttrs [
-    "sodium"
-    "capnp"
-    "rpc_parallel"
-    "async_kernel"
-    "base58"
-  ] (builtins.mapAttrs (_: last) (opam-nix.listRepo external-repo));
+  external-packages =
+    getAttrs [ "sodium" "capnp" "rpc_parallel" "async_kernel" "base58" ]
+    (builtins.mapAttrs (_: last) (opam-nix.listRepo external-repo));
 
   difference = a: b:
-    filterAttrs (name: _: !builtins.elem name (builtins.attrNames b))
-    a;
+    filterAttrs (name: _: !builtins.elem name (builtins.attrNames b)) a;
 
   export-installed = opam-nix.opamListToQuery export.installed;
 
@@ -55,13 +51,8 @@ let
   sourceInfo = inputs.self.sourceInfo or { };
 
   external-libs = with pkgs;
-    [
-      zlib
-      bzip2
-      gmp
-      openssl
-      libffi
-    ] ++ lib.optional (! (stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
+    [ zlib bzip2 gmp openssl libffi ]
+    ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
   filtered-src = with inputs.nix-filter.lib;
     filter {
@@ -78,8 +69,7 @@ let
 
   overlay = self: super:
     let
-      ocaml-libs =
-        builtins.attrValues (getAttrs installedPackageNames self);
+      ocaml-libs = builtins.attrValues (getAttrs installedPackageNames self);
 
       # This is needed because
       # - lld package is not wrapped to pick up the correct linker flags
@@ -176,10 +166,11 @@ let
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
-        shellHook = "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
+        shellHook =
+          "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
       } // optionalAttrs pkgs.stdenv.isDarwin {
-          OCAMLPARAM = "_,cclib=-lc++";
-        });
+        OCAMLPARAM = "_,cclib=-lc++";
+      });
 
       mina = let
         commit_sha1 =

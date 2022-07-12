@@ -62,15 +62,14 @@
       pipeline = with flake-buildkite-pipeline.lib;
         let
           pushToRegistry = package: {
-            command = runInEnv self.devShells.x86_64-linux.operations
-              ''
-                skopeo \
-                copy \
-                --insecure-policy \
-                --dest-registry-token $(gcloud auth application-default print-access-token) \
-                docker-archive:${self.packages.x86_64-linux.${package}} \
-                docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
-              '';
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              skopeo \
+              copy \
+              --insecure-policy \
+              --dest-registry-token $(gcloud auth application-default print-access-token) \
+              docker-archive:${self.packages.x86_64-linux.${package}} \
+              docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+            '';
             label = "Upload mina-docker to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
@@ -92,9 +91,8 @@
             (import nixpkgs-mozilla)
             (import ./nix/overlay.nix)
             (final: prev: {
-              ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-                inherit inputs pkgs;
-              });
+              ocamlPackages_mina = requireSubmodules
+                (import ./nix/ocaml.nix { inherit inputs pkgs; });
             })
           ]);
         inherit (pkgs) lib;
