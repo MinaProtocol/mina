@@ -26,6 +26,7 @@
    block_time
    currency
    data_hash_lib
+   hash_prefixes
    fields_derivers
    fields_derivers_zkapps
    genesis_constants

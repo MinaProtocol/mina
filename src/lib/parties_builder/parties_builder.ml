@@ -35,12 +35,9 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
     other_parties : Parties.t =
   let fee_payer : Party.Fee_payer.t =
     { body =
-        { update = Party.Update.noop
-        ; public_key = fee_payer_pk
+        { public_key = fee_payer_pk
         ; fee = Currency.Fee.of_int fee
-        ; events = []
-        ; sequence_events = []
-        ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+        ; valid_until = None
         ; nonce = fee_payer_nonce
         }
     ; authorization = Signature.dummy

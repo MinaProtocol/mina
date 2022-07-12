@@ -233,10 +233,10 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   let hash parent_hash (proof_elem : User_command.t) =
     let p =
       match proof_elem with
-      | Signed_command c ->
-          Receipt.Elt.Signed_command (Signed_command.payload c)
-      | Parties x ->
-          Receipt.Elt.Parties (Parties.commitment x)
+      | Signed_command cmd ->
+          Receipt.Elt.Signed_command_payload (Signed_command.payload cmd)
+      | Parties parties ->
+          Receipt.Elt.Parties_commitment (Parties.commitment parties)
     in
     Receipt.Chain_hash.cons p parent_hash
 end)

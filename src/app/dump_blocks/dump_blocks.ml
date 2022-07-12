@@ -40,10 +40,12 @@ let f make_breadcrumb =
           (Breadcrumb.block_with_hash breadcrumb)
       in
       Core_kernel.eprintf
-        !"Randomly generated block, sexp:\n%{sexp:Mina_block.Precomputed.t}\n"
+        !"Randomly generated block, sexp:\n" ;
+      Core_kernel.printf !"%{sexp:Mina_block.Precomputed.t}\n"
         precomputed ;
       Core_kernel.eprintf
-        !"Randomly generated block, json:\n%{Yojson.Safe}\n"
+        !"Randomly generated block, json:\n" ;
+      Core_kernel.printf !"%{Yojson.Safe}\n"
         (Mina_block.Precomputed.to_yojson precomputed) ;
       clean_up_persistent_root ~frontier )
 

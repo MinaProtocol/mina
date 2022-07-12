@@ -60,15 +60,32 @@
           }
         ];
       };
-      pipeline = with flake-buildkite-pipeline.lib; {
-        steps = flakeSteps {
-          commonExtraStepConfig = {
-            agents = [ "nix" ];
-            soft_fail = "true";
+      pipeline = with flake-buildkite-pipeline.lib;
+        let
+          pushToRegistry = package: {
+            command = runInEnv self.devShells.x86_64-linux.operations
+              ''
+                skopeo \
+                copy \
+                --insecure-policy \
+                --dest-registry-token $(gcloud auth application-default print-access-token) \
+                docker-archive:${self.packages.x86_64-linux.${package}} \
+                docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+              '';
+            label = "Upload mina-docker to Google Artifact Registry";
+            depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+            # branches = [ "compatible" "develop" ];
           };
-        } self;
-      };
+        in {
+          steps = flakeSteps {
+            reproduceRepo = "mina";
+            commonExtraStepConfig = {
+              agents = [ "nix" ];
+              plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+            };
+          } self ++ [ (pushToRegistry "mina-docker") ];
+        };
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
@@ -268,6 +285,9 @@
             popd
           '';
         });
+
+        devShells.operations =
+          pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
 
         devShells.impure = import ./nix/impure-shell.nix pkgs;
         devShells.rust-wasm-impure = pkgs.mkShell {

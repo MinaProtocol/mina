@@ -13,14 +13,12 @@ import (
 	"sync"
 	"time"
 
-	lmdbbs "github.com/georgeee/go-bs-lmdb"
 	"github.com/ipfs/go-bitswap"
 	bitnet "github.com/ipfs/go-bitswap/network"
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log/v2"
 	p2p "github.com/libp2p/go-libp2p"
 
-	p2pconnmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/control"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -31,7 +29,6 @@ import (
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
@@ -39,12 +36,13 @@ import (
 	record "github.com/libp2p/go-libp2p-record"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	discovery "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	libp2pyamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	p2pconnmgr "github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/crypto/blake2b"
-
-	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
-	mplex "github.com/libp2p/go-mplex"
 )
 
 const NodeStatusTimeout = 10 * time.Second
@@ -129,16 +127,19 @@ func (cm *CodaConnectionManager) AddOnDisconnectHandler(f func(network.Network, 
 	}
 }
 
-func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) *CodaConnectionManager {
+func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) (*CodaConnectionManager, error) {
 	noop := func(net network.Network, c network.Conn) {}
-
+	connmgr, err := p2pconnmgr.NewConnManager(minConnections, maxConnections, p2pconnmgr.WithGracePeriod(grace))
+	if err != nil {
+		return nil, err
+	}
 	return &CodaConnectionManager{
-		p2pManager:       p2pconnmgr.NewConnManager(minConnections, maxConnections, grace),
+		p2pManager:       connmgr,
 		OnConnect:        noop,
 		OnDisconnect:     noop,
 		minaPeerExchange: minaPeerExchange,
 		protectedMirror:  make(map[peer.ID]map[string]interface{}),
-	}
+	}, nil
 }
 
 // proxy connmgr.ConnManager interface to p2pconnmgr.BasicConnMgr
@@ -203,12 +204,6 @@ func (cm *CodaConnectionManager) Listen(net network.Network, addr ma.Multiaddr) 
 }
 func (cm *CodaConnectionManager) ListenClose(net network.Network, addr ma.Multiaddr) {
 	cm.p2pManager.Notifee().ListenClose(net, addr)
-}
-func (cm *CodaConnectionManager) OpenedStream(net network.Network, stream network.Stream) {
-	cm.p2pManager.Notifee().OpenedStream(net, stream)
-}
-func (cm *CodaConnectionManager) ClosedStream(net network.Network, stream network.Stream) {
-	cm.p2pManager.Notifee().ClosedStream(net, stream)
 }
 func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) {
 	logger.Debugf("%s connected to %s", c.LocalPeer(), c.RemotePeer())
@@ -785,9 +780,13 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	var kad *dual.DHT
 
-	mplex.MaxMessageSize = 1 << 30
+	// TODO is it fine to have 1 << 20?
+	// mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
+	connManager, err := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
+	if err != nil {
+		return nil, err
+	}
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	// we initialize the known private addr filters to reject all ip addresses initially
@@ -798,8 +797,9 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	}
 
 	gs := NewCodaGatingState(gatingConfig, knownPrivateAddrFilters)
-	host, err := p2p.New(ctx,
-		p2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
+	host, err := p2p.New(
+		p2p.Transport(tcp.NewTCPTransport),
+		p2p.Muxer("/coda/yamux/1.0.0", libp2pyamux.DefaultTransport),
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
@@ -836,27 +836,18 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	if err != nil {
 		return nil, err
 	}
-
-	// 256MiB, a large enough mmap size to make mmap grow() a rare event
-	opt := lmdbbs.Options{
-		Path:            path.Join(statedir, "block-db"),
-		InitialMmapSize: 256 << 20,
-		CidToKeyMapper:  cidToKeyMapper,
-		KeyToCidMapper:  keyToCidMapper,
-	}
-	bstore, err := lmdbbs.Open(&opt)
+	bstore, err := OpenBitswapStorageLmdb(path.Join(statedir, "block-db"))
 	if err != nil {
 		return nil, err
 	}
-
 	bitswapNetwork := bitnet.NewFromIpfsHost(host, kad, bitnet.Prefix(BitSwapExchange))
-	bs := bitswap.New(context.Background(), bitswapNetwork, bstore).(*bitswap.Bitswap)
+	bs := bitswap.New(context.Background(), bitswapNetwork, bstore.Blockstore()).(*bitswap.Bitswap)
 
 	// nil fields are initialized by beginAdvertising
 	h := &Helper{
 		Host:              host,
 		Bitswap:           bs,
-		BitswapStorage:    (*BitswapStorageLmdb)(bstore),
+		BitswapStorage:    bstore,
 		Ctx:               ctx,
 		Mdns:              nil,
 		Dht:               kad,

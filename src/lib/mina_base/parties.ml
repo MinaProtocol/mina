@@ -783,7 +783,7 @@ module T = struct
 
       let to_latest = Fn.id
 
-      let version_byte = Base58_check.Version_bytes.snapp_command
+      let version_byte = Base58_check.Version_bytes.zkapp_command
 
       let description = "Parties"
 

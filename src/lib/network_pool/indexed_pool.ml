@@ -1911,15 +1911,7 @@ let%test_module _ =
       let parties_wire : Parties.Stable.Latest.Wire.t =
         { fee_payer =
             { Party.Fee_payer.body =
-                { public_key = sender_pk
-                ; update = Party.Update.noop
-                ; fee
-                ; events = []
-                ; sequence_events = []
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
-                ; nonce
-                }
+                { public_key = sender_pk; fee; nonce; valid_until = None }
                 (* Real signature added in below *)
             ; authorization = Signature.dummy
             }

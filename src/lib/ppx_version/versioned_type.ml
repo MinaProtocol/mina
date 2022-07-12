@@ -266,8 +266,6 @@ module Deriving = struct
 
   let ocaml_builtin_type_constructors = [ "list"; "array"; "option"; "ref" ]
 
-  let jane_street_type_constructors = [ "sexp_opaque" ]
-
   let is_version_module vn =
     let len = String.length vn in
     len > 1
@@ -338,7 +336,6 @@ module Deriving = struct
               []
             else if
               List.mem ocaml_builtin_type_constructors id ~equal:String.equal
-              || List.mem jane_street_type_constructors id ~equal:String.equal
             then
               match core_types with
               | [ _ ] ->

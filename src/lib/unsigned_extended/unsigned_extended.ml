@@ -157,21 +157,3 @@ module UInt32 = struct
 
   let of_uint32 : uint32 -> t = Fn.id
 end
-
-(* check that serializations don't change *)
-let%test_module "Unsigned serializations" =
-  ( module struct
-    let%test "UInt32 V1 serialization" =
-      let uint32 = UInt32.of_int 9775 in
-      let known_good_digest = "b66e8ba9d68f2d08bafaa3abd3abccba" in
-      Test_util.check_serialization
-        (module UInt32.Stable.V1)
-        uint32 known_good_digest
-
-    let%test "UInt64 V1 serialization" =
-      let uint64 = UInt64.of_int64 191797697848L in
-      let known_good_digest = "9a34874c0a6a0c797b19d1f756f39103" in
-      Test_util.check_serialization
-        (module UInt64.Stable.V1)
-        uint64 known_good_digest
-  end )

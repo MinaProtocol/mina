@@ -2195,7 +2195,7 @@ let receipt_chain_hash =
        *)
        let transaction = Signed_command.of_base58_check_exn transaction_id in
        let hash =
-         Receipt.Chain_hash.cons (Signed_command transaction.payload)
+         Receipt.Chain_hash.cons (Signed_command_payload transaction.payload)
            previous_hash
        in
        printf "%s\n" (Receipt.Chain_hash.to_base58_check hash) )

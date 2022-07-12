@@ -48,7 +48,7 @@
    mina_numbers
    mina_transaction
  )
- (preprocessor_deps ../../../config.mlh)
+ (preprocessor_deps ../../../config.mlh ../../../graphql-ppx-config.inc)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_coda
@@ -66,8 +66,4 @@
                ppx_hash
                ppx_custom_printf
                h_list.ppx
-               graphql_ppx --
-               -extend-query Graphql_lib.Serializing.ExtendQuery
-               -extend-mutation Graphql_lib.Serializing.ExtendQuery
-               -future-added-value false
-)))
+               graphql_ppx -- %{read-lines:../../../graphql-ppx-config.inc})))
