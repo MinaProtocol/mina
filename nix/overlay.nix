@@ -237,17 +237,13 @@ in {
     pname = "plonk_wasm";
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/.*)?)?$"
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
     ];
     sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
     nativeBuildInputs = [ pkgs.wasm-pack wasm-bindgen-cli ];
     cargoLock.lockFile = lock;
-    cargoLock.outputHashes = 
-      let cargoHashes = narHashesFromCargoLock lock;
-      in
-      cargoHashes;
+    cargoLock.outputHashes = narHashesFromCargoLock lock;
 
     # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
     # Want to run after cargoSetupPostUnpackHook
