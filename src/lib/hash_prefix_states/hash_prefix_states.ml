@@ -5,9 +5,9 @@ let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
 
 let salt_legacy (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
 
-let receipt_chain_user_command_legacy = salt_legacy receipt_chain_user_command
+let receipt_chain_signed_command = salt_legacy receipt_chain_user_command
 
-let receipt_chain_user_command = salt receipt_chain_user_command
+let receipt_chain_parties = salt receipt_chain_user_command
 
 let receipt_chain_zkapp = salt receipt_chain_zkapp
 

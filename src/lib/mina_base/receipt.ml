@@ -59,7 +59,7 @@ module Chain_hash = struct
     in
     Input.(append x (field (t :> Field.t)))
     |> pack_input
-    |> hash ~init:Hash_prefix.receipt_chain_user_command_legacy
+    |> hash ~init:Hash_prefix.receipt_chain_signed_command
     |> of_hash
 
   (* prepend party index computed by Parties_logic.apply *)
@@ -70,7 +70,7 @@ module Chain_hash = struct
     let index_input = Mina_numbers.Index.to_input index in
     Input.Chunked.(append index_input (append x (field (t :> Field.t))))
     |> pack_input
-    |> hash ~init:Hash_prefix.receipt_chain_user_command
+    |> hash ~init:Hash_prefix.receipt_chain_parties
     |> of_hash
 
   [%%if defined consensus_mechanism]
@@ -104,7 +104,7 @@ module Chain_hash = struct
             payload
       in
       make_checked (fun () ->
-          Checked.hash ~init:Hash_prefix.receipt_chain_user_command_legacy
+          Checked.hash ~init:Hash_prefix.receipt_chain_signed_command
             (Checked.pack_input Input.(append x (field (var_to_hash_packed t))))
           |> var_of_hash_packed )
 
@@ -119,7 +119,7 @@ module Chain_hash = struct
       in
       let index_input = Mina_numbers.Index.Checked.to_input index in
       make_checked (fun () ->
-          Checked.hash ~init:Hash_prefix.receipt_chain_user_command
+          Checked.hash ~init:Hash_prefix.receipt_chain_parties
             (Checked.pack_input
                Input.Chunked.(
                  append index_input (append x (field (var_to_hash_packed t)))) )
