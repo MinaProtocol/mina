@@ -48,7 +48,7 @@ let verify_heterogenous (ts : Instance.t list) =
     List.map ts
       ~f:(fun
            (T
-             ( _max_proofs_verified
+             ( (module Local_max_proofs_verified)
              , _statement
              , key
              , app_state
@@ -160,18 +160,15 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.clock __LOC__ ;
         (* TODO: The deferred values "bulletproof_challenges" should get routed
            into a "batch dlog Tick acc verifier" *)
-        let actual_proofs_verified =
-          Vector.length statement.pass_through.old_bulletproof_challenges
-        in
         Timer.clock __LOC__ ;
         let combined_inner_product_actual =
           Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
-            ~domain:tick_domain ~ft_eval1:evals.ft_eval1
-            ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-            evals.evals
+            ~domain:tick_domain ~ft_eval1:evals.ft_eval1 evals.evals
             ~old_bulletproof_challenges:
-              (Vector.map ~f:Ipa.Step.compute_challenges
-                 statement.pass_through.old_bulletproof_challenges )
+              (Vector.extend_exn
+                 (Vector.map ~f:Ipa.Step.compute_challenges
+                    statement.pass_through.old_bulletproof_challenges )
+                 Local_max_proofs_verified.n Dummy.Ipa.Step.challenges_computed )
             ~r:r_actual ~xi ~zeta ~zetaw
         in
         let check_eq lab x y =

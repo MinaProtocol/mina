@@ -33,8 +33,6 @@ let challenge_polynomial =
 let tick_rounds = Nat.to_int Tick.Rounds.n
 
 let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
-    ~actual_proofs_verified:
-      (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
     (e : _ Plonk_types.All_evals.With_public_input.t)
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
     ~plonk ~xi ~zeta ~zetaw =
@@ -50,7 +48,6 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       (Plonk_types.Evals.to_in_circuit combined_evals)
       (fst e.public_input)
   in
-  let T = AB.eq in
   let challenge_polys =
     Vector.map
       ~f:(fun chals -> unstage (challenge_polynomial (Vector.to_array chals)))
@@ -275,7 +272,6 @@ let wrap
     let combined_inner_product =
       let open As_field in
       combined_inner_product (* Note: We do not pad here. *)
-        ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
         { evals = proof.openings.evals; public_input = x_hat }
         ~r ~xi ~zeta ~zetaw ~old_bulletproof_challenges:prev_challenges
         ~env:tick_env ~domain:tick_domain ~ft_eval1:proof.openings.ft_eval1
