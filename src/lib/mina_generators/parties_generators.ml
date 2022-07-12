@@ -854,8 +854,10 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     let account_id = Account_id.create public_key token_id in
     match account_ids_seen with
     | None ->
+        (* fee payer *)
         true
     | Some hash_set ->
+        (* other partys *)
         not @@ Hash_set.mem hash_set account_id
   in
   let%bind account_precondition =
