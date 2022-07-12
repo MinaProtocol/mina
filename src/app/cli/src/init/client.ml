@@ -2040,6 +2040,8 @@ let receipt_chain_hash =
        (* What we call transaction IDs in GraphQL are just base58_check-encoded
           transactions. It's easy to handle, and we return it from the
           transaction commands above, so lets use this format.
+
+          TODO: handle zkApps, issue #11431
        *)
        let transaction = Signed_command.of_base58_check_exn transaction_id in
        let hash =

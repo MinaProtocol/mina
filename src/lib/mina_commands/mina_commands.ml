@@ -166,9 +166,9 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
         Receipt.Chain_hash.cons_signed_command_payload elt parent_hash
     | Parties _parties ->
         failwith "Not implemented for zkApps"
-  (* TODO: apply cons_parties_commitment operation for all occurrences of a party
+  (* TODO: apply cons_parties_commitment operation for all occurrences of fee payer
 
-     issue #11431
+     issue #11495
 
      let elt = Receipt.Parties_elt.Parties_commitment (Parties.commitment parties) in
      let fee_payer_index = Mina_numbers.Index.zero in
