@@ -66,10 +66,10 @@ module "kubernetes_testnet" {
     }
   ]
 
-  cpuRequest = var.cpu_request
-  memRequest= var.mem_request
-  workerCpuRequest = var.worker_cpu_request
-  workerMemRequest= var.worker_mem_request
+  cpu_request = var.cpu_request
+  mem_request= var.mem_request
+  worker_cpu_request = var.worker_cpu_request
+  worker_mem_request= var.worker_mem_request
 
   #we don't use plain nodes in the intg test
   plain_node_configs = []
