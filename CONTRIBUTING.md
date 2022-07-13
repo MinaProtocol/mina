@@ -1,11 +1,11 @@
-# Contributing to Coda
+# Contributing to Mina
 
-Thank you for your interest in contributing to Coda 😁. This file outlines
-various parts of our process. Coda is still very young, so things might be a
+Thank you for your interest in contributing to Mina. This file outlines
+various parts of our process. Mina is still very young, so things might be a
 little bumpy while we figure out how to smoothly run the project!
 
 If you haven't seen it yet, the [developer README](README-dev.md) has the
-basic setup you need to get up and running to build and edit Coda.
+basic setup you need to get up and running to build and edit Mina.
 
 Here's the summary if you want to contribute code:
 
@@ -19,7 +19,7 @@ Here's the summary if you want to contribute code:
 
 ## Bug reports
 
-Bug reports should include, at minimal, the `coda -version` output and
+Bug reports should include, at minimal, the `mina -version` output and
 a description of the error. See the [bug report
 template](.github/ISSUE_TEMPLATES/bug_report.md). Documentation
 issues and failing tests should be reported using respective templates.
@@ -43,8 +43,10 @@ labels.
 
 ## Pull Requests
 
-All pull requests go through CircleCI, which makes sure the code doesn't need to
-be reformatted, builds Coda in its various configurations, and runs all the
+Our branching workflow is [documented on the wiki](https://minaprotocol.notion.site/minaprotocol/Compatible-vs-Develop-branch-management-31c845b2924b4c518740eb9da4514dcc).
+
+All pull requests go through Buildkite CI, which makes sure the code doesn't need to
+be reformatted, builds Mina in its various configurations, and runs all the
 tests.
 
 All pull requests must get _code reviewed_. Anyone can do a code
@@ -52,19 +54,22 @@ review! Check out the [code review
 guide](https://docs.minaprotocol.com/en/developers/code-reviews) for
 what to look for. Just leave comments on the "Files changed" view.
 
-All pull requests must be approved by at least one member of the "core eng"
-team on github.
+All pull requests must be approved by at least one _code owner_ for the
+source code they touch. See the [CODEOWNERS](./CODEOWNERS) file to
+find out who they are.
 
 Maintainers should assign reviewers to pull requests, and tag them with any
-relevant labels.
+relevant labels. If you happen to have access to the development slack,
+you can skip this step by asking reviewers directly in the #review-requests channel.
 
 If you are PRing from the main remote, add `ci-build-me` label when you want to run CI. If you are PRing from a fork, ask a core contributor to `!ci-build-me` when you're ready for CI to run. Note: You will need the `!ci-build-me` comment for each and every run of CI.
 
-Once a PR has been reviewed and approved, and all CI tests have passed, tag the PR with the `ready-to-merge` label to trigger Mergify and automatically merge the code.
+Once a PR has been reviewed and approved, and all CI tests have passed, it can be merged
+by a maintainer (or by you, if you have this access).
 
 ## Documentation
 
-There are three main pieces of Coda documentation:
+There are three main pieces of Mina documentation:
 
 1. The [`docs`](docs/) directory, which has prose documentation of various sorts. This
    doesn't exist yet, but it should by the time this repo is made public!
@@ -131,5 +136,5 @@ And then do the above steps for testnet. Don't forget to deploy!
 ## Issue/PR label guide
 
 We use them, although currently in a somewhat ad-hoc way. Please see
-https://github.com/CodaProtocol/coda/labels for the list of labels and their
+https://github.com/MinaProtocol/mina/labels for the list of labels and their
 short descriptions. Any "complicated" labels should be described here.
