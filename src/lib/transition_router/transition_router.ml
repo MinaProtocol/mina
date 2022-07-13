@@ -71,9 +71,8 @@ let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
 
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller
-    ~producer_transition_reader_ref ~producer_transition_writer_ref
-    ~verified_transition_writer ~clear_reader ~collected_transitions
-    ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
+    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+    ~collected_transitions ?transition_writer_ref ~frontier_w frontier =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -90,27 +89,29 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
           ?valid_cb ~pipe_name:name ~logger )
       ()
   in
-  transition_reader_ref := transition_frontier_controller_reader ;
+  let transition_writer_ref =
+    Option.value transition_writer_ref
+      ~default:(ref transition_frontier_controller_writer)
+  in
   transition_writer_ref := transition_frontier_controller_writer ;
   let producer_transition_reader, producer_transition_writer =
     Strict_pipe.create ~name:"transition frontier: producer transition"
       Synchronous
   in
-  producer_transition_reader_ref := producer_transition_reader ;
-  producer_transition_writer_ref := producer_transition_writer ;
+  producer_transition_writer_ref := Some producer_transition_writer ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   Transition_frontier_controller.run
     ~context:(module Context)
     ~trust_system ~verifier ~network ~time_controller ~collected_transitions
-    ~frontier ~network_transition_reader:!transition_reader_ref
-    ~producer_transition_reader ~clear_reader ~verified_transition_writer
+    ~frontier ~network_transition_reader:transition_frontier_controller_reader
+    ~producer_transition_reader ~clear_reader ~verified_transition_writer ;
+  transition_writer_ref
 
 let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
-    ~verifier ~network ~time_controller ~producer_transition_reader_ref
-    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ~transition_reader_ref ~transition_writer_ref ~consensus_local_state
-    ~frontier_w ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~best_seen_transition ~catchup_mode =
+    ~verifier ~network ~time_controller ~producer_transition_writer_ref
+    ~verified_transition_writer ~clear_reader ?transition_writer_ref
+    ~consensus_local_state ~frontier_w ~initial_root_transition ~persistent_root
+    ~persistent_frontier ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
@@ -126,34 +127,35 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
           ~pipe_name:name ~logger ?valid_cb )
       ()
   in
-  transition_reader_ref := bootstrap_controller_reader ;
-  transition_writer_ref := bootstrap_controller_writer ;
-  let producer_transition_reader, producer_transition_writer =
-    Strict_pipe.create ~name:"bootstrap controller: producer transition"
-      Synchronous
+  let transition_writer_ref =
+    Option.value transition_writer_ref
+      ~default:(ref bootstrap_controller_writer)
   in
-  producer_transition_reader_ref := producer_transition_reader ;
-  producer_transition_writer_ref := producer_transition_writer ;
-  Option.iter best_seen_transition ~f:(fun block ->
-      Strict_pipe.Writer.write bootstrap_controller_writer
-        (`Block block, `Valid_cb None) ) ;
+  transition_writer_ref := bootstrap_controller_writer ;
+  producer_transition_writer_ref := None ;
+  let f block =
+    Strict_pipe.Writer.write bootstrap_controller_writer
+      (`Block block, `Valid_cb None) ;
+    match Envelope.Incoming.sender block with Remote r -> [ r ] | Local -> []
+  in
+  let preferred_peers = Option.value_map ~f ~default:[] best_seen_transition in
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   upon
     (Bootstrap_controller.run
        ~context:(module Context)
        ~trust_system ~verifier ~network ~consensus_local_state
-       ~transition_reader:!transition_reader_ref ~persistent_frontier
-       ~persistent_root ~initial_root_transition ~best_seen_transition
-       ~catchup_mode )
+       ~transition_reader:bootstrap_controller_reader ~persistent_frontier
+       ~persistent_root ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
-      Strict_pipe.Writer.kill !transition_writer_ref ;
+      Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller
-        ~producer_transition_reader_ref ~producer_transition_writer_ref
-        ~verified_transition_writer ~clear_reader ~collected_transitions
-        ~transition_reader_ref ~transition_writer_ref ~frontier_w new_frontier
-      )
+        ~producer_transition_writer_ref ~verified_transition_writer
+        ~clear_reader ~collected_transitions ~transition_writer_ref ~frontier_w
+        new_frontier
+      |> Fn.const () ) ;
+  transition_writer_ref
 
 let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
     ~network ~verifier ~trust_system ~most_recent_valid_block_writer
@@ -323,10 +325,9 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
 
 let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
     ~is_demo_mode ~verifier ~trust_system ~time_controller ~frontier_w
-    ~producer_transition_reader_ref ~producer_transition_writer_ref
-    ~clear_reader ~verified_transition_writer ~transition_reader_ref
-    ~transition_writer_ref ~most_recent_valid_block_writer ~persistent_root
-    ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online =
+    ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
+    ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
+    ~consensus_local_state ~catchup_mode ~notify_online =
   let open Context in
   let%bind () =
     if is_demo_mode then return ()
@@ -346,7 +347,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
          ~verifier ~persistent_frontier ~persistent_root ~consensus_local_state
          ~catchup_mode )
   with
-  | best_tip, None ->
+  | best_seen_transition, None ->
       [%log info] "Unable to load frontier; starting bootstrap" ;
       let%map initial_root_transition =
         Persistent_frontier.(
@@ -356,99 +357,99 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
       start_bootstrap_controller
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller
-        ~producer_transition_reader_ref ~producer_transition_writer_ref
-        ~verified_transition_writer ~clear_reader ~transition_reader_ref
-        ~consensus_local_state ~transition_writer_ref ~frontier_w
-        ~persistent_root ~persistent_frontier ~initial_root_transition
-        ~catchup_mode ~best_seen_transition:best_tip
-  | best_tip, Some frontier -> (
-      match best_tip with
-      | Some best_tip
-        when is_transition_for_bootstrap
-               ~context:(module Context)
-               frontier
-               (best_tip |> Envelope.Incoming.data) ->
-          [%log info]
-            ~metadata:
-              [ ( "length"
-                , `Int
-                    (Unsigned.UInt32.to_int
-                       ( Mina_block.blockchain_length
-                       @@ Validation.block best_tip.data ) ) )
-              ]
-            "Network best tip is too new to catchup to (best_tip with \
-             $length); starting bootstrap" ;
-          let initial_root_transition =
-            Transition_frontier.(
-              Breadcrumb.validated_transition (root frontier))
-          in
-          let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
-          start_bootstrap_controller
-            ~context:(module Context)
-            ~trust_system ~verifier ~network ~time_controller
-            ~producer_transition_reader_ref ~producer_transition_writer_ref
-            ~verified_transition_writer ~clear_reader ~transition_reader_ref
-            ~consensus_local_state ~transition_writer_ref ~frontier_w
-            ~persistent_root ~persistent_frontier ~initial_root_transition
-            ~catchup_mode ~best_seen_transition:(Some best_tip)
-      | _ ->
-          if Option.is_some best_tip then
+        ~producer_transition_writer_ref ~verified_transition_writer
+        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
+        ~frontier_w ~persistent_root ~persistent_frontier
+        ~initial_root_transition ~catchup_mode ~best_seen_transition
+  | Some best_tip, Some frontier
+    when is_transition_for_bootstrap
+           ~context:(module Context)
+           frontier
+           (best_tip |> Envelope.Incoming.data) ->
+      [%log info]
+        ~metadata:
+          [ ( "length"
+            , `Int
+                (Unsigned.UInt32.to_int
+                   ( Mina_block.blockchain_length
+                   @@ Validation.block best_tip.data ) ) )
+          ]
+        "Network best tip is too new to catchup to (best_tip with $length); \
+         starting bootstrap" ;
+      let initial_root_transition =
+        Transition_frontier.(Breadcrumb.validated_transition (root frontier))
+      in
+      let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+      start_bootstrap_controller
+        ~context:(module Context)
+        ~trust_system ~verifier ~network ~time_controller
+        ~producer_transition_writer_ref ~verified_transition_writer
+        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
+        ~frontier_w ~persistent_root ~persistent_frontier
+        ~initial_root_transition ~catchup_mode
+        ~best_seen_transition:(Some best_tip)
+  | best_tip_opt, Some frontier ->
+      let collected_transitions =
+        match best_tip_opt with
+        | Some best_tip ->
             [%log info]
               ~metadata:
                 [ ( "length"
                   , `Int
                       (Unsigned.UInt32.to_int
                          ( Mina_block.blockchain_length
-                         @@ Validation.block (Option.value_exn best_tip).data ) )
-                  )
+                         @@ Validation.block best_tip.data ) ) )
                 ]
               "Network best tip is recent enough to catchup to (best_tip with \
-               $length); syncing local state and starting participation"
-          else
+               $length); syncing local state and starting participation" ;
+            let f x = Bootstrap_controller.Transition_cache.Block x in
+            [ (Envelope.Incoming.map ~f best_tip, None) ]
+        | None ->
             [%log info]
               "Successfully loaded frontier, but failed downloaded best tip \
                from network" ;
-          let curr_best_tip = Transition_frontier.best_tip frontier in
-          let%map () =
-            match
-              Consensus.Hooks.required_local_state_sync
-                ~constants:precomputed_values.consensus_constants
-                ~consensus_state:
-                  (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
+            []
+      in
+      let curr_best_tip = Transition_frontier.best_tip frontier in
+      let%map () =
+        match
+          Consensus.Hooks.required_local_state_sync
+            ~constants:precomputed_values.consensus_constants
+            ~consensus_state:
+              (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
+            ~local_state:consensus_local_state
+        with
+        | None ->
+            [%log info] "Local state already in sync" ;
+            Deferred.unit
+        | Some sync_jobs -> (
+            [%log info] "Local state is out of sync; " ;
+            match%map
+              Consensus.Hooks.sync_local_state
                 ~local_state:consensus_local_state
+                ~context:(module Context)
+                ~trust_system
+                ~random_peers:(Mina_networking.random_peers network)
+                ~query_peer:
+                  { Consensus.Hooks.Rpcs.query =
+                      (fun peer rpc query ->
+                        Mina_networking.(
+                          query_peer network peer.peer_id
+                            (Rpcs.Consensus_rpc rpc) query) )
+                  }
+                sync_jobs
             with
-            | None ->
-                [%log info] "Local state already in sync" ;
-                Deferred.unit
-            | Some sync_jobs -> (
-                [%log info] "Local state is out of sync; " ;
-                match%map
-                  Consensus.Hooks.sync_local_state
-                    ~local_state:consensus_local_state
-                    ~context:(module Context)
-                    ~trust_system
-                    ~random_peers:(Mina_networking.random_peers network)
-                    ~query_peer:
-                      { Consensus.Hooks.Rpcs.query =
-                          (fun peer rpc query ->
-                            Mina_networking.(
-                              query_peer network peer.peer_id
-                                (Rpcs.Consensus_rpc rpc) query) )
-                      }
-                    sync_jobs
-                with
-                | Error e ->
-                    Error.tag e ~tag:"Local state sync failed" |> Error.raise
-                | Ok () ->
-                    () )
-          in
-          let collected_transitions = Option.to_list best_tip in
-          start_transition_frontier_controller
-            ~context:(module Context)
-            ~trust_system ~verifier ~network ~time_controller
-            ~producer_transition_reader_ref ~producer_transition_writer_ref
-            ~verified_transition_writer ~clear_reader ~collected_transitions
-            ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier )
+            | Error e ->
+                Error.tag e ~tag:"Local state sync failed" |> Error.raise
+            | Ok () ->
+                () )
+      in
+      start_transition_frontier_controller
+        ~context:(module Context)
+        ~trust_system ~verifier ~network ~time_controller
+        ~producer_transition_writer_ref ~verified_transition_writer
+        ~clear_reader ~collected_transitions ?transition_writer_ref:None
+        ~frontier_w frontier
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -515,29 +516,17 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           ~pipe_name:name ~logger ?valid_cb )
       ()
   in
-  let transition_reader, transition_writer =
-    let name = "transition pipe" in
-    create_bufferred_pipe ~name
-      ~f:(fun (`Block block, `Valid_cb valid_cb) ->
-        Mina_metrics.(Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
-        Mina_block.handle_dropped_transition
-          ( Network_peer.Envelope.Incoming.data block
-          |> Validation.block_with_hash |> With_hash.hash )
-          ?valid_cb ~pipe_name:name ~logger )
-      ()
-  in
-  let transition_reader_ref = ref transition_reader in
-  let transition_writer_ref = ref transition_writer in
-  let producer_transition_reader_ref, producer_transition_writer_ref =
-    let reader, writer =
-      Strict_pipe.create ~name:"producer transition" Synchronous
-    in
-    (ref reader, ref writer)
-  in
+  (* Ref is None when bootstrap is in progress and Some writer when it's catch-up.query
+     In fact, we don't expect any produced blocks during bootstrap (possible only in rare case
+     of race condition between bootstrap and block creation) *)
+  let producer_transition_writer_ref = ref None in
   O1trace.background_thread "transition_router" (fun () ->
       don't_wait_for
       @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
-             Strict_pipe.Writer.write !producer_transition_writer_ref x ) ;
+             Option.value_map ~f:Strict_pipe.Writer.write
+               ~default:(Fn.const Deferred.unit)
+               !producer_transition_writer_ref
+               x ) ;
       let%bind () =
         wait_till_genesis ~logger ~time_controller ~precomputed_values
       in
@@ -566,15 +555,13 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           ~directory:persistent_root_location
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
-      let%map () =
+      let%map transition_writer_ref =
         initialize
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
-          ~producer_transition_reader_ref ~catchup_mode
-          ~producer_transition_writer_ref ~clear_reader
-          ~verified_transition_writer ~transition_reader_ref
-          ~transition_writer_ref ~most_recent_valid_block_writer
+          ~catchup_mode ~producer_transition_writer_ref ~clear_reader
+          ~verified_transition_writer ~most_recent_valid_block_writer
           ~consensus_local_state ~notify_online
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
@@ -621,7 +608,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                           frontier incoming_transition
                       then (
                         Strict_pipe.Writer.kill !transition_writer_ref ;
-                        Strict_pipe.Writer.kill !producer_transition_writer_ref ;
+                        Option.iter ~f:Strict_pipe.Writer.kill
+                          !producer_transition_writer_ref ;
                         let initial_root_transition =
                           Transition_frontier.(
                             Breadcrumb.validated_transition (root frontier))
@@ -632,17 +620,17 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                         let%map () =
                           Transition_frontier.close ~loc:__LOC__ frontier
                         in
-                        start_bootstrap_controller
-                          ~context:(module Context)
-                          ~trust_system ~verifier ~network ~time_controller
-                          ~producer_transition_reader_ref
-                          ~producer_transition_writer_ref
-                          ~verified_transition_writer ~clear_reader
-                          ~transition_reader_ref ~transition_writer_ref
-                          ~consensus_local_state ~frontier_w ~persistent_root
-                          ~persistent_frontier ~initial_root_transition
-                          ~best_seen_transition:(Some enveloped_transition)
-                          ~catchup_mode )
+                        Fn.const ()
+                        @@ start_bootstrap_controller
+                             ~context:(module Context)
+                             ~trust_system ~verifier ~network ~time_controller
+                             ~producer_transition_writer_ref
+                             ~verified_transition_writer ~clear_reader
+                             ~transition_writer_ref ~consensus_local_state
+                             ~frontier_w ~persistent_root ~persistent_frontier
+                             ~initial_root_transition
+                             ~best_seen_transition:(Some enveloped_transition)
+                             ~catchup_mode )
                       else Deferred.unit
                   | None ->
                       Deferred.unit

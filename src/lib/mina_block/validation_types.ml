@@ -124,6 +124,44 @@ type almost_valid_with_block =
   , [ `Protocol_versions ] * unit Truth.true_t )
   with_block
 
+type ( 'time_received
+     , 'genesis_state
+     , 'proof
+     , 'delta_block_chain
+     , 'frontier_dependencies
+     , 'staged_ledger_diff
+     , 'protocol_versions )
+     with_header =
+  Header.with_hash
+  * ( 'time_received
+    , 'genesis_state
+    , 'proof
+    , 'delta_block_chain
+    , 'frontier_dependencies
+    , 'staged_ledger_diff
+    , 'protocol_versions )
+    t
+
+type initial_valid_with_header =
+  ( [ `Time_received ] * unit Truth.true_t
+  , [ `Genesis_state ] * unit Truth.true_t
+  , [ `Proof ] * unit Truth.true_t
+  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+  , [ `Frontier_dependencies ] * unit Truth.false_t
+  , [ `Staged_ledger_diff ] * unit Truth.false_t
+  , [ `Protocol_versions ] * unit Truth.true_t )
+  with_header
+
+type almost_valid_with_header =
+  ( [ `Time_received ] * unit Truth.true_t
+  , [ `Genesis_state ] * unit Truth.true_t
+  , [ `Proof ] * unit Truth.true_t
+  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+  , [ `Frontier_dependencies ] * unit Truth.true_t
+  , [ `Staged_ledger_diff ] * unit Truth.false_t
+  , [ `Protocol_versions ] * unit Truth.true_t )
+  with_header
+
 type fully_valid_with_block = Block.with_hash * fully_valid
 
 let fully_invalid : fully_invalid =

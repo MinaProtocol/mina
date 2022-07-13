@@ -14,8 +14,7 @@ val run :
   -> verifier:Verifier.t
   -> network:Mina_networking.t
   -> time_controller:Block_time.Controller.t
-  -> collected_transitions:
-       Transition_handler.Unprocessed_transition_cache.source list
+  -> collected_transitions:Bootstrap_controller.Transition_cache.element list
   -> frontier:Transition_frontier.t
   -> network_transition_reader:
        ( [< `Block of

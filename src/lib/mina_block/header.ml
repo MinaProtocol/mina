@@ -98,6 +98,8 @@ Stable.Latest.
   , t_of_sexp
   , to_yojson )]
 
+type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+
 type protocol_version_status =
   { valid_current : bool; valid_next : bool; matches_daemon : bool }
 
