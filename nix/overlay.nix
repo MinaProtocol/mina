@@ -14,17 +14,6 @@ in {
   else
     prev.openssh);
 
-  # jemalloc = prev.jemalloc.overrideAttrs (_: {
-  #   nativeBuildInputs = [ final.autoconf ];
-  #   preConfigure = "./autogen.sh";
-  #   src = final.fetchFromGitHub {
-  #     owner = "jemalloc";
-  #     repo = "jemalloc";
-  #     rev = "011449f17bdddd4c9e0510b27a3fb34e88d072ca";
-  #     sha256 = "FwMs8m/yYsXCEOd94ZWgpwqtVrTLncEQCSDj/FqGewE=";
-  #   };
-  # });
-
   git = prev.git.overrideAttrs
     (o: { doCheck = o.doCheck && !prev.stdenv.hostPlatform.isMusl; });
 
