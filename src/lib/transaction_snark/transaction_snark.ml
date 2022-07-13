@@ -988,9 +988,9 @@ module Base = struct
 
         let empty = Field.constant Parties.Transaction_commitment.empty
 
-        let commitment ~other_parties:{ With_hash.hash = other_parties; _ } =
-          Parties.Transaction_commitment.Checked.create
-            ~other_parties_hash:other_parties
+        let commitment ~other_parties:{ With_hash.hash = other_parties_hash; _ }
+            =
+          Parties.Transaction_commitment.Checked.create ~other_parties_hash
 
         let full_commitment ~party:{ party; _ } ~memo_hash ~commitment =
           Parties.Transaction_commitment.Checked.create_complete commitment
@@ -1010,6 +1010,18 @@ module Base = struct
 
         let assert_with_failure_status_tbl b _failure_status_tbl =
           Assert.is_true b
+      end
+
+      module Index = struct
+        open Mina_numbers.Index.Checked
+
+        type t = var
+
+        let zero = zero
+
+        let succ t = succ t |> run_checked
+
+        let if_ b ~then_ ~else_ = if_ b ~then_ ~else_ |> run_checked
       end
 
       module Account_id = struct
@@ -1076,6 +1088,23 @@ module Base = struct
 
         let add_signed_amount_flagged x y =
           run_checked (add_signed_amount_flagged x y)
+      end
+
+      module Receipt_chain_hash = struct
+        open Receipt.Chain_hash.Checked
+
+        type nonrec t = t
+
+        module Elt = struct
+          type t = Parties_elt.t
+
+          let of_transaction_commitment tc = Parties_elt.Parties_commitment tc
+        end
+
+        let cons_parties_commitment index elt t =
+          run_checked (cons_parties_commitment index elt t)
+
+        let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
       end
 
       module Verification_key = struct
@@ -1200,6 +1229,13 @@ module Base = struct
                     ~txn_amount:None ~txn_global_slot )
           in
           (`Invalid_timing (Option.value_exn !invalid_timing), timing)
+
+        let receipt_chain_hash (a : t) : Receipt_chain_hash.t =
+          a.data.receipt_chain_hash
+
+        let set_receipt_chain_hash (a : t)
+            (receipt_chain_hash : Receipt_chain_hash.t) : t =
+          { a with data = { a.data with receipt_chain_hash } }
 
         let make_zkapp (a : t) = a
 
@@ -1632,6 +1668,7 @@ module Base = struct
           , Ledger_hash.var * Sparse_ledger.t V.t
           , Bool.t
           , Transaction_commitment.t
+          , Index.t
           , Bool.failure_status_tbl )
           Mina_transaction_logic.Parties_logic.Local_state.t
 
@@ -1950,6 +1987,7 @@ module Base = struct
               , Ledger.t
               , Bool.t
               , Transaction_commitment.t
+              , Index.t
               , unit )
               Mina_transaction_logic.Parties_logic.Local_state.t
           ; protocol_state_precondition :
@@ -2073,6 +2111,7 @@ module Base = struct
               ( statement.source.local_state.ledger
               , V.create (fun () -> !witness.local_state_init.ledger) )
           ; success = statement.source.local_state.success
+          ; party_index = statement.source.local_state.party_index
           ; failure_status_tbl = ()
           }
         in
@@ -2559,7 +2598,7 @@ module Base = struct
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
                let%bind r =
-                 Receipt.Chain_hash.Checked.cons
+                 Receipt.Chain_hash.Checked.cons_signed_command_payload
                    (Signed_command_payload payload) current
                in
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
@@ -3463,7 +3502,8 @@ type local_state =
   , Currency.Amount.Signed.t
   , Sparse_ledger.t
   , bool
-  , unit
+  , Parties.Transaction_commitment.t
+  , Mina_numbers.Index.t
   , Transaction_status.Failure.Collection.t )
   Mina_transaction_logic.Parties_logic.Local_state.t
 
@@ -3916,6 +3956,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
             (local :
               ( Stack_frame.value
               , Stack_frame.value list
+              , _
               , _
               , _
               , _

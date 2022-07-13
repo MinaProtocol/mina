@@ -18,7 +18,13 @@ type failure =
 
 let gen_account_precondition_from_account ?failure account =
   let open Quickcheck.Let_syntax in
-  let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
+  let { Account.Poly.balance
+      ; nonce
+      ; delegate
+      ; receipt_chain_hash = _
+      ; zkapp
+      ; _
+      } =
     account
   in
   (* choose constructor *)
@@ -72,7 +78,15 @@ let gen_account_precondition_from_account ?failure account =
         Or_ignore.gen
           (return { Zkapp_precondition.Closed_interval.lower; upper })
       in
-      let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
+      let receipt_chain_hash =
+        (* TODO: make this Or_ignore.Check receipt_chain_hash
+
+           for first occurrence of an account id
+
+           issue #11454
+        *)
+        Or_ignore.Ignore
+      in
       let%bind delegate =
         match delegate with
         | None ->
@@ -662,7 +676,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
        -> b Quickcheck.Generator.t )
     ~(f_balance_change : a -> Currency.Amount.Signed.t)
     ~(increment_nonce : b * bool) ~(f_token_id : Token_id.t -> c)
-    ~f_account_predcondition
+    ~f_account_precondition
     ~(f_party_account_precondition : d -> Party.Account_precondition.t) ~ledger
     ~authorization_tag () :
     (_, _, _, a, _, _, _, b, _, d, _) Party_body_components.t
@@ -843,7 +857,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     field_array_list_gen ~max_array_len:4 ~max_list_len:6
   in
   let%bind call_data = Snark_params.Tick.Field.gen in
-  let%bind account_precondition = f_account_predcondition account in
+  let%bind account_precondition = f_account_precondition account in
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
   let%bind use_full_commitment =
@@ -1025,7 +1039,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
       ~account_state_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
-      ~f_account_predcondition:(gen_account_precondition_from_account ?failure)
+      ~f_account_precondition:(gen_account_precondition_from_account ?failure)
       ~f_party_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
         gen_use_full_commitment ~increment_nonce ~account_precondition
@@ -1053,7 +1067,7 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
         *)
         assert (Token_id.equal token_id Token_id.default) ;
         () )
-      ~f_account_predcondition:account_precondition_gen
+      ~f_account_precondition:account_precondition_gen
       ~f_party_account_precondition:(fun nonce -> Nonce nonce)
       ~gen_use_full_commitment:(fun ~account_precondition:_ -> return ())
       ~ledger ?protocol_state_view ~authorization_tag:Control.Tag.Signature ()
@@ -1374,6 +1388,46 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     | `Ok keymap' ->
         keymap'
   in
+  (* update receipt chain hashes in accounts table *)
+  let receipt_elt =
+    let _txn_commitment, full_txn_commitment =
+      (* also computed in replace_authorizations, but easier just to re-compute here *)
+      Parties_builder.get_transaction_commitments parties_dummy_signatures
+    in
+    Receipt.Parties_elt.Parties_commitment full_txn_commitment
+  in
+  let fee_payer_acct_id =
+    Party.Fee_payer.account_id parties_dummy_signatures.fee_payer
+  in
+  Account_id.Table.change account_state_tbl fee_payer_acct_id ~f:(function
+    | None ->
+        failwith "Expected fee payer account id to be in table"
+    | Some account ->
+        let receipt_chain_hash =
+          Receipt.Chain_hash.cons_parties_commitment Mina_numbers.Index.zero
+            receipt_elt account.Account.Poly.receipt_chain_hash
+        in
+        Some { account with receipt_chain_hash } ) ;
+  let partys =
+    Parties.Call_forest.to_parties_list parties_dummy_signatures.other_parties
+  in
+  List.iteri partys ~f:(fun ndx party ->
+      (* update receipt chain hash only for signature, proof authorizations *)
+      match Party.authorization party with
+      | Control.Proof _ | Control.Signature _ ->
+          let acct_id = Party.account_id party in
+          Account_id.Table.change account_state_tbl acct_id ~f:(function
+            | None ->
+                failwith "Expected other party account id to be in table"
+            | Some account ->
+                let receipt_chain_hash =
+                  let party_index = Mina_numbers.Index.of_int (ndx + 1) in
+                  Receipt.Chain_hash.cons_parties_commitment party_index
+                    receipt_elt account.Account.Poly.receipt_chain_hash
+                in
+                Some { account with receipt_chain_hash } )
+      | Control.None_given ->
+          () ) ;
   return
   @@ Parties_builder.replace_authorizations ?prover ~keymap
        parties_dummy_signatures
