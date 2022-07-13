@@ -436,6 +436,7 @@ let%test_module "Account precondition tests" =
         let%map account_precondition =
           Mina_generators.Parties_generators
           .gen_account_precondition_from_account snapp_account
+            ~first_use_of_account:true
         in
         (l, account_precondition)
       in
@@ -496,7 +497,7 @@ let%test_module "Account precondition tests" =
         in
         let%map account_precondition =
           Mina_generators.Parties_generators.(
-            gen_account_precondition_from_account
+            gen_account_precondition_from_account ~first_use_of_account:true
               ~failure:Invalid_account_precondition snapp_account)
         in
         (l, account_precondition)
