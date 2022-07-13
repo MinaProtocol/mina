@@ -55,6 +55,10 @@ module Network_config = struct
     ; snark_worker_replicas : int
     ; snark_worker_fee : string
     ; snark_worker_public_key : string
+    ; cpu_request : int
+    ; mem_request : string
+    ; worker_cpu_request : int
+    ; worker_mem_request : string
     }
   [@@deriving to_yojson]
 
@@ -270,6 +274,10 @@ module Network_config = struct
         ; snark_worker_public_key
         ; snark_worker_fee
         ; aws_route53_zone_id
+        ; cpu_request = 6
+        ; mem_request = "12GB"
+        ; worker_cpu_request = 4
+        ; worker_mem_request = "6GB"
         }
     }
 
@@ -498,6 +506,15 @@ module Network_manager = struct
     let open Malleable_error.Let_syntax in
     let logger = t.logger in
     if t.deployed then failwith "network already deployed" ;
+    (* let%bind kubectl_top_output =
+         run_cmd_or_hard_error t "kubectl"
+         [ "top";
+         "pods";
+         "--all-namespaces"
+         ; "--containers=true"
+         ; "--sort-by=cpu"
+         ; "| tail -n +2 " ]
+       in *)
     [%log info] "Deploying network" ;
     let%bind _ =
       run_cmd_or_hard_error t "terraform" [ "apply"; "-auto-approve" ]
