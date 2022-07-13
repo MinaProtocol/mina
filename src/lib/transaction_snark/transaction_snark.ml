@@ -373,8 +373,7 @@ module Proof = struct
   module Stable = struct
     module V2 = struct
       type t = Pickles.Proof.Proofs_verified_2.Stable.V2.t
-      [@@deriving
-        version { asserted }, yojson, bin_io, compare, equal, sexp, hash]
+      [@@deriving yojson, compare, equal, sexp, hash]
 
       let to_latest = Fn.id
     end
