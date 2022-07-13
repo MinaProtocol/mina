@@ -290,14 +290,22 @@
           pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
 
         devShells.impure = import ./nix/impure-shell.nix pkgs;
-        devShells.rust-wasm-impure = pkgs.mkShell {
-          name = "mina-rust-wasm-shell";
-          buildInputs = [
+
+        # A shell from which it's possible to build Mina with Rust bits being built incrementally using cargo.
+        # This is "impure" from the nix' perspective since running `cargo build` requires networking in general.
+        # However, this is a useful balance between purity and convenience for Rust development.
+        devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-rust-shell";
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.kimchi-rust.cargo
             pkgs.kimchi-rust-wasm
             pkgs.wasm-pack
             pkgs.wasm-bindgen-cli
           ];
-        };
+          MARLIN_PLONK_STUBS = "n";
+          PLONK_WASM_WEB = "n";
+          PLONK_WASM_NODEJS = "n";
+        });
 
         inherit checks;
       });
