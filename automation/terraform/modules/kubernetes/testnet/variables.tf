@@ -145,7 +145,7 @@ variable "log_txn_pool_gossip" {
 }
 
 variable "cpu_request" {
-  type    = int
+  type    = number
   default = 0
 }
 
@@ -274,7 +274,7 @@ variable "gcloud_seeds" {
 }
 
 variable "worker_cpu_request" {
-  type    = int
+  type    = number
   default = 0
 }
 
