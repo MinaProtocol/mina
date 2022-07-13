@@ -69,7 +69,7 @@ variable "log_precomputed_blocks" {
 }
 
 variable "worker_cpu_request" {
-  type    = int
+  type    = number
   default = 0
 }
 
@@ -79,7 +79,7 @@ variable "worker_mem_request" {
 }
 
 variable "cpu_request" {
-  type    = int
+  type    = number
   default = 0
 }
 
