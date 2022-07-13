@@ -12,7 +12,11 @@ type fully_invalid_block = Validation.fully_invalid_with_block
 
 type initial_valid_block = Validation.initial_valid_with_block
 
+type initial_valid_header = Validation.initial_valid_with_header
+
 type almost_valid_block = Validation.almost_valid_with_block
+
+type almost_valid_header = Validation.almost_valid_with_header
 
 type fully_valid_block = Validation.fully_valid_with_block
 
