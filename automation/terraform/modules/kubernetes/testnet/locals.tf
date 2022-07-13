@@ -24,6 +24,8 @@ locals {
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
+    cpuRequest = var.cpu_request
+    memRequest= var.mem_request
   }
 
   healthcheck_vars = {
@@ -173,6 +175,9 @@ locals {
       publicKey =snark.snark_worker_public_key
       snarkFee = snark.snark_worker_fee
       workSelectionAlgorithm = "seq"
+
+      workerCpuRequest = var.worker_cpu_request
+      workerMemRequest= var.worker_mem_request
     }
   ]
 
