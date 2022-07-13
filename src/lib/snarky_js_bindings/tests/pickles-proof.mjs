@@ -9,14 +9,14 @@ export { picklesProof };
 const trueFactors = [Field.random(), Field.random()];
 const trueProduct = trueFactors[0].mul(trueFactors[1]);
 const truePrehash = Field.random();
-const trueHash = Poseidon.hash([truePrehash]);
+const trueHash = Poseidon.hash([truePrehash], false);
 
 function factors(x, y) {
   x.mul(y).assertEquals(trueProduct);
 }
 
 function hash(x) {
-  Poseidon.hash([x]).assertEquals(trueHash);
+  Poseidon.hash([x], true).assertEquals(trueHash);
 }
 
 async function picklesProof() {

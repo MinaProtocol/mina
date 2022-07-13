@@ -60,15 +60,32 @@
           }
         ];
       };
-      pipeline = with flake-buildkite-pipeline.lib; {
-        steps = flakeSteps {
-          commonExtraStepConfig = {
-            agents = [ "nix" ];
-            soft_fail = "true";
+      pipeline = with flake-buildkite-pipeline.lib;
+        let
+          pushToRegistry = package: {
+            command = runInEnv self.devShells.x86_64-linux.operations
+              ''
+                skopeo \
+                copy \
+                --insecure-policy \
+                --dest-registry-token $(gcloud auth application-default print-access-token) \
+                docker-archive:${self.packages.x86_64-linux.${package}} \
+                docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+              '';
+            label = "Upload mina-docker to Google Artifact Registry";
+            depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+            # branches = [ "compatible" "develop" ];
           };
-        } self;
-      };
+        in {
+          steps = flakeSteps {
+            reproduceRepo = "mina";
+            commonExtraStepConfig = {
+              agents = [ "nix" ];
+              plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+            };
+          } self ++ [ (pushToRegistry "mina-docker") ];
+        };
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
@@ -269,15 +286,26 @@
           '';
         });
 
+        devShells.operations =
+          pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
+
         devShells.impure = import ./nix/impure-shell.nix pkgs;
-        devShells.rust-wasm-impure = pkgs.mkShell {
-          name = "mina-rust-wasm-shell";
-          buildInputs = [
+
+        # A shell from which it's possible to build Mina with Rust bits being built incrementally using cargo.
+        # This is "impure" from the nix' perspective since running `cargo build` requires networking in general.
+        # However, this is a useful balance between purity and convenience for Rust development.
+        devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-rust-shell";
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.kimchi-rust.cargo
             pkgs.kimchi-rust-wasm
             pkgs.wasm-pack
             pkgs.wasm-bindgen-cli
           ];
-        };
+          MARLIN_PLONK_STUBS = "n";
+          PLONK_WASM_WEB = "n";
+          PLONK_WASM_NODEJS = "n";
+        });
 
         inherit checks;
       });
