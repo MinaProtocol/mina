@@ -502,7 +502,7 @@ let lint_ast =
           acc_with_accum_errors acc
             (deriving_errors @ versioned_type_misuse_errors)
       | Pstr_extension ((name, _payload), _attrs)
-      (* %%versioned, %%versioned_asserted, etc. inside functor *)
+      (* %%versioned, %%versioned_binable inside functor *)
         when acc.in_functor
              && String.length name.txt >= 9
              && String.equal (String.sub name.txt ~pos:0 ~len:9) "versioned" ->
