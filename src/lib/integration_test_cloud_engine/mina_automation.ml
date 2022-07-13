@@ -308,9 +308,9 @@ module Network_config = struct
         ; snark_worker_fee
         ; aws_route53_zone_id
         ; cpu_request = 6
-        ; mem_request = "12GB"
+        ; mem_request = "12Gi"
         ; worker_cpu_request = 4
-        ; worker_mem_request = "6GB"
+        ; worker_mem_request = "6Gi"
         }
     }
 
