@@ -1098,27 +1098,32 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
     let empty_signature = "Empty_signature" in
     let stable_latest = "Stable.Latest" in
     let empty_sig =
-      (mk_loc ~loc empty_signature)
+      mk_loc ~loc empty_signature
       |> Mtd.mk ~typ:(Mty.signature [])
       |> Str.modtype
     in
     let empty_bind =
       let pattern = Pat.constraint_ (Pat.mk Ppat_any) (Typ.mk Ptyp_any)
       and expression =
-        let latest = stable_latest |> Longident.parse |> Loc.make ~loc |> Mod.ident in
-        let empty_signature = empty_signature |> Longident.parse |> Loc.make ~loc in
+        let latest =
+          stable_latest |> Longident.parse |> Loc.make ~loc |> Mod.ident
+        in
+        let empty_signature =
+          empty_signature |> Longident.parse |> Loc.make ~loc
+        in
         Exp.constraint_ (Exp.pack latest) (Typ.package empty_signature [])
       in
       let binding = Vb.mk pattern expression in
-      Str.value Nonrecursive [binding]
+      Str.value Nonrecursive [ binding ]
     in
     Str.include_ ~loc
       (Incl.mk ~loc
          (Ast_helper.Mod.structure ~loc
-             ((Str.module_ ~loc
+            ( Str.module_ ~loc
                 (Mb.mk ~loc:modname.loc (some_loc modname)
-                   (Mod.structure ~loc:modbody.loc modbody.txt))
-            :: type_stri) @ [empty_sig; empty_bind])))
+                   (Mod.structure ~loc:modbody.loc modbody.txt) )
+              :: type_stri
+            @ [ empty_sig; empty_bind ] ) ) )
   with exn ->
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
