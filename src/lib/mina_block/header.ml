@@ -116,6 +116,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       Protocol_version.compatible_with_daemon (current_protocol_version body)
     in
     { valid_current; valid_next; matches_daemon }
+
+  type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+
+  let blockchain_length h =
+    protocol_state h |> Mina_state.Protocol_state.consensus_state
+    |> Consensus.Data.Consensus_state.blockchain_length
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

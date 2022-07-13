@@ -14,8 +14,7 @@ val run :
   -> verifier:Verifier.t
   -> network:Mina_networking.t
   -> time_controller:Block_time.Controller.t
-  -> collected_transitions:
-       Transition_handler.Unprocessed_transition_cache.source list
+  -> collected_transitions:Bootstrap_controller.Transition_cache.element list
   -> frontier:Transition_frontier.t
   -> network_transition_reader:
        ( [< `Block of
@@ -23,8 +22,7 @@ val run :
             , [ `Genesis_state ] * unit Truth.true_t
             , [ `Proof ] * unit Truth.true_t
             , [ `Delta_block_chain ]
-              * Data_hash_lib.State_hash.t Mina_stdlib.Nonempty_list.t
-                Truth.true_t
+              * Mina_base.State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
             , [ `Frontier_dependencies ] * unit Truth.false_t
             , [ `Staged_ledger_diff ] * unit Truth.false_t
             , [ `Protocol_versions ] * unit Truth.true_t )

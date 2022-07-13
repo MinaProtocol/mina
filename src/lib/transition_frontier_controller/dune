@@ -33,7 +33,8 @@
    mina_networking
    block_time
    truth
-   mina_net2
    mina_stdlib
+   mina_net2
+   bootstrap_controller
    transaction_snark_work
 ))
