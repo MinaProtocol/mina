@@ -984,7 +984,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   { Party_body_components.public_key
   ; update =
       ( if new_account then
-        { update with
+        { Party.Update.dummy with
           verification_key = Zkapp_basic.Set_or_keep.Set verification_key
         ; permissions =
             Zkapp_basic.Set_or_keep.Set
@@ -1033,7 +1033,10 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
       ?permissions_auth ?account_id ?protocol_state_view ?vk ~account_ids_seen
       ~available_public_keys ?required_balance_change ?required_balance ~ledger
       ~account_state_tbl
-      ~gen_balance_change:(gen_balance_change ?permissions_auth ~new_account)
+      ~gen_balance_change:
+        (gen_balance_change ?permissions_auth
+           ~new_account:
+             (new_account || (zkapp_account && Option.is_none account_id)) )
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
         gen_account_precondition_from_account ?failure ~first_use_of_account
@@ -1054,7 +1057,6 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
     ?protocol_state_view ~account_state_tbl () :
     Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  print_endline "fee payer body begins" ;
   let account_precondition_gen (account : Account.t) =
     Quickcheck.Generator.return account.nonce
   in
@@ -1074,21 +1076,18 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
       ~gen_use_full_commitment:(fun ~account_precondition:_ -> return ())
       ~ledger ?protocol_state_view ~authorization_tag:Control.Tag.Signature ()
   in
-  print_endline "fee payer body ends" ;
   Party_body_components.to_fee_payer body_components
 
 let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
     ?protocol_state_view ?vk ~account_state_tbl () :
     Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
-  print_endline "fee_payer begins" ;
   let%map body =
     gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
       ?protocol_state_view ~account_state_tbl ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
-  print_endline "fee_payer ends" ;
   ({ body; authorization } : Party.Fee_payer.t)
 
 (* keep max_other_parties small, so snapp integration tests don't need lots
@@ -1162,11 +1161,18 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
       ~account_id:fee_payer_account_id ~ledger ?vk ~account_state_tbl ()
   in
   Hash_set.add account_ids_seen fee_payer_account_id ;
+  let%bind balancing_party =
+    let authorization = Control.Signature Signature.dummy in
+    gen_party_from ?failure ~account_ids_seen ~authorization ~new_account:false
+      ~available_public_keys ~ledger
+      ~required_balance_change:Currency.Amount.Signed.zero ~account_state_tbl
+      ?protocol_state_view ?vk ()
+  in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     let rec go acc n =
       let open Zkapp_basic in
       let open Permissions in
-      if n <= 0 then return (List.rev acc)
+      if n <= 0 then return (List.rev (fst acc), snd acc)
       else
         (* choose a random authorization
 
@@ -1255,15 +1261,14 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
         let%bind party0 =
           (* Signature authorization to start *)
           let authorization = Control.Signature Signature.dummy in
-          let required_balance_change = Currency.Amount.Signed.zero in
           gen_party_from ~account_ids_seen ~update ?failure ~authorization
             ~new_account:new_parties ~permissions_auth ~zkapp_account
-            ~available_public_keys ~required_balance_change ~ledger
-            ~account_state_tbl ?protocol_state_view ?vk ()
+            ~available_public_keys ~ledger ~account_state_tbl
+            ?protocol_state_view ?vk ()
         in
-        if new_parties || zkapp_account then go (party0 :: acc) (n - 1)
+        if new_parties || zkapp_account then
+          go (party0 :: fst acc, snd acc + 1) (n - 1)
         else
-          let () = print_endline "old" in
           let%bind party =
             (* authorization according to chosen permissions auth *)
             let%bind authorization, update =
@@ -1339,27 +1344,26 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
               ?protocol_state_view ?vk ()
           in
           (* this list will be reversed, so `party0` will execute before `party` *)
-          go (party :: party0 :: acc) (n - 1)
+          go (party :: party0 :: fst acc, snd acc) (n - 1)
     in
-    go [] num_parties
+    go ([], 0) num_parties
   in
   (* at least 1 party *)
   let%bind num_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
   let num_old_parties = num_parties - num_new_accounts in
-  let%bind old_parties =
+  let%bind old_parties, num_of_created1 =
     gen_parties_with_dynamic_balance ~new_parties:false num_old_parties
   in
-  print_endline "old parties !" ;
-  let%bind new_parties =
+  let%bind new_parties, num_of_created2 =
     gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
   in
-  print_endline "new parties !" ;
   let other_parties0 = old_parties @ new_parties in
+  let num_of_created = num_of_created1 + num_of_created2 in
   let balance_change_sum =
     List.fold other_parties0
       ~init:
-        ( if num_new_accounts = 0 then Currency.Amount.Signed.zero
+        ( if num_of_created = 0 then Currency.Amount.Signed.zero
         else
           Currency.Amount.(
             Signed.of_unsigned
@@ -1367,7 +1371,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
                   (of_fee
                      Genesis_constants.Constraint_constants.compiled
                        .account_creation_fee )
-                  num_new_accounts
+                  num_of_created
               |> Option.value_exn )) )
       ~f:(fun acc party ->
         match Currency.Amount.Signed.add acc party.body.balance_change with
@@ -1379,26 +1383,17 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
 
   (* create a party with balance change to yield a zero sum
 
-     a new account, because the balance change for an existing
-     account might be constrained by its balance
+     the party is actually created immediately after the fee payer
+     party is created. This is because the preconditions generation
+     is sensitive to the order of party generation.
   *)
-  let%bind balancing_party =
-    let required_balance_change =
-      Currency.Amount.Signed.negate balance_change_sum
-    in
-    let required_balance =
-      match required_balance_change with
-      | { sgn = Sgn.Neg; _ } ->
-          (* Large balance to allow more updates to this account*)
-          Some (Currency.Balance.of_formatted_string "10000000.0")
-      | { sgn = Sgn.Pos; _ } ->
-          (* we're adding to the account, so no required balance *)
-          None
-    in
-    let authorization = Control.Signature Signature.dummy in
-    gen_party_from ?failure ~account_ids_seen ~authorization ~new_account:true
-      ~available_public_keys ~ledger ~required_balance_change ?required_balance
-      ~account_state_tbl ?protocol_state_view ?vk ()
+  let balancing_party =
+    { balancing_party with
+      body =
+        { balancing_party.body with
+          balance_change = Currency.Amount.Signed.negate balance_change_sum
+        }
+    }
   in
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
