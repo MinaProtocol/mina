@@ -1111,7 +1111,11 @@ let%test_module "account timing check" =
         ; fee = Currency.Fee.of_int fee
         ; fee_payer = None
         ; receivers = []
-        ; amount = Currency.Amount.of_int (balance + fee)
+        ; amount =
+            Option.value_exn
+              Currency.(
+                Amount.add (of_int balance)
+                  (Amount.of_fee constraint_constants.account_creation_fee))
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo =
             Signed_command_memo.create_from_string_exn
