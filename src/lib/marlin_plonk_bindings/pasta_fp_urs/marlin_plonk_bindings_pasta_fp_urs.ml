@@ -29,5 +29,12 @@ external batch_accumulator_check :
   -> Marlin_plonk_bindings_pasta_fp.t array
   -> bool = "caml_pasta_fp_urs_batch_accumulator_check"
 
+external batch_accumulator_generate :
+     t
+  -> int
+  -> Marlin_plonk_bindings_pasta_fp.t array
+  -> Marlin_plonk_bindings_pasta_vesta.Affine.t array
+  = "caml_pasta_fp_urs_batch_accumulator_generate"
+
 external h : t -> Marlin_plonk_bindings_pasta_vesta.Affine.t
   = "caml_pasta_fp_urs_h"
