@@ -2,8 +2,11 @@ use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
+use mina_curves::pasta::pallas::PallasParameters;
 use mina_curves::pasta::Fq;
-use mina_curves::pasta::{pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+use mina_curves::pasta::{pallas::Pallas, vesta::Vesta};
+use oracle::constants::PlonkSpongeConstantsKimchi;
+use oracle::sponge::DefaultFqSponge;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -12,7 +15,7 @@ use std::{
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
-pub struct CamlPastaFqPlonkIndex(pub Box<ProverIndex<GAffine>>);
+pub struct CamlPastaFqPlonkIndex(pub Box<ProverIndex<Pallas>>);
 pub type CamlPastaFqPlonkIndexPtr<'a> = ocaml::Pointer<'a, CamlPastaFqPlonkIndex>;
 
 extern "C" fn caml_pasta_fq_plonk_index_finalize(v: ocaml::Raw) {
@@ -70,17 +73,17 @@ pub fn caml_pasta_fq_plonk_index_create(
     };
 
     // endo
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Vesta>();
 
     // Unsafe if we are in a multi-core ocaml
     {
-        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+        let ptr: &mut commitment_dlog::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
     // create index
-    let mut index = ProverIndex::<GAffine>::create(cs, endo_q, srs.clone());
+    let mut index = ProverIndex::<Pallas>::create(cs, endo_q, srs.clone());
     // Compute and cache the verifier index digest
     index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
 
@@ -143,7 +146,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
+    let mut t = ProverIndex::<Pallas>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
     t.srs = srs.clone();
 
     let (linearization, powers_of_alpha) = expr_linearization(false, false, None);

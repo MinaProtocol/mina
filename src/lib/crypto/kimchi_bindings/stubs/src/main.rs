@@ -5,7 +5,10 @@ use std::io::Write;
 use wires_15_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{
-        bigint_256::*, fp256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*,
+        bigint_256::*,
+        fields::{fp::*, fq::*},
+        group_affine::*,
+        group_projective::*,
     },
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
@@ -40,7 +43,7 @@ use wires_15_stubs::{
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    let env = &mut Env::default();
+    let env = &mut Env::new();
 
     let header = "(* This file is generated automatically with ocaml_gen. *)\n";
 
@@ -143,12 +146,8 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_bigint_256_deep_copy => "deep_copy");
     });
 
-    decl_module!(w, env, "Fp256", {
-        decl_type!(w, env, Fp256<T1> => "t");
-    });
-
     decl_module!(w, env, "Fp", {
-        decl_type_alias!(w, env, "t" => CamlFp);
+        decl_type!(w, env, CamlFp => "t");
 
         decl_func!(w, env, caml_pasta_fp_size_in_bits => "size_in_bits");
         decl_func!(w, env, caml_pasta_fp_size => "size");
@@ -184,7 +183,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
     });
 
     decl_module!(w, env, "Fq", {
-        decl_type_alias!(w, env, "t" => CamlFq);
+        decl_type!(w, env, CamlFq => "t");
 
         decl_func!(w, env, caml_pasta_fq_size_in_bits => "size_in_bits");
         decl_func!(w, env, caml_pasta_fq_size => "size");

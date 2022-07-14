@@ -57,7 +57,7 @@ macro_rules! impl_oracles {
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,
                     oracles_result.combined_inner_product,
-                    oracles_result.p_eval,
+                    oracles_result.public_evals,
                     oracles_result.digest,
                     oracles_result.oracles,
                 );
