@@ -1261,8 +1261,9 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
             ~available_public_keys ~required_balance_change ~ledger
             ~account_state_tbl ?protocol_state_view ?vk ()
         in
-        if new_parties then go (party0 :: acc) (n - 1)
+        if new_parties || zkapp_account then go (party0 :: acc) (n - 1)
         else
+          let () = print_endline "old" in
           let%bind party =
             (* authorization according to chosen permissions auth *)
             let%bind authorization, update =
@@ -1349,21 +1350,25 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   let%bind old_parties =
     gen_parties_with_dynamic_balance ~new_parties:false num_old_parties
   in
+  print_endline "old parties !" ;
   let%bind new_parties =
     gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
   in
+  print_endline "new parties !" ;
   let other_parties0 = old_parties @ new_parties in
   let balance_change_sum =
     List.fold other_parties0
       ~init:
-        Currency.Amount.(
-          Signed.of_unsigned
-            ( scale
-                (of_fee
-                   Genesis_constants.Constraint_constants.compiled
-                     .account_creation_fee )
-                num_new_accounts
-            |> Option.value_exn ))
+        ( if num_new_accounts = 0 then Currency.Amount.Signed.zero
+        else
+          Currency.Amount.(
+            Signed.of_unsigned
+              ( scale
+                  (of_fee
+                     Genesis_constants.Constraint_constants.compiled
+                       .account_creation_fee )
+                  num_new_accounts
+              |> Option.value_exn )) )
       ~f:(fun acc party ->
         match Currency.Amount.Signed.add acc party.body.balance_change with
         | Some sum ->
