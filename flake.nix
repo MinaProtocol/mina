@@ -298,7 +298,7 @@
           name = "mina-rust-shell";
           nativeBuildInputs = oa.nativeBuildInputs ++ [
             pkgs.rustup
-            pkgs.libiconv
+            pkgs.libiconv # needed on macOS for one of the rust dep
           ];
           MARLIN_PLONK_STUBS = "n";
           PLONK_WASM_WEB = "n";
