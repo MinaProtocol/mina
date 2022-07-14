@@ -18,7 +18,7 @@ import {
 } from "snarkyjs";
 
 function sendTransaction(tx) {
-  //console.log("DEBUG -- TXN\n", JSON.stringify(partiesToJson(tx.transaction)));
+  // console.log("DEBUG -- TXN\n", JSON.stringify(partiesToJson(tx.transaction)));
   tx.send();
 }
 
@@ -39,6 +39,7 @@ class SimpleZkapp extends SmartContract {
     });
     this.balance.addInPlace(UInt64.fromNumber(initialBalance));
     this.x.set(initialState);
+    this.tokenSymbol.set("TEST_TOKEN");
   }
 
   update(y) {
@@ -51,7 +52,7 @@ class SimpleZkapp extends SmartContract {
   }
 
   mint(receiverAddress) {
-    let amount = 1_000_000_000;
+    let amount = UInt64.from(1_000_000);
     this.token().mint({
       address: receiverAddress,
       amount,
@@ -60,7 +61,7 @@ class SimpleZkapp extends SmartContract {
   }
 
   burn(receiverAddress) {
-    let amount = 1_000_000;
+    let amount = UInt64.from(1_000);
     this.token().burn({
       address: receiverAddress,
       amount,
@@ -69,7 +70,7 @@ class SimpleZkapp extends SmartContract {
   }
 
   send(senderAddress, receiverAddress) {
-    let amount = 1_000_000;
+    let amount = UInt64.from(1_000);
     this.token().send({
       from: senderAddress,
       to: receiverAddress,
@@ -109,13 +110,14 @@ let tokenAccount2 = tokenAccount2Key.toPublicKey();
 let initialBalance = 10_000_000_000;
 let initialState = Field(1);
 let zkapp = new SimpleZkapp(zkappAddress);
+let tx;
 
 console.log("deploy");
-let tx = await Local.transaction(feePayer, () => {
+tx = await Local.transaction(feePayer, () => {
   Party.fundNewAccount(feePayer, { initialBalance });
   zkapp.deploy({ zkappKey });
 });
-tx.send();
+sendTransaction(tx);
 
 console.log(`initial balance: ${zkapp.account.balance.get().div(1e9)} MINA`);
 
@@ -124,6 +126,7 @@ const customToken = new Token({ tokenOwner: zkappAddress });
 console.log("---FEE PAYER", feePayer.toPublicKey().toBase58());
 console.log("---TOKEN OWNER", zkappAddress.toBase58());
 console.log("---CUSTOM TOKEN", customToken.id);
+console.log(`---TOKEN SYMBOL ${Mina.getAccount(zkappAddress).tokenSymbol}`);
 console.log("---TOKEN ACCOUNT1", tokenAccount1.toBase58());
 console.log("---TOKEN ACCOUNT2", tokenAccount2.toBase58());
 
@@ -136,10 +139,10 @@ tx = await Local.transaction(feePayer, () => {
 sendTransaction(tx);
 
 console.log(
-  `tokenAccount1 balance: ${Mina.getBalance({
-    publicKey: tokenAccount1,
-    tokenId: customToken.id,
-  })} custom tokens`
+  `tokenAccount1 balance: ${Mina.getBalance(
+    tokenAccount1,
+    customToken.id
+  )} custom tokens`
 );
 
 console.log("----------token burning----------");
@@ -151,10 +154,10 @@ tx = tx.sign([tokenAccount1Key]);
 sendTransaction(tx);
 
 console.log(
-  `tokenAccount1 balance: ${Mina.getBalance({
-    publicKey: tokenAccount1,
-    tokenId: customToken.id,
-  })} custom tokens`
+  `tokenAccount1 balance: ${Mina.getBalance(
+    tokenAccount1,
+    customToken.id
+  )} custom tokens`
 );
 
 console.log("----------token transfer----------");
@@ -167,16 +170,16 @@ tx = tx.sign([tokenAccount1Key, tokenAccount2Key]);
 sendTransaction(tx);
 
 console.log(
-  `tokenAccount1 balance: ${Mina.getBalance({
-    publicKey: tokenAccount1,
-    tokenId: customToken.id,
-  })} custom tokens`
+  `tokenAccount1 balance: ${Mina.getBalance(
+    tokenAccount1,
+    customToken.id
+  )} custom tokens`
 );
 console.log(
-  `tokenAccount2 balance: ${Mina.getBalance({
-    publicKey: tokenAccount2,
-    tokenId: customToken.id,
-  })} custom tokens`
+  `tokenAccount2 balance: ${Mina.getBalance(
+    tokenAccount2,
+    customToken.id
+  )} custom tokens`
 );
 
 shutdown();
