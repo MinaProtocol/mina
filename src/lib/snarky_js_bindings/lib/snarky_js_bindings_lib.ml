@@ -2310,6 +2310,7 @@ module Ledger = struct
   type account =
     < publicKey : group_class Js.t Js.readonly_prop
     ; tokenId : field_class Js.t Js.readonly_prop
+    ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
     ; zkapp : zkapp_account Js.readonly_prop >
@@ -2553,6 +2554,8 @@ module Ledger = struct
         val publicKey = public_key a.public_key
 
         val tokenId = token_id a.token_id
+
+        val tokenSymbol = Js.string a.token_symbol
 
         val balance = uint64 (Currency.Balance.to_uint64 a.balance)
 
