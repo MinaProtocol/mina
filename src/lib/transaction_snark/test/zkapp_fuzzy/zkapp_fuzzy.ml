@@ -167,6 +167,8 @@ let test_timed_account () =
       done )
 
 let () =
+  Backtrace.elide := false ;
+  Async.Scheduler.set_record_backtraces true ;
   let num_of_fee_payers = 5 in
   let trials = 2 in
   generate_parties_and_apply_them_consecutively () ;

@@ -233,18 +233,20 @@ let gen_fee (account : Account.t) =
 let fee_to_amt fee =
   Currency.Amount.(Signed.of_unsigned (of_fee fee) |> Signed.negate)
 
-let gen_balance_change ?permissions_auth (account : Account.t) =
+let gen_balance_change ?permissions_auth (account : Account.t) ~new_account =
   let open Quickcheck.Let_syntax in
   let%bind sgn =
-    match permissions_auth with
-    | Some auth -> (
-        match auth with
-        | Control.Tag.None_given ->
-            return Sgn.Pos
-        | _ ->
-            Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] )
-    | None ->
-        Quickcheck.Generator.of_list [ Sgn.Pos; Neg ]
+    if new_account then return Sgn.Pos
+    else
+      match permissions_auth with
+      | Some auth -> (
+          match auth with
+          | Control.Tag.None_given ->
+              return Sgn.Pos
+          | _ ->
+              Quickcheck.Generator.of_list [ Sgn.Pos; Neg ] )
+      | None ->
+          Quickcheck.Generator.of_list [ Sgn.Pos; Neg ]
   in
   (* if negative, magnitude constrained to balance in account
          the effective balance is either what's in the account state table,
@@ -254,13 +256,19 @@ let gen_balance_change ?permissions_auth (account : Account.t) =
   let small_balance_change =
     (*make small transfers to allow generating large number of parties without an overflow*)
     let open Currency in
-    if Balance.(effective_balance < of_formatted_string "1.0") then
-      failwith "account has low balance"
+    if
+      Balance.(effective_balance < of_formatted_string "1.0") && not new_account
+    then failwith "account has low balance"
     else Balance.of_formatted_string "0.000001"
   in
   let%map (magnitude : Currency.Amount.t) =
-    Currency.Amount.gen_incl Currency.Amount.zero
-      (Currency.Balance.to_amount small_balance_change)
+    if new_account then
+      Currency.Amount.gen_incl
+        (Currency.Amount.of_formatted_string "2.0")
+        (Currency.Amount.of_formatted_string "10.0")
+    else
+      Currency.Amount.gen_incl Currency.Amount.zero
+        (Currency.Balance.to_amount small_balance_change)
   in
   match sgn with
   | Pos ->
@@ -699,6 +707,14 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   in
   (* party_increment_nonce for fee payer is unit and increment_nonce is true *)
   let party_increment_nonce, increment_nonce = increment_nonce in
+  let verification_key =
+    Option.value vk
+      ~default:
+        With_hash.
+          { data = Pickles.Side_loaded.Verification_key.dummy
+          ; hash = Zkapp_account.dummy_vk_hash ()
+          }
+  in
   let%bind account =
     if new_account then (
       if Option.is_some account_id then
@@ -711,17 +727,6 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
             "gen_party_body: new_account is true, but available_public_keys \
              not provided"
       | Some available_pks ->
-          let low, high =
-            match required_balance with
-            | Some bal ->
-                (bal, bal)
-            | _ ->
-                ( Currency.Balance.of_formatted_string "1000000.0"
-                , Currency.Balance.of_formatted_string "10000000.0" )
-          in
-          let%map account_with_gen_pk =
-            Account.gen_with_constrained_balance ~low ~high
-          in
           let available_pk =
             match
               Signature_lib.Public_key.Compressed.Table.choose available_pks
@@ -734,47 +739,22 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           (* available public key no longer available *)
           Signature_lib.Public_key.Compressed.Table.remove available_pks
             available_pk ;
+          let account_id = Account_id.create available_pk Token_id.default in
           let account_with_pk =
-            { account_with_gen_pk with
-              public_key = available_pk
-            ; token_id = Token_id.default
-            }
+            Account.create account_id (Currency.Balance.of_int 0)
           in
           let account =
             if zkapp_account then
               { account_with_pk with
                 zkapp =
-                  (let vk =
-                     match vk with
-                     | None ->
-                         With_hash.
-                           { data = Pickles.Side_loaded.Verification_key.dummy
-                           ; hash = Zkapp_account.dummy_vk_hash ()
-                           }
-                     | Some vk ->
-                         vk
-                   in
-                   Some
-                     { Zkapp_account.default with verification_key = Some vk }
-                  )
+                  Some
+                    { Zkapp_account.default with
+                      verification_key = Some verification_key
+                    }
               }
             else account_with_pk
           in
-          (* add new account to ledger *)
-          ( match
-              Ledger.get_or_create_account ledger
-                (Account_id.create account.public_key account.token_id)
-                account
-            with
-          | Ok (`Added, _) ->
-              ()
-          | Ok (`Existed, _) ->
-              failwith "gen_party_body: account for new party already in ledger"
-          | Error err ->
-              failwithf
-                "gen_party_body: could not add account to ledger new party: %s"
-                (Error.to_string_hum err) () ) ;
-          account )
+          return account )
     else
       match account_id with
       | None ->
@@ -1002,7 +982,18 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
            ; zkapp = zkapp updated_account
            } ) ) ;
   { Party_body_components.public_key
-  ; update
+  ; update =
+      ( if new_account then
+        { update with
+          verification_key = Zkapp_basic.Set_or_keep.Set verification_key
+        ; permissions =
+            Zkapp_basic.Set_or_keep.Set
+              { Permissions.user_default with
+                edit_state = Permissions.Auth_required.Proof
+              ; edit_sequence_state = Proof
+              }
+        }
+      else update )
   ; token_id
   ; balance_change
   ; increment_nonce = party_increment_nonce
@@ -1042,7 +1033,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
       ?permissions_auth ?account_id ?protocol_state_view ?vk ~account_ids_seen
       ~available_public_keys ?required_balance_change ?required_balance ~ledger
       ~account_state_tbl
-      ~gen_balance_change:(gen_balance_change ?permissions_auth)
+      ~gen_balance_change:(gen_balance_change ?permissions_auth ~new_account)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
         gen_account_precondition_from_account ?failure ~first_use_of_account
@@ -1063,6 +1054,7 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
     ?protocol_state_view ~account_state_tbl () :
     Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
+  print_endline "fee payer body begins" ;
   let account_precondition_gen (account : Account.t) =
     Quickcheck.Generator.return account.nonce
   in
@@ -1082,18 +1074,21 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
       ~gen_use_full_commitment:(fun ~account_precondition:_ -> return ())
       ~ledger ?protocol_state_view ~authorization_tag:Control.Tag.Signature ()
   in
+  print_endline "fee payer body ends" ;
   Party_body_components.to_fee_payer body_components
 
 let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
     ?protocol_state_view ?vk ~account_state_tbl () :
     Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
+  print_endline "fee_payer begins" ;
   let%map body =
     gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
       ?protocol_state_view ~account_state_tbl ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
+  print_endline "fee_payer ends" ;
   ({ body; authorization } : Party.Fee_payer.t)
 
 (* keep max_other_parties small, so snapp integration tests don't need lots
@@ -1266,81 +1261,84 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
             ~available_public_keys ~required_balance_change ~ledger
             ~account_state_tbl ?protocol_state_view ?vk ()
         in
-        let%bind party =
-          (* authorization according to chosen permissions auth *)
-          let%bind authorization, update =
-            match failure with
-            | Some (Update_not_permitted update_type) ->
-                let auth =
-                  match permissions_auth with
-                  | Proof ->
-                      Control.(dummy_of_tag Signature)
-                  | Signature ->
-                      Control.(dummy_of_tag Proof)
-                  | _ ->
-                      Control.(dummy_of_tag None_given)
-                in
-                let%bind update =
-                  match update_type with
-                  | `Delegate ->
-                      let%map delegate =
-                        Signature_lib.Public_key.Compressed.gen
-                      in
-                      { Party.Update.dummy with
-                        delegate = Set_or_keep.Set delegate
-                      }
-                  | `App_state ->
-                      let%map app_state =
-                        let%map fields =
-                          let field_gen =
-                            Snark_params.Tick.Field.gen
-                            >>| fun x -> Set_or_keep.Set x
-                          in
-                          Quickcheck.Generator.list_with_length 8 field_gen
+        if new_parties then go (party0 :: acc) (n - 1)
+        else
+          let%bind party =
+            (* authorization according to chosen permissions auth *)
+            let%bind authorization, update =
+              match failure with
+              | Some (Update_not_permitted update_type) ->
+                  let auth =
+                    match permissions_auth with
+                    | Proof ->
+                        Control.(dummy_of_tag Signature)
+                    | Signature ->
+                        Control.(dummy_of_tag Proof)
+                    | _ ->
+                        Control.(dummy_of_tag None_given)
+                  in
+                  let%bind update =
+                    match update_type with
+                    | `Delegate ->
+                        let%map delegate =
+                          Signature_lib.Public_key.Compressed.gen
                         in
-                        Zkapp_state.V.of_list_exn fields
-                      in
-                      { Party.Update.dummy with app_state }
-                  | `Verification_key ->
-                      let data = Pickles.Side_loaded.Verification_key.dummy in
-                      let hash = Zkapp_account.digest_vk data in
-                      let verification_key =
-                        Set_or_keep.Set { With_hash.data; hash }
-                      in
-                      return { Party.Update.dummy with verification_key }
-                  | `Zkapp_uri ->
-                      let zkapp_uri = Set_or_keep.Set "https://o1labs.org" in
-                      return { Party.Update.dummy with zkapp_uri }
-                  | `Token_symbol ->
-                      let token_symbol = Set_or_keep.Set "CODA" in
-                      return { Party.Update.dummy with token_symbol }
-                  | `Voting_for ->
-                      let%map field = Snark_params.Tick.Field.gen in
-                      let voting_for = Set_or_keep.Set field in
-                      { Party.Update.dummy with voting_for }
-                  | `Balance ->
-                      return Party.Update.dummy
-                in
-                let%map new_perm =
-                  Permissions.gen ~auth_tag:Control.Tag.Signature
-                in
-                ( auth
-                , Some { update with permissions = Set_or_keep.Set new_perm } )
-            | _ ->
-                return (Control.dummy_of_tag permissions_auth, None)
+                        { Party.Update.dummy with
+                          delegate = Set_or_keep.Set delegate
+                        }
+                    | `App_state ->
+                        let%map app_state =
+                          let%map fields =
+                            let field_gen =
+                              Snark_params.Tick.Field.gen
+                              >>| fun x -> Set_or_keep.Set x
+                            in
+                            Quickcheck.Generator.list_with_length 8 field_gen
+                          in
+                          Zkapp_state.V.of_list_exn fields
+                        in
+                        { Party.Update.dummy with app_state }
+                    | `Verification_key ->
+                        let data = Pickles.Side_loaded.Verification_key.dummy in
+                        let hash = Zkapp_account.digest_vk data in
+                        let verification_key =
+                          Set_or_keep.Set { With_hash.data; hash }
+                        in
+                        return { Party.Update.dummy with verification_key }
+                    | `Zkapp_uri ->
+                        let zkapp_uri = Set_or_keep.Set "https://o1labs.org" in
+                        return { Party.Update.dummy with zkapp_uri }
+                    | `Token_symbol ->
+                        let token_symbol = Set_or_keep.Set "CODA" in
+                        return { Party.Update.dummy with token_symbol }
+                    | `Voting_for ->
+                        let%map field = Snark_params.Tick.Field.gen in
+                        let voting_for = Set_or_keep.Set field in
+                        { Party.Update.dummy with voting_for }
+                    | `Balance ->
+                        return Party.Update.dummy
+                  in
+                  let%map new_perm =
+                    Permissions.gen ~auth_tag:Control.Tag.Signature
+                  in
+                  ( auth
+                  , Some { update with permissions = Set_or_keep.Set new_perm }
+                  )
+              | _ ->
+                  return (Control.dummy_of_tag permissions_auth, None)
+            in
+            let account_id =
+              Account_id.create party0.body.public_key party0.body.token_id
+            in
+            (* if we use this account again, it will have a Signature authorization *)
+            let permissions_auth = Control.Tag.Signature in
+            gen_party_from ~update ?failure ~account_ids_seen ~account_id
+              ~authorization ~permissions_auth ~zkapp_account
+              ~available_public_keys ~ledger ~account_state_tbl
+              ?protocol_state_view ?vk ()
           in
-          let account_id =
-            Account_id.create party0.body.public_key party0.body.token_id
-          in
-          (* if we use this account again, it will have a Signature authorization *)
-          let permissions_auth = Control.Tag.Signature in
-          gen_party_from ~update ?failure ~account_ids_seen ~account_id
-            ~authorization ~permissions_auth ~zkapp_account
-            ~available_public_keys ~ledger ~account_state_tbl
-            ?protocol_state_view ?vk ()
-        in
-        (* this list will be reversed, so `party0` will execute before `party` *)
-        go (party :: party0 :: acc) (n - 1)
+          (* this list will be reversed, so `party0` will execute before `party` *)
+          go (party :: party0 :: acc) (n - 1)
     in
     go [] num_parties
   in
@@ -1356,7 +1354,16 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   in
   let other_parties0 = old_parties @ new_parties in
   let balance_change_sum =
-    List.fold other_parties0 ~init:Currency.Amount.Signed.zero
+    List.fold other_parties0
+      ~init:
+        Currency.Amount.(
+          Signed.of_unsigned
+            ( scale
+                (of_fee
+                   Genesis_constants.Constraint_constants.compiled
+                     .account_creation_fee )
+                num_new_accounts
+            |> Option.value_exn ))
       ~f:(fun acc party ->
         match Currency.Amount.Signed.add acc party.body.balance_change with
         | Some sum ->
