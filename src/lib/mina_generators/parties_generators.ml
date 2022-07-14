@@ -984,14 +984,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   { Party_body_components.public_key
   ; update =
       ( if new_account then
-        { Party.Update.dummy with
+        { update with
           verification_key = Zkapp_basic.Set_or_keep.Set verification_key
-        ; permissions =
-            Zkapp_basic.Set_or_keep.Set
-              { Permissions.user_default with
-                edit_state = Permissions.Auth_required.Proof
-              ; edit_sequence_state = Proof
-              }
         }
       else update )
   ; token_id
@@ -1387,14 +1381,22 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
      party is created. This is because the preconditions generation
      is sensitive to the order of party generation.
   *)
+  let balance_change = Currency.Amount.Signed.negate balance_change_sum in
   let balancing_party =
-    { balancing_party with
-      body =
-        { balancing_party.body with
-          balance_change = Currency.Amount.Signed.negate balance_change_sum
-        }
-    }
+    { balancing_party with body = { balancing_party.body with balance_change } }
   in
+  Account_id.Table.update account_state_tbl
+    (Account_id.create balancing_party.body.public_key Token_id.default)
+    ~f:(function
+    | None ->
+        failwith "account of balancing party is missing"
+    | Some account ->
+        { account with
+          balance =
+            Currency.Balance.add_signed_amount_flagged account.balance
+              balance_change
+            |> fst
+        } ) ;
   let other_parties = balancing_party :: other_parties0 in
   let%bind memo = Signed_command_memo.gen in
   let parties_dummy_signatures : Parties.t =
