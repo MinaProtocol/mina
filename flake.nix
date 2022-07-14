@@ -297,10 +297,8 @@
         devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-rust-shell";
           nativeBuildInputs = oa.nativeBuildInputs ++ [
-            pkgs.kimchi-rust.cargo
-            pkgs.kimchi-rust-wasm
-            pkgs.wasm-pack
-            pkgs.wasm-bindgen-cli
+            pkgs.rustup
+            pkgs.libiconv
           ];
           MARLIN_PLONK_STUBS = "n";
           PLONK_WASM_WEB = "n";
