@@ -1095,26 +1095,11 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
       Option.map ~f:erase_stable_versions#structure_item type_stri
       |> Option.to_list
     in
-    let empty_signature = "Empty_signature" in
-    let stable_latest = "Stable.Latest" in
-    let empty_sig =
-      mk_loc ~loc empty_signature
-      |> Mtd.mk ~typ:(Mty.signature [])
-      |> Str.modtype
-    in
-    let empty_bind =
-      let pattern = Pat.constraint_ (Pat.mk Ppat_any) (Typ.mk Ptyp_any)
-      and expression =
-        let latest =
-          stable_latest |> Longident.parse |> Loc.make ~loc |> Mod.ident
-        in
-        let empty_signature =
-          empty_signature |> Longident.parse |> Loc.make ~loc
-        in
-        Exp.constraint_ (Exp.pack latest) (Typ.package empty_signature [])
-      in
-      let binding = Vb.mk pattern expression in
-      Str.value Nonrecursive [ binding ]
+    let empty_binding =
+      [%str
+        module type Empty_signature = sig end
+
+        let (_ : _) = (module Stable.Latest : Empty_signature)]
     in
     Str.include_ ~loc
       (Incl.mk ~loc
@@ -1123,7 +1108,7 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
                 (Mb.mk ~loc:modname.loc (some_loc modname)
                    (Mod.structure ~loc:modbody.loc modbody.txt) )
               :: type_stri
-            @ [ empty_sig; empty_bind ] ) ) )
+            @ empty_binding ) ) )
   with exn ->
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
