@@ -55,6 +55,25 @@ end
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
+let validate_block ~genesis_state_hash (b, v) =
+  let open Mina_block.Validation in
+  let open Result.Let_syntax in
+  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  validate_genesis_protocol_state ~genesis_state_hash h
+  >>= validate_protocol_versions >>= validate_delta_block_chain
+  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+
+let validate_proofs_block ~verifier ~genesis_state_hash blocks =
+  let open Mina_block.Validation in
+  let open Deferred.Result.Let_syntax in
+  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
+  let hs =
+    List.map blocks ~f:(fun (b, v) ->
+        (With_hash.map ~f:Mina_block.header b, v) )
+  in
+  validate_proofs ~verifier ~genesis_state_hash hs
+  >>| List.zip_exn blocks >>| List.map ~f
+
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     ~frontier ~unprocessed_transition_cache enveloped_transition =
   let open Context in
@@ -67,10 +86,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       transition_with_hash
       |> Mina_block.Validation.skip_time_received_validation
            `This_block_was_not_received_via_gossip
-      |> Mina_block.Validation.validate_genesis_protocol_state
-           ~genesis_state_hash
-      >>= Mina_block.Validation.validate_protocol_versions
-      >>= Mina_block.Validation.validate_delta_block_chain
+      |> validate_block ~genesis_state_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -488,7 +504,7 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
         |> State_hash.With_state_hashes.state_hash
       in
       match%bind
-        Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+        validate_proofs_block ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
                Mina_block.Validation.wrap (Envelope.Incoming.data t) ) )
       with

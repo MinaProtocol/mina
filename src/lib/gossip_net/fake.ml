@@ -268,7 +268,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           let time = Block_time.now t.time_controller in
           let module M = (val sinksM) in
           M.Block_sink.push sink_block
-            (`Transition env, `Time_received time, `Valid_cb vc) )
+            (`Block env, `Time_received time, `Valid_cb vc) )
 
     let broadcast_snark_pool_diff ?origin_topic t diff =
       ignore origin_topic ;

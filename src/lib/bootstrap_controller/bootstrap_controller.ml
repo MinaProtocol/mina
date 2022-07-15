@@ -140,11 +140,14 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
   | `Repeat ->
       `Ignored
 
+let to_consensus_state h =
+  Mina_block.Header.protocol_state h |> Protocol_state.consensus_state
+
 let on_transition ({ context = (module Context); _ } as t) ~sender
-    ~root_sync_ledger ~genesis_constants candidate_transition =
+    ~root_sync_ledger ~genesis_constants candidate_header =
   let open Context in
   let candidate_consensus_state =
-    With_hash.map ~f:Mina_block.consensus_state candidate_transition
+    With_hash.map ~f:to_consensus_state candidate_header
   in
   if not @@ should_sync ~root_sync_ledger t candidate_consensus_state then
     Deferred.return `Ignored
@@ -181,39 +184,48 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
     response_writer ;
-  Reader.iter sync_ledger_reader
-    ~f:(fun (`Block incoming_transition, `Valid_cb vc) ->
-      let (transition, _) : Mina_block.initial_valid_block =
-        Envelope.Incoming.data incoming_transition
+  Reader.iter sync_ledger_reader ~f:(fun (b_or_h, `Valid_cb vc) ->
+      let header_with_hash, sender, transition_cache_element =
+        match b_or_h with
+        | `Block b_env ->
+            ( Envelope.Incoming.data b_env
+              |> Mina_block.Validation.block_with_hash
+              |> With_hash.map ~f:Mina_block.header
+            , Envelope.Incoming.remote_sender_exn b_env
+            , Envelope.Incoming.map ~f:(fun x -> Transition_cache.Block x) b_env
+            )
+        | `Header h_env ->
+            ( Envelope.Incoming.data h_env
+              |> Mina_block.Validation.header_with_hash
+            , Envelope.Incoming.remote_sender_exn h_env
+            , Envelope.Incoming.map
+                ~f:(fun x -> Transition_cache.Header x)
+                h_env )
       in
       let previous_state_hash =
-        With_hash.data transition |> Mina_block.header
+        With_hash.data header_with_hash
         |> Mina_block.Header.protocol_state
         |> Protocol_state.previous_state_hash
       in
-      let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
       Transition_cache.add transition_graph ~parent:previous_state_hash
-        ( Envelope.Incoming.map
-            ~f:(fun x -> Transition_cache.Block x)
-            incoming_transition
-        , vc ) ;
+        (transition_cache_element, vc) ;
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
       if
         worth_getting_root t
-          (With_hash.map ~f:Mina_block.consensus_state transition)
+          (With_hash.map ~f:to_consensus_state header_with_hash)
       then (
         [%log trace] "Added the transition from sync_ledger_reader into cache"
           ~metadata:
             [ ( "state_hash"
               , State_hash.to_yojson
-                  (State_hash.With_state_hashes.state_hash transition) )
-            ; ( "external_transition"
-              , Mina_block.to_yojson (With_hash.data transition) )
+                  (State_hash.With_state_hashes.state_hash header_with_hash) )
+            ; ( "header"
+              , Mina_block.Header.to_yojson (With_hash.data header_with_hash) )
             ] ;
 
         Deferred.ignore_m
         @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
-             transition )
+             header_with_hash )
       else Deferred.unit )
 
 let external_transition_compare ~context:(module Context : CONTEXT) =
@@ -255,18 +267,22 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                ( `Capacity 50
                , `Overflow
                    (Drop_head
-                      (fun ( `Block
-                               (block :
-                                 Mina_block.Validation.initial_valid_with_block
-                                 Envelope.Incoming.t )
-                           , `Valid_cb valid_cb ) ->
+                      (fun (b_or_h, `Valid_cb valid_cb) ->
                         Mina_metrics.(
                           Counter.inc_one
                             Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
-                        Mina_block.handle_dropped_transition ?valid_cb
-                          ( With_hash.hash
-                          @@ Mina_block.Validation.block_with_hash
-                          @@ Envelope.Incoming.data block )
+                        let hash =
+                          match b_or_h with
+                          | `Block b_env ->
+                              Envelope.Incoming.data b_env
+                              |> Mina_block.Validation.block_with_hash
+                              |> With_hash.hash
+                          | `Header h_env ->
+                              Envelope.Incoming.data h_env
+                              |> Mina_block.Validation.header_with_hash
+                              |> With_hash.hash
+                        in
+                        Mina_block.handle_dropped_transition ?valid_cb hash
                           ~pipe_name:sync_ledger_pipe ~logger ) ) ) )
         in
         don't_wait_for

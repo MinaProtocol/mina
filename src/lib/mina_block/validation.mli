@@ -30,7 +30,15 @@ val block_with_hash : _ with_block -> Block.with_hash
 
 val block : _ with_block -> Block.t
 
+val header : _ with_header -> Header.t
+
+val to_header :
+     ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_block
+  -> ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_header
+
 val wrap : Block.with_hash -> fully_invalid_with_block
+
+val wrap_header : Header.with_hash -> fully_invalid_with_header
 
 val validate_time_received :
      precomputed_values:Precomputed_values.t
@@ -42,7 +50,7 @@ val validate_time_received :
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
   -> ( ( [ `Time_received ] * unit Truth.true_t
        , 'a
        , 'b
@@ -50,7 +58,7 @@ val validate_time_received :
        , 'd
        , 'e
        , 'f )
-       with_block
+       with_header
      , [> `Invalid_time_received of [ `Too_early | `Too_late of int64 ] ] )
      Result.t
 
@@ -75,7 +83,7 @@ val validate_genesis_protocol_state :
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
   -> ( ( 'a
        , [ `Genesis_state ] * unit Truth.true_t
        , 'b
@@ -83,7 +91,7 @@ val validate_genesis_protocol_state :
        , 'd
        , 'e
        , 'f )
-       with_block
+       with_header
      , [> `Invalid_genesis_protocol_state ] )
      Result.t
 
@@ -113,16 +121,16 @@ val reset_genesis_protocol_state_validation :
 val validate_proofs :
      verifier:Verifier.t
   -> genesis_state_hash:State_hash.t
-  -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block list
-  -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block list
+  -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_header list
+  -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_header list
      , [> `Invalid_proof | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val validate_single_proof :
      verifier:Verifier.t
   -> genesis_state_hash:State_hash.t
-  -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block
-  -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block
+  -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_header
+  -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_header
      , [> `Invalid_proof | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
@@ -150,7 +158,7 @@ val validate_delta_block_chain :
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
   -> ( ( 'a
        , 'b
        , 'c
@@ -158,7 +166,7 @@ val validate_delta_block_chain :
        , 'd
        , 'e
        , 'f )
-       with_block
+       with_header
      , [> `Invalid_delta_block_chain_proof ] )
      Result.t
 
@@ -182,25 +190,28 @@ val skip_delta_block_chain_validation :
      with_block
 
 val validate_frontier_dependencies :
-     context:(module CONTEXT)
+     to_header:('a -> Header.t)
+  -> context:(module CONTEXT)
   -> root_block:Block.with_hash
-  -> get_block_by_hash:(State_hash.t -> Block.with_hash option)
-  -> ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , [ `Frontier_dependencies ] * unit Truth.false_t
-     , 'e
-     , 'f )
-     with_block
-  -> ( ( 'a
-       , 'b
+  -> is_block_in_frontier:(Frozen_ledger_hash.t -> bool)
+  -> ('a, State_hash.State_hashes.t) With_hash.t
+     * ( 'b
        , 'c
        , 'd
-       , [ `Frontier_dependencies ] * unit Truth.true_t
        , 'e
-       , 'f )
-       with_block
+       , [ `Frontier_dependencies ] * unit Truth.false_t
+       , 'f
+       , 'g )
+       t
+  -> ( ('a, State_hash.State_hashes.t) With_hash.t
+       * ( 'b
+         , 'c
+         , 'd
+         , 'e
+         , [ `Frontier_dependencies ] * unit Truth.true_t
+         , 'f
+         , 'g )
+         t
      , [> `Already_in_frontier
        | `Not_selected_over_frontier_root
        | `Parent_missing_from_frontier ] )
@@ -227,22 +238,24 @@ val skip_frontier_dependencies_validation :
      with_block
 
 val reset_frontier_dependencies_validation :
-     ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , [ `Frontier_dependencies ] * unit Truth.true_t
-     , 'e
-     , 'f )
-     with_block
-  -> ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , [ `Frontier_dependencies ] * unit Truth.false_t
-     , 'e
-     , 'f )
-     with_block
+     'g
+     * ( 'a
+       , 'b
+       , 'c
+       , 'd
+       , [ `Frontier_dependencies ] * unit Truth.true_t
+       , 'e
+       , 'f )
+       t
+  -> 'g
+     * ( 'a
+       , 'b
+       , 'c
+       , 'd
+       , [ `Frontier_dependencies ] * unit Truth.false_t
+       , 'e
+       , 'f )
+       t
 
 val validate_staged_ledger_diff :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
@@ -320,22 +333,9 @@ val skip_staged_ledger_diff_validation :
      with_block
 
 val reset_staged_ledger_diff_validation :
-     ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , 'e
-     , [ `Staged_ledger_diff ] * unit Truth.true_t
-     , 'f )
-     with_block
-  -> ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , 'e
-     , [ `Staged_ledger_diff ] * unit Truth.false_t
-     , 'f )
-     with_block
+     'g * ('a, 'b, 'c, 'd, 'e, [ `Staged_ledger_diff ] * unit Truth.true_t, 'f) t
+  -> 'g
+     * ('a, 'b, 'c, 'd, 'e, [ `Staged_ledger_diff ] * unit Truth.false_t, 'f) t
 
 val validate_protocol_versions :
      ( 'a
@@ -345,7 +345,7 @@ val validate_protocol_versions :
      , 'e
      , 'f
      , [ `Protocol_versions ] * unit Truth.false_t )
-     with_block
+     with_header
   -> ( ( 'a
        , 'b
        , 'c
@@ -353,7 +353,7 @@ val validate_protocol_versions :
        , 'e
        , 'f
        , [ `Protocol_versions ] * unit Truth.true_t )
-       with_block
+       with_header
      , [> `Invalid_protocol_version | `Mismatched_protocol_version ] )
      Result.t
 
@@ -374,4 +374,23 @@ val skip_protocol_versions_validation :
      , 'e
      , 'f
      , [ `Protocol_versions ] * unit Truth.true_t )
+     with_block
+
+val with_body :
+     ( 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , [ `Staged_ledger_diff ] * unit Truth.false_t
+     , 'f )
+     with_header
+  -> Staged_ledger_diff.Body.t
+  -> ( 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , [ `Staged_ledger_diff ] * unit Truth.false_t
+     , 'f )
      with_block

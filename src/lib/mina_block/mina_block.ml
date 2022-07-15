@@ -50,6 +50,10 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
   in
   (block_with_hash, validation)
 
+let genesis_header ~precomputed_values =
+  let b, v = genesis ~precomputed_values in
+  (With_hash.map ~f:Block.header b, v)
+
 let handle_dropped_transition ?pipe_name ?valid_cb ~logger block =
   [%log warn] "Dropping state_hash $state_hash from $pipe transition pipe"
     ~metadata:
