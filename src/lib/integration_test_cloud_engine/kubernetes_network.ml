@@ -88,7 +88,7 @@ module Node = struct
     ; ("pod_id", `String node.pod_id)
     ]
 
-  module Serializing = Graphql_lib.Serializing
+  module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
     let ingress_uri node =
@@ -113,7 +113,7 @@ module Node = struct
     ({|
       mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+          public_key: publicKey
         }
       }
     |}
@@ -192,7 +192,7 @@ module Node = struct
         account(publicKey: $public_key) {
           nonce
           balance {
-            total @ppxCustom(module: "Serializing.Balance")
+            total @ppxCustom(module: "Scalars.Balance")
           }
         }
       }
@@ -222,7 +222,7 @@ module Node = struct
           stateHash
           commandTransactionCount
           creatorAccount {
-            publicKey
+            publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           }
         }
       }
