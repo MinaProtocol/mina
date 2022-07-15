@@ -33,7 +33,8 @@
    mina_metrics
    o1trace
    staged_ledger_diff
-   )
+   ppx_version.runtime
+ )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_let ppx_deriving_yojson)))

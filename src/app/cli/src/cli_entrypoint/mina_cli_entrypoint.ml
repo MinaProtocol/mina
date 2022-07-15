@@ -1381,6 +1381,39 @@ let replay_blocks logger =
            "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
          Async.never () ) )
 
+let dump_type_shapes =
+  Command.basic ~summary:"Print serialization shape digests of versioned types"
+    (Command.Param.return (fun () ->
+         Ppx_version_runtime.Shapes.iteri ~f:(fun ~key:path ~data:shape ->
+             let open Bin_prot.Shape in
+             let canonical = eval shape in
+             let digest = Canonical.to_digest canonical |> Digest.to_hex in
+             let shape_summary =
+               let shape_sexp =
+                 Canonical.to_string_hum canonical |> Sexp.of_string
+               in
+               (* elide the shape below specified depth, so that changes to
+                  contained types aren't considered a change to the containing
+                  type, even though the shape digests differ
+               *)
+               let summary_sexp =
+                 let max_depth = 6 in
+                 let rec go sexp depth =
+                   match sexp with
+                   | Sexp.Atom _ ->
+                       sexp
+                   | Sexp.List items ->
+                       if depth > max_depth then Atom "."
+                       else
+                         Sexp.List
+                           (List.map items ~f:(fun item -> go item (depth + 1)))
+                 in
+                 go shape_sexp 0
+               in
+               Sexp.to_string summary_sexp
+             in
+             Core_kernel.printf "%s, %s, %s\n" path digest shape_summary ) ) )
+
 [%%if force_updates]
 
 let rec ensure_testnet_id_still_good logger =
@@ -1648,6 +1681,7 @@ let internal_commands logger =
           | None ->
               () ) ;
           Deferred.return ()) )
+  ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger)
   ]
 
