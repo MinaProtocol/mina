@@ -1143,6 +1143,10 @@ let poseidon =
         val events = Js.string (zkapp_events :> string)
 
         val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+
+        val partyCons = Js.string (party_cons :> string)
+
+        val partyNode = Js.string (party_node :> string)
       end
   end
 
@@ -2632,7 +2636,8 @@ module Ledger = struct
       val party = to_js_field_unchecked (party.elt.party_digest :> Impl.field)
 
       val calls =
-        to_js_field_unchecked (Parties.Digest.Forest.empty :> Impl.field)
+        to_js_field_unchecked
+          (Parties.Call_forest.hash party.elt.calls :> Impl.field)
     end
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
