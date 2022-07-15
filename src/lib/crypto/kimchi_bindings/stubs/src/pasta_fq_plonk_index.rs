@@ -52,7 +52,7 @@ pub fn caml_pasta_fq_plonk_index_create(
         .collect();
 
     // create constraint system
-    let cs = match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq_kimchi::params())
+    let cs = match ConstraintSystem::<Fq>::create(gates)
         .public(public as usize)
         .build()
     {
@@ -78,7 +78,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     // create index
     Ok(CamlPastaFqPlonkIndex(Box::new(
-        ProverIndex::<GAffine>::create(cs, oracle::pasta::fp_kimchi::params(), endo_q, srs.clone()),
+        ProverIndex::<GAffine>::create(cs, endo_q, srs.clone()),
     )))
 }
 
@@ -139,9 +139,7 @@ pub fn caml_pasta_fq_plonk_index_read(
 
     // deserialize the index
     let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
-    t.cs.fr_sponge_params = oracle::pasta::fq_kimchi::params();
     t.srs = srs.clone();
-    t.fq_sponge_params = oracle::pasta::fp_kimchi::params();
 
     let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
     t.linearization = linearization;

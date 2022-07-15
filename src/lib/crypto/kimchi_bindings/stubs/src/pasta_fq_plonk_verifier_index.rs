@@ -127,9 +127,6 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
 
             lookup_index: index.lookup_index.map(Into::into),
             linearization,
-
-            fr_sponge_params: oracle::pasta::fq_kimchi::params(),
-            fq_sponge_params: oracle::pasta::fp_kimchi::params(),
         }
     }
 }
@@ -141,21 +138,12 @@ pub fn read_raw(
 ) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
     let path = Path::new(&path);
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-    let fq_sponge_params = oracle::pasta::fp_kimchi::params();
-    let fr_sponge_params = oracle::pasta::fq_kimchi::params();
-    VerifierIndex::<GAffine>::from_file(
-        Some(srs.0),
-        path,
-        offset.map(|x| x as u64),
-        endo_q,
-        fq_sponge_params,
-        fr_sponge_params,
-    )
-    .map_err(|_e| {
-        ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
-            .err()
-            .unwrap()
-    })
+    VerifierIndex::<GAffine>::from_file(Some(srs.0), path, offset.map(|x| x as u64), endo_q)
+        .map_err(|_e| {
+            ocaml::Error::invalid_argument("caml_pasta_fq_plonk_verifier_index_raw_read")
+                .err()
+                .unwrap()
+        })
 }
 
 //
