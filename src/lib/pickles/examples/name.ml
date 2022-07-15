@@ -94,11 +94,11 @@ let%test_module "can we wordle" =
                                Field.equal guess soln )
                          in
                          let res_out_of_order =
-                           Array.iter2_exn res in_place ~f:(fun res in_place ->
+                           Array.map2_exn res in_place ~f:(fun res in_place ->
                                Boolean.(res && in_place) )
                          in
                          let res_in_order =
-                           Array.iter2_exn res in_place ~f:(fun res in_place ->
+                           Array.map2_exn res in_place ~f:(fun res in_place ->
                                Boolean.(res && not in_place) )
                          in
                          { previous_proof_statements = []
