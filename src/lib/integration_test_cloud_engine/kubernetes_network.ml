@@ -90,7 +90,7 @@ module Node = struct
     ; ("pod_id", `String node.pod_id)
     ]
 
-  module Serializing = Graphql_lib.Serializing
+  module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
     let ingress_uri node =

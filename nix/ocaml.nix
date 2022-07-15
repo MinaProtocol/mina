@@ -56,11 +56,11 @@ let
   dds = x: x.overrideAttrs (o: { dontDisableStatic = true; });
 
   external-libs = with pkgs;
-    if static then
+    lib.optional (! (stdenv.isDarwin && stdenv.isAarch64)) jemalloc ++
+    (if static then
       map dds [
         (zlib.override { splitStaticOutput = false; })
         (bzip2.override { linkStatic = true; })
-        (jemalloc)
         (gmp.override { withStatic = true; })
         (openssl.override { static = true; })
         libffi
@@ -68,11 +68,10 @@ let
     else [
       zlib
       bzip2
-      jemalloc
       gmp
       openssl
       libffi
-    ];
+    ]);
 
   filtered-src = with inputs.nix-filter.lib;
     filter {
