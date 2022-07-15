@@ -39,29 +39,16 @@ let%test_module "can we wordle" =
               respond Unhandled
 
         module Statement = struct
-          type t = Boolean.var array * Boolean.var array
+          type t = unit
 
-          let to_field_elements (x, y) =
-            let map = Array.map ~f:(fun (x : Boolean.var) -> (x :> Field.t)) in
-            Array.append (map x) (map y)
-
-          module Constant = struct
-            type t = bool array * bool array
-
-            let to_field_elements (x, y) =
-              let map =
-                Array.map ~f:(fun x ->
-                    if x then Field.Constant.zero else Field.Constant.one )
-              in
-              Array.append (map x) (map y)
-          end
+          let to_field_elements () = [||]
         end
 
         let tag, _, p, [ step ] =
           Async.Thread_safe.block_on_async_exn
           @@ Pickles.compile
                (module Statement)
-               (module Statement.Constant)
+               (module Statement)
                ~public_input:
                  (Output
                     Typ.(array ~length:5 Field.typ * array ~length:5 Field.typ)
