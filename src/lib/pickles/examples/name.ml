@@ -44,7 +44,7 @@ let%test_module "can we wordle" =
           let to_field_elements () = [||]
         end
 
-        let tag, _, p, [ step ] =
+        let tag, _, p, Pickles.Provers.[ step ] =
           Pickles.compile
                (module Statement)
                (module Statement)
