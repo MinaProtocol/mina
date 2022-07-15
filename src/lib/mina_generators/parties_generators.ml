@@ -771,37 +771,12 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           if zkapp_account && Option.is_none account.zkapp then
             failwith "gen_party_body: chosen account has no snapp field" ;
           account
-      | Some account_id -> (
-          (* use given account from the ledger *)
-          match Ledger.location_of_account ledger account_id with
-          | None ->
-              failwithf
-                "gen_party_body: could not find account location for passed \
-                 account id with public key %s and token_id %s"
-                (Signature_lib.Public_key.Compressed.to_base58_check
-                   (Account_id.public_key account_id) )
-                (Account_id.token_id account_id |> Token_id.to_string)
-                ()
-          | Some location -> (
-              match Ledger.get ledger location with
-              | None ->
-                  (* should be unreachable *)
-                  failwithf
-                    "gen_party_body: could not find account for passed account \
-                     id with public key %s and token id %s"
-                    (Signature_lib.Public_key.Compressed.to_base58_check
-                       (Account_id.public_key account_id) )
-                    (Account_id.token_id account_id |> Token_id.to_string)
-                    ()
-              | Some _acct ->
-                  (*get the latest state of the account*)
-                  let acct =
-                    Account_id.Table.find_exn account_state_tbl account_id
-                  in
-                  if zkapp_account && Option.is_none acct.zkapp then
-                    failwith
-                      "gen_party_body: provided account has no snapp field" ;
-                  return acct ) )
+      | Some account_id ->
+          (*get the latest state of the account*)
+          let acct = Account_id.Table.find_exn account_state_tbl account_id in
+          if zkapp_account && Option.is_none acct.zkapp then
+            failwith "gen_party_body: provided account has no snapp field" ;
+          return acct
   in
   let public_key = account.public_key in
   let token_id = account.token_id in
@@ -1260,85 +1235,81 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
             ~available_public_keys ~ledger ~account_state_tbl
             ?protocol_state_view ?vk ()
         in
-        if new_parties || zkapp_account then
-          go (party0 :: fst acc, snd acc + 1) (n - 1)
-        else
-          let%bind party =
-            (* authorization according to chosen permissions auth *)
-            let%bind authorization, update =
-              match failure with
-              | Some (Update_not_permitted update_type) ->
-                  let auth =
-                    match permissions_auth with
-                    | Proof ->
-                        Control.(dummy_of_tag Signature)
-                    | Signature ->
-                        Control.(dummy_of_tag Proof)
-                    | _ ->
-                        Control.(dummy_of_tag None_given)
-                  in
-                  let%bind update =
-                    match update_type with
-                    | `Delegate ->
-                        let%map delegate =
-                          Signature_lib.Public_key.Compressed.gen
-                        in
-                        { Party.Update.dummy with
-                          delegate = Set_or_keep.Set delegate
-                        }
-                    | `App_state ->
-                        let%map app_state =
-                          let%map fields =
-                            let field_gen =
-                              Snark_params.Tick.Field.gen
-                              >>| fun x -> Set_or_keep.Set x
-                            in
-                            Quickcheck.Generator.list_with_length 8 field_gen
+        let%bind party =
+          (* authorization according to chosen permissions auth *)
+          let%bind authorization, update =
+            match failure with
+            | Some (Update_not_permitted update_type) ->
+                let auth =
+                  match permissions_auth with
+                  | Proof ->
+                      Control.(dummy_of_tag Signature)
+                  | Signature ->
+                      Control.(dummy_of_tag Proof)
+                  | _ ->
+                      Control.(dummy_of_tag None_given)
+                in
+                let%bind update =
+                  match update_type with
+                  | `Delegate ->
+                      let%map delegate =
+                        Signature_lib.Public_key.Compressed.gen
+                      in
+                      { Party.Update.dummy with
+                        delegate = Set_or_keep.Set delegate
+                      }
+                  | `App_state ->
+                      let%map app_state =
+                        let%map fields =
+                          let field_gen =
+                            Snark_params.Tick.Field.gen
+                            >>| fun x -> Set_or_keep.Set x
                           in
-                          Zkapp_state.V.of_list_exn fields
+                          Quickcheck.Generator.list_with_length 8 field_gen
                         in
-                        { Party.Update.dummy with app_state }
-                    | `Verification_key ->
-                        let data = Pickles.Side_loaded.Verification_key.dummy in
-                        let hash = Zkapp_account.digest_vk data in
-                        let verification_key =
-                          Set_or_keep.Set { With_hash.data; hash }
-                        in
-                        return { Party.Update.dummy with verification_key }
-                    | `Zkapp_uri ->
-                        let zkapp_uri = Set_or_keep.Set "https://o1labs.org" in
-                        return { Party.Update.dummy with zkapp_uri }
-                    | `Token_symbol ->
-                        let token_symbol = Set_or_keep.Set "CODA" in
-                        return { Party.Update.dummy with token_symbol }
-                    | `Voting_for ->
-                        let%map field = Snark_params.Tick.Field.gen in
-                        let voting_for = Set_or_keep.Set field in
-                        { Party.Update.dummy with voting_for }
-                    | `Balance ->
-                        return Party.Update.dummy
-                  in
-                  let%map new_perm =
-                    Permissions.gen ~auth_tag:Control.Tag.Signature
-                  in
-                  ( auth
-                  , Some { update with permissions = Set_or_keep.Set new_perm }
-                  )
-              | _ ->
-                  return (Control.dummy_of_tag permissions_auth, None)
-            in
-            let account_id =
-              Account_id.create party0.body.public_key party0.body.token_id
-            in
-            (* if we use this account again, it will have a Signature authorization *)
-            let permissions_auth = Control.Tag.Signature in
-            gen_party_from ~update ?failure ~account_ids_seen ~account_id
-              ~authorization ~permissions_auth ~zkapp_account
-              ~available_public_keys ~ledger ~account_state_tbl
-              ?protocol_state_view ?vk ()
+                        Zkapp_state.V.of_list_exn fields
+                      in
+                      { Party.Update.dummy with app_state }
+                  | `Verification_key ->
+                      let data = Pickles.Side_loaded.Verification_key.dummy in
+                      let hash = Zkapp_account.digest_vk data in
+                      let verification_key =
+                        Set_or_keep.Set { With_hash.data; hash }
+                      in
+                      return { Party.Update.dummy with verification_key }
+                  | `Zkapp_uri ->
+                      let zkapp_uri = Set_or_keep.Set "https://o1labs.org" in
+                      return { Party.Update.dummy with zkapp_uri }
+                  | `Token_symbol ->
+                      let token_symbol = Set_or_keep.Set "CODA" in
+                      return { Party.Update.dummy with token_symbol }
+                  | `Voting_for ->
+                      let%map field = Snark_params.Tick.Field.gen in
+                      let voting_for = Set_or_keep.Set field in
+                      { Party.Update.dummy with voting_for }
+                  | `Balance ->
+                      return Party.Update.dummy
+                in
+                let%map new_perm =
+                  Permissions.gen ~auth_tag:Control.Tag.Signature
+                in
+                ( auth
+                , Some { update with permissions = Set_or_keep.Set new_perm } )
+            | _ ->
+                return (Control.dummy_of_tag permissions_auth, None)
           in
-          (* this list will be reversed, so `party0` will execute before `party` *)
-          go (party :: party0 :: fst acc, snd acc) (n - 1)
+          let account_id =
+            Account_id.create party0.body.public_key party0.body.token_id
+          in
+          (* if we use this account again, it will have a Signature authorization *)
+          let permissions_auth = Control.Tag.Signature in
+          gen_party_from ~update ?failure ~account_ids_seen ~account_id
+            ~authorization ~permissions_auth ~zkapp_account
+            ~available_public_keys ~ledger ~account_state_tbl
+            ?protocol_state_view ?vk ()
+        in
+        (* this list will be reversed, so `party0` will execute before `party` *)
+        go (party :: party0 :: fst acc, snd acc) (n - 1)
     in
     go ([], 0) num_parties
   in

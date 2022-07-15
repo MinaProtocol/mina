@@ -178,19 +178,15 @@ let () =
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:Invalid_protocol_state_precondition
     ~expected_failure_status:Protocol_state_precondition_unsatisfied ;
-  (*
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:(Update_not_permitted `App_state)
     ~expected_failure_status:Update_not_permitted_app_state ;
-  *)
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:(Update_not_permitted `Verification_key)
     ~expected_failure_status:Update_not_permitted_verification_key ;
-  (*
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:(Update_not_permitted `Zkapp_uri)
     ~expected_failure_status:Update_not_permitted_zkapp_uri ;
-  *)
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:(Update_not_permitted `Token_symbol)
     ~expected_failure_status:Update_not_permitted_token_symbol ;
