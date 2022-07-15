@@ -21,12 +21,17 @@ let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
   let f_drop_head name head valid_cb =
-    let block : Mina_block.initial_valid_block =
-      Network_peer.Envelope.Incoming.data @@ Cache_lib.Cached.peek head
+    let hashes =
+      match head with
+      | `Block b ->
+          With_hash.hash @@ Validation.block_with_hash
+          @@ Network_peer.Envelope.Incoming.data @@ Cache_lib.Cached.peek b
+      | `Header h ->
+          With_hash.hash @@ Validation.header_with_hash
+          @@ Network_peer.Envelope.Incoming.data h
     in
-    Mina_block.handle_dropped_transition
-      (Validation.block_with_hash block |> With_hash.hash)
-      ?valid_cb ~pipe_name:name ~logger
+    Mina_block.handle_dropped_transition hashes ?valid_cb ~pipe_name:name
+      ~logger
   in
   let valid_transition_reader, valid_transition_writer =
     let name = "valid transitions" in
@@ -35,7 +40,7 @@ let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
          ( `Capacity valid_transition_pipe_capacity
          , `Overflow
              (Drop_head
-                (fun (`Block head, `Valid_cb vc) ->
+                (fun (head, `Valid_cb vc) ->
                   Mina_metrics.(
                     Counter.inc_one
                       Pipe.Drop_on_overflow
@@ -53,7 +58,7 @@ let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
          ( `Capacity primary_transition_pipe_capacity
          , `Overflow
              (Drop_head
-                (fun (`Block head, `Valid_cb vc) ->
+                (fun (head, `Valid_cb vc) ->
                   Mina_metrics.(
                     Counter.inc_one
                       Pipe.Drop_on_overflow
@@ -75,30 +80,26 @@ let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
   let unprocessed_transition_cache =
     Transition_handler.Unprocessed_transition_cache.create ~logger
   in
-  let collected_transitions =
-    List.filter_map collected_transitions ~f:(fun (x, vc) ->
-        let open Network_peer.Envelope.Incoming in
-        match data x with
-        | Bootstrap_controller.Transition_cache.Block b ->
-            Some (map x ~f:(const b), vc)
-        | _ ->
-            (* TODO: handle headers too *)
-            None )
-  in
   List.iter collected_transitions ~f:(fun (t, vc) ->
-      (* since the cache was just built, it's safe to assume
-       * registering these will not fail, so long as there
-       * are no duplicates in the list *)
-      let block_cached =
-        Transition_handler.Unprocessed_transition_cache.register_exn
-          unprocessed_transition_cache t
+      let b_or_h =
+        let open Bootstrap_controller.Transition_cache in
+        match Network_peer.Envelope.Incoming.data t with
+        | Block b ->
+            (* since the cache was just built, it's safe to assume
+             * registering these will not fail, so long as there
+             * are no duplicates in the list *)
+            `Block
+              ( Transition_handler.Unprocessed_transition_cache.register_exn
+                  unprocessed_transition_cache
+              @@ Network_peer.Envelope.Incoming.map ~f:(const b) t )
+        | Header h ->
+            `Header (Network_peer.Envelope.Incoming.map ~f:(const h) t)
       in
-      Strict_pipe.Writer.write primary_transition_writer
-        (`Block block_cached, `Valid_cb vc) ) ;
+      Strict_pipe.Writer.write primary_transition_writer (b_or_h, `Valid_cb vc) ) ;
   let initial_state_hashes =
     List.map collected_transitions ~f:(fun (envelope, _) ->
         Network_peer.Envelope.Incoming.data envelope
-        |> Validation.block_with_hash
+        |> Bootstrap_controller.Transition_cache.header_with_hash
         |> Mina_base.State_hash.With_state_hashes.state_hash )
     |> Mina_base.State_hash.Set.of_list
   in
@@ -125,8 +126,7 @@ let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
     ~transition_reader:network_transition_reader ~valid_transition_writer
     ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
-    ~f:(fun (`Block b, `Valid_cb vc) ->
-      Strict_pipe.Writer.write primary_transition_writer (`Block b, `Valid_cb vc) )
+    ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
   Transition_handler.Processor.run
