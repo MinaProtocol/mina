@@ -13,6 +13,7 @@
    cohttp-async
    graphql-async
    graphql-cohttp
+   graphql
    async_kernel
    result
    ;; local libraries
@@ -20,6 +21,7 @@
    currency
    signature_lib
    mina_base
+   block_time
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))
