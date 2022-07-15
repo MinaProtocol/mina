@@ -340,19 +340,8 @@ let () =
      ; ("assertGte", Field.Assert.gte)
      ] ) ;
   method_ "assertEquals" (fun this (y : As_field.t) : unit ->
-      try Field.Assert.equal this##.value (As_field.value y)
-      with _ ->
-        console_log this ;
-        console_log (As_field.to_field_obj y) ;
-        let () = raise_error "assertEquals: not equal" in
-        () ) ;
+      Field.Assert.equal this##.value (As_field.value y) ) ;
 
-  (* TODO: bring back better error msg when .toString works in circuits *)
-  (* sprintf "assertEquals: %s != %s"
-         (Js.to_string this##toString)
-         (Js.to_string (As_field.to_field_obj y)##toString)
-     in
-     Js.raise_js_error (new%js Js.error_constr (Js.string s))) ; *)
   method_ "assertBoolean" (fun this : unit ->
       Impl.assert_ (Constraint.boolean this##.value) ) ;
   method_ "isZero" (fun this : bool_class Js.t ->
@@ -1480,6 +1469,34 @@ module Circuit = struct
     let kp = Impl.Keypair.generate cs in
     new%js keypair_constr kp
 
+  let constraint_system (main : unit -> unit) =
+    let cs =
+      Impl.constraint_system
+        ~exposing:Impl.Data_spec.[]
+        ~return_typ:Snark_params.Tick.Typ.unit main
+    in
+    let rows = List.length cs.rows_rev in
+    let digest =
+      Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
+    in
+    (* TODO: to_json doesn't return anything; call into kimchi instead *)
+    let json =
+      Js.Unsafe.(
+        fun_call
+          global ##. JSON##.parse
+          [| inject
+               ( Backend.R1CS_constraint_system.to_json cs
+               |> Yojson.Safe.to_string |> Js.string )
+          |])
+    in
+    object%js
+      val rows = rows
+
+      val digest = digest
+
+      val json = json
+    end
+
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
     let main, spec = main_and_input c in
@@ -1526,6 +1543,7 @@ module Circuit = struct
     := Js.wrap_callback (fun () : bool Js.t ->
            Js.bool (Impl.in_checked_computation ()) ) ;
     Js.Unsafe.set circuit (Js.string "if") if_ ;
+    Js.Unsafe.set circuit (Js.string "_constraintSystem") constraint_system ;
     circuit##.getVerificationKey
     := fun (vk : Verification_key.t) -> new%js verification_key_constr vk
 end
@@ -2610,10 +2628,12 @@ module Ledger = struct
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let party = List.nth_exn tx.other_parties party_index in
-    Public_input.Constant.to_js
-      [| (party.elt.party_digest :> Impl.field)
-       ; (Parties.Digest.Forest.empty :> Impl.field)
-      |]
+    object%js
+      val party = to_js_field_unchecked (party.elt.party_digest :> Impl.field)
+
+      val calls =
+        to_js_field_unchecked (Parties.Digest.Forest.empty :> Impl.field)
+    end
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
     Signature_lib.Schnorr.Chunked.sign (private_key key)
