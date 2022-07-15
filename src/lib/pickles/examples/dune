@@ -1,0 +1,64 @@
+(library
+ (inline_tests)
+ (name name)
+ (flags -warn-error -22+34+33+27)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_coda
+   ppx_jane
+   ppx_compare
+   ppx_deriving_yojson
+   h_list.ppx))
+ (libraries
+   ;; opam libraries
+   stdio
+   integers
+   result
+   base.caml
+   bignum.bigint
+   core_kernel
+   base64
+   digestif
+   ppx_inline_test.config
+   sexplib0
+   base
+   async_kernel
+   async
+   bin_prot.shape
+   ;; local libraries
+   pickles
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   kimchi_backend.pasta
+   bitstring_lib
+   snarky.intf
+   pickles.backend
+   pickles_types
+   snarky.backendless
+   snarky_group_map
+   sponge
+   pickles.pseudo
+   pickles.precomputed
+   pickles.limb_vector
+   pickles_base
+   kimchi_backend
+   mina_version
+   base58_check
+   codable
+   random_oracle_input
+   pickles.composition_types
+   pickles.plonk_checks
+   pickles.one_hot_vector
+   snarky_log
+   group_map
+   snarky_curve
+   key_cache
+   snark_keys_header
+   tuple_lib
+   promise
+   kimchi_backend.common
+))
