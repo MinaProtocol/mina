@@ -134,8 +134,6 @@ end
 
 open Core_kernel
 
-let lookup_config : Plonk_types.Lookup_config.t = { lookup = No; runtime = No }
-
 let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
     (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
@@ -159,7 +157,10 @@ let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
         (Branch_data.typ
            (module Impl)
            ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
-    ; Plonk_types.All_evals.typ (module Impl) lookup_config
+    ; Plonk_types.All_evals.typ
+        (module Impl)
+        (* Assume we have lookup iff we have runtime tables *)
+        { lookup; runtime = lookup }
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
     ; Vector.typ Inner_curve.typ max_proofs_verified
     ]
