@@ -11,9 +11,9 @@ module Stable = struct
       [@@deriving fields, sexp, yojson]
     end
 
-    let to_latest = Fn.id
-
     include T
+
+    let to_latest = Fn.id
 
     include (
       Allocation_functor.Make.Bin_io_and_sexp (struct
