@@ -12,8 +12,13 @@ module Js_layout = struct
   module Accumulator = struct
     type field = { key : string; value : Yojson.Safe.t; docs : Yojson.Safe.t }
 
-    let to_yojson ({ key; value; docs } : field) : Yojson.Safe.t =
-      `Assoc [ ("key", `String key); ("value", value); ("docs", docs) ]
+    let to_key ({ key; _ } : field) = `String key
+
+    let to_entry ({ key; value; _ } : field) : string * Yojson.Safe.t =
+      (key, value)
+
+    let to_doc_entry ({ key; docs; _ } : field) : string * Yojson.Safe.t =
+      (key, docs)
 
     type 'a t = < js_layout_accumulator : field option list ref ; .. > as 'a
       constraint 'a t = 'a Input.t
@@ -45,18 +50,19 @@ module Js_layout = struct
     let annotations =
       Fields_derivers.Annotations.Top.of_annots ~name t_toplevel_annots
     in
-    let js_layout_accumulator = !(obj#js_layout_accumulator) in
+    let accumulator =
+      List.filter_map ~f:Fn.id !(obj#js_layout_accumulator) |> List.rev
+    in
     obj#js_layout :=
       `Assoc
         [ ("type", `String "object")
         ; ("name", `String annotations.name)
         ; ( "docs"
           , match annotations.doc with Some s -> `String s | None -> `Null )
-        ; ( "layout"
-          , `List
-              ( List.filter_map js_layout_accumulator
-                  ~f:(Option.map ~f:Accumulator.to_yojson)
-              |> List.rev ) )
+        ; ("keys", `List (List.map ~f:Accumulator.to_key accumulator))
+        ; ("entries", `Assoc (List.map ~f:Accumulator.to_entry accumulator))
+        ; ( "docEntries"
+          , `Assoc (List.map ~f:Accumulator.to_doc_entry accumulator) )
         ] ;
     obj
 
