@@ -1217,7 +1217,15 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
               in
               (auth_tag, Some update)
           | _ ->
-              let%map tag = Control.Tag.gen in
+              (* Since zkapp account would trigger new account generation, and for new account
+                 verification keys are not in the ledger, so for now we can only use `Signature`
+                 or `None_given` for authorization. This could be fixed by passing the list
+                 of zkapp account into the generator function
+              *)
+              let%map tag =
+                Quickcheck.Generator.of_list
+                  [ Control.Tag.Signature; None_given ]
+              in
               (tag, None)
         in
         let zkapp_account =
