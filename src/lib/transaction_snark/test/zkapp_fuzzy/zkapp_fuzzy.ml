@@ -193,7 +193,9 @@ let () =
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:(Update_not_permitted `Voting_for)
     ~expected_failure_status:Update_not_permitted_voting_for ;
+  (*
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:(Update_not_permitted `Balance)
     ~expected_failure_status:Update_not_permitted_balance ;
+  *)
   test_timed_account ()
