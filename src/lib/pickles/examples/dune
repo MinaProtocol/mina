@@ -27,6 +27,7 @@
    base
    async_kernel
    async
+   async_unix
    bin_prot.shape
    ;; local libraries
    pickles
