@@ -195,6 +195,14 @@ module Instance = struct
       ~persistent_root_instance =
     let open Context in
     let open Deferred.Result.Let_syntax in
+    let validate genesis_state_hash (b, v) =
+      Validation.validate_genesis_protocol_state ~genesis_state_hash
+        (With_hash.map ~f:Mina_block.header b, v)
+      |> Result.map
+           ~f:
+             (Fn.flip Validation.with_body
+                (Mina_block.body @@ With_hash.data b) )
+    in
     let downgrade_transition transition genesis_state_hash :
         ( Mina_block.almost_valid_block
         , [ `Invalid_genesis_protocol_state ] )
@@ -203,7 +211,7 @@ module Instance = struct
       transition |> Mina_block.Validated.remember
       |> Validation.reset_staged_ledger_diff_validation
       |> Validation.reset_genesis_protocol_state_validation
-      |> Validation.validate_genesis_protocol_state ~genesis_state_hash
+      |> validate genesis_state_hash
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)

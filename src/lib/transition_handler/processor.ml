@@ -98,125 +98,150 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~frontier ~catchup_scheduler ~processed_transition_writer
-    ~time_controller ~transition:cached_initially_validated_transition ~valid_cb
-    =
+    ~time_controller ~block_or_header ~valid_cb =
   let open Context in
-  let enveloped_initially_validated_transition =
-    Cached.peek cached_initially_validated_transition
-  in
-  let transition_receipt_time =
-    Some
-      (Envelope.Incoming.received_at enveloped_initially_validated_transition)
-  in
-  let sender =
-    Envelope.Incoming.sender enveloped_initially_validated_transition
-  in
-  let initially_validated_transition =
-    Envelope.Incoming.data enveloped_initially_validated_transition
-  in
-  let transition_hash, transition =
-    let t, _ = initially_validated_transition in
-    (State_hash.With_state_hashes.state_hash t, With_hash.data t)
+  let parent_hash, transition_hash, transition_receipt_time, sender, validation
+      =
+    match block_or_header with
+    | `Block cached_env ->
+        let env = Cached.peek cached_env in
+        let block, v = Envelope.Incoming.data env in
+        ( Protocol_state.previous_state_hash
+            (Header.protocol_state @@ Mina_block.header @@ With_hash.data block)
+        , State_hash.With_state_hashes.state_hash block
+        , Some (Envelope.Incoming.received_at env)
+        , Envelope.Incoming.sender env
+        , v )
+    | `Header env ->
+        let h, v = Envelope.Incoming.data env in
+        ( Protocol_state.previous_state_hash
+            (Header.protocol_state @@ With_hash.data h)
+        , State_hash.With_state_hashes.state_hash h
+        , Some (Envelope.Incoming.received_at env)
+        , Envelope.Incoming.sender env
+        , v )
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
-  Deferred.map ~f:(Fn.const ())
-    (let open Deferred.Result.Let_syntax in
-    let%bind mostly_validated_transition =
-      let open Deferred.Let_syntax in
+  let root_block =
+    Transition_frontier.(Breadcrumb.block_with_hash @@ root frontier)
+  in
+  let is_block_in_frontier =
+    Fn.compose Option.is_some @@ Transition_frontier.find frontier
+  in
+  match block_or_header with
+  | `Header env -> (
+      let header_with_hash, _ = Envelope.Incoming.data env in
+      return
+      @@
       match
         Mina_block.Validation.validate_frontier_dependencies
           ~context:(module Context)
-          ~root_block:
-            Transition_frontier.(Breadcrumb.block_with_hash @@ root frontier)
-          ~get_block_by_hash:
-            Transition_frontier.(
-              Fn.compose (Option.map ~f:Breadcrumb.block_with_hash)
-              @@ find frontier)
-          initially_validated_transition
+          ~root_block ~is_block_in_frontier ~to_header:ident
+          (Envelope.Incoming.data env)
       with
-      | Ok t ->
-          return (Ok t)
-      | Error `Not_selected_over_frontier_root ->
-          let%map () =
-            Trust_system.record_envelope_sender trust_system logger sender
-              ( Trust_system.Actions.Gossiped_invalid_transition
-              , Some
-                  ( "The transition with hash $state_hash was not selected \
-                     over the transition frontier root"
-                  , metadata ) )
-          in
-          let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-            Cached.invalidate_with_failure cached_initially_validated_transition
-          in
-          Error ()
-      | Error `Already_in_frontier ->
-          [%log warn] ~metadata
-            "Refusing to process the transition with hash $state_hash because \
-             is is already in the transition frontier" ;
-          let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
-            Cached.invalidate_with_failure cached_initially_validated_transition
-          in
-          return (Error ())
-      | Error `Parent_missing_from_frontier -> (
-          let _, validation =
-            Cached.peek cached_initially_validated_transition
-            |> Envelope.Incoming.data
-          in
-          match validation with
-          | ( _
-            , _
-            , _
-            , (`Delta_block_chain, Truth.True delta_state_hashes)
-            , _
-            , _
-            , _ ) ->
-              let timeout_duration =
-                Option.fold
-                  (Transition_frontier.find frontier
-                     (Non_empty_list.head delta_state_hashes) )
-                  ~init:(Block_time.Span.of_ms 0L)
-                  ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
-              in
-              Catchup_scheduler.watch catchup_scheduler ~timeout_duration
-                ~cached_transition:cached_initially_validated_transition
-                ~valid_cb ;
-              return (Error ()) )
-    in
-    (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
-    let parent_hash =
-      Protocol_state.previous_state_hash
-        (Header.protocol_state @@ Mina_block.header transition)
-    in
-    let parent_breadcrumb = Transition_frontier.find_exn frontier parent_hash in
-    let%bind breadcrumb =
-      cached_transform_deferred_result cached_initially_validated_transition
-        ~transform_cached:(fun _ ->
-          Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-            ~verifier ~trust_system ~transition_receipt_time
-            ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:mostly_validated_transition
-            (* TODO: Can we skip here? *) () )
-        ~transform_result:(function
-          | Error (`Invalid_staged_ledger_hash error)
-          | Error (`Invalid_staged_ledger_diff error) ->
-              [%log error]
-                ~metadata:
-                  (metadata @ [ ("error", Error_json.error_to_yojson error) ])
-                "Error while building breadcrumb in the transition handler \
-                 processor: $error" ;
-              Deferred.return (Error ())
-          | Error (`Fatal_error exn) ->
-              raise exn
-          | Ok breadcrumb ->
-              Deferred.return (Ok breadcrumb) )
-    in
-    Mina_metrics.(
-      Counter.inc_one
-        Transition_frontier_controller.breadcrumbs_built_by_processor) ;
-    Deferred.map ~f:Result.return
-      (add_and_finalize ~logger ~frontier ~catchup_scheduler
-         ~processed_transition_writer ~only_if_present:false ~time_controller
-         ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb ))
+      | Ok _ ->
+          Catchup_scheduler.watch_header catchup_scheduler ~valid_cb
+            ~header_with_hash
+      | Error `Parent_missing_from_frontier ->
+          Catchup_scheduler.watch_header catchup_scheduler ~valid_cb
+            ~header_with_hash
+      | _ ->
+          () )
+  | `Block cached_initially_validated_transition ->
+      Deferred.map ~f:(Fn.const ())
+      @@
+      let open Deferred.Result.Let_syntax in
+      let%bind mostly_validated_transition =
+        let open Deferred.Let_syntax in
+        let initially_validated_transition =
+          Cached.peek cached_initially_validated_transition
+          |> Envelope.Incoming.data
+        in
+        match
+          Mina_block.Validation.validate_frontier_dependencies
+            ~context:(module Context)
+            ~root_block ~is_block_in_frontier ~to_header:Mina_block.header
+            initially_validated_transition
+        with
+        | Ok t ->
+            return (Ok t)
+        | Error `Not_selected_over_frontier_root ->
+            let%map () =
+              Trust_system.record_envelope_sender trust_system logger sender
+                ( Trust_system.Actions.Gossiped_invalid_transition
+                , Some
+                    ( "The transition with hash $state_hash was not selected \
+                       over the transition frontier root"
+                    , metadata ) )
+            in
+            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
+              Cached.invalidate_with_failure
+                cached_initially_validated_transition
+            in
+            Error ()
+        | Error `Already_in_frontier ->
+            [%log warn] ~metadata
+              "Refusing to process the transition with hash $state_hash \
+               because is is already in the transition frontier" ;
+            let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
+              Cached.invalidate_with_failure
+                cached_initially_validated_transition
+            in
+            return (Error ())
+        | Error `Parent_missing_from_frontier -> (
+            match validation with
+            | ( _
+              , _
+              , _
+              , (`Delta_block_chain, Truth.True delta_state_hashes)
+              , _
+              , _
+              , _ ) ->
+                let timeout_duration =
+                  Option.fold
+                    (Transition_frontier.find frontier
+                       (Non_empty_list.head delta_state_hashes) )
+                    ~init:(Block_time.Span.of_ms 0L)
+                    ~f:(fun _ _ -> catchup_timeout_duration precomputed_values)
+                in
+                Catchup_scheduler.watch catchup_scheduler ~timeout_duration
+                  ~cached_transition:cached_initially_validated_transition
+                  ~valid_cb ;
+                return (Error ()) )
+      in
+      (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
+      let parent_breadcrumb =
+        Transition_frontier.find_exn frontier parent_hash
+      in
+      let%bind breadcrumb =
+        cached_transform_deferred_result cached_initially_validated_transition
+          ~transform_cached:(fun _ ->
+            Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
+              ~verifier ~trust_system ~transition_receipt_time
+              ~sender:(Some sender) ~parent:parent_breadcrumb
+              ~transition:mostly_validated_transition
+              (* TODO: Can we skip here? *) () )
+          ~transform_result:(function
+            | Error (`Invalid_staged_ledger_hash error)
+            | Error (`Invalid_staged_ledger_diff error) ->
+                [%log error]
+                  ~metadata:
+                    (metadata @ [ ("error", Error_json.error_to_yojson error) ])
+                  "Error while building breadcrumb in the transition handler \
+                   processor: $error" ;
+                Deferred.return (Error ())
+            | Error (`Fatal_error exn) ->
+                raise exn
+            | Ok breadcrumb ->
+                Deferred.return (Ok breadcrumb) )
+      in
+      Mina_metrics.(
+        Counter.inc_one
+          Transition_frontier_controller.breadcrumbs_built_by_processor) ;
+      Deferred.map ~f:Result.return
+        (add_and_finalize ~logger ~frontier ~catchup_scheduler
+           ~processed_transition_writer ~only_if_present:false ~time_controller
+           ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb )
 
 let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~time_controller ~frontier
@@ -224,7 +249,8 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
        ( [ `Block of
            ( Mina_block.initial_valid_block Envelope.Incoming.t
            , State_hash.t )
-           Cached.t ]
+           Cached.t
+         | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Reader.t )
     ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
@@ -355,9 +381,9 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   Mina_metrics.(
                     Gauge.dec_one
                       Transition_frontier_controller.transitions_being_processed)
-              | `Partially_valid_transition
-                  (`Block transition, `Valid_cb valid_cb) ->
-                  process_transition ~transition ~valid_cb ) ) )
+              | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb)
+                ->
+                  process_transition ~block_or_header ~valid_cb ) ) )
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct

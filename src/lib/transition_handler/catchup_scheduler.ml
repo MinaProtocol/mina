@@ -194,16 +194,41 @@ let rec remove_tree t parent_hash =
       let transition, _ = Envelope.Incoming.data (Cached.peek child) in
       remove_tree t (State_hash.With_state_hashes.state_hash transition) )
 
-let watch t ~timeout_duration ~cached_transition ~valid_cb =
-  let transition_with_hash, _ =
-    Envelope.Incoming.data (Cached.peek cached_transition)
-  in
-  let hash = State_hash.With_state_hashes.state_hash transition_with_hash in
-  let parent_hash =
-    With_hash.data transition_with_hash
-    |> Mina_block.header |> Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash
-  in
+let get_parent_hash transition_with_hash =
+  With_hash.data transition_with_hash
+  |> Mina_block.header |> Header.protocol_state
+  |> Mina_state.Protocol_state.previous_state_hash
+
+type make_timeout_target =
+  | Parent of Mina_block.with_hash
+  | Self of Mina_block.Header.with_hash
+
+let make_timeout t transition_with_hash duration =
+  let target_hash = get_parent_hash transition_with_hash in
+  Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
+      let forest = extract_forest t target_hash in
+      Hashtbl.remove t.parent_root_timeouts target_hash ;
+      Mina_metrics.(
+        Gauge.dec_one
+          Transition_frontier_controller.transitions_in_catchup_scheduler) ;
+      remove_tree t target_hash ;
+      [%log' info t.logger]
+        ~metadata:
+          [ ("parent_hash", Mina_base.State_hash.to_yojson target_hash)
+          ; ( "duration"
+            , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
+          ; ( "cached_transition"
+            , With_hash.data transition_with_hash |> Mina_block.to_yojson )
+          ]
+        "Timed out waiting for the parent of $cached_transition after \
+         $duration ms, signalling a catchup job" ;
+      (* it's ok to create a new thread here because the thread essentially does no work *)
+      if Writer.is_closed t.catchup_job_writer then
+        [%log' trace t.logger]
+          "catchup job pipe was closed; attempt to write to closed pipe"
+      else Writer.write t.catchup_job_writer forest )
+
+let register_validation_callback ~hash ~valid_cb t =
   Option.value_map valid_cb ~default:() ~f:(fun data ->
       match Hashtbl.add t.validation_callbacks ~key:hash ~data with
       | `Ok ->
@@ -213,31 +238,28 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb =
             (fun () -> Hashtbl.remove t.validation_callbacks hash)
       | `Duplicate ->
           [%log' warn t.logger] "Double validation callback for $state_hash"
-            ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson hash) ] ) ;
-  let make_timeout duration =
-    Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
-        let forest = extract_forest t parent_hash in
-        Hashtbl.remove t.parent_root_timeouts parent_hash ;
-        Mina_metrics.(
-          Gauge.dec_one
-            Transition_frontier_controller.transitions_in_catchup_scheduler) ;
-        remove_tree t parent_hash ;
-        [%log' info t.logger]
-          ~metadata:
-            [ ("parent_hash", Mina_base.State_hash.to_yojson parent_hash)
-            ; ( "duration"
-              , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
-            ; ( "cached_transition"
-              , With_hash.data transition_with_hash |> Mina_block.to_yojson )
-            ]
-          "Timed out waiting for the parent of $cached_transition after \
-           $duration ms, signalling a catchup job" ;
-        (* it's ok to create a new thread here because the thread essentially does no work *)
-        if Writer.is_closed t.catchup_job_writer then
-          [%log' trace t.logger]
-            "catchup job pipe was closed; attempt to write to closed pipe"
-        else Writer.write t.catchup_job_writer forest )
+            ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson hash) ] )
+
+let watch_header t ~header_with_hash ~valid_cb =
+  let hash = State_hash.With_state_hashes.state_hash header_with_hash in
+  match Hashtbl.find t.collected_transitions hash with
+  | None ->
+      register_validation_callback ~hash ~valid_cb t ;
+      (* it's ok to create a new thread here because the thread essentially does no work *)
+      if Writer.is_closed t.catchup_job_writer then
+        [%log' trace t.logger]
+          "catchup job pipe was closed; attempt to write to closed pipe"
+      else Writer.write t.catchup_job_writer (hash, [])
+  | _ ->
+      ()
+
+let watch t ~timeout_duration ~cached_transition ~valid_cb =
+  let transition_with_hash, _ =
+    Envelope.Incoming.data (Cached.peek cached_transition)
   in
+  let hash = State_hash.With_state_hashes.state_hash transition_with_hash in
+  let parent_hash = get_parent_hash transition_with_hash in
+  register_validation_callback ~hash ~valid_cb t ;
   match Hashtbl.find t.collected_transitions parent_hash with
   | None ->
       let remaining_time = cancel_timeout t hash in
@@ -247,7 +269,7 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb =
       ignore
         ( Hashtbl.add t.parent_root_timeouts ~key:parent_hash
             ~data:
-              (make_timeout
+              (make_timeout t transition_with_hash
                  (Option.fold remaining_time ~init:timeout_duration
                     ~f:(fun _ remaining_time ->
                       Block_time.Span.min remaining_time timeout_duration ) ) )

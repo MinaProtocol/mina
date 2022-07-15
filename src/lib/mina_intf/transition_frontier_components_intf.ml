@@ -336,14 +336,15 @@ module type Transition_router_intf = sig
          transition_frontier option Pipe_lib.Broadcast_pipe.Reader.t
          * transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:
-         ( [ `Transition of Mina_block.t Envelope.Incoming.t ]
+         ( [ `Block of Mina_block.t Envelope.Incoming.t
+           | `Header of Mina_block.Header.t Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:
-         Mina_block.initial_valid_block Broadcast_pipe.Reader.t
-         * Mina_block.initial_valid_block Broadcast_pipe.Writer.t
+         Mina_block.initial_valid_header Broadcast_pipe.Reader.t
+         * Mina_block.initial_valid_header Broadcast_pipe.Writer.t
     -> catchup_mode:[ `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
     -> ( [ `Transition of Mina_block.Validated.t ]

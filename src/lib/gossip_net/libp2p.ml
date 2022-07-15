@@ -76,7 +76,7 @@ let download_seed_peer_list uri =
 
 type publish_functions =
   { publish_v0 : Message.msg -> unit Deferred.t
-  ; publish_v1_block : Message.state_msg -> unit Deferred.t
+  ; publish_v1_block : Mina_block.Header.t -> unit Deferred.t
   ; publish_v1_tx : Message.transaction_pool_diff_msg -> unit Deferred.t
   ; publish_v1_snark_work : Message.snark_pool_diff_msg -> unit Deferred.t
   }
@@ -418,7 +418,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             let snark_bin_prot =
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
-            let block_bin_prot = Mina_block.Stable.Latest.bin_t in
+            let header_bin_prot = Mina_block.Header.Stable.Latest.bin_t in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
               match config.pubsub_v1 with
@@ -443,10 +443,10 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               publish_v1_impl
                 (fun (env, vc) ->
                   Sinks.Block_sink.push sink_block
-                    ( `Transition env
+                    ( `Header env
                     , `Time_received (Block_time.now config.time_controller)
                     , `Valid_cb vc ) )
-                block_bin_prot v1_topic_block
+                header_bin_prot v1_topic_block
             in
             let map_v0_msg msg =
               match msg with
@@ -463,8 +463,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
                       Sinks.Block_sink.push sink_block
-                        ( `Transition
-                            (Envelope.Incoming.map ~f:(const state) env)
+                        ( `Block (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
                   | Message.Latest.T.Transaction_pool_diff diff ->
@@ -925,7 +924,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let broadcast_state ?origin_topic t state =
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block state
+        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block
+          (Mina_block.header state)
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
 

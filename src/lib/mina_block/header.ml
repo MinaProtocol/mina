@@ -116,3 +116,7 @@ let protocol_version_status body =
     Protocol_version.compatible_with_daemon (current_protocol_version body)
   in
   { valid_current; valid_next; matches_daemon }
+
+let blockchain_length t =
+  protocol_state t |> Mina_state.Protocol_state.consensus_state
+  |> Consensus.Data.Consensus_state.blockchain_length

@@ -24,6 +24,8 @@ let validation (_, v) = v
 
 let header_with_hash (b, _) = b
 
+let header (b, _) = With_hash.data b
+
 let block_with_hash (b, _) = b
 
 let block (b, _) = With_hash.data b
@@ -262,7 +264,7 @@ end
 let validate_time_received ~(precomputed_values : Precomputed_values.t)
     ~time_received (t, validation) =
   let consensus_state =
-    t |> With_hash.data |> Block.header |> Header.protocol_state
+    t |> With_hash.data |> Header.protocol_state
     |> Protocol_state.consensus_state
   in
   let constants = precomputed_values.consensus_constants in
@@ -283,7 +285,7 @@ let skip_time_received_validation `This_block_was_not_received_via_gossip
   (t, Unsafe.set_valid_time_received validation)
 
 let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
-  let state = t |> With_hash.data |> Block.header |> Header.protocol_state in
+  let state = t |> With_hash.data |> Header.protocol_state in
   if
     State_hash.equal
       (Protocol_state.genesis_state_hash state)
@@ -328,7 +330,7 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
           *)
           None
         else
-          let header = Block.header @@ With_hash.data t in
+          let header = With_hash.data t in
           Some
             (Blockchain_snark.Blockchain.create
                ~state:(Header.protocol_state header)
@@ -367,7 +369,7 @@ let extract_delta_block_chain_witness = function
       failwith "why can't this be refuted?"
 
 let validate_delta_block_chain (t, validation) =
-  let header = t |> With_hash.data |> Block.header in
+  let header = t |> With_hash.data in
   match
     Transition_chain_verifier.verify
       ~target_hash:
@@ -389,8 +391,9 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
   , Unsafe.set_valid_delta_block_chain validation
       (Non_empty_list.singleton previous_protocol_state_hash) )
 
-let validate_frontier_dependencies ~context:(module Context : CONTEXT)
-    ~root_block ~get_block_by_hash (t, validation) =
+let validate_frontier_dependencies ~to_header
+    ~context:(module Context : CONTEXT) ~root_block ~is_block_in_frontier
+    (t, validation) =
   let module Context = struct
     include Context
 
@@ -402,7 +405,14 @@ let validate_frontier_dependencies ~context:(module Context : CONTEXT)
   end in
   let open Result.Let_syntax in
   let hash = State_hash.With_state_hashes.state_hash t in
-  let protocol_state = Fn.compose Header.protocol_state Block.header in
+  let protocol_state = Fn.compose Header.protocol_state to_header in
+  let root_consensus_state =
+    With_hash.map
+      ~f:
+        (Fn.compose Protocol_state.consensus_state
+           (Fn.compose Header.protocol_state Block.header) )
+      root_block
+  in
   let parent_hash =
     Protocol_state.previous_state_hash (protocol_state @@ With_hash.data t)
   in
@@ -410,9 +420,7 @@ let validate_frontier_dependencies ~context:(module Context : CONTEXT)
     Fn.compose Protocol_state.consensus_state protocol_state
   in
   let%bind () =
-    Result.ok_if_true
-      (hash |> get_block_by_hash |> Option.is_none)
-      ~error:`Already_in_frontier
+    Result.ok_if_true (is_block_in_frontier hash) ~error:`Already_in_frontier
   in
   let%bind () =
     (* need pervasive (=) in scope for comparing polymorphic variant *)
@@ -421,13 +429,13 @@ let validate_frontier_dependencies ~context:(module Context : CONTEXT)
       ( `Take
       = Consensus.Hooks.select
           ~context:(module Context)
-          ~existing:(With_hash.map ~f:consensus_state root_block)
+          ~existing:root_consensus_state
           ~candidate:(With_hash.map ~f:consensus_state t) )
       ~error:`Not_selected_over_frontier_root
   in
   let%map () =
     Result.ok_if_true
-      (parent_hash |> get_block_by_hash |> Option.is_some)
+      (is_block_in_frontier parent_hash)
       ~error:`Parent_missing_from_frontier
   in
   (t, Unsafe.set_valid_frontier_dependencies validation)
@@ -585,7 +593,7 @@ let reset_staged_ledger_diff_validation (transition_with_hash, validation) =
 
 let validate_protocol_versions (t, validation) =
   let { Header.valid_current; valid_next; matches_daemon } =
-    t |> With_hash.data |> Block.header |> Header.protocol_version_status
+    t |> With_hash.data |> Header.protocol_version_status
   in
   if not (valid_current && valid_next) then Error `Invalid_protocol_version
   else if not matches_daemon then Error `Mismatched_protocol_version
@@ -594,3 +602,11 @@ let validate_protocol_versions (t, validation) =
 let skip_protocol_versions_validation `This_block_has_valid_protocol_versions
     (t, validation) =
   (t, Unsafe.set_valid_protocol_versions validation)
+
+let with_body (header_with_hash, validation) body =
+  ( With_hash.map ~f:(fun header -> Block.create ~header ~body) header_with_hash
+  , validation )
+
+let wrap_header t : fully_invalid_with_header = (t, fully_invalid)
+
+let to_header (b, v) = (With_hash.map ~f:Block.header b, v)

@@ -599,6 +599,12 @@ module Vrf_evaluation_state = struct
     poll ~logger ~vrf_evaluator t
 end
 
+let validate_genesis_protocol_state_block ~genesis_state_hash (b, v) =
+  Validation.validate_genesis_protocol_state ~genesis_state_hash
+    (With_hash.map ~f:Mina_block.header b, v)
+  |> Result.map
+       ~f:(Fn.flip Validation.with_body (Mina_block.body @@ With_hash.data b))
+
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
@@ -817,7 +823,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                            `This_block_was_not_received_via_gossip
                       |> Validation.skip_protocol_versions_validation
                            `This_block_has_valid_protocol_versions
-                      |> Validation.validate_genesis_protocol_state
+                      |> validate_genesis_protocol_state_block
                            ~genesis_state_hash:
                              (Protocol_state.genesis_state_hash
                                 ~state_hash:(Some previous_state_hash)
@@ -827,13 +833,13 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                       >>| Validation.skip_delta_block_chain_validation
                             `This_block_was_not_received_via_gossip
                       >>= Validation.validate_frontier_dependencies
+                            ~to_header:Mina_block.header
                             ~context:(module Context)
                             ~root_block:
                               ( Transition_frontier.root frontier
                               |> Breadcrumb.block_with_hash )
-                            ~get_block_by_hash:
-                              (Fn.compose
-                                 (Option.map ~f:Breadcrumb.block_with_hash)
+                            ~is_block_in_frontier:
+                              (Fn.compose Option.is_some
                                  (Transition_frontier.find frontier) )
                       |> Deferred.return
                     in
@@ -1309,19 +1315,19 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                  `This_block_was_generated_internally
             |> Validation.skip_delta_block_chain_validation
                  `This_block_was_not_received_via_gossip
-            |> Validation.validate_genesis_protocol_state
+            |> validate_genesis_protocol_state_block
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash
                       ~state_hash:(Some previous_protocol_state_hash)
                       previous_protocol_state )
             >>= Validation.validate_frontier_dependencies
+                  ~to_header:Mina_block.header
                   ~context:(module Context)
                   ~root_block:
                     ( Transition_frontier.root frontier
                     |> Breadcrumb.block_with_hash )
-                  ~get_block_by_hash:
-                    (Fn.compose
-                       (Option.map ~f:Breadcrumb.block_with_hash)
+                  ~is_block_in_frontier:
+                    (Fn.compose Option.is_some
                        (Transition_frontier.find frontier) )
             |> Deferred.return
           in

@@ -50,6 +50,7 @@
    protocol_version
    random_oracle
    transition_frontier_base
+   integers
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)

@@ -18,16 +18,11 @@ val run :
   -> frontier:Transition_frontier.t
   -> network_transition_reader:
        ( [< `Block of
-            ( [ `Time_received ] * unit Truth.true_t
-            , [ `Genesis_state ] * unit Truth.true_t
-            , [ `Proof ] * unit Truth.true_t
-            , [ `Delta_block_chain ]
-              * Mina_base.State_hash.t Non_empty_list.t Truth.true_t
-            , [ `Frontier_dependencies ] * unit Truth.false_t
-            , [ `Staged_ledger_diff ] * unit Truth.false_t
-            , [ `Protocol_versions ] * unit Truth.true_t )
-            Mina_block.Validation.with_block
-            Network_peer.Envelope.Incoming.t ]
+            Mina_block.Validation.initial_valid_with_block
+            Network_peer.Envelope.Incoming.t
+         | `Header of
+           Mina_block.Validation.initial_valid_with_header
+           Network_peer.Envelope.Incoming.t ]
        * [< `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Pipe_lib.Strict_pipe.Reader.t
   -> producer_transition_reader:

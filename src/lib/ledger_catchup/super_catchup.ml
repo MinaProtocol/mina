@@ -128,6 +128,25 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
+let validate_block ~genesis_state_hash (b, v) =
+  let open Mina_block.Validation in
+  let open Result.Let_syntax in
+  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  validate_genesis_protocol_state ~genesis_state_hash h
+  >>= validate_protocol_versions >>= validate_delta_block_chain
+  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+
+let validate_proofs_block ~verifier ~genesis_state_hash blocks =
+  let open Mina_block.Validation in
+  let open Deferred.Result.Let_syntax in
+  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
+  let hs =
+    List.map blocks ~f:(fun (b, v) ->
+        (With_hash.map ~f:Mina_block.header b, v) )
+  in
+  validate_proofs ~verifier ~genesis_state_hash hs
+  >>| List.zip_exn blocks >>| List.map ~f
+
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     ~frontier ~unprocessed_transition_cache enveloped_transition =
   let open Context in
@@ -135,15 +154,10 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
-    let open Result.Let_syntax in
-    let open Mina_block in
-    let%bind initially_validated_transition =
-      transition_with_hash
-      |> Validation.skip_time_received_validation
-           `This_block_was_not_received_via_gossip
-      |> Validation.validate_genesis_protocol_state ~genesis_state_hash
-      >>= Validation.validate_protocol_versions
-      >>= Validation.validate_delta_block_chain
+    let%bind.Result initially_validated_transition =
+      Mina_block.Validation.skip_time_received_validation
+        `This_block_was_not_received_via_gossip transition_with_hash
+      |> validate_block ~genesis_state_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -504,7 +518,7 @@ module Initial_validate_batcher = struct
                    ; state_body_hash = None
                    } )
             |> Mina_block.Validation.wrap )
-        |> Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+        |> validate_proofs_block ~verifier ~genesis_state_hash
         >>| function
         | Ok tvs ->
             Ok (List.map tvs ~f:(fun x -> `Valid x))

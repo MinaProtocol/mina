@@ -65,7 +65,7 @@ type components =
   ; snark_pool : Network_pool.Snark_pool.t
   ; transition_frontier : Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block :
-      Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+      Mina_block.initial_valid_header Broadcast_pipe.Reader.t
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
@@ -1897,7 +1897,8 @@ let create ?wallets (config : Config.t) =
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
             Broadcast_pipe.create
-              ( Mina_block.genesis ~precomputed_values:config.precomputed_values
+              ( Mina_block.genesis_header
+                  ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
           in

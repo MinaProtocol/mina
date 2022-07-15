@@ -68,7 +68,7 @@ module type Gossip_net_intf = sig
     -> 'r rpc_response Deferred.t List.t Deferred.t
 
   val broadcast_state :
-    ?origin_topic:string -> t -> Message.state_msg -> unit Deferred.t
+    ?origin_topic:string -> t -> Mina_block.t -> unit Deferred.t
 
   val broadcast_transaction_pool_diff :
        ?origin_topic:string

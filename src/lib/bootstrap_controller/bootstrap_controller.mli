@@ -22,7 +22,8 @@ val run :
   -> network:Mina_networking.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> transition_reader:
-       ( [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t ]
+       ( [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t
+         | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Strict_pipe.Reader.t
   -> preferred_peers:Network_peer.Peer.t list
