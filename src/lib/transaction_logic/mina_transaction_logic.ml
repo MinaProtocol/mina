@@ -1536,7 +1536,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
-      | Check_account_precondition (party, account, local_state) -> (
+      | Check_account_precondition (party, account, new_account, local_state)
+        -> (
           match party.body.preconditions.account with
           | Accept ->
               local_state
@@ -1544,13 +1545,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let nonce_matches = Account.Nonce.equal account.nonce n in
               Inputs.Local_state.add_check local_state
                 Account_nonce_precondition_unsatisfied nonce_matches
-          | Full p ->
+          | Full precondition_account ->
               let local_state = ref local_state in
               let check failure b =
                 local_state :=
                   Inputs.Local_state.add_check !local_state failure b
               in
-              Zkapp_precondition.Account.check ~check p account ;
+              Zkapp_precondition.Account.check ~new_account ~check
+                precondition_account account ;
               !local_state )
       | Init_account { party = _; account = a } ->
           a

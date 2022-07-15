@@ -84,7 +84,7 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
         | Some pk ->
             Or_ignore.gen (return pk)
       in
-      let%bind state, sequence_state, proved_state =
+      let%bind state, sequence_state, proved_state, is_new =
         match zkapp with
         | None ->
             let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -95,7 +95,8 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
             in
             let sequence_state = Or_ignore.Ignore in
             let proved_state = Or_ignore.Ignore in
-            return (state, sequence_state, proved_state)
+            let is_new = Or_ignore.Ignore in
+            return (state, sequence_state, proved_state, is_new)
         | Some { Zkapp_account.app_state; sequence_state; proved_state; _ } ->
             let state =
               Zkapp_state.V.map app_state ~f:(fun field ->
@@ -110,7 +111,8 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
               return (Or_ignore.Check (List.nth_exn fields ndx))
             in
             let proved_state = Or_ignore.Check proved_state in
-            return (state, sequence_state, proved_state)
+            let%bind is_new = Or_ignore.gen Quickcheck.Generator.bool in
+            return (state, sequence_state, proved_state, is_new)
       in
       return
         { Zkapp_precondition.Account.balance
@@ -120,6 +122,7 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
         ; state
         ; sequence_state
         ; proved_state
+        ; is_new
         }
     in
     match failure with

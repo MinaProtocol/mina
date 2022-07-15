@@ -2,10 +2,6 @@
 
 open Core_kernel
 
-(* if these items change, please also change
-   Transaction_snark.Base.User_command_failure.t
-   and update the code following it
-*)
 module Failure = struct
   [%%versioned
   module Stable = struct
@@ -46,6 +42,7 @@ module Failure = struct
         | Account_sequence_state_precondition_unsatisfied
         | Account_app_state_precondition_unsatisfied of int
         | Account_proved_state_precondition_unsatisfied
+        | Account_is_new_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
@@ -124,6 +121,7 @@ module Failure = struct
       ~account_app_state_precondition_unsatisfied:(fun acc var ->
         List.init 8 ~f:var.constructor @ acc )
       ~account_proved_state_precondition_unsatisfied:add
+      ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
       ~invalid_fee_excess:add
 
@@ -200,6 +198,8 @@ module Failure = struct
         sprintf "Account_app_state_%i_precondition_unsatisfied" i
     | Account_proved_state_precondition_unsatisfied ->
         "Account_proved_state_precondition_unsatisfied"
+    | Account_is_new_precondition_unsatisfied ->
+        "Account_is_new_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "Protocol_state_precondition_unsatisfied"
     | Incorrect_nonce ->
@@ -405,6 +405,8 @@ module Failure = struct
           "The party's account app state (%i) precondition was unsatisfied" i
     | Account_proved_state_precondition_unsatisfied ->
         "The party's account proved state precondition was unsatisfied"
+    | Account_is_new_precondition_unsatisfied ->
+        "The party's account is-new state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "The party's protocol state precondition unsatisfied"
     | Incorrect_nonce ->

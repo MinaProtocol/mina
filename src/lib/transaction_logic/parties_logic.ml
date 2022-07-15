@@ -594,7 +594,11 @@ end
 module Eff = struct
   type (_, _) t =
     | Check_account_precondition :
-        'party * 'account * 'local_state
+        (* the bool input is a new_account flag *)
+        'party
+        * 'account
+        * 'bool
+        * 'local_state
         -> ( 'local_state
            , < bool : 'bool
              ; party : 'party
@@ -1066,8 +1070,13 @@ module Make (Inputs : Inputs_intf) = struct
        verify a snapp proof.
     *)
     Account.register_verification_key a ;
+    let (`Is_new account_is_new) =
+      Inputs.Ledger.check_account (Party.public_key party)
+        (Party.token_id party) (a, inclusion_proof)
+    in
     let local_state =
-      h.perform (Check_account_precondition (party, a, local_state))
+      h.perform
+        (Check_account_precondition (party, a, account_is_new, local_state))
     in
     let protocol_state_predicate_satisfied =
       h.perform
@@ -1114,10 +1123,6 @@ module Make (Inputs : Inputs_intf) = struct
           increments_nonce_and_constrains_its_old_value
           ||| depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer
           ||| does_not_use_a_signature)
-    in
-    let (`Is_new account_is_new) =
-      Inputs.Ledger.check_account (Party.public_key party)
-        (Party.token_id party) (a, inclusion_proof)
     in
     let a = Account.set_token_id a (Party.token_id party) in
     let party_token = Party.token_id party in
