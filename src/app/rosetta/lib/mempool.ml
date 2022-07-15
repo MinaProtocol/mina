@@ -1,4 +1,4 @@
-module Serializing = Graphql_lib.Serializing
+module Scalars = Graphql_lib.Scalars
 
 module Get_all_transactions =
 [%graphql
@@ -25,23 +25,23 @@ module Get_transactions_by_hash =
       }
       pooledUserCommands(hashes: $hashes) {
         hash
-        amount @ppxCustom(module: "Serializing.UInt64")
-        fee @ppxCustom(module: "Serializing.UInt64")
+        amount @ppxCustom(module: "Scalars.UInt64")
+        fee @ppxCustom(module: "Scalars.UInt64")
         kind
-        feeToken @ppxCustom(module: "Serializing.UInt64")
-        validUntil @ppxCustom(module: "Serializing.Optional_uint32")
+        feeToken @ppxCustom(module: "Scalars.UInt64")
+        validUntil
         memo
         feePayer {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         nonce
         receiver {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         source {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
-        token  @ppxCustom(module: "Serializing.UInt64")
+        token   @ppxCustom(module: "Scalars.UInt64")
       }
     }
 |}]
@@ -259,7 +259,7 @@ module Transaction = struct
       ; fee_token= obj.feeToken
       ; nonce= Unsigned.UInt32.of_int obj.nonce
       ; amount= Some obj.amount
-      ; valid_until= obj.validUntil
+      ; valid_until= Some obj.validUntil
       ; memo = if String.equal obj.memo "" then None else Some obj.memo
       ; failure_status= None
       ; hash= obj.hash }

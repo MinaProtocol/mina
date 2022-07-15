@@ -13,7 +13,7 @@ module Get_coinbase_and_genesis =
       }
       protocolState {
         blockchainState {
-          date
+          date @ppxCustom(module: "Serializing.String")
         }
       }
       stateHash
