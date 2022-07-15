@@ -50,7 +50,7 @@ let%test_module "can we wordle" =
                (module Statement)
                ~public_input:
                  (Output
-                    Typ.(array ~length:5 Field.typ * array ~length:5 Field.typ)
+                    Typ.(array ~length:5 Boolean.typ * array ~length:5 Boolean.typ)
                  )
                ~auxiliary_typ:Typ.unit
                ~branches:(module Nat.N1)
