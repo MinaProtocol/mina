@@ -49,6 +49,7 @@ module Failure = struct
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
+        | Invalid_verification_key_hash
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
@@ -125,7 +126,7 @@ module Failure = struct
         List.init 8 ~f:var.constructor @ acc )
       ~account_proved_state_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
-      ~invalid_fee_excess:add
+      ~invalid_fee_excess:add ~invalid_verification_key_hash:add
 
   let gen = Quickcheck.Generator.of_list all
 
@@ -206,6 +207,8 @@ module Failure = struct
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
+    | Invalid_verification_key_hash ->
+        "Invalid_verification_key_hash"
 
   let of_string = function
     | "Predicate" ->
@@ -411,6 +414,8 @@ module Failure = struct
         "Incorrect nonce"
     | Invalid_fee_excess ->
         "Fee excess from parties transaction more than the transaction fees"
+    | Invalid_verification_key_hash ->
+        "The hash provided for the verification key is invalid"
 end
 
 [%%versioned

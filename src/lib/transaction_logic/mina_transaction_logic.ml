@@ -899,6 +899,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Field = struct
       type t = Snark_params.Tick.Field.t
 
+      let equal = Snark_params.Tick.Field.equal
+
       let if_ = value_if
     end
 
@@ -1085,6 +1087,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
     module Verification_key = struct
       type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
+
+      let validate_hash (t : t) =
+        Option.value_map t ~default:true ~f:(fun { data = vk; hash } ->
+            let hash' = Zkapp_account.digest_vk vk in
+            Field.equal hash hash' )
 
       let if_ = value_if
     end

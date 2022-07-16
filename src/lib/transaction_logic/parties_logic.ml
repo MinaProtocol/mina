@@ -137,6 +137,12 @@ module type Timing_intf = sig
   val vesting_period : t -> global_slot
 end
 
+module type Verification_key_intf = sig
+  include Iffable
+
+  val validate_hash : t -> bool
+end
+
 module type Token_id_intf = sig
   include Iffable
 
@@ -661,7 +667,7 @@ module type Inputs_intf = sig
   module Timing :
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
-  module Verification_key : Iffable with type bool := Bool.t
+  module Verification_key : Verification_key_intf with type bool := Bool.t
 
   module Zkapp_uri : Iffable with type bool := Bool.t
 
@@ -1282,6 +1288,11 @@ module Make (Inputs : Inputs_intf) = struct
       let verification_key =
         Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
           (Account.verification_key a)
+      in
+      let valid_hash = Verification_key.validate_hash verification_key in
+      let local_state =
+        Local_state.add_check local_state Invalid_verification_key_hash
+          valid_hash
       in
       let a = Account.set_verification_key verification_key a in
       (a, local_state)

@@ -1118,6 +1118,14 @@ module Base = struct
 
         let if_ b ~(then_ : t) ~(else_ : t) : t =
           Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
+
+        let validate_hash ({ is_some = _; data } : t) : Bool.t =
+          let vk_with_hash = As_prover.Ref.get (Data_as_hash.ref data) in
+          Option.value_map (With_hash.data vk_with_hash) ~default:Bool.true_
+            ~f:(fun vk ->
+              let hash' = Zkapp_account.digest_vk vk in
+              Bool.var_of_value
+              @@ Field.Constant.equal (With_hash.hash vk_with_hash) hash' )
       end
 
       module Events = struct
