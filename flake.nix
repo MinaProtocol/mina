@@ -75,7 +75,7 @@
             label = "Upload mina-docker to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
-            # branches = [ "compatible" "develop" ];
+            branches = [ "compatible" "develop" ];
           };
         in {
           steps = flakeSteps {
@@ -84,7 +84,10 @@
               agents = [ "nix" ];
               plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             };
-          } self ++ [ (pushToRegistry "mina-docker") ];
+          } self ++ [
+            (pushToRegistry "mina-docker")
+            (pushToRegistry "mina-daemon-docker")
+          ];
         };
     } // utils.lib.eachDefaultSystem (system:
       let
