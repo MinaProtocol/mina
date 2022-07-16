@@ -1,9 +1,9 @@
 open Core_kernel
-open Import
+open Mina_base_import
 
 module Single : sig
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t = private
         { receiver_pk : Public_key.Compressed.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
@@ -12,7 +12,7 @@ module Single : sig
       [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   type t = Stable.Latest.t = private
@@ -51,12 +51,12 @@ module Single : sig
 end
 
 module Stable : sig
-  module V1 : sig
-    type t = private Single.Stable.V1.t One_or_two.Stable.V1.t
+  module V2 : sig
+    type t = private Single.Stable.V2.t One_or_two.Stable.V1.t
     [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
   end
 
-  module Latest = V1
+  module Latest = V2
 end
 
 type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]

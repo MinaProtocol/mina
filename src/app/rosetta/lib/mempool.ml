@@ -28,7 +28,7 @@ module Get_transactions_by_hash =
         amount @ppxCustom(module: "Serializing.UInt64")
         fee @ppxCustom(module: "Serializing.UInt64")
         kind
-        feeToken @ppxCustom(module: "Serializing.UInt64")
+        feeToken @ppxCustom(module: "Serializing.Token_s")
         validUntil @ppxCustom(module: "Serializing.Optional_uint32")
         memo
         feePayer {
@@ -41,10 +41,11 @@ module Get_transactions_by_hash =
         source {
           publicKey
         }
-        token  @ppxCustom(module: "Serializing.UInt64")
+        token  @ppxCustom(module: "Serializing.Token_s")
       }
     }
 |}]
+let _ = Decoders.uint32
 
 (* Avoid shadowing graphql_ppx functions *)
 open Core_kernel
@@ -159,12 +160,6 @@ module Transaction = struct
               `String "PAYMENT"
           | `Delegation ->
               `String "STAKE_DELEGATION"
-          | `Create_token ->
-              `String "CREATE_NEW_TOKEN"
-          | `Create_token_account ->
-              `String "CREATE_TOKEN_ACCOUNT"
-          | `Mint_tokens ->
-              `String "MINT_TOKENS"
 
         method feeToken = user_command_info.fee_token
 
@@ -231,12 +226,6 @@ module Transaction = struct
             M.return `Payment
         | `String "STAKE_DELEGATION" ->
             M.return `Delegation
-        | `String "CREATE_NEW_TOKEN" ->
-            M.return `Create_token
-        | `String "CREATE_TOKEN_ACCOUNT" ->
-            M.return `Create_token_account
-        | `String "MINT_TOKENS" ->
-            M.return `Mint_tokens
         | kind ->
             M.fail
               (Errors.create

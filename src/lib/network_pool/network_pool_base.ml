@@ -249,7 +249,8 @@ end)
     go ()
 
   let create ~config ~constraint_constants ~consensus_constants ~time_controller
-      ~frontier_broadcast_pipe ~logger ~log_gossip_heard ~on_remote_push =
+      ~expiry_ns ~frontier_broadcast_pipe ~logger ~log_gossip_heard
+      ~on_remote_push =
     (*Diffs from tansition frontier extensions*)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
@@ -258,7 +259,7 @@ end)
     let t, locals, remotes =
       of_resource_pool_and_diffs
         (Resource_pool.create ~constraint_constants ~consensus_constants
-           ~time_controller ~config ~logger ~frontier_broadcast_pipe
+           ~time_controller ~expiry_ns ~config ~logger ~frontier_broadcast_pipe
            ~tf_diff_writer )
         ~constraint_constants ~logger ~tf_diffs:tf_diff_reader ~log_gossip_heard
         ~on_remote_push
