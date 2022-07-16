@@ -65,6 +65,9 @@ module Network_config = struct
   type t =
     { mina_automation_location : string
     ; debug_arg : bool (* ; keypairs : Network_keypair.t list *)
+    ; check_capacity : bool
+    ; check_capacity_delay : int
+    ; check_capacity_retries : int
     ; block_producer_keypairs : Network_keypair.t list
     ; extra_genesis_keypairs : Network_keypair.t list
     ; constants : Test_config.constants
@@ -250,6 +253,9 @@ module Network_config = struct
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
+    ; check_capacity = cli_inputs.check_capacity
+    ; check_capacity_delay = cli_inputs.check_capacity_delay
+    ; check_capacity_retries = cli_inputs.check_capacity_retries
     ; block_producer_keypairs = bp_net_keypairs
     ; extra_genesis_keypairs = extra_genesis_net_keypairs
     ; constants
@@ -358,7 +364,8 @@ module Network_manager = struct
   let run_cmd_or_hard_error t prog args =
     Util.run_cmd_or_hard_error t.testnet_dir prog args
 
-  let rec check_kube_capacity ~logger (retries : int) : unit Malleable_error.t =
+  let rec check_kube_capacity t ~logger ~(retries : int) ~(delay : float) :
+      unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
     let%bind () =
       Malleable_error.return ([%log info] "Running capacity check")
@@ -401,25 +408,25 @@ module Network_manager = struct
     let max_nodes =
       List.fold max_node_count_by_node_pool ~init:0 ~f:(fun accum max_nodes ->
           accum + (max_nodes * 3) )
+      (*
+        the max_node_count_by_node_pool is per zone.  us-west1 has 3 zones (we assume this never changes).
+          therefore to get the actual number of nodes a node_pool has, we multiply by 3.  
+          then we sum up the number of nodes in all our node_pools to get the actual total maximum number of nodes that we can scale up to *)
     in
-    (*
-        the max_node_count for a node pool is per zone.  us-west1 has 3 zones (we assume this never changes).
-          therefore to get the actual number of nodes a node_pool has, we multiply by 3.  then we sum up the node_pools to get the
-          total maximum number of nodes that we can use *)
-    if num_kube_nodes >= max_nodes && retries > 0 then
-      let%bind () =
-        Malleable_error.return
-          ([%log info]
-             "Capacity check failed.  %d nodes are provisioned, the cluster \
-              can scale up to a max of %d nodes.  This test needs at least 1 \
-              node to be unprovisioned.  sleeping for 60 seconds before \
-              retrying.  will retry %d more times"
-             num_kube_nodes max_nodes (retries - 1) )
-      in
-      let%bind () = Malleable_error.return (Thread.delay 60.0) in
-      check_kube_capacity ~logger (retries - 1)
-    else if retries <= 0 then exit 7
-    else
+    let nodes_available = max_nodes - num_kube_nodes in
+    let cpus_needed_estimate =
+      6
+      * ( List.length t.seed_workloads
+        + List.length t.block_producer_keypairs
+        + List.length t.snark_coordinator_workloads )
+      (* as of 2022/07, the seed, bps, and the snark coordinator use 6 cpus.  this is just a rough heuristic so we're not bothering to calculate memory needed *)
+    in
+    let cluster_nodes_needed =
+      Int.of_float
+        (Float.round_up (Float.( / ) (Float.of_int cpus_needed_estimate) 64.0))
+      (* assuming that each node on the cluster has 64 cpus, as we've configured it to be in GCP as of *)
+    in
+    if nodes_available >= cluster_nodes_needed then
       let%bind () =
         Malleable_error.return
           ([%log info]
@@ -429,6 +436,28 @@ module Network_manager = struct
              num_kube_nodes max_nodes )
       in
       Malleable_error.return ()
+    else if retries <= 0 then
+      let%bind () =
+        Malleable_error.return
+          ([%log info]
+             "Capacity check failed.  %d nodes are provisioned, the cluster \
+              can scale up to a max of %d nodes.  This test needs at least 1 \
+              node to be unprovisioned.  no more retries, thus exiting"
+             num_kube_nodes max_nodes )
+      in
+      exit 7
+    else
+      let%bind () =
+        Malleable_error.return
+          ([%log info]
+             "Capacity check failed.  %d nodes are provisioned, the cluster \
+              can scale up to a max of %d nodes.  This test needs at least 1 \
+              node to be unprovisioned.  sleeping for 60 seconds before \
+              retrying.  will retry %d more times"
+             num_kube_nodes max_nodes (retries - 1) )
+      in
+      let%bind () = Malleable_error.return (Thread.delay delay) in
+      check_kube_capacity t ~logger ~retries:(retries - 1) ~delay
 
   let create ~logger (network_config : Network_config.t) =
     let open Malleable_error.Let_syntax in
@@ -555,7 +584,13 @@ module Network_manager = struct
       }
     in
     (* check capacity *)
-    let%bind () = check_kube_capacity ~logger 5 in
+    let%bind () =
+      if network_config.check_capacity then
+        check_kube_capacity t ~logger
+          ~delay:(Float.of_int network_config.check_capacity_delay)
+          ~retries:network_config.check_capacity_retries
+      else Malleable_error.return ()
+    in
     (* making the main.tf.json *)
     let open Deferred.Let_syntax in
     let%bind () =
