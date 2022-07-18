@@ -1382,8 +1382,13 @@ let replay_blocks logger =
          Async.never () ) )
 
 let dump_type_shapes =
+  let max_depth_flag =
+    let open Command.Param in
+    flag "--max-depth" ~aliases:[ "-max-depth" ] (optional int)
+      ~doc:"NN Maximum depth of shape S-expressions"
+  in
   Command.basic ~summary:"Print serialization shapes of versioned types"
-    (Command.Param.return (fun () ->
+    (Command.Param.map max_depth_flag ~f:(fun max_depth () ->
          Ppx_version_runtime.Shapes.iteri ~f:(fun ~key:path ~data:shape ->
              let open Bin_prot.Shape in
              let canonical = eval shape in
@@ -1397,19 +1402,22 @@ let dump_type_shapes =
                   type, even though the shape digests differ
                *)
                let summary_sexp =
-                 (* TODO: tune the depth; want least depth that reveals local changes *)
-                 let max_depth = 8 in
-                 let rec go sexp depth =
-                   if depth > max_depth then Sexp.Atom "."
-                   else
-                     match sexp with
-                     | Sexp.Atom _ ->
-                         sexp
-                     | Sexp.List items ->
-                         Sexp.List
-                           (List.map items ~f:(fun item -> go item (depth + 1)))
-                 in
-                 go shape_sexp 0
+                 match max_depth with
+                 | None ->
+                     shape_sexp
+                 | Some n ->
+                     let rec go sexp depth =
+                       if depth > n then Sexp.Atom "."
+                       else
+                         match sexp with
+                         | Sexp.Atom _ ->
+                             sexp
+                         | Sexp.List items ->
+                             Sexp.List
+                               (List.map items ~f:(fun item ->
+                                    go item (depth + 1) ) )
+                     in
+                     go shape_sexp 0
                in
                Sexp.to_string summary_sexp
              in
