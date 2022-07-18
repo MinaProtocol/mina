@@ -17,6 +17,18 @@ type failure =
       | `Send
       | `Receive ]
 
+(* keep max_other_parties small, so snapp integration tests don't need lots
+   of block producers
+
+   because the other parties are split into a permissions-setter
+   and another party, the actual number of other parties is
+   twice this value, plus one, for the "balancing" party
+
+   when we have separate transaction accounts in integration tests
+   this number can be increased
+*)
+let max_other_parties = 2
+
 let gen_account_precondition_from_account ?failure account =
   let open Quickcheck.Let_syntax in
   let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
@@ -214,13 +226,15 @@ let gen_account_precondition_from_account ?failure account =
     | _ ->
         return (Party.Account_precondition.Nonce nonce)
 
-let gen_fee (account : Account.t) =
+let gen_fee ?parties_size (account : Account.t) =
   let balance = account.balance in
-  let lo_fee = Mina_compile_config.minimum_user_command_fee in
-  let hi_fee =
+  let parties_size = Option.value ~default:max_other_parties parties_size in
+  let lo_fee =
     Option.value_exn
-      Currency.Fee.(scale Mina_compile_config.minimum_user_command_fee 2)
+      Currency.Fee.(
+        scale Mina_compile_config.minimum_user_command_fee (parties_size * 2))
   in
+  let hi_fee = Option.value_exn Currency.Fee.(scale lo_fee 2) in
   assert (
     Currency.(
       Fee.(hi_fee <= (Balance.to_amount balance |> Currency.Amount.to_fee))) ) ;
@@ -1056,7 +1070,7 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
   let%map body_components =
     gen_party_body_components ?failure ?permissions_auth ~account_id
       ~account_state_tbl ?vk ~is_fee_payer:true ~increment_nonce:((), true)
-      ~gen_balance_change:gen_fee ~f_balance_change:fee_to_amt
+      ~gen_balance_change:(gen_fee ?parties_size) ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
         (* make sure the fee payer's token id is the default,
            which is represented by the unit value in the body
@@ -1070,29 +1084,17 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
   in
   Party_body_components.to_fee_payer body_components
 
-let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
+let gen_fee_payer ?failure ?permissions_auth ?parties_size ~account_id ~ledger
     ?protocol_state_view ?vk ~account_state_tbl () :
     Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
-    gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
-      ?protocol_state_view ~account_state_tbl ()
+    gen_party_body_fee_payer ?failure ?permissions_auth ?parties_size
+      ~account_id ~ledger ?vk ?protocol_state_view ~account_state_tbl ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
   let authorization = Signature.dummy in
   ({ body; authorization } : Party.Fee_payer.t)
-
-(* keep max_other_parties small, so snapp integration tests don't need lots
-   of block producers
-
-   because the other parties are split into a permissions-setter
-   and another party, the actual number of other parties is
-   twice this value, plus one, for the "balancing" party
-
-   when we have separate transaction accounts in integration tests
-   this number can be increased
-*)
-let max_other_parties = 2
 
 let setup_fee_payer_and_available_keys_and_account_state_tbl
     ~(fee_payer_keypair : Signature_lib.Keypair.t) ~keymap ?account_state_tbl
@@ -1149,7 +1151,7 @@ let gen_parties_base ?(no_new_account = false) ?(limited = false)
     ~account_state_tbl ~ledger ?protocol_state_view ?vk ?parties_size () =
   let open Quickcheck.Let_syntax in
   let%bind fee_payer =
-    gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
+    gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature ?parties_size
       ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ?vk
       ~account_state_tbl ()
   in
