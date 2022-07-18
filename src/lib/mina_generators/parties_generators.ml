@@ -1060,8 +1060,8 @@ let gen_party_from ?(limited = false) ?(no_new_account = false) ?(update = None)
   return { Party.Simple.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
-    ?protocol_state_view ~account_state_tbl () :
+let gen_party_body_fee_payer ?failure ?permissions_auth ?parties_size
+    ~account_id ~ledger ?vk ?protocol_state_view ~account_state_tbl () :
     Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let account_precondition_gen (account : Account.t) =
