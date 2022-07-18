@@ -12,6 +12,8 @@
    base
    core_kernel
    core
+   bin_prot
+   bin_prot.shape
    init
    tests
    async
@@ -67,6 +69,7 @@
    blockchain_snark
    snarky.backendless
    o1trace
+   ppx_version.runtime
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
