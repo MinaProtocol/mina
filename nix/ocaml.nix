@@ -1,29 +1,25 @@
-{ inputs, static ? false, ... }@args:
+{ inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
-  pkgs = if static then args.pkgs.pkgsMusl else args.pkgs;
+  inherit (args) pkgs;
 
   inherit (builtins) filterSource path;
 
-  inherit (pkgs.lib) hasPrefix;
+  inherit (pkgs.lib)
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam ../src/opam.export;
-  external-packages = pkgs.lib.getAttrs [
-    "sodium"
-    "capnp"
-    "rpc_parallel"
-    "async_kernel"
-    "base58"
-  ] (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
+  external-packages =
+    getAttrs [ "sodium" "capnp" "rpc_parallel" "async_kernel" "base58" ]
+    (builtins.mapAttrs (_: last) (opam-nix.listRepo external-repo));
 
   difference = a: b:
-    pkgs.lib.filterAttrs (name: _: !builtins.elem name (builtins.attrNames b))
-    a;
+    filterAttrs (name: _: !builtins.elem name (builtins.attrNames b)) a;
 
   export-installed = opam-nix.opamListToQuery export.installed;
 
@@ -53,25 +49,10 @@ let
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
 
   sourceInfo = inputs.self.sourceInfo or { };
-  dds = x: x.overrideAttrs (o: { dontDisableStatic = true; });
 
   external-libs = with pkgs;
-    lib.optional (! (stdenv.isDarwin && stdenv.isAarch64)) jemalloc ++
-    (if static then
-      map dds [
-        (zlib.override { splitStaticOutput = false; })
-        (bzip2.override { linkStatic = true; })
-        (gmp.override { withStatic = true; })
-        (openssl.override { static = true; })
-        libffi
-      ]
-    else [
-      zlib
-      bzip2
-      gmp
-      openssl
-      libffi
-    ]);
+    [ zlib bzip2 gmp openssl libffi ]
+    ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
   filtered-src = with inputs.nix-filter.lib;
     filter {
@@ -88,8 +69,7 @@ let
 
   overlay = self: super:
     let
-      ocaml-libs =
-        builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
+      ocaml-libs = builtins.attrValues (getAttrs installedPackageNames self);
 
       # This is needed because
       # - lld package is not wrapped to pick up the correct linker flags
@@ -194,18 +174,17 @@ let
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
-        shellHook = "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
-      } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; }
-        // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
-          OCAMLPARAM = "_,cclib=-lc++";
-        });
+        shellHook =
+          "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
+      } // optionalAttrs pkgs.stdenv.isDarwin {
+        OCAMLPARAM = "_,cclib=-lc++";
+      });
 
       mina = let
         commit_sha1 =
           inputs.self.sourceInfo.rev or "<unknown>                               ";
         commit_date =
           inputs.self.sourceInfo.lastModifiedDate or "<unknown>     ";
-        inherit (pkgs.lib) makeBinPath;
       in pkgs.runCommand "mina-release" {
         buildInputs = [ pkgs.makeWrapper ];
         outputs = self.mina-dev.outputs;

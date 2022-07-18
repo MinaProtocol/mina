@@ -63,15 +63,14 @@
       pipeline = with flake-buildkite-pipeline.lib;
         let
           pushToRegistry = package: {
-            command = runInEnv self.devShells.x86_64-linux.operations
-              ''
-                skopeo \
-                copy \
-                --insecure-policy \
-                --dest-registry-token $(gcloud auth application-default print-access-token) \
-                docker-archive:${self.packages.x86_64-linux.${package}} \
-                docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
-              '';
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              skopeo \
+              copy \
+              --insecure-policy \
+              --dest-registry-token $(gcloud auth application-default print-access-token) \
+              docker-archive:${self.packages.x86_64-linux.${package}} \
+              docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+            '';
             label = "Upload mina-docker to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
@@ -96,10 +95,8 @@
             (import nixpkgs-mozilla)
             (import ./nix/overlay.nix)
             (final: prev: {
-              ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-                inherit inputs pkgs;
-                static = final.stdenv.hostPlatform.isStatic;
-              });
+              ocamlPackages_mina = requireSubmodules
+                (import ./nix/ocaml.nix { inherit inputs pkgs; });
             })
           ]);
         inherit (pkgs) lib;
@@ -124,7 +121,6 @@
         checks = import ./nix/checks.nix inputs pkgs;
 
         ocamlPackages = pkgs.ocamlPackages_mina;
-        ocamlPackages_static = pkgs.pkgsStatic.ocamlPackages_mina;
       in {
 
         # Jobs/Lint/Rust.dhall
@@ -235,7 +231,7 @@
           checkPhase = "npm test";
         };
 
-        inherit ocamlPackages ocamlPackages_static;
+        inherit ocamlPackages;
         packages.mina = ocamlPackages.mina;
         packages.mina_tests = ocamlPackages.mina_tests;
         packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
