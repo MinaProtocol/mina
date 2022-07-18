@@ -481,6 +481,7 @@ let get_other_party_body ~pool body_id =
                  ; state_id
                  ; sequence_state_id
                  ; proved_state
+                 ; is_new
                  } =
           query_db ~f:(fun db ->
               Processor.Zkapp_precondition_account.load db
@@ -557,6 +558,7 @@ let get_other_party_body ~pool body_id =
           Or_ignore.of_option sequence_state_opt
         in
         let proved_state = Or_ignore.of_option proved_state in
+        let is_new = Or_ignore.of_option is_new in
         return
           (Party.Account_precondition.Full
              { balance
@@ -566,6 +568,7 @@ let get_other_party_body ~pool body_id =
              ; state
              ; sequence_state
              ; proved_state
+             ; is_new
              } )
   in
   let caller = Party.Call_type.of_string caller in
