@@ -7,7 +7,8 @@ let
   inherit (builtins) filterSource path;
 
   inherit (pkgs.lib)
-    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath;
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath
+    optionalString;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
@@ -113,6 +114,10 @@ let
         MINA_COMMIT_DATE = "__commit_date_";
         MINA_COMMIT_SHA1 = "__commit_sha1___________________________";
         MINA_BRANCH = "<unknown>";
+
+        NIX_LDFLAGS =
+          optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
+          "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
 
         buildInputs = ocaml-libs ++ external-libs;
 
