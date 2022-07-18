@@ -2894,10 +2894,6 @@ module Ledger = struct
     static_method "createTokenAccount" create_token_account ;
     static_method "create" create ;
 
-    static_method "hashParty" hash_party ;
-    static_method "hashTransaction" hash_transaction ;
-    static_method "hashTransactionChecked" hash_transaction_checked ;
-
     static_method "transactionCommitments" transaction_commitments ;
     static_method "zkappPublicInput" zkapp_public_input ;
     static_method "signFieldElement" sign_field_element ;
@@ -2913,6 +2909,7 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
     static_method "memoToBase58" memo_to_base58 ;
 
+    static_method "hashPartyFromJson" hash_party ;
     static_method "hashPartyFromFields"
       (Checked.fields_to_hash
          (Mina_base.Party.Body.typ ())
