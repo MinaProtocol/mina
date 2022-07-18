@@ -16,6 +16,10 @@ type failure =
       | `Token_symbol
       | `Balance ]
 
+(* whether we should create a new account in the ledger *)
+let should_create_account ?account_id ~new_account ~zkapp_account =
+  new_account || (zkapp_account && Option.is_none account_id)
+
 let gen_account_precondition_from_account ?failure ~first_use_of_account account
     =
   let open Quickcheck.Let_syntax in
@@ -111,7 +115,11 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
               return (Or_ignore.Check (List.nth_exn fields ndx))
             in
             let proved_state = Or_ignore.Check proved_state in
-            let%bind is_new = Or_ignore.gen Quickcheck.Generator.bool in
+            let is_new =
+              (* when we apply the generated Parties.t, the account is always in the ledger
+              *)
+              Or_ignore.Check false
+            in
             return (state, sequence_state, proved_state, is_new)
       in
       return
@@ -680,15 +688,15 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
-  (* if it's a Snapp account, and we haven't provided an account id, then
-     we have to create a new account; not all ledger accounts are Snapp accounts,
+  (* if it's a zkApp account, and we haven't provided an account id, then
+     we have to create a new account; not all ledger accounts are zkApp accounts,
      so we can't just pick a ledger account
   *)
-  let new_account =
-    new_account || (zkapp_account && Option.is_none account_id)
+  let create_new_account =
+    should_create_account ?account_id ~new_account ~zkapp_account
   in
   (* a required balance is associated with a new account *)
-  ( match (required_balance, new_account) with
+  ( match (required_balance, create_new_account) with
   | Some _, false ->
       failwith "Required balance, but not new account"
   | _ ->
@@ -703,7 +711,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   (* party_increment_nonce for fee payer is unit and increment_nonce is true *)
   let party_increment_nonce, increment_nonce = increment_nonce in
   let%bind account =
-    if new_account then (
+    if create_new_account then (
       if Option.is_some account_id then
         failwith
           "gen_party_body: new party is true, but an account id, presumably \
@@ -711,8 +719,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
       match available_public_keys with
       | None ->
           failwith
-            "gen_party_body: new_account is true, but available_public_keys \
-             not provided"
+            "gen_party_body: create_new_account is true, but \
+             available_public_keys not provided"
       | Some available_pks ->
           let low, high =
             match required_balance with
@@ -772,10 +780,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           | Ok (`Added, _) ->
               ()
           | Ok (`Existed, _) ->
-              failwith "gen_party_body: account for new party already in ledger"
+              failwith "account for new party already in ledger"
           | Error err ->
-              failwithf
-                "gen_party_body: could not add account to ledger new party: %s"
+              failwithf "could not add account to ledger for new party: %s"
                 (Error.to_string_hum err) () ) ;
           account )
     else
@@ -799,8 +806,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           match Ledger.location_of_account ledger account_id with
           | None ->
               failwithf
-                "gen_party_body: could not find account location for passed \
-                 account id with public key %s and token_id %s"
+                "could not find account location for passed account id with \
+                 public key %s and token_id %s"
                 (Signature_lib.Public_key.Compressed.to_base58_check
                    (Account_id.public_key account_id) )
                 (Account_id.token_id account_id |> Token_id.to_string)
@@ -810,20 +817,19 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
               | None ->
                   (* should be unreachable *)
                   failwithf
-                    "gen_party_body: could not find account for passed account \
-                     id with public key %s and token id %s"
+                    "could not find account for passed account id with public \
+                     key %s and token id %s"
                     (Signature_lib.Public_key.Compressed.to_base58_check
                        (Account_id.public_key account_id) )
                     (Account_id.token_id account_id |> Token_id.to_string)
                     ()
               | Some _acct ->
-                  (*get the latest state of the account*)
+                  (* get the latest state of the account *)
                   let acct =
                     Account_id.Table.find_exn account_state_tbl account_id
                   in
                   if zkapp_account && Option.is_none acct.zkapp then
-                    failwith
-                      "gen_party_body: provided account has no snapp field" ;
+                    failwith "provided account has no zkapp account field" ;
                   return acct ) )
   in
   let public_key = account.public_key in
@@ -1048,8 +1054,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
       ~gen_balance_change:(gen_balance_change ?permissions_auth)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
-        gen_account_precondition_from_account ?failure ~first_use_of_account
-          acct )
+        gen_account_precondition_from_account ~first_use_of_account acct )
       ~f_party_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
         gen_use_full_commitment ~increment_nonce ~account_precondition

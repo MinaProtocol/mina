@@ -276,6 +276,8 @@ module Failure = struct
         Ok Account_sequence_state_precondition_unsatisfied
     | "Account_proved_state_precondition_unsatisfied" ->
         Ok Account_proved_state_precondition_unsatisfied
+    | "Account_is_new_precondition_unsatisfied" ->
+        Ok Account_is_new_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
         Ok Protocol_state_precondition_unsatisfied
     | "Incorrect_nonce" ->
