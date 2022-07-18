@@ -708,20 +708,37 @@ let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
            :: _ as str ) ->
         (stri, type_stri, str, None)
     | ( { pstr_desc =
-            Pstr_type (_, [ { ptype_name = t1_actual;
-                                 ptype_private = Public;
-                                 ptype_manifest = _; _ } ]);  _ } as manifest)
+            Pstr_type
+              ( _
+              , [ { ptype_name = t1_actual
+                  ; ptype_private = Public
+                  ; ptype_manifest = _
+                  ; _
+                  }
+                ] )
+        ; _
+        } as manifest )
       :: ( { pstr_desc =
-            Pstr_type (_, [ { ptype_name = { txt = "t"; _ };
-                                 ptype_private = Public;
-                                 ptype_manifest =
-                                   Some { ptyp_desc = Ptyp_constr ({ txt = t1_expected; _ }, _); _ } 
-                                 ; _ }])
-            ; _ } as type_stri )
-      ::  str when Poly.(Longident.name t1_expected = t1_actual.txt) ->
-       (type_stri, type_stri, str, Some manifest)
+               Pstr_type
+                 ( _
+                 , [ { ptype_name = { txt = "t"; _ }
+                     ; ptype_private = Public
+                     ; ptype_manifest =
+                         Some
+                           { ptyp_desc =
+                               Ptyp_constr ({ txt = t1_expected; _ }, _)
+                           ; _
+                           }
+                     ; _
+                     }
+                   ] )
+           ; _
+           } as type_stri )
+         :: str
+      when Poly.(Longident.name t1_expected = t1_actual.txt) ->
+        (type_stri, type_stri, str, Some manifest)
     | type_stri :: str ->
-       (type_stri, type_stri, str, None)
+        (type_stri, type_stri, str, None)
   in
   let should_convert, type_str, extra_stris =
     version_type ~version_option version stri ~all_version_tagged

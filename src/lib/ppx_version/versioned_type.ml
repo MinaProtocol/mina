@@ -136,11 +136,13 @@ module Printing = struct
     { type_decl_no_attrs with ptype_attributes }
 
   (* remmove manifest from types, except it's kind is `Ptype_abstract` *)
-  let remove_type_decls_manifest type_decl = 
-     match type_decl.ptype_kind with
-     | Ptype_abstract -> type_decl
-     | _ -> { type_decl with ptype_manifest = None }
-          
+  let remove_type_decls_manifest type_decl =
+    match type_decl.ptype_kind with
+    | Ptype_abstract ->
+        type_decl
+    | _ ->
+        { type_decl with ptype_manifest = None }
+
   (* convert type_decls to structure item so we can print it *)
   let type_decls_to_stri type_decls =
     (* type derivers only work with recursive types *)
