@@ -115,7 +115,10 @@ inputs:
           ${arg "protocol-version"} \
           ${arg "block-producer-key"} \
           ${arg "discovery-keypair"} \
-          ${optionalString cfg.generate-genesis-proof "--generate-genesis-proof true"} \
+          ${
+            optionalString cfg.generate-genesis-proof
+            "--generate-genesis-proof true"
+          } \
           ${flag "disable-node-status"} \
           ${flag "enable-peer-exchange"} \
           ${flag "seed"} \
