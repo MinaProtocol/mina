@@ -12,7 +12,6 @@
    async_kernel
    core_kernel
    prometheus
-   jemalloc
    cohttp-async
    cohttp
    async
