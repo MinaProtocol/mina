@@ -4,18 +4,9 @@ module T = Data_hash_lib.State_hash
 include T
 
 module State_hashes = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { mutable state_body_hash : State_body_hash.Stable.V1.t option
-        ; state_hash : T.Stable.V1.t
-        }
-      [@@deriving equal, sexp, to_yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
+  type t =
+    { mutable state_body_hash : State_body_hash.t option; state_hash : T.t }
+  [@@deriving equal, sexp, to_yojson]
 
   let state_hash { state_hash; _ } = state_hash
 
@@ -32,23 +23,11 @@ module State_hashes = struct
 end
 
 module With_state_hashes = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type 'a t = ('a, State_hashes.Stable.V1.t) With_hash.Stable.V1.t
-      [@@deriving equal, sexp, to_yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
   type 'a t = ('a, State_hashes.t) With_hash.t
   [@@deriving equal, sexp, to_yojson]
 
   open With_hash
-  open State_hashes.Stable.Latest
+  open State_hashes
 
   let data { data; _ } = data
 

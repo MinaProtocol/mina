@@ -148,10 +148,7 @@ module Stable = struct
   module V2 = struct
     type t =
       ( Zkapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V2.t
-        , F.Stable.V1.t )
-        With_hash.Stable.V1.t
-        option
+      , Side_loaded_verification_key.Stable.V2.t option
       , Mina_numbers.Zkapp_version.Stable.V1.t
       , F.Stable.V1.t
       , Mina_numbers.Global_slot.Stable.V1.t
@@ -165,7 +162,7 @@ end]
 
 type t =
   ( Zkapp_state.Value.t
-  , (Side_loaded_verification_key.t, F.t) With_hash.t option
+  , Side_loaded_verification_key.t option
   , Mina_numbers.Zkapp_version.t
   , F.t
   , Mina_numbers.Global_slot.t
@@ -192,10 +189,7 @@ let dummy_vk_hash =
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Zkapp_state.V.t
-    , ( Boolean.var
-      , (Side_loaded_verification_key.t option, Field.t) With_hash.t
-        Data_as_hash.t )
-      Flagged_option.t
+    , (Boolean.var, Side_loaded_verification_key.t option) Flagged_option.t
     , Mina_numbers.Zkapp_version.Checked.t
     , Pickles.Impls.Step.Field.t
     , Mina_numbers.Global_slot.Checked.t
@@ -220,8 +214,7 @@ module Checked = struct
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
-    to_input'
-      { t with verification_key = Data_as_hash.hash t.verification_key.data }
+    to_input' { t with verification_key = t.verification_key }
 
   let digest_vk t =
     Random_oracle.Checked.(
@@ -241,9 +234,7 @@ let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
     [ Zkapp_state.typ Field.typ
-    ; Flagged_option.option_typ
-        ~default:{ With_hash.data = None; hash = dummy_vk_hash () }
-        (Data_as_hash.typ ~hash:With_hash.hash)
+    ; Flagged_option.option_typ ~default:dummy_vk_hash
       |> Typ.transport
            ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
            ~back:
@@ -266,9 +257,7 @@ let to_input (t : t) =
   in
   Poly.Fields.fold ~init:[] ~app_state:(f app_state)
     ~verification_key:
-      (f
-         (Fn.compose field
-            (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+      (f (Option.value_map ~default:(dummy_vk_hash ()) ~f:Fn.id))
     ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
     ~sequence_state:(f app_state)
     ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
