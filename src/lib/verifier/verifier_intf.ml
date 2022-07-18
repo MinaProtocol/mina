@@ -7,18 +7,28 @@ module Base = struct
 
     type ledger_proof
 
+    type invalid =
+      [ `Invalid_keys of Signature_lib.Public_key.Compressed.t list
+      | `Invalid_signature of Signature_lib.Public_key.Compressed.t list
+      | `Invalid_proof
+      | `Missing_verification_key of Signature_lib.Public_key.Compressed.t list
+      ]
+    [@@deriving bin_io, to_yojson]
+
+    val invalid_to_string : invalid -> string
+
     val verify_commands :
          t
       -> Mina_base.User_command.Verifiable.t list
          (* The first level of error represents failure to verify, the second a failure in
             communicating with the verifier. *)
       -> [ `Valid of Mina_base.User_command.Valid.t
-         | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Mina_base.Snapp_statement.t
+           * Mina_base.Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
-           list ]
+           list
+         | invalid ]
          list
          Deferred.Or_error.t
 
@@ -29,6 +39,9 @@ module Base = struct
          t
       -> (ledger_proof * Mina_base.Sok_message.t) list
       -> bool Or_error.t Deferred.t
+
+    val get_blockchain_verification_key :
+      t -> Pickles.Verification_key.t Or_error.t Deferred.t
   end
 end
 

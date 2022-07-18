@@ -6,6 +6,7 @@
 open Core
 
 open Mina_base
+open Mina_transaction
 open Mina_numbers
 
 module Command_error : sig
@@ -23,17 +24,48 @@ module Command_error : sig
     | Overflow
     | Bad_token
     | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot.t ]
-        * [ `Current_global_slot of Mina_numbers.Global_slot.t ]
-    | Unwanted_fee_token of Token_id.t
-    | Invalid_transaction
-  [@@deriving sexp_of, to_yojson]
+        [ `Valid_until of Mina_numbers.Global_slot.t
+        | `Timestamp_predicate of string ]
+        * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
+    | Unwanted_fee_token of Mina_base.Token_id.t
+    | Verification_failed
+  [@@deriving sexp, to_yojson]
+
+  val grounds_for_diff_rejection : t -> bool
 end
 
 val replace_fee : Currency.Fee.t
 
+module Config : sig
+  type t
+end
+
+module Sender_local_state : sig
+  type t [@@deriving sexp, to_yojson]
+
+  val sender : t -> Account_id.t
+
+  val is_remove : t -> bool
+end
+
 (** Transaction pool. This is a purely functional data structure. *)
 type t [@@deriving sexp_of]
+
+val config : t -> Config.t
+
+val get_sender_local_state : t -> Account_id.t -> Sender_local_state.t
+
+val set_sender_local_state : t -> Sender_local_state.t -> t
+
+module rec Update : sig
+  val apply : Update.t -> t -> t
+
+  type t [@@deriving to_yojson, sexp]
+
+  val merge : t -> t -> t
+
+  val empty : t
+end
 
 (* TODO sexp is debug only, remove *)
 
@@ -42,16 +74,17 @@ val empty :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> time_controller:Block_time.Controller.t
+  -> expiry_ns:Time_ns.Span.t
   -> t
 
 (** How many transactions are currently in the pool *)
 val size : t -> int
 
-(** What is the lowest fee transaction in the pool *)
-val min_fee : t -> Currency.Fee.t option
+(* The least fee per weight unit of all transactions in the transaction pool *)
+val min_fee : t -> Currency.Fee_rate.t option
 
-(** Remove the lowest fee command from the pool, along with any others from the
-    same account with higher nonces. *)
+(** Remove the command from the pool with the lowest fee per wu,
+    along with any others from the same account with higher nonces. *)
 val remove_lowest_fee :
   t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
 
@@ -59,7 +92,7 @@ val remove_lowest_fee :
 val remove_expired :
   t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
 
-(** Get the highest fee applicable command in the pool *)
+(** Get the applicable command in the pool with the highest fee per wu *)
 val get_highest_fee :
   t -> Transaction_hash.User_command_with_valid_signature.t option
 
@@ -88,10 +121,35 @@ val handle_committed_txn :
     are required to keep the pool in sync with the ledger you are applying
     transactions against.
 *)
+val add_from_gossip_exn_async :
+     config:Config.t
+  -> sender_local_state:Sender_local_state.t
+  -> verify:
+       (   User_command.Verifiable.t
+        -> User_command.Valid.t option Async.Deferred.t )
+  -> [ `Unchecked of Transaction_hash.User_command.t * User_command.Verifiable.t
+     | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
+  -> Account_nonce.t
+  -> Currency.Amount.t
+  -> ( ( Transaction_hash.User_command_with_valid_signature.t
+       * Transaction_hash.User_command_with_valid_signature.t list )
+       * Sender_local_state.t
+       * Update.t
+     , Command_error.t )
+     Async.Deferred.Result.t
+(** Returns the commands dropped as a result of adding the command, which will
+    be empty unless we're replacing one. *)
+
+(** Add a command to the pool. Pass the current nonce for the account and
+    its current balance. Throws if the contents of the pool before adding the
+    new command are invalid given the supplied current nonce and balance - you
+    are required to keep the pool in sync with the ledger you are applying
+    transactions against.
+*)
 val add_from_gossip_exn :
      t
-  -> verify:(User_command.t -> User_command.Valid.t option)
-  -> [ `Unchecked of Transaction_hash.User_command.t
+  -> verify:(User_command.Verifiable.t -> User_command.Valid.t option)
+  -> [ `Unchecked of Transaction_hash.User_command.t * User_command.Verifiable.t
      | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
   -> Account_nonce.t
   -> Currency.Amount.t
@@ -135,8 +193,8 @@ val revalidate :
      (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
-(** Get the current global slot according to the pool's time controller. *)
-val current_global_slot : t -> Mina_numbers.Global_slot.t
+(** Get the global slot since genesis according to the pool's time controller. *)
+val global_slot_since_genesis : t -> Mina_numbers.Global_slot.t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception
