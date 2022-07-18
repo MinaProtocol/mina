@@ -117,9 +117,17 @@ module Js_layout = struct
     obj#js_layout := leaf_type Bool ;
     obj
 
-  let list x obj : _ Input.t =
+  let list ?static_length x obj : _ Input.t =
     let inner = !(x#js_layout) in
-    obj#js_layout := `Assoc [ ("type", `String "array"); ("inner", inner) ] ;
+    let static_length =
+      match static_length with Some length -> `Int length | None -> `Null
+    in
+    obj#js_layout :=
+      `Assoc
+        [ ("type", `String "array")
+        ; ("inner", inner)
+        ; ("staticLength", static_length)
+        ] ;
     obj
 
   let option x obj ~(js_type : [ `Implicit | `Flagged_option | `Or_undefined ])

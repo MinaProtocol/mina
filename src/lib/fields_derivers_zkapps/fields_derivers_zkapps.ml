@@ -236,12 +236,13 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _e = Fields_derivers_js.Js_layout.option ~js_type x obj in
     Fields_derivers_json.Of_yojson.option x obj
 
-  let list (x : _ Unified_input.t) obj : _ Unified_input.t =
+  let list ?(static_length : int option) (x : _ Unified_input.t) obj :
+      _ Unified_input.t =
     let _a = Graphql.Fields.list x obj in
     let _b = Graphql.Args.list x obj in
     let _c = Fields_derivers_json.To_yojson.list x obj in
     let _d = Fields_derivers_graphql.Graphql_query.list x obj in
-    let _e = Fields_derivers_js.Js_layout.list x obj in
+    let _e = Fields_derivers_js.Js_layout.list ?static_length x obj in
     Fields_derivers_json.Of_yojson.list x obj
 
   let iso ~map ~contramap (x : _ Unified_input.t) obj : _ Unified_input.t =
