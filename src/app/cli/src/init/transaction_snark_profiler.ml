@@ -385,24 +385,28 @@ let generate_base_snarks_witness sparse_ledger0
   Async.Deferred.return "Base constraint system satisfied"
 
 let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
-    use_zkapps : unit Async.Deferred.t =
-  let open Async.Deferred.Let_syntax in
+    use_zkapps : unit =
   let logger = Logger.null () in
-  Parallel.init_master () ;
-  let%bind verifier =
-    Verifier.create ~logger ~proof_level ~constraint_constants ~conf_dir:None
-      ~pids:(Child_processes.Termination.create_pid_table ())
-  in
-  if use_zkapps then
+  if use_zkapps then (
     let ledger, transactions = create_ledger_and_zkapps num_transactions in
+    Parallel.init_master () ;
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.create ~logger ~proof_level ~constraint_constants
+            ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
+    in
     let rec go n =
-      if n <= 0 then Async.Deferred.unit
+      if n <= 0 then ()
       else
-        let%bind message = zkapp_profiler ~verifier ledger transactions in
+        let message =
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              zkapp_profiler ~verifier ledger transactions )
+        in
         printf !"[%i] %s\n%!" n message ;
         go (n - 1)
     in
-    go repeats
+    go repeats )
   else
     let ledger, transactions =
       create_ledger_and_transactions num_transactions
@@ -415,11 +419,11 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
                participants ) )
     in
     let rec go n =
-      if n <= 0 then Async.Deferred.unit
+      if n <= 0 then ()
       else
-        let open Async.Deferred.Let_syntax in
-        let%bind message =
-          user_command_profiler sparse_ledger transactions preeval
+        let message =
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              user_command_profiler sparse_ledger transactions preeval )
         in
         printf !"[%i] %s\n%!" n message ;
         go (n - 1)
@@ -457,7 +461,7 @@ let witness num_transactions repeats preeval use_zkapps () =
 
 let command =
   let open Command.Let_syntax in
-  Async.Command.async ~summary:"transaction snark profiler"
+  Command.basic ~summary:"transaction snark profiler"
     (let%map_open n =
        flag "--k" ~aliases:[ "-k" ]
          ~doc:
