@@ -336,7 +336,7 @@ let%test_module "Account precondition tests" =
           | Some pk ->
               Or_ignore.Check pk
         in
-        let state, sequence_state, proved_state =
+        let state, sequence_state, proved_state, is_new =
           match zkapp with
           | None ->
               let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -347,7 +347,8 @@ let%test_module "Account precondition tests" =
               in
               let sequence_state = Or_ignore.Ignore in
               let proved_state = Or_ignore.Ignore in
-              (state, sequence_state, proved_state)
+              let is_new = Or_ignore.Ignore in
+              (state, sequence_state, proved_state, is_new)
           | Some { app_state; sequence_state; proved_state; _ } ->
               let state =
                 Zkapp_state.V.map app_state ~f:(fun field ->
@@ -361,7 +362,9 @@ let%test_module "Account precondition tests" =
                 Or_ignore.Check (List.hd_exn fields)
               in
               let proved_state = Or_ignore.Check proved_state in
-              (state, sequence_state, proved_state)
+              (* the account is in the ledger *)
+              let is_new = Or_ignore.Check false in
+              (state, sequence_state, proved_state, is_new)
         in
         { Zkapp_precondition.Account.balance
         ; nonce
@@ -370,6 +373,7 @@ let%test_module "Account precondition tests" =
         ; state
         ; sequence_state
         ; proved_state
+        ; is_new
         }
       in
       Party.Account_precondition.Full predicate_account
@@ -436,6 +440,7 @@ let%test_module "Account precondition tests" =
         let%map account_precondition =
           Mina_generators.Parties_generators
           .gen_account_precondition_from_account snapp_account
+            ~first_use_of_account:true
         in
         (l, account_precondition)
       in
@@ -496,7 +501,7 @@ let%test_module "Account precondition tests" =
         in
         let%map account_precondition =
           Mina_generators.Parties_generators.(
-            gen_account_precondition_from_account
+            gen_account_precondition_from_account ~first_use_of_account:true
               ~failure:Invalid_account_precondition snapp_account)
         in
         (l, account_precondition)

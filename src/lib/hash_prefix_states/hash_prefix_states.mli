@@ -65,7 +65,9 @@ val party_stack_frame : Field.t State.t
 
 val party_stack_frame_cons : Field.t State.t
 
-val receipt_chain_user_command : Field.t Legacy.State.t
+val receipt_chain_signed_command : Field.t Legacy.State.t
+
+val receipt_chain_parties : Field.t State.t
 
 val receipt_chain_zkapp : Field.t State.t
 

@@ -60,6 +60,7 @@
    random_oracle
    kimchi_backend
    pickles.backend
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

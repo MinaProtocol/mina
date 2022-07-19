@@ -97,9 +97,13 @@ struct
       module V1 = struct
         module T = struct
           type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
-          [@@deriving
-            version { asserted }, equal, bin_io, sexp, compare, yojson, hash]
+          [@@deriving equal, bin_io, sexp, compare, yojson, hash]
         end
+
+        (* asserts the versioned-ness of V1
+           to do this properly, we'd move the Stable module outside the functor
+        *)
+        let __versioned__ = ()
 
         include T
 

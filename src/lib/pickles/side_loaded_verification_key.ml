@@ -219,7 +219,7 @@ module Stable = struct
           Option.map srs ~f:(fun srs : Impls.Wrap.Verification_key.t ->
               { domain =
                   { log_size_of_group = log2_size
-                  ; group_gen = Backend.Tock.Field.domain_generator log2_size
+                  ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
                   }
               ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
               ; max_quot_size
