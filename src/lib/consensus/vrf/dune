@@ -45,6 +45,7 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
+   ppx_version.runtime
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))

@@ -352,7 +352,8 @@ type local_state =
   , Currency.Amount.Signed.t
   , Mina_ledger.Sparse_ledger.t
   , bool
-  , unit
+  , Parties.Transaction_commitment.t
+  , Mina_numbers.Index.t
   , Transaction_status.Failure.Collection.t )
   Mina_transaction_logic.Parties_logic.Local_state.t
 

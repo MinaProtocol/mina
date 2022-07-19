@@ -17,8 +17,7 @@ let with_versioned_json = "with_versioned_json"
 let no_toplevel_latest_type_str = "no_toplevel_latest_type"
 
 (* option to `deriving version' *)
-type version_option = No_version_option | Asserted | Binable
-[@@deriving equal]
+type version_option = No_version_option | Binable [@@deriving equal]
 
 let create_attr ~loc attr_name attr_payload =
   { attr_name; attr_payload; attr_loc = loc }
@@ -35,8 +34,6 @@ let rec add_deriving ~loc ~version_option attributes : attributes =
     match version_option with
     | No_version_option ->
         [%expr version]
-    | Asserted ->
-        [%expr version { asserted }]
     | Binable ->
         [%expr version { binable }]
   in
@@ -45,7 +42,7 @@ let rec add_deriving ~loc ~version_option attributes : attributes =
       let attr_name = mk_loc ~loc "deriving" in
       let attr_payload =
         match version_option with
-        | No_version_option | Asserted ->
+        | No_version_option ->
             payload [ [%expr bin_io]; version_expr ]
         | Binable ->
             payload [ version_expr ]
@@ -76,7 +73,7 @@ let rec add_deriving ~loc ~version_option attributes : attributes =
           in
           let needs_bin_io =
             match version_option with
-            | No_version_option | Asserted ->
+            | No_version_option ->
                 true
             | Binable ->
                 false
@@ -294,8 +291,8 @@ let mk_all_version_tags_type_decl =
       else type_decl
   end
 
-let version_type ~version_option version stri ~all_version_tagged
-    ~top_version_tag ~json_version_tag =
+let version_type ~version_option ~all_version_tagged ~top_version_tag
+    ~json_version_tag version stri =
   let loc = stri.pstr_loc in
   let find_t_stri stri =
     let is_t_stri stri =
@@ -322,6 +319,7 @@ let version_type ~version_option version stri ~all_version_tagged
           Location.raise_errorf ~loc:stri.pstr_loc
             "Expected a module containing a type t."
   in
+  let t_stri = find_t_stri stri in
   let t, params =
     let subst_type t_stri =
       (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
@@ -349,7 +347,6 @@ let version_type ~version_option version stri ~all_version_tagged
           Location.raise_errorf ~loc:stri.pstr_loc
             "Expected a single public type t."
     in
-    let t_stri = find_t_stri stri in
     subst_type t_stri
   in
   let empty_params = List.is_empty params in
@@ -434,21 +431,16 @@ let version_type ~version_option version stri ~all_version_tagged
       in
       let t =
         (* type `t` is equal to `typ`, but serialized/deserialized as `t_tagged` *)
-        let ty_decl =
-          type_declaration ~name:(Located.mk "t") ~params ~cstrs:[]
-            ~private_:Public
-            ~manifest:
-              (Some
-                 (ptyp_constr (Located.lident "typ") (List.map ~f:fst params))
-              )
-            ~kind:Ptype_abstract
-        in
-        { ty_decl with ptype_attributes = [ Lazy.force deriving_bin_io ] }
+        type_declaration ~name:(Located.mk "t") ~params ~cstrs:[]
+          ~private_:Public
+          ~manifest:
+            (Some (ptyp_constr (Located.lident "typ") (List.map ~f:fst params)))
+          ~kind:Ptype_abstract
       in
       let create = [%stri let create t = { t; version = [%e eint version] }] in
-      let bin_io_tagged_shadows =
+      let bin_io_t =
         [ [%stri
-            let bin_read_t_tagged =
+            let bin_read_t =
               [%e
                 fun_args
                   [%expr
@@ -463,12 +455,12 @@ let version_type ~version_option version stri ~all_version_tagged
                       then
                         failwith
                           (Core_kernel.sprintf
-                             "bin_read_t_tagged: version read %d does not \
-                              match expected version %d"
+                             "bin_read_t: version read %d does not match \
+                              expected version %d"
                              read_version [%e eint version] ) ;
                       t]]]
         ; [%stri
-            let __bin_read_t_tagged__ =
+            let __bin_read_t__ =
               [%e
                 fun_args
                   [%expr
@@ -484,34 +476,31 @@ let version_type ~version_option version stri ~all_version_tagged
                       then
                         failwith
                           (Core_kernel.sprintf
-                             "__bin_read_t_tagged__: version read %d does not \
-                              match expected version %d"
+                             "__bin_read_t__: version read %d does not match \
+                              expected version %d"
                              read_version version ) ;
                       t]]]
         ; [%stri
-            let bin_reader_t_tagged =
+            let bin_reader_t =
               [%e
                 fun_args
                   [%expr
                     { Bin_prot.Type_class.read =
-                        [%e
-                          apply_args ~f:(mk_field "read")
-                            [%expr bin_read_t_tagged]]
+                        [%e apply_args ~f:(mk_field "read") [%expr bin_read_t]]
                     ; vtag_read =
                         [%e
-                          apply_args ~f:(mk_field "read")
-                            [%expr __bin_read_t_tagged__]]
+                          apply_args ~f:(mk_field "read") [%expr __bin_read_t__]]
                     }]]]
         ; [%stri
-            let bin_size_t_tagged =
+            let bin_size_t =
               [%e
                 fun_args
                   [%expr
                     fun t ->
                       create t |> [%e apply_args [%expr bin_size_t_tagged]]]]]
-        ; [%stri let bin_shape_t_tagged = bin_shape_t_tagged]
+        ; [%stri let bin_shape_t = bin_shape_t_tagged]
         ; [%stri
-            let bin_write_t_tagged =
+            let bin_write_t =
               [%e
                 fun_args
                   [%expr
@@ -519,58 +508,31 @@ let version_type ~version_option version stri ~all_version_tagged
                       create t
                       |> [%e apply_args [%expr bin_write_t_tagged]] buf ~pos]]]
         ; [%stri
-            let bin_writer_t_tagged =
+            let bin_writer_t =
               [%e
                 fun_args
                   [%expr
                     { Bin_prot.Type_class.size =
-                        [%e
-                          apply_args ~f:(mk_field "size")
-                            [%expr bin_size_t_tagged]]
+                        [%e apply_args ~f:(mk_field "size") [%expr bin_size_t]]
                     ; write =
                         [%e
-                          apply_args ~f:(mk_field "write")
-                            [%expr bin_write_t_tagged]]
+                          apply_args ~f:(mk_field "write") [%expr bin_write_t]]
                     }]]]
         ; [%stri
-            let bin_t_tagged =
+            let bin_t =
               [%e
                 fun_args
                   [%expr
                     { Bin_prot.Type_class.shape =
                         [%e
-                          apply_args ~f:(mk_field "shape")
-                            [%expr bin_shape_t_tagged]]
+                          apply_args ~f:(mk_field "shape") [%expr bin_shape_t]]
                     ; writer =
                         [%e
-                          apply_args ~f:(mk_field "writer")
-                            [%expr bin_writer_t_tagged]]
+                          apply_args ~f:(mk_field "writer") [%expr bin_writer_t]]
                     ; reader =
                         [%e
-                          apply_args ~f:(mk_field "reader")
-                            [%expr bin_reader_t_tagged]]
+                          apply_args ~f:(mk_field "reader") [%expr bin_reader_t]]
                     }]]]
-        ; [%stri
-            let (_ : _) =
-              ( bin_read_t_tagged
-              , __bin_read_t_tagged__
-              , bin_reader_t_tagged
-              , bin_size_t_tagged
-              , bin_shape_t_tagged
-              , bin_write_t_tagged
-              , bin_writer_t_tagged
-              , bin_t_tagged )]
-        ]
-      in
-      let bin_io_t =
-        [ [%stri let bin_read_t = bin_read_t_tagged]
-        ; [%stri let __bin_read_t__ = __bin_read_t_tagged__]
-        ; [%stri let bin_reader_t = bin_reader_t_tagged]
-        ; [%stri let bin_size_t = bin_size_t_tagged]
-        ; [%stri let bin_shape_t = bin_shape_t_tagged]
-        ; [%stri let bin_write_t = bin_write_t_tagged]
-        ; [%stri let bin_writer_t = bin_writer_t_tagged]
-        ; [%stri let bin_t = bin_t_tagged]
         ; [%stri
             let (_ : _) =
               ( bin_read_t
@@ -593,7 +555,7 @@ let version_type ~version_option version stri ~all_version_tagged
                     ; pstr_type Recursive [ t ]
                     ; create
                     ]
-                  @ bin_io_tagged_shadows @ bin_io_t ) ) )
+                  @ bin_io_t ) ) )
       ]
     in
     let all_version_tag_modules =
@@ -602,7 +564,6 @@ let version_type ~version_option version stri ~all_version_tagged
         if equal_version_option version_option Binable then
           Location.raise_errorf ~loc
             "Cannot all-tag types in %%versioned_binable modules" ;
-        let t_stri = find_t_stri stri in
         let typ_decl =
           (* type `typ` is equal to `t` from the surrounding versioned type; but all contained
              occurrences of the form `M.Stable.Vn.t` become `M.Stable.Vn.With_all_version_tags.t`, so
@@ -646,7 +607,44 @@ let version_type ~version_option version stri ~all_version_tagged
         [%str let (_ : _) = to_latest]
       else []
     in
-    to_latest_guard_modules @ version_tag_items
+    let register_shape =
+      let open Ast_builder in
+      match t_stri.pstr_desc with
+      | Pstr_type (_, [ { ptype_name; ptype_params; _ } ]) ->
+          (* incomplete shape if there are type parameters *)
+          if List.is_empty ptype_params then
+            [%str
+              let (_ : _) =
+                let path =
+                  Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
+                    [%e estring ptype_name.txt]
+                in
+                match Ppx_version_runtime.Shapes.register path bin_shape_t with
+                | `Ok ->
+                    ()
+                | `Duplicate -> (
+                    (* versioned types inside functors that are called more than
+                       once will yield duplicates; OK if the shapes are the same
+                    *)
+                    match Ppx_version_runtime.Shapes.find path with
+                    | Some bin_shape_t' ->
+                        if
+                          not
+                            (Ppx_version_runtime.Shapes.equal_shapes bin_shape_t
+                               bin_shape_t' )
+                        then
+                          Core_kernel.failwithf
+                            "Different type shapes at path %s" path ()
+                        else ()
+                    | None ->
+                        Core_kernel.failwithf
+                          "Expected to find registered shape at path %s" path ()
+                    )]
+          else []
+      | _ ->
+          failwith "Expected single type declaration in structure item"
+    in
+    register_shape @ to_latest_guard_modules @ version_tag_items
   in
   match stri.pstr_desc with
   | Pstr_type _ ->
@@ -786,8 +784,7 @@ let convert_modbody ~loc ~version_option body =
             version stri
         in
         let type_stri =
-          if no_toplevel_type then None
-          else Some (Option.value ~default:current_type_stri type_stri)
+          Some (Option.value ~default:current_type_stri type_stri)
         in
         ( match !may_convert_latest with
         | None ->
@@ -815,6 +812,13 @@ let convert_modbody ~loc ~version_option body =
         , json_tag_convs ) )
   in
   let (module Ast_builder) = Ast_builder.make loc in
+  let alert_prolog, alert_epilog =
+    let open Ast_builder in
+    if equal_version_option version_option Binable then
+      ( [ [%stri [@@@alert "-legacy-deprecated"]] ]
+      , [ [%stri [@@@alert "+legacy+deprecated"]] ] )
+    else ([], [])
+  in
   let rev_str =
     match !latest_version with
     | Some latest_version -> (
@@ -838,7 +842,7 @@ let convert_modbody ~loc ~version_option body =
     | None ->
         rev_str
   in
-  let rev_str =
+  let rev_str_with_converters =
     match !may_convert_latest with
     | Some true ->
         let converter_modules =
@@ -1073,9 +1077,12 @@ let convert_modbody ~loc ~version_option body =
     | _ ->
         rev_str
   in
-  (List.rev rev_str, type_stri)
+  let rev_str_with_all =
+    alert_epilog @ rev_str_with_converters @ alert_prolog
+  in
+  (List.rev rev_str_with_all, if no_toplevel_type then None else type_stri)
 
-let version_module ~loc ~version_option ~path:_ modname modbody =
+let version_module ~loc ~path:_ ~version_option modname modbody =
   Printexc.record_backtrace true ;
   try
     let modname = map_loc ~f:(check_modname ~loc:modname.loc) modname in
@@ -1398,11 +1405,6 @@ let () =
       declare "versioned" Context.structure_item module_ast_pattern
         (version_module ~version_option:No_version_option))
   in
-  let module_extension_asserted =
-    Extension.(
-      declare "versioned_asserted" Context.structure_item module_ast_pattern
-        (version_module ~version_option:Asserted))
-  in
   let module_extension_binable =
     Extension.(
       declare "versioned_binable" Context.structure_item module_ast_pattern
@@ -1421,16 +1423,11 @@ let () =
         version_module_decl)
   in
   let module_rule = Context_free.Rule.extension module_extension in
-  let module_rule_asserted =
-    Context_free.Rule.extension module_extension_asserted
-  in
   let module_rule_binable =
     Context_free.Rule.extension module_extension_binable
   in
   let module_decl_rule = Context_free.Rule.extension module_decl_extension in
-  let rules =
-    [ module_rule; module_rule_asserted; module_rule_binable; module_decl_rule ]
-  in
+  let rules = [ module_rule; module_rule_binable; module_decl_rule ] in
   Driver.register_transformation "ppx_version/versioned_module" ~rules ;
   Ppxlib.Driver.add_arg "--no-toplevel-latest-type"
     (Caml.Arg.Unit (fun () -> no_toplevel_latest_type := true))

@@ -10,7 +10,7 @@ let evals =
   let open Plonk_types in
   let e =
     Evals.map (Evaluation_lengths.create ~of_int:Fn.id) ~f:(fun n ->
-        let a () = Array.create n (Ro.tock ()) in
+        let a () = Array.create ~len:n (Ro.tock ()) in
         (a (), a ()) )
   in
   let ex =
