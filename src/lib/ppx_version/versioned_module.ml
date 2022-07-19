@@ -1097,8 +1097,8 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
     in
     let empty_binding =
       [%str
-         let (_ : _) =
-           (module Stable.Latest : Ppx_version_runtime.Util.Empty_signature)]
+        let (_ : _) =
+          (module Stable.Latest : Ppx_version_runtime.Util.Empty_signature)]
     in
     Str.include_ ~loc
       (Incl.mk ~loc
