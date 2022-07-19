@@ -31,6 +31,7 @@
    bitstring_lib
    test_util
    kimchi_backend.common
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

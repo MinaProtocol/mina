@@ -23,4 +23,5 @@
    kimchi_types
    pasta_bindings
    snarkette
+   ppx_version.runtime
 ))

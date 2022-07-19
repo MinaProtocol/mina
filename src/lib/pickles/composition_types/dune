@@ -19,5 +19,6 @@
    pickles_base
    pickles.backend
    kimchi_backend.common
+   ppx_version.runtime
  )
 )

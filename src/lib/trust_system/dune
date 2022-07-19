@@ -24,6 +24,7 @@
    network_peer
    run_in_thread
    test_util
+   ppx_version.runtime
  )
  (inline_tests)
  (preprocess
