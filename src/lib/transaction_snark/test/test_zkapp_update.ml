@@ -15,8 +15,6 @@ module type Input_intf = sig
   val failure_expected : Mina_base.Transaction_status.Failure.t
 end
 
-module T = U.T
-
 module Make (Input : Input_intf) = struct
   open Input
 

@@ -31,11 +31,25 @@ end
 
 let ledger_depth = constraint_constants.ledger_depth
 
-module T = Transaction_snark.Make (struct
-  let constraint_constants = constraint_constants
+let get_snark_module =
+  let snark_module : (module Transaction_snark.S) option ref = ref None in
+  function
+  | () -> (
+      (* load SNARK system lazily, so that linking this library doesn't
+         automatically load it
+      *)
+      match !snark_module with
+      | Some (module M) ->
+          (module M : Transaction_snark.S)
+      | None ->
+          snark_module :=
+            Some
+              ( module Transaction_snark.Make (struct
+                let constraint_constants = constraint_constants
 
-  let proof_level = proof_level
-end)
+                let proof_level = proof_level
+              end) ) ;
+          Option.value_exn !snark_module )
 
 let genesis_state_body =
   let compile_time_genesis =
@@ -120,6 +134,7 @@ let trivial_zkapp =
 
 let check_parties_with_merges_exn ?expected_failure
     ?(state_body = genesis_state_body) ledger partiess =
+  let module T = (val get_snark_module ()) in
   (*TODO: merge multiple snapp transactions*)
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in

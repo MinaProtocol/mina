@@ -55,6 +55,7 @@ let%test_module "Transaction union tests" =
     let of_user_command' (sok_digest : Sok_message.Digest.t) ledger
         (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
+      let module T = (val U.get_snark_module ()) in
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
         Mina_state.Protocol_state.Body.consensus_state state_body
@@ -83,8 +84,7 @@ let%test_module "Transaction union tests" =
                 (Or_error.ok_exn (Transaction.supply_increase txn))
               ~pending_coinbase_stack_state
           in
-          U.T.of_user_command ~init_stack ~statement user_command_in_block
-            handler )
+          T.of_user_command ~init_stack ~statement user_command_in_block handler )
 
     let coinbase_test state_body ~carryforward =
       let mk_pubkey () =
@@ -441,6 +441,7 @@ let%test_module "Transaction union tests" =
 
     let test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
         ~carryforward1 ~carryforward2 =
+      let module T = (val U.get_snark_module ()) in
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = U.Wallet.random_wallets () in
           (*let state_body = Lazy.force state_body in
@@ -588,11 +589,11 @@ let%test_module "Transaction union tests" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof13 =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    U.T.merge ~sok_digest proof12 proof23 )
+                    T.merge ~sok_digest proof12 proof23 )
                 |> Or_error.ok_exn
               in
               Async.Thread_safe.block_on_async (fun () ->
-                  U.T.verify_against_digest proof13 )
+                  T.verify_against_digest proof13 )
               |> Result.ok_exn ) )
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
