@@ -93,7 +93,7 @@ macro_rules! impl_oracles {
             {
                 fn from(ro: RandomOracles<$F>) -> Self {
                     Self {
-                        joint_combiner_chal: ro.joint_combiner.map(|x| x.0.0.into()),
+                        joint_combiner_chal: ro.joint_combiner.as_ref().map(|x| x.0.0.into()),
                         joint_combiner: ro.joint_combiner.map(|x| x.1.into()),
                         beta: ro.beta.into(),
                         gamma: ro.gamma.into(),
