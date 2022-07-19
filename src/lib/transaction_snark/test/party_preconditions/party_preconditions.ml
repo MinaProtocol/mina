@@ -236,9 +236,7 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let ps =
                     Parties.Call_forest.With_hashes.of_parties_simple_list
-                      (List.map
-                         ~f:(fun p -> (p, ()))
-                         [ sender_party; snapp_party ] )
+                      [ sender_party; snapp_party ]
                   in
                   let other_parties_hash = Parties.Call_forest.hash ps in
                   let commitment =
@@ -636,7 +634,7 @@ let%test_module "Account precondition tests" =
               in
               let ps =
                 Parties.Call_forest.With_hashes.of_parties_simple_list
-                  (List.map ~f:(fun p -> (p, ())) [ sender_party; snapp_party ])
+                  [ sender_party; snapp_party ]
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
               let commitment =

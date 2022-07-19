@@ -452,13 +452,17 @@ module Call_forest = struct
     | x :: _ ->
         With_stack_hash.stack_hash x
 
-  let cons ?(calls = []) (party : Party.t) (xs : _ t) : _ t =
-    let party_digest = Digest.Party.create party in
+  let cons_aux (type p) ~(digest_party : p -> _) ?(calls = []) (party : p)
+      (xs : _ t) : _ t =
+    let party_digest = digest_party party in
     let tree : _ Tree.t = { party; party_digest; calls } in
     { elt = tree
     ; stack_hash = Digest.Forest.cons (Digest.Tree.create tree) (hash xs)
     }
     :: xs
+
+  let cons ?calls (party : Party.t) xs =
+    cons_aux ~digest_party:Digest.Party.create ?calls party xs
 
   let rec accumulate_hashes ~hash_party (xs : _ t) =
     let go = accumulate_hashes ~hash_party in
@@ -641,7 +645,7 @@ module Call_forest = struct
          ~party_caller:(fun p -> p.caller) )
       t
 
-  module With_hashes = struct
+  module With_hashes_and_data = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
@@ -690,6 +694,57 @@ module Call_forest = struct
 
     let other_parties_hash xs =
       List.map ~f:(fun x -> (x, ())) xs |> other_parties_hash'
+  end
+
+  module With_hashes = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Party.Stable.V1.t
+          , Digest.Party.Stable.V1.t
+          , Digest.Forest.Stable.V1.t )
+          Stable.V1.t
+        [@@deriving sexp, compare, equal, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let empty = Digest.Forest.empty
+
+    let hash_party (p : Party.t) = Digest.Party.create p
+
+    let accumulate_hashes xs : t = accumulate_hashes ~hash_party xs
+
+    let of_parties_simple_list (xs : Party.Simple.t list) : t =
+      of_parties_list xs ~party_depth:(fun (p : Party.Simple.t) ->
+          p.body.call_depth )
+      |> add_callers
+           ~call_type:(fun (p : Party.Simple.t) -> p.body.caller)
+           ~add_caller:(fun p id -> add_caller_simple p id)
+           ~null_id:Token_id.default
+           ~party_id:(fun (p : Party.Simple.t) ->
+             Account_id.(
+               derive_token_id ~owner:(create p.body.public_key p.body.token_id))
+             )
+      |> accumulate_hashes
+
+    let of_parties_list (xs : Party.Graphql_repr.t list) : t =
+      of_parties_list_map
+        ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
+        ~f:(fun p -> Party.of_graphql_repr p)
+        xs
+      |> accumulate_hashes
+
+    let to_parties_list (x : t) = to_parties_list x
+
+    let to_parties_with_hashes_list (x : t) = to_parties_with_hashes_list x
+
+    let other_parties_hash' xs = of_parties_list xs |> hash
+
+    let other_parties_hash xs =
+      List.map ~f:(fun x -> x) xs |> other_parties_hash'
   end
 
   let is_empty : _ t -> bool = List.is_empty
@@ -1087,7 +1142,7 @@ module Verifiable = struct
             , Zkapp_basic.F.Stable.V1.t )
             With_hash.Stable.V1.t
             option
-            Call_forest.With_hashes.Stable.V1.t
+            Call_forest.With_hashes_and_data.Stable.V1.t
         ; memo : Signed_command_memo.Stable.V1.t
         }
       [@@deriving sexp, compare, equal, hash, yojson]

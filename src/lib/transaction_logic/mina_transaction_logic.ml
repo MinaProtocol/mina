@@ -1332,18 +1332,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
 
-      (* same as the type of the field other_parties in Mina_base.Parties.t *)
-      type parties =
-        ( Party.t
-        , Parties.Digest.Party.t
-        , Parties.Digest.Forest.t )
-        Parties.Call_forest.t
+      type call_forest = Zkapp_call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
       let caller (p : t) = p.body.caller
 
-      let check_authorization ~commitment:_ ~at_party:_ (party : t) =
+      let check_authorization ~commitment:_ ~calls:_ (party : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
@@ -1429,28 +1424,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push x ~onto : t = x :: onto
     end
 
-    module Parties = struct
-      type t = Party.parties
-
-      let empty () = []
-
-      let if_ = value_if
-
-      let is_empty = List.is_empty
-
-      let pop_exn : t -> (Party.t * t) * t = function
-        | { stack_hash = _; elt = { party; calls; party_digest = _ } } :: xs ->
-            ((party, calls), xs)
-        | _ ->
-            failwith "pop_exn"
-    end
+    module Call_forest = Zkapp_call_forest
 
     module Stack_frame = struct
       include Stack_frame
 
       type t = value
 
-      let if_ = Parties.if_
+      let if_ = Parties.value_if
 
       let make = Stack_frame.make
     end
