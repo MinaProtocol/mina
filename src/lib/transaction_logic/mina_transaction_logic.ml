@@ -1332,18 +1332,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
 
-      (* same as the type of the field other_parties in Mina_base.Parties.t *)
-      type parties =
-        ( Party.t
-        , Parties.Digest.Party.t
-        , Parties.Digest.Forest.t )
-        Parties.Call_forest.t
+      type call_forest = Zkapp_call_forest.t
 
       type transaction_commitment = Transaction_commitment.t
 
       let caller (p : t) = p.body.caller
 
-      let check_authorization ~commitment:_ ~at_party:_ (party : t) =
+      let check_authorization ~commitment:_ ~calls:_ (party : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
@@ -1429,28 +1424,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let push x ~onto : t = x :: onto
     end
 
-    module Parties = struct
-      type t = Party.parties
-
-      let empty () = []
-
-      let if_ = value_if
-
-      let is_empty = List.is_empty
-
-      let pop_exn : t -> (Party.t * t) * t = function
-        | { stack_hash = _; elt = { party; calls; party_digest = _ } } :: xs ->
-            ((party, calls), xs)
-        | _ ->
-            failwith "pop_exn"
-    end
+    module Call_forest = Zkapp_call_forest
 
     module Stack_frame = struct
       include Stack_frame
 
       type t = value
 
-      let if_ = Parties.if_
+      let if_ = Parties.value_if
 
       let make = Stack_frame.make
     end
@@ -1536,7 +1517,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
-      | Check_account_precondition (party, account, local_state) -> (
+      | Check_account_precondition (party, account, new_account, local_state)
+        -> (
           match party.body.preconditions.account with
           | Accept ->
               local_state
@@ -1544,13 +1526,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let nonce_matches = Account.Nonce.equal account.nonce n in
               Inputs.Local_state.add_check local_state
                 Account_nonce_precondition_unsatisfied nonce_matches
-          | Full p ->
+          | Full precondition_account ->
               let local_state = ref local_state in
               let check failure b =
                 local_state :=
                   Inputs.Local_state.add_check !local_state failure b
               in
-              Zkapp_precondition.Account.check ~check p account ;
+              Zkapp_precondition.Account.check ~new_account ~check
+                precondition_account account ;
               !local_state )
       | Init_account { party = _; account = a } ->
           a

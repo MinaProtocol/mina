@@ -46,6 +46,7 @@
    mina_ledger
    transition_handler
    o1trace
+   ppx_version.runtime
  )
  (inline_tests)
  (preprocess
