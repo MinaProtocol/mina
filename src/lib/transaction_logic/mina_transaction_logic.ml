@@ -272,7 +272,8 @@ module type S = sig
            , Amount.Signed.t
            , ledger
            , bool
-           , unit
+           , Parties.Transaction_commitment.t
+           , Mina_numbers.Index.t
            , Transaction_status.Failure.Collection.t )
            Parties_logic.Local_state.t
          * Amount.Signed.t ) )
@@ -305,7 +306,8 @@ module type S = sig
                , Amount.Signed.t
                , ledger
                , bool
-               , unit
+               , Parties.Transaction_commitment.t
+               , Mina_numbers.Index.t
                , Transaction_status.Failure.Collection.t )
                Parties_logic.Local_state.t
           -> 'acc )
@@ -620,7 +622,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         balance
       ; nonce = Account.Nonce.succ account.nonce
       ; receipt_chain_hash =
-          Receipt.Chain_hash.cons command account.receipt_chain_hash
+          Receipt.Chain_hash.cons_signed_command_payload command
+            account.receipt_chain_hash
       ; timing
       } )
 
@@ -889,12 +892,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   module Inputs = struct
     let with_label ~label:_ f = f ()
 
+    let value_if b ~then_ ~else_ = if b then then_ else else_
+
     module Global_state = Global_state
 
     module Field = struct
       type t = Snark_params.Tick.Field.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Bool = struct
@@ -906,7 +911,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let any bs = List.exists ~f:Fn.id bs |> is_true
       end
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let true_ = true
 
@@ -943,13 +948,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Account_id = struct
       include Account_id
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Ledger = struct
       type t = L.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let empty = L.empty
 
@@ -975,27 +980,43 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Transaction_commitment = struct
-      type t = unit
+      type t = Field.t
 
-      let empty = ()
+      let empty = Parties.Transaction_commitment.empty
 
-      let if_ = Parties.value_if
+      let commitment ~other_parties =
+        let other_parties_hash =
+          Mina_base.Parties.Call_forest.hash other_parties
+        in
+        Parties.Transaction_commitment.create ~other_parties_hash
 
-      let commitment ~other_parties:_ = ()
+      let full_commitment ~party ~memo_hash ~commitment =
+        (* when called from Parties_logic.apply, the party is the fee payer *)
+        let fee_payer_hash = Parties.Digest.Party.create party in
+        Parties.Transaction_commitment.create_complete commitment ~memo_hash
+          ~fee_payer_hash
 
-      let full_commitment ~party:_ ~memo_hash:_ ~commitment:_ = ()
+      let if_ = value_if
+    end
+
+    module Index = struct
+      type t = Mina_numbers.Index.t
+
+      let zero, succ = Mina_numbers.Index.(zero, succ)
+
+      let if_ = value_if
     end
 
     module Public_key = struct
       type t = Public_key.Compressed.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Controller = struct
       type t = Permissions.Auth_required.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let check ~proof_verifies ~signature_verifies perm =
         (* Invariant: We either have a proof, a signature, or neither. *)
@@ -1011,27 +1032,42 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Global_slot = struct
       include Mina_numbers.Global_slot
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Nonce = struct
       type t = Account.Nonce.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let succ = Account.Nonce.succ
+    end
+
+    module Receipt_chain_hash = struct
+      type t = Receipt.Chain_hash.t
+
+      module Elt = struct
+        type t = Receipt.Parties_elt.t
+
+        let of_transaction_commitment tc =
+          Receipt.Parties_elt.Parties_commitment tc
+      end
+
+      let cons_parties_commitment = Receipt.Chain_hash.cons_parties_commitment
+
+      let if_ = value_if
     end
 
     module State_hash = struct
       include State_hash
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Timing = struct
       type t = Party.Update.Timing_info.t option
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let vesting_period (t : t) =
         match t with
@@ -1044,13 +1080,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Balance = struct
       include Balance
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Verification_key = struct
       type t = (Side_loaded_verification_key.t, Field.t) With_hash.t option
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Events = struct
@@ -1064,13 +1100,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Zkapp_uri = struct
       type t = string
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Token_symbol = struct
       type t = Account.Token_symbol.t
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Account = struct
@@ -1109,7 +1145,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
         type t = Permissions.t
 
-        let if_ = Parties.value_if
+        let if_ = value_if
       end
 
       type timing = Party.Update.Timing_info.t option
@@ -1139,6 +1175,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ~txn_global_slot ~account
         in
         (invalid_timing, Party.Update.Timing_info.of_account_timing timing)
+
+      let receipt_chain_hash (a : t) : Receipt.Chain_hash.t =
+        a.receipt_chain_hash
+
+      let set_receipt_chain_hash (a : t) hash =
+        { a with receipt_chain_hash = hash }
 
       let make_zkapp (a : t) =
         let zkapp =
@@ -1233,12 +1275,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type t = unsigned
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       module Signed = struct
         include Signed
 
-        let if_ = Parties.value_if
+        let if_ = value_if
 
         let is_pos (t : t) = Sgn.equal t.sgn Pos
       end
@@ -1272,7 +1314,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     module Token_id = struct
       include Token_id
 
-      let if_ = Parties.value_if
+      let if_ = value_if
     end
 
     module Protocol_state_precondition = struct
@@ -1290,6 +1332,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
 
+      (* same as the type of the field other_parties in Mina_base.Parties.t *)
       type parties =
         ( Party.t
         , Parties.Digest.Party.t
@@ -1365,7 +1408,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     struct
       type t = Elt.t list
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let empty () = []
 
@@ -1391,7 +1434,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let empty () = []
 
-      let if_ = Parties.value_if
+      let if_ = value_if
 
       let is_empty = List.is_empty
 
@@ -1423,6 +1466,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         , Ledger.t
         , Bool.t
         , Transaction_commitment.t
+        , Index.t
         , Bool.failure_status_tbl )
         Parties_logic.Local_state.t
 
@@ -1476,11 +1520,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , L.t
           , bool
           , Transaction_commitment.t
+          , Index.t
           , Transaction_status.Failure.Collection.t )
           Parties_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
-      ; transaction_commitment : unit
-      ; full_transaction_commitment : unit
+      ; transaction_commitment : Transaction_commitment.t
+      ; full_transaction_commitment : Transaction_commitment.t
       ; field : Snark_params.Tick.Field.t
       ; failure : Transaction_status.Failure.t option >
 
@@ -1491,7 +1536,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
-      | Check_account_precondition (party, account, local_state) -> (
+      | Check_account_precondition (party, account, new_account, local_state)
+        -> (
           match party.body.preconditions.account with
           | Accept ->
               local_state
@@ -1499,13 +1545,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               let nonce_matches = Account.Nonce.equal account.nonce n in
               Inputs.Local_state.add_check local_state
                 Account_nonce_precondition_unsatisfied nonce_matches
-          | Full p ->
+          | Full precondition_account ->
               let local_state = ref local_state in
               let check failure b =
                 local_state :=
                   Inputs.Local_state.add_check !local_state failure b
               in
-              Zkapp_precondition.Account.check ~check p account ;
+              Zkapp_precondition.Account.check ~new_account ~check
+                precondition_account account ;
               !local_state )
       | Init_account { party = _; account = a } ->
           a
@@ -1550,12 +1597,13 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
              ; caller_caller = Token_id.default
              } : Inputs.Stack_frame.t)
         ; call_stack = []
-        ; transaction_commitment = ()
-        ; full_transaction_commitment = ()
+        ; transaction_commitment = Inputs.Transaction_commitment.empty
+        ; full_transaction_commitment = Inputs.Transaction_commitment.empty
         ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger
         ; success = true
+        ; party_index = Inputs.Index.zero
         ; failure_status_tbl = []
         } )
     in

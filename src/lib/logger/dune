@@ -13,6 +13,7 @@
    base.base_internalhash_types
    ;; local libraries
    interpolator_lib
+   ppx_version.runtime
  )
  (preprocess
   (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson))

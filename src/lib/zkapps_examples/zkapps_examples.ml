@@ -21,6 +21,7 @@ module Party_under_construction = struct
             [ Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore ]
         ; sequence_state = Ignore
         ; proved_state = Ignore
+        ; is_new = Ignore
         }
       in
       let proved_state =
@@ -198,6 +199,7 @@ module Party_under_construction = struct
                    ]
                ; sequence_state = Ignore
                ; proved_state = Ignore
+               ; is_new = Ignore
                } )
         in
         let proved_state =

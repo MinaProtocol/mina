@@ -650,7 +650,9 @@ struct
                 (Pow_2_roots_of_unity ds.h) ~shifts:Common.tick_shifts
                 ~domain_generator:Backend.Tick.Field.domain_generator
             in
-            let checked_domain () = side_loaded_domain (Field.of_int ds.h) in
+            let checked_domain () =
+              side_loaded_domain ~log2_size:(Field.of_int ds.h)
+            in
             [%test_eq: Field.Constant.t]
               (d_unchecked#vanishing_polynomial pt)
               (run (fun () ->

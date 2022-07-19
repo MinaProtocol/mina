@@ -19,6 +19,7 @@
    genesis_constants
    snarky_curves
    bitstring_lib
+   ppx_version.runtime
  )
  (preprocess
   (pps

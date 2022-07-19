@@ -678,6 +678,7 @@ module Zkapp_precondition_account = struct
     ; state_id : int
     ; sequence_state_id : int option
     ; proved_state : bool option
+    ; is_new : bool option
     }
   [@@deriving fields, hlist]
 
@@ -690,6 +691,7 @@ module Zkapp_precondition_account = struct
         ; option int
         ; int
         ; option int
+        ; option bool
         ; option bool
         ]
 
@@ -727,6 +729,7 @@ module Zkapp_precondition_account = struct
       |> Option.map ~f:Kimchi_backend.Pasta.Basic.Fp.to_string
     in
     let proved_state = Zkapp_basic.Or_ignore.to_option acct.proved_state in
+    let is_new = Zkapp_basic.Or_ignore.to_option acct.is_new in
     let value =
       { balance_id
       ; nonce_id
@@ -735,6 +738,7 @@ module Zkapp_precondition_account = struct
       ; state_id
       ; sequence_state_id
       ; proved_state
+      ; is_new
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
