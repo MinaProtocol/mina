@@ -61,6 +61,7 @@
    mina_ledger
    mina_base.import
    snark_params
+   ppx_version.runtime
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

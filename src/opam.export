@@ -118,7 +118,6 @@ installed: [
   "ipaddr.5.0.1"
   "ipaddr-sexp.5.0.1"
   "jane-street-headers.v0.14.0"
-  "jemalloc.0.2"
   "js_of_ocaml.4.0.0"
   "js_of_ocaml-compiler.4.0.0"
   "js_of_ocaml-ppx.4.0.0"

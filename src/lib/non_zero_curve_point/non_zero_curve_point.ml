@@ -24,12 +24,12 @@ module Compressed = struct
 
   module Arg = struct
     (* module with same type t as Stable below, to build functor argument *)
-    [%%versioned_asserted
+    [%%versioned
     module Stable = struct
       module V1 = struct
         [@@@with_all_version_tags]
 
-        type t = (Field.t, bool) Poly.Stable.V1.t
+        type t = ((Field.t[@version_asserted]), bool) Poly.Stable.V1.t
 
         let to_latest = Fn.id
       end
@@ -38,11 +38,11 @@ module Compressed = struct
 
   let compress (x, y) = { Poly.x; is_odd = parity y }
 
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = (Field.t, bool) Poly.Stable.V1.t
+        type t = ((Field.t[@version_asserted]), bool) Poly.Stable.V1.t
         [@@deriving equal, compare, hash]
 
         let to_latest = Fn.id

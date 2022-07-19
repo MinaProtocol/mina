@@ -131,8 +131,6 @@ module Runtime = struct
 
   let current_gc = ref (Gc.stat ())
 
-  let current_jemalloc = ref (Jemalloc.get_memory_stats ())
-
   let gc_stat_interval_mins = ref 15.
 
   let gc_allocated_bytes = ref (Gc.allocated_bytes ())
@@ -140,7 +138,6 @@ module Runtime = struct
   let rec gc_stat () =
     let%bind () = after (Time_ns.Span.of_min !gc_stat_interval_mins) in
     current_gc := Gc.stat () ;
-    current_jemalloc := Jemalloc.get_memory_stats () ;
     gc_allocated_bytes := Gc.allocated_bytes () ;
     gc_stat ()
 
@@ -222,28 +219,6 @@ module Runtime = struct
       (fun () -> float_of_int !current_gc.Gc.Stat.stack_size)
       ~help:"Current stack size."
 
-  let jemalloc_active_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
-      (fun () -> float_of_int !current_jemalloc.active)
-      ~help:"active memory in bytes"
-
-  let jemalloc_resident_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
-      (fun () -> float_of_int !current_jemalloc.resident)
-      ~help:
-        "resident memory in bytes (may be zero depending on jemalloc compile \
-         options)"
-
-  let jemalloc_allocated_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
-      (fun () -> float_of_int !current_jemalloc.allocated)
-      ~help:"memory allocated to heap objects in bytes"
-
-  let jemalloc_mapped_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
-      (fun () -> float_of_int !current_jemalloc.mapped)
-      ~help:"memory mapped into process address space in bytes"
-
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
       ~help:"Total user and system CPU time spent in seconds."
@@ -267,10 +242,6 @@ module Runtime = struct
     ; ocaml_gc_largest_free
     ; ocaml_gc_fragments
     ; ocaml_gc_stack_size
-    ; jemalloc_active_bytes
-    ; jemalloc_resident_bytes
-    ; jemalloc_allocated_bytes
-    ; jemalloc_mapped_bytes
     ; process_cpu_seconds_total
     ; process_uptime_ms_total
     ]

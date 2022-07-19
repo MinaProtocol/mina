@@ -1,10 +1,9 @@
 open Core_kernel
 
-[%%versioned_asserted
+[%%versioned
 module Stable = struct
   module V1 = struct
-    (* there's no Time.Stable.Vn, assert version *)
-    type t = Unbanned | Banned_until of Time.t
+    type t = Unbanned | Banned_until of (Time.t[@version_asserted])
 
     let to_latest = Fn.id
 

@@ -12,10 +12,13 @@ module Arg = struct
   let version_byte = Base58_check.Version_bytes.signature
 end
 
-[%%versioned_asserted
+[%%versioned
 module Stable = struct
   module V1 = struct
-    type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.V1.t
+    type t =
+      ( (Field.t[@version_asserted])
+      , (Inner_curve.Scalar.t[@version_asserted]) )
+      Signature_poly.Stable.V1.t
     [@@deriving sexp, compare, equal, hash]
 
     type _unused = unit constraint t = Arg.t

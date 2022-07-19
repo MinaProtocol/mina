@@ -3,12 +3,13 @@
 open Core_kernel
 open Snark_params.Tick
 
-[%%versioned_asserted
+[%%versioned
 module Stable = struct
   module V1 = struct
     [@@@with_all_version_tags]
 
-    type t = Inner_curve.Scalar.t [@@deriving compare, sexp]
+    type t = (Inner_curve.Scalar.t[@version_asserted])
+    [@@deriving compare, sexp]
 
     (* deriver not working, apparently *)
     let sexp_of_t = [%sexp_of: Inner_curve.Scalar.t]

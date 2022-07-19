@@ -19,10 +19,18 @@ let
     # nice error message if the toolchain is missing
     placeholderPos = builtins.unsafeGetAttrPos "placeholder" toolchainHashes;
     in pkgs.rustChannelOf rec {
-      channel = if hasPrefix "nightly-" toolchain.channel then "nightly" else toolchain.channel;
-      date = if channel == "nightly" then removePrefix "nightly-" toolchain.channel else null;
-      sha256 = toolchainHashes.${toolchain.channel} or
-        (warn ''Please add the rust toolchain hash (see error message below) for "${toolchain.channel}" at ${placeholderPos.file}:${toString placeholderPos.line}'' toolchainHashes.placeholder);
+      channel = if hasPrefix "nightly-" toolchain.channel then
+        "nightly"
+      else
+        toolchain.channel;
+      date = if channel == "nightly" then
+        removePrefix "nightly-" toolchain.channel
+      else
+        null;
+      sha256 = toolchainHashes.${toolchain.channel} or (warn ''
+        Please add the rust toolchain hash (see error message below) for "${toolchain.channel}" at ${placeholderPos.file}:${
+          toString placeholderPos.line
+        }'' toolchainHashes.placeholder);
     };
 
   # mapFilterListToAttrs :: (x -> {name: str, value: b}) -> (x -> bool) -> [x] -> {b}
@@ -46,35 +54,6 @@ let
       }).narHash;
     }) package;
 in {
-  # nixpkgs + musl problems
-  postgresql =
-    (prev.postgresql.override { enableSystemd = false; }).overrideAttrs
-    (o: { doCheck = false; });
-
-  openssh = (if prev.stdenv.hostPlatform.isMusl then
-    (prev.openssh.override {
-      # todo: fix libredirect musl
-      libredirect = "";
-    }).overrideAttrs (o: { doCheck = !prev.stdenv.hostPlatform.isMusl; })
-  else
-    prev.openssh);
-
-  # jemalloc = prev.jemalloc.overrideAttrs (_: {
-  #   nativeBuildInputs = [ final.autoconf ];
-  #   preConfigure = "./autogen.sh";
-  #   src = final.fetchFromGitHub {
-  #     owner = "jemalloc";
-  #     repo = "jemalloc";
-  #     rev = "011449f17bdddd4c9e0510b27a3fb34e88d072ca";
-  #     sha256 = "FwMs8m/yYsXCEOd94ZWgpwqtVrTLncEQCSDj/FqGewE=";
-  #   };
-  # });
-
-  git = prev.git.overrideAttrs
-    (o: { doCheck = o.doCheck && !prev.stdenv.hostPlatform.isMusl; });
-
-  # Overrides for dependencies
-
   sodium-static =
     pkgs.libsodium.overrideAttrs (o: { dontDisableStatic = true; });
 
@@ -188,7 +167,8 @@ in {
     '';
   };
 
-  kimchi-rust = rustChannelFromToolchainFileOf ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
+  kimchi-rust = rustChannelFromToolchainFileOf
+    ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
   kimchi-rust-wasm = pkgs.kimchi-rust.rust.override {
     targets = [ "wasm32-unknown-unknown" ];
     # rust-src is needed for -Zbuild-std
@@ -226,7 +206,10 @@ in {
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
-        [ openssl ] ++ lib.optionals stdenv.isDarwin [ curl darwin.apple_sdk.frameworks.Security ];
+        [ openssl ] ++ lib.optionals stdenv.isDarwin [
+          curl
+          darwin.apple_sdk.frameworks.Security
+        ];
 
       checkInputs = [ final.nodejs ];
 
