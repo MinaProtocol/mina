@@ -278,19 +278,18 @@ let profile_zkapps ~verifier ledger partiess =
         let tm_zkapp0 = Core.Unix.gettimeofday () in
         (*verify*)
         let%map () =
-          return ()
-          (* match%map
-               Async_kernel.Monitor.try_with (fun () ->
-                   Transaction_snark_tests.Util.check_parties_with_merges_exn
-                     ledger [ parties ] )
-             with
-             | Ok () ->
-                 ()
-             | Error exn ->
-                 (* workaround for SNARK failures *)
-                 printf !"Error: %s\n%!" (Exn.to_string exn) ;
-                 printf "zkApp failed, continuing ...\n" ;
-                 () *)
+          match%map
+            Async_kernel.Monitor.try_with (fun () ->
+                Transaction_snark_tests.Util.check_parties_with_merges_exn
+                  ledger [ parties ] )
+          with
+          | Ok () ->
+              ()
+          | Error exn ->
+              (* workaround for SNARK failures *)
+              printf !"Error: %s\n%!" (Exn.to_string exn) ;
+              printf "zkApp failed, continuing ...\n" ;
+              ()
         in
         let tm_zkapp1 = Core.Unix.gettimeofday () in
         let zkapp_span = Time.Span.of_sec (tm_zkapp1 -. tm_zkapp0) in
