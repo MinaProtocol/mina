@@ -12,7 +12,7 @@ import {
   Permissions,
   Party,
   UInt64,
-  partiesToJson,
+  Ledger,
   Token,
   getDefaultTokenId,
 } from "snarkyjs";
@@ -40,6 +40,10 @@ class SimpleZkapp extends SmartContract {
     this.balance.addInPlace(UInt64.fromNumber(initialBalance));
     this.x.set(initialState);
     this.tokenSymbol.set("TEST_TOKEN");
+    console.log(
+      "Current tokenId while deploying: ",
+      Ledger.fieldToBase58(this.tokenId)
+    );
   }
 
   update(y) {
@@ -125,10 +129,20 @@ console.log(`initial balance: ${zkapp.account.balance.get().div(1e9)} MINA`);
 const customToken = new Token({ tokenOwner: zkappAddress });
 console.log("---FEE PAYER", feePayer.toPublicKey().toBase58());
 console.log("---TOKEN OWNER", zkappAddress.toBase58());
-console.log("---CUSTOM TOKEN", customToken.id);
+console.log("---CUSTOM TOKEN", Ledger.fieldToBase58(customToken.id));
 console.log(`---TOKEN SYMBOL ${Mina.getAccount(zkappAddress).tokenSymbol}`);
 console.log("---TOKEN ACCOUNT1", tokenAccount1.toBase58());
 console.log("---TOKEN ACCOUNT2", tokenAccount2.toBase58());
+console.log(
+  "---CUSTOM TOKEN CHECKED",
+  Ledger.fieldToBase58(
+    Ledger.customTokenIdChecked(zkappAddress, getDefaultTokenId())
+  )
+);
+console.log(
+  "---CUSTOM TOKEN UNCHECKED",
+  Ledger.fieldToBase58(Ledger.customTokenId(zkappAddress, getDefaultTokenId()))
+);
 
 console.log("----------token minting----------");
 tx = await Local.transaction(feePayer, () => {

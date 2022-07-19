@@ -2430,6 +2430,12 @@ module Ledger = struct
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
 
+  let public_key_checked (pk : public_key) :
+      Signature_lib.Public_key.Compressed.var =
+    let x = pk##.g##.x##.value in
+    let y = pk##.g##.y##.value in
+    Signature_lib.Public_key.compress_var (x, y) |> Impl.run_checked
+
   let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
     { x = to_unchecked pk##.g##.x##.value
     ; is_odd = Bigint.(test_bit (of_field (to_unchecked pk##.g##.y##.value)) 0)
@@ -2441,12 +2447,19 @@ module Ledger = struct
       (fun () -> failwith "invalid scalar")
       Fn.id
 
+  let token_id_checked (token : field_class Js.t) =
+    token |> of_js_field |> Mina_base.Token_id.Checked.of_field
+
   let token_id (token : field_class Js.t) : Mina_base.Token_id.t =
-    token |> of_js_field |> to_unchecked |> Mina_base.Token_id.of_field
+    token |> of_js_field_unchecked |> Mina_base.Token_id.of_field
 
   let default_token_id_js =
     Mina_base.Token_id.default |> Mina_base.Token_id.to_field_unsafe
     |> Field.constant |> to_js_field
+
+  let account_id_checked pk token =
+    Mina_base.Account_id.Checked.create (public_key_checked pk)
+      (token_id_checked token)
 
   let account_id pk token =
     Mina_base.Account_id.create (public_key pk) (token_id token)
@@ -2852,14 +2865,17 @@ module Ledger = struct
     apply_parties_transaction l txn (Js.to_string account_creation_fee)
 
   let create_token_account pk token =
-    Mina_base.Account_id.create (public_key pk) (token_id token)
-    |> Mina_base.Account_id.public_key
+    account_id pk token |> Mina_base.Account_id.public_key
     |> Signature_lib.Public_key.Compressed.to_string |> Js.string
 
-  let custom_token_id pk token =
-    Mina_base.Account_id.derive_token_id
-      ~owner:(Mina_base.Account_id.create (public_key pk) (token_id token))
-    |> Mina_base.Token_id.to_string |> Js.string
+  let custom_token_id_checked pk token =
+    Mina_base.Account_id.Checked.derive_token_id
+      ~owner:(account_id_checked pk token)
+    |> Mina_base.Account_id.Digest.Checked.to_field_unsafe |> to_js_field
+
+  let custom_token_id_unchecked pk token =
+    Mina_base.Account_id.derive_token_id ~owner:(account_id pk token)
+    |> Mina_base.Token_id.to_field_unsafe |> to_js_field_unchecked
 
   let () =
     let static_method name f =
@@ -2868,7 +2884,8 @@ module Ledger = struct
     let method_ name (f : ledger_class Js.t -> _) =
       method_ ledger_class name f
     in
-    static_method "customTokenID" custom_token_id ;
+    static_method "customTokenId" custom_token_id_unchecked ;
+    static_method "customTokenIdChecked" custom_token_id_checked ;
     static_method "createTokenAccount" create_token_account ;
     static_method "create" create ;
 
