@@ -24,6 +24,7 @@
    result
    base.caml
    integers
+   re2
    ;; local libraries
    integration_test_lib
    graphql_lib
