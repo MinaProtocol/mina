@@ -2,6 +2,7 @@
  (name zkapps_examples)
  (libraries
    ;; opam libraries
+   async_kernel
    core_kernel
    ;; local libraries
    crypto_params
@@ -19,8 +20,10 @@
    snark_params
    sgn
    signature_lib
-   tuple_lib)
+   tuple_lib
+   with_hash)
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
+   ppx_let
    ppx_version)))
