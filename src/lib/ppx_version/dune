@@ -10,5 +10,7 @@
    ppx_derivers
    ppx_bin_prot
    base base.caml
-   core_kernel)
+   core_kernel
+   ppx_version.runtime
+   bin_prot)
  (preprocess (pps ppx_compare ppxlib.metaquot)))

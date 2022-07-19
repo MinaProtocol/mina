@@ -61,6 +61,10 @@ let senderKey = sender.privateKey;
 let zkappKey = PrivateKey.random();
 let zkappAddress = zkappKey.toPublicKey();
 
+tic("compute circuit digest");
+let digest = SimpleZkapp.digest(zkappAddress);
+toc();
+
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
 let { verificationKey } = await SimpleZkapp.compile(zkappAddress);
