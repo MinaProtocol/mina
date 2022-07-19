@@ -460,6 +460,12 @@ let batch_test_zkapps =
           "NUM_MILLISECONDS Interval that the rate-limiter is applied over. \
            Used for rate limiting (default: 300000)"
         (optional_with_default 300000 int)
+    and batch_size =
+      flag "--batch-size" ~aliases:[ "batch-size" ]
+        ~doc:
+          "NUM Number of transactions generated at once before sending \
+           (default: 10). Note: generating large parties transactions is slow"
+        (optional_with_default 10 int)
     in
     ( keypair_path
     , fee_payer_privkey_path
@@ -467,7 +473,8 @@ let batch_test_zkapps =
     , rate_limit
     , rate_limit_level
     , rate_limit_interval
-    , num_txns )
+    , num_txns
+    , batch_size )
   in
   Command.async
     ~summary:
@@ -482,7 +489,8 @@ let batch_test_zkapps =
             , rate_limit
             , rate_limit_level
             , rate_limit_interval
-            , num_txns )
+            , num_txns
+            , batch_size )
           ->
          let open Deferred.Let_syntax in
          let%bind fee_payer_keypair =
@@ -512,7 +520,7 @@ let batch_test_zkapps =
            in
            min (Float.to_int limit_level) rate_limit_level
          in
-         let per_batch = 10 in
+         let per_batch = batch_size in
          (*Takes as bit to generate these transactions*)
          let curr_count = ref 0 in
          let total_count = ref 0 in
