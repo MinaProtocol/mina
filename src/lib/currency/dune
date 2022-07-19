@@ -33,6 +33,7 @@
    pickles
    snarky.backendless
    kimchi_backend.common
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

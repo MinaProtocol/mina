@@ -24,6 +24,7 @@
    sgn
    snark_params
    snarky.backendless
+   ppx_version.runtime
    with_hash)
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
@@ -37,4 +38,3 @@
     ppx_optcomp
     ppx_sexp_conv
     ppx_version)))
-

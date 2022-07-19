@@ -291,8 +291,8 @@ let mk_all_version_tags_type_decl =
       else type_decl
   end
 
-let version_type ~version_option version stri ~all_version_tagged
-    ~top_version_tag ~json_version_tag =
+let version_type ~version_option ~all_version_tagged ~top_version_tag
+    ~json_version_tag version stri =
   let loc = stri.pstr_loc in
   let find_t_stri stri =
     let is_t_stri stri =
@@ -319,6 +319,7 @@ let version_type ~version_option version stri ~all_version_tagged
           Location.raise_errorf ~loc:stri.pstr_loc
             "Expected a module containing a type t."
   in
+  let t_stri = find_t_stri stri in
   let t, params =
     let subst_type t_stri =
       (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
@@ -346,7 +347,6 @@ let version_type ~version_option version stri ~all_version_tagged
           Location.raise_errorf ~loc:stri.pstr_loc
             "Expected a single public type t."
     in
-    let t_stri = find_t_stri stri in
     subst_type t_stri
   in
   let empty_params = List.is_empty params in
@@ -564,7 +564,6 @@ let version_type ~version_option version stri ~all_version_tagged
         if equal_version_option version_option Binable then
           Location.raise_errorf ~loc
             "Cannot all-tag types in %%versioned_binable modules" ;
-        let t_stri = find_t_stri stri in
         let typ_decl =
           (* type `typ` is equal to `t` from the surrounding versioned type; but all contained
              occurrences of the form `M.Stable.Vn.t` become `M.Stable.Vn.With_all_version_tags.t`, so
@@ -608,7 +607,44 @@ let version_type ~version_option version stri ~all_version_tagged
         [%str let (_ : _) = to_latest]
       else []
     in
-    to_latest_guard_modules @ version_tag_items
+    let register_shape =
+      let open Ast_builder in
+      match t_stri.pstr_desc with
+      | Pstr_type (_, [ { ptype_name; ptype_params; _ } ]) ->
+          (* incomplete shape if there are type parameters *)
+          if List.is_empty ptype_params then
+            [%str
+              let (_ : _) =
+                let path =
+                  Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
+                    [%e estring ptype_name.txt]
+                in
+                match Ppx_version_runtime.Shapes.register path bin_shape_t with
+                | `Ok ->
+                    ()
+                | `Duplicate -> (
+                    (* versioned types inside functors that are called more than
+                       once will yield duplicates; OK if the shapes are the same
+                    *)
+                    match Ppx_version_runtime.Shapes.find path with
+                    | Some bin_shape_t' ->
+                        if
+                          not
+                            (Ppx_version_runtime.Shapes.equal_shapes bin_shape_t
+                               bin_shape_t' )
+                        then
+                          Core_kernel.failwithf
+                            "Different type shapes at path %s" path ()
+                        else ()
+                    | None ->
+                        Core_kernel.failwithf
+                          "Expected to find registered shape at path %s" path ()
+                    )]
+          else []
+      | _ ->
+          failwith "Expected single type declaration in structure item"
+    in
+    register_shape @ to_latest_guard_modules @ version_tag_items
   in
   match stri.pstr_desc with
   | Pstr_type _ ->
@@ -748,8 +784,7 @@ let convert_modbody ~loc ~version_option body =
             version stri
         in
         let type_stri =
-          if no_toplevel_type then None
-          else Some (Option.value ~default:current_type_stri type_stri)
+          Some (Option.value ~default:current_type_stri type_stri)
         in
         ( match !may_convert_latest with
         | None ->
@@ -1045,9 +1080,9 @@ let convert_modbody ~loc ~version_option body =
   let rev_str_with_all =
     alert_epilog @ rev_str_with_converters @ alert_prolog
   in
-  (List.rev rev_str_with_all, type_stri)
+  (List.rev rev_str_with_all, if no_toplevel_type then None else type_stri)
 
-let version_module ~loc ~version_option ~path:_ modname modbody =
+let version_module ~loc ~path:_ ~version_option modname modbody =
   Printexc.record_backtrace true ;
   try
     let modname = map_loc ~f:(check_modname ~loc:modname.loc) modname in
