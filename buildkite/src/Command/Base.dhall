@@ -152,7 +152,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                      then None B/ArtifactPaths
                      else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
-    timeout_in_minutes = Some 60,
+    timeout_in_minutes = Some 120,
     label = Some c.label,
     retry =
           Some {
