@@ -141,48 +141,6 @@ type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool) t_ =
   ; proved_state : 'bool
   }
 
-let digest_vk (t : Side_loaded_verification_key.t) =
-  Random_oracle.(
-    hash ~init:Hash_prefix_states.side_loaded_vk
-      (pack_input (Side_loaded_verification_key.to_input t)))
-
-let dummy_vk_hash =
-  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
-
-module Vk_wire = struct
-  [%%versioned_binable
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = (Side_loaded_verification_key.t, F.t) With_hash.t
-        [@@deriving sexp, yojson, equal, compare, hash]
-      end
-
-      include T
-
-      let to_latest = Fn.id
-
-      module M = struct
-        type nonrec t = t
-
-        (* don't send hash over the wire; restore hash on receipt *)
-
-        let to_binable (t : t) = t.data
-
-        let of_binable vk : t =
-          let data = vk in
-          let hash = digest_vk vk in
-          { data; hash }
-      end
-
-      include
-        Binable.Of_binable_without_uuid
-          (Side_loaded_verification_key.Stable.V2)
-          (M)
-    end
-  end]
-end
-
 [%%versioned
 module Stable = struct
   [@@@no_toplevel_latest_type]
@@ -190,7 +148,7 @@ module Stable = struct
   module V2 = struct
     type t =
       ( Zkapp_state.Value.Stable.V1.t
-      , Vk_wire.Stable.V1.t option
+      , Verification_key_wire.Stable.V1.t option
       , Mina_numbers.Zkapp_version.Stable.V1.t
       , F.Stable.V1.t
       , Mina_numbers.Global_slot.Stable.V1.t
@@ -204,7 +162,7 @@ end]
 
 type t =
   ( Zkapp_state.Value.t
-  , Vk_wire.t option
+  , Verification_key_wire.t option
   , Mina_numbers.Zkapp_version.t
   , F.t
   , Mina_numbers.Global_slot.t
@@ -267,6 +225,8 @@ module Checked = struct
     Random_oracle.Checked.(
       hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input' t)))
 end
+
+[%%define_locally Verification_key_wire.(digest_vk, dummy_vk_hash)]
 
 let typ : (Checked.t, t) Typ.t =
   let open Poly in
