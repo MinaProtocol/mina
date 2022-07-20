@@ -84,7 +84,7 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
         | Some pk ->
             Or_ignore.gen (return pk)
       in
-      let%bind state, sequence_state, proved_state =
+      let%bind state, sequence_state, proved_state, is_new =
         match zkapp with
         | None ->
             let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -95,7 +95,8 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
             in
             let sequence_state = Or_ignore.Ignore in
             let proved_state = Or_ignore.Ignore in
-            return (state, sequence_state, proved_state)
+            let is_new = Or_ignore.Ignore in
+            return (state, sequence_state, proved_state, is_new)
         | Some { Zkapp_account.app_state; sequence_state; proved_state; _ } ->
             let state =
               Zkapp_state.V.map app_state ~f:(fun field ->
@@ -110,7 +111,12 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
               return (Or_ignore.Check (List.nth_exn fields ndx))
             in
             let proved_state = Or_ignore.Check proved_state in
-            return (state, sequence_state, proved_state)
+            let is_new =
+              (* when we apply the generated Parties.t, the account is always in the ledger
+              *)
+              Or_ignore.Check false
+            in
+            return (state, sequence_state, proved_state, is_new)
       in
       return
         { Zkapp_precondition.Account.balance
@@ -120,6 +126,7 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
         ; state
         ; sequence_state
         ; proved_state
+        ; is_new
         }
     in
     match failure with
@@ -686,13 +693,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
-  (* if it's a Snapp account, and we haven't provided an account id, then
-     we have to create a new account; not all ledger accounts are Snapp accounts,
-     so we can't just pick a ledger account
-  *)
-  let new_account = new_account in
   (* a required balance is associated with a new account *)
-  ( match (required_balance, new_account) with
+  ( match (required_balance, create_new_account) with
   | Some _, false ->
       failwith "Required balance, but not new account"
   | _ ->
@@ -715,7 +717,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           }
   in
   let%bind account =
-    if new_account then (
+    if create_new_account then (
       if Option.is_some account_id then
         failwith
           "gen_party_body: new party is true, but an account id, presumably \
@@ -723,8 +725,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
       match available_public_keys with
       | None ->
           failwith
-            "gen_party_body: new_account is true, but available_public_keys \
-             not provided"
+            "gen_party_body: create_new_account is true, but \
+             available_public_keys not provided"
       | Some available_pks ->
           let available_pk =
             match
@@ -1021,8 +1023,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
              (new_account || (zkapp_account && Option.is_none account_id)) )
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
-        gen_account_precondition_from_account ?failure ~first_use_of_account
-          acct )
+        gen_account_precondition_from_account ~first_use_of_account acct )
       ~f_party_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
         gen_use_full_commitment ~increment_nonce ~account_precondition

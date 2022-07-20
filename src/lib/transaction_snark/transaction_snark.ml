@@ -919,32 +919,6 @@ module Base = struct
     open Parties_segment
     open Spec
 
-    module Prover_value : sig
-      type 'a t
-
-      val get : 'a t -> 'a
-
-      val create : (unit -> 'a) -> 'a t
-
-      val map : 'a t -> f:('a -> 'b) -> 'b t
-
-      val if_ : Boolean.var -> then_:'a t -> else_:'a t -> 'a t
-    end = struct
-      open Impl
-
-      type 'a t = 'a As_prover.Ref.t
-
-      let get = As_prover.Ref.get
-
-      let create = As_prover.Ref.create
-
-      let if_ b ~then_ ~else_ =
-        create (fun () ->
-            get (if Impl.As_prover.read Boolean.typ b then then_ else else_) )
-
-      let map t ~f = create (fun () -> f (get t))
-    end
-
     module Global_state = struct
       type t =
         { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
@@ -971,7 +945,7 @@ module Base = struct
       val set_zkapp_input : Zkapp_statement.Checked.t -> unit
     end
 
-    type party =
+    type party = Zkapp_call_forest.Checked.party =
       { party :
           (Party.Body.Checked.t, Parties.Digest.Party.Checked.t) With_hash.t
       ; control : Control.t Prover_value.t
@@ -1325,75 +1299,10 @@ module Base = struct
           Flagged_option.data x
       end
 
-      module Parties = struct
-        module F = Parties.Digest.Forest.Checked
-
-        type t =
-          ( ( Party.t * unit
-            , Parties.Digest.Party.t
-            , Parties.Digest.Forest.t )
-            Parties.Call_forest.t
-            V.t
-          , F.t )
-          With_hash.t
-
-        let if_ b ~then_:(t : t) ~else_:(e : t) : t =
-          { hash = F.if_ b ~then_:t.hash ~else_:e.hash
-          ; data = V.if_ b ~then_:t.data ~else_:e.data
-          }
-
-        let empty =
-          Parties.Digest.Forest.constant Parties.Call_forest.With_hashes.empty
-
-        let is_empty ({ hash = x; _ } : t) = F.equal empty x
-
-        let empty () : t = { hash = empty; data = V.create (fun () -> []) }
-
-        let pop_exn ({ hash = h; data = r } : t) : (party * t) * t =
-          with_label "Parties.pop_exn" (fun () ->
-              let hd_r =
-                V.create (fun () ->
-                    V.get r |> List.hd_exn |> With_stack_hash.elt )
-              in
-              let party = V.create (fun () -> (V.get hd_r).party |> fst) in
-              let auth = V.(create (fun () -> (V.get party).authorization)) in
-              let party =
-                exists (Party.Body.typ ()) ~compute:(fun () ->
-                    (V.get party).body )
-              in
-              let party =
-                With_hash.of_data party
-                  ~hash_data:Parties.Digest.Party.Checked.create
-              in
-              let subforest : t =
-                let subforest = V.create (fun () -> (V.get hd_r).calls) in
-                let subforest_hash =
-                  exists Parties.Digest.Forest.typ ~compute:(fun () ->
-                      Parties.Call_forest.hash (V.get subforest) )
-                in
-                { hash = subforest_hash; data = subforest }
-              in
-              let tl_hash =
-                exists Parties.Digest.Forest.typ ~compute:(fun () ->
-                    V.get r |> List.tl_exn |> Parties.Call_forest.hash )
-              in
-              let tree_hash =
-                Parties.Digest.Tree.Checked.create ~party:party.hash
-                  ~calls:subforest.hash
-              in
-              let hash_cons =
-                Parties.Digest.Forest.Checked.cons tree_hash tl_hash
-              in
-              F.Assert.equal hash_cons h ;
-              ( ( ({ party; control = auth }, subforest)
-                , { hash = tl_hash
-                  ; data = V.(create (fun () -> List.tl_exn (get r)))
-                  } )
-                : (party * t) * t ) )
-      end
+      module Call_forest = Zkapp_call_forest.Checked
 
       module Stack_frame = struct
-        type frame = (Token_id.Checked.t, Parties.t) Stack_frame.t
+        type frame = (Token_id.Checked.t, Call_forest.t) Stack_frame.t
 
         type t = (frame, Stack_frame.Digest.Checked.t Lazy.t) With_hash.t
 
@@ -1403,7 +1312,7 @@ module Base = struct
                 (Stack_frame.Digest.Checked.if_ b ~then_:(Lazy.force t1.hash)
                    ~else_:(Lazy.force t2.hash) )
           ; data =
-              Stack_frame.Checked.if_ Parties.if_ b ~then_:t1.data
+              Stack_frame.Checked.if_ Call_forest.if_ b ~then_:t1.data
                 ~else_:t2.data
           }
 
@@ -1418,7 +1327,7 @@ module Base = struct
           ; hash =
               lazy
                 (Stack_frame.Digest.Checked.create
-                   ~hash_parties:(fun (calls : Parties.t) -> calls.hash)
+                   ~hash_parties:(fun (calls : Call_forest.t) -> calls.hash)
                    frame )
           }
 
@@ -1430,7 +1339,7 @@ module Base = struct
         let unhash (h : Stack_frame.Digest.Checked.t)
             (frame :
               ( Mina_base.Token_id.Stable.V1.t
-              , unit Mina_base.Parties.Call_forest.With_hashes.Stable.V1.t )
+              , Mina_base.Parties.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
               V.t ) : t =
           with_label "unhash" (fun () ->
@@ -1464,7 +1373,7 @@ module Base = struct
 
           type frame =
             ( caller
-            , ( Party.t * unit
+            , ( Party.t
               , Parties.Digest.Party.t
               , Parties.Digest.Forest.t )
               Parties.Call_forest.t )
@@ -1510,7 +1419,7 @@ module Base = struct
         let exists_elt (elt_ref : (Value.frame, _) With_hash.t V.t) :
             Stack_frame.t =
           let elt : Stack_frame.frame =
-            let calls : Parties.t =
+            let calls : Call_forest.t =
               { hash =
                   exists Mina_base.Parties.Digest.Forest.typ ~compute:(fun () ->
                       (V.get elt_ref).data.calls
@@ -1835,7 +1744,7 @@ module Base = struct
         module Party = struct
           type t = party
 
-          type parties = Parties.t
+          type call_forest = Call_forest.t
 
           type 'a or_ignore = 'a Zkapp_basic.Or_ignore.Checked.t
 
@@ -1859,14 +1768,14 @@ module Base = struct
           let increment_nonce (t : t) = t.party.data.increment_nonce
 
           let check_authorization ~commitment
-              ~at_party:({ hash = at_party; _ } : Parties.t)
+              ~calls:({ hash = calls; _ } : Call_forest.t)
               ({ party; control; _ } : t) =
             let proof_verifies =
               match auth_type with
               | Proof ->
                   set_zkapp_input
                     { party = (party.hash :> Field.t)
-                    ; calls = (at_party :> Field.t)
+                    ; calls = (calls :> Field.t)
                     } ;
                   Boolean.true_
               | Signature | None_given ->
@@ -2007,12 +1916,13 @@ module Base = struct
             (protocol_state_predicate, global_state) ->
             Zkapp_precondition.Protocol_state.Checked.check
               protocol_state_predicate global_state.protocol_state
-        | Check_account_precondition ({ party; _ }, account, local_state) ->
+        | Check_account_precondition
+            ({ party; _ }, account, new_account, local_state) ->
             let local_state = ref local_state in
             let check failure b =
               local_state := Inputs.Local_state.add_check !local_state failure b
             in
-            Zkapp_precondition.Account.Checked.check ~check
+            Zkapp_precondition.Account.Checked.check ~new_account ~check
               party.data.preconditions.account account.data ;
             !local_state
         | Init_account { party = { party; _ }; account } ->
@@ -2137,8 +2047,7 @@ module Base = struct
                   | `Skip ->
                       []
                   | `Start p ->
-                      Parties.parties p.parties
-                      |> Parties.Call_forest.map ~f:(fun party -> (party, ())) )
+                      Parties.parties p.parties )
               in
               let h =
                 exists Parties.Digest.Forest.typ ~compute:(fun () ->
@@ -3964,18 +3873,11 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
               , _
               , _ )
               Mina_transaction_logic.Parties_logic.Local_state.t ) =
-          let stack_frame (stack_frame : Stack_frame.value) =
-            { stack_frame with
-              calls =
-                Parties.Call_forest.map stack_frame.calls ~f:(fun p -> (p, ()))
-            }
-          in
           { local with
-            stack_frame = stack_frame local.stack_frame
+            stack_frame = local.stack_frame
           ; call_stack =
-              List.map local.call_stack ~f:(fun f ->
-                  With_hash.of_data (stack_frame f)
-                    ~hash_data:Stack_frame.Digest.create )
+              List.map local.call_stack
+                ~f:(With_hash.of_data ~hash_data:Stack_frame.Digest.create)
               |> accumulate_call_stack_hashes ~hash_frame:(fun x ->
                      x.With_hash.hash )
           }
@@ -4111,7 +4013,7 @@ struct
                   s.parties.other_parties ) ;
             None )
     | xs ->
-        Parties.Call_forest.hd_party xs |> Option.map ~f:fst
+        Parties.Call_forest.hd_party xs
 
   let party_proof (p : Party.t) =
     match p.authorization with
@@ -4494,8 +4396,7 @@ module For_tests = struct
       @ snapp_parties @ other_receivers
     in
     let ps =
-      Parties.Call_forest.With_hashes.of_parties_simple_list
-        (List.map ~f:(fun p -> (p, ())) other_parties_data)
+      Parties.Call_forest.With_hashes.of_parties_simple_list other_parties_data
     in
     let other_parties_hash = Parties.Call_forest.hash ps in
     let commitment : Parties.Transaction_commitment.t =
@@ -4610,7 +4511,7 @@ module For_tests = struct
     let snapp_parties =
       snapp_parties
       |> List.map ~f:(fun p -> (p, p))
-      |> Parties.Call_forest.With_hashes.of_parties_simple_list
+      |> Parties.Call_forest.With_hashes_and_data.of_parties_simple_list
       |> Zkapp_statement.zkapp_statements_of_forest
       |> Parties.Call_forest.to_parties_list
     in
@@ -4620,7 +4521,7 @@ module For_tests = struct
     let%map.Async.Deferred snapp_parties =
       Async.Deferred.List.map snapp_parties_keypairs
         ~f:(fun
-             ((snapp_party, (simple_snapp_party, tx_statement)), snapp_keypair)
+             (((snapp_party, simple_snapp_party), tx_statement), snapp_keypair)
            ->
           match spec.current_auth with
           | Permissions.Auth_required.Proof ->
@@ -4809,7 +4710,7 @@ module For_tests = struct
     let memo = Signed_command_memo.empty in
     let ps =
       Parties.Call_forest.With_hashes.of_parties_simple_list
-        [ (sender_party_data, ()); (snapp_party_data, ()) ]
+        [ sender_party_data; snapp_party_data ]
     in
     let other_parties_hash = Parties.Call_forest.hash ps in
     let transaction : Parties.Transaction_commitment.t =
@@ -4819,7 +4720,7 @@ module For_tests = struct
     let proof_party =
       let tree =
         Parties.Call_forest.With_hashes.of_parties_simple_list
-          [ (snapp_party_data, ()) ]
+          [ snapp_party_data ]
         |> List.hd_exn
       in
       tree.elt.party_digest
