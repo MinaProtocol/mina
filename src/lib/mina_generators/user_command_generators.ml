@@ -95,6 +95,9 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
         let account = Account.create account_id balance in
         if ndx mod 2 = 0 then account else snappify_account account )
   in
+  let zkapp_account_keypairs =
+    List.filteri keypairs_in_ledger ~f:(fun ndx _ -> ndx mod 2 <> 0)
+  in
   let fee_payer_keypair = List.hd_exn keypairs in
   let ledger = Ledger.create ~depth:ledger_depth () in
   List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
@@ -115,8 +118,8 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
     Option.value account_state_tbl ~default:(Account_id.Table.create ())
   in
   let%bind parties =
-    Parties_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
-      ~account_state_tbl ?vk ?failure ()
+    Parties_generators.gen_parties_from ~zkapp_account_keypairs
+      ~fee_payer_keypair ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
   in
   let parties =
     Option.value_exn

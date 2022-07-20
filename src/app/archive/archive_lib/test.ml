@@ -70,7 +70,9 @@ let%test_module "Archive node unit tests" =
       and fee_payer_key_index =
         Base_quickcheck.Generator.int_inclusive 0 @@ (Array.length keys - 1)
       in
-      let keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
+      let test_keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
+      let extra_keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
+      let keys = Array.append test_keys extra_keys in
       let fee_payer_keypair = keys.(fee_payer_key_index) in
       let keymap =
         Array.map keys ~f:(fun { public_key; private_key } ->
@@ -78,18 +80,41 @@ let%test_module "Archive node unit tests" =
         |> Array.to_list |> Public_key.Compressed.Map.of_alist_exn
       in
       let ledger = Mina_ledger.Ledger.create ~depth:10 () in
-      let fee_payer_cpk = Public_key.compress fee_payer_keypair.public_key in
-      let fee_payer_account_id =
-        Account_id.create fee_payer_cpk Token_id.default
+      let public_keys =
+        Array.map test_keys ~f:(fun key -> Public_key.compress key.public_key)
       in
-      let account = Account.create fee_payer_account_id initial_balance in
-      Mina_ledger.Ledger.get_or_create_account ledger fee_payer_account_id
-        account
-      |> Or_error.ok_exn
+      let account_ids =
+        Array.map public_keys ~f:(fun pk ->
+            Account_id.create pk Token_id.default )
+      in
+      let zkappify_account (account : Account.t) : Account.t =
+        let verification_key =
+          Some
+            With_hash.
+              { data = Side_loaded_verification_key.dummy
+              ; hash = Zkapp_account.dummy_vk_hash ()
+              }
+        in
+        let zkapp = Some { Zkapp_account.default with verification_key } in
+        { account with zkapp }
+      in
+      let accounts =
+        Array.mapi account_ids ~f:(fun ndx account_id ->
+            let account = Account.create account_id initial_balance in
+            if ndx mod 2 = 0 then (account_id, account)
+            else (account_id, zkappify_account account) )
+      in
+      let zkapp_account_keypairs =
+        List.filteri (Array.to_list test_keys) ~f:(fun ndx _ -> ndx mod 2 <> 0)
+      in
+      Array.map accounts ~f:(fun (account_id, account) ->
+          Mina_ledger.Ledger.get_or_create_account ledger account_id account
+          |> Or_error.ok_exn )
       |> fun _ ->
       let%map (parties : Parties.t) =
         Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
-          ~keymap ~ledger ~protocol_state_view:genesis_state_view ()
+          ~zkapp_account_keypairs ~keymap ~ledger
+          ~protocol_state_view:genesis_state_view ()
       in
       User_command.Parties parties
 

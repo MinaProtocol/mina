@@ -5,6 +5,8 @@ module U = Transaction_snark_tests.Util
 
 let logger = Logger.create ()
 
+let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
+
 let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let fee_payer_keypairs =
     Array.init num_of_fee_payers ~f:(fun _ -> Keypair.create ())
@@ -45,7 +47,41 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
         fee_payer_account
       |> Or_error.ok_exn
       |> fun _ -> () ) ;
-  let keys = List.init 1000 ~f:(fun _ -> Keypair.create ()) in
+  let normal_keys = List.init 200 ~f:(fun _ -> Keypair.create ()) in
+  let zkapp_keys = List.init 200 ~f:(fun _ -> Keypair.create ()) in
+  let extra_keys = List.init 200 ~f:(fun _ -> Keypair.create ()) in
+  let normal_account_ids =
+    List.map normal_keys ~f:(fun key ->
+        Account_id.create
+          (Signature_lib.Public_key.compress key.public_key)
+          Token_id.default )
+  in
+  let zkapp_account_ids =
+    List.map zkapp_keys ~f:(fun key ->
+        Account_id.create
+          (Signature_lib.Public_key.compress key.public_key)
+          Token_id.default )
+  in
+  let normal_accounts =
+    List.map normal_account_ids ~f:(fun id ->
+        Account.create id initial_balance )
+  in
+  let zkapp_accounts =
+    List.map zkapp_account_ids ~f:(fun id ->
+        let account = Account.create id initial_balance in
+        let verification_key = Some vk in
+        let zkapp = Some { Zkapp_account.default with verification_key } in
+        { account with zkapp } )
+  in
+  List.iter
+    (List.zip_exn
+       (normal_account_ids @ zkapp_account_ids)
+       (normal_accounts @ zkapp_accounts) )
+    ~f:(fun (account_id, account) ->
+      Mina_ledger.Ledger.get_or_create_account ledger account_id account
+      |> Or_error.ok_exn
+      |> fun _ -> () ) ;
+  let keys = normal_keys @ zkapp_keys @ extra_keys in
   let keymap =
     List.map
       (Array.to_list fee_payer_keypairs @ keys)
@@ -53,14 +89,12 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
         (Public_key.compress public_key, private_key) )
     |> Public_key.Compressed.Map.of_alist_exn
   in
-  (ledger, fee_payer_keypairs, keymap)
-
-let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
+  (ledger, fee_payer_keypairs, zkapp_keys, keymap)
 
 let generate_parties_and_apply_them_consecutively () =
   let num_of_fee_payers = 5 in
   let trials = 6 in
-  let ledger, fee_payer_keypairs, keymap =
+  let ledger, fee_payer_keypairs, zkapp_account_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers ()
   in
   Test_util.with_randomness 123456789 (fun () ->
@@ -69,7 +103,7 @@ let generate_parties_and_apply_them_consecutively () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
+             ~zkapp_account_keypairs ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -98,14 +132,14 @@ let generate_parties_and_apply_them_freshly () =
   let trials = 6 in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
-        let ledger, fee_payer_keypairs, keymap =
+        let ledger, fee_payer_keypairs, zkapp_account_keypairs, keymap =
           mk_ledgers_and_fee_payers ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
+             ~zkapp_account_keypairs ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 U.check_parties_with_merges_exn ledger [ parties ] ) )
@@ -118,14 +152,14 @@ let mk_invalid_test ~num_of_fee_payers ~trials ~type_of_failure
     ~expected_failure_status =
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
-        let ledger, fee_payer_keypairs, keymap =
+        let ledger, fee_payer_keypairs, zkapp_account_keypairs, keymap =
           mk_ledgers_and_fee_payers ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
              ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
+             ~zkapp_account_keypairs ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -144,14 +178,14 @@ let test_timed_account () =
   let trials = 1 in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
-        let ledger, fee_payer_keypairs, keymap =
+        let ledger, fee_payer_keypairs, zkapp_account_keypairs, keymap =
           mk_ledgers_and_fee_payers ~is_timed:true ~num_of_fee_payers ()
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
+             ~zkapp_account_keypairs ~keymap ~ledger ~vk ~prover () )
           ~f:(fun parties ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 [%log info]
@@ -193,9 +227,7 @@ let () =
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:(Update_not_permitted `Voting_for)
     ~expected_failure_status:Update_not_permitted_voting_for ;
-  (*
   mk_invalid_test ~num_of_fee_payers ~trials
     ~type_of_failure:(Update_not_permitted `Balance)
     ~expected_failure_status:Update_not_permitted_balance ;
-  *)
   test_timed_account ()

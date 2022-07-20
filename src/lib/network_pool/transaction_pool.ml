@@ -1715,7 +1715,7 @@ let%test_module _ =
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
+      let create ?vk : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let pipe_r, pipe_w =
           Broadcast_pipe.create
@@ -1728,6 +1728,24 @@ let%test_module _ =
               ( account_id
               , Account.create account_id
                 @@ Currency.Balance.of_formatted_string "900000000.0" ) )
+        in
+        let zkappify_account (account : Account.t) : Account.t =
+          let verification_key =
+            Some
+              (Option.value vk
+                 ~default:
+                   With_hash.
+                     { data = Side_loaded_verification_key.dummy
+                     ; hash = Zkapp_account.dummy_vk_hash ()
+                     } )
+          in
+          let zkapp = Some { Zkapp_account.default with verification_key } in
+          { account with zkapp }
+        in
+        let accounts =
+          List.mapi accounts ~f:(fun ndx (account_id, account) ->
+              if ndx mod 2 = 0 then (account_id, account)
+              else (account_id, zkappify_account account) )
         in
         let ledger = Account_id.Table.of_alist_exn accounts in
         ((pipe_r, ref ledger), pipe_w)
@@ -1798,8 +1816,8 @@ let%test_module _ =
       in
       assert (List.is_sorted txns ~compare)
 
-    let setup_test ?expiry () =
-      let tf, best_tip_diff_w = Mock_transition_frontier.create () in
+    let setup_test ?vk ?expiry () =
+      let tf, best_tip_diff_w = Mock_transition_frontier.create ?vk () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
       let config =
@@ -1886,7 +1904,9 @@ let%test_module _ =
             let key = Public_key.compress public_key in
             Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
       in
-      (* ledger that gets updated by the Snapp generators *)
+      let zkapp_account_keypairs =
+        List.filteri (Array.to_list test_keys) ~f:(fun ndx _ -> ndx mod 2 <> 0)
+      in
       let ledger = mk_ledger () in
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in
@@ -1895,7 +1915,7 @@ let%test_module _ =
             let fee_payer_keypair = test_keys.(n) in
             let%map (parties : Parties.t) =
               Mina_generators.Parties_generators.gen_parties_from ~keymap
-                ~fee_payer_keypair ~ledger ()
+                ~zkapp_account_keypairs ~fee_payer_keypair ~ledger ()
             in
             let parties =
               Option.value_exn
@@ -1911,18 +1931,6 @@ let%test_module _ =
       let result =
         Quickcheck.random_value ~seed:(`Deterministic "parties") (go 0 [])
       in
-      (* add new accounts to best tip ledger *)
-      let ledger_accounts =
-        Mina_ledger.Ledger.to_list ledger
-        |> List.filter ~f:(fun acct -> Option.is_some acct.zkapp)
-      in
-      List.iter ledger_accounts ~f:(fun account ->
-          let account_id =
-            Account_id.create account.public_key account.token_id
-          in
-          ignore
-            ( Mock_base_ledger.add best_tip_ledger ~account_id ~account
-              : [ `Duplicate | `Ok ] ) ) ;
       result
 
     let mk_parties_cmds' (pool : Test.Resource_pool.t) : User_command.t list =

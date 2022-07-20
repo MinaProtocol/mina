@@ -30,6 +30,7 @@
    mina_base.util
    kimchi_backend.pasta
    pickles
+   random_oracle
    pipe_lib
    block_time
    currency
