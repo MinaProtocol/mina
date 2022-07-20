@@ -134,6 +134,9 @@ let
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
+        # this is used to retrieve the path of the built static library
+        # and copy it from within a dune rule
+        # (see src/lib/crypto/kimchi_bindings/stubs/dune)
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
 
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
