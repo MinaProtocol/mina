@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2022-06-30 00:25:00-7:00"
+    "genesis_state_timestamp": "2022-07-20 14:00:00-7:00"
   },
   "ledger": {
     "name": "gossipqa",
