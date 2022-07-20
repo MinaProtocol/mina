@@ -1095,13 +1095,19 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
       Option.map ~f:erase_stable_versions#structure_item type_stri
       |> Option.to_list
     in
+    let empty_binding =
+      [%str
+        let (_ : _) =
+          (module Stable.Latest : Ppx_version_runtime.Util.Empty_signature)]
+    in
     Str.include_ ~loc
       (Incl.mk ~loc
          (Ast_helper.Mod.structure ~loc
             ( Str.module_ ~loc
                 (Mb.mk ~loc:modname.loc (some_loc modname)
                    (Mod.structure ~loc:modbody.loc modbody.txt) )
-            :: type_stri ) ) )
+              :: type_stri
+            @ empty_binding ) ) )
   with exn ->
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
