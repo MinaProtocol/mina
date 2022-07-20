@@ -32,6 +32,7 @@
    fields_derivers.zkapps
    fields_derivers.json
    test_util
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

@@ -22,7 +22,8 @@
    merkle_address
    direction
    error_json
-)
+   ppx_version.runtime
+ )
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving_yojson ppx_register_event))
  (instrumentation (backend bisect_ppx))

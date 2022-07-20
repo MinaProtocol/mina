@@ -38,6 +38,7 @@ impl ocaml::custom::Custom for CamlPastaFqPlonkIndex {
 pub fn caml_pasta_fq_plonk_index_create(
     gates: CamlPastaFqPlonkGateVectorPtr,
     public: ocaml::Int,
+    prev_challenges: ocaml::Int,
     srs: CamlFqSrs,
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
     let gates: Vec<_> = gates
@@ -54,6 +55,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     // create constraint system
     let cs = match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq_kimchi::params())
         .public(public as usize)
+        .prev_challenges(prev_challenges as usize)
         .build()
     {
         Err(_) => {

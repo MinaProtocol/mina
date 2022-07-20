@@ -340,19 +340,8 @@ let () =
      ; ("assertGte", Field.Assert.gte)
      ] ) ;
   method_ "assertEquals" (fun this (y : As_field.t) : unit ->
-      try Field.Assert.equal this##.value (As_field.value y)
-      with _ ->
-        console_log this ;
-        console_log (As_field.to_field_obj y) ;
-        let () = raise_error "assertEquals: not equal" in
-        () ) ;
+      Field.Assert.equal this##.value (As_field.value y) ) ;
 
-  (* TODO: bring back better error msg when .toString works in circuits *)
-  (* sprintf "assertEquals: %s != %s"
-         (Js.to_string this##toString)
-         (Js.to_string (As_field.to_field_obj y)##toString)
-     in
-     Js.raise_js_error (new%js Js.error_constr (Js.string s))) ; *)
   method_ "assertBoolean" (fun this : unit ->
       Impl.assert_ (Constraint.boolean this##.value) ) ;
   method_ "isZero" (fun this : bool_class Js.t ->
@@ -1095,18 +1084,39 @@ type sponge =
 
 let poseidon =
   object%js
-    method hash (xs : field_class Js.t Js.js_array Js.t) : field_class Js.t =
+    (* this could be removed eventually since it's easily implemented using `update` *)
+    method hash (xs : field_class Js.t Js.js_array Js.t)
+        (is_checked : bool Js.t) : field_class Js.t =
       let input = Array.map (Js.to_array xs) ~f:of_js_field in
       let digest =
-        try Random_oracle.Checked.hash input
-        with _ ->
+        if Js.to_bool is_checked then Random_oracle.Checked.hash input
+        else
           Random_oracle.hash (Array.map ~f:to_unchecked input) |> Field.constant
       in
       to_js_field digest
 
+    method update (state : field_class Js.t Js.js_array Js.t)
+        (xs : field_class Js.t Js.js_array Js.t) (is_checked : bool Js.t)
+        : field_class Js.t Js.js_array Js.t =
+      let state : Field.t Random_oracle.State.t =
+        Array.map (Js.to_array state) ~f:of_js_field |> Obj.magic
+      in
+      let input = Array.map (Js.to_array xs) ~f:of_js_field in
+      let new_state : field_class Js.t array =
+        ( if Js.to_bool is_checked then Random_oracle.Checked.update ~state input
+        else
+          Random_oracle.update
+            ~state:(Random_oracle.State.map ~f:to_unchecked state)
+            (Array.map ~f:to_unchecked input)
+          |> Random_oracle.State.map ~f:Field.constant )
+        |> Random_oracle.State.map ~f:to_js_field
+        |> Obj.magic
+      in
+      new_state |> Js.array
+
     (* returns a "sponge" that stays opaque to JS *)
-    method spongeCreate () : sponge =
-      if Impl.in_checked_computation () then
+    method spongeCreate (is_checked : bool Js.t) =
+      if Js.to_bool is_checked then
         Checked
           (Poseidon_sponge_checked.create ?init:None sponge_params_checked)
       else Unchecked (Poseidon_sponge.create ?init:None sponge_params)
@@ -1124,6 +1134,16 @@ let poseidon =
           Poseidon_sponge_checked.squeeze s |> to_js_field
       | Unchecked s ->
           Poseidon_sponge.squeeze s |> Field.constant |> to_js_field
+
+    val prefixes =
+      let open Hash_prefixes in
+      object%js
+        val event = Js.string (zkapp_event :> string)
+
+        val events = Js.string (zkapp_events :> string)
+
+        val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+      end
   end
 
 class type verification_key_class =
@@ -1357,7 +1377,7 @@ module Circuit = struct
          let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
          let ctor2 : _ Js.Optdef.t = (Obj.magic t2)##.constructor in
          let has_methods ctor =
-           let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
+           let has s = Js.Optdef.test (Js.Unsafe.get ctor (Js.string s)) in
            has "toFields" && has "ofFields"
          in
          if not (js_equal ctor1 ctor2) then
@@ -1377,7 +1397,11 @@ module Circuit = struct
              array_iter2 ks1 ks2 ~f:(fun k1 k2 ->
                  if not (js_equal k1 k2) then
                    raise_error "if: Arguments had mismatched types" ) ;
-             let result = new%js ctor1 in
+             (* we use Object.create to avoid calling the constructor with the wrong number of arguments *)
+             let result =
+               Js.Unsafe.global ##. Object##create
+                 (Js.Unsafe.coerce ctor1)##.prototype
+             in
              array_iter ks1 ~f:(fun k ->
                  Js.Unsafe.set result k
                    (if_magic b (Js.Unsafe.get t1 k) (Js.Unsafe.get t2 k)) ) ;
@@ -1442,8 +1466,36 @@ module Circuit = struct
       Impl.constraint_system ~exposing:spec
         ~return_typ:Snark_params.Tick.Typ.unit (fun x -> main x)
     in
-    let kp = Impl.Keypair.generate cs in
+    let kp = Impl.Keypair.generate ~prev_challenges:0 cs in
     new%js keypair_constr kp
+
+  let constraint_system (main : unit -> unit) =
+    let cs =
+      Impl.constraint_system
+        ~exposing:Impl.Data_spec.[]
+        ~return_typ:Snark_params.Tick.Typ.unit main
+    in
+    let rows = List.length cs.rows_rev in
+    let digest =
+      Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
+    in
+    (* TODO: to_json doesn't return anything; call into kimchi instead *)
+    let json =
+      Js.Unsafe.(
+        fun_call
+          global ##. JSON##.parse
+          [| inject
+               ( Backend.R1CS_constraint_system.to_json cs
+               |> Yojson.Safe.to_string |> Js.string )
+          |])
+    in
+    object%js
+      val rows = rows
+
+      val digest = digest
+
+      val json = json
+    end
 
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
@@ -1491,6 +1543,7 @@ module Circuit = struct
     := Js.wrap_callback (fun () : bool Js.t ->
            Js.bool (Impl.in_checked_computation ()) ) ;
     Js.Unsafe.set circuit (Js.string "if") if_ ;
+    Js.Unsafe.set circuit (Js.string "_constraintSystem") constraint_system ;
     circuit##.getVerificationKey
     := fun (vk : Verification_key.t) -> new%js verification_key_constr vk
 end
@@ -2575,10 +2628,12 @@ module Ledger = struct
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let party = List.nth_exn tx.other_parties party_index in
-    Public_input.Constant.to_js
-      [| (party.elt.party_digest :> Impl.field)
-       ; (Parties.Digest.Forest.empty :> Impl.field)
-      |]
+    object%js
+      val party = to_js_field_unchecked (party.elt.party_digest :> Impl.field)
+
+      val calls =
+        to_js_field_unchecked (Parties.Digest.Forest.empty :> Impl.field)
+    end
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
     Signature_lib.Schnorr.Chunked.sign (private_key key)

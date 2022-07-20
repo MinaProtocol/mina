@@ -1,5 +1,6 @@
 open Core_kernel
 
+(* Same as the type of the field other_parties in Mina_base.Parties.t *)
 type t =
   ( Party.t
   , Parties.Digest.Party.t
