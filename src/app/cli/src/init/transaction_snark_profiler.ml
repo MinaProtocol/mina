@@ -181,8 +181,13 @@ let format_time_span ts =
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
-let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
-    (transitions : Transaction.Valid.t list) _ : string Async.Deferred.t =
+let profile_user_command sparse_ledger0 (transitions : Transaction.Valid.t list)
+    _ : string Async.Deferred.t =
+  let module T = Transaction_snark.Make (struct
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+    let proof_level = Genesis_constants.Proof_level.Full
+  end) in
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let txn_state_view = Lazy.force curr_state_view in
   let open Async.Deferred.Let_syntax in
@@ -431,14 +436,7 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
 
 let main num_transactions repeats preeval use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
-      let module T = Transaction_snark.Make (struct
-        let constraint_constants =
-          Genesis_constants.Constraint_constants.compiled
-
-        let proof_level = Genesis_constants.Proof_level.Full
-      end) in
-      run
-        ~user_command_profiler:(profile_user_command (module T))
+      run ~user_command_profiler:profile_user_command
         ~zkapp_profiler:profile_zkapps num_transactions repeats preeval
         use_zkapps )
 
