@@ -269,9 +269,8 @@ module Numeric = struct
           Boolean.( &&& ) is_some (is_constant data) )
   end
 
-  let typ { equal = eq; zero; max_value; typ; _ } =
-    Or_ignore.typ_implicit (Closed_interval.typ typ)
-      ~equal:(Closed_interval.equal eq)
+  let typ { zero; max_value; typ; _ } =
+    Or_ignore.typ_explicit (Closed_interval.typ typ)
       ~ignore:{ Closed_interval.lower = zero; upper = max_value }
 
   let check ~label { compare; _ } (t : 'a t) (x : 'a) =
@@ -427,9 +426,6 @@ module Eq_data = struct
     | Check y ->
         if equal x y then Ok ()
         else Or_error.errorf "Equality check failed: %s" label
-
-  let typ_implicit { Tc.equal; default = ignore; typ; _ } =
-    typ_implicit ~equal ~ignore typ
 
   let typ_explicit { Tc.default = ignore; typ; _ } = typ_explicit ~ignore typ
 end
@@ -709,7 +705,7 @@ module Account = struct
       ; receipt_chain_hash
       ; public_key ()
       ; Zkapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
-      ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
+      ; Or_ignore.typ_explicit Field.typ
           ~ignore:(Lazy.force Zkapp_account.Sequence_events.empty_hash)
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
       ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
