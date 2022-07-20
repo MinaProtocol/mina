@@ -261,12 +261,6 @@ module Or_ignore = struct
   module Checked : sig
     type 'a t
 
-    val typ_implicit :
-         equal:('a -> 'a -> bool)
-      -> ignore:'a
-      -> ('a_var, 'a) Typ.t
-      -> ('a_var t, 'a Stable.Latest.t) Typ.t
-
     val typ_explicit :
       ignore:'a -> ('a_var, 'a) Typ.t -> ('a_var t, 'a Stable.Latest.t) Typ.t
 
@@ -312,15 +306,6 @@ module Or_ignore = struct
       | Explicit t ->
           f_explicit t
 
-    let typ_implicit (type a a_var) ~equal ~(ignore : a) (t : (a_var, a) Typ.t)
-        : (a_var t, a Stable.Latest.t) Typ.t =
-      Typ.transport t
-        ~there:(function Check x -> x | Ignore -> ignore)
-        ~back:(fun x -> if equal x ignore then Ignore else Check x)
-      |> Typ.transport_var
-           ~there:(function Implicit x -> x | Explicit _ -> assert false)
-           ~back:(fun x -> Implicit x)
-
     let typ_explicit (type a_var a) ~ignore (t : (a_var, a) Typ.t) =
       Typ.transport_var
         (Flagged_option.option_typ ~default:ignore t)
@@ -333,8 +318,6 @@ module Or_ignore = struct
     let make_unsafe_explicit is_ignore data =
       Explicit { is_some = is_ignore; data }
   end
-
-  let typ_implicit = Checked.typ_implicit
 
   let typ_explicit = Checked.typ_explicit
 
