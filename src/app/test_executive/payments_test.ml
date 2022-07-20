@@ -8,6 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -49,6 +51,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ]
+    ; num_archive_nodes = 1
     ; num_snark_workers = 4
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -399,15 +402,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Malleable_error.soft_error_format ~value:()
                  "Payment failed for unexpected reason: %s" err_str ) )
     in
-    section
-      "send out a bunch more txns to fill up the snark ledger, then wait for \
-       proofs to be emitted"
-      (let receiver = untimed_node_a in
-       let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-       let sender = untimed_node_b in
-       let%bind sender_pub_key = Util.pub_key_of_node sender in
-       let%bind () =
-         (*
+    let%bind () =
+      section
+        "send out a bunch more txns to fill up the snark ledger, then wait for \
+         proofs to be emitted"
+        (let receiver = untimed_node_a in
+         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let sender = untimed_node_b in
+         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let%bind () =
+           (*
             To fill up a `small` transaction capacity with work delay of 1, 
             there needs to be 12 total txns sent.
 
@@ -421,12 +425,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
 
             2 successful txn are sent in the prior course of this test,
-            so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
-         repeat_seq ~n:10 ~f:(fun () ->
-             Network.Node.must_send_payment ~logger sender ~sender_pub_key
-               ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-             >>| ignore )
+            so spamming out at least 10 more here will trigger a ledger proof to be emitted.
+            might be a good idea to send out more than that in case some fail for no reason *)
+           repeat_seq ~n:13 ~f:(fun () ->
+               Network.Node.must_send_payment ~logger sender ~sender_pub_key
+                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+               >>| ignore )
+         in
+         wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+    in
+    section_hard "running replayer"
+      (let%bind logs =
+         Network.Node.run_replayer ~logger
+           (List.hd_exn @@ Network.archive_nodes network)
        in
-       wait_for t
-         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+       check_replayer_logs ~logger logs )
 end

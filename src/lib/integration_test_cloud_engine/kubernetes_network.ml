@@ -857,8 +857,8 @@ let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 40 (* 10 mins *) in
-  let all_pods =
-    all_nodes network
+  let all_pods_set =
+    all_pods network
     |> List.map ~f:(fun { pod_id; _ } -> pod_id)
     |> String.Set.of_list
   in
@@ -879,20 +879,29 @@ let initialize_infra ~logger network =
            let parts = String.split line ~on:':' in
            assert (List.length parts = 2) ;
            (List.nth_exn parts 0, List.nth_exn parts 1) )
-    |> List.filter ~f:(fun (pod_name, _) -> String.Set.mem all_pods pod_name)
+    |> List.filter ~f:(fun (pod_name, _) ->
+           String.Set.mem all_pods_set pod_name )
+    (* this filters out the archive bootstrap pods, since they aren't in all_pods_set.  in fact the bootstrap pods aren't tracked at all in the framework *)
     |> String.Map.of_alist_exn
   in
   let rec poll n =
     [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
-    let is_successful_pod_status = String.equal "Running" in
+    let is_successful_pod_status status = String.equal "Running" status in
     match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
     | Ok str ->
         let pod_statuses = parse_pod_statuses str in
+        [%log info] "pod_statuses: \n %s"
+          ( String.Map.to_alist pod_statuses
+          |> List.map ~f:(fun (key, data) -> key ^ ": " ^ data ^ "\n")
+          |> String.concat ) ;
+        [%log info] "all_pods: \n %s"
+          (String.Set.elements all_pods_set |> String.concat ~sep:", ") ;
         let all_pods_are_present =
-          List.for_all (String.Set.elements all_pods) ~f:(fun pod_id ->
+          List.for_all (String.Set.elements all_pods_set) ~f:(fun pod_id ->
               String.Map.mem pod_statuses pod_id )
         in
         let any_pods_are_not_running =
+          (* there could be duplicate keys... *)
           List.exists
             (String.Map.data pod_statuses)
             ~f:(Fn.compose not is_successful_pod_status)
@@ -903,7 +912,7 @@ let initialize_infra ~logger network =
             "Not all pods were found when querying namespace; this indicates a \
              deployment error. Refusing to continue. Expected pods: [%s].  \
              Present pods: [%s]"
-            (String.Set.elements all_pods |> String.concat ~sep:"; ")
+            (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
             (present_pods |> String.concat ~sep:"; ") ;
           Malleable_error.hard_error_string ~exit_code:5
             "Some pods were not found in namespace." )
