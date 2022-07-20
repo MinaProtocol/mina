@@ -52,12 +52,13 @@ module Hex64 = struct
 
   include T
 
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = T.t [@@deriving compare, sexp, yojson, hash, equal]
+      type t = (T.t[@version_asserted])
+      [@@deriving compare, sexp, yojson, hash, equal]
 
       let to_latest = Fn.id
     end

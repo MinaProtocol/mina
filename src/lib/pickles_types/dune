@@ -23,4 +23,5 @@
    ;; local libraries
    snarky.backendless
    tuple_lib
+   ppx_version.runtime
 ))

@@ -38,7 +38,8 @@
    genesis_constants
    o1trace
    with_hash
-   )
+   ppx_version.runtime
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_base ppx_coda ppx_version ppx_let ppx_sexp_conv ppx_bin_prot ppx_custom_printf

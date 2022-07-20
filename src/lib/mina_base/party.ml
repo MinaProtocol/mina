@@ -221,10 +221,7 @@ module Update = struct
             F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
-            ( Pickles.Side_loaded.Verification_key.Stable.V2.t
-            , F.Stable.V1.t )
-            With_hash.Stable.V1.t
-            Set_or_keep.Stable.V1.t
+            Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         ; zkapp_uri : string Set_or_keep.Stable.V1.t
         ; token_symbol :
@@ -606,7 +603,7 @@ module Account_precondition = struct
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
-          sequenceState: null, provedState: null
+          sequenceState: null, provedState: null, isNew: null
         }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
@@ -954,14 +951,6 @@ module Body = struct
     ; call_depth
     }
 
-  (* * Balance change for the fee payer is always going to be Neg, so represent it using
-       an unsigned fee,
-     * token id is always going to be the default, so use unit value as a
-       placeholder,
-     * increment nonce must always be true for a fee payer, so use unit as a
-       placeholder.
-     TODO: what about use_full_commitment? it's unit here and bool there
-  *)
   module Fee_payer = struct
     [%%versioned
     module Stable = struct

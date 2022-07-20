@@ -39,6 +39,7 @@
    transaction_snark_tests
    with_hash
    zkapps_initialize_state
+   zkapps_examples
    )
   (inline_tests)
   (preprocess

@@ -139,10 +139,10 @@ end
 
 (* assert versionedness *)
 module M8 = struct
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Int.t List.t
+      type t = ((Int.t[@version_asserted]) List.t[@version_asserted])
 
       let to_latest = Fn.id
     end

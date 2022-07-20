@@ -145,7 +145,7 @@ module Make (F : Input_intf) :
 
   module Stable = struct
     module V1 = struct
-      type t = F.t [@@deriving version { asserted }]
+      type t = (F.t[@version_asserted]) [@@deriving version]
 
       include
         Binable.Of_binable

@@ -71,6 +71,7 @@
    sparse_ledger_lib
    trust_system
    mina_base.import
+   ppx_version.runtime
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess
