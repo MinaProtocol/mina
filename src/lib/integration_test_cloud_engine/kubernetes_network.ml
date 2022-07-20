@@ -856,7 +856,7 @@ let all_pod_ids t = Map.keys t.nodes_by_pod_id
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
-  let max_polls = 60 (* 15 mins *) in
+  let max_polls = 40 (* 10 mins *) in
   let all_pods =
     all_nodes network
     |> List.map ~f:(fun { pod_id; _ } -> pod_id)
@@ -885,18 +885,6 @@ let initialize_infra ~logger network =
   let rec poll n =
     [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
     let is_successful_pod_status = String.equal "Running" in
-    let poll_again () =
-      if n < max_polls then
-        let%bind () =
-          after poll_interval |> Deferred.bind ~f:Malleable_error.return
-        in
-        poll (n + 1)
-      else (
-        [%log fatal] "Not all pods were assigned to nodes and ready in time." ;
-        Malleable_error.hard_error_string ~exit_code:4
-          "Some pods either were not assigned to nodes or did not deploy \
-           properly." )
-    in
     match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
     | Ok str ->
         let pod_statuses = parse_pod_statuses str in
@@ -910,32 +898,55 @@ let initialize_infra ~logger network =
             ~f:(Fn.compose not is_successful_pod_status)
         in
         if not all_pods_are_present then (
+          let present_pods = String.Map.keys pod_statuses in
           [%log fatal]
             "Not all pods were found when querying namespace; this indicates a \
-             deployment error. Refusing to continue. Expected pods: [%s]"
-            (String.Set.elements all_pods |> String.concat ~sep:"; ") ;
+             deployment error. Refusing to continue. Expected pods: [%s].  \
+             Present pods: [%s]"
+            (String.Set.elements all_pods |> String.concat ~sep:"; ")
+            (present_pods |> String.concat ~sep:"; ") ;
           Malleable_error.hard_error_string ~exit_code:5
             "Some pods were not found in namespace." )
-        else if any_pods_are_not_running then (
+        else if any_pods_are_not_running then
           let failed_pod_statuses =
             List.filter (String.Map.to_alist pod_statuses)
               ~f:(fun (_, status) -> not (is_successful_pod_status status))
           in
-          [%log debug] "Got bad pod statuses, polling again ($failed_statuses"
-            ~metadata:
-              [ ( "failed_statuses"
-                , `Assoc
-                    (List.Assoc.map failed_pod_statuses ~f:(fun v -> `String v))
-                )
-              ] ;
-          poll_again () )
+          if n > 0 then (
+            [%log debug] "Got bad pod statuses, polling again ($failed_statuses"
+              ~metadata:
+                [ ( "failed_statuses"
+                  , `Assoc
+                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
+                           `String v ) ) )
+                ] ;
+            let%bind () =
+              after poll_interval |> Deferred.bind ~f:Malleable_error.return
+            in
+            poll (n - 1) )
+          else (
+            [%log fatal]
+              "Got bad pod statuses, not all pods were assigned to nodes and \
+               ready in time.  pod statuses: ($failed_statuses"
+              ~metadata:
+                [ ( "failed_statuses"
+                  , `Assoc
+                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
+                           `String v ) ) )
+                ] ;
+            Malleable_error.hard_error_string ~exit_code:4
+              "Some pods either were not assigned to nodes or did not deploy \
+               properly." )
         else return ()
     | Error _ ->
         [%log debug] "`kubectl get pods` timed out, polling again" ;
-        poll_again ()
+        let%bind () =
+          after poll_interval |> Deferred.bind ~f:Malleable_error.return
+        in
+        poll n
   in
   [%log info] "Waiting for pods to be assigned nodes and become ready" ;
-  let res = poll 0 in
+  let res = poll max_polls in
   match%bind.Deferred res with
   | Error _ ->
       [%log error] "Not all pods were assigned nodes, cannot proceed!" ;
