@@ -681,12 +681,6 @@ dependencies = [
  "ark-poly",
  "mina-curves",
  "o1-utils",
-<<<<<<< HEAD:src/lib/crypto/Cargo.lock
- "ocaml",
- "ocaml-gen",
- "once_cell",
-=======
->>>>>>> develop:src/lib/crypto/kimchi_bindings/wasm/Cargo.lock
  "rand",
  "rayon",
  "serde",
