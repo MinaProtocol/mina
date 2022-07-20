@@ -181,13 +181,8 @@ let format_time_span ts =
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
-let profile_user_command sparse_ledger0 (transitions : Transaction.Valid.t list)
-    _ : string Async.Deferred.t =
-  let module T = Transaction_snark.Make (struct
-    let constraint_constants = Genesis_constants.Constraint_constants.compiled
-
-    let proof_level = Genesis_constants.Proof_level.Full
-  end) in
+let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
+    (transitions : Transaction.Valid.t list) _ : string Async.Deferred.t =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let txn_state_view = Lazy.force curr_state_view in
   let open Async.Deferred.Let_syntax in
@@ -391,6 +386,7 @@ let generate_base_snarks_witness sparse_ledger0
 let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
     use_zkapps : unit =
   let logger = Logger.null () in
+  let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions = create_ledger_and_zkapps num_transactions in
     Parallel.init_master () ;
@@ -407,7 +403,7 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
           Async.Thread_safe.block_on_async_exn (fun () ->
               zkapp_profiler ~verifier ledger transactions )
         in
-        printf !"[%i] %s\n%!" n message ;
+        print n message ;
         go (n - 1)
     in
     go repeats )
@@ -429,14 +425,21 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
           Async.Thread_safe.block_on_async_exn (fun () ->
               user_command_profiler sparse_ledger transactions preeval )
         in
-        printf !"[%i] %s\n%!" n message ;
+        print n message ;
         go (n - 1)
     in
     go repeats
 
 let main num_transactions repeats preeval use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
-      run ~user_command_profiler:profile_user_command
+      let module T = Transaction_snark.Make (struct
+        let constraint_constants =
+          Genesis_constants.Constraint_constants.compiled
+
+        let proof_level = Genesis_constants.Proof_level.Full
+      end) in
+      run
+        ~user_command_profiler:(profile_user_command (module T))
         ~zkapp_profiler:profile_zkapps num_transactions repeats preeval
         use_zkapps )
 
