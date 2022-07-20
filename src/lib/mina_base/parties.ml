@@ -483,14 +483,17 @@ module Call_forest = struct
     | x :: _ ->
         With_stack_hash.stack_hash x
 
+  let cons_tree tree (forest : _ t) : _ t =
+    { elt = tree
+    ; stack_hash = Digest.Forest.cons (Digest.Tree.create tree) (hash forest)
+    }
+    :: forest
+
   let cons_aux (type p) ~(digest_party : p -> _) ?(calls = []) (party : p)
       (xs : _ t) : _ t =
     let party_digest = digest_party party in
     let tree : _ Tree.t = { party; party_digest; calls } in
-    { elt = tree
-    ; stack_hash = Digest.Forest.cons (Digest.Tree.create tree) (hash xs)
-    }
-    :: xs
+    cons_tree tree xs
 
   let cons ?calls (party : Party.t) xs =
     cons_aux ~digest_party:Digest.Party.create ?calls party xs
