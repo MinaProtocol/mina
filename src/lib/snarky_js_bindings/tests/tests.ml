@@ -8,7 +8,7 @@ let keygen_prove_verify (main : ?w:'a -> 'b -> unit -> unit) spec ?priv pub =
     Impl.constraint_system ~exposing:spec
       ~return_typ:(Snarky_backendless.Typ.unit ())
       (main ?w:None)
-    |> Impl.Keypair.generate
+    |> Impl.Keypair.generate ~prev_challenges:0
   in
   let pk = Impl.Keypair.pk kp in
   let proof =
