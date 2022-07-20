@@ -2,7 +2,7 @@
  *  In this context, "full" refers to the fact that this frontier contains
  *  "fully expanded blockchain states" (i.e. [Breadcrumb]s). By comparison,
  *  the persistent frontier only contains "light blockchain states" (i.e.
- *  [External_transition]s). This module is only concerned with the core
+ *  [Mina_block]s). This module is only concerned with the core
  *  data structure of the frontier, and is further wrapped with logic to
  *  integrate the core data structure with the various other concerns of
  *  the transition frontier (e.g. extensions, persistence, etc...) in the
@@ -28,7 +28,7 @@ end
 val create :
      logger:Logger.t
   -> root_data:Root_data.t
-  -> root_ledger:Ledger.Any_ledger.witness
+  -> root_ledger:Mina_ledger.Ledger.Any_ledger.witness
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
   -> precomputed_values:Precomputed_values.t
@@ -50,7 +50,7 @@ val protocol_states_for_root_scan_state :
 val apply_diffs :
      t
   -> Diff.Full.E.t list
-  -> enable_epoch_ledger_sync:[`Enabled of Ledger.Db.t | `Disabled]
+  -> enable_epoch_ledger_sync:[ `Enabled of Mina_ledger.Ledger.Db.t | `Disabled ]
   -> has_long_catchup_job:bool
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
@@ -60,4 +60,27 @@ module For_tests : sig
 
   val find_protocol_state_exn :
     t -> State_hash.t -> Mina_state.Protocol_state.value
+
+  val gen_breadcrumb :
+       verifier:Verifier.t
+    -> ?send_to_random_pk:bool
+    -> unit
+    -> (   Frontier_base.Breadcrumb.t
+        -> Frontier_base.Breadcrumb.t Async_kernel.Deferred.t )
+       Base_quickcheck.Generator.t
+
+  val gen_breadcrumb_seq :
+       verifier:Verifier.t
+    -> int
+    -> (   Frontier_base.Breadcrumb.t
+        -> Frontier_base.Breadcrumb.t list Async_kernel.Deferred.t )
+       Base_quickcheck.Generator.t
+
+  val create_frontier : unit -> t
+
+  val clean_up_persistent_root : frontier:t -> unit
+
+  val verifier : unit -> Verifier.t
+
+  val max_length : int
 end

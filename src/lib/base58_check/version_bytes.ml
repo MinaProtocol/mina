@@ -50,7 +50,11 @@ let coinbase_stack_hash : t = '\x18'
 
 let pending_coinbase_hash_builder : t = '\x19'
 
-let snapp_command : t = '\x1A'
+let zkapp_command : t = '\x1A'
+
+let verification_key : t = '\x1B'
+
+let token_id_key : t = '\x1C'
 
 (** used for testing only *)
 

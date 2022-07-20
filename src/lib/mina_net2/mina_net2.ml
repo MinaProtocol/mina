@@ -2,7 +2,6 @@ open Core
 open Async
 open Async_unix
 open Network_peer
-module Bitswap_block = Bitswap_block
 module Keypair = Keypair
 module Libp2p_stream = Libp2p_stream
 module Multiaddr = Multiaddr

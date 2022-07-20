@@ -24,6 +24,8 @@
    mina_numbers
    genesis_constants
    logger
+   logger.file_system
+   ppx_version.runtime
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

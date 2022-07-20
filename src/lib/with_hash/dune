@@ -1,11 +1,17 @@
 (library
  (name with_hash)
  (public_name with_hash)
- (libraries bin_prot.shape sexplib0 base.caml core_kernel)
+ (libraries
+   ;; opam libraries
+   bin_prot.shape sexplib0 base.caml core_kernel
+   ;; local libraries
+   ppx_version.runtime
+ )
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
+   ppx_annot
    ppx_jane
    ppx_deriving_yojson
    ppx_deriving.std

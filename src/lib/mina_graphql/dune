@@ -21,6 +21,9 @@
    graphql_parser
    ;; local libraries
    network_pool
+   kimchi_backend.pasta
+   mina_base.util
+   mina_ledger
    pickles
    mina_incremental
    coda_genesis_ledger
@@ -49,6 +52,7 @@
    node_addrs_and_ports
    network_peer
    mina_base
+   mina_transaction
    mina_block
    user_command_input
    signature_lib
@@ -72,12 +76,14 @@
    coda_genesis_proof
    mina_version
    coda_runtime_config
+   mina_base.import
    pickles.backend
    pickles_types
    graphql
+   fields_derivers.graphql
    o1trace
+   verifier
    graphql_wrapper
-   either
- )
+   staged_ledger_diff)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))

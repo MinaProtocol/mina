@@ -29,6 +29,10 @@
    async_kernel
    bin_prot.shape
    ;; local libraries
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   kimchi_backend.pasta
    bitstring_lib
    snarky.intf
    pickles.backend
@@ -40,6 +44,7 @@
    pickles.precomputed
    pickles.limb_vector
    pickles_base
+   kimchi_backend
    mina_version
    base58_check
    codable
@@ -53,18 +58,7 @@
    key_cache
    snark_keys_header
    tuple_lib
-   zexe_backend
-   zexe_backend_common
-   marlin_plonk_bindings
-   marlin_plonk_bindings_pasta_vesta
-   marlin_plonk_bindings_pasta_pallas
-   pasta
-   run_in_thread
-   marlin_plonk_bindings_pasta_fq_urs
-   marlin_plonk_bindings_types
-   marlin_plonk_bindings_pasta_fp_urs
-   marlin_plonk_bindings_pasta_fp_index
-   marlin_plonk_bindings_pasta_fq_index
-   marlin_plonk_bindings_pasta_fp_verifier_index
-   marlin_plonk_bindings_pasta_fq_verifier_index
+   promise
+   kimchi_backend.common
+   ppx_version.runtime
 ))
