@@ -7,7 +7,6 @@
    async_kernel
    async_unix
    core_kernel
-   async
    ;; local libraries
    mina_base
    currency

@@ -55,7 +55,7 @@ let%test_module "Transaction union tests" =
     let of_user_command' (sok_digest : Sok_message.Digest.t) ledger
         (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
-      let module T = (val U.get_snark_module ()) in
+      let module T = (val Lazy.force U.snark_module) in
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
         Mina_state.Protocol_state.Body.consensus_state state_body
@@ -441,7 +441,7 @@ let%test_module "Transaction union tests" =
 
     let test_base_and_merge ~state_hash_and_body1 ~state_hash_and_body2
         ~carryforward1 ~carryforward2 =
-      let module T = (val U.get_snark_module ()) in
+      let module T = (val Lazy.force U.snark_module) in
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = U.Wallet.random_wallets () in
           (*let state_body = Lazy.force state_body in

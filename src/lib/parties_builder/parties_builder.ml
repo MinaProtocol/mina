@@ -98,7 +98,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) :
   let fee_payer_with_valid_signature =
     { parties.fee_payer with authorization = fee_payer_signature }
   in
-  let open Async.Deferred.Let_syntax in
+  let open Async_kernel.Deferred.Let_syntax in
   let%map other_parties_with_valid_signatures =
     Parties.Call_forest.deferred_mapi parties.other_parties
       ~f:(fun _ndx ({ body; authorization } : Party.t) tree ->

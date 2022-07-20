@@ -18,7 +18,7 @@ module Sparse_ledger : module type of Mina_ledger.Sparse_ledger
 
 val ledger_depth : Ledger.index
 
-val get_snark_module : unit -> (module Transaction_snark.S)
+val snark_module : (module Transaction_snark.S) lazy_t
 
 val genesis_state_body : Transaction_protocol_state.Block_data.t
 
