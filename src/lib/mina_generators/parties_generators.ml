@@ -694,7 +694,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
   (* a required balance is associated with a new account *)
-  ( match (required_balance, create_new_account) with
+  ( match (required_balance, new_account) with
   | Some _, false ->
       failwith "Required balance, but not new account"
   | _ ->
@@ -717,7 +717,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           }
   in
   let%bind account =
-    if create_new_account then (
+    if new_account then (
       if Option.is_some account_id then
         failwith
           "gen_party_body: new party is true, but an account id, presumably \
@@ -725,8 +725,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
       match available_public_keys with
       | None ->
           failwith
-            "gen_party_body: create_new_account is true, but \
-             available_public_keys not provided"
+            "gen_party_body: new_account is true, but available_public_keys \
+             not provided"
       | Some available_pks ->
           let available_pk =
             match
