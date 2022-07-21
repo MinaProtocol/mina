@@ -1219,11 +1219,11 @@ let initialize_infra ~logger network =
     match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
     | Ok str ->
         let pod_statuses = parse_pod_statuses str in
-        [%log info] "pod_statuses: \n %s"
+        [%log debug] "pod_statuses: \n %s"
           ( String.Map.to_alist pod_statuses
           |> List.map ~f:(fun (key, data) -> key ^ ": " ^ data ^ "\n")
           |> String.concat ) ;
-        [%log info] "all_pods: \n %s"
+        [%log debug] "all_pods: \n %s"
           (String.Set.elements all_pods_set |> String.concat ~sep:", ") ;
         let all_pods_are_present =
           List.for_all (String.Set.elements all_pods_set) ~f:(fun pod_id ->
@@ -1239,7 +1239,8 @@ let initialize_infra ~logger network =
           let present_pods = String.Map.keys pod_statuses in
           [%log fatal]
             "Not all pods were found when querying namespace; this indicates a \
-             deployment error. Refusing to continue. Expected pods: [%s].  \
+             deployment error. Refusing to continue. \n\
+             Expected pods: [%s].  \n\
              Present pods: [%s]"
             (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
             (present_pods |> String.concat ~sep:"; ") ;
