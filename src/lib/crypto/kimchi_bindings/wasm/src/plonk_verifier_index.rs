@@ -410,8 +410,6 @@ macro_rules! impl_verification_key {
                             res.set(zk_w3(domain)).unwrap();
                             res
                         },
-                        fr_sponge_params: $FrSpongeParams::params(),
-                        fq_sponge_params: $FqSpongeParams::params(),
                         endo: endo_q,
                         max_poly_size: max_poly_size as usize,
                         max_quot_size: max_quot_size as usize,
@@ -467,15 +465,11 @@ macro_rules! impl_verification_key {
             ) -> Result<DlogVerifierIndex<$G>, JsValue> {
                 let path = Path::new(&path);
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-                let fq_sponge_params = $FqSpongeParams::params();
-                let fr_sponge_params = $FrSpongeParams::params();
                 DlogVerifierIndex::<$G>::from_file(
                     Some(srs.0.clone()),
                     path,
                     offset.map(|x| x as u64),
                     endo_q,
-                    fq_sponge_params,
-                    fr_sponge_params,
                 ).map_err(|e| JsValue::from_str(format!("read_raw: {}", e).as_str()))
             }
 
