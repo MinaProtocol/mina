@@ -8,6 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -43,12 +45,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~cliff_amount:0 ~vesting_period:4
                 ~vesting_increment:5_000_000_000_000
           }
-          (* 30_000_000_000_000 mina is the total. initially, the balance will be 10k mina. after 8 global slots, the cliff is hit, although the cliff amount is 0. 4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
+          (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
         ]
     ; extra_genesis_accounts =
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ]
+    ; num_archive_nodes = 1
     ; num_snark_workers = 4
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -184,17 +187,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Network.Node.must_get_account_data ~logger untimed_node_b
              ~public_key:sender_pub_key
          in
-         (* let node_a_num_produced_blocks =
-              Map.find (network_state t).blocks_produced_by_node
-                (Network.Node.id untimed_node_a)
-              |> Option.value ~default:[] |> List.length
-            in
-            let node_b_num_produced_blocks =
-              Map.find (network_state t).blocks_produced_by_node
-                (Network.Node.id untimed_node_b)
-              |> Option.value ~default:[] |> List.length
-            in
-            let coinbase_reward = Currency.Amount.of_int 720_000_000_000 in *)
          (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
          let receiver_expected =
            Currency.Amount.add receiver_original_balance amount
@@ -399,22 +391,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Malleable_error.soft_error_format ~value:()
                  "Payment failed for unexpected reason: %s" err_str ) )
     in
-    section
-      "send out a bunch more txns to fill up the snark ledger, then wait for \
-       proofs to be emitted"
-      (let receiver = untimed_node_a in
-       let%bind receiver_pub_key = Util.pub_key_of_node receiver in
-       let sender = untimed_node_b in
-       let%bind sender_pub_key = Util.pub_key_of_node sender in
-       let%bind () =
-         (*
-            To fill up a `small` transaction capacity with work delay of 1, 
+    let%bind () =
+      section_hard
+        "send out a bunch more txns to fill up the snark ledger, then wait for \
+         proofs to be emitted"
+        (let receiver = untimed_node_a in
+         let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+         let sender = untimed_node_b in
+         let%bind sender_pub_key = Util.pub_key_of_node sender in
+         let%bind () =
+           (*
+            To fill up a `small` transaction capacity with work delay of 1,
             there needs to be 12 total txns sent.
 
             Calculation is as follows:
             Max number trees in the scan state is
               `(transaction_capacity_log+1) * (work_delay+1)`
-            and for 2^2 transaction capacity and work delay 1 it is 
+            and for 2^2 transaction capacity and work delay 1 it is
               `(2+1)*(1+1)=6`.
             Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
             In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
@@ -422,11 +415,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
             2 successful txn are sent in the prior course of this test,
             so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
-         repeat_seq ~n:10 ~f:(fun () ->
-             Network.Node.must_send_payment ~logger sender ~sender_pub_key
-               ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-             >>| ignore )
+           repeat_seq ~n:10 ~f:(fun () ->
+               Network.Node.must_send_payment ~logger sender ~sender_pub_key
+                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+               >>| ignore )
+         in
+         wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+    in
+    section_hard "running replayer"
+      (let%bind logs =
+         Network.Node.run_replayer ~logger
+           (List.hd_exn @@ Network.archive_nodes network)
        in
-       wait_for t
-         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+       check_replayer_logs ~logger logs )
 end
