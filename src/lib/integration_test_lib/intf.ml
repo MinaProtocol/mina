@@ -324,6 +324,7 @@ module Dsl = struct
       | Nodes_to_synchronize
       | Signed_command_to_be_included_in_frontier
       | Ledger_proofs_emitted_since_genesis
+      | Block_height_growth
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -338,6 +339,8 @@ module Dsl = struct
     val nodes_to_initialize : Engine.Network.Node.t list -> t
 
     val blocks_to_be_produced : int -> t
+
+    val block_height_growth : height_growth:int -> t
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 

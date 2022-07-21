@@ -36,6 +36,7 @@ struct
     | Nodes_to_synchronize
     | Signed_command_to_be_included_in_frontier
     | Ledger_proofs_emitted_since_genesis
+    | Block_height_growth
 
   type t =
     { id : wait_condition_id
@@ -95,6 +96,26 @@ struct
     in
     { id = Blocks_to_be_produced
     ; description = Printf.sprintf "%d blocks to be produced" n
+    ; predicate = Network_state_predicate (init, check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let block_height_growth ~height_growth =
+    (* block height is an objective measurement for the whole chain.  block height growth checks that the block height increased by the desired_height since the wait condition was called *)
+    let init state = Predicate_continuation state.block_height in
+    let check initial_height (state : Network_state.t) =
+      if state.block_height - initial_height >= height_growth then
+        Predicate_passed
+      else Predicate_continuation initial_height
+    in
+    let description =
+      Printf.sprintf "chain block height greater than equal to [%d] "
+        height_growth
+    in
+    let soft_timeout_in_slots = (2 * height_growth) + 1 in
+    { id = Block_height_growth
+    ; description
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
