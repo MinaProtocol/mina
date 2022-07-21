@@ -172,6 +172,7 @@ module VerifierIndex = struct
     ; max_poly_size : int
     ; max_quot_size : int
     ; public : int
+    ; prev_challenges : int
     ; srs : 'srs
     ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array

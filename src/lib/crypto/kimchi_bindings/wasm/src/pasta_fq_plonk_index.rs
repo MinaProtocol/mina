@@ -29,6 +29,7 @@ pub struct WasmPastaFqPlonkIndex(#[wasm_bindgen(skip)] pub Box<DlogIndex<GAffine
 pub fn caml_pasta_fq_plonk_index_create(
     gates: &WasmGateVector,
     public_: i32,
+    prev_challenges: i32,
     srs: &WasmSrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsValue> {
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
@@ -52,6 +53,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     // create constraint system
     let cs = match ConstraintSystem::<Fq>::create(gates)
         .public(public_ as usize)
+        .prev_challenges(prev_challenges as usize)
         .build()
     {
         Err(_) => {

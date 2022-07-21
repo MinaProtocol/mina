@@ -30,6 +30,7 @@ impl From<VerifierIndex<GAffine>> for CamlPastaFqPlonkVerifierIndex {
             max_poly_size: vi.max_poly_size as isize,
             max_quot_size: vi.max_quot_size as isize,
             public: vi.public as isize,
+            prev_challenges: vi.prev_challenges as isize,
             srs: CamlFqSrs(vi.srs.get().expect("have an srs").clone()),
             evals: CamlPlonkVerificationEvals {
                 sigma_comm: vi.sigma_comm.to_vec().iter().map(Into::into).collect(),
@@ -90,6 +91,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<GAffine> {
             max_poly_size: index.max_poly_size as usize,
             max_quot_size: index.max_quot_size as usize,
             public: index.public as usize,
+            prev_challenges: index.prev_challenges as usize,
             powers_of_alpha,
             srs: {
                 let res = once_cell::sync::OnceCell::new();
@@ -221,6 +223,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
         max_poly_size: 0,
         max_quot_size: 0,
         public: 0,
+        prev_challenges: 0,
         srs: CamlFqSrs::new(SRS::create(0)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm: vec_comm(PERMUTS),
