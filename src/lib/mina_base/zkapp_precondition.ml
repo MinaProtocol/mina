@@ -240,12 +240,16 @@ module Numeric = struct
   let gen gen_a compare_a = Or_ignore.gen (Closed_interval.gen gen_a compare_a)
 
   let to_input { zero; max_value; to_input; _ } (t : 'a t) =
-    Closed_interval.to_input ~f:to_input
+    Flagged_option.to_input'
+      ~f:(Closed_interval.to_input ~f:to_input)
+      ~field_of_bool
       ( match t with
-      | Check x ->
-          x
       | Ignore ->
-          { lower = zero; upper = max_value } )
+          { is_some = false
+          ; data = { Closed_interval.lower = zero; upper = max_value }
+          }
+      | Check x ->
+          { is_some = true; data = x } )
 
   module Checked = struct
     type 'a t = 'a Closed_interval.t Or_ignore.Checked.t
@@ -622,7 +626,7 @@ module Account = struct
       ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
           (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
-      ; Eq_data.(to_input ~explicit:false (Lazy.force Tc.sequence_state))
+      ; Eq_data.(to_input_explicit (Lazy.force Tc.sequence_state))
           sequence_state
       ; Eq_data.(to_input_explicit Tc.boolean) proved_state
       ]
