@@ -45,4 +45,4 @@ let deriver inner obj =
   let open Fields_derivers_zkapps in
   let ( !. ) = ( !. ) ~t_fields_annots:As_record.t_fields_annots in
   As_record.Fields.make_creator obj ~data:!.inner ~hash:!.field
-  |> finish "Events" ~t_toplevel_annots:As_record.t_toplevel_annots
+  |> finish "DataAsHash" ~t_toplevel_annots:As_record.t_toplevel_annots

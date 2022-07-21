@@ -524,30 +524,6 @@ let proof obj : _ Unified_input.t =
   iso_string obj ~name:"SnappProof" ~js_type:String
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
 
-let verification_key_with_hash obj =
-  let verification_key obj =
-    Pickles.Side_loaded.Verification_key.(
-      iso_string obj ~name:"VerificationKey" ~js_type:String
-        ~to_string:to_base58_check
-        ~of_string:(except ~f:of_base58_check_exn `Verification_key)
-        ~doc:"Verification key in Base58Check format")
-  in
-  let ( !. ) =
-    ( !. ) ~t_fields_annots:With_hash.Stable.Latest.t_fields_annots
-  in
-  With_hash.Stable.Latest.Fields.make_creator ~data:!.verification_key
-    ~hash:!.field obj
-  |> finish "VerificationKeyWithHash"
-       ~t_toplevel_annots:With_hash.Stable.Latest.t_toplevel_annots
-
-let%test_unit "verification key with hash, roundtrip json" =
-  let open Pickles.Side_loaded.Verification_key in
-  (* we do this because the dummy doesn't have a wrap_vk on it *)
-  let data = dummy |> to_base58_check |> of_base58_check_exn in
-  let v = { With_hash.data; hash = Field.one } in
-  let o = verification_key_with_hash @@ o () in
-  [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
-
 [%%endif]
 
 let%test_module "Test" =

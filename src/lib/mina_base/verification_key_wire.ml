@@ -46,3 +46,24 @@ module Stable = struct
         (M)
   end
 end]
+
+let deriver obj : _ Fields_derivers_zkapps.Unified_input.t =
+  let open Fields_derivers_zkapps in
+  let module Vk = Side_loaded_verification_key in
+  iso_string obj ~name:"VerificationKey" ~js_type:String
+    ~doc:"Verification key in Base58Check format"
+    ~to_string:(Fn.compose Vk.to_base58_check With_hash.data)
+    ~of_string:
+      (except
+         ~f:
+           (Fn.compose
+              (With_hash.of_data ~hash_data:digest_vk)
+              Vk.of_base58_check_exn )
+         `Verification_key )
+
+let%test_unit "json roundtrip" =
+  let open Fields_derivers_zkapps in
+  let open Side_loaded_verification_key in
+  let v = With_hash.of_data ~hash_data:digest_vk dummy in
+  let o = deriver @@ o () in
+  [%test_eq: (t, F.t) With_hash.t] v (of_json o (to_json o v))

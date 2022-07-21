@@ -860,78 +860,6 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "VerificationKeyWithHashInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "data",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "VerificationKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "data",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "VerificationKey",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "hash",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
           "name": "PermissionsInput",
           "description": null,
           "fields": [
@@ -1476,8 +1404,8 @@
               "description": null,
               "args": [],
               "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "VerificationKeyWithHashInput",
+                "kind": "SCALAR",
+                "name": "VerificationKey",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -1569,8 +1497,8 @@
               "name": "verificationKey",
               "description": null,
               "type": {
-                "kind": "INPUT_OBJECT",
-                "name": "VerificationKeyWithHashInput",
+                "kind": "SCALAR",
+                "name": "VerificationKey",
                 "ofType": null
               },
               "defaultValue": null
@@ -7600,49 +7528,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "OBJECT",
-          "name": "VerificationKeyWithHash",
-          "description": null,
-          "fields": [
-            {
-              "name": "data",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "VerificationKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "SCALAR",
           "name": "Field",
           "description": "String representing an Fp Field element",
@@ -7694,8 +7579,8 @@
               "description": null,
               "args": [],
               "type": {
-                "kind": "OBJECT",
-                "name": "VerificationKeyWithHash",
+                "kind": "SCALAR",
+                "name": "VerificationKey",
                 "ofType": null
               },
               "isDeprecated": false,

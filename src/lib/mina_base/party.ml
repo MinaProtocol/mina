@@ -447,19 +447,21 @@ module Update = struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
-    let string_with_hash =
+    let string_with_hash o =
       with_checked
         ~checked:(Data_as_hash.deriver string)
-        ~name:"StringWithHash" string
+        ~name:"StringWithHash" o
     in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
-         ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
+         ~verification_key:
+           !.(Set_or_keep.deriver
+                (string_with_hash Verification_key_wire.deriver) )
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
-         ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
-         ~token_symbol:!.(Set_or_keep.deriver string_with_hash)
+         ~zkapp_uri:!.(Set_or_keep.deriver (string_with_hash string))
+         ~token_symbol:!.(Set_or_keep.deriver (string_with_hash string))
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
