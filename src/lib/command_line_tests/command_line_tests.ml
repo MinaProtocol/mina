@@ -21,6 +21,28 @@ let%test_module "Command line tests" =
     *)
     let coda_exe = "../../app/cli/src/mina.exe"
 
+    let create_daemon_process config_dir genesis_ledger_dir port =
+      let%bind working_dir = Sys.getcwd () in
+      Core.printf "Starting daemon inside %s\n" working_dir ;
+      Process.create ~prog:coda_exe
+        ~args:
+          [ "daemon"
+          ; "-seed"
+          ; "-working-dir"
+          ; working_dir
+          ; "-client-port"
+          ; sprintf "%d" port
+          ; "-config-directory"
+          ; config_dir
+          ; "-genesis-ledger-dir"
+          ; genesis_ledger_dir
+          ; "-current-protocol-version"
+          ; "0.0.0"
+          ; "-external-ip"
+          ; "0.0.0.0"
+          ]
+        ()
+
     let start_daemon config_dir genesis_ledger_dir port =
       let%bind working_dir = Sys.getcwd () in
       Core.printf "Starting daemon inside %s\n" working_dir ;
@@ -77,8 +99,8 @@ let%test_module "Command line tests" =
       let test_failed = ref false in
       let port = 1337 in
       let client_delay = 40. in
-      let retry_delay = 15. in
-      let retry_attempts = 15 in
+      let retry_delay = 30. in
+      let retry_attempts = 30 in
       let config_dir, genesis_ledger_dir = create_config_directories () in
       Monitor.protect
         ~finally:(fun () ->
@@ -126,11 +148,82 @@ let%test_module "Command line tests" =
               test_failed := true ;
               Error.raise err )
 
+    let test_daemon_recover () =
+      let test_failed = ref false in
+      let port = 1337 in
+      let client_delay = 40. in
+      let retry_delay = 30. in
+      let retry_attempts = 5 in
+      let config_dir, genesis_ledger_dir = create_config_directories () in
+      Monitor.protect
+        ~finally:(fun () ->
+          ( if !test_failed then
+            let contents =
+              Core.In_channel.(
+                with_file (config_dir ^/ "mina.log") ~f:input_all)
+            in
+            Core.Printf.printf
+              !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
+              contents ) ;
+          remove_config_directory config_dir genesis_ledger_dir )
+        (fun () ->
+          match%map
+            let open Deferred.Or_error.Let_syntax in
+            let%bind p =
+              create_daemon_process config_dir genesis_ledger_dir port
+            in
+            let%bind () =
+              Deferred.map
+                (after @@ Time.Span.of_sec client_delay)
+                ~f:Or_error.return
+            in
+            let rec call_client retries_remaining =
+              let open Deferred.Let_syntax in
+              match%bind start_client port with
+              | Error _ when retries_remaining > 0 ->
+                  Core.Printf.printf
+                    "Daemon not responding.. retrying (%i/%i)\n"
+                    (retry_attempts - retries_remaining)
+                    retry_attempts ;
+                  let%bind () = after @@ Time.Span.of_sec retry_delay in
+                  call_client (retries_remaining - 1)
+              | ret ->
+                  return ret
+            in
+            let%bind _ = call_client retry_attempts in
+            Process.send_signal p Core.Signal.kill ;
+            let%bind (_ : Unix.Exit_or_signal.t) =
+              Deferred.map (Process.wait p) ~f:Or_error.return
+            in
+            let%bind _ = start_daemon config_dir genesis_ledger_dir port in
+            let%bind () =
+              Deferred.map
+                (after @@ Time.Span.of_sec client_delay)
+                ~f:Or_error.return
+            in
+            let%bind _ = call_client retry_attempts in
+            let%map _ = stop_daemon port in
+            ()
+          with
+          | Ok () ->
+              true
+          | Error err ->
+              test_failed := true ;
+              Error.raise err )
+
     let%test "The mina daemon works in background mode" =
       match Core.Sys.is_file coda_exe with
       | `Yes ->
           Async.Thread_safe.block_on_async_exn test_background_daemon
       | _ ->
           printf !"Please build mina.exe in order to run this test\n%!" ;
+          false
+
+    let%test "The mina daemon recovers from crashes" =
+      match Core.Sys.is_file coda_exe with
+      | `Yes ->
+          Async.Thread_safe.block_on_async_exn test_daemon_recover
+      | _ ->
+          printf !"please build mina.exe in order to run this test\n%!" ;
           false
   end )

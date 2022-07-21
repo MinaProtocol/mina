@@ -32,11 +32,13 @@
    random_oracle_input
    pickles
    snarky.backendless
-   crypto_params
+   kimchi_backend.common
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
+   ppx_annot
    ppx_coda
    ppx_version
    ppx_let
@@ -49,6 +51,7 @@
    ppx_custom_printf
    ppx_deriving.std
    ppx_deriving_yojson
+   ppx_fields_conv
    h_list.ppx
    ppx_inline_test))
  (instrumentation

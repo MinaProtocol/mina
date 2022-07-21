@@ -1,0 +1,8 @@
+(executable
+ (name ppx_annot_tests)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_annot)))
+
+(rule
+ (alias runtest)
+ (action (run ./ppx_annot_tests.exe)))

@@ -6,13 +6,13 @@
 /Makefile @MinaProtocol/infra-eng-reviewers
 /src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /src/config/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/CODE_OF_CONDUCT.md @imeckler @emberian
+/CODE_OF_CONDUCT.md @imeckler
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
 /LICENSE @imeckler
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
 
-/src/external/ @emberian @bkase @psteckler @imeckler @mrmr1993
+/src/external/ @bkase @psteckler @imeckler @mrmr1993
 
 /src/app/archive @MinaProtocol/product-eng-reviewers
 /src/app/cli/src/tests @MinaProtocol/protocol-eng-reviewers
@@ -35,12 +35,18 @@
 /src/lib/mina_numbers/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crs/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crypto_params/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/crypto @MinaProtocol/crypto-eng-reviewers
+/src/lib/crypto/kimchi_bindings/js @MinaProtocol/crypto-eng-reviewers @mitschabaude
 /src/lib/dummy_values/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/hash_prefixes/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/non_zero_curve_point/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/outside_hash_image/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/pickles_base/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/pickles_types/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/pickles/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/pokolog/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/precomputed_values/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/promise @MinaProtocol/protocol-eng-reviewers @MinaProtocol/product-eng-reviewers
 /src/lib/sha256_lib/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/signature_lib/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snark_keys/ @MinaProtocol/crypto-eng-reviewers
@@ -49,6 +55,7 @@
 /src/lib/snarky_curves/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_field_extensions/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_group_map/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/snarky_js_bindings @MinaProtocol/product-eng-reviewers @imeckler @mrmr1993
 /src/lib/snarky_log/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_pairing/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers

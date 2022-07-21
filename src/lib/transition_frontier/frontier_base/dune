@@ -18,6 +18,7 @@
    staged_ledger_diff
    block_time
    one_or_two
+   mina_base.import
    currency
    truth
    allocation_functor
@@ -27,8 +28,10 @@
    precomputed_values
    consensus
    network_peer
+   mina_ledger
    mina_block
    mina_base
+   mina_transaction_logic
    mina_state
    staged_ledger
    data_hash_lib
@@ -45,6 +48,7 @@
    transaction_snark
    non_empty_list
    coda_genesis_proof
-   )
+   ppx_version.runtime
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))

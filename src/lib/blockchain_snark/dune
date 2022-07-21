@@ -23,6 +23,7 @@
    snarky.backendless
    snark_params
    mina_base
+   mina_transaction_logic
    mina_state
    pickles_types
    pickles
@@ -30,9 +31,10 @@
    currency
    sgn
    random_oracle
+   kimchi_backend.pasta
    data_hash_lib
-   pasta
-   )
+   ppx_version.runtime
+ )
  (inline_tests)
  (preprocess
   (pps ppx_snarky ppx_coda ppx_version ppx_jane ppx_compare))
