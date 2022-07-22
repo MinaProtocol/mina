@@ -223,6 +223,7 @@ module Stable = struct
               ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
               ; max_quot_size
               ; public
+              ; prev_challenges = 2 (* Due to Wrap_hack *)
               ; srs
               ; evals =
                   (let g (x, y) =
