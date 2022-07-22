@@ -771,7 +771,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
               Ledger.get ledger location
             with
             | Some account ->
-                account
+                (* get the latest state of this account *)
+                Account_id.Table.find_exn account_state_tbl
+                  (Account.identifier account)
             | None ->
                 failwith "gen_party_body: fail to find zkapp account"
           else
@@ -1156,9 +1158,8 @@ let gen_parties_from ?failure
     gen_party_from ?failure ~permissions_auth:Control.Tag.Signature
       ~zkapp_account_ids ~account_ids_seen ~authorization ~new_account:false
       ~available_public_keys ~ledger
-      ~required_balance_change:
-        { magnitude = Currency.Amount.of_int 1; sgn = Neg }
-      ~account_state_tbl ?protocol_state_view ?vk ()
+      ~required_balance_change:Currency.Amount.Signed.zero ~account_state_tbl
+      ?protocol_state_view ?vk ()
   in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     let rec go acc n =
