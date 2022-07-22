@@ -36,7 +36,7 @@ let with_top_hash_logging f =
     top_hash_logging_enabled := old ;
     raise err
 
-module Proof_type = struct
+(* module Proof_type = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -46,7 +46,7 @@ module Proof_type = struct
       let to_latest = Fn.id
     end
   end]
-end
+end *)
 
 module Pending_coinbase_stack_state = struct
   module Init_stack = struct
@@ -1614,7 +1614,7 @@ module Base = struct
 
       let { auth_type; is_start = _ } = spec
 
-      module V = Prover_value
+      (* module V = Prover_value *)
       open Impl
 
       module Inputs = struct
@@ -3202,7 +3202,7 @@ module Base = struct
         handler r
 end
 
-module Transition_data = struct
+(* module Transition_data = struct
   type t =
     { proof : Proof_type.t
     ; supply_increase : (Amount.t, Sgn.t) Signed_poly.t
@@ -3211,7 +3211,7 @@ module Transition_data = struct
     ; pending_coinbase_stack_state : Pending_coinbase_stack_state.t
     }
   [@@deriving fields]
-end
+end *)
 
 module Merge = struct
   open Tick
@@ -4299,7 +4299,7 @@ module For_tests = struct
   end
 
   let create_trivial_snapp ~constraint_constants () =
-    let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ] =
+    let tag, _, (module _), Pickles.Provers.[ trivial_prover; _ ] =
       let trivial_rule : _ Pickles.Inductive_rule.t =
         let trivial_main (tx_commitment : Zkapp_statement.Checked.t) :
             unit Checked.t =

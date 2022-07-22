@@ -5,7 +5,7 @@
 open Core_kernel
 open Signature_lib
 module Amount = Currency.Amount
-module Fee = Currency.Fee
+(* module Fee = Currency.Fee *)
 
 module Poly = struct
   [%%versioned

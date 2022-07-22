@@ -103,7 +103,7 @@ module Worker_state = struct
     }
 
   let make_last_checked_slot_and_epoch_table old_table new_keys ~default =
-    let module Set = Public_key.Compressed.Set in
+    (* let module Set = Public_key.Compressed.Set in *)
     let module Table = Public_key.Compressed.Table in
     let last_checked_slot_and_epoch = Table.create () in
     List.iter new_keys ~f:(fun (_, pk) ->

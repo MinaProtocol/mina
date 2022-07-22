@@ -192,7 +192,7 @@ type var = (State_hash.var, Body.var) Poly.t
 
 [%%endif]
 
-module Proof = Proof
+(* module Proof = Proof *)
 module Hash = State_hash
 
 let create ~previous_state_hash ~body =

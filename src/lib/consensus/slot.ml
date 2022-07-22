@@ -42,7 +42,7 @@ let gen (constants : Constants.t) =
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
   let constants = Lazy.force Constants.for_unit_tests in
-  let module Length = Mina_numbers.Length in
+  (* let module Length = Mina_numbers.Length in *)
   let test x =
     Test_util.test_equal
       (Snarky_backendless.Typ.tuple2 Constants.typ typ)

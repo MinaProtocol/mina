@@ -23,11 +23,11 @@ module type Monad_with_Or_error_intf = sig
 
   include Monad.S with type 'a t := 'a t
 
-  module Or_error : sig
+  (* module Or_error : sig
     type nonrec 'a t = 'a Or_error.t t
 
     include Monad.S with type 'a t := 'a t
-  end
+  end *)
 end
 
 module Transaction_with_witness = struct
@@ -735,7 +735,7 @@ let all_work_pairs t
     list
     Or_error.t =
   let all_jobs = all_jobs t in
-  let module A = Available_job in
+  (* let module A = Available_job in *)
   let open Or_error.Let_syntax in
   let single_spec (job : job) =
     match extract_from_job job with

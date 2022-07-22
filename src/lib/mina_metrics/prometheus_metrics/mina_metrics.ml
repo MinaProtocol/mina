@@ -1588,7 +1588,7 @@ module Object_lifetime_statistics = struct
     Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
-module Execution_times = struct
+(* module Execution_times = struct
   let tracked_metrics = String.Table.create ()
 
   let create_metric thread =
@@ -1616,7 +1616,7 @@ module Execution_times = struct
           Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread) )
 
   let () = CollectorRegistry.(register_pre_collect default sync_metrics)
-end
+end *)
 
 let generic_server ?forward_uri ~port ~logger ~registry () =
   let open Cohttp in

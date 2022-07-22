@@ -83,7 +83,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+     module V1 = struct
       module T = struct
         type query = unit
 
@@ -157,7 +157,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+     module V2 = struct
       module T = struct
         type query = State_hash.Stable.V1.t
 
@@ -226,7 +226,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+     module V2 = struct
       module T = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving sexp]
@@ -292,7 +292,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+     module V2 = struct
       module T = struct
         type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
@@ -356,7 +356,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+     module V1 = struct
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving sexp]
 
@@ -421,7 +421,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+     module V1 = struct
       module T = struct
         type query = unit [@@deriving sexp]
 
@@ -491,7 +491,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+     module V2 = struct
       module T = struct
         type query =
           ( Consensus.Data.Consensus_state.Value.Stable.V1.t
@@ -563,7 +563,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+     module V1 = struct
       module T = struct
         type query = Core.Time.Stable.V1.t [@@deriving sexp]
 
@@ -630,7 +630,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+     module V2 = struct
       module T = struct
         type query = unit [@@deriving sexp]
 
@@ -702,7 +702,7 @@ module Rpcs = struct
           let to_latest = Fn.id
         end
 
-        module V1 = struct
+         module V1 = struct
           type t =
             { node_ip_addr : Core.Unix.Inet_addr.Stable.V1.t
                   [@to_yojson
@@ -791,7 +791,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+     module V2 = struct
       module T = struct
         type query = unit [@@deriving sexp]
 
@@ -816,9 +816,9 @@ module Rpcs = struct
 
       include T'
       include Register (T')
-    end
+    end 
 
-    module V1 = struct
+   module V1 = struct
       module T = struct
         type query = unit [@@deriving sexp]
 

@@ -146,7 +146,7 @@ module Worker_state = struct
              end : S )
          | Check ->
              ( module struct
-               module Transaction_snark = Transaction_snark
+                 (* module Transaction_snark = Transaction_snark *)
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
@@ -180,7 +180,7 @@ module Worker_state = struct
              end : S )
          | None ->
              ( module struct
-               module Transaction_snark = Transaction_snark
+                 (* module Transaction_snark = Transaction_snark *)
 
                let extend_blockchain _chain next_state _block _ledger_proof
                    _state_for_handler _pending_coinbase =
@@ -209,7 +209,7 @@ module Functions = struct
 
   let initialized =
     create bin_unit [%bin_type_class: [ `Initialized ]] (fun w () ->
-        let (module W) = Worker_state.get w in
+        let (module _) = Worker_state.get w in
         Deferred.return `Initialized )
 
   let extend_blockchain =
