@@ -1382,7 +1382,15 @@ let gen_parties_from ?failure
   *)
   let balance_change = Currency.Amount.Signed.negate balance_change_sum in
   let balancing_party =
-    { balancing_party with body = { balancing_party.body with balance_change } }
+    { balancing_party with
+      body =
+        { balancing_party.body with
+          balance_change
+        ; increment_nonce =
+            ( if Currency.Amount.Signed.is_negative balance_change then true
+            else balancing_party.body.increment_nonce )
+        }
+    }
   in
   Account_id.Table.update account_state_tbl
     (Account_id.create balancing_party.body.public_key Token_id.default)
