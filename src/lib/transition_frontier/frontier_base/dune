@@ -48,6 +48,7 @@
    transaction_snark
    non_empty_list
    coda_genesis_proof
-   )
+   ppx_version.runtime
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))

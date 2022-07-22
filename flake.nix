@@ -5,6 +5,7 @@
     allow-import-from-derivation = "true";
     extra-substituters = [ "https://storage.googleapis.com/mina-nix-cache" ];
     extra-trusted-public-keys = [
+      "nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4="
       "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
     ];
   };
@@ -59,18 +60,34 @@
           }
         ];
       };
-      pipeline = with flake-buildkite-pipeline.lib; {
-        steps = flakeSteps {
-          pushToBinaryCaches =
-            [ "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" ];
-          signWithKeys = [ "/var/secrets/nix-cache-key.sec" ];
-          commonExtraStepConfig = {
-            agents = [ "nix" ];
-            soft_fail = "true";
-            env.BUILDKITE_REPO = "";
+      pipeline = with flake-buildkite-pipeline.lib;
+        let
+          pushToRegistry = package: {
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              skopeo \
+              copy \
+              --insecure-policy \
+              --dest-registry-token $(gcloud auth application-default print-access-token) \
+              docker-archive:${self.packages.x86_64-linux.${package}} \
+              docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+            '';
+            label = "Upload mina-docker to Google Artifact Registry";
+            depends_on = [ "packages_x86_64-linux_${package}" ];
+            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+            branches = [ "compatible" "develop" ];
           };
-        } self;
-      };
+        in {
+          steps = flakeSteps {
+            reproduceRepo = "mina";
+            commonExtraStepConfig = {
+              agents = [ "nix" ];
+              plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+            };
+          } self ++ [
+            (pushToRegistry "mina-docker")
+            (pushToRegistry "mina-daemon-docker")
+          ];
+        };
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
@@ -78,10 +95,8 @@
             (import nixpkgs-mozilla)
             (import ./nix/overlay.nix)
             (final: prev: {
-              ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-                inherit inputs pkgs;
-                static = final.stdenv.hostPlatform.isStatic;
-              });
+              ocamlPackages_mina = requireSubmodules
+                (import ./nix/ocaml.nix { inherit inputs pkgs; });
             })
           ]);
         inherit (pkgs) lib;
@@ -106,7 +121,6 @@
         checks = import ./nix/checks.nix inputs pkgs;
 
         ocamlPackages = pkgs.ocamlPackages_mina;
-        ocamlPackages_static = pkgs.pkgsStatic.ocamlPackages_mina;
       in {
 
         # Jobs/Lint/Rust.dhall
@@ -217,7 +231,7 @@
           checkPhase = "npm test";
         };
 
-        inherit ocamlPackages ocamlPackages_static;
+        inherit ocamlPackages;
         packages.mina = ocamlPackages.mina;
         packages.mina_tests = ocamlPackages.mina_tests;
         packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
@@ -271,18 +285,24 @@
           '';
         });
 
-        # TODO: think about rust toolchain in the dev shell
-        packages.impure-shell =
-          (import ./nix/impure-shell.nix pkgs).inputDerivation;
+        devShells.operations =
+          pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
+
         devShells.impure = import ./nix/impure-shell.nix pkgs;
-        devShells.rust-wasm-impure = pkgs.mkShell {
-          name = "mina-rust-wasm-shell";
-          buildInputs = [
-            pkgs.kimchi-rust-wasm
-            pkgs.wasm-pack
-            pkgs.wasm-bindgen-cli
+
+        # A shell from which it's possible to build Mina with Rust bits being built incrementally using cargo.
+        # This is "impure" from the nix' perspective since running `cargo build` requires networking in general.
+        # However, this is a useful balance between purity and convenience for Rust development.
+        devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-rust-shell";
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.rustup
+            pkgs.libiconv # needed on macOS for one of the rust dep
           ];
-        };
+          MARLIN_PLONK_STUBS = "n";
+          PLONK_WASM_WEB = "n";
+          PLONK_WASM_NODEJS = "n";
+        });
 
         inherit checks;
       });

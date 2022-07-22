@@ -2,6 +2,7 @@
  (name dump_blocks)
  (public_name dump_blocks)
  (libraries
+   base
    core async async_kernel async_unix core_kernel sexplib0 yojson
    ppx_inline_test.runner.lib
    transition_frontier_base transition_frontier_full_frontier
@@ -9,5 +10,5 @@
    transition_frontier mina_state mina_block
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version ppx_let ppx_custom_printf))
  (modes native))

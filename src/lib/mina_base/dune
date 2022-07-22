@@ -11,7 +11,6 @@
    ppx_inline_test.config
    sexplib0
    yojson
-   ppx_version.runtime
    digestif
    sexp_diff_kernel
    core_kernel
@@ -67,6 +66,7 @@
    kimchi_backend
    hex
    snark_bits
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

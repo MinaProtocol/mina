@@ -84,7 +84,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
@@ -98,7 +97,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
@@ -108,7 +106,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Deferred.Or_error.t
 
@@ -117,7 +114,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 

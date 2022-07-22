@@ -483,7 +483,7 @@ type var =
   , Timing.var
   , Permissions.Checked.t
   , Field.Var.t * Zkapp_account.t option As_prover.Ref.t
-  (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
+  (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
   , string Data_as_hash.t )
   Poly.t
 

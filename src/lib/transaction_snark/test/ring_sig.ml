@@ -50,9 +50,9 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   { identifier = "ring-sig-rule"
   ; prevs = []
   ; main =
-      (fun { previous_public_inputs = []; public_input = x } ->
-        ring_sig_main x |> Run.run_checked ;
-        { previous_proofs_should_verify = []
+      (fun { public_input = x } ->
+        Run.run_checked @@ ring_sig_main x ;
+        { previous_proof_statements = []
         ; public_output = ()
         ; auxiliary_output = ()
         } )
@@ -179,12 +179,8 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let fee_payer : Party.Fee_payer.t =
             { Party.Fee_payer.body =
                 { public_key = sender_pk
-                ; update = Party.Update.noop
                 ; fee = Amount.to_fee fee
-                ; events = []
-                ; sequence_events = []
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
+                ; valid_until = None
                 ; nonce = sender_nonce
                 }
                 (* Real signature added in below *)
@@ -238,7 +234,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
             Parties.Call_forest.With_hashes.of_parties_simple_list
-              [ (sender_party_data, ()); (snapp_party_data, ()) ]
+              [ sender_party_data; snapp_party_data ]
           in
           let other_parties_hash = Parties.Call_forest.hash ps in
           let memo = Signed_command_memo.empty in
@@ -268,7 +264,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 respond Unhandled
           in
           let (), (), (pi : Pickles.Side_loaded.Proof.t) =
-            (fun () -> ringsig_prover ~handler [] tx_statement)
+            (fun () -> ringsig_prover ~handler tx_statement)
             |> Async.Thread_safe.block_on_async_exn
           in
           let fee_payer =
