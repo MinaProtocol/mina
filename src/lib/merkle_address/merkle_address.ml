@@ -260,7 +260,7 @@ module Range = struct
                   (current_node, (next_node, `Don't_stop)) ) )
 end
 
-(* module Make_test (Input : sig
+module Make_test (Input : sig
   val depth : int
 end) =
 struct
@@ -307,19 +307,19 @@ struct
             ()
         | Some addr' ->
             [%test_result: t option] ~expect:(Some address) (prev addr') )
-end*)
+end
 
 let%test_module "Address" =
   ( module struct
-    (* module Test4 = Make_test (struct
+     module _ = Make_test (struct
       let depth = 4
     end)
 
-    module Test16 = Make_test (struct
+    module _ = Make_test (struct
       let depth = 16
     end)
 
-    module Test30 = Make_test (struct
+    module _ = Make_test (struct
       let depth = 30
-    end) *)
+    end)
   end )
