@@ -12,7 +12,9 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 let ledger_depth = 20
 
-let parties_with_ledger ?account_state_tbl ?vk ?failure () =
+let parties_with_ledger
+    ?(constraint_constants = Genesis_constants.Constraint_constants.compiled)
+    ?account_state_tbl ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -50,12 +52,12 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_int min_cmd_fee
-      |> Int.( + ) 1_000_000_000_000_000
+      |> Int.( + ) 100_000_000_000_000_000
       |> Currency.Balance.of_int
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =
-      let max_bal = Currency.Balance.of_formatted_string "10000000.0" in
+      let max_bal = Currency.Balance.of_formatted_string "2000000000.0" in
       match
         Currency.Balance.add_amount min_balance
           (Currency.Balance.to_amount max_bal)
@@ -118,8 +120,9 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
     Option.value account_state_tbl ~default:(Account_id.Table.create ())
   in
   let%bind parties =
-    Parties_generators.gen_parties_from ~zkapp_account_keypairs
-      ~fee_payer_keypair ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
+    Parties_generators.gen_parties_from ~constraint_constants
+      ~zkapp_account_keypairs ~fee_payer_keypair ~keymap ~ledger
+      ~account_state_tbl ?vk ?failure ()
   in
   let parties =
     Option.value_exn
@@ -129,7 +132,9 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
 
-let sequence_parties_with_ledger ?length ?vk ?failure () =
+let sequence_parties_with_ledger
+    ?(constraint_constants = Genesis_constants.Constraint_constants.compiled)
+    ?length ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let%bind length =
     match length with
@@ -158,7 +163,8 @@ let sequence_parties_with_ledger ?length ?vk ?failure () =
     if n <= 0 then return (List.rev parties_and_fee_payer_keypairs, init_ledger)
     else
       let%bind parties, fee_payer_keypair, keymap, ledger =
-        parties_with_ledger ~account_state_tbl ?vk ?failure ()
+        parties_with_ledger ~constraint_constants ~account_state_tbl ?vk
+          ?failure ()
       in
       let parties_and_fee_payer_keypairs' =
         (parties, fee_payer_keypair, keymap) :: parties_and_fee_payer_keypairs

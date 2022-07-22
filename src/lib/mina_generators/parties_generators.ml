@@ -1017,10 +1017,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
       ?permissions_auth ?account_id ?protocol_state_view ?vk ~zkapp_account_ids
       ~account_ids_seen ~available_public_keys ?required_balance_change
       ?required_balance ~ledger ~account_state_tbl
-      ~gen_balance_change:
-        (gen_balance_change ?permissions_auth
-           ~new_account:
-             (new_account || (zkapp_account && Option.is_none account_id)) )
+      ~gen_balance_change:(gen_balance_change ?permissions_auth ~new_account)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
         gen_account_precondition_from_account ~first_use_of_account acct )
@@ -1086,7 +1083,9 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
 *)
 let max_other_parties = 2
 
-let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
+let gen_parties_from ?failure
+    ?(constraint_constants = Genesis_constants.Constraint_constants.compiled)
+    ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(zkapp_account_keypairs : Signature_lib.Keypair.t list)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
@@ -1156,14 +1155,14 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     let authorization = Control.Signature Signature.dummy in
     gen_party_from ?failure ~zkapp_account_ids ~account_ids_seen ~authorization
       ~new_account:false ~available_public_keys ~ledger
-      ~required_balance_change:Currency.Amount.Signed.zero ~account_state_tbl
-      ?protocol_state_view ?vk ()
+      ~required_balance_change:Currency.Amount.(Signed.zero)
+      ~account_state_tbl ?protocol_state_view ?vk ()
   in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     let rec go acc n =
       let open Zkapp_basic in
       let open Permissions in
-      if n <= 0 then return (List.rev (fst acc), snd acc)
+      if n <= 0 then return (List.rev acc)
       else
         (* choose a random authorization
 
@@ -1341,34 +1340,31 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
             ?protocol_state_view ?vk ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
-        go (party :: party0 :: fst acc, snd acc) (n - 1)
+        go (party :: party0 :: acc) (n - 1)
     in
-    go ([], 0) num_parties
+    go [] num_parties
   in
   (* at least 1 party *)
   let%bind num_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
   let num_old_parties = num_parties - num_new_accounts in
-  let%bind old_parties, num_of_created1 =
+  let%bind old_parties =
     gen_parties_with_dynamic_balance ~new_parties:false num_old_parties
   in
-  let%bind new_parties, num_of_created2 =
+  let%bind new_parties =
     gen_parties_with_dynamic_balance ~new_parties:true num_new_accounts
   in
   let other_parties0 = old_parties @ new_parties in
-  let num_of_created = num_of_created1 + num_of_created2 in
   let balance_change_sum =
     List.fold other_parties0
       ~init:
-        ( if num_of_created = 0 then Currency.Amount.Signed.zero
+        ( if num_new_accounts = 0 then Currency.Amount.Signed.zero
         else
           Currency.Amount.(
             Signed.of_unsigned
               ( scale
-                  (of_fee
-                     Genesis_constants.Constraint_constants.compiled
-                       .account_creation_fee )
-                  num_of_created
+                  (of_fee constraint_constants.account_creation_fee)
+                  num_new_accounts
               |> Option.value_exn )) )
       ~f:(fun acc party ->
         match Currency.Amount.Signed.add acc party.body.balance_change with
@@ -1399,8 +1395,56 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
             Currency.Balance.add_signed_amount_flagged account.balance
               balance_change
             |> fst
+        ; nonce =
+            ( if Currency.Amount.Signed.is_negative balance_change then
+              Account.Nonce.succ account.nonce
+            else account.nonce )
         } ) ;
-  let other_parties = balancing_party :: other_parties0 in
+  (* modify the account balance && nonce precondition of the balancing account to reflect the change*)
+  let other_parties =
+    balancing_party
+    :: List.map other_parties0 ~f:(fun party ->
+           if
+             Signature_lib.Public_key.Compressed.equal party.body.public_key
+               balancing_party.body.public_key
+           then
+             { party with
+               body =
+                 { party.body with
+                   preconditions =
+                     { party.body.preconditions with
+                       account =
+                         ( match party.body.preconditions.account with
+                         | Full precond ->
+                             Full
+                               { precond with
+                                 balance =
+                                   ( match precond.balance with
+                                   | Check interval ->
+                                       Check
+                                         Zkapp_precondition.Closed_interval.
+                                           { lower =
+                                               Currency.Balance
+                                               .add_signed_amount_flagged
+                                                 interval.lower balance_change
+                                               |> fst
+                                           ; upper =
+                                               Currency.Balance
+                                               .add_signed_amount_flagged
+                                                 interval.upper balance_change
+                                               |> fst
+                                           }
+                                   | _ ->
+                                       precond.balance )
+                               ; nonce = Ignore
+                               }
+                         | _ ->
+                             Accept )
+                     }
+                 }
+             }
+           else party )
+  in
   let%bind memo = Signed_command_memo.gen in
   let parties_dummy_signatures : Parties.t =
     Parties.of_simple { fee_payer; other_parties; memo }
