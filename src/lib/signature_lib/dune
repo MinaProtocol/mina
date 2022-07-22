@@ -10,7 +10,6 @@
    base
    sexplib0
    yojson
-   ppx_version.runtime
    core_kernel
    bin_prot.shape
    base.caml
@@ -36,6 +35,8 @@
    pickles.backend
    kimchi_backend
    h_list
+   test_util
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

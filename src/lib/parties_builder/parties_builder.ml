@@ -35,12 +35,9 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
     other_parties : Parties.t =
   let fee_payer : Party.Fee_payer.t =
     { body =
-        { update = Party.Update.noop
-        ; public_key = fee_payer_pk
+        { public_key = fee_payer_pk
         ; fee = Currency.Fee.of_int fee
-        ; events = []
-        ; sequence_events = []
-        ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+        ; valid_until = None
         ; nonce = fee_payer_nonce
         }
     ; authorization = Signature.dummy
@@ -61,25 +58,31 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
       |> Parties.Call_forest.accumulate_hashes_predicated
   }
 
-(* replace dummy signatures, proofs with valid ones for fee payer, other parties
-   [keymap] maps compressed public keys to private keys
-*)
-let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
+let get_transaction_commitments (parties : Parties.t) =
   let memo_hash = Signed_command_memo.hash parties.memo in
   let fee_payer_hash =
     Party.of_fee_payer parties.fee_payer |> Parties.Digest.Party.create
   in
   let other_parties_hash = Parties.other_parties_hash parties in
-  let tx_commitment =
+  let txn_commitment =
     Parties.Transaction_commitment.create ~other_parties_hash
   in
-  let full_tx_commitment =
-    Parties.Transaction_commitment.create_complete tx_commitment ~memo_hash
+  let full_txn_commitment =
+    Parties.Transaction_commitment.create_complete txn_commitment ~memo_hash
       ~fee_payer_hash
+  in
+  (txn_commitment, full_txn_commitment)
+
+(* replace dummy signatures, proofs with valid ones for fee payer, other parties
+   [keymap] maps compressed public keys to private keys
+*)
+let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
+  let txn_commitment, full_txn_commitment =
+    get_transaction_commitments parties
   in
   let sign_for_party ~use_full_commitment sk =
     let commitment =
-      if use_full_commitment then full_tx_commitment else tx_commitment
+      if use_full_commitment then full_txn_commitment else txn_commitment
     in
     Signature_lib.Schnorr.Chunked.sign sk
       (Random_oracle.Input.Chunked.field commitment)
@@ -128,15 +131,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) : Parties.t =
                   in
                   let (), (), proof =
                     Async_unix.Thread_safe.block_on_async_exn (fun () ->
-                        prover ?handler:(Some handler)
-                          ( []
-                            : ( unit
-                              , unit
-                              , unit )
-                              Pickles_types.Hlist.H3.T
-                                (Pickles.Statement_with_proof)
-                              .t )
-                          txn_stmt )
+                        prover ?handler:(Some handler) txn_stmt )
                   in
                   Control.Proof proof )
           | None_given ->

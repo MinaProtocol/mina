@@ -44,9 +44,6 @@ CREATE TYPE public.call_type_type AS ENUM (
     'delegate_call'
 );
 
-
-ALTER TYPE public.call_type_type OWNER TO o1labs;
-
 --
 -- Name: chain_status_type; Type: TYPE; Schema: public; Owner: o1labs
 --
@@ -56,9 +53,6 @@ CREATE TYPE public.chain_status_type AS ENUM (
     'orphaned',
     'pending'
 );
-
-
-ALTER TYPE public.chain_status_type OWNER TO o1labs;
 
 --
 -- Name: internal_command_type; Type: TYPE; Schema: public; Owner: o1labs
@@ -70,9 +64,6 @@ CREATE TYPE public.internal_command_type AS ENUM (
     'coinbase'
 );
 
-
-ALTER TYPE public.internal_command_type OWNER TO o1labs;
-
 --
 -- Name: transaction_status; Type: TYPE; Schema: public; Owner: o1labs
 --
@@ -82,9 +73,6 @@ CREATE TYPE public.transaction_status AS ENUM (
     'failed'
 );
 
-
-ALTER TYPE public.transaction_status OWNER TO o1labs;
-
 --
 -- Name: user_command_type; Type: TYPE; Schema: public; Owner: o1labs
 --
@@ -93,9 +81,6 @@ CREATE TYPE public.user_command_type AS ENUM (
     'payment',
     'delegation'
 );
-
-
-ALTER TYPE public.user_command_type OWNER TO o1labs;
 
 --
 -- Name: zkapp_auth_required_type; Type: TYPE; Schema: public; Owner: o1labs
@@ -110,9 +95,6 @@ CREATE TYPE public.zkapp_auth_required_type AS ENUM (
     'impossible'
 );
 
-
-ALTER TYPE public.zkapp_auth_required_type OWNER TO o1labs;
-
 --
 -- Name: zkapp_authorization_kind_type; Type: TYPE; Schema: public; Owner: o1labs
 --
@@ -122,9 +104,6 @@ CREATE TYPE public.zkapp_authorization_kind_type AS ENUM (
     'signature',
     'none_given'
 );
-
-
-ALTER TYPE public.zkapp_authorization_kind_type OWNER TO o1labs;
 
 --
 -- Name: zkapp_precondition_type; Type: TYPE; Schema: public; Owner: o1labs
@@ -136,8 +115,6 @@ CREATE TYPE public.zkapp_precondition_type AS ENUM (
     'accept'
 );
 
-
-ALTER TYPE public.zkapp_precondition_type OWNER TO o1labs;
 
 SET default_tablespace = '';
 
@@ -151,9 +128,6 @@ CREATE TABLE public.account_identifiers (
     token_id integer NOT NULL
 );
 
-
-ALTER TABLE public.account_identifiers OWNER TO o1labs;
-
 --
 -- Name: account_identifiers_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
 --
@@ -165,9 +139,6 @@ CREATE SEQUENCE public.account_identifiers_id_seq
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-
-
-ALTER TABLE public.account_identifiers_id_seq OWNER TO o1labs;
 
 --
 -- Name: account_identifiers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -195,9 +166,6 @@ CREATE TABLE public.accounts_accessed (
     zkapp_id integer
 );
 
-
-ALTER TABLE public.accounts_accessed OWNER TO o1labs;
-
 --
 -- Name: accounts_created; Type: TABLE; Schema: public; Owner: o1labs
 --
@@ -207,9 +175,6 @@ CREATE TABLE public.accounts_created (
     account_identifier_id integer NOT NULL,
     creation_fee text NOT NULL
 );
-
-
-ALTER TABLE public.accounts_created OWNER TO o1labs;
 
 --
 -- Name: blocks; Type: TABLE; Schema: public; Owner: o1labs
@@ -235,9 +200,6 @@ CREATE TABLE public.blocks (
     chain_status public.chain_status_type NOT NULL
 );
 
-
-ALTER TABLE public.blocks OWNER TO o1labs;
-
 --
 -- Name: blocks_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
 --
@@ -249,9 +211,6 @@ CREATE SEQUENCE public.blocks_id_seq
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-
-
-ALTER TABLE public.blocks_id_seq OWNER TO o1labs;
 
 --
 -- Name: blocks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -274,8 +233,6 @@ CREATE TABLE public.blocks_internal_commands (
 );
 
 
-ALTER TABLE public.blocks_internal_commands OWNER TO o1labs;
-
 --
 -- Name: blocks_user_commands; Type: TABLE; Schema: public; Owner: o1labs
 --
@@ -289,8 +246,6 @@ CREATE TABLE public.blocks_user_commands (
 );
 
 
-ALTER TABLE public.blocks_user_commands OWNER TO o1labs;
-
 --
 -- Name: blocks_zkapp_commands; Type: TABLE; Schema: public; Owner: o1labs
 --
@@ -302,9 +257,6 @@ CREATE TABLE public.blocks_zkapp_commands (
     status public.transaction_status NOT NULL,
     failure_reasons_ids integer[]
 );
-
-
-ALTER TABLE public.blocks_zkapp_commands OWNER TO o1labs;
 
 --
 -- Name: epoch_data; Type: TABLE; Schema: public; Owner: o1labs
@@ -321,8 +273,6 @@ CREATE TABLE public.epoch_data (
 );
 
 
-ALTER TABLE public.epoch_data OWNER TO o1labs;
-
 --
 -- Name: epoch_data_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
 --
@@ -334,9 +284,6 @@ CREATE SEQUENCE public.epoch_data_id_seq
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-
-
-ALTER TABLE public.epoch_data_id_seq OWNER TO o1labs;
 
 --
 -- Name: epoch_data_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -357,9 +304,6 @@ CREATE TABLE public.internal_commands (
     hash text NOT NULL
 );
 
-
-ALTER TABLE public.internal_commands OWNER TO o1labs;
-
 --
 -- Name: internal_commands_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
 --
@@ -371,9 +315,6 @@ CREATE SEQUENCE public.internal_commands_id_seq
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-
-
-ALTER TABLE public.internal_commands_id_seq OWNER TO o1labs;
 
 --
 -- Name: internal_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -391,9 +332,6 @@ CREATE TABLE public.public_keys (
     value text NOT NULL
 );
 
-
-ALTER TABLE public.public_keys OWNER TO o1labs;
-
 --
 -- Name: public_keys_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
 --
@@ -405,9 +343,6 @@ CREATE SEQUENCE public.public_keys_id_seq
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-
-
-ALTER TABLE public.public_keys_id_seq OWNER TO o1labs;
 
 --
 -- Name: public_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -426,7 +361,7 @@ CREATE TABLE public.snarked_ledger_hashes (
 );
 
 
-ALTER TABLE public.snarked_ledger_hashes OWNER TO o1labs;
+ 
 
 --
 -- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -441,7 +376,7 @@ CREATE SEQUENCE public.snarked_ledger_hashes_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.snarked_ledger_hashes_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -465,7 +400,7 @@ CREATE TABLE public.timing_info (
 );
 
 
-ALTER TABLE public.timing_info OWNER TO o1labs;
+ 
 
 --
 -- Name: timing_info_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -480,7 +415,7 @@ CREATE SEQUENCE public.timing_info_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.timing_info_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: timing_info_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -499,7 +434,7 @@ CREATE TABLE public.token_symbols (
 );
 
 
-ALTER TABLE public.token_symbols OWNER TO o1labs;
+ 
 
 --
 -- Name: token_symbols_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -514,7 +449,7 @@ CREATE SEQUENCE public.token_symbols_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.token_symbols_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: token_symbols_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -535,7 +470,7 @@ CREATE TABLE public.tokens (
 );
 
 
-ALTER TABLE public.tokens OWNER TO o1labs;
+ 
 
 --
 -- Name: tokens_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -550,7 +485,7 @@ CREATE SEQUENCE public.tokens_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.tokens_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -578,7 +513,7 @@ CREATE TABLE public.user_commands (
 );
 
 
-ALTER TABLE public.user_commands OWNER TO o1labs;
+ 
 
 --
 -- Name: user_commands_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -593,7 +528,7 @@ CREATE SEQUENCE public.user_commands_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_commands_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: user_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -612,7 +547,7 @@ CREATE TABLE public.voting_for (
 );
 
 
-ALTER TABLE public.voting_for OWNER TO o1labs;
+ 
 
 --
 -- Name: voting_for_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -627,7 +562,7 @@ CREATE SEQUENCE public.voting_for_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.voting_for_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: voting_for_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -648,7 +583,7 @@ CREATE TABLE public.zkapp_account_precondition (
 );
 
 
-ALTER TABLE public.zkapp_account_precondition OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_account_precondition_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -663,7 +598,7 @@ CREATE SEQUENCE public.zkapp_account_precondition_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_account_precondition_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_account_precondition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -688,7 +623,7 @@ CREATE TABLE public.zkapp_accounts (
 );
 
 
-ALTER TABLE public.zkapp_accounts OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_accounts_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -703,7 +638,7 @@ CREATE SEQUENCE public.zkapp_accounts_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_accounts_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -723,7 +658,7 @@ CREATE TABLE public.zkapp_amount_bounds (
 );
 
 
-ALTER TABLE public.zkapp_amount_bounds OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_amount_bounds_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -738,7 +673,7 @@ CREATE SEQUENCE public.zkapp_amount_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_amount_bounds_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_amount_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -758,7 +693,7 @@ CREATE TABLE public.zkapp_balance_bounds (
 );
 
 
-ALTER TABLE public.zkapp_balance_bounds OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_balance_bounds_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -773,7 +708,7 @@ CREATE SEQUENCE public.zkapp_balance_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_balance_bounds_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_balance_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -795,7 +730,7 @@ CREATE TABLE public.zkapp_commands (
 );
 
 
-ALTER TABLE public.zkapp_commands OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_commands_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -810,7 +745,7 @@ CREATE SEQUENCE public.zkapp_commands_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_commands_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -833,7 +768,7 @@ CREATE TABLE public.zkapp_epoch_data (
 );
 
 
-ALTER TABLE public.zkapp_epoch_data OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_epoch_data_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -848,7 +783,7 @@ CREATE SEQUENCE public.zkapp_epoch_data_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_epoch_data_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_epoch_data_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -868,7 +803,7 @@ CREATE TABLE public.zkapp_epoch_ledger (
 );
 
 
-ALTER TABLE public.zkapp_epoch_ledger OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_epoch_ledger_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -883,7 +818,7 @@ CREATE SEQUENCE public.zkapp_epoch_ledger_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_epoch_ledger_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_epoch_ledger_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -902,7 +837,7 @@ CREATE TABLE public.zkapp_events (
 );
 
 
-ALTER TABLE public.zkapp_events OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_events_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -917,7 +852,7 @@ CREATE SEQUENCE public.zkapp_events_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_events_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -933,16 +868,13 @@ ALTER SEQUENCE public.zkapp_events_id_seq OWNED BY public.zkapp_events.id;
 CREATE TABLE public.zkapp_fee_payer_body (
     id integer NOT NULL,
     account_identifier_id integer NOT NULL,
-    update_id integer NOT NULL,
     fee text NOT NULL,
-    events_id integer NOT NULL,
-    sequence_events_id integer NOT NULL,
-    zkapp_network_precondition_id integer NOT NULL,
+    valid_until bigint,
     nonce bigint NOT NULL
 );
 
 
-ALTER TABLE public.zkapp_fee_payer_body OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_fee_payer_body_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -957,7 +889,7 @@ CREATE SEQUENCE public.zkapp_fee_payer_body_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_fee_payer_body_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_fee_payer_body_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -977,7 +909,7 @@ CREATE TABLE public.zkapp_global_slot_bounds (
 );
 
 
-ALTER TABLE public.zkapp_global_slot_bounds OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_global_slot_bounds_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -992,7 +924,7 @@ CREATE SEQUENCE public.zkapp_global_slot_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_global_slot_bounds_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_global_slot_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1012,7 +944,7 @@ CREATE TABLE public.zkapp_length_bounds (
 );
 
 
-ALTER TABLE public.zkapp_length_bounds OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_length_bounds_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1027,7 +959,7 @@ CREATE SEQUENCE public.zkapp_length_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_length_bounds_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_length_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1054,7 +986,7 @@ CREATE TABLE public.zkapp_network_precondition (
 );
 
 
-ALTER TABLE public.zkapp_network_precondition OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1069,7 +1001,7 @@ CREATE SEQUENCE public.zkapp_network_precondition_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_network_precondition_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_network_precondition_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1089,7 +1021,7 @@ CREATE TABLE public.zkapp_nonce_bounds (
 );
 
 
-ALTER TABLE public.zkapp_nonce_bounds OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_nonce_bounds_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1104,7 +1036,7 @@ CREATE SEQUENCE public.zkapp_nonce_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_nonce_bounds_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_nonce_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1124,7 +1056,7 @@ CREATE TABLE public.zkapp_other_party (
 );
 
 
-ALTER TABLE public.zkapp_other_party OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_other_party_body; Type: TABLE; Schema: public; Owner: o1labs
@@ -1147,7 +1079,7 @@ CREATE TABLE public.zkapp_other_party_body (
 );
 
 
-ALTER TABLE public.zkapp_other_party_body OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_other_party_body_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1162,7 +1094,7 @@ CREATE SEQUENCE public.zkapp_other_party_body_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_other_party_body_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_other_party_body_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1184,7 +1116,7 @@ CREATE SEQUENCE public.zkapp_other_party_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_other_party_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_other_party_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1204,7 +1136,7 @@ CREATE TABLE public.zkapp_party_failures (
 );
 
 
-ALTER TABLE public.zkapp_party_failures OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_party_failures_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1219,7 +1151,7 @@ CREATE SEQUENCE public.zkapp_party_failures_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_party_failures_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_party_failures_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1248,7 +1180,7 @@ CREATE TABLE public.zkapp_permissions (
 );
 
 
-ALTER TABLE public.zkapp_permissions OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_permissions_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1263,7 +1195,7 @@ CREATE SEQUENCE public.zkapp_permissions_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_permissions_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_permissions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1284,11 +1216,12 @@ CREATE TABLE public.zkapp_precondition_accounts (
     delegate_id integer,
     state_id integer NOT NULL,
     sequence_state_id integer,
-    proved_state boolean
+    proved_state boolean,
+    is_new boolean
 );
 
 
-ALTER TABLE public.zkapp_precondition_accounts OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_precondition_accounts_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1303,7 +1236,7 @@ CREATE SEQUENCE public.zkapp_precondition_accounts_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_precondition_accounts_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_precondition_accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1322,7 +1255,7 @@ CREATE TABLE public.zkapp_sequence_states (
 );
 
 
-ALTER TABLE public.zkapp_sequence_states OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_sequence_states_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1337,7 +1270,7 @@ CREATE SEQUENCE public.zkapp_sequence_states_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_sequence_states_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_sequence_states_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1356,7 +1289,7 @@ CREATE TABLE public.zkapp_state_data (
 );
 
 
-ALTER TABLE public.zkapp_state_data OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_state_data_array; Type: TABLE; Schema: public; Owner: o1labs
@@ -1368,7 +1301,7 @@ CREATE TABLE public.zkapp_state_data_array (
 );
 
 
-ALTER TABLE public.zkapp_state_data_array OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_state_data_array_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1383,7 +1316,7 @@ CREATE SEQUENCE public.zkapp_state_data_array_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_state_data_array_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_state_data_array_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1405,7 +1338,7 @@ CREATE SEQUENCE public.zkapp_state_data_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_state_data_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_state_data_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1424,7 +1357,7 @@ CREATE TABLE public.zkapp_states (
 );
 
 
-ALTER TABLE public.zkapp_states OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_states_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1439,7 +1372,7 @@ CREATE SEQUENCE public.zkapp_states_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_states_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_states_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1459,7 +1392,7 @@ CREATE TABLE public.zkapp_timestamp_bounds (
 );
 
 
-ALTER TABLE public.zkapp_timestamp_bounds OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_timestamp_bounds_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1474,7 +1407,7 @@ CREATE SEQUENCE public.zkapp_timestamp_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_timestamp_bounds_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_timestamp_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1497,7 +1430,7 @@ CREATE TABLE public.zkapp_timing_info (
 );
 
 
-ALTER TABLE public.zkapp_timing_info OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_timing_info_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1512,7 +1445,7 @@ CREATE SEQUENCE public.zkapp_timing_info_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_timing_info_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_timing_info_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1532,7 +1465,7 @@ CREATE TABLE public.zkapp_token_id_bounds (
 );
 
 
-ALTER TABLE public.zkapp_token_id_bounds OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_token_id_bounds_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1547,7 +1480,7 @@ CREATE SEQUENCE public.zkapp_token_id_bounds_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_token_id_bounds_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_token_id_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1573,7 +1506,7 @@ CREATE TABLE public.zkapp_updates (
 );
 
 
-ALTER TABLE public.zkapp_updates OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_updates_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1588,7 +1521,7 @@ CREATE SEQUENCE public.zkapp_updates_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_updates_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_updates_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1607,7 +1540,7 @@ CREATE TABLE public.zkapp_uris (
 );
 
 
-ALTER TABLE public.zkapp_uris OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_uris_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1622,7 +1555,7 @@ CREATE SEQUENCE public.zkapp_uris_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_uris_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_uris_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -1642,7 +1575,7 @@ CREATE TABLE public.zkapp_verification_keys (
 );
 
 
-ALTER TABLE public.zkapp_verification_keys OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_verification_keys_id_seq; Type: SEQUENCE; Schema: public; Owner: o1labs
@@ -1657,7 +1590,7 @@ CREATE SEQUENCE public.zkapp_verification_keys_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.zkapp_verification_keys_id_seq OWNER TO o1labs;
+ 
 
 --
 -- Name: zkapp_verification_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: o1labs
@@ -4198,6 +4131,7 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 
 
 --
+<<<<<<< HEAD
 -- Name: zkapp_fee_payer_body zkapp_fee_payer_body_events_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: o1labs
 --
 
@@ -4231,6 +4165,9 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 
 --
 -- Name: zkapp_network_precondition zkapp_network_precondition_blockchain_length_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: o1labs
+=======
+-- Name: zkapp_fee_payers zkapp_fee_payers_body_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+>>>>>>> origin/fix/payments-using-zkapp-accounts
 --
 
 ALTER TABLE ONLY public.zkapp_network_precondition

@@ -605,10 +605,11 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
             let output_file =
               State_hash.to_base58_check block.state_hash ^ ".json"
             in
+            (* use Latest.to_yojson to get versioned JSON *)
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
                 return
                   (Async.fprintf writer "%s\n%!"
-                     ( Extensional.Block.to_yojson block
+                     ( Extensional.Block.Stable.Latest.to_yojson block
                      |> Yojson.Safe.pretty_to_string ) ) ) )
       in
       ()

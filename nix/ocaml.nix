@@ -1,38 +1,44 @@
-{ inputs, static ? false, ... }@args:
+{ inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
-  pkgs = if static then args.pkgs.pkgsMusl else args.pkgs;
+  inherit (args) pkgs;
 
   inherit (builtins) filterSource path;
 
-  inherit (pkgs.lib) hasPrefix;
+  inherit (pkgs.lib)
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath
+    optionalString;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam ../src/opam.export;
-  external-packages = pkgs.lib.getAttrs [
-    "sodium"
-    "capnp"
-    "rpc_parallel"
-    "async_kernel"
-    "base58"
-  ] (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
+  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
+    (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   difference = a: b:
-    pkgs.lib.filterAttrs (name: _: !builtins.elem name (builtins.attrNames b))
-    a;
+    filterAttrs (name: _: !builtins.elem name (builtins.attrNames b)) a;
 
-  extra-packages = {
-    ocaml-lsp-server = "1.4.1";
-    ocaml-system = "4.11.2";
+  export-installed = opam-nix.opamListToQuery export.installed;
+
+  extra-packages = with implicit-deps; {
+    dune-rpc = dune;
+    dyn = dune;
+    fiber = dune;
+    ocaml-lsp-server = "1.11.6";
+    ocaml-system = ocaml;
+    ocamlformat-rpc-lib = "0.22.4";
+    omd = "1.3.1";
+    ordering = dune;
+    pp = "1.1.2";
     ppx_yojson_conv_lib = "v0.15.0";
+    stdune = dune;
+    xdg = dune;
   };
 
-  implicit-deps = (opam-nix.opamListToQuery export.installed)
-    // external-packages;
+  implicit-deps = export-installed // external-packages;
 
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
 
@@ -43,26 +49,10 @@ let
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
 
   sourceInfo = inputs.self.sourceInfo or { };
-  dds = x: x.overrideAttrs (o: { dontDisableStatic = true; });
 
   external-libs = with pkgs;
-    if static then
-      map dds [
-        (zlib.override { splitStaticOutput = false; })
-        (bzip2.override { linkStatic = true; })
-        (jemalloc)
-        (gmp.override { withStatic = true; })
-        (openssl.override { static = true; })
-        libffi
-      ]
-    else [
-      zlib
-      bzip2
-      jemalloc
-      gmp
-      openssl
-      libffi
-    ];
+    [ zlib bzip2 gmp openssl libffi ]
+    ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
   filtered-src = with inputs.nix-filter.lib;
     filter {
@@ -79,8 +69,7 @@ let
 
   overlay = self: super:
     let
-      ocaml-libs =
-        builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
+      ocaml-libs = builtins.attrValues (getAttrs installedPackageNames self);
 
       # This is needed because
       # - lld package is not wrapped to pick up the correct linker flags
@@ -125,6 +114,10 @@ let
         MINA_COMMIT_SHA1 = "__commit_sha1___________________________";
         MINA_BRANCH = "<unknown>";
 
+        NIX_LDFLAGS =
+          optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
+          "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
+
         buildInputs = ocaml-libs ++ external-libs;
 
         nativeBuildInputs = [
@@ -140,6 +133,9 @@ let
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
+        # this is used to retrieve the path of the built static library
+        # and copy it from within a dune rule
+        # (see src/lib/crypto/kimchi_bindings/stubs/dune)
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
 
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
@@ -185,17 +181,17 @@ let
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
-      } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; }
-        // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
-          OCAMLPARAM = "_,cclib=-lc++";
-        });
+        shellHook =
+          "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
+      } // optionalAttrs pkgs.stdenv.isDarwin {
+        OCAMLPARAM = "_,cclib=-lc++";
+      });
 
       mina = let
         commit_sha1 =
           inputs.self.sourceInfo.rev or "<unknown>                               ";
         commit_date =
           inputs.self.sourceInfo.lastModifiedDate or "<unknown>     ";
-        inherit (pkgs.lib) makeBinPath;
       in pkgs.runCommand "mina-release" {
         buildInputs = [ pkgs.makeWrapper ];
         outputs = self.mina-dev.outputs;
@@ -221,7 +217,9 @@ let
       } ''
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
-        psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
+        pushd src/app/archive
+        psql "$MINA_TEST_POSTGRES" < create_schema.sql
+        popd
         # TODO: investigate failing tests, ideally we should run all tests in src/
         dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';

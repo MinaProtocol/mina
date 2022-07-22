@@ -41,9 +41,9 @@ module Step = struct
 
     let create = Fields.create
 
-    let generate cs =
+    let generate ~prev_challenges cs =
       let open Tick.Keypair in
-      let keypair = create cs in
+      let keypair = create ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
@@ -161,9 +161,9 @@ module Wrap = struct
 
     let create = Fields.create
 
-    let generate cs =
+    let generate ~prev_challenges cs =
       let open Tock.Keypair in
-      let keypair = create cs in
+      let keypair = create ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 

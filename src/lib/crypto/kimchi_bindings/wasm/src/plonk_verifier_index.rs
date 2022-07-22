@@ -224,6 +224,8 @@ macro_rules! impl_verification_key {
                 pub domain: WasmDomain,
                 pub max_poly_size: i32,
                 pub max_quot_size: i32,
+                pub public_: i32,
+                pub prev_challenges: i32,
                 #[wasm_bindgen(skip)]
                 pub srs: $WasmSrs,
                 #[wasm_bindgen(skip)]
@@ -240,6 +242,8 @@ macro_rules! impl_verification_key {
                     domain: &WasmDomain,
                     max_poly_size: i32,
                     max_quot_size: i32,
+                    public_: i32,
+                    prev_challenges: i32,
                     srs: &$WasmSrs,
                     evals: &WasmPlonkVerificationEvals,
                     shifts: &WasmShifts,
@@ -248,6 +252,8 @@ macro_rules! impl_verification_key {
                         domain: domain.clone(),
                         max_poly_size,
                         max_quot_size,
+                        public_,
+                        prev_challenges,
                         srs: srs.clone(),
                         evals: evals.clone(),
                         shifts: shifts.clone(),
@@ -286,6 +292,8 @@ macro_rules! impl_verification_key {
                     },
                     max_poly_size: vi.max_poly_size as i32,
                     max_quot_size: vi.max_quot_size as i32,
+                    public_: vi.public as i32,
+                    prev_challenges: vi.prev_challenges as i32,
                     srs: srs.into(),
                     evals: WasmPlonkVerificationEvals {
                         sigma_comm: IntoIterator::into_iter(vi.sigma_comm).map(From::from).collect(),
@@ -359,6 +367,8 @@ macro_rules! impl_verification_key {
             pub fn of_wasm(
                 max_poly_size: i32,
                 max_quot_size: i32,
+                public_: i32,
+                prev_challenges: i32,
                 log_size_of_group: i32,
                 srs: &$WasmSrs,
                 evals: &WasmPlonkVerificationEvals,
@@ -400,11 +410,11 @@ macro_rules! impl_verification_key {
                             res.set(zk_w3(domain)).unwrap();
                             res
                         },
-                        fr_sponge_params: $FrSpongeParams::params(),
-                        fq_sponge_params: $FqSpongeParams::params(),
                         endo: endo_q,
                         max_poly_size: max_poly_size as usize,
                         max_quot_size: max_quot_size as usize,
+                        public: public_ as usize,
+                        prev_challenges: prev_challenges as usize,
                         zkpm: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_polynomial(domain)).unwrap();
@@ -437,6 +447,8 @@ macro_rules! impl_verification_key {
                     of_wasm(
                         index.max_poly_size,
                         index.max_quot_size,
+                        index.public_,
+                        index.prev_challenges,
                         index.domain.log_size_of_group,
                         &index.srs,
                         &index.evals,
@@ -453,15 +465,11 @@ macro_rules! impl_verification_key {
             ) -> Result<DlogVerifierIndex<$G>, JsValue> {
                 let path = Path::new(&path);
                 let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-                let fq_sponge_params = $FqSpongeParams::params();
-                let fr_sponge_params = $FrSpongeParams::params();
                 DlogVerifierIndex::<$G>::from_file(
                     Some(srs.0.clone()),
                     path,
                     offset.map(|x| x as u64),
                     endo_q,
-                    fq_sponge_params,
-                    fr_sponge_params,
                 ).map_err(|e| JsValue::from_str(format!("read_raw: {}", e).as_str()))
             }
 
@@ -575,6 +583,8 @@ macro_rules! impl_verification_key {
                     },
                     max_poly_size: 0,
                     max_quot_size: 0,
+                    public_: 0,
+                    prev_challenges: 0,
                     srs: $WasmSrs(Arc::new(SRS::create(0))),
                     evals: WasmPlonkVerificationEvals {
                         sigma_comm: vec_comm(PERMUTS),

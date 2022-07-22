@@ -10,7 +10,6 @@
    base.caml
    sexplib0
    core_kernel
-   ppx_version.runtime
    bin_prot.shape
    base
    base.base_internalhash_types
@@ -26,6 +25,8 @@
    random_oracle
    bitstring_lib
    kimchi_backend.pasta
+   test_util
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

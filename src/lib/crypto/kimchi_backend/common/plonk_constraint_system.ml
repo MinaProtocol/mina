@@ -50,7 +50,7 @@ module Position = struct
 
   (** Generates a full row of positions that each points to itself. *)
   let create_cols (row : 'row) : _ t array =
-    Array.init Constants.permutation_cols (fun i -> { row; col = i })
+    Array.init Constants.permutation_cols ~f:(fun i -> { row; col = i })
 
   (** Given a number of columns, 
       append enough column wires to get an entire row.
@@ -62,7 +62,7 @@ module Position = struct
     assert (padding_offset <= Constants.permutation_cols) ;
     let padding_len = Constants.permutation_cols - padding_offset in
     let padding =
-      Array.init padding_len (fun i -> { row; col = i + padding_offset })
+      Array.init padding_len ~f:(fun i -> { row; col = i + padding_offset })
     in
     Array.append cols padding
 
@@ -273,6 +273,8 @@ type ('f, 'rust_gates) t =
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
     public_input_size : int Core_kernel.Set_once.t
+  ; (* The number of previous recursion challenges. *)
+    prev_challenges : int Core_kernel.Set_once.t
   ; (* Whatever is not public input. *)
     mutable auxiliary_input_size : int
   ; (* Queue (of size 1) of generic gate. *)
@@ -416,6 +418,7 @@ struct
   (* Initializes a constraint system. *)
   let create () : t =
     { public_input_size = Set_once.create ()
+    ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
     ; rows_rev = []
@@ -436,12 +439,19 @@ struct
   (** Returns the number of public inputs. *)
   let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]
 
+  (** Returns the number of previous challenges. *)
+  let get_prev_challenges t = Set_once.get_exn t.prev_challenges [%here]
+
   (* Non-public part of the witness. *)
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
   (** Sets the number of public-input. It must and can only be called once. *)
   let set_primary_input_size (sys : t) num_pub_inputs =
     Set_once.set_exn sys.public_input_size [%here] num_pub_inputs
+
+  (** Sets the number of previous challenges. It must and can only be called once. *)
+  let set_prev_challenges (sys : t) num_prev_challenges =
+    Set_once.set_exn sys.prev_challenges [%here] num_prev_challenges
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
@@ -849,7 +859,7 @@ struct
                 add_generic_constraint ~l:x1
                   [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
                   sys ;
-                Hashtbl.set sys.cached_constants ratio x1 )
+                Hashtbl.set sys.cached_constants ~key:ratio ~data:x1 )
         | `Constant, `Var x2 -> (
             (* s1 = s2 * x2
                x2 = s1 / s2
@@ -862,7 +872,7 @@ struct
                 add_generic_constraint ~r:x2
                   [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
                   sys ;
-                Hashtbl.set sys.cached_constants ratio x2 )
+                Hashtbl.set sys.cached_constants ~key:ratio ~data:x2 )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic { l; r; o; m; c }) ->

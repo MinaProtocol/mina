@@ -36,23 +36,8 @@ let%test_module "Zkapp payments tests" =
         { fee_payer =
             { body =
                 { public_key = acct1.account.public_key
-                ; update =
-                    { app_state =
-                        Pickles_types.Vector.map new_state ~f:(fun x ->
-                            Zkapp_basic.Set_or_keep.Set x )
-                    ; delegate = Keep
-                    ; verification_key = Keep
-                    ; permissions = Keep
-                    ; zkapp_uri = Keep
-                    ; token_symbol = Keep
-                    ; timing = Keep
-                    ; voting_for = Keep
-                    }
                 ; fee = Fee.of_int full_amount
-                ; events = []
-                ; sequence_events = []
-                ; protocol_state_precondition =
-                    Zkapp_precondition.Protocol_state.accept
+                ; valid_until = None
                 ; nonce = acct1.account.nonce
                 }
             ; authorization = Signature.dummy
@@ -60,7 +45,18 @@ let%test_module "Zkapp payments tests" =
         ; other_parties =
             [ { body =
                   { public_key = acct1.account.public_key
-                  ; update = Party.Update.noop
+                  ; update =
+                      { app_state =
+                          Pickles_types.Vector.map new_state ~f:(fun x ->
+                              Zkapp_basic.Set_or_keep.Set x )
+                      ; delegate = Keep
+                      ; verification_key = Keep
+                      ; permissions = Keep
+                      ; zkapp_uri = Keep
+                      ; token_symbol = Keep
+                      ; timing = Keep
+                      ; voting_for = Keep
+                      }
                   ; token_id = Token_id.default
                   ; balance_change =
                       Amount.Signed.(of_unsigned receiver_amount |> negate)

@@ -393,38 +393,21 @@ let load_events pool id =
 
 let get_fee_payer_body ~pool body_id =
   let query_db = Mina_caqti.query pool in
-  let%bind { account_identifier_id
-           ; update_id
-           ; fee
-           ; events_id
-           ; sequence_events_id
-           ; zkapp_network_precondition_id
-           ; nonce
-           } =
+  let%bind { account_identifier_id; fee; valid_until; nonce } =
     query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
   in
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
   let public_key = Account_id.public_key account_id in
-  let%bind update = update_of_id pool update_id in
   let fee = Currency.Fee.of_string fee in
-  let%bind events = load_events pool events_id in
-  let%bind sequence_events = load_events pool sequence_events_id in
-  let%bind protocol_state_precondition =
-    protocol_state_precondition_of_id pool zkapp_network_precondition_id
+  let valid_until =
+    let open Option.Let_syntax in
+    valid_until >>| Unsigned.UInt32.of_int64
+    >>| Mina_numbers.Global_slot.of_uint32
   in
   let nonce =
     nonce |> Unsigned.UInt32.of_int64 |> Mina_numbers.Account_nonce.of_uint32
   in
-  return
-    ( { public_key
-      ; update
-      ; fee
-      ; events
-      ; sequence_events
-      ; protocol_state_precondition
-      ; nonce
-      }
-      : Party.Body.Fee_payer.t )
+  return ({ public_key; fee; valid_until; nonce } : Party.Body.Fee_payer.t)
 
 let get_other_party_body ~pool body_id =
   let open Zkapp_basic in
@@ -498,6 +481,7 @@ let get_other_party_body ~pool body_id =
                  ; state_id
                  ; sequence_state_id
                  ; proved_state
+                 ; is_new
                  } =
           query_db ~f:(fun db ->
               Processor.Zkapp_precondition_account.load db
@@ -574,6 +558,7 @@ let get_other_party_body ~pool body_id =
           Or_ignore.of_option sequence_state_opt
         in
         let proved_state = Or_ignore.of_option proved_state in
+        let is_new = Or_ignore.of_option is_new in
         return
           (Party.Account_precondition.Full
              { balance
@@ -583,6 +568,7 @@ let get_other_party_body ~pool body_id =
              ; state
              ; sequence_state
              ; proved_state
+             ; is_new
              } )
   in
   let caller = Party.Call_type.of_string caller in
