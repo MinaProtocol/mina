@@ -194,8 +194,10 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
         Snark_transition.genesis ~constraint_constants ~consensus_constants
           ~genesis_ledger ~genesis_body_reference:t.genesis_body_reference
     ; prev_state
+    ; prev_state_proof = blockchain_dummy
+    ; txn_snark = dummy_txn_stmt
+    ; txn_snark_proof = txn_dummy
     }
-    [ (prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy) ]
     t.protocol_state_with_hashes.data
 
 let digests (module T : Transaction_snark.S)

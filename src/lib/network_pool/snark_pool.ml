@@ -527,14 +527,16 @@ struct
             not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
           then (
             [%log' debug t.logger]
-              "Prover $prover did not have sufficient balance" ~metadata ;
+              "Snark work did not have sufficient fee to create prover $prover \
+               acccount"
+              ~metadata ;
             return false )
           else if
             Option.value_map ~default:false ~f:not prover_permitted_to_receive
           then (
-            [%log' debug t.logger]
-              "Prover $prover not permitted to receive. Permission to receive \
-               is $receive_permission"
+            [%log' warn t.logger]
+              "Snark work prover $prover not permitted to receive fees. \
+               Required permission to receive is $receive_permission"
               ~metadata:
                 ( ( "receive_permission"
                   , Mina_base.Permissions.Auth_required.to_yojson

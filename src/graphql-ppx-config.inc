@@ -1,0 +1,3 @@
+-extend-query=Graphql_lib.Serializing.ExtendQuery
+-extend-mutation=Graphql_lib.Serializing.ExtendQuery
+-future-added-value=false

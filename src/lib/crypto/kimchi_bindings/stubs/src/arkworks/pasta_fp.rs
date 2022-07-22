@@ -279,9 +279,13 @@ pub fn caml_pasta_fp_to_bigint(x: ocaml::Pointer<CamlFp>) -> CamlBigInteger256 {
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_of_bigint(x: CamlBigInteger256) -> Result<CamlFp, ocaml::Error> {
-    Fp::from_repr(x.0).map(CamlFp).ok_or(ocaml::Error::Message(
-        "caml_pasta_fp_of_bigint was given an invalid CamlBigInteger256",
-    ))
+    Fp::from_repr(x.0).map(CamlFp).ok_or_else(|| {
+        let err = format!(
+            "caml_pasta_fp_of_bigint was given an invalid CamlBigInteger256: {}",
+            x.0
+        );
+        ocaml::Error::Error(err.into())
+    })
 }
 
 #[ocaml_gen::func]

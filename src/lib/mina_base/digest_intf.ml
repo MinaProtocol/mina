@@ -42,11 +42,6 @@ module type S = sig
     end
 
     module Latest = V1
-
-    val versions : (int * (Bigstring.t -> pos_ref:int ref -> Latest.t)) array
-
-    val bin_read_to_latest_opt :
-      Bin_prot.Common.buf -> pos_ref:int ref -> Latest.t option
   end
 
   type t = Stable.V1.t

@@ -117,7 +117,7 @@ struct
 
   let parse = Decoders.public_key
 
-  let serialize = unimplemented_serializer "public_key"
+  let serialize = Encoders.public_key
 end
 
 module Public_key_s :

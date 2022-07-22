@@ -151,6 +151,8 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
 
 - Exit code `4` will be returned if not all pods were assigned to nodes and ready in time.
 - Exit code `5` will be returned if some pods could not be found.
+- Exit code `6` will be returned if Subscriptions, Topics, or Log sinks could not be created
+- Exit code `7` will be returned if the capacity check reports that the integration test cluster is out of capacity and no further tests can be run
 - Exit code `10` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a command in a container.  This exit code is the general case of such errors, there are subsequent exit codes which are preferred in more specific cases
 - Exit code `11` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `start.sh` script in a container
 - Exit code `12` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `stop.sh` script in a container

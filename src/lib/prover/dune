@@ -39,6 +39,7 @@
    logger.file_system
    data_hash_lib
    staged_ledger_diff
+   ppx_version.runtime
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

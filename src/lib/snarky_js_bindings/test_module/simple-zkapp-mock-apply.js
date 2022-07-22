@@ -11,7 +11,7 @@ import {
   Mina,
   signFeePayer,
   Permissions,
-  Ledger,
+  verify,
 } from "snarkyjs";
 import { tic, toc } from "./tictoc.js";
 
@@ -42,6 +42,7 @@ class SimpleZkapp extends SmartContract {
 
   update(y) {
     let x = this.x.get();
+    this.x.assertEquals(x);
     y.assertGt(0);
     this.x.set(x.add(y));
   }
@@ -59,6 +60,10 @@ let senderKey = sender.privateKey;
 // create new random zkapp keypair (with snarkyjs)
 let zkappKey = PrivateKey.random();
 let zkappAddress = zkappKey.toPublicKey();
+
+tic("compute circuit digest");
+let digest = SimpleZkapp.digest(zkappAddress);
+toc();
 
 // compile smart contract (= Pickles.compile)
 tic("compile smart contract");
@@ -84,7 +89,7 @@ tic("create initialize transaction (with proof)");
 let transaction = await Mina.transaction(() => {
   new SimpleZkapp(zkappAddress).initialize();
 });
-await transaction.prove();
+let [proof] = await transaction.prove();
 let partiesJsonInitialize = transaction.toJSON();
 partiesJsonInitialize = signFeePayer(partiesJsonInitialize, senderKey, {
   transactionFee,
@@ -93,14 +98,7 @@ toc();
 
 // verify the proof
 tic("verify transaction proof");
-let parties = JSON.parse(partiesJsonInitialize);
-let proof = parties.otherParties[0].authorization.proof;
-let publicInput = Ledger.zkappPublicInput(partiesJsonInitialize, 0);
-let ok = await Ledger.verifyPartyProof(
-  publicInput,
-  proof,
-  verificationKey.data
-);
+let ok = await verify(proof, verificationKey.data);
 toc();
 console.log("did proof verify?", ok);
 if (!ok) throw Error("proof didn't verify");

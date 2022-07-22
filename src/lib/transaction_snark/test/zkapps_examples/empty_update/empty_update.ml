@@ -16,17 +16,8 @@ let pk_compressed = Public_key.compress pk
 
 let account_id = Account_id.create pk_compressed Token_id.default
 
-module Statement = struct
-  type t = unit
-
-  let to_field_elements () = [||]
-end
-
 let tag, _, p_module, Pickles.Provers.[ prover ] =
-  Pickles.compile ~cache:Cache_dir.cache
-    (module Statement)
-    (module Statement)
-    ~public_input:(Output Zkapp_statement.typ) ~auxiliary_typ:Impl.Typ.unit
+  Zkapps_examples.compile () ~cache:Cache_dir.cache ~auxiliary_typ:Impl.Typ.unit
     ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
     ~name:"empty_update"
@@ -39,20 +30,11 @@ module P = (val p_module)
 
 let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
-(* TODO: This should be entirely unnecessary. *)
-let party_body = Zkapps_empty_update.generate_party pk_compressed
+let party, () = Async.Thread_safe.block_on_async_exn prover
 
-let _stmt, (), party_proof = Async.Thread_safe.block_on_async_exn (prover [])
-
-let party_proof = Pickles.Side_loaded.Proof.of_proof party_proof
-
-let party : Party.Graphql_repr.t =
-  Party.to_graphql_repr ~call_depth:0
-    { body = party_body; authorization = Proof party_proof }
-
-let deploy_party_body : Party.Body.Graphql_repr.t =
+let deploy_party_body : Party.Body.t =
   (* TODO: This is a pain. *)
-  { Party.Body.Graphql_repr.dummy with
+  { Party.Body.dummy with
     public_key = pk_compressed
   ; update =
       { Party.Update.dummy with
@@ -74,25 +56,20 @@ let deploy_party_body : Party.Body.Graphql_repr.t =
   ; use_full_commitment = true
   }
 
-let deploy_party : Party.Graphql_repr.t =
+let deploy_party : Party.t =
   (* TODO: This is a pain. *)
   { body = deploy_party_body; authorization = Signature Signature.dummy }
 
-let protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
-
-let ps =
-  (* TODO: This is a pain. *)
-  Parties.Call_forest.of_parties_list
-    ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
-    [ deploy_party; party ]
-  |> Parties.Call_forest.map ~f:Party.of_graphql_repr
-  |> Parties.Call_forest.accumulate_hashes_predicated
+let other_parties =
+  []
+  |> Parties.Call_forest.cons_tree party
+  |> Parties.Call_forest.cons deploy_party
 
 let memo = Signed_command_memo.empty
 
 let transaction_commitment : Parties.Transaction_commitment.t =
   (* TODO: This is a pain. *)
-  let other_parties_hash = Parties.Call_forest.hash ps in
+  let other_parties_hash = Parties.Call_forest.hash other_parties in
   Parties.Transaction_commitment.create ~other_parties_hash
 
 let fee_payer =
@@ -101,7 +78,6 @@ let fee_payer =
       { Party.Body.Fee_payer.dummy with
         public_key = pk_compressed
       ; fee = Currency.Fee.(of_int 100)
-      ; protocol_state_precondition
       }
   ; authorization = Signature.dummy
   }
@@ -151,11 +127,7 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
 let parties : Parties.t =
   sign_all
     { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
-    ; other_parties =
-        Parties.Call_forest.of_parties_list [ deploy_party; party ]
-          ~party_depth:(fun (p : Party.Graphql_repr.t) -> p.body.call_depth)
-        |> Parties.Call_forest.map ~f:Party.of_graphql_repr
-        |> Parties.Call_forest.accumulate_hashes'
+    ; other_parties
     ; memo
     }
 

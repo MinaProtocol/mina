@@ -44,13 +44,13 @@ let of_tree (type party)
   ; calls = (Parties.Call_forest.hash calls :> Parties.Transaction_commitment.t)
   }
 
-let zkapp_statements_of_forest (type data)
-    (forest : data Parties.Call_forest.With_hashes.t) :
-    (data * t) Parties.Call_forest.With_hashes.t =
+let zkapp_statements_of_forest' (type data)
+    (forest : data Parties.Call_forest.With_hashes_and_data.t) :
+    (data * t) Parties.Call_forest.With_hashes_and_data.t =
   Parties.Call_forest.mapi_with_trees forest ~f:(fun _i (party, data) tree ->
       (party, (data, of_tree tree)) )
 
-let zkapp_statements_of_forest' (type party)
+let zkapp_statements_of_forest (type party)
     (forest : (party, _, _) Parties.Call_forest.t) :
     (party * t, _, _) Parties.Call_forest.t =
   Parties.Call_forest.mapi_with_trees forest ~f:(fun _i party tree ->

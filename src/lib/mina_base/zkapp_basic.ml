@@ -198,8 +198,7 @@ module Set_or_keep = struct
         ~back:(function
           | { Flagged_option.is_some = true; data = x } ->
               Set (Option.value_exn (to_option x))
-          | { Flagged_option.is_some = false; data = x } ->
-              assert (Option.is_none (to_option x)) ;
+          | { Flagged_option.is_some = false; data = _ } ->
               Keep )
 
     let to_input (t : _ t) ~f =

@@ -248,10 +248,10 @@ module Protocol = struct
     end]
   end
 
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Int64.t) Poly.Stable.V1.t
+      type t = (int, int, (Int64.t[@version_asserted])) Poly.Stable.V1.t
       [@@deriving equal, ord, hash]
 
       let to_latest = Fn.id
@@ -312,24 +312,6 @@ module Protocol = struct
           }
         in
         T.sexp_of_t t'
-    end
-
-    module Tests = struct
-      let%test "protocol constants serialization v1" =
-        let t : V1.t =
-          { k = 1
-          ; delta = 100
-          ; slots_per_sub_window = 10
-          ; slots_per_epoch = 1000
-          ; genesis_state_timestamp =
-              Time.of_string "2019-10-08 17:51:23.050849Z" |> of_time
-          }
-        in
-        (*from the print statement in Serialization.check_serialization*)
-        let known_good_digest = "28b7c3bb5f94351f0afa6ebd83078730" in
-        Ppx_version_runtime.Serialization.check_serialization
-          (module V1)
-          t known_good_digest
     end
   end]
 

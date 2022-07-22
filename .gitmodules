@@ -4,21 +4,12 @@
 [submodule "src/external/ppx_optcomp"]
 	path = src/external/ppx_optcomp
 	url = https://github.com/MinaProtocol/ppx_optcomp
-[submodule "src/external/async_kernel"]
-	path = src/external/async_kernel
-	url = https://github.com/MinaProtocol/async_kernel
-[submodule "src/external/rpc_parallel"]
-	path = src/external/rpc_parallel
-	url = https://github.com/MinaProtocol/rpc_parallel.git
 [submodule "frontend/wallet/tablecloth"]
 	path = frontend/wallet/tablecloth
 	url = https://github.com/bkase/tablecloth
 [submodule "src/lib/crypto/proof-systems"]
 	path = src/lib/crypto/proof-systems
 	url = https://github.com/o1-labs/proof-systems.git
-[submodule "src/external/ppx_version"]
-	path = src/external/ppx_version
-	url = https://github.com/o1-labs/ppx_version.git
 [submodule "src/external/prometheus"]
 	path = src/external/prometheus
 	url = https://github.com/MinaProtocol/prometheus.git
@@ -26,9 +17,6 @@
 [submodule "src/external/c-reference-signer"]
 	path = src/external/c-reference-signer
 	url = https://github.com/MinaProtocol/c-reference-signer.git
-[submodule "src/external/capnp-ocaml"]
-	path = src/external/capnp-ocaml
-	url = https://github.com/o1-labs/capnp-ocaml.git
 [submodule "src/lib/snarky_js_bindings/snarkyjs"]
 	path = src/lib/snarky_js_bindings/snarkyjs
 	url = https://github.com/o1-labs/snarkyjs.git

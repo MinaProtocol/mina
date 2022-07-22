@@ -171,8 +171,7 @@ module Diff_versioned = struct
       | Fee_payer_account_not_found ->
           "Fee payer account was not found in the best tip ledger"
       | Fee_payer_not_permitted_to_send ->
-          "Fee payer account permissions don't allow sending funds with \
-           signature authorization"
+          "Fee payer account permissions don't allow sending funds"
   end
 
   module Rejected = struct

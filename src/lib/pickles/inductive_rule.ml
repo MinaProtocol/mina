@@ -6,6 +6,22 @@ module B = struct
   type t = Impls.Step.Boolean.var
 end
 
+module Previous_proof_statement = struct
+  type ('prev_var, 'width) t =
+    { public_input : 'prev_var
+    ; proof : ('width, 'width) Proof.t Impls.Step.As_prover.Ref.t
+    ; proof_must_verify : B.t
+    }
+
+  module Constant = struct
+    type ('prev_value, 'width) t =
+      { public_input : 'prev_value
+      ; proof : ('width, 'width) Proof.t
+      ; proof_must_verify : bool
+      }
+  end
+end
+
 (** This type relates the types of the input and output types of an inductive
     rule's [main] function to the type of the public input to the resulting
     circuit.
@@ -28,18 +44,15 @@ type ('var, 'value, 'input_var, 'input_value, 'ret_var, 'ret_value) public_input
          public_input
 
 (** The input type of an inductive rule's main function. *)
-type ('prev_vars, 'public_input) main_input =
-  { previous_public_inputs : 'prev_vars H1.T(Id).t
-        (** A heterogeneous list of the public inputs of the previous proofs to
-            verify.
-        *)
-  ; public_input : 'public_input
+type 'public_input main_input =
+  { public_input : 'public_input
         (** The publicly-exposed input to the circuit's main function. *)
   }
 
 (** The return type of an inductive rule's main function. *)
-type ('prev_vars, 'public_output, 'auxiliary_output) main_return =
-  { previous_proofs_should_verify : 'prev_vars H1.T(E01(B)).t
+type ('prev_vars, 'widths, 'public_output, 'auxiliary_output) main_return =
+  { previous_proof_statements :
+      ('prev_vars, 'widths) H2.T(Previous_proof_statement).t
         (** A list of booleans, determining whether each previous proof must
             verify.
         *)
@@ -101,8 +114,8 @@ type ( 'prev_vars
   { identifier : string
   ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
   ; main :
-         ('prev_vars, 'a_var) main_input
-      -> ('prev_vars, 'ret_var, 'auxiliary_var) main_return
+         'a_var main_input
+      -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
   }
 
 module T
