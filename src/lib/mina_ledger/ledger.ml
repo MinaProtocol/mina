@@ -65,7 +65,7 @@ module Ledger_inner = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
-        type t = Account.Stable.V2.t [@@deriving equal, compare, sexp]
+        type t = Account.Stable.V2.t [@@deriving equal, compare, sexp, yojson]
 
         let to_latest = Fn.id
 
@@ -448,39 +448,76 @@ let apply_initial_ledger_state : t -> init_state -> unit =
       in
       create_new_account_exn t account_id account' )
 
-let%test_unit "tokens test" =
-  let open Mina_transaction_logic.For_tests in
-  let open Parties_builder in
-  let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
-  in
-  let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
-  let ledger_get_exn ledger pk token =
-    match
-      Ledger_inner.get_or_create ledger (Account_id.create pk token)
-      |> Or_error.ok_exn
-    with
-    | `Added, _, _ ->
-        failwith "Account did not exist"
-    | `Existed, acct, _ ->
-        acct
-  in
-  let pk =
-    let kp, _ = keypair_and_amounts.(0) in
-    Public_key.compress kp.public_key
-  in
-  let main (ledger : t) =
-    let execute_parties_transaction
+let%test_module "ledger tests" =
+  ( module struct
+    open Parties_builder
+    open Mina_transaction_logic.For_tests
+
+    let%test_unit "parties payment test" =
+      let open Mina_transaction_logic.For_tests in
+      let module L = Ledger_inner in
+      let constraint_constants =
+        { Genesis_constants.Constraint_constants.for_unit_tests with
+          account_creation_fee = Currency.Fee.of_int 1
+        }
+      in
+      Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+          let ts1 : Signed_command.t list = List.map specs ~f:command_send in
+          let ts2 : Parties.t list =
+            List.map specs ~f:(fun s ->
+                let use_full_commitment =
+                  Quickcheck.random_value Bool.quickcheck_generator
+                in
+                party_send ~constraint_constants ~use_full_commitment s )
+          in
+          L.with_ledger ~depth ~f:(fun l1 ->
+              L.with_ledger ~depth ~f:(fun l2 ->
+                  Init_ledger.init (module L) init_ledger l1 ;
+                  Init_ledger.init (module L) init_ledger l2 ;
+                  let open Result.Let_syntax in
+                  let%bind () =
+                    iter_err ts1 ~f:(fun t ->
+                        apply_user_command_unchecked l1 t ~constraint_constants
+                          ~txn_global_slot )
+                  in
+                  let%bind () =
+                    iter_err ts2 ~f:(fun t ->
+                        apply_parties_unchecked l2 t ~constraint_constants
+                          ~state_view:view )
+                  in
+                  let accounts =
+                    List.concat_map ~f:Parties.accounts_accessed ts2
+                  in
+                  (* TODO: Hack. The nonces are inconsistent between the 2
+                     versions. See the comment in
+                     [Mina_transaction_logic.For_tests.party_send] for more info.
+                  *)
+                  L.iteri l1 ~f:(fun index account ->
+                      L.set_at_index_exn l1 index
+                        { account with
+                          nonce =
+                            account.nonce
+                            |> Mina_numbers.Account_nonce.to_uint32
+                            |> Unsigned.UInt32.(mul (of_int 2))
+                            |> Mina_numbers.Account_nonce.to_uint32
+                        } ) ;
+                  test_eq (module L) accounts l1 l2 ) )
+          |> Or_error.ok_exn )
+
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
+    let execute_parties_transaction ~ledger ~fee_payer_pk
         (parties : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t) :
         unit =
       let _, ({ nonce; _ } : Account.t), _ =
         Ledger_inner.get_or_create ledger
-          (Account_id.create pk Token_id.default)
+          (Account_id.create fee_payer_pk Token_id.default)
         |> Or_error.ok_exn
       in
       match
         apply_parties_unchecked ~constraint_constants ~state_view:view ledger
-          (mk_parties_transaction ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+          (mk_parties_transaction ~fee:7 ~fee_payer_pk ~fee_payer_nonce:nonce
              parties )
       with
       | Ok ({ command = { status; _ }; _ }, _) -> (
@@ -503,133 +540,194 @@ let%test_unit "tokens test" =
       | Error err ->
           failwithf "Error executing transaction: %s" (Error.to_string_hum err)
             ()
-    in
-    let token_funder, _ = keypair_and_amounts.(1) in
-    let token_owner = Keypair.create () in
-    let token_account1 = Keypair.create () in
-    let token_account2 = Keypair.create () in
-    let account_creation_fee =
-      Currency.Fee.to_int constraint_constants.account_creation_fee
-    in
-    let create_token : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
-      mk_forest
-        [ mk_node
-            (mk_party_body Call token_funder Token_id.default
-               (-(4 * account_creation_fee)) )
-            []
-        ; mk_node
-            (mk_party_body Call token_owner Token_id.default
-               (3 * account_creation_fee) )
-            []
-        ]
-    in
-    let custom_token_id =
-      Account_id.derive_token_id
-        ~owner:
-          (Account_id.create
-             (Public_key.compress token_owner.public_key)
-             Token_id.default )
-    in
-    let token_minting =
-      mk_forest
-        [ mk_node
-            (mk_party_body Call token_owner Token_id.default
-               (-account_creation_fee) )
-            [ mk_node (mk_party_body Call token_account1 custom_token_id 100) []
-            ]
-        ]
-    in
-    let token_transfers =
-      mk_forest
-        [ mk_node
-            (mk_party_body Call token_owner Token_id.default
-               (-account_creation_fee) )
-            [ mk_node
-                (mk_party_body Call token_account1 custom_token_id (-30))
-                []
-            ; mk_node (mk_party_body Call token_account2 custom_token_id 30) []
-            ; mk_node
-                (mk_party_body Call token_account1 custom_token_id (-10))
-                []
-            ; mk_node (mk_party_body Call token_account2 custom_token_id 10) []
-            ; mk_node
-                (mk_party_body Call token_account2 custom_token_id (-5))
-                []
-            ; mk_node (mk_party_body Call token_account1 custom_token_id 5) []
-            ]
-        ]
-    in
-    let check_token_balance k balance =
-      [%test_eq: Currency.Balance.t]
-        (ledger_get_exn ledger
-           (Public_key.compress k.Keypair.public_key)
-           custom_token_id )
-          .balance
-        (Currency.Balance.of_int balance)
-    in
-    execute_parties_transaction create_token ;
-    (* Check that token_owner exists *)
-    ledger_get_exn ledger
-      (Public_key.compress token_owner.public_key)
-      Token_id.default
-    |> ignore ;
-    execute_parties_transaction token_minting ;
-    check_token_balance token_account1 100 ;
-    execute_parties_transaction token_transfers ;
-    check_token_balance token_account1 65 ;
-    check_token_balance token_account2 35
-  in
-  Ledger_inner.with_ledger ~depth ~f:(fun ledger ->
-      Init_ledger.init
-        (module Ledger_inner)
-        [| keypair_and_amounts.(0); keypair_and_amounts.(1) |]
-        ledger ;
-      main ledger )
 
-let%test_unit "parties payment test" =
-  let open Mina_transaction_logic.For_tests in
-  let module L = Ledger_inner in
-  let constraint_constants =
-    { Genesis_constants.Constraint_constants.for_unit_tests with
-      account_creation_fee = Currency.Fee.of_int 1
-    }
-  in
-  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
-      let ts1 : Signed_command.t list = List.map specs ~f:command_send in
-      let ts2 : Parties.t list =
-        List.map specs ~f:(fun s ->
-            let use_full_commitment =
-              Quickcheck.random_value Bool.quickcheck_generator
-            in
-            party_send ~constraint_constants ~use_full_commitment s )
+    let%test_unit "tokens test" =
+      let open Mina_transaction_logic.For_tests in
+      let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
+      let ledger_get_exn ledger pk token =
+        match
+          Ledger_inner.get_or_create ledger (Account_id.create pk token)
+          |> Or_error.ok_exn
+        with
+        | `Added, _, _ ->
+            failwith "Account did not exist"
+        | `Existed, acct, _ ->
+            acct
       in
-      L.with_ledger ~depth ~f:(fun l1 ->
-          L.with_ledger ~depth ~f:(fun l2 ->
-              Init_ledger.init (module L) init_ledger l1 ;
-              Init_ledger.init (module L) init_ledger l2 ;
-              let open Result.Let_syntax in
-              let%bind () =
-                iter_err ts1 ~f:(fun t ->
-                    apply_user_command_unchecked l1 t ~constraint_constants
-                      ~txn_global_slot )
-              in
-              let%bind () =
-                iter_err ts2 ~f:(fun t ->
-                    apply_parties_unchecked l2 t ~constraint_constants
-                      ~state_view:view )
-              in
-              let accounts = List.concat_map ~f:Parties.accounts_accessed ts2 in
-              (* TODO: Hack. The nonces are inconsistent between the 2
-                 versions. See the comment in
-                 [Mina_transaction_logic.For_tests.party_send] for more info.
-              *)
-              L.iteri l1 ~f:(fun index account ->
-                  L.set_at_index_exn l1 index
-                    { account with
-                      nonce =
-                        account.nonce |> Mina_numbers.Account_nonce.to_uint32
-                        |> Unsigned.UInt32.(mul (of_int 2))
-                        |> Mina_numbers.Account_nonce.to_uint32
-                    } ) ;
-              test_eq (module L) accounts l1 l2 ) )
-      |> Or_error.ok_exn )
+      let main (ledger : t) =
+        let fee_payer_pk =
+          let kp, _ = keypair_and_amounts.(0) in
+          Public_key.compress kp.public_key
+        in
+        let execute = execute_parties_transaction ~ledger ~fee_payer_pk in
+        let token_funder, _ = keypair_and_amounts.(1) in
+        let token_owner = Keypair.create () in
+        let token_account1 = Keypair.create () in
+        let token_account2 = Keypair.create () in
+        let account_creation_fee =
+          Currency.Fee.to_int constraint_constants.account_creation_fee
+        in
+        let create_token :
+            (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
+          mk_forest
+            [ mk_node
+                (mk_party_body Call token_funder Token_id.default
+                   (-(4 * account_creation_fee)) )
+                []
+            ; mk_node
+                (mk_party_body Call token_owner Token_id.default
+                   (3 * account_creation_fee) )
+                []
+            ]
+        in
+        let custom_token_id =
+          Account_id.derive_token_id
+            ~owner:
+              (Account_id.create
+                 (Public_key.compress token_owner.public_key)
+                 Token_id.default )
+        in
+        let token_minting =
+          mk_forest
+            [ mk_node
+                (mk_party_body Call token_owner Token_id.default
+                   (-account_creation_fee) )
+                [ mk_node
+                    (mk_party_body Call token_account1 custom_token_id 100)
+                    []
+                ]
+            ]
+        in
+        let token_transfers =
+          mk_forest
+            [ mk_node
+                (mk_party_body Call token_owner Token_id.default
+                   (-account_creation_fee) )
+                [ mk_node
+                    (mk_party_body Call token_account1 custom_token_id (-30))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id 30)
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account1 custom_token_id (-10))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id 10)
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account2 custom_token_id (-5))
+                    []
+                ; mk_node
+                    (mk_party_body Call token_account1 custom_token_id 5)
+                    []
+                ]
+            ]
+        in
+        let check_token_balance k balance =
+          [%test_eq: Currency.Balance.t]
+            (ledger_get_exn ledger
+               (Public_key.compress k.Keypair.public_key)
+               custom_token_id )
+              .balance
+            (Currency.Balance.of_int balance)
+        in
+        execute create_token ;
+        (* Check that token_owner exists *)
+        ledger_get_exn ledger
+          (Public_key.compress token_owner.public_key)
+          Token_id.default
+        |> ignore ;
+        execute token_minting ;
+        check_token_balance token_account1 100 ;
+        execute token_transfers ;
+        check_token_balance token_account1 65 ;
+        check_token_balance token_account2 35
+      in
+      Ledger_inner.with_ledger ~depth ~f:(fun ledger ->
+          Init_ledger.init
+            (module Ledger_inner)
+            [| keypair_and_amounts.(0); keypair_and_amounts.(1) |]
+            ledger ;
+          main ledger )
+
+    let%test_unit "parties sequence events test" =
+      let open Mina_transaction_logic.For_tests in
+      let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
+      let main (ledger : t) =
+        let fee_payer_pk =
+          let kp, _ = keypair_and_amounts.(0) in
+          Public_key.compress kp.public_key
+        in
+        let execute = execute_parties_transaction ~ledger ~fee_payer_pk in
+        let fee_payer, _ = keypair_and_amounts.(0) in
+        let other_party, _ = keypair_and_amounts.(1) in
+        (* update permissions to allow setting sequence state *)
+        let _set_body_update ~update (body : Party.Body.Simple.t) :
+            Party.Body.Simple.t =
+          { body with update }
+        in
+        let set_body_sequence_events (body : Party.Body.Simple.t) :
+            Party.Body.Simple.t =
+          let sequence_events =
+            let open Snark_params.Tick.Field in
+            let array0 = [| zero; one |] in
+            let array1 = [| one; zero; one |] in
+            [ array0; array1 ]
+          in
+          { body with sequence_events }
+        in
+        let set_body_sequence_events2 (body : Party.Body.Simple.t) :
+            Party.Body.Simple.t =
+          let sequence_events =
+            let open Snark_params.Tick.Field in
+            let array0 = [| one; zero; one |] in
+            let array1 = [| one; zero; zero |] in
+            [ array0; array1 ]
+          in
+          { body with sequence_events }
+        in
+        (* let set_update_permissions ~permissions (update : Party.Update.t) =
+           { update with permissions = Set permissions }
+           in *)
+        let create_zkapp_account :
+            (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
+          mk_forest
+            [ mk_node (mk_party_body Call fee_payer Token_id.default 0) []
+            ; (let body =
+                 set_body_sequence_events
+                   (mk_party_body Call other_party Token_id.default 0)
+               in
+               mk_node body [] )
+            ]
+        in
+        let change_zkapp_account :
+            (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
+          mk_forest
+            [ mk_node (mk_party_body Call fee_payer Token_id.default 0) []
+            ; (let body =
+                 set_body_sequence_events2
+                   (mk_party_body Call other_party Token_id.default 0)
+               in
+               mk_node body [] )
+            ]
+        in
+        Ledger_inner.iteri ledger ~f:(fun _ acct ->
+            Format.eprintf "ACCOUNT BEFORE: %s@."
+              (Account.to_yojson acct |> Yojson.Safe.to_string) ) ;
+        execute create_zkapp_account ;
+        Ledger_inner.iteri ledger ~f:(fun _ acct ->
+            Format.eprintf "ACCOUNT AFTER: %s@."
+              (Account.to_yojson acct |> Yojson.Safe.to_string) ) ;
+        execute change_zkapp_account ;
+        Ledger_inner.iteri ledger ~f:(fun _ acct ->
+            Format.eprintf "ACCOUNT AFTER2: %s@."
+              (Account.to_yojson acct |> Yojson.Safe.to_string) )
+      in
+      Ledger_inner.with_ledger ~depth ~f:(fun ledger ->
+          Init_ledger.init
+            (module Ledger_inner)
+            [| keypair_and_amounts.(0); keypair_and_amounts.(1) |]
+            ledger ;
+          main ledger )
+  end )

@@ -121,13 +121,12 @@ module type S = sig
 end
 
 module type S_with_version = sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, sexp, bin_io, compare, yojson, hash, equal]
+      type t [@@deriving sexp, compare, yojson, hash, equal]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
 end
