@@ -899,18 +899,6 @@ module Data = struct
       go None delegators
   end
 
-(*  module Optional_state_hash = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = Mina_base.State_hash.Stable.V1.t option
-        [@@deriving sexp, compare, hash, to_yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end *)
-
   module Epoch_data = struct
     include Mina_base.Epoch_data
 
@@ -2540,7 +2528,7 @@ module Hooks = struct
         include Master
       end)
 
-      (* module V2 = struct
+      module V2 = struct
         module T = struct
           type query = Mina_base.Ledger_hash.Stable.V1.t
 
@@ -2568,7 +2556,7 @@ module Hooks = struct
 
         include T'
         include Register (T')
-      end*)
+      end
 
       let implementation ~context:(module Context : CONTEXT) ~local_state
           ~genesis_ledger_hash conn ~version:_ ledger_hash =

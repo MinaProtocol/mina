@@ -36,18 +36,6 @@ let with_top_hash_logging f =
     top_hash_logging_enabled := old ;
     raise err
 
-(* module Proof_type = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = [ `Base | `Merge ]
-      [@@deriving compare, equal, hash, sexp, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-end *)
-
 module Pending_coinbase_stack_state = struct
   module Init_stack = struct
     [%%versioned
@@ -1614,7 +1602,6 @@ module Base = struct
 
       let { auth_type; is_start = _ } = spec
 
-      (* module V = Prover_value *)
       open Impl
 
       module Inputs = struct
@@ -3201,17 +3188,6 @@ module Base = struct
     | _ ->
         handler r
 end
-
-(* module Transition_data = struct
-  type t =
-    { proof : Proof_type.t
-    ; supply_increase : (Amount.t, Sgn.t) Signed_poly.t
-    ; fee_excess : Fee_excess.t
-    ; sok_digest : Sok_message.Digest.t
-    ; pending_coinbase_stack_state : Pending_coinbase_stack_state.t
-    }
-  [@@deriving fields]
-end *)
 
 module Merge = struct
   open Tick

@@ -146,7 +146,6 @@ module Worker_state = struct
              end : S )
          | Check ->
              ( module struct
-                 (* module Transaction_snark = Transaction_snark *)
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
@@ -179,8 +178,7 @@ module Worker_state = struct
                let verify _state _proof = Deferred.return true
              end : S )
          | None ->
-             ( module struct
-                 (* module Transaction_snark = Transaction_snark *)
+             ( module struct                 
 
                let extend_blockchain _chain next_state _block _ledger_proof
                    _state_for_handler _pending_coinbase =

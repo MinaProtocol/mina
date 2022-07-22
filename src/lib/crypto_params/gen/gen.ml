@@ -2,7 +2,6 @@
 
 open Ppxlib
 open Core_kernel
-(* module Impl = Pickles.Impls.Step.Internal_Basic *)
 module Group = Pickles.Backend.Tick.Inner_curve
 
 let group_map_params =

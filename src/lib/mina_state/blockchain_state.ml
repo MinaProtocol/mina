@@ -84,8 +84,6 @@ let typ : (var, Value.t) Typ.t =
   Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-(* module Impl = Pickles.Impls.Step *)
-
 let var_to_input
     ({ staged_ledger_hash
      ; genesis_ledger_hash

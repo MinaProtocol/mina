@@ -1,7 +1,6 @@
 open Core
 open Async
 open Webkit_trace_event
-(* module Scheduler = Async_kernel_scheduler *)
 
 let current_wr = ref None
 

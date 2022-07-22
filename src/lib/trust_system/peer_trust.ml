@@ -232,7 +232,6 @@ let%test_module "peer_trust" =
       let advance span = current_time := Time.add !current_time span
     end
 
-    (* module Mock_record = Record.Make (Mock_now) *)
     module Db = Key_value_database.Make_mock (Int) (Record)
 
     module Peer_id = struct

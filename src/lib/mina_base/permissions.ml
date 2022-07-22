@@ -9,9 +9,6 @@ open Snark_params.Tick
 
 [%%endif]
 
-(* module Frozen_ledger_hash = Frozen_ledger_hash0 *)
-(* module Ledger_hash = Ledger_hash0 *)
-
 (* Semantically this type represents a function
      { has_valid_signature: bool; has_valid_proof: bool } -> bool
 
