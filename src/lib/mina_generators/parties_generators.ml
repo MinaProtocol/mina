@@ -1153,9 +1153,11 @@ let gen_parties_from ?failure
   Hash_set.add account_ids_seen fee_payer_account_id ;
   let%bind balancing_party =
     let authorization = Control.Signature Signature.dummy in
-    gen_party_from ?failure ~zkapp_account_ids ~account_ids_seen ~authorization
-      ~new_account:false ~available_public_keys ~ledger
-      ~required_balance_change:Currency.Amount.(Signed.zero)
+    gen_party_from ?failure ~permissions_auth:Control.Tag.Signature
+      ~zkapp_account_ids ~account_ids_seen ~authorization ~new_account:false
+      ~available_public_keys ~ledger
+      ~required_balance_change:
+        { magnitude = Currency.Amount.of_int 1; sgn = Neg }
       ~account_state_tbl ?protocol_state_view ?vk ()
   in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
@@ -1382,15 +1384,7 @@ let gen_parties_from ?failure
   *)
   let balance_change = Currency.Amount.Signed.negate balance_change_sum in
   let balancing_party =
-    { balancing_party with
-      body =
-        { balancing_party.body with
-          balance_change
-        ; increment_nonce =
-            ( if Currency.Amount.Signed.is_negative balance_change then true
-            else balancing_party.body.increment_nonce )
-        }
-    }
+    { balancing_party with body = { balancing_party.body with balance_change } }
   in
   Account_id.Table.update account_state_tbl
     (Account_id.create balancing_party.body.public_key Token_id.default)
@@ -1403,10 +1397,6 @@ let gen_parties_from ?failure
             Currency.Balance.add_signed_amount_flagged account.balance
               balance_change
             |> fst
-        ; nonce =
-            ( if Currency.Amount.Signed.is_negative balance_change then
-              Account.Nonce.succ account.nonce
-            else account.nonce )
         } ) ;
   (* modify the account balance && nonce precondition of the balancing account to reflect the change*)
   let other_parties =
@@ -1444,10 +1434,9 @@ let gen_parties_from ?failure
                                            }
                                    | _ ->
                                        precond.balance )
-                               ; nonce = Ignore
                                }
                          | _ ->
-                             Accept )
+                             party.body.preconditions.account )
                      }
                  }
              }
