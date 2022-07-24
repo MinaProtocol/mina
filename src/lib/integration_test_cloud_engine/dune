@@ -3,7 +3,47 @@
  (name integration_test_cloud_engine)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_optcomp graphql_ppx ppx_let ppx_inline_test ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving ppx_pipebang ppx_sexp_conv))
- (libraries
-   core async lens mina_base pipe_lib runtime_config genesis_constants graphql_lib transition_frontier user_command_input genesis_ledger_helper integration_test_lib block_time interruptible exit_handlers transition_router block_producer)
+ (preprocessor_deps ../../graphql-ppx-config.inc)
+ (preprocess (pps
+               ppx_coda ppx_version ppx_let ppx_inline_test ppx_pipebang
+               ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving
+               ppx_sexp_conv
+               graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}))
+(libraries
+   ;; opam libraries
+   async_unix
+   async_kernel
+   core_kernel
+   core
+   async
+   cmdliner
+   base
+   uri
+   sexplib0
+   stdio
+   result
+   base.caml
+   integers
+   ;; local libraries
+   integration_test_lib
+   graphql_lib
+   coda_runtime_config
+   mina_base
+   genesis_constants
+   genesis_ledger_helper
+   logger
+   signature_lib
+   currency
+   mina_version
+   timeout_lib
+   mina_numbers
+   file_system
+   pickles
+   pickles_types
+   backend
+   with_hash
+   data_hash_lib
+   unsigned_extended
+   mina_graphql
+   )
 )

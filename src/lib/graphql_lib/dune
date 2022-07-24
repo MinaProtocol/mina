@@ -2,6 +2,24 @@
  (name graphql_lib)
  (public_name graphql_lib)
  (libraries
-   async cohttp core cohttp-async mina_base graphql-async graphql-cohttp)
+   ;; opam libraries
+   async_unix
+   uri
+   core_kernel
+   integers
+   async
+   cohttp
+   core
+   cohttp-async
+   graphql-async
+   graphql-cohttp
+   async_kernel
+   result
+   ;; local libraries
+   mina_numbers
+   currency
+   signature_lib
+   mina_base
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))

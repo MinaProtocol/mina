@@ -35,12 +35,16 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Histogram = struct
   type t = unit
 
   let observe : t -> float -> unit = fun _ _ -> ()
+
+  let buckets () = []
 end
 
 module Runtime = struct
@@ -69,12 +73,22 @@ end
 
 module Bootstrap = struct
   let bootstrap_time_ms : Gauge.t = ()
+
+  let staking_epoch_ledger_sync_ms : Counter.t = ()
+
+  let next_epoch_ledger_sync_ms : Counter.t = ()
+
+  let root_snarked_ledger_sync_ms : Counter.t = ()
+
+  let num_of_root_snarked_ledger_retargeted : Gauge.t = ()
 end
 
 module Transaction_pool = struct
   let useful_transactions_received_time_sec : Gauge.t = ()
 
   let pool_size : Gauge.t = ()
+
+  let transactions_added_to_pool : Counter.t = ()
 end
 
 module Network = struct
@@ -100,6 +114,14 @@ module Network = struct
     module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Snark_work = struct
@@ -114,6 +136,14 @@ module Network = struct
     module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Transaction = struct
@@ -126,6 +156,14 @@ module Network = struct
     let received : Counter.t = ()
 
     module Validation_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
   end
@@ -337,6 +375,10 @@ module Block_producer = struct
   let slots_won : Counter.t = ()
 
   let blocks_produced : Counter.t = ()
+
+  module Block_production_delay_histogram = Histogram
+
+  let block_production_delay : Block_production_delay_histogram.t = ()
 end
 
 module Transition_frontier = struct
@@ -388,7 +430,7 @@ module Transition_frontier = struct
 
   let best_tip_block_height : Gauge.t = ()
 
-  let root_snarked_ledger_accounts : Gauge.t = ()
+  let root_snarked_ledger_accounts : Counter.t = ()
 
   let root_snarked_ledger_total_currency : Gauge.t = ()
 end

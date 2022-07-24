@@ -2,8 +2,6 @@ let Prelude = ../External/Prelude.dhall
 let RunInToolchain = ../Command/RunInToolchain.dhall
 let ContainerImages = ./ContainerImages.dhall
 
-let dependsOnGitEnv = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
-
 let DebVersion = < Bullseye | Buster | Stretch | Focal | Bionic >
 
 let capitalName = \(debVersion : DebVersion) ->
@@ -46,11 +44,11 @@ let toolchainImage = \(debVersion : DebVersion) ->
 
 let dependsOn = \(debVersion : DebVersion) ->
   merge {
-    Bullseye = dependsOnGitEnv # [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
-    , Buster = dependsOnGitEnv # [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
-    , Stretch = dependsOnGitEnv # [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
-    , Bionic = dependsOnGitEnv # [{ name = "MinaArtifactBionic", key = "build-deb-pkg" }]
-    , Focal = dependsOnGitEnv # [{ name = "MinaArtifactFocal", key = "build-deb-pkg" }]
+    Bullseye = [{ name = "MinaArtifactBullseye", key = "build-deb-pkg" }]
+    , Buster = [{ name = "MinaArtifactBuster", key = "build-deb-pkg" }]
+    , Stretch = [{ name = "MinaArtifactStretch", key = "build-deb-pkg" }]
+    , Bionic = [{ name = "MinaArtifactBionic", key = "build-deb-pkg" }]
+    , Focal = [{ name = "MinaArtifactFocal", key = "build-deb-pkg" }]
   } debVersion
 
 in
@@ -62,5 +60,4 @@ in
   , toolchainRunner = toolchainRunner
   , toolchainImage = toolchainImage
   , dependsOn = dependsOn
-  , dependsOnGitEnv = dependsOnGitEnv
 }

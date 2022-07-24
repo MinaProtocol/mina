@@ -12,7 +12,7 @@ type Structured_log_events.t +=
             | `String time ->
                 Ok (Time.Span.of_string time)
             | _ ->
-                Error "Snark_worker.Functor: Could not parse timespan"])
+                Error "Snark_worker.Functor: Could not parse timespan"] )
       }
   [@@deriving register_event { msg = "Merge SNARK generated in $time" }]
 
@@ -26,7 +26,7 @@ type Structured_log_events.t +=
             | `String time ->
                 Ok (Time.Span.of_string time)
             | _ ->
-                Error "Snark_worker.Functor: Could not parse timespan"])
+                Error "Snark_worker.Functor: Could not parse timespan"] )
       }
   [@@deriving register_event { msg = "Base SNARK generated in $time" }]
 
@@ -73,7 +73,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         in
         ( proof
         , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
-        ))
+        ) )
     |> Deferred.Or_error.map ~f:(function
          | `One (proof1, metrics1) ->
              { Snark_work_lib.Work.Result.proofs = `One proof1
@@ -86,7 +86,7 @@ module Make (Inputs : Intf.Inputs_intf) :
              ; metrics = `Two (metrics1, metrics2)
              ; spec
              ; prover = public_key
-             })
+             } )
 
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
@@ -97,11 +97,11 @@ module Make (Inputs : Intf.Inputs_intf) :
           (Rpc.Connection.Heartbeat_config.create
              ~timeout:
                (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_timeout_sec)
+                  Mina_compile_config.rpc_heartbeat_timeout_sec )
              ~send_every:
                (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_send_every_sec)
-             ())
+                  Mina_compile_config.rpc_heartbeat_send_every_sec )
+             () )
         (Tcp.Where_to_connect.of_host_and_port address)
         (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
@@ -132,11 +132,11 @@ module Make (Inputs : Intf.Inputs_intf) :
             Mina_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
-            [%str_log info] (Base_snark_generated { time }))
+            [%str_log info] (Base_snark_generated { time }) )
 
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t) ~logger
+        with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
       ~proof_level daemon_address shutdown_on_disconnect =
     let constraint_constants =
       (* TODO: Make this configurable. *)
@@ -207,7 +207,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               ; ( "work_ids"
                 , Transaction_snark_work.Statement.compact_json
                     (One_or_two.map (Work.Spec.instances work)
-                       ~f:Work.Single.Spec.statement) )
+                       ~f:Work.Single.Spec.statement ) )
               ] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
@@ -222,7 +222,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   ; ( "work_ids"
                     , Transaction_snark_work.Statement.compact_json
                         (One_or_two.map (Work.Spec.instances work)
-                           ~f:Work.Single.Spec.statement) )
+                           ~f:Work.Single.Spec.statement ) )
                   ] ;
               let rec submit_work () =
                 match%bind
@@ -241,7 +241,7 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let command_from_rpcs
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t) =
+        with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
@@ -266,7 +266,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;
-            Core.exit 0) ;
+            Core.exit 0 ) ;
         let proof_level =
           Option.value ~default:Genesis_constants.Proof_level.compiled
             proof_level

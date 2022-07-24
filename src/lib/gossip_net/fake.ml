@@ -14,7 +14,11 @@ module type S = sig
   val create_network : Peer.t list -> network
 
   val create_instance :
-    network -> Peer.t -> Rpc_intf.rpc_handler list -> t Deferred.t
+       network
+    -> Peer.t
+    -> Rpc_intf.rpc_handler list
+    -> Message.sinks
+    -> t Deferred.t
 end
 
 module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
@@ -25,18 +29,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   module Network = struct
     type rpc_hook =
       { hook :
-          'q 'r.    Peer.Id.t -> ('q, 'r) rpc -> 'q
+          'q 'r.
+             Peer.Id.t
+          -> ('q, 'r) rpc
+          -> 'q
           -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
       }
 
-    type network_interface =
-      { broadcast_message_writer :
-          ( Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
-          , Strict_pipe.crash Strict_pipe.buffered
-          , unit )
-          Strict_pipe.Writer.t
-      ; rpc_hook : rpc_hook
-      }
+    type network_interface = { sinks : Message.sinks; rpc_hook : rpc_hook }
 
     type node = { peer : Peer.t; mutable interface : network_interface option }
 
@@ -46,14 +46,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let nodes = Hashtbl.create (module Peer.Id) in
       List.iter peers ~f:(fun peer ->
           Hashtbl.add_multi nodes ~key:peer.Peer.peer_id
-            ~data:{ peer; interface = None }) ;
+            ~data:{ peer; interface = None } ) ;
       { nodes }
 
     let get_initial_peers { nodes } local_ip =
       Hashtbl.data nodes |> List.concat
       |> List.filter_map ~f:(fun node ->
              if Unix.Inet_addr.equal node.peer.host local_ip then None
-             else Some node.peer)
+             else Some node.peer )
 
     let lookup_node t peer =
       let error = Error.of_string "peer does not exist" in
@@ -75,19 +75,27 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           Or_error.error_string
             "cannot call rpc on peer which was never registered"
 
-    let broadcast t ~sender msg =
-      Hashtbl.iter t.nodes ~f:(fun nodes ->
-          List.iter nodes ~f:(fun node ->
-              if not (Peer.equal node.peer sender) then
-                Or_error.iter (get_interface node) ~f:(fun intf ->
+    let broadcast t ~sender msg send_f =
+      Hashtbl.fold t.nodes ~init:Deferred.unit
+        ~f:(fun ~key:_ ~data:nodes prev ->
+          prev
+          >>= fun () ->
+          Deferred.List.iter ~how:`Sequential nodes ~f:(fun node ->
+              if Peer.equal node.peer sender then Deferred.unit
+              else
+                Option.fold node.interface
+                  ~f:(fun a intf ->
+                    a
+                    >>= fun () ->
                     let msg =
                       Envelope.(
                         Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
                     in
-                    Strict_pipe.Writer.write intf.broadcast_message_writer
+                    send_f intf.sinks
                       ( msg
                       , Mina_net2.Validation_callback.create_without_expiration
-                          () ))))
+                          () ) )
+                  ~init:Deferred.unit ) )
 
     let call_rpc :
         type q r.
@@ -120,16 +128,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       ; peer_table : (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers : Peer.t list
       ; connection_gating : Mina_net2.connection_gating ref
-      ; received_message_reader :
-          (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
-          Strict_pipe.Reader.t
-      ; received_message_writer :
-          ( Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
-          , Strict_pipe.crash Strict_pipe.buffered
-          , unit )
-          Strict_pipe.Writer.t
       ; ban_notification_reader : ban_notification Linear_pipe.Reader.t
       ; ban_notification_writer : ban_notification Linear_pipe.Writer.t
+      ; time_controller : Block_time.Controller.t
       }
 
     let rpc_hook t rpc_handlers =
@@ -153,7 +154,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         match
           List.find_map rpc_handlers ~f:(fun handler ->
               match_handler handler rpc ~do_:(fun f ->
-                  f sender ~version:latest_version query))
+                  f sender ~version:latest_version query ) )
         with
         | None ->
             failwith "fake gossip net error: rpc not implemented"
@@ -164,16 +165,17 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       in
       Network.{ hook }
 
-    let create network me rpc_handlers =
+    let create network me rpc_handlers sinks =
       let initial_peers = Network.get_initial_peers network me.Peer.host in
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
-          Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer) ;
-      let received_message_reader, received_message_writer =
-        Strict_pipe.(create (Buffered (`Capacity 5, `Overflow Crash)))
-      in
+          Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer ) ;
       let ban_notification_reader, ban_notification_writer =
         Linear_pipe.create ()
+      in
+      let time_controller =
+        Block_time.Controller.create
+        @@ Block_time.Controller.basic ~logger:(Logger.create ())
       in
       let t =
         { network
@@ -185,17 +187,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             ref
               Mina_net2.
                 { banned_peers = []; trusted_peers = []; isolate = false }
-        ; received_message_reader
-        ; received_message_writer
         ; ban_notification_reader
         ; ban_notification_writer
+        ; time_controller
         }
       in
       Network.(
         attach_interface network me
-          { broadcast_message_writer = received_message_writer
-          ; rpc_hook = rpc_hook t rpc_handlers
-          }) ;
+          { sinks; rpc_hook = rpc_hook t rpc_handlers }) ;
       t
 
     let peers { peer_table; _ } = Hashtbl.data peer_table |> Deferred.return
@@ -232,9 +231,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let on_first_high_connectivity _ ~f:_ = Deferred.never ()
 
-    let received_message_reader { received_message_reader; _ } =
-      received_message_reader
-
     let ban_notification_reader { ban_notification_reader; _ } =
       ban_notification_reader
 
@@ -253,7 +249,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               | Connected x ->
                   x.data
               | Failed_to_connect e ->
-                  return (Mina_base.Rpc_intf.Failed_to_connect e))
+                  return (Mina_base.Rpc_intf.Failed_to_connect e) )
             |> Or_error.all
           in
           let sender =
@@ -261,11 +257,32 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               (Hashtbl.find t.peer_table peer)
               ~error:(Error.createf "failed to find peer %s in peer_table" peer)
           in
-          Connected (Envelope.Incoming.wrap_peer ~data ~sender))
+          Connected (Envelope.Incoming.wrap_peer ~data ~sender) )
 
     let query_random_peers _ = failwith "TODO stub"
 
-    let broadcast t msg = Network.broadcast t.network ~sender:t.me msg
+    let broadcast_state ?origin_topic t state =
+      ignore origin_topic ;
+      Network.broadcast t.network ~sender:t.me state
+        (fun (Any_sinks (sinksM, (sink_block, _, _))) (env, vc) ->
+          let time = Block_time.now t.time_controller in
+          let module M = (val sinksM) in
+          M.Block_sink.push sink_block
+            (`Transition env, `Time_received time, `Valid_cb vc) )
+
+    let broadcast_snark_pool_diff ?origin_topic t diff =
+      ignore origin_topic ;
+      Network.broadcast t.network ~sender:t.me diff
+        (fun (Any_sinks (sinksM, (_, _, sink_snark_work))) ->
+          let module M = (val sinksM) in
+          M.Snark_sink.push sink_snark_work )
+
+    let broadcast_transaction_pool_diff ?origin_topic t diff =
+      ignore origin_topic ;
+      Network.broadcast t.network ~sender:t.me diff
+        (fun (Any_sinks (sinksM, (_, sink_tx, _))) ->
+          let module M = (val sinksM) in
+          M.Tx_sink.push sink_tx )
 
     let connection_gating t = Deferred.return !(t.connection_gating)
 
@@ -282,6 +299,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let create_network = Network.create
 
-  let create_instance network local_ip impls =
-    Deferred.return (Instance.create network local_ip impls)
+  let create_instance network local_ip impls sinks =
+    Deferred.return (Instance.create network local_ip impls sinks)
 end

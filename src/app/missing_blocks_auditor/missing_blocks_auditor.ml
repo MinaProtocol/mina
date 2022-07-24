@@ -46,21 +46,33 @@ let main ~archive_uri () =
       let missing_blocks =
         List.filter missing_blocks_raw ~f:(fun (_, _, height, _) -> height <> 1)
       in
-      if List.is_empty missing_blocks then
-        [%log info] "There are no missing blocks in the archive db"
-      else (
-        add_error missing_blocks_error ;
-        List.iter missing_blocks
-          ~f:(fun (block_id, state_hash, height, parent_hash) ->
-            if height > 1 then
-              [%log info] "Block has no parent in archive db"
-                ~metadata:
-                  [ ("block_id", `Int block_id)
-                  ; ("state_hash", `String state_hash)
-                  ; ("height", `Int height)
-                  ; ("parent_hash", `String parent_hash)
-                  ; ("parent_height", `Int (height - 1))
-                  ]) ) ;
+      let%bind () =
+        if List.is_empty missing_blocks then
+          return @@ [%log info] "There are no missing blocks in the archive db"
+        else (
+          add_error missing_blocks_error ;
+          Deferred.List.iter missing_blocks
+            ~f:(fun (block_id, state_hash, height, parent_hash) ->
+              match%map
+                Caqti_async.Pool.use
+                  (fun db -> Sql.Missing_blocks_gap.run db height)
+                  pool
+              with
+              | Ok gap_size ->
+                  [%log info] "Block has no parent in archive db"
+                    ~metadata:
+                      [ ("block_id", `Int block_id)
+                      ; ("state_hash", `String state_hash)
+                      ; ("height", `Int height)
+                      ; ("parent_hash", `String parent_hash)
+                      ; ("parent_height", `Int (height - 1))
+                      ; ("missing_blocks_gap", `Int gap_size)
+                      ]
+              | Error msg ->
+                  [%log error] "Error getting missing blocks gap"
+                    ~metadata:[ ("error", `String (Caqti_error.show msg)) ] ;
+                  Core_kernel.exit 1 ) )
+      in
       [%log info] "Querying for gaps in chain statuses" ;
       let%bind highest_canonical =
         match%bind
@@ -79,7 +91,7 @@ let main ~archive_uri () =
         match%bind
           Caqti_async.Pool.use
             (fun db ->
-              Sql.Chain_status.run_count_pending_below db highest_canonical)
+              Sql.Chain_status.run_count_pending_below db highest_canonical )
             pool
         with
         | Ok count ->
@@ -107,8 +119,7 @@ let main ~archive_uri () =
       let%bind canonical_chain =
         match%bind
           Caqti_async.Pool.use
-            (fun db ->
-              Sql.Chain_status.run_canonical_chain db highest_canonical)
+            (fun db -> Sql.Chain_status.run_canonical_chain db highest_canonical)
             pool
         with
         | Ok chain ->
@@ -128,7 +139,7 @@ let main ~archive_uri () =
       let invalid_chain =
         List.filter canonical_chain
           ~f:(fun (_block_id, _state_hash, chain_status) ->
-            not (String.equal chain_status "canonical"))
+            not (String.equal chain_status "canonical") )
       in
       if List.is_empty invalid_chain then
         [%log info]
@@ -141,7 +152,7 @@ let main ~archive_uri () =
               [ ("block_id", `Int block_id)
               ; ("state_hash", `String state_hash)
               ; ("chain_status", `String chain_status)
-              ]) ;
+              ] ) ;
       Core.exit (get_exit_code ())
 
 let () =
@@ -157,4 +168,4 @@ let () =
                 postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
          in
-         main ~archive_uri)))
+         main ~archive_uri )))

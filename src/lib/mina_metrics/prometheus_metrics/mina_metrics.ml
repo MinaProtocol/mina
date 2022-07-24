@@ -97,13 +97,15 @@ module TextFormat_0_0_4 = struct
         Fmt.pf f "#HELP %a %a@.#TYPE %a %a@.%a" MetricName.pp name
           output_unquoted help MetricName.pp name output_metric_type metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
-          samples)
+          samples )
 end
 
 module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Runtime = struct
@@ -129,21 +131,15 @@ module Runtime = struct
 
   let current_gc = ref (Gc.stat ())
 
-  let current_jemalloc = ref (Jemalloc.get_memory_stats ())
-
   let gc_stat_interval_mins = ref 15.
 
   let gc_allocated_bytes = ref (Gc.allocated_bytes ())
 
   let rec gc_stat () =
-    Async.Deferred.(
-      upon
-        (after (Time_ns.Span.of_min !gc_stat_interval_mins))
-        (fun () ->
-          current_gc := Gc.stat () ;
-          current_jemalloc := Jemalloc.get_memory_stats () ;
-          gc_allocated_bytes := Gc.allocated_bytes () ;
-          gc_stat ()))
+    let%bind () = after (Time_ns.Span.of_min !gc_stat_interval_mins) in
+    current_gc := Gc.stat () ;
+    gc_allocated_bytes := Gc.allocated_bytes () ;
+    gc_stat ()
 
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
@@ -223,28 +219,6 @@ module Runtime = struct
       (fun () -> float_of_int !current_gc.Gc.Stat.stack_size)
       ~help:"Current stack size."
 
-  let jemalloc_active_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
-      (fun () -> float_of_int !current_jemalloc.active)
-      ~help:"active memory in bytes"
-
-  let jemalloc_resident_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
-      (fun () -> float_of_int !current_jemalloc.resident)
-      ~help:
-        "resident memory in bytes (may be zero depending on jemalloc compile \
-         options)"
-
-  let jemalloc_allocated_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
-      (fun () -> float_of_int !current_jemalloc.allocated)
-      ~help:"memory allocated to heap objects in bytes"
-
-  let jemalloc_mapped_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
-      (fun () -> float_of_int !current_jemalloc.mapped)
-      ~help:"memory mapped into process address space in bytes"
-
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
       ~help:"Total user and system CPU time spent in seconds."
@@ -252,7 +226,7 @@ module Runtime = struct
   let process_uptime_ms_total =
     simple_metric ~metric_type:Counter "process_uptime_ms_total"
       (fun () ->
-        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
+        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time) )
       ~help:"Total time the process has been running for in milliseconds."
 
   let metrics =
@@ -268,10 +242,6 @@ module Runtime = struct
     ; ocaml_gc_largest_free
     ; ocaml_gc_fragments
     ; ocaml_gc_stack_size
-    ; jemalloc_active_bytes
-    ; jemalloc_resident_bytes
-    ; jemalloc_allocated_bytes
-    ; jemalloc_mapped_bytes
     ; process_cpu_seconds_total
     ; process_uptime_ms_total
     ]
@@ -279,7 +249,7 @@ module Runtime = struct
   let () =
     let open CollectorRegistry in
     List.iter metrics ~f:(fun (info, collector) ->
-        register default info collector)
+        register default info collector )
 end
 
 module Cryptography = struct
@@ -322,6 +292,24 @@ module Bootstrap = struct
   let bootstrap_time_ms =
     let help = "time elapsed while bootstrapping" in
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
+
+  let staking_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync staking epoch ledger in ms" in
+    Counter.v "staking_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let next_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync next epoch ledger in ms" in
+    Counter.v "next_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let root_snarked_ledger_sync_ms =
+    let help = "time elapsed when sync root snarked ledger in ms" in
+    Counter.v "root_snarked_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let num_of_root_snarked_ledger_retargeted =
+    let help =
+      "number of times root_snarked_ledger retargeted during bootstrap"
+    in
+    Gauge.v "num_of_root_snarked_ledger_retargeted" ~help ~namespace ~subsystem
 end
 
 module Transaction_pool = struct
@@ -336,6 +324,12 @@ module Transaction_pool = struct
   let pool_size : Gauge.t =
     let help = "Number of transactions in the pool" in
     Gauge.v "size" ~help ~namespace ~subsystem
+
+  let transactions_added_to_pool : Counter.t =
+    let help =
+      "Number of transactions added to the pool since the node start"
+    in
+    Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -426,6 +420,36 @@ module Network = struct
             "average time, in ms, for blocks to be validated and rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average time, in ms, for blocks to be accepted after the OCaml \
+             process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for blocks to be rejected after the OCaml \
+             process receives it"
+        end)
+        ()
   end
 
   module Snark_work = struct
@@ -461,6 +485,36 @@ module Network = struct
              rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for snark work to be accepted after the \
+             OCaml process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for snark work to be rejected after the \
+             OCaml process receives it"
+        end)
+        ()
   end
 
   module Transaction = struct
@@ -494,6 +548,36 @@ module Network = struct
           let help =
             "average delay, in ms, for transactions to be validated and \
              rebroadcasted"
+        end)
+        ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for transactions to be accepted after the \
+             OCaml process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for transactions to be rejected after the \
+             OCaml process receives it"
         end)
         ()
   end
@@ -850,6 +934,10 @@ module Network = struct
   let ipc_latency_ns_summary : Ipc_latency_histogram.t =
     let help = "A histogram for all IPC message latencies" in
     Ipc_latency_histogram.v "ipc_latency_ns_summary" ~help ~namespace ~subsystem
+
+  let ipc_logs_received_total : Counter.t =
+    let help = "Total number of logs received from libp2p helper subprocess" in
+    Counter.v "ipc_logs_received_total" ~help ~namespace ~subsystem
 end
 
 module Pipe = struct
@@ -1057,6 +1145,18 @@ module Block_producer = struct
   let blocks_produced : Counter.t =
     let help = "blocks produced and submitted by the daemon" in
     Counter.v "blocks_produced" ~help ~namespace ~subsystem
+
+  module Block_production_delay_histogram = Histogram (struct
+    (* First bucket: 60s, buckets with linear increase up to 3m30s *)
+    let spec = Histogram_spec.of_linear 60000. 30000. 6
+  end)
+
+  let block_production_delay =
+    let help =
+      "A histogram for delay between start of slot and time of block production"
+    in
+    Block_production_delay_histogram.v "block_production_delay" ~help ~namespace
+      ~subsystem
 end
 
 module Transition_frontier = struct
@@ -1309,7 +1409,7 @@ module Block_latency = struct
           let total_sum, count_sum =
             List.fold buckets ~init:(0.0, 0)
               ~f:(fun (total_sum, count_sum) (total, count) ->
-                (total_sum +. total, count_sum + count))
+                (total_sum +. total, count_sum + count) )
           in
           total_sum /. Float.of_int count_sum
       end)
@@ -1459,6 +1559,36 @@ module Object_lifetime_statistics = struct
     Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
+module Execution_times = struct
+  let tracked_metrics = String.Table.create ()
+
+  let create_metric thread =
+    let name = O1trace.Thread.name thread in
+    let info : MetricInfo.t =
+      { name =
+          MetricName.v
+            (Printf.sprintf "Mina_Daemon_time_spent_in_thread_%s_ms" name)
+      ; help = Printf.sprintf "Total number of ms spent on '%s'" name
+      ; metric_type = Counter
+      ; label_names = []
+      }
+    in
+    let collect () =
+      let elapsed = O1trace.Execution_timer.elapsed_time_of_thread thread in
+      LabelSetMap.singleton []
+        [ Sample_set.sample (Time_ns.Span.to_ms elapsed) ]
+    in
+    CollectorRegistry.register CollectorRegistry.default info collect
+
+  let sync_metrics () =
+    O1trace.Thread.iter_threads ~f:(fun thread ->
+        let name = O1trace.Thread.name thread in
+        if not (Hashtbl.mem tracked_metrics name) then
+          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread) )
+
+  let () = CollectorRegistry.(register_pre_collect default sync_metrics)
+end
+
 let generic_server ?forward_uri ~port ~logger ~registry () =
   let open Cohttp in
   let open Cohttp_async in
@@ -1513,9 +1643,10 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
 type t = (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t
 
 let server ?forward_uri ~port ~logger () =
-  Runtime.gc_stat () ;
-  generic_server ?forward_uri ~port ~logger ~registry:CollectorRegistry.default
-    ()
+  O1trace.background_thread "collect_gc_metrics" Runtime.gc_stat ;
+  O1trace.thread "serve_metrics"
+    (generic_server ?forward_uri ~port ~logger
+       ~registry:CollectorRegistry.default )
 
 module Archive = struct
   type t =

@@ -11,7 +11,7 @@ type engine = string * (module Intf.Engine.S)
 module Make_test_inputs (Engine : Intf.Engine.S) () :
   Intf.Test.Inputs_intf
     with type Engine.Network_config.Cli_inputs.t =
-          Engine.Network_config.Cli_inputs.t = struct
+      Engine.Network_config.Cli_inputs.t = struct
   module Engine = Engine
 
   module Dsl = Dsl.Make (Engine) ()
@@ -20,7 +20,7 @@ end
 type test_inputs_with_cli_inputs =
   | Test_inputs_with_cli_inputs :
       (module Intf.Test.Inputs_intf
-         with type Engine.Network_config.Cli_inputs.t = 'cli_inputs)
+         with type Engine.Network_config.Cli_inputs.t = 'cli_inputs )
       * 'cli_inputs
       -> test_inputs_with_cli_inputs
 
@@ -45,8 +45,11 @@ let tests : test list =
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ( "opt-block-prod"
+    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -77,7 +80,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       (color_eprintf
          (color_of_severity severity)
          "%s %s\n"
-         (category_prefix_of_severity severity))
+         (category_prefix_of_severity severity) )
   in
   let max_sev a b =
     match (a, b) with
@@ -112,8 +115,8 @@ let report_test_errors ~log_error_set ~internal_error_set =
               (color_of_severity severity)
               "        [%s] %s\n"
               (Time.to_string error_message.timestamp)
-              (Yojson.Safe.to_string (Logger.Message.to_yojson error_message))) ;
-        Print.eprintf "\n")
+              (Yojson.Safe.to_string (Logger.Message.to_yojson error_message)) ) ;
+        Print.eprintf "\n" )
   in
   (* check invariants *)
   if List.length log_errors.from_current_context > 0 then
@@ -138,7 +141,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
             (color_of_severity severity)
             "    [%s] %s\n"
             (Time.to_string occurrence_time)
-            (Error.to_string_hum error))) ;
+            (Error.to_string_hum error) ) ) ;
   (* report non-contextualized internal errors *)
   List.iter internal_errors.from_current_context
     ~f:(fun (severity, { occurrence_time; error }) ->
@@ -146,7 +149,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
         (color_of_severity severity)
         "[%s] %s\n"
         (Time.to_string occurrence_time)
-        (Error.to_string_hum error)) ;
+        (Error.to_string_hum error) ) ;
   (* determine if test is passed/failed and exit accordingly *)
   let test_failed =
     match (log_errors_severity, internal_errors_severity) with
@@ -157,17 +160,21 @@ let report_test_errors ~log_error_set ~internal_error_set =
         false
   in
   Print.eprintf "\n" ;
-  let result =
+  let exit_code =
     if test_failed then (
       color_eprintf Bash_colors.red
         "The test has failed. See the above errors for details.\n\n" ;
-      false )
+      match (internal_error_set.exit_code, log_error_set.exit_code) with
+      | None, None ->
+          Some 1
+      | Some exit_code, _ | None, Some exit_code ->
+          Some exit_code )
     else (
       color_eprintf Bash_colors.green "The test has completed successfully.\n\n" ;
-      true )
+      None )
   in
   let%bind () = Writer.(flushed (Lazy.force stderr)) in
-  return result
+  return exit_code
 
 (* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
 
@@ -189,7 +196,7 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       let open Test_error.Set in
       combine [ test_error_set; of_hard_or_error log_engine_cleanup_result ]
     in
-    let%bind test_was_successful =
+    let%bind exit_code =
       report_test_errors ~log_error_set ~internal_error_set
     in
     let%bind () = pause_cleanup_func () in
@@ -197,7 +204,7 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       Option.value_map !net_manager_ref ~default:Deferred.unit
         ~f:network_cleanup_func
     in
-    if not test_was_successful then exit 1 else Deferred.unit
+    Deferred.Option.map ~f:exit (return exit_code) >>| ignore
   in
   match !cleanup_deferred_ref with
   | Some deferred ->
@@ -245,6 +252,7 @@ let main inputs =
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
+  [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
       ~debug:inputs.debug ~test_config:T.config ~images
@@ -255,6 +263,7 @@ let main inputs =
   let error_accumulator_ref = ref None in
   let network_state_writer_ref = ref None in
   let cleanup_deferred_ref = ref None in
+  [%log trace] "preparing up cleanup phase" ;
   let f_dispatch_cleanup =
     let pause_cleanup_func () =
       if inputs.debug then
@@ -272,6 +281,7 @@ let main inputs =
       ~network_state_writer_ref ~cleanup_deferred_ref
   in
   (* run test while gracefully recovering handling exceptions and interrupts *)
+  [%log trace] "attaching signal handler" ;
   Signal.handle Signal.terminating ~f:(fun signal ->
       [%log info] "handling signal %s" (Signal.to_string signal) ;
       let error =
@@ -280,7 +290,7 @@ let main inputs =
       in
       don't_wait_for
         (f_dispatch_cleanup ~exit_reason:"signal received"
-           ~test_result:(Malleable_error.hard_error error))) ;
+           ~test_result:(Malleable_error.hard_error error) ) ) ;
   let%bind monitor_test_result =
     let on_fatal_error message =
       don't_wait_for
@@ -288,21 +298,26 @@ let main inputs =
            ~exit_reason:
              (sprintf
                 !"log engine fatal error: %s"
-                (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
-           ~test_result:(Malleable_error.return ()))
+                (Yojson.Safe.to_string (Logger.Message.to_yojson message)) )
+           ~test_result:(Malleable_error.hard_error_string "fatal error") )
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
-        let init_result =
-          let open Deferred.Or_error.Let_syntax in
-          let lift = Deferred.map ~f:Or_error.return in
+        let open Malleable_error.Let_syntax in
+        let%bind network, dsl =
+          let lift ?exit_code =
+            Deferred.bind ~f:(Malleable_error.or_hard_error ?exit_code)
+          in
+          [%log trace] "initializing network manager" ;
           let%bind net_manager =
-            lift @@ Engine.Network_manager.create ~logger network_config
+            Engine.Network_manager.create ~logger network_config
           in
           net_manager_ref := Some net_manager ;
-          let%bind network =
-            lift @@ Engine.Network_manager.deploy net_manager
+          [%log trace] "deploying network" ;
+          let%bind network = Engine.Network_manager.deploy net_manager in
+          [%log trace] "initializing log engine" ;
+          let%map log_engine =
+            lift ~exit_code:6 (Engine.Log_engine.create ~logger ~network)
           in
-          let%map log_engine = Engine.Log_engine.create ~logger ~network in
           log_engine_ref := Some log_engine ;
           let event_router =
             Dsl.Event_router.create ~logger
@@ -310,21 +325,39 @@ let main inputs =
           in
           error_accumulator_ref :=
             Some (Dsl.watch_log_errors ~logger ~event_router ~on_fatal_error) ;
+          [%log trace] "beginning to process network events" ;
           let network_state_reader, network_state_writer =
             Dsl.Network_state.listen ~logger event_router
           in
           network_state_writer_ref := Some network_state_writer ;
+          [%log trace] "initializing dsl" ;
           let (`Don't_call_in_tests dsl) =
             Dsl.create ~logger ~network ~event_router ~network_state_reader
           in
           (network, dsl)
         in
-        let open Malleable_error.Let_syntax in
-        let%bind network, dsl =
-          Deferred.bind init_result ~f:Malleable_error.or_hard_error
+        [%log trace] "initializing network abstraction" ;
+        let%bind () = Engine.Network.initialize_infra ~logger network in
+
+        [%log info] "Starting the daemons within the pods" ;
+        let start_print (node : Engine.Network.Node.t) =
+          let open Malleable_error.Let_syntax in
+          [%log info] "starting %s ..." (Engine.Network.Node.id node) ;
+          let%bind res = Engine.Network.Node.start ~fresh_state:false node in
+          [%log info] "%s started" (Engine.Network.Node.id node) ;
+          Malleable_error.return res
         in
-        let%bind () = Engine.Network.initialize ~logger network in
-        T.run network dsl)
+        let seed_nodes = network |> Engine.Network.seeds in
+        let non_seed_pods = network |> Engine.Network.all_non_seed_pods in
+        (* TODO: parallelize (requires accumlative hard errors) *)
+        let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
+        let%bind () =
+          Dsl.wait_for dsl (Dsl.Wait_condition.nodes_to_initialize seed_nodes)
+        in
+        let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
+        [%log info] "Daemons started" ;
+        [%log trace] "executing test" ;
+        T.run network dsl )
   in
   let exit_reason, test_result =
     match monitor_test_result with

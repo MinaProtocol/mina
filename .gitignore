@@ -37,6 +37,7 @@ maintenance/*.dot
 maintenance/*.png
 
 scripts/genesis_ledger.json
+scripts/annotated_ledger.json
 
 automation/*config.json
 automation/!bsconfig.json
@@ -54,6 +55,8 @@ automation/keys/testnet-keys/*
 automation/keys/libp2p/*
 automation/src/*.js
 automation/node_modules/
+automation/terraform/testnets/**/keys
+
 
 automation/scripts/offline_fish_keys
 automation/scripts/offline_whale_keys
@@ -81,3 +84,19 @@ automation/services/watchdog/check_libp2p/check_libp2p
 
 *.terraform.lock.hcl
 _opam
+
+target
+release
+Cargo.lock
+.vscode
+
+### IntelliJ IDEA ###
+**/.idea/
+*.iws
+*.iml
+*.ipr
+
+### Direnv ###
+.env
+.envrc
+.direnv/

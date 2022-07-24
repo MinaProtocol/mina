@@ -3,8 +3,19 @@
  (public_name string_sign_nonconsensus)
  (inline_tests)
  (library_flags -linkall)
- (libraries snark_params_nonconsensus mina_base_nonconsensus random_oracle_nonconsensus
-            signature_lib_nonconsensus digestif.ocaml)
+ (libraries
+   ;;opam libraries
+   ppx_inline_test.config
+   core_kernel
+   digestif.ocaml
+   ;;local libraries
+   random_oracle_input
+   mina_signature_kind
+   signature_lib_nonconsensus
+   mina_base_nonconsensus
+   snark_params_nonconsensus
+   random_oracle_nonconsensus
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_snarky ppx_optcomp ppx_inline_test))

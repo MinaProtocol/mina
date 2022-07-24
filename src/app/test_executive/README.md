@@ -16,10 +16,9 @@ Note: this environment setup assumes that one is a member of o(1) labs and has a
 
 ![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)
 
-4) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
+4) In addition to the above mentioned `GCLOUD_API_KEY` and `GOOGLE_CLOUD_KEYFILE_JSON`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.):
 - `KUBE_CONFIG_PATH`.  this should usually be `~/.kube/config`
-- any other vars relating to Google cloud access,
-- any AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
+- the following AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`,
 - vars relating to ocaml compilation
 
 5) Run the following commands in order to log in to Google Cloud, and activate the service account for one's work machine.
@@ -147,3 +146,14 @@ Any Integration test first creates a whole new testnet from scratch, and then ru
     - structured log events are not an integration test construct, they are defined in various places around the protocol code.  For example, the  `Rejecting_command_for_reason` structured event is defined in `network_pool/transaction_pool.ml`.
     - The structured log events that matter to the integration test are in `src/lib/integration_test_lib/event_type.ml`.  The events integration-test-side will trigger based on logic defined in each event type's `parse` function, which parses messages from the logs, often trying to match for exact strings
 - Please bear in mind that the nodes on GCP run the image that you link in your argument, it does NOT run whatever code you have locally.  Only that which relates to the test executive is run from local.  If you make a change in the protocol code, first this needs to be pushed to CI, where CI will bake a fresh image, and that image can be obtained to run on one's nodes.
+
+# Exit codes
+
+- Exit code `4` will be returned if not all pods were assigned to nodes and ready in time.
+- Exit code `5` will be returned if some pods could not be found.
+- Exit code `6` will be returned if Subscriptions, Topics, or Log sinks could not be created
+- Exit code `10` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a command in a container.  This exit code is the general case of such errors, there are subsequent exit codes which are preferred in more specific cases
+- Exit code `11` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `start.sh` script in a container
+- Exit code `12` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to run a node's `stop.sh` script in a container
+- Exit code `13` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to retrieve logs.
+- Exit code `20` will be returned if any testnet nodes hard timed-out on initialization

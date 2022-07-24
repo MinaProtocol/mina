@@ -12,7 +12,7 @@ module Stake_delegation = Mina_base.Stake_delegation
 let pk_to_public_key ~context (`Pk pk) =
   Public_key.Compressed.of_base58_check pk
   |> Result.map_error ~f:(fun _ ->
-         Errors.create ~context `Public_key_format_not_valid)
+         Errors.create ~context `Public_key_format_not_valid )
 
 let account_id (`Pk pk) token_id =
   { Account_identifier.address = pk
@@ -46,14 +46,14 @@ module Op = struct
             let related_operations =
               op.related_to
               |> Option.bind ~f:(fun relate ->
-                     List.findi plan ~f:(fun _ a -> a_eq relate a.label))
+                     List.findi plan ~f:(fun _ a -> a_eq relate a.label) )
               |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
             in
             let%map a =
               f ~related_operations
                 ~operation_identifier:(operation_identifier i) op
             in
-            (i + 1, a :: acc))
+            (i + 1, a :: acc) )
       in
       List.rev rev_data
   end
@@ -159,7 +159,7 @@ module Partial = struct
               ~error:
                 (Errors.create
                    (`Operations_not_valid
-                     [ Errors.Partial_reason.Amount_not_some ]))
+                     [ Errors.Partial_reason.Amount_not_some ] ) )
           in
           let payload =
             { Payment_payload.Poly.source_pk
@@ -199,7 +199,7 @@ module Partial = struct
               ~error:
                 (Errors.create
                    (`Operations_not_valid
-                     [ Errors.Partial_reason.Amount_not_some ]))
+                     [ Errors.Partial_reason.Amount_not_some ] ) )
           in
           let payload =
             { Mina_base.Minting_payload.token_id = Token_id.of_uint64 t.token
@@ -314,7 +314,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       if
         List.for_all ops ~f:(fun op ->
             let p = Option.equal String.equal op.status in
-            p None || p (Some ""))
+            p None || p (Some "") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_x =
@@ -392,7 +392,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       if
         List.for_all ops ~f:(fun op ->
             let p = Option.equal String.equal op.status in
-            p None || p (Some ""))
+            p None || p (Some "") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_y =
@@ -449,7 +449,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     and () =
       if
         List.for_all ops ~f:(fun op ->
-            Option.equal String.equal op.status (Some "Pending"))
+            Option.equal String.equal op.status (Some "Pending") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_y =
@@ -516,7 +516,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     and () =
       if
         List.for_all ops ~f:(fun op ->
-            Option.equal String.equal op.status (Some "Pending"))
+            Option.equal String.equal op.status (Some "Pending") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_y =
@@ -570,7 +570,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     and () =
       if
         List.for_all ops ~f:(fun op ->
-            Option.equal String.equal op.status (Some "Pending"))
+            Option.equal String.equal op.status (Some "Pending") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_y =
@@ -624,7 +624,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   let partials =
     [ payment; delegation; create_token; create_token_account; mint_tokens ]
   in
-  let oks, errs = List.partition_map partials ~f:Result.ok_fst in
+  let oks, errs = List.partition_map partials ~f:Result.to_either in
   match (oks, errs) with
   | [], errs ->
       (* no Oks *)
@@ -804,8 +804,8 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
                      [ ( "delegate_change_target"
                        , `String
                            (let (`Pk r) = t.receiver in
-                            r) )
-                     ]))
+                            r ) )
+                     ] ) )
           }
       | `Mint_tokens amount ->
           { Operation.operation_identifier
@@ -822,9 +822,9 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
                      [ ( "token_owner_pk"
                        , `String
                            (let (`Pk r) = t.source in
-                            r) )
-                     ]))
-          })
+                            r ) )
+                     ] ) )
+          } )
 
 let to_operations' (t : t) : Operation.t list =
   to_operations ~failure_status:t.failure_status (forget t)
@@ -905,7 +905,7 @@ let dummies =
         Some
           (`Applied
             (Account_creation_fees_paid.By_receiver
-               (Unsigned.UInt64.of_int 1_000_000)))
+               (Unsigned.UInt64.of_int 1_000_000) ) )
     ; hash = "TXN_1new_HASH"
     ; valid_until = None
     ; memo = Some "hello"
@@ -993,7 +993,7 @@ let dummies =
         Some
           (`Applied
             (Account_creation_fees_paid.By_fee_payer
-               (Unsigned.UInt64.of_int 3_000)))
+               (Unsigned.UInt64.of_int 3_000) ) )
     ; hash = "TXN_3b_HASH"
     ; valid_until = None
     ; memo = Some "hello"

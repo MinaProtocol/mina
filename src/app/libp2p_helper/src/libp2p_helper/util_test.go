@@ -62,11 +62,12 @@ func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []
 		privkey,
 		string(testProtocol),
 		seeds,
-		codanet.NewCodaGatingState(nil, nil, nil, nil),
+		&codanet.CodaGatingConfig{},
 		minConns,
 		maxConns,
 		minaPeerExchange,
-		10 * time.Second,
+		10*time.Second,
+		nil,
 	)
 	require.NoError(t, err)
 

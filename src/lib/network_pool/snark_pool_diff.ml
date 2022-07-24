@@ -82,7 +82,7 @@ module Make
         ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
           Snark_work_lib.Work.Spec.t
         , Ledger_proof.t )
-        Snark_work_lib.Work.Result.t) =
+        Snark_work_lib.Work.Result.t ) =
     Add_solved_work
       ( One_or_two.map res.spec.instances
           ~f:Snark_work_lib.Work.Single.Spec.statement
@@ -157,4 +157,21 @@ module Make
             Deferred.return
               ( if is_local then Error (`Locally_generated (diff, ()))
               else Error (`Other e) ) )
+
+  type Structured_log_events.t +=
+    | Snark_work_received of { work : compact; sender : Envelope.Sender.t }
+    [@@deriving
+      register_event { msg = "Received Snark-pool diff $work from $sender" }]
+
+  let update_metrics envelope valid_cb gossip_heard_logger_option =
+    Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
+    Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_received) ;
+    let diff = Envelope.Incoming.data envelope in
+    Option.iter gossip_heard_logger_option ~f:(fun logger ->
+        Option.iter (to_compact diff) ~f:(fun work ->
+            [%str_log debug]
+              (Snark_work_received
+                 { work; sender = Envelope.Incoming.sender envelope } ) ) ) ;
+    Mina_metrics.(Counter.inc_one Network.Snark_work.received) ;
+    Mina_net2.Validation_callback.set_message_type valid_cb `Snark_work
 end

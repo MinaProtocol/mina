@@ -1,4 +1,4 @@
-(* memory_stats.ml -- log OCaml, jemalloc memory data *)
+(* memory_stats.ml -- log OCaml memory data *)
 
 open Core_kernel
 open Async
@@ -13,16 +13,6 @@ let ocaml_memory_stats () =
   ; ("live_size_bytes", `Int (stat.live_words * bytes_per_word))
   ; ("live_blocks", `Int stat.live_blocks)
   ; ("fragments", `Int stat.fragments)
-  ]
-
-let jemalloc_memory_stats () =
-  let { Jemalloc.active; resident; allocated; mapped } =
-    Jemalloc.get_memory_stats ()
-  in
-  [ ("active", `Int active)
-  ; ("resident", `Int resident)
-  ; ("allocated", `Int allocated)
-  ; ("mapped", `Int mapped)
   ]
 
 let log_memory_stats logger ~process =
@@ -62,9 +52,7 @@ let log_memory_stats logger ~process =
      let log_stats suffix =
        let proc = ("process", `String process) in
        [%log debug] "OCaml memory statistics, %s" suffix
-         ~metadata:(proc :: ocaml_memory_stats ()) ;
-       [%log debug] "Jemalloc memory statistics (in bytes)"
-         ~metadata:(proc :: jemalloc_memory_stats ())
+         ~metadata:(proc :: ocaml_memory_stats ())
      in
      let rec loop () =
        log_stats "before major gc" ;
@@ -73,4 +61,4 @@ let log_memory_stats logger ~process =
        let%bind () = after interval in
        loop ()
      in
-     loop ())
+     loop () )

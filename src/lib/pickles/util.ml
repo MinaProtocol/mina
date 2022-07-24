@@ -25,7 +25,7 @@ let rec absorb :
   | With_degree_bound ->
       Array.iter t.unshifted ~f:(fun t ->
           absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt
-            PC (mask_g1_opt t)) ;
+            PC (mask_g1_opt t) ) ;
       absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt PC
         (mask_g1_opt t.shifted)
   | ty1 :: ty2 ->

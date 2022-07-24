@@ -27,7 +27,7 @@ val create :
          | `Invalid
          | `Potentially_invalid of 'partially_validated ]
          list
-         Deferred.Or_error.t)
+         Deferred.Or_error.t )
   -> ('init, 'partially_validated, 'result) t
 
 val verify :

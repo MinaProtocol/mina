@@ -3,4 +3,12 @@
  (public_name sgn_type)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson))
- (libraries core_kernel ppx_deriving_yojson.runtime yojson))
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ppx_deriving_yojson.runtime
+   yojson
+   sexplib0
+   bin_prot.shape
+   base.caml
+))

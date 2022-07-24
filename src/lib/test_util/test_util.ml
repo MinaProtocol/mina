@@ -6,7 +6,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
     let to_string b = if b then "1" else "0" in
     String.concat ~sep:" "
       (List.map trips ~f:(fun (b1, b2, b3) ->
-           to_string b1 ^ to_string b2 ^ to_string b3))
+           to_string b1 ^ to_string b2 ^ to_string b3 ) )
 
   let checked_to_unchecked typ1 typ2 checked input =
     let open Impl in
@@ -14,7 +14,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
       run_and_check
         (let%bind input = exists typ1 ~compute:(As_prover.return input) in
          let%map result = checked input in
-         As_prover.read typ2 result)
+         As_prover.read typ2 result )
         ()
       |> Or_error.ok_exn
     in
@@ -30,7 +30,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
            (List.map result
               ~f:
                 (As_prover.read
-                   (Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ))))
+                   (Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ) ) ) )
         ()
       |> Or_error.ok_exn
     in
@@ -47,7 +47,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
 
   let arbitrary_string ~len =
     String.init (Random.int len) ~f:(fun _ ->
-        Char.of_int_exn (Random.int_incl 0 255))
+        Char.of_int_exn (Random.int_incl 0 255) )
 
   let with_randomness r f =
     let s = Caml.Random.get_state () in

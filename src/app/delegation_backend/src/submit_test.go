@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	logging "github.com/ipfs/go-log/v2"
 	"io/ioutil"
 	"math/rand"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	logging "github.com/ipfs/go-log/v2"
 )
 
 const TSPG_EXPECTED_1 = `{"block":"zLgvHQzxSh8MWlTjXK+cMA==","created_at":"2021-07-01T16:21:33Z","peer_id":"MLF0jAGTpL84LLerLddNs5M10NCHM+BwNeMxK78+"}`
@@ -31,7 +32,7 @@ func mkB64B(b []byte) *Base64 {
 
 func TestSignPayloadGeneration(t *testing.T) {
 	req := new(submitRequestData)
-	req.PeerId = mkB64("MLF0jAGTpL84LLerLddNs5M10NCHM+BwNeMxK78+")
+	req.PeerId = "MLF0jAGTpL84LLerLddNs5M10NCHM+BwNeMxK78+"
 	req.Block = mkB64("zLgvHQzxSh8MWlTjXK+cMA==")
 	req.CreatedAt, _ = time.Parse(time.RFC3339, "2021-07-01T19:21:33+03:00")
 	json, err := makeSignPayload(req)
@@ -187,15 +188,17 @@ func TestSuccess(t *testing.T) {
 			t.Logf("Failed testing %s: %v", f, rep)
 			t.FailNow()
 		}
-		paths := makePaths(&req)
-		var meta metaToBeSaved
-		meta.SubmittedAt = tm.Now()
+		paths, bhStr := makePaths(tm.Now(), &req)
+		var meta MetaToBeSaved
+		meta.CreatedAt = req.Data.CreatedAt.Format(time.RFC3339)
 		meta.PeerId = req.Data.PeerId
 		meta.SnarkWork = req.Data.SnarkWork
 		meta.RemoteAddr = "192.0.2.1:1234"
+		meta.BlockHash = bhStr
+		meta.Submitter = req.Submitter
 		metaBytes, err2 := json.Marshal(meta)
-		if err2 != nil || !bytes.Equal((*objs)[paths.metaPath], metaBytes) ||
-			!bytes.Equal((*objs)[paths.blockPath], req.Data.Block.data) {
+		if err2 != nil || !bytes.Equal((*objs)[paths.Meta], metaBytes) ||
+			!bytes.Equal((*objs)[paths.Block], req.Data.Block.data) {
 			t.Logf("Content check failed for %s", f)
 			t.FailNow()
 		}
@@ -228,7 +231,7 @@ func Test40x(t *testing.T) {
 		t.FailNow()
 	}
 	req2 = req
-	req2.Data.PeerId = nil
+	req2.Data.PeerId = ""
 	body2, err2 = json.Marshal(req2)
 	if rep := sh.testRequest(body2); err2 != nil || rep.Code != 400 {
 		t.Log("No peerId test failed")

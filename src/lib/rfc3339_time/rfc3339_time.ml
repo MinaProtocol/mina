@@ -1,7 +1,7 @@
 open Core_kernel
 
 let get_rfc3339_time () =
-  let tm = Unix.gettimeofday () in
+  let tm = Core.Unix.gettimeofday () in
   match Ptime.of_float_s tm with
   | None ->
       (* should never occur *)

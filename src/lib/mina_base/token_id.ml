@@ -48,15 +48,16 @@ module Stable = struct
   module V1 = struct
     type t = T.Stable.V1.t [@@deriving sexp, equal, compare, hash, yojson]
 
-    include Binable.Of_binable
-              (T.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable_without_uuid
+        (T.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable = check
+          let to_binable = check
 
-                let of_binable = check
-              end)
+          let of_binable = check
+        end)
 
     let equal = T.Stable.V1.equal
 
@@ -70,7 +71,7 @@ let gen_ge minimum =
   Quickcheck.Generator.map
     Int64.(gen_incl (min_value + minimum) max_value)
     ~f:(fun x ->
-      Int64.(x - min_value) |> Unsigned.UInt64.of_int64 |> T.of_uint64)
+      Int64.(x - min_value) |> Unsigned.UInt64.of_int64 |> T.of_uint64 )
 
 let gen = gen_ge 1L
 
@@ -130,6 +131,6 @@ let%test_unit "var_of_t preserves the underlying value" =
       [%test_eq: t] tid
         (Test_util.checked_to_unchecked Typ.unit typ
            (fun () -> Snark_params.Tick.Checked.return (var_of_t tid))
-           ()))
+           () ) )
 
 [%%endif]

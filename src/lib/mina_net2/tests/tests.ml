@@ -52,6 +52,7 @@ let%test_module "coda network tests" =
           ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
+          ~known_private_ip_nets:[] ~topic_config:[]
         >>| Or_error.ok_exn
       in
       let%bind raw_seed_peers = listening_addrs a >>| Or_error.ok_exn in
@@ -72,6 +73,7 @@ let%test_module "coda network tests" =
           ~max_connections:50 ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
+          ~known_private_ip_nets:[] ~topic_config:[]
         >>| Or_error.ok_exn
       and () =
         configure c ~external_maddr:(List.hd_exn maddrs) ~me:kp_c ~maddrs
@@ -81,8 +83,10 @@ let%test_module "coda network tests" =
           ~min_connections:20 ~validation_queue_size:150
           ~initial_gating_config:
             { trusted_peers = []; banned_peers = []; isolate = false }
+          ~known_private_ip_nets:[] ~topic_config:[]
         >>| Or_error.ok_exn
       in
+      let%bind () = after (Time.Span.of_sec 10.) in
       let%bind b_advert = begin_advertising b in
       Or_error.ok_exn b_advert ;
       let%bind c_advert = begin_advertising c in
@@ -102,7 +106,7 @@ let%test_module "coda network tests" =
     (* TODO fails occasionally, uncomment after debugging it *)
     let%test_unit "b_stream_c" =
       let () = Core.Backtrace.elide := false in
-      let test_def =
+      let test_def () =
         let open Deferred.Let_syntax in
         let%bind b, c, shutdown = setup_two_nodes "test_stream" in
         let%bind b_peerid = me b >>| Keypair.to_peer_id in
@@ -131,14 +135,14 @@ let%test_module "coda network tests" =
                     else
                       failwith
                         (Printf.sprintf "Unexpected string %s not matches %d" s
-                           !j)
+                           !j )
                   done ;
                   go !j
               in
               go 1000
               >>| fun () ->
               Pipe.close w ;
-              Ivar.fill handler_finished ())
+              Ivar.fill handler_finished () )
           >>| Or_error.ok_exn
         in
         let%bind stream =
@@ -157,11 +161,11 @@ let%test_module "coda network tests" =
         let%bind _msgs = Pipe.read_all r in
         shutdown ()
       in
-      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+      Async.Thread_safe.block_on_async_exn test_def
 
     let%test_unit "stream" =
       let () = Core.Backtrace.elide := false in
-      let test_def =
+      let test_def () =
         let open Deferred.Let_syntax in
         let%bind b, c, shutdown = setup_two_nodes "test_stream" in
         let%bind b_peerid = me b >>| Keypair.to_peer_id in
@@ -172,7 +176,7 @@ let%test_module "coda network tests" =
               let r, w = Libp2p_stream.pipes stream in
               let%map () = Pipe.transfer r w ~f:Fn.id in
               Pipe.close w ;
-              Ivar.fill_if_empty handler_finished ())
+              Ivar.fill_if_empty handler_finished () )
           |> Deferred.Or_error.ok_exn
         in
         let%bind stream =
@@ -190,8 +194,7 @@ let%test_module "coda network tests" =
         assert (String.equal msg testmsg) ;
         let%bind () = Ivar.read handler_finished in
         let%bind () = close_protocol b ~protocol:"echo" in
-        let%map () = shutdown () in
-        ()
+        shutdown ()
       in
-      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+      Async.Thread_safe.block_on_async_exn test_def
   end )

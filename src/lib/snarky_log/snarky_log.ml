@@ -28,7 +28,7 @@ module Constraints (Snarky_backendless : Snark_intf.Basic) = struct
             create_event label
               ~phase:(if start then Measure_start else Measure_end)
               ~timestamp:count
-            :: !rev_events)
+            :: !rev_events )
     in
     List.rev !rev_events
 

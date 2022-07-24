@@ -3,15 +3,25 @@
  (public_name signer.cli)
  (modules signer_cli)
  (libraries
-   async
-   async_ssl
+   ;;opam libraries
+   async_kernel
+   core
    core_kernel
-   logger
-   rosetta_models
+   async
+   base
    lib
-   ppx_deriving_yojson.runtime
-   yojson
+   async_unix
+   async.async_command
+   ;;local libraries
+   pickles
+   rosetta_coding
+   rosetta_lib
    string_sign
+   signature_lib
+   mina_base
+   snark_params
+   pickles.backend
+   zexe_backend.pasta
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
@@ -19,7 +29,8 @@
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -31,14 +42,15 @@
  (public_name signer)
  (modes native)
  (modules signer)
- (libraries signer_cli)
+ (libraries signer_cli async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -50,14 +62,15 @@
  (public_name signer-testnet)
  (modes native)
  (modules signer_testnet_signatures)
- (libraries signer_cli)
+ (libraries signer_cli async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))
@@ -69,14 +82,15 @@
  (public_name signer-mainnet)
  (modes native)
  (modules signer_mainnet_signatures)
- (libraries signer_cli)
+ (libraries signer_cli async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
                ppx_coda
                ppx_deriving.show
                ppx_deriving_yojson
-               ppx_jane
+               ppx_base
+               ppx_let
                ppx_version
                ppx_compare
  ))

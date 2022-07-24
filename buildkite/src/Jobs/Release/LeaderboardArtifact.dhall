@@ -11,10 +11,7 @@ let Command = ../../Command/Base.dhall
 let Size = ../../Command/Size.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
-let dependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
-
 let spec = DockerImage.ReleaseSpec::{
-    deps=dependsOn,
     service="leaderboard",
     step_key="leaderboard-docker-image"
 }

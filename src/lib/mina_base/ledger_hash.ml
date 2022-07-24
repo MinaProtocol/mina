@@ -19,7 +19,7 @@ module Merkle_tree =
         Tick.make_checked (fun () ->
             Random_oracle.Checked.hash
               ~init:(Hash_prefix.merkle_tree height)
-              [| h1; h2 |])
+              [| h1; h2 |] )
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
@@ -92,7 +92,7 @@ let%snarkydef modify_account ~depth t aid
     (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
        ~f:(fun account ->
          let%bind x = filter account in
-         f x account))
+         f x account ) )
     reraise_merkle_requests
   >>| var_of_hash_packed
 
@@ -121,9 +121,9 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
          let%bind () =
            [%with_label "account is either present or empty and writeable"]
              (Boolean.Assert.any
-                [ account_already_there; not_there_but_writeable ])
+                [ account_already_there; not_there_but_writeable ] )
          in
-         return not_there_but_writeable))
+         return not_there_but_writeable ) )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
@@ -149,5 +149,5 @@ let%snarkydef modify_account_recv ~depth t aid ~f =
            [%with_label "account is either present or empty"]
              (Boolean.Assert.any [ account_already_there; account_not_there ])
          in
-         return account_not_there))
+         return account_not_there ) )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)

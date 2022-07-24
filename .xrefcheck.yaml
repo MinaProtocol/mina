@@ -1,0 +1,60 @@
+# Parameters of repository traversal.
+traversal:
+  # Files and folders which we pretend do not exist
+  # (so they are neither analyzed nor can be referenced).
+  ignored:
+    # Git files
+    - .git
+    # Build artifacts
+    - _build
+    - _opam
+    # Git submodules
+    - src/external
+    - src/lib/marlin
+    - src/lib/snarky
+    - frontend/wallet/tablecloth
+
+# Verification parameters.
+verification:
+  # On 'anchor not found' error, how much similar anchors should be displayed as
+  # hint. Number should be between 0 and 1, larger value means stricter filter.
+  anchorSimilarityThreshold: 0.5
+
+  # When checking external references, how long to wait on request before
+  # declaring "Response timeout".
+  externalRefCheckTimeout: 10s
+
+  # Prefixes of files, references in which should not be analyzed.
+  notScanned:
+    - .github/pull_request_template.md
+    - .github/issue_template.md
+    - .github/PULL_REQUEST_TEMPLATE
+    - .github/ISSUE_TEMPLATE
+
+  # Glob patterns describing the files which do not physically exist in the
+  # repository but should be treated as existing nevertheless.
+  virtualFiles:
+    - ../../../issues
+    - ../../../issues/*
+    - ../../../pulls
+    - ../../../pulls/*
+
+  # POSIX extended regular expressions that match external references
+  # that have to be ignored (not verified).
+  # It is an optional parameter, so it can be omitted.
+  ignoreRefs:
+    - "https://github.com/.*" # Otherwise Resource unavailable (429 too many requests)
+
+  # Check localhost links.
+  checkLocalhost: false
+
+  # Skip links which return 403 or 401 code.
+  ignoreAuthFailures: true
+
+# Parameters of scanners for various file types.
+scanners:
+  markdown:
+    # Flavor of markdown, e.g. GitHub-flavor.
+    #
+    # This affects which anchors are generated for headers.
+    flavor: GitHub

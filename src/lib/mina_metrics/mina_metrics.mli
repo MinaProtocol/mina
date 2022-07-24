@@ -33,6 +33,8 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Runtime : sig
@@ -61,12 +63,22 @@ end
 
 module Bootstrap : sig
   val bootstrap_time_ms : Gauge.t
+
+  val staking_epoch_ledger_sync_ms : Counter.t
+
+  val next_epoch_ledger_sync_ms : Counter.t
+
+  val root_snarked_ledger_sync_ms : Counter.t
+
+  val num_of_root_snarked_ledger_retargeted : Gauge.t
 end
 
 module Transaction_pool : sig
   val useful_transactions_received_time_sec : Gauge.t
 
   val pool_size : Gauge.t
+
+  val transactions_added_to_pool : Counter.t
 end
 
 module Network : sig
@@ -92,6 +104,14 @@ module Network : sig
     module Validation_time : sig
       val update : Time.Span.t -> unit
     end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
+      val update : Time.Span.t -> unit
+    end
   end
 
   module Snark_work : sig
@@ -106,6 +126,14 @@ module Network : sig
     module Validation_time : sig
       val update : Time.Span.t -> unit
     end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
+      val update : Time.Span.t -> unit
+    end
   end
 
   module Transaction : sig
@@ -118,6 +146,14 @@ module Network : sig
     val received : Counter.t
 
     module Validation_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
       val update : Time.Span.t -> unit
     end
   end
@@ -249,6 +285,8 @@ module Network : sig
   val rpc_latency_ms_summary : Rpc_latency_histogram.t
 
   val ipc_latency_ns_summary : Ipc_latency_histogram.t
+
+  val ipc_logs_received_total : Counter.t
 end
 
 module Pipe : sig
@@ -327,6 +365,10 @@ module Block_producer : sig
   val slots_won : Counter.t
 
   val blocks_produced : Counter.t
+
+  module Block_production_delay_histogram : Histogram
+
+  val block_production_delay : Block_production_delay_histogram.t
 end
 
 module Transition_frontier : sig

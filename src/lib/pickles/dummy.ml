@@ -18,18 +18,18 @@ let evals =
 let evals_combined =
   Tuple_lib.Double.map evals ~f:(fun (e, _x) ->
       Dlog_plonk_types.Evals.map e
-        ~f:(Array.reduce_exn ~f:Backend.Tock.Field.( + )))
+        ~f:(Array.reduce_exn ~f:Backend.Tock.Field.( + )) )
 
 module Ipa = struct
   module Wrap = struct
     let challenges =
       Vector.init Tock.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          { Bulletproof_challenge.prechallenge })
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
       Vector.map challenges ~f:(fun { prechallenge } : Tock.Field.t ->
-          Ipa.Wrap.compute_challenge prechallenge)
+          Ipa.Wrap.compute_challenge prechallenge )
 
     let sg =
       lazy
@@ -40,11 +40,11 @@ module Ipa = struct
     let challenges =
       Vector.init Tick.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          { Bulletproof_challenge.prechallenge })
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
       Vector.map challenges ~f:(fun { prechallenge } : Tick.Field.t ->
-          Ipa.Step.compute_challenge prechallenge)
+          Ipa.Step.compute_challenge prechallenge )
 
     let sg =
       lazy

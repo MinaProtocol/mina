@@ -1,6 +1,24 @@
 (library
  (name mina_net2_tests)
- (libraries mina_net2 inline_test_quiet_logs)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   ppx_inline_test.config
+   async_kernel
+   async_unix
+   core_kernel
+   sexplib0
+   bin_prot.shape
+   base.caml
+   ;; local libraries
+   mina_net2
+   inline_test_quiet_logs
+   logger
+   child_processes
+   network_peer
+   file_system
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version))
  (inline_tests))

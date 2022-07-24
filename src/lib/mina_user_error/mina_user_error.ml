@@ -23,7 +23,7 @@ FATAL ERROR
   ☠  Mina %s.
 
   %s
-%!|err}
-               error message)
+%!|err} error
+               message )
       | _ ->
-          None)
+          None )

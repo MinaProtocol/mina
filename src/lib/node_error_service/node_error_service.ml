@@ -15,7 +15,8 @@ type catchup_job_states = Transition_frontier.Full_catchup_tree.job_states =
 [@@deriving to_yojson]
 
 type node_error_data =
-  { peer_id : string
+  { version : int
+  ; peer_id : string
   ; ip_address : string
   ; public_key : Public_key.Compressed.t option
   ; git_branch : string
@@ -45,7 +46,7 @@ let send_node_error_data ~logger ~url node_error_data =
     Async.try_with (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-          url)
+          url )
   with
   | Ok ({ status; _ }, body) ->
       let metadata =
@@ -110,14 +111,16 @@ let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
             | Full catchup_tree ->
                 Some
                   (Transition_frontier.Full_catchup_tree.to_node_status_report
-                     catchup_tree)
+                     catchup_tree )
             | _ ->
                 None )
       in
       let block_height_at_best_tip =
         Mina_lib.best_tip mina
-        |> Participating_state.map
-             ~f:Transition_frontier.Breadcrumb.blockchain_length
+        |> Participating_state.map ~f:(fun b ->
+               Transition_frontier.Breadcrumb.consensus_state b
+               |> Consensus.Data.Consensus_state.blockchain_length
+               |> Mina_numbers.Length.to_uint32 )
         |> Participating_state.map ~f:Unsigned.UInt32.to_int
         |> Participating_state.active
       in
@@ -128,7 +131,8 @@ let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
       let%bind hardware_info = Mina_lib.Conf_dir.get_hw_info () in
       send_node_error_data ~logger
         ~url:(Uri.of_string node_error_url)
-        { peer_id
+        { version = 1
+        ; peer_id
         ; ip_address
         ; public_key
         ; git_branch
@@ -152,5 +156,5 @@ let send_report ~logger ~node_error_url ~mina_ref ~error ~contact_info =
               Span.to_string_hum
               @@ Time.diff (now ())
                    (Time_ns.to_time_float_round_nearest_microsecond
-                      Mina_lib.daemon_start_time))
+                      Mina_lib.daemon_start_time ))
         }

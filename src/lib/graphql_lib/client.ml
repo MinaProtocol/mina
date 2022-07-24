@@ -52,8 +52,7 @@ module Connection_error = struct
 
   let ok_exn = function
     | `Failed_request e ->
-        eprintf "❌ Error connecting to graphql server. Error message: %s\n%!"
-          e ;
+        eprintf "❌ Error connecting to graphql server. Error message: %s\n%!" e ;
         exit 17
     | `Graphql_error e ->
         eprintf "❌ Error: %s\n" e ;
@@ -82,15 +81,15 @@ module Make (Config : Config_intf) = struct
         ( ("Accept", "application/json")
         :: ("Content-Type", "application/json")
         :: Map.to_alist Config.headers ) ~f:(fun header (key, value) ->
-          Cohttp.Header.add header key value)
+          Cohttp.Header.add header key value )
     in
     let%bind response, body =
       Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
           Cohttp_async.Client.post ~headers
             ~body:(Cohttp_async.Body.of_string body_string)
-            uri)
+            uri )
       |> Deferred.Result.map_error ~f:(fun e ->
-             `Failed_request (Error.to_string_hum e))
+             `Failed_request (Error.to_string_hum e) )
     in
     let%bind body_str =
       Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
@@ -105,7 +104,7 @@ module Make (Config : Config_intf) = struct
           Deferred.return
             (Error
                (`Failed_request
-                 (Printf.sprintf "Status code %d -- %s" code body_str)))
+                 (Printf.sprintf "Status code %d -- %s" code body_str) ) )
     in
     let open Yojson.Basic.Util in
     ( match (member "errors" body_json, member "data" body_json) with
@@ -119,7 +118,7 @@ module Make (Config : Config_intf) = struct
                `Graphql_error
                  (Printf.sprintf
                     "Problem parsing graphql response\nError message: %s"
-                    (Exn.to_string e))) )
+                    (Exn.to_string e) ) ) )
     |> Deferred.return
 
   let query_exn query_obj port =

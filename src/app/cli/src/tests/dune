@@ -2,15 +2,73 @@
  (name tests)
  (public_name tests)
  (libraries
-   ; opam deps
-   async core
-   ; libs
-   mina_base mina_graphql mina_lib mina_state mina_net2
-   mina_transition mina_version child_processes
-   parallel protocol_version
-   node_addrs_and_ports transition_frontier
-   ; internal deps
-   init)
+   ;;opam libraries
+   uri
+   archive_lib
+   caqti-async
+   rpc_parallel
+   base
+   core_kernel
+   async_kernel
+   bin_prot.shape
+   graphql-async
+   integers
+   init
+   async
+   core
+   sexplib0
+   ppx_hash.runtime-lib
+   async.async_command
+   base.caml
+   caqti
+   base.base_internalhash_types
+   graphql_parser
+   async_unix
+   ;;local libraries
+   transaction_snark_work
+   staged_ledger_diff
+   o1trace
+   genesis_constants
+   file_system
+   mina_commands
+   genesis_ledger_helper
+   sync_status
+   logger
+   user_command_input
+   data_hash_lib
+   block_time
+   coda_genesis_proof
+   participating_state
+   trust_system
+   protocol_version
+   child_processes
+   mina_block
+   mina_state
+   mina_graphql
+   mina_base
+   mina_lib
+   mina_net2
+   parallel
+   node_addrs_and_ports
+   mina_networking
+   gossip_net
+   coda_genesis_ledger
+   consensus
+   precomputed_values
+   with_hash
+   network_peer
+   currency
+   coda_runtime_config
+   pipe_lib
+   signature_lib
+   cli_lib
+   mina_numbers
+   filtered_external_transition
+   work_selector
+   mina_compile_config
+   unsigned_extended
+ )
+
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

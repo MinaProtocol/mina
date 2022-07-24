@@ -2,6 +2,9 @@ package main
 
 import (
 	cryptorand "crypto/rand"
+	"fmt"
+	gonet "net"
+	"sync"
 	"time"
 
 	"codanet"
@@ -11,10 +14,12 @@ import (
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -128,7 +133,19 @@ func (msg BeginAdvertisingReq) handle(app *app, seqno uint64) *capnp.Message {
 	})
 }
 
-func configurePubsub(app *app, validationQueueSize int, directPeers []peer.AddrInfo, opts ...pubsub.Option) error {
+func configurePubsub(app *app, validationQueueSize int, directPeers []peer.AddrInfo, topicLevel topicLevelConf, opts ...pubsub.Option) error {
+	if len(topicLevel) > 0 {
+		f := &leveledSubscriptionFilter{
+			topicLevel: topicLevel,
+			peerLevel:  make(map[peer.ID]int),
+			localPeer:  app.P2p.Me,
+		}
+		opts = append(opts, pubsub.WithSubscriptionFilter(f))
+		app.P2p.ConnectionManager.AddOnDisconnectHandler(func(net net.Network, c net.Conn) {
+			f.OnDisconnect(c.RemotePeer())
+		})
+	}
+
 	// SOMEDAY:
 	// - stop putting block content on the mesh.
 	// - bigger than 32MiB block size?
@@ -141,6 +158,119 @@ func configurePubsub(app *app, validationQueueSize int, directPeers []peer.AddrI
 	)
 	app.P2p.Pubsub = ps
 	return err
+}
+
+func readTopicLevels(lst ipc.TopicLevel_List) (topicLevelConf, error) {
+	res := make(topicLevelConf)
+	for i := 0; i < lst.Len(); i++ {
+		tl := lst.At(i)
+		topics, err := tl.Topics()
+		if err != nil {
+			return nil, err
+		}
+		for j := 0; j < topics.Len(); j++ {
+			topic, err := topics.At(j)
+			if err != nil {
+				return nil, err
+			}
+			l, has := res[topic]
+			if has {
+				if i == l.maxLevel+1 {
+					res[topic] = topicLevelEntry{
+						minLevel: l.minLevel,
+						maxLevel: i,
+					}
+				} else {
+					return nil, fmt.Errorf("duplicate topic on level %d: %s (minL: %d, maxL: %d)", i, topic, l.minLevel, l.maxLevel)
+				}
+			} else {
+				res[topic] = topicLevelEntry{minLevel: i, maxLevel: i}
+			}
+		}
+	}
+	return res, nil
+}
+
+type topicLevelConf map[string]topicLevelEntry
+
+type topicLevelEntry struct {
+	minLevel int
+	maxLevel int
+}
+
+// leveledSubscriptionFilter is a filter that takes topic level parameter
+// which lists topics for each level.
+// Then, for each peer we monitor topics being used and discard
+// subscriptions from topics of lower level than the max level
+// observed for the node.
+// Filter keeps a record per each connected node that subscribed to some topic,
+// and cleans up the record when the node disconnects.
+type leveledSubscriptionFilter struct {
+	topicLevel topicLevelConf
+	peerLevel  map[peer.ID]int
+	lock       sync.RWMutex
+	localPeer  peer.ID
+}
+
+func (f *leveledSubscriptionFilter) CanSubscribe(topic string) bool {
+	_, has := f.topicLevel[topic]
+	return has
+}
+func (f *leveledSubscriptionFilter) FilterIncomingSubscriptions(pid peer.ID, subs []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error) {
+	f.lock.RLock()
+	pl, hasPl := f.peerLevel[pid]
+	f.lock.RUnlock()
+	initHasPl := hasPl
+	peerLevel := pl
+	for _, sub := range subs {
+		l, hasL := f.topicLevel[sub.GetTopicid()]
+		if !hasL {
+			continue
+		}
+		if !hasPl || pl < l.minLevel {
+			hasPl = true
+			pl = l.minLevel
+		}
+	}
+	if !hasPl {
+		// all subs are irrelevant
+		return nil, nil
+	}
+	if !initHasPl || peerLevel < pl {
+		f.lock.Lock()
+		peerLevel, initHasPl = f.peerLevel[pid]
+		if !initHasPl || peerLevel < pl {
+			f.peerLevel[pid] = pl
+			peerLevel = pl
+		}
+		f.lock.Unlock()
+	}
+	res := pubsub.FilterSubscriptions(subs, func(topic string) bool {
+		l, hasL := f.topicLevel[topic]
+		return hasL && l.minLevel <= peerLevel && peerLevel <= l.maxLevel
+	})
+	// Uncomment lines below to debug the filter
+	// initTopics := make([]string, 0, len(subs))
+	// resTopics := make([]string, 0, len(res))
+	// for _, sub := range subs {
+	// 	initTopics = append(initTopics, fmt.Sprintf("%s:%v", sub.GetTopicid(), sub.GetSubscribe()))
+	// }
+	// for _, sub := range res {
+	// 	resTopics = append(resTopics, fmt.Sprintf("%s:%v", sub.GetTopicid(), sub.GetSubscribe()))
+	// }
+	// fmt.Printf("%s subscribes to %s: {%s} -> {%s}\n", pid.Pretty(), f.localPeer.Pretty(), strings.Join(initTopics, ", "), strings.Join(resTopics, ", "))
+	return res, nil
+}
+
+func (f *leveledSubscriptionFilter) OnDisconnect(p peer.ID) {
+	f.lock.RLock()
+	_, has := f.peerLevel[p]
+	f.lock.RUnlock()
+	if has {
+		f.lock.Lock()
+		delete(f.peerLevel, p)
+		f.lock.Unlock()
+	}
 }
 
 type ConfigureReqT = ipc.Libp2pHelperInterface_Configure_Request
@@ -251,8 +381,48 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
+	var topicLevel topicLevelConf
+	if m.HasTopicConfig() {
+		tc, err := m.TopicConfig()
+		if err == nil {
+			topicLevel, err = readTopicLevels(tc)
+		}
+		if err != nil {
+			return mkRpcRespError(seqno, badRPC(err))
+		}
+	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, listenOn, externalMaddr, stateDir, privk, netId, seeds, gatingConfig, int(m.MinConnections()), int(m.MaxConnections()), m.MinaPeerExchange(), time.Millisecond)
+	knownPrivateIpNetsRaw, err := m.KnownPrivateIpNets()
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+	knownPrivateIpNets := make([]gonet.IPNet, 0, knownPrivateIpNetsRaw.Len())
+	err = textListForeach(knownPrivateIpNetsRaw, func(v string) error {
+		_, addr, err := gonet.ParseCIDR(v)
+		if err == nil {
+			knownPrivateIpNets = append(knownPrivateIpNets, *addr)
+		}
+		return err
+	})
+	if err != nil {
+		return mkRpcRespError(seqno, badRPC(err))
+	}
+
+	helper, err := codanet.MakeHelper(
+		app.Ctx,
+		listenOn,
+		externalMaddr,
+		stateDir,
+		privk,
+		netId,
+		seeds,
+		gatingConfig,
+		int(m.MinConnections()),
+		int(m.MaxConnections()),
+		m.MinaPeerExchange(),
+		time.Millisecond,
+		knownPrivateIpNets,
+	)
 	if err != nil {
 		return mkRpcRespError(seqno, badHelper(err))
 	}
@@ -261,9 +431,13 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	app.bitswapCtx.engine = helper.Bitswap
 	app.bitswapCtx.storage = helper.BitswapStorage
 
-	err = configurePubsub(app, int(m.ValidationQueueSize()), directPeers,
+	opts := []pubsub.Option{
 		pubsub.WithFloodPublish(m.Flood()),
-		pubsub.WithPeerExchange(m.PeerExchange()))
+		pubsub.WithPeerExchange(m.PeerExchange()),
+	}
+
+	err = configurePubsub(app, int(m.ValidationQueueSize()), directPeers, topicLevel, opts...)
+
 	if err != nil {
 		return mkRpcRespError(seqno, badHelper(err))
 	}
@@ -400,16 +574,16 @@ func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}
-	var newState *codanet.CodaGatingState
+	var gatingConfig *codanet.CodaGatingConfig
 	gc, err := SetGatingConfigReqT(m).GatingConfig()
 	if err == nil {
-		newState, err = readGatingConfig(gc, app.AddedPeers)
+		gatingConfig, err = readGatingConfig(gc, app.AddedPeers)
 	}
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
-	app.P2p.SetGatingState(newState)
+	app.P2p.SetGatingState(gatingConfig)
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		_, err := m.NewSetGatingConfig()

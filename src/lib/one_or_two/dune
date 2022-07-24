@@ -3,7 +3,16 @@
  (public_name one_or_two)
  (flags :standard -short-paths)
  (library_flags -linkall)
- (libraries core_kernel async_kernel)
+(libraries
+  ;; opam libraries
+  bin_prot.shape
+  base
+  async_kernel
+  core_kernel
+  ppx_hash.runtime-lib
+  sexplib0
+  base.caml
+  )
  (preprocess
   (pps ppx_base ppx_bin_prot ppx_version ppx_deriving.std ppx_deriving_yojson ppx_let))
  (instrumentation (backend bisect_ppx))

@@ -200,8 +200,8 @@ module Constraint_constants = struct
 end
 
 (*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
-The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
-TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
+  The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
+  TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
 let genesis_timestamp_of_string str =
   let default_zone = Time.Zone.of_utc_offset ~hours:(-8) in
@@ -216,7 +216,7 @@ let validate_time time_str =
   match
     Result.try_with (fun () ->
         Option.value_map ~default:(Time.now ()) ~f:genesis_timestamp_of_string
-          time_str)
+          time_str )
   with
   | Ok time ->
       Ok (of_time time)
@@ -267,8 +267,8 @@ module Protocol = struct
                 (Time.to_string_abs
                    (Time.of_span_since_epoch
                       (Time.Span.of_ms
-                         (Int64.to_float t.genesis_state_timestamp)))
-                   ~zone:Time.Zone.utc) )
+                         (Int64.to_float t.genesis_state_timestamp) ) )
+                   ~zone:Time.Zone.utc ) )
           ]
 
       let of_yojson = function
@@ -307,7 +307,7 @@ module Protocol = struct
           ; genesis_state_timestamp =
               Time.to_string_abs
                 (Time.of_span_since_epoch
-                   (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)))
+                   (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)) )
                 ~zone:Time.Zone.utc
           }
         in
@@ -360,7 +360,7 @@ module T = struct
       ^ Time.to_string_abs ~zone:Time.Zone.utc
           (Time.of_span_since_epoch
              (Time.Span.of_ms
-                (Int64.to_float t.protocol.genesis_state_timestamp)))
+                (Int64.to_float t.protocol.genesis_state_timestamp) ) )
     in
     Blake2.digest_string str |> Blake2.to_hex
 end

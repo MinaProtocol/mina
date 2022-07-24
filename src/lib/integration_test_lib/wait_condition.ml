@@ -1,11 +1,9 @@
 open Core_kernel
 open Mina_base
-open Currency
-open Signature_lib
 
 let all_equal ~equal ~compare ls =
   Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-      List.equal equal [ h ] (List.find_all_dups ~compare ls))
+      List.equal equal [ h ] (List.find_all_dups ~compare ls) )
 
 module Make
     (Engine : Intf.Engine.S)
@@ -32,8 +30,16 @@ struct
         'b Event_type.t * 'a * ('a -> Node.t -> 'b -> 'a predicate_result)
         -> predicate
 
+  type wait_condition_id =
+    | Nodes_to_initialize
+    | Blocks_to_be_produced
+    | Nodes_to_synchronize
+    | Signed_command_to_be_included_in_frontier
+    | Ledger_proofs_emitted_since_genesis
+
   type t =
-    { description : string
+    { id : wait_condition_id
+    ; description : string
     ; predicate : predicate
     ; soft_timeout : Network_time_span.t
     ; hard_timeout : Network_time_span.t
@@ -45,19 +51,15 @@ struct
     ; hard_timeout = Option.value hard_timeout ~default:t.hard_timeout
     }
 
-  (* TODO: does this actually work if it's run twice? I think not *)
-  (*
-   * options:
-   *   - assume nodes have not yet initialized by the time we get here
-   *   - associate additional state to see when initialization was last checked
-   *)
+  let wait_condition_id t = t.id
+
   let nodes_to_initialize nodes =
     let open Network_state in
     let check () (state : Network_state.t) =
       if
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
-            |> Option.value ~default:false)
+            |> Option.value ~default:false )
       then Predicate_passed
       else Predicate_continuation ()
     in
@@ -65,7 +67,8 @@ struct
       nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
       |> Printf.sprintf "[%s] to initialize"
     in
-    { description
+    { id = Nodes_to_initialize
+    ; description
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Literal (Time.Span.of_min 10.0)
     ; hard_timeout = Literal (Time.Span.of_min 15.0)
@@ -81,8 +84,17 @@ struct
         Predicate_passed
       else Predicate_continuation init_blocks_generated
     in
-    let soft_timeout_in_slots = 2 * n in
-    { description = Printf.sprintf "%d blocks to be produced" n
+    let soft_timeout_in_slots =
+      (* We add 1 here to make sure that we see the entirety of at least 2*n
+         full slots, since slot time may be misaligned with wait times after
+         non-block-related waits.
+         This ensures that low numbers of blocks (e.g. 1 or 2) have a
+         reasonable probability of success, reducing flakiness of the tests.
+      *)
+      (2 * n) + 1
+    in
+    { id = Blocks_to_be_produced
+    ; description = Printf.sprintf "%d blocks to be produced" n
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -96,7 +108,7 @@ struct
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find state.best_tips_by_node (Node.id node))
+            String.Map.find state.best_tips_by_node (Node.id node) )
       in
       if
         List.for_all best_tips ~f:Option.is_some
@@ -110,66 +122,63 @@ struct
       |> List.map ~f:(fun node -> "\"" ^ Node.id node ^ "\"")
       |> String.concat ~sep:", "
     in
-    { description = Printf.sprintf "%s to synchronize" formatted_nodes
+    { id = Nodes_to_synchronize
+    ; description = Printf.sprintf "%s to synchronize" formatted_nodes
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let payment_to_be_included_in_frontier ~sender_pub_key ~receiver_pub_key
-      ~amount =
-    let command_matches_payment cmd =
-      let open User_command in
-      match cmd with
-      | Signed_command signed_cmd -> (
-          let open Signature_lib in
-          let body =
-            Signed_command.payload signed_cmd |> Signed_command_payload.body
-          in
-          match body with
-          | Payment { source_pk; receiver_pk; amount = paid_amt; token_id = _ }
-            when Public_key.Compressed.equal source_pk sender_pub_key
-                 && Public_key.Compressed.equal receiver_pk receiver_pub_key
-                 && Currency.Amount.equal paid_amt amount ->
-              true
-          | _ ->
-              false )
-      | Snapp_command _ ->
-          false
-    in
-    let check () _node (breadcrumb_added : Event_type.Breadcrumb_added.t) =
-      let payment_opt =
-        List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
-            cmd_with_status.With_status.data |> User_command.forget_check
-            |> command_matches_payment)
+  let signed_command_to_be_included_in_frontier ~txn_hash
+      ~(node_included_in : [ `Any_node | `Node of Node.t ]) =
+    let check () state =
+      let blocks_with_txn_set_opt =
+        Map.find state.blocks_including_txn txn_hash
       in
-      match payment_opt with
-      | Some cmd_with_status ->
-          let actual_status = cmd_with_status.With_status.status in
-          let was_applied =
-            match actual_status with
-            | Transaction_status.Applied _ ->
-                true
-            | _ ->
-                false
-          in
-          if was_applied then Predicate_passed
-          else
-            Predicate_failure
-              (Error.createf "Unexpected status in matching payment: %s"
-                 ( Transaction_status.to_yojson actual_status
-                 |> Yojson.Safe.to_string ))
+      match blocks_with_txn_set_opt with
       | None ->
           Predicate_continuation ()
+      | Some blocks_with_txn_set -> (
+          match node_included_in with
+          | `Any_node ->
+              Predicate_passed
+          | `Node n ->
+              let blocks_seen_by_n =
+                Map.find state.blocks_seen_by_node (Node.id n)
+                |> Option.value ~default:State_hash.Set.empty
+              in
+              let intersection =
+                State_hash.Set.inter blocks_with_txn_set blocks_seen_by_n
+              in
+              if State_hash.Set.is_empty intersection then
+                Predicate_continuation ()
+              else Predicate_passed )
     in
+
     let soft_timeout_in_slots = 8 in
-    { description =
-        Printf.sprintf "payment from %s to %s of amount %s"
-          (Public_key.Compressed.to_string sender_pub_key)
-          (Public_key.Compressed.to_string receiver_pub_key)
-          (Amount.to_string amount)
-    ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    { id = Signed_command_to_be_included_in_frontier
+    ; description =
+        Printf.sprintf "signed command with hash %s"
+          (Transaction_hash.to_base58_check txn_hash)
+    ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let ledger_proofs_emitted_since_genesis ~num_proofs =
+    let open Network_state in
+    let check () (state : Network_state.t) =
+      if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
+      else Predicate_continuation ()
+    in
+    let description =
+      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
+        num_proofs
+    in
+    { id = Ledger_proofs_emitted_since_genesis
+    ; description
+    ; predicate = Network_state_predicate (check (), check)
+    ; soft_timeout = Slots 15
+    ; hard_timeout = Slots 20
     }
 end

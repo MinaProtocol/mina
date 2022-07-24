@@ -40,6 +40,9 @@ module Error_accumulator = struct
   let empty =
     { from_current_context = []; contextualized_errors = String.Map.empty }
 
+  let is_empty { from_current_context; contextualized_errors } =
+    List.is_empty from_current_context && Map.is_empty contextualized_errors
+
   let record_errors map context new_errors ~time_of_error =
     String.Map.update map context ~f:(fun errors_opt ->
         let errors =
@@ -47,15 +50,15 @@ module Error_accumulator = struct
         in
         let errors_by_time =
           List.fold new_errors ~init:errors.errors_by_time ~f:(fun acc error ->
-              Time.Map.add_multi acc ~key:(time_of_error error) ~data:error)
+              Time.Map.add_multi acc ~key:(time_of_error error) ~data:error )
         in
-        { errors with errors_by_time })
+        { errors with errors_by_time } )
 
   let error_count { from_current_context; contextualized_errors } =
     let num_current_context = List.length from_current_context in
     let num_contextualized =
       String.Map.fold contextualized_errors ~init:0 ~f:(fun ~key:_ ~data sum ->
-          Time.Map.length data.errors_by_time + sum)
+          Time.Map.length data.errors_by_time + sum )
     in
     num_current_context + num_contextualized
 
@@ -63,7 +66,7 @@ module Error_accumulator = struct
     let context_errors =
       String.Map.data contextualized_errors
       |> List.bind ~f:(fun { errors_by_time; _ } ->
-             Time.Map.data errors_by_time)
+             Time.Map.data errors_by_time )
       |> List.concat
     in
     from_current_context @ context_errors
@@ -107,21 +110,22 @@ module Error_accumulator = struct
             { errors with
               errors_by_time =
                 Time.Map.map errors.errors_by_time ~f:(List.map ~f)
-            })
+            } )
     }
 
   (* This only iterates over contextualized errors. You must check errors in the current context manually *)
   let iter_contexts { from_current_context = _; contextualized_errors } ~f =
     let contexts_by_time =
       contextualized_errors |> String.Map.to_alist
-      |> List.map ~f:(fun (ctx, errors) -> (errors.introduction_time, ctx))
-      |> Time.Map.of_alist_exn
+      |> List.map ~f:(fun (ctx, errors) ->
+             (errors.introduction_time, (ctx, errors)) )
+      |> Time.Map.of_alist_multi
     in
-    Time.Map.iter contexts_by_time ~f:(fun context ->
-        let { errors_by_time; _ } =
-          String.Map.find_exn contextualized_errors context
-        in
-        errors_by_time |> Time.Map.data |> List.concat |> f context)
+    let f =
+      List.iter ~f:(fun (context, { errors_by_time; _ }) ->
+          errors_by_time |> Time.Map.data |> List.concat |> f context )
+    in
+    Time.Map.iter contexts_by_time ~f
 
   let merge a b =
     let from_current_context =
@@ -138,7 +142,7 @@ module Error_accumulator = struct
               | None ->
                   data
               | Some data' ->
-                  resolve_conflict data' data))
+                  resolve_conflict data' data ) )
       in
       let merge_contextualized_errors a_errors b_errors =
         { introduction_time =
@@ -167,7 +171,7 @@ module Error_accumulator = struct
           ~init:(Map.empty cmp, Map.empty cmp)
           ~f:(fun ~key ~data (left, right) ->
             let l, r = f data in
-            (Map.add_exn left ~key ~data:l, Map.add_exn right ~key ~data:r))
+            (Map.add_exn left ~key ~data:l, Map.add_exn right ~key ~data:r) )
       in
       partition_map
         (module String)
@@ -179,7 +183,7 @@ module Error_accumulator = struct
               ctx_errors.errors_by_time ~f:(List.partition_tf ~f)
           in
           ( { ctx_errors with errors_by_time = l }
-          , { ctx_errors with errors_by_time = r } ))
+          , { ctx_errors with errors_by_time = r } ) )
     in
     let a =
       { from_current_context = from_current_context_a
@@ -198,26 +202,28 @@ module Set = struct
   type nonrec 'error t =
     { soft_errors : 'error Error_accumulator.t
     ; hard_errors : 'error Error_accumulator.t
+    ; exit_code : int option
     }
 
   let empty =
     { soft_errors = Error_accumulator.empty
     ; hard_errors = Error_accumulator.empty
+    ; exit_code = None
     }
 
-  let max_severity { soft_errors; hard_errors } =
+  let max_severity { soft_errors; hard_errors; exit_code = _ } =
     let num_soft = Error_accumulator.error_count soft_errors in
     let num_hard = Error_accumulator.error_count hard_errors in
     if num_hard > 0 then `Hard else if num_soft > 0 then `Soft else `None
 
-  let all_errors { soft_errors; hard_errors } =
+  let all_errors { soft_errors; hard_errors; exit_code = _ } =
     Error_accumulator.merge soft_errors hard_errors
 
   let soft_singleton err =
     { empty with soft_errors = Error_accumulator.singleton err }
 
-  let hard_singleton err =
-    { empty with hard_errors = Error_accumulator.singleton err }
+  let hard_singleton ?exit_code err =
+    { empty with hard_errors = Error_accumulator.singleton err; exit_code }
 
   let of_soft_or_error = function
     | Ok () ->
@@ -225,33 +231,50 @@ module Set = struct
     | Error err ->
         soft_singleton (internal_error err)
 
-  let of_hard_or_error = function
+  let of_hard_or_error ?exit_code = function
     | Ok () ->
         empty
     | Error err ->
-        hard_singleton (internal_error err)
+        hard_singleton ?exit_code (internal_error err)
 
   let add_soft err t =
     { t with soft_errors = Error_accumulator.add t.soft_errors err }
 
-  let add_hard err t =
-    { t with hard_errors = Error_accumulator.add t.soft_errors err }
+  let add_hard ?exit_code err t =
+    let exit_code =
+      match (t.exit_code, exit_code) with
+      | Some exit_code, _ | None, Some exit_code ->
+          Some exit_code
+      | None, None ->
+          None
+    in
+    { t with hard_errors = Error_accumulator.add t.soft_errors err; exit_code }
 
   let merge a b =
     { soft_errors = Error_accumulator.merge a.soft_errors b.soft_errors
     ; hard_errors = Error_accumulator.merge a.hard_errors b.hard_errors
+    ; exit_code =
+        ( match (a.exit_code, b.exit_code) with
+        | Some exit_code, _ | None, Some exit_code ->
+            Some exit_code
+        | None, None ->
+            None )
     }
 
   let combine = List.fold_left ~init:empty ~f:merge
 
-  let partition { soft_errors; hard_errors } ~f =
+  let partition { soft_errors; hard_errors; exit_code } ~f =
     let soft_errors_a, soft_errors_b =
       Error_accumulator.partition soft_errors ~f
     in
     let hard_errors_a, hard_errors_b =
       Error_accumulator.partition hard_errors ~f
     in
-    let a = { soft_errors = soft_errors_a; hard_errors = hard_errors_a } in
-    let b = { soft_errors = soft_errors_b; hard_errors = hard_errors_b } in
+    let a =
+      { soft_errors = soft_errors_a; hard_errors = hard_errors_a; exit_code }
+    in
+    let b =
+      { soft_errors = soft_errors_b; hard_errors = hard_errors_b; exit_code }
+    in
     (a, b)
 end

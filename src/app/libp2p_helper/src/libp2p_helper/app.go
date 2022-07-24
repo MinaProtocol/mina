@@ -18,7 +18,7 @@ import (
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns_legacy"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -46,15 +46,14 @@ func newApp() *app {
 
 func (app *app) SetConnectionHandlers() {
 	app.setConnectionHandlersOnce.Do(func() {
-		app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		app.P2p.ConnectionManager.AddOnConnectHandler(func(net net.Network, c net.Conn) {
 			app.updateConnectionMetrics()
 			app.writeMsg(mkPeerConnectedUpcall(peer.Encode(c.RemotePeer())))
-		}
-
-		app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		})
+		app.P2p.ConnectionManager.AddOnDisconnectHandler(func(net net.Network, c net.Conn) {
 			app.updateConnectionMetrics()
 			app.writeMsg(mkPeerDisconnectedUpcall(peer.Encode(c.RemotePeer())))
-		}
+		})
 	})
 }
 
@@ -360,11 +359,8 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 }
 
 func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
-	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
-	if err != nil {
-		return err
-	}
-	app.P2p.Mdns = &mdns
+	mdns := mdns.NewMdnsService(app.P2p.Host, "_coda-discovery._udp.local")
+	app.P2p.Mdns = mdns
 	l := &mdnsListener{
 		FoundPeer: foundPeerCh,
 		app:       app,

@@ -5,12 +5,12 @@ open Async
 let generate_keypair =
   Command.async ~summary:"Generate a new public, private keypair"
     (let open Command.Let_syntax in
-    let env = Secrets.Keypair.env in
-    if Option.is_some (Sys.getenv env) then
-      eprintf "Using password from environment variable %s\n" env ;
     let%map_open privkey_path = Flag.privkey_write_path in
     Exceptions.handle_nicely
     @@ fun () ->
+    let env = Secrets.Keypair.env in
+    if Option.is_some (Sys.getenv env) then
+      eprintf "Using password from environment variable %s\n" env ;
     let open Deferred.Let_syntax in
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
@@ -41,7 +41,7 @@ let validate_keypair =
                   exit 1 )
             | None ->
                 eprintf "No public key found in file %s\n" pubkey_path ;
-                exit 1)
+                exit 1 )
       with exn ->
         eprintf "Could not read public key file %s, error: %s\n" pubkey_path
           (Exn.to_string exn) ;
@@ -101,8 +101,10 @@ let validate_transaction =
     ( Command.Param.return
     @@ fun () ->
     let num_fails = ref 0 in
+    (* TODO upgrade to yojson 2.0.0 when possible to use seq_from_channel
+     * instead of the deprecated stream interface *)
     let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
-    ( match
+    ( match[@alert "--deprecated"]
         Or_error.try_with (fun () ->
             Caml.Stream.iter
               (fun transaction_json ->
@@ -122,8 +124,8 @@ let validate_transaction =
                        error:%s@."
                       (Yojson.Safe.pretty_to_string transaction_json)
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err)))
-              jsons)
+                         (Error_json.error_to_yojson err) ) )
+              jsons )
       with
     | Ok () ->
         ()
@@ -148,9 +150,6 @@ module Vrf = struct
          threshold_met = true in the JSON output), or to generate a witness \
          that a 3rd party can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
-      let env = Secrets.Keypair.env in
-      if Option.is_some (Sys.getenv env) then
-        eprintf "Using password from environment variable %s\n" env ;
       let%map_open privkey_path = Flag.privkey_write_path
       and global_slot =
         flag "--global-slot" ~doc:"NUM Global slot to evaluate the VRF for"
@@ -180,6 +179,9 @@ module Vrf = struct
       in
       Exceptions.handle_nicely
       @@ fun () ->
+      let env = Secrets.Keypair.env in
+      if Option.is_some (Sys.getenv env) then
+        eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =
@@ -239,12 +241,12 @@ module Vrf = struct
          \"epochSeed\": _, \"delegatorIndex\": _} JSON message objects read on \
          stdin"
       (let open Command.Let_syntax in
-      let env = Secrets.Keypair.env in
-      if Option.is_some (Sys.getenv env) then
-        eprintf "Using password from environment variable %s\n" env ;
       let%map_open privkey_path = Flag.privkey_write_path in
       Exceptions.handle_nicely
       @@ fun () ->
+      let env = Secrets.Keypair.env in
+      if Option.is_some (Sys.getenv env) then
+        eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =
@@ -277,15 +279,15 @@ module Vrf = struct
                         (Yojson.Safe.pretty_print ?std:None)
                         (Evaluation.to_yojson evaluation) ;
                       Deferred.return (`Repeat ())
-                    with Yojson.End_of_input -> return (`Finished ()))
+                    with Yojson.End_of_input -> return (`Finished ()) )
                 >>| function
                 | Ok x ->
                     x
                 | Error err ->
                     Format.eprintf "Error:@.%s@.@."
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err)) ;
-                    `Repeat ())
+                         (Error_json.error_to_yojson err) ) ;
+                    `Repeat () )
         | Error err ->
             eprintf "Could not read the specified keypair: %s\n"
               (Secrets.Privkey_error.to_string err) ;
@@ -331,15 +333,15 @@ module Vrf = struct
                     (Yojson.Safe.pretty_print ?std:None)
                     (Evaluation.to_yojson evaluation) ;
                   Deferred.return (`Repeat ())
-                with Yojson.End_of_input -> return (`Finished ()))
+                with Yojson.End_of_input -> return (`Finished ()) )
             >>| function
             | Ok x ->
                 x
             | Error err ->
                 Format.eprintf "Error:@.%s@.@."
                   (Yojson.Safe.pretty_to_string
-                     (Error_json.error_to_yojson err)) ;
-                `Repeat ())
+                     (Error_json.error_to_yojson err) ) ;
+                `Repeat () )
       in
       exit 0 )
 

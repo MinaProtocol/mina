@@ -73,16 +73,30 @@ module Poly = struct
           ]
 
       let of_yojson token_of_yojson fee_of_yojson = function
-        | `List
-            [ `Assoc [ ("token", fee_token_l); ("amount", fee_excess_l) ]
-            ; `Assoc [ ("token", fee_token_r); ("amount", fee_excess_r) ]
-            ] ->
-            let open Result.Let_syntax in
-            let%map fee_token_l = token_of_yojson fee_token_l
-            and fee_excess_l = fee_of_yojson fee_excess_l
-            and fee_token_r = token_of_yojson fee_token_r
-            and fee_excess_r = fee_of_yojson fee_excess_r in
-            { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
+        | `List [ `Assoc [ left0; left1 ]; `Assoc [ right0; right1 ] ] -> (
+            (* allow for reversed field order: "be liberal in what you accept" *)
+            let token_and_excess pair0 pair1 =
+              match (pair0, pair1) with
+              | ("token", token), ("amount", excess) ->
+                  Some (token, excess)
+              | ("amount", excess), ("token", token) ->
+                  Some (token, excess)
+              | _ ->
+                  None
+            in
+            let left = token_and_excess left0 left1 in
+            let right = token_and_excess right0 right1 in
+            match (left, right) with
+            | Some (fee_token_l, fee_excess_l), Some (fee_token_r, fee_excess_r)
+              ->
+                let open Result.Let_syntax in
+                let%map fee_token_l = token_of_yojson fee_token_l
+                and fee_excess_l = fee_of_yojson fee_excess_l
+                and fee_token_r = token_of_yojson fee_token_r
+                and fee_excess_r = fee_of_yojson fee_excess_r in
+                { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
+            | _ ->
+                Error "Fee_excess.Poly.Stable.V1.t, unexpected JSON field" )
         | _ ->
             Error "Fee_excess.Poly.Stable.V1.t"
     end
@@ -409,7 +423,7 @@ let%snarkydef combine_checked
       (eliminate_fee_excess_checked
          (fee_token1_l, fee_excess1_l)
          (fee_token1_r, fee_excess1_r)
-         (fee_token2_l, fee_excess2_l))
+         (fee_token2_l, fee_excess2_l) )
   in
   let%bind (fee_token1_l, fee_excess1_l), (fee_token2_r, fee_excess2_r) =
     (* [1l; 2l; 2r] -> [1l; 2r] *)
@@ -417,7 +431,7 @@ let%snarkydef combine_checked
       (eliminate_fee_excess_checked
          (fee_token1_l, fee_excess1_l)
          (fee_token2_l, fee_excess2_l)
-         (fee_token2_r, fee_excess2_r))
+         (fee_token2_r, fee_excess2_r) )
   in
   let%bind { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
     rebalance_checked
@@ -554,7 +568,7 @@ let%test_unit "Checked and unchecked behaviour is consistent" =
               Typ.(typ * typ)
               typ
               (fun (fe1, fe2) -> combine_checked fe1 fe2)
-              (fe1, fe2))
+              (fe1, fe2) )
       in
       match (fe, fe_checked) with
       | Ok fe, Ok fe_checked ->
@@ -562,7 +576,7 @@ let%test_unit "Checked and unchecked behaviour is consistent" =
       | Error _, Error _ ->
           ()
       | _ ->
-          [%test_eq: t Or_error.t] fe fe_checked)
+          [%test_eq: t Or_error.t] fe fe_checked )
 
 let%test_unit "Combine succeeds when the middle excess is zero" =
   Quickcheck.test (Quickcheck.Generator.tuple3 gen Token_id.gen Fee.Signed.gen)
@@ -580,7 +594,7 @@ let%test_unit "Combine succeeds when the middle excess is zero" =
             of_one_or_two
               (`Two
                 ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
-                , (tid, excess) ))
+                , (tid, excess) ) )
           with
           | Ok fe2 ->
               fe2
@@ -588,6 +602,6 @@ let%test_unit "Combine succeeds when the middle excess is zero" =
               (* The token is the same, and rebalancing causes an overflow. *)
               of_single (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
       in
-      ignore @@ Or_error.ok_exn (combine fe1 fe2))
+      ignore @@ Or_error.ok_exn (combine fe1 fe2) )
 
 [%%endif]

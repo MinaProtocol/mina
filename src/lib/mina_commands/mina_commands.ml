@@ -33,7 +33,7 @@ let get_keys_with_details t =
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_int
-      , account.Account.Poly.nonce |> Account.Nonce.to_int ))
+      , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
 let get_nonce t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
@@ -75,7 +75,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
            (sprintf !"%s"
               ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
                 .to_yojson (snd failed_txn)
-              |> Yojson.Safe.to_string )))
+              |> Yojson.Safe.to_string ) ) )
   | Ok ([ Signed_command txn ], []) ->
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:[ ("command", User_command.to_yojson (Signed_command txn)) ]
@@ -93,8 +93,8 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                      (Fn.compose
                         Network_pool.Transaction_pool.Resource_pool.Diff
                         .Diff_error
-                        .to_yojson snd)
-                   invalid_commands) )
+                        .to_yojson snd )
+                   invalid_commands ) )
           ]
         "Invalid result from scheduling a payment" ;
       Error (Error.of_string "Internal error while scheduling a payment")
@@ -261,8 +261,8 @@ let get_status ~flag t =
         None
   in
   let new_block_length_received =
-    Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
-    @@ Mina_transition.External_transition.Initial_validated.consensus_state
+    let open Mina_block in
+    Length.to_int @@ Mina_block.blockchain_length @@ Validation.block
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Mina_lib.most_recent_valid_transition t)
   in
@@ -361,9 +361,25 @@ let get_status ~flag t =
     | Full full ->
         Some
           (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
-               (state, State_hash.Set.length hashes)))
+               (state, State_hash.Set.length hashes) ) )
     | _ ->
         None
+  in
+  let metrics =
+    let open Mina_metrics.Block_producer in
+    Mina_metrics.
+      { Daemon_rpcs.Types.Status.Metrics.block_production_delay =
+          Block_production_delay_histogram.buckets block_production_delay
+      ; transaction_pool_diff_received =
+          Float.to_int @@ Gauge.value Network.transaction_pool_diff_received
+      ; transaction_pool_diff_broadcasted =
+          Float.to_int @@ Gauge.value Network.transaction_pool_diff_broadcasted
+      ; transaction_pool_size =
+          Float.to_int @@ Gauge.value Transaction_pool.pool_size
+      ; transactions_added_to_pool =
+          Float.to_int
+          @@ Counter.value Transaction_pool.transactions_added_to_pool
+      }
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
@@ -397,6 +413,7 @@ let get_status ~flag t =
   ; consensus_mechanism
   ; consensus_configuration
   ; addrs_and_ports
+  ; metrics
   }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t

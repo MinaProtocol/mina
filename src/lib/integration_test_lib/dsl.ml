@@ -19,7 +19,7 @@ let broadcast_pipe_fold_until_with_timeout reader ~timeout_duration
                 true
             | `Continue x ->
                 acc := x ;
-                false ))
+                false ) )
   in
   match%map Timeout.await () ~timeout_duration read_deferred with
   | `Ok () ->
@@ -138,15 +138,18 @@ module Make (Engine : Intf.Engine.S) () :
     in
     match result with
     | `Hard_timeout ->
-        Malleable_error.hard_error_format "hit a hard timeout waiting for %s"
-          condition.description
+        let exit_code =
+          match condition.id with Nodes_to_initialize -> Some 20 | _ -> None
+        in
+        Malleable_error.hard_error_format ?exit_code
+          "hit a hard timeout waiting for %s" condition.description
     | `Failure error ->
         Malleable_error.hard_error
           (Error.of_list
              [ Error.createf "wait_for hit an error waiting for %s"
                  condition.description
              ; error
-             ])
+             ] )
     | `Success ->
         let soft_timeout_was_met =
           Time.(add start_time soft_timeout >= now ())
@@ -204,24 +207,28 @@ module Make (Engine : Intf.Engine.S) () :
               [%log fatal] "Error occured $error"
                 ~metadata:[ ("error", Logger.Message.to_yojson message) ] ;
               on_fatal_error message ) ;
-            Deferred.return `Continue)
+            Deferred.return `Continue )
         : 'a Event_router.event_subscription ) ;
     log_error_accumulator
 
-  let lift_accumulated_log_errors { warn; faulty_peer; error; fatal } =
+  let lift_accumulated_log_errors ?exit_code { warn; faulty_peer; error; fatal }
+      =
     let open Test_error in
     let lift error_array =
       DynArray.to_list error_array
       |> List.map ~f:(fun (node, message) ->
-             { node_id = Node.id node; error_message = message })
+             { node_id = Node.id node; error_message = message } )
     in
     let time_of_error { error_message; _ } = error_message.timestamp in
     let accumulate_errors =
       List.fold ~init:Error_accumulator.empty ~f:(fun acc error ->
           Error_accumulator.add_to_context acc error.node_id error
-            ~time_of_error)
+            ~time_of_error )
     in
     let soft_errors = accumulate_errors (lift warn @ lift faulty_peer) in
     let hard_errors = accumulate_errors (lift error @ lift fatal) in
-    { Set.soft_errors; hard_errors }
+    let exit_code =
+      if Error_accumulator.is_empty hard_errors then None else exit_code
+    in
+    { Set.soft_errors; hard_errors; exit_code }
 end

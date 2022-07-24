@@ -91,10 +91,10 @@ let typ : (Checked.t, t) Typ.t =
          { Poly.predicate = With_hash.data predicate
          ; body1 = With_hash.data body1
          ; body2 = With_hash.data body2
-         })
+         } )
        ~back:(fun ({ predicate; body1; body2 } : _ Poly.t) ->
          let f = With_hash.of_data ~hash_data:(fun _ -> Set_once.create ()) in
-         { Poly.predicate = f predicate; body1 = f body1; body2 = f body2 })
+         { Poly.predicate = f predicate; body1 = f body1; body2 = f body2 } )
 
 open Snapp_basic
 
@@ -128,7 +128,7 @@ module Complement = struct
            ; account2_nonce
            ; other_fee_payer_opt
            } :
-            t) ~one:({ predicate; body1; body2 } as one : Checked.t) :
+            t ) ~one:({ predicate; body1; body2 } as one : Checked.t) :
           Snapp_command.Payload.One_proved.Digested.Checked.t =
         let (_ : Pickles.Impls.Step.Field.t array) =
           Checked.to_field_elements one
@@ -161,7 +161,7 @@ module Complement = struct
           |> Typ.transport
                ~there:
                  (Flagged_option.of_option
-                    ~default:Other_fee_payer.Payload.dummy)
+                    ~default:Other_fee_payer.Payload.dummy )
                ~back:Flagged_option.to_option
         ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -175,7 +175,7 @@ module Complement = struct
          ; one = _
          ; two
          } :
-          Snapp_command.Payload.One_proved.t) : t =
+          Snapp_command.Payload.One_proved.t ) : t =
       { second_starts_empty
       ; second_ends_empty
       ; token_id
@@ -190,7 +190,7 @@ module Complement = struct
          ; account2_nonce
          ; other_fee_payer_opt
          } :
-          t) ~one:({ predicate; body1; body2 } : Stable.Latest.t) :
+          t ) ~one:({ predicate; body1; body2 } : Stable.Latest.t) :
         Snapp_command.Payload.One_proved.t =
       { Snapp_command.Payload.Inner.second_starts_empty
       ; second_ends_empty
@@ -218,7 +218,7 @@ module Complement = struct
          ; one = _
          ; two = _
          } :
-          Snapp_command.Payload.Two_proved.t) : t =
+          Snapp_command.Payload.Two_proved.t ) : t =
       { token_id; other_fee_payer_opt }
 
     module Checked = struct
@@ -256,7 +256,7 @@ module Complement = struct
           |> Typ.transport
                ~there:
                  (Flagged_option.of_option
-                    ~default:Other_fee_payer.Payload.dummy)
+                    ~default:Other_fee_payer.Payload.dummy )
                ~back:Flagged_option.to_option
         ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist

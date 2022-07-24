@@ -14,6 +14,16 @@ module Unparented_blocks = struct
   let run (module Conn : Caqti_async.CONNECTION) () = Conn.collect_list query ()
 end
 
+module Missing_blocks_gap = struct
+  let query =
+    Caqti_request.find Caqti_type.int Caqti_type.int
+      {sql| SELECT $1 - MAX(height) - 1 FROM blocks
+            WHERE height < $1
+      |sql}
+
+  let run (module Conn : Caqti_async.CONNECTION) height = Conn.find query height
+end
+
 module Chain_status = struct
   let query_highest_canonical =
     Caqti_request.find Caqti_type.unit Caqti_type.int64

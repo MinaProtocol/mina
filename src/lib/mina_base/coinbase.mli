@@ -59,6 +59,6 @@ module Gen : sig
     -> max_amount:int
     -> fee_transfer:
          (   coinbase_amount:Currency.Amount.t
-          -> Fee_transfer.t Quickcheck.Generator.t)
+          -> Fee_transfer.t Quickcheck.Generator.t )
     -> t Quickcheck.Generator.t
 end

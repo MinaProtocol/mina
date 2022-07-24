@@ -6,7 +6,7 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type t = { major : int; minor : int; patch : int }
-    [@@deriving compare, sexp]
+    [@@deriving compare, sexp, yojson]
 
     let to_latest = Fn.id
   end
@@ -22,7 +22,7 @@ let set_proposed_opt t_opt = proposed_protocol_version_opt := t_opt
 
 (* we set current protocol version on daemon startup, so we should not see errors
    due to current_protocol_version = None in get_current and create_exn
- *)
+*)
 let get_current () = Option.value_exn !current_protocol_version
 
 let get_proposed_opt () = !proposed_protocol_version_opt

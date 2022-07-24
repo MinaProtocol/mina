@@ -6,7 +6,8 @@ open Mina_base
 module Global_slot = Mina_numbers.Global_slot
 module Memo = Signed_command_memo
 
-let raise_js_error s = Js.raise_js_error (new%js Js.error_constr (Js.string s))
+let raise_js_error s =
+  Js_error.(raise_ @@ of_error (new%js Js.error_constr (Js.string s)))
 
 type string_js = Js.js_string Js.t
 
@@ -142,4 +143,4 @@ let signature_kind_of_string_js network_js fname : Mina_signature_kind.t =
   | s ->
       raise_js_error
         (Core_kernel.sprintf
-           "%s: expected network to be mainnet or testnet, got: %s" fname s)
+           "%s: expected network to be mainnet or testnet, got: %s" fname s )

@@ -89,10 +89,9 @@ let () =
     | Received_undefined_union (ctx, n) ->
         Some
           (Printf.sprintf
-             "Received an undefined union for %s over the libp2p IPC: %n " ctx
-             n)
+             "Received an undefined union for %s over the libp2p IPC: %n " ctx n )
     | _ ->
-        None)
+        None )
 
 let compression = `None
 
@@ -127,13 +126,19 @@ let create_multiaddr representation =
     (module Builder.Multiaddr)
     (op Builder.Multiaddr.representation_set representation)
 
+let create_topic_level topics =
+  build'
+    (module Builder.TopicLevel)
+    (list_op Builder.TopicLevel.topics_set_list topics)
+
 let create_peer_id peer_id =
   build' (module Builder.PeerId) (op Builder.PeerId.id_set peer_id)
 
 let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
-    ~seed_peers ~peer_exchange ~mina_peer_exchange ~min_connections
-    ~max_connections ~validation_queue_size ~gating_config =
+    ~seed_peers ~known_private_ip_nets ~peer_exchange ~mina_peer_exchange
+    ~min_connections ~max_connections ~validation_queue_size ~gating_config
+    ~topic_config =
   build
     (module Builder.Libp2pConfig)
     Builder.Libp2pConfig.(
@@ -147,12 +152,15 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
       *> op flood_set flood
       *> list_op direct_peers_set_list direct_peers
       *> list_op seed_peers_set_list seed_peers
+      *> list_op known_private_ip_nets_set_list known_private_ip_nets
       *> op peer_exchange_set peer_exchange
       *> op mina_peer_exchange_set mina_peer_exchange
       *> op min_connections_set_int_exn min_connections
       *> op max_connections_set_int_exn max_connections
       *> op validation_queue_size_set_int_exn validation_queue_size
-      *> reader_op gating_config_set_reader gating_config)
+      *> reader_op gating_config_set_reader gating_config
+      *> list_op topic_config_set_list
+           (List.map ~f:create_topic_level topic_config))
 
 let create_gating_config ~banned_ips ~banned_peers ~trusted_ips ~trusted_peers
     ~isolate =
@@ -215,6 +223,10 @@ let rpc_request_body_set req body =
       ignore @@ set_node_status_set_builder req b
   | GetPeerNodeStatus b ->
       ignore @@ get_peer_node_status_set_builder req b
+  | TestDecodeBitswapBlocks b ->
+      ignore @@ test_decode_bitswap_blocks_set_builder req b
+  | TestEncodeBitswapBlocks b ->
+      ignore @@ test_encode_bitswap_blocks_set_builder req b
   | Undefined _ ->
       failwith "cannot set undefined rpc request body"
 
@@ -262,47 +274,41 @@ let create_push_message ~validation_id ~validation_result =
               (module Builder.Libp2pHelperInterface.Validation)
               Builder.Libp2pHelperInterface.Validation.(
                 reader_op validation_id_set_reader validation_id
-                *> op result_set validation_result)))
+                *> op result_set validation_result) ))
 
-(* TODO: carefully think about the scheduling implications of this. *)
-(* TODO: maybe IPC delay metrics should go here instead? *)
-let stream_messages pipe =
-  let open Capnp.Codecs in
-  let stream = FramedStream.empty compression in
-  let complete = ref false in
-  let r, w = Strict_pipe.(create Synchronous) in
-  let rec read_frames () =
-    match FramedStream.get_next_frame stream with
-    | Ok msg ->
-        let%bind () = Strict_pipe.Writer.write w (Ok msg) in
-        read_frames ()
-    | Error FramingError.Unsupported ->
-        complete := true ;
-        Strict_pipe.Writer.write w
-          (Or_error.error_string "unsupported capnp frame header")
-    | Error FramingError.Incomplete ->
-        Deferred.unit
+let read_and_decode_message =
+  let open Incremental_parsing in
+  let open Let_syntax in
+  let open Decoders in
+  let%bind segment_count = parse uint32 >>| Uint32.(( + ) one) in
+  let%bind segment_sizes =
+    parse (monomorphic_list uint32 (Uint32.to_int segment_count))
   in
+  let%map segments =
+    parse
+      (polymorphic_list
+         (List.map segment_sizes ~f:(fun n -> bytes (Uint32.to_int n * 8))) )
+  in
+  Capnp.BytesMessage.Message.of_storage segments
 
-  let rec scheduler_loop () =
-    let%bind () = Scheduler.yield () in
-    if !complete then Deferred.unit
-    else
-      let%bind () = read_frames () in
-      scheduler_loop ()
+let rec stream_messages frag_stream w =
+  let%bind () =
+    read_and_decode_message frag_stream
+    >>| Reader.DaemonInterface.Message.of_message >>| Or_error.return
+    >>= Strict_pipe.Writer.write w
   in
-  don't_wait_for
-    (let%map () =
-       Strict_pipe.Reader.iter pipe
-         ~f:(Fn.compose Deferred.return (FramedStream.add_fragment stream))
-     in
-     complete := true) ;
-  don't_wait_for (scheduler_loop ()) ;
-  r
+  stream_messages frag_stream w
 
 let read_incoming_messages reader =
-  Strict_pipe.Reader.map (stream_messages reader)
-    ~f:(Or_error.map ~f:Reader.DaemonInterface.Message.of_message)
+  let r, w = Strict_pipe.create Strict_pipe.Synchronous in
+  let fragment_stream = Incremental_parsing.Fragment_stream.create () in
+  O1trace.background_thread "stream_libp2p_ipc_messages" (fun () ->
+      stream_messages fragment_stream w ) ;
+  O1trace.background_thread "accumulate_libp2p_ipc_message_fragments" (fun () ->
+      Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
+          Incremental_parsing.Fragment_stream.add_fragment fragment_stream
+            (Stdlib.Bytes.unsafe_of_string fragment) ) ) ;
+  r
 
 let write_outgoing_message writer msg =
   msg |> Builder.Libp2pHelperInterface.Message.to_message

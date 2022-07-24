@@ -50,7 +50,8 @@ type block =
 [@@deriving to_yojson]
 
 type node_status_data =
-  { block_height_at_best_tip : int
+  { version : int
+  ; block_height_at_best_tip : int
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
   ; catchup_job_states : catchup_job_states option
@@ -83,7 +84,7 @@ let send_node_status_data ~logger ~url node_status_data =
     Async.try_with (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-          url)
+          url )
   with
   | Ok ({ status; _ }, body) ->
       let metadata =
@@ -169,7 +170,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
         | Full catchup_tree ->
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree)
+                 catchup_tree )
         | _ ->
             None
       in
@@ -184,10 +185,12 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
           , `Cpu_usage libp2p_cpu_usage ) ->
           let%bind peers = Mina_networking.peers network in
           let node_status_data =
-            { block_height_at_best_tip =
+            { version = 1
+            ; block_height_at_best_tip =
                 Transition_frontier.best_tip tf
-                |> Transition_frontier.Breadcrumb.blockchain_length
-                |> Unsigned.UInt32.to_int
+                |> Transition_frontier.Breadcrumb.consensus_state
+                |> Consensus.Data.Consensus_state.blockchain_length
+                |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int
             ; max_observed_block_height =
                 !Mina_metrics.Transition_frontier.max_blocklength_observed
             ; max_observed_unvalidated_block_height =
@@ -336,7 +339,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                         Time.to_string (Block_time.to_time received_at)
                     ; is_valid = false
                     ; reason_for_rejection = Some reason_for_rejection
-                    })
+                    } )
                 @ List.map (Queue.to_list Transition_frontier.validated_blocks)
                     ~f:(fun (hash, sender, received_at) ->
                       { hash
@@ -345,7 +348,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                           Time.to_string (Block_time.to_time received_at)
                       ; is_valid = true
                       ; reason_for_rejection = None
-                      })
+                      } )
             }
           in
           reset_gauges () ;

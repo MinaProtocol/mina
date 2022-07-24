@@ -51,7 +51,7 @@ let max_digestible_string_length = 1000
 (* 0th byte is a tag to distinguish digests from other data
    1st byte is length, always 32 for digests
    bytes 2 to 33 are data, 0-right-padded if length is less than 32
- *)
+*)
 
 let digest_tag = '\x00'
 
@@ -99,7 +99,7 @@ let create_by_digesting_string_exn s =
   String.init memo_length ~f:(fun ndx ->
       if Int.(ndx = tag_index) then digest_tag
       else if Int.(ndx = length_index) then digest_length_byte
-      else digest.[ndx - 2])
+      else digest.[ndx - 2] )
 
 let create_by_digesting_string (s : string) =
   try Ok (create_by_digesting_string_exn s)
@@ -122,7 +122,7 @@ let create_from_value_exn (type t) (module M : Memoable with type t = t)
       if Int.(ndx = tag_index) then bytes_tag
       else if Int.(ndx = length_index) then Char.of_int_exn len
       else if Int.(ndx < len + 2) then M.get value (ndx - 2)
-      else '\x00')
+      else '\x00' )
 
 let create_from_bytes_exn bytes = create_from_value_exn (module Bytes) bytes
 
@@ -144,6 +144,29 @@ let dummy = (create_by_digesting_string_exn "" :> t)
 
 let empty = create_from_string_exn ""
 
+type raw = Digest of string | Bytes of string
+
+let to_raw_exn memo =
+  let tag = tag memo in
+  if Char.equal tag digest_tag then Digest (to_base58_check memo)
+  else if Char.equal tag bytes_tag then
+    let len = length memo in
+    Bytes (String.init len ~f:(fun idx -> memo.[idx - 2]))
+  else failwithf "Unknown memo tag %c" tag ()
+
+let to_raw_bytes_exn memo =
+  match to_raw_exn memo with
+  | Digest _ ->
+      failwith "Cannot convert a digest to raw bytes"
+  | Bytes str ->
+      str
+
+let of_raw_exn = function
+  | Digest base58_check ->
+      of_base58_check_exn base58_check
+  | Bytes str ->
+      create_from_string_exn str
+
 let fold_bits t =
   { Fold_lib.Fold.fold =
       (fun ~init ~f ->
@@ -154,7 +177,7 @@ let fold_bits t =
             let b = (Char.to_int t.[i / 8] lsr (i mod 8)) land 1 = 1 in
             go (f acc b) (i + 1)
         in
-        go init 0)
+        go init 0 )
   }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
@@ -185,7 +208,7 @@ module Typ = Tick.Typ
 
 (* the code below is much the same as in Random_oracle.Digest; tag and length bytes
    make it a little different
- *)
+*)
 
 module Checked = struct
   type unchecked = t
@@ -252,7 +275,7 @@ let%test_module "user_command_memo" =
       in
       let memo_var =
         Snarky_backendless.Typ_monads.Store.run (typ.store memo) (fun x ->
-            Snarky_backendless.Cvar.Constant x)
+            Snarky_backendless.Cvar.Constant x )
       in
       let memo_read =
         Snarky_backendless.Typ_monads.Read.run (typ.read memo_var) read_constant

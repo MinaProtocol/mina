@@ -58,7 +58,7 @@ module Index = struct
           let rec go acc i =
             if i = ledger_depth then acc else go (f acc (Vector.get t i)) (i + 1)
           in
-          go init 0)
+          go init 0 )
     }
 
   let fold ~ledger_depth t =
@@ -188,15 +188,16 @@ module Stable = struct
     type t = Binable_arg.Stable.V1.t
     [@@deriving sexp, equal, hash, compare, yojson]
 
-    include Binable.Of_binable
-              (Binable_arg.Stable.V1)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable_without_uuid
+        (Binable_arg.Stable.V1)
+        (struct
+          type nonrec t = t
 
-                let to_binable = check
+          let to_binable = check
 
-                let of_binable = check
-              end)
+          let of_binable = check
+        end)
 
     let to_latest = Fn.id
 
@@ -334,7 +335,7 @@ let typ : (var, value) Typ.t =
       ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
           ~back:(fun delegate ->
             if Public_key.Compressed.(equal empty) delegate then None
-            else Some delegate)
+            else Some delegate )
       ; State_hash.typ
       ; Timing.typ
       ; Permissions.typ
@@ -357,7 +358,7 @@ let var_of_t
      ; permissions
      ; snapp
      } :
-      value) =
+      value ) =
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
   ; token_id = Token_id.var_of_t token_id
   ; token_permissions = Token_permissions.var_of_t token_permissions
@@ -394,7 +395,7 @@ module Checked = struct
     let open Random_oracle.Input in
     let bits conv =
       f (fun x ->
-          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)))
+          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)) )
     in
     make_checked (fun () ->
         List.reduce_exn ~f:append
@@ -413,13 +414,13 @@ module Checked = struct
              ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
              ~delegate:(f Public_key.Compressed.Checked.to_input)
              ~voting_for:(f State_hash.var_to_input)
-             ~timing:(bits Timing.var_to_bits)))
+             ~timing:(bits Timing.var_to_bits) ) )
 
   let digest t =
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:crypto_hash_prefix
-            (pack_input (Run.run_checked (to_input t)))))
+            (pack_input (Run.run_checked (to_input t)))) )
 
   let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
       ~vesting_increment ~initial_minimum_balance =
@@ -456,7 +457,7 @@ module Checked = struct
                subtract_unpacking_or_zero ~m min_balance_less_cliff_decrement
                  vesting_decrement
              in
-             min_balance_less_cliff_and_vesting_decrements))
+             min_balance_less_cliff_and_vesting_decrements ) )
 
   let has_locked_tokens ~global_slot (t : var) =
     let open Timing.As_record in
@@ -479,7 +480,7 @@ module Checked = struct
           (Bigint.of_field Field.zero |> Bigint.to_bignum_bigint)
       in
       make_checked (fun () ->
-          Snarky_integer.Integer.equal ~m cur_min_balance zero_int)
+          Snarky_integer.Integer.equal ~m cur_min_balance zero_int )
     in
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance

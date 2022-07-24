@@ -35,19 +35,19 @@ let s3 to_string read ~bucket_prefix ~install_path =
       Result.map_error
         (ksprintf Unix.system
            "curl --fail --silent --show-error -o \"%s\" \"%s\"" file_path
-           uri_string) ~f:(function
+           uri_string ) ~f:(function
         | `Exit_non_zero _ as e ->
             Error.of_string (Unix.Exit.to_string_hum (Error e))
         | `Signal s ->
             Error.createf "died after receiving %s (signal number %d)"
-              (Signal.to_string s) (Signal.to_system_int s))
+              (Signal.to_string s) (Signal.to_system_int s) )
       |> Result.map_error ~f:(fun err ->
              [%log trace] "Could not download key to key cache"
                ~metadata:
                  [ ("url", `String uri_string)
                  ; ("local_file_path", `String file_path)
                  ] ;
-             err)
+             err )
     in
     [%log trace] "Downloaded key to key cache"
       ~metadata:
@@ -64,11 +64,11 @@ module Disk_storable = struct
     (* TODO: Make more efficient *)
     let read _ ~path =
       Or_error.try_with (fun () ->
-          Binable.of_string m (In_channel.read_all path))
+          Binable.of_string m (In_channel.read_all path) )
     in
     let write _k t path =
       Or_error.try_with (fun () ->
-          Out_channel.write_all path ~data:(Binable.to_string m t))
+          Out_channel.write_all path ~data:(Binable.to_string m t) )
     in
     { to_string; read; write }
 
@@ -93,7 +93,7 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
             ((s3 to_string r ~bucket_prefix ~install_path).read k, `Cache_hit)
       in
       let%map.Or_error res = res in
-      (res, cache_hit))
+      (res, cache_hit) )
 
 let write spec { Disk_storable.to_string; read = r; write = w } k v =
   let errs =
@@ -108,6 +108,6 @@ let write spec { Disk_storable.to_string; read = r; write = w } k v =
           | S3 { bucket_prefix = _; install_path = _ } ->
               Or_error.return ()
         in
-        match res with Error e -> Some e | Ok () -> None)
+        match res with Error e -> Some e | Ok () -> None )
   in
   match errs with [] -> Ok () | errs -> Error (Error.of_list errs)

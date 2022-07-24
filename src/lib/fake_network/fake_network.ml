@@ -31,16 +31,15 @@ type peer_state =
          , Marlin_plonk_bindings_pasta_fp.t )
          With_hash.t
          Envelope.Incoming.t
-      -> ( Mina_transition.External_transition.t
-         , State_body_hash.t list * Mina_transition.External_transition.t )
+      -> ( Mina_block.t
+         , State_body_hash.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
   ; get_best_tip :
          unit Envelope.Incoming.t
-      -> ( Mina_transition.External_transition.t
-         , Marlin_plonk_bindings_pasta_fp.t list
-           * Mina_transition.External_transition.t )
+      -> ( Mina_block.t
+         , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -59,7 +58,7 @@ type peer_state =
          Deferred.t
   ; get_transition_chain :
          Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
-      -> Mina_transition.External_transition.t list option Deferred.t
+      -> Mina_block.t list option Deferred.t
   }
 
 type peer_network =
@@ -95,9 +94,9 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
             ~libp2p_port
             ~peer_id:
               (Peer.Id.unsafe_of_string
-                 (sprintf "fake peer at port %d" libp2p_port))
+                 (sprintf "fake peer at port %d" libp2p_port) )
         in
-        ((Int32.( + ) Int32.one ip, libp2p_port + 1), peer))
+        ((Int32.( + ) Int32.one ip, libp2p_port + 1), peer) )
   in
   let fake_gossip_network =
     Gossip_net.Fake.create_network (Vect.to_list peers)
@@ -113,6 +112,7 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
         Ledger.merkle_root
           (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
     ; constraint_constants = precomputed_values.constraint_constants
+    ; consensus_constants = precomputed_values.consensus_constants
     ; creatable_gossip_net =
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -131,6 +131,10 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
               (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
+                ~sinks:
+                  ( Transition_handler.Block_sink.void
+                  , Network_pool.Transaction_pool.Remote_sink.void
+                  , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                   state.get_staged_ledger_aux_and_pending_coinbases_at_hash
                 ~get_some_initial_peers:state.get_some_initial_peers
@@ -140,9 +144,9 @@ let setup (type n) ~logger ?(trust_system = Trust_system.null ())
                 ~get_node_status:state.get_node_status
                 ~get_transition_knowledge:state.get_transition_knowledge
                 ~get_transition_chain_proof:state.get_transition_chain_proof
-                ~get_transition_chain:state.get_transition_chain)
+                ~get_transition_chain:state.get_transition_chain )
         in
-        { peer; state; network })
+        { peer; state; network } )
   in
   { fake_gossip_network; peer_networks }
 
@@ -221,7 +225,7 @@ module Generator = struct
                           (Error.createf
                              !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
                              Mina_networking.refused_answer_query_string
-                             ledger_hash)) )
+                             ledger_hash ) ) )
     ; get_ancestry =
         ( match get_ancestry with
         | Some f ->
@@ -236,7 +240,7 @@ module Generator = struct
                    |> With_hash.map_hash ~f:(fun state_hash ->
                           { State_hash.State_hashes.state_hash
                           ; state_body_hash = None
-                          }) )) )
+                          } ) ) ) )
     ; get_best_tip =
         ( match get_best_tip with
         | Some f ->
@@ -264,7 +268,7 @@ module Generator = struct
             fun query_env ->
               Deferred.return
                 (Transition_chain_prover.prove ~frontier
-                   (Envelope.Incoming.data query_env)) )
+                   (Envelope.Incoming.data query_env) ) )
     ; get_transition_chain =
         ( match get_transition_chain with
         | Some f ->
@@ -273,7 +277,7 @@ module Generator = struct
             fun query_env ->
               Deferred.return
                 (Sync_handler.get_transition_chain ~frontier
-                   (Envelope.Incoming.data query_env)) )
+                   (Envelope.Incoming.data query_env) ) )
     }
 
   let fresh_peer_custom_rpc ?get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -344,7 +348,7 @@ module Generator = struct
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Deferred.List.iter branch
-          ~f:(Transition_frontier.add_breadcrumb_exn frontier)) ;
+          ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
 
     make_peer_state ~frontier ~consensus_local_state ~precomputed_values ~logger
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -369,7 +373,7 @@ module Generator = struct
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun (config : peer_config) ->
           config ~logger ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup)
+            ~use_super_catchup )
     in
     setup ~precomputed_values ~logger states
 end

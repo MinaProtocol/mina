@@ -3,10 +3,17 @@
  (name dump_dhall_types)
  (public_name dump_dhall_types)
  (libraries
+   ;; opam libraries
+   base
+   core_kernel
    async_kernel
    core
-   runtime_config
-   ppx_dhall_type)
+   stdio
+   base.caml
+   ;; local libraries
+   coda_runtime_config
+   ppx_dhall_type
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let)))

@@ -40,7 +40,7 @@ let str_decl ~loc (decl : type_declaration) : structure =
       (* [type t = A of int | B of bool | ...] *)
       [%str
         let ([%p pvar ~loc (mangle ~suffix:deriver_name name.txt)] :
-              [%t constr_of_decl ~loc decl] -> int) =
+              [%t constr_of_decl ~loc decl] -> int ) =
           [%e
             pexp_function ~loc
               (List.mapi constrs ~f:(fun i constr ->
@@ -53,7 +53,7 @@ let str_decl ~loc (decl : type_declaration) : structure =
                              Some (ppat_any ~loc) )
                    ; pc_guard = None
                    ; pc_rhs = eint ~loc i
-                   }))]
+                   } ) )]
 
         let [%p pvar ~loc (mangle_prefix ~prefix:"min" name.txt)] = 0
 
@@ -67,7 +67,7 @@ let str_decl ~loc (decl : type_declaration) : structure =
       (* [type t = Foo.t] *)
       [%str
         let ([%p pvar ~loc (mangle ~suffix:deriver_name name.txt)] :
-              [%t constr_of_decl ~loc decl] -> int) =
+              [%t constr_of_decl ~loc decl] -> int ) =
           [%e
             pexp_ident ~loc (Located.map (mangle_lid ~suffix:deriver_name) lid)]
 
@@ -86,7 +86,7 @@ let str_decl ~loc (decl : type_declaration) : structure =
       (* [type t = [ `A of int | `B of bool | ...]] *)
       [%str
         let ([%p pvar ~loc (mangle ~suffix:deriver_name name.txt)] :
-              [%t constr_of_decl ~loc decl] -> int) =
+              [%t constr_of_decl ~loc decl] -> int ) =
           [%e
             pexp_function ~loc
               (List.mapi constrs ~f:(fun i constr ->
@@ -99,14 +99,13 @@ let str_decl ~loc (decl : type_declaration) : structure =
                                ppat_variant ~loc label.txt None
                            | false, _ :: _ ->
                                (* [`A of int] *)
-                               ppat_variant ~loc label.txt
-                                 (Some (ppat_any ~loc))
+                               ppat_variant ~loc label.txt (Some (ppat_any ~loc))
                            | true, _ :: _ ->
                                (* [`A | `A of int] *)
                                ppat_or ~loc
                                  (ppat_variant ~loc label.txt None)
                                  (ppat_variant ~loc label.txt
-                                    (Some (ppat_any ~loc))) )
+                                    (Some (ppat_any ~loc)) ) )
                        ; pc_guard = None
                        ; pc_rhs = eint ~loc i
                        }
@@ -114,7 +113,7 @@ let str_decl ~loc (decl : type_declaration) : structure =
                        Location.raise_errorf ~loc:typ.ptyp_loc
                          "Cannot derive %s for this type: inherited fields are \
                           not supported"
-                         deriver_name))]
+                         deriver_name ) )]
 
         let [%p pvar ~loc (mangle_prefix ~prefix:"min" name.txt)] = 0
 

@@ -30,7 +30,7 @@ module Status = struct
           let padding =
             String.init (max_key_length - String.length s) ~f:(fun _ -> ' ')
           in
-          sprintf "%s: %s %s" s padding x)
+          sprintf "%s: %s %s" s padding x )
       |> String.concat ~sep:"\n"
     in
     title ^ "\n" ^ output ^ "\n"
@@ -47,13 +47,13 @@ module Status = struct
       List.map best ~f:(fun (v, (lo, hi)) ->
           Printf.sprintf
             !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
-            lo hi v)
+            lo hi v )
     in
     let total = List.sum (module Int) values ~f:Fn.id in
     List.fold msgs
       ~init:
         (Printf.sprintf "\n\tTotal: %d (overflow:%d) (underflow:%d)\n\t" total
-           overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x)
+           overflow underflow ) ~f:(fun acc x -> acc ^ "\n\t" ^ x)
     ^ "\n\t..."
 
   module Rpc_timings = struct
@@ -91,14 +91,14 @@ module Status = struct
         let f x = Field.get x s in
         Fields.fold ~init:[]
           ~get_staged_ledger_aux:(fun acc x ->
-            add_rpcs ~name:"Get Staged Ledger Aux" (f x) acc)
+            add_rpcs ~name:"Get Staged Ledger Aux" (f x) acc )
           ~answer_sync_ledger_query:(fun acc x ->
-            add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc)
+            add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
           ~get_ancestry:(fun acc x -> add_rpcs ~name:"Get Ancestry" (f x) acc)
           ~get_transition_chain_proof:(fun acc x ->
-            add_rpcs ~name:"Get transition chain proof" (f x) acc)
+            add_rpcs ~name:"Get transition chain proof" (f x) acc )
           ~get_transition_chain:(fun acc x ->
-            add_rpcs ~name:"Get transition chain" (f x) acc)
+            add_rpcs ~name:"Get transition chain" (f x) acc )
         |> List.rev
       in
       digest_entries ~title:"RPCs" entries
@@ -120,13 +120,13 @@ module Status = struct
         let f x = Field.get x s in
         Fields.fold ~init:[]
           ~rpc_timings:(fun acc x ->
-            ("RPC Timings", Rpc_timings.to_text (f x)) :: acc)
+            ("RPC Timings", Rpc_timings.to_text (f x)) :: acc )
           ~external_transition_latency:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Block Latencies (hist.)", summarize_report report) :: acc)
+                ("Block Latencies (hist.)", summarize_report report) :: acc )
           ~accepted_transition_local_latency:(fun acc x ->
             match f x with
             | None ->
@@ -134,7 +134,7 @@ module Status = struct
             | Some report ->
                 ( "Accepted local block Latencies (hist.)"
                 , summarize_report report )
-                :: acc)
+                :: acc )
           ~accepted_transition_remote_latency:(fun acc x ->
             match f x with
             | None ->
@@ -142,19 +142,20 @@ module Status = struct
             | Some report ->
                 ( "Accepted remote block Latencies (hist.)"
                 , summarize_report report )
-                :: acc)
+                :: acc )
           ~snark_worker_transition_time:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker a->b (hist.)", summarize_report report) :: acc)
+                ("Snark Worker a->b (hist.)", summarize_report report) :: acc )
           ~snark_worker_merge_time:(fun acc x ->
             match f x with
             | None ->
                 acc
             | Some report ->
-                ("Snark Worker Merge (hist.)", summarize_report report) :: acc)
+                ("Snark Worker Merge (hist.)", summarize_report report) :: acc
+            )
       in
       digest_entries ~title:"Performance Histograms" entries
   end
@@ -181,6 +182,17 @@ module Status = struct
     [@@deriving to_yojson, bin_io_unversioned]
   end
 
+  module Metrics = struct
+    type t =
+      { block_production_delay : int list
+      ; transaction_pool_diff_received : int
+      ; transaction_pool_diff_broadcasted : int
+      ; transactions_added_to_pool : int
+      ; transaction_pool_size : int
+      }
+    [@@deriving to_yojson, bin_io_unversioned, fields]
+  end
+
   module Make_entries (FieldT : sig
     type 'a t
 
@@ -204,13 +216,15 @@ module Status = struct
 
     let int_option_entry = option_entry ~f:Int.to_string
 
+    let list_mapper ~to_string list =
+      let len = List.length list in
+      let list_str =
+        if len > 0 then " " ^ List.to_string ~f:to_string list else ""
+      in
+      Printf.sprintf "%d%s" len list_str
+
     let list_string_entry name ~to_string =
-      map_entry name ~f:(fun list ->
-          let len = List.length list in
-          let list_str =
-            if len > 0 then " " ^ List.to_string ~f:to_string list else ""
-          in
-          Printf.sprintf "%d%s" len list_str)
+      map_entry name ~f:(list_mapper ~to_string)
 
     let num_accounts = int_option_entry "Global number of accounts"
 
@@ -223,7 +237,7 @@ module Status = struct
 
     let uptime_secs =
       map_entry "Local uptime" ~f:(fun secs ->
-          Time.Span.to_string (Time.Span.of_int_sec secs))
+          Time.Span.to_string (Time.Span.of_int_sec secs) )
 
     let ledger_merkle_root = string_option_entry "Ledger Merkle root"
 
@@ -257,7 +271,7 @@ module Status = struct
         | None ->
             "Block producer"
         | Some pk ->
-            pk)
+            pk )
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
@@ -280,8 +294,7 @@ module Status = struct
           let slot_str (slot : Next_producer_timing.slot) =
             sprintf "slot: %s slot-since-genesis: %s"
               (Mina_numbers.Global_slot.to_string slot.slot)
-              (Mina_numbers.Global_slot.to_string
-                 slot.global_slot_since_genesis)
+              (Mina_numbers.Global_slot.to_string slot.global_slot_since_genesis)
           in
           let generated_from =
             sprintf "Generated from consensus at %s"
@@ -299,7 +312,7 @@ module Status = struct
               sprintf "%s for %s (%s)" (str time) (slot_str for_slot)
                 generated_from
           | Produce_now { for_slot; _ } ->
-              sprintf "Now (for %s %s)" (slot_str for_slot) generated_from)
+              sprintf "Now (for %s %s)" (slot_str for_slot) generated_from )
 
     let consensus_time_best_tip =
       option_entry "Best tip consensus time"
@@ -351,7 +364,7 @@ module Status = struct
             | Some peer ->
                 [ ("Libp2p PeerID", peer.peer_id) ]
             | None ->
-                [])
+                [] )
         |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
@@ -382,10 +395,38 @@ module Status = struct
               | Wait_for_parent ->
                   "Waiting for parent to finish"
             in
-            ("\t" ^ s, Int.to_string n))
+            ("\t" ^ s, Int.to_string n) )
         |> digest_entries ~title:""
       in
       option_entry "Catchup status" ~f:render
+
+    let metrics =
+      let render conf =
+        let fmt_field name op field = [ (name, op (Field.get field conf)) ] in
+        let block_production_delay =
+          fmt_field "block_production_delay"
+          @@ list_mapper ~to_string:string_of_int
+        in
+        let transaction_pool_diff_received =
+          fmt_field "transaction_pool_diff_received" string_of_int
+        in
+        let transaction_pool_diff_broadcasted =
+          fmt_field "transaction_pool_diff_broadcasted" string_of_int
+        in
+        let transactions_added_to_pool =
+          fmt_field "transactions_added_to_pool" string_of_int
+        in
+        let transaction_pool_size =
+          fmt_field "transaction_pool_size" string_of_int
+        in
+        Metrics.Fields.to_list ~block_production_delay
+          ~transaction_pool_diff_received ~transaction_pool_diff_broadcasted
+          ~transactions_added_to_pool ~transaction_pool_size
+        |> List.concat
+        |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
+        |> digest_entries ~title:""
+      in
+      map_entry "Metrics" ~f:render
   end
 
   type t =
@@ -418,6 +459,7 @@ module Status = struct
     ; consensus_mechanism : string
     ; consensus_configuration : Consensus.Configuration.Stable.Latest.t
     ; addrs_and_ports : Node_addrs_and_ports.Display.Stable.Latest.t
+    ; metrics : Metrics.t
     }
   [@@deriving to_yojson, bin_io_unversioned, fields]
 
@@ -435,7 +477,7 @@ module Status = struct
       ~coinbase_receiver ~histograms ~consensus_time_best_tip
       ~global_slot_since_genesis_best_tip ~consensus_time_now
       ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports ~catchup_status
+      ~snark_work_fee ~addrs_and_ports ~catchup_status ~metrics
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

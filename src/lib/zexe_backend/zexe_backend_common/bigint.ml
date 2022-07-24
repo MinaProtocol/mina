@@ -83,7 +83,7 @@ module Make
     let bin_shape_t =
       Bin_prot.Shape.basetype
         (Bin_prot.Shape.Uuid.of_string
-           (sprintf "zexe_backend_bigint_%d" M.length_in_bytes))
+           (sprintf "zexe_backend_bigint_%d" M.length_in_bytes) )
         []
 
     let __bin_read_t__ _buf ~pos_ref _vint =

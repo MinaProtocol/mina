@@ -40,7 +40,7 @@ type ( 'a_var
               and type max_branching = 'max_branching
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
-              and type local_branches = 'local_heights)
+              and type local_branches = 'local_heights )
       }
       -> ( 'a_var
          , 'a_value
@@ -55,7 +55,7 @@ type ( 'a_var
 (* Compile an inductive rule. *)
 let create
     (type branches max_branching local_signature local_branches a_var a_value
-    prev_vars prev_values) ~index
+    prev_vars prev_values ) ~index
     ~(self : (a_var, a_value, max_branching, branches) Tag.t) ~wrap_domains
     ~(max_branching : max_branching Nat.t)
     ~(branchings : (int, branches) Vector.t) ~(branches : branches Nat.t) ~typ

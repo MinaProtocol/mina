@@ -248,10 +248,8 @@ spec:
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
         {{- end }}
-        - name: CODA_CLIENT_TRUSTLIST
+        - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
-        - name: CONNECT_PRIVATE_IPS
-          value: "true"
         ports:
         - name: client-port
           protocol: TCP

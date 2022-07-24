@@ -8,7 +8,7 @@ let or_error_list_fold ls ~init ~f =
   let open Or_error.Let_syntax in
   List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
       let%bind acc = acc_or_error in
-      f acc el)
+      f acc el )
 
 let get_metadata (message : Logger.Message.t) key =
   match String.Map.find message.metadata key with
@@ -19,7 +19,7 @@ let get_metadata (message : Logger.Message.t) key =
 
 let parse id (m : Logger.Message.t) =
   Or_error.try_with (fun () ->
-      Structured_log_events.parse_exn id (Map.to_alist m.metadata))
+      Structured_log_events.parse_exn id (Map.to_alist m.metadata) )
 
 let bad_parse = Or_error.error_string "bad parse"
 
@@ -127,7 +127,7 @@ module Transition_frontier_diff_application = struct
                 Or_error.error_string "unexpected transition frontier diff name"
             )
         | _ ->
-            Or_error.error_string "unexpected transition frontier diff format")
+            Or_error.error_string "unexpected transition frontier diff format" )
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -140,6 +140,7 @@ module Block_produced = struct
     ; epoch : int
     ; global_slot : int
     ; snarked_ledger_generated : bool
+    ; state_hash : State_hash.t
     }
   [@@deriving to_yojson]
 
@@ -179,6 +180,18 @@ module Block_produced = struct
     let open Json_parsing in
     let open Or_error.Let_syntax in
     let%bind breadcrumb = get_metadata message "breadcrumb" in
+    let%bind state_hash_str =
+      find string breadcrumb [ "validated_transition"; "hash"; "state_hash" ]
+    in
+    let%bind state_hash =
+      State_hash.of_yojson (`String state_hash_str)
+      |> fun res ->
+      match res with
+      | Ok hash ->
+          Or_error.return hash
+      | Error str ->
+          Or_error.error_string str
+    in
     let%bind snarked_ledger_generated =
       find bool breadcrumb [ "just_emitted_a_proof" ]
     in
@@ -198,7 +211,7 @@ module Block_produced = struct
       find int breadcrumb_consensus_state [ "curr_global_slot"; "slot_number" ]
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
-    { block_height; global_slot; epoch; snarked_ledger_generated }
+    { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -206,7 +219,10 @@ end
 module Breadcrumb_added = struct
   let name = "Breadcrumb_added"
 
-  type t = { user_commands : User_command.Valid.t With_status.t list }
+  type t =
+    { state_hash : State_hash.t
+    ; user_commands : User_command.Valid.t With_status.t list
+    }
   [@@deriving to_yojson]
 
   let structured_event_id =
@@ -215,11 +231,15 @@ module Breadcrumb_added = struct
   let parse_func message =
     let open Json_parsing in
     let open Or_error.Let_syntax in
+    let%bind state_hash_json = get_metadata message "state_hash" in
+    let state_hash =
+      parser_from_of_yojson State_hash.of_yojson state_hash_json
+    in
     let%map user_commands =
       get_metadata message "user_commands"
       >>= parse valid_commands_with_statuses
     in
-    { user_commands }
+    { state_hash; user_commands }
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -242,11 +262,12 @@ module Gossip = struct
 
     let name = "Block_gossip"
 
-    let id = Mina_networking.block_received_structured_events_id
+    let id = Transition_handler.Block_sink.block_received_structured_events_id
 
     let parse_func message =
       match%bind parse id message with
-      | Mina_networking.Block_received { state_hash; sender = _ } ->
+      | Transition_handler.Block_sink.Block_received { state_hash; sender = _ }
+        ->
           Ok ({ state_hash }, Direction.Received)
       | Mina_networking.Gossip_new_state { state_hash } ->
           Ok ({ state_hash }, Sent)
@@ -264,11 +285,14 @@ module Gossip = struct
 
     let name = "Snark_work_gossip"
 
-    let id = Mina_networking.snark_work_received_structured_events_id
+    let id =
+      Network_pool.Snark_pool.Resource_pool.Diff
+      .snark_work_received_structured_events_id
 
     let parse_func message =
       match%bind parse id message with
-      | Mina_networking.Snark_work_received { work; sender = _ } ->
+      | Network_pool.Snark_pool.Resource_pool.Diff.Snark_work_received
+          { work; sender = _ } ->
           Ok ({ work }, Direction.Received)
       | Mina_networking.Gossip_snark_pool_diff { work } ->
           Ok ({ work }, Direction.Received)
@@ -287,11 +311,14 @@ module Gossip = struct
 
     let name = "Transactions_gossip"
 
-    let id = Mina_networking.transactions_received_structured_events_id
+    let id =
+      Network_pool.Transaction_pool.Resource_pool.Diff
+      .transactions_received_structured_events_id
 
     let parse_func message =
       match%bind parse id message with
-      | Mina_networking.Transactions_received { txns; sender = _ } ->
+      | Network_pool.Transaction_pool.Resource_pool.Diff.Transactions_received
+          { txns; sender = _ } ->
           Ok ({ txns }, Direction.Received)
       | Mina_networking.Gossip_transaction_pool_diff { txns } ->
           Ok ({ txns }, Sent)
@@ -435,7 +462,7 @@ let structured_events_table =
   all_event_types
   |> List.filter_map ~f:(fun t ->
          let%map event_id = to_structured_event_id t in
-         (Structured_log_events.string_of_id event_id, t))
+         (Structured_log_events.string_of_id event_id, t) )
   |> String.Table.of_alist_exn
 
 let of_structured_event_id id =
@@ -452,7 +479,7 @@ let puppeteer_events_table =
   all_event_types
   |> List.filter_map ~f:(fun t ->
          let%map event_id = to_puppeteer_event_string t in
-         (event_id, t))
+         (event_id, t) )
   |> String.Table.of_alist_exn
 
 let of_puppeteer_event_string id = String.Table.find puppeteer_events_table id
@@ -513,7 +540,7 @@ let parse_puppeteer_event (message : Puppeteer_message.t) =
            "the events emitting from the puppeteer script are either not \
             formatted correctly, or are trying to emit an event_type which is \
             not actually recognized by the integration test framework.  this \
-            should not happen and is a programmer error")
+            should not happen and is a programmer error" )
 
 let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
  fun t1 e t2 h ->

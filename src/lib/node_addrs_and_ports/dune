@@ -1,7 +1,18 @@
 (library
  (name node_addrs_and_ports)
  (public_name node_addrs_and_ports)
- (libraries core async network_peer yojson)
+ (libraries
+   ;; opam libraries
+   core
+   async
+   yojson
+   sexplib0
+   base.caml
+   core_kernel
+   bin_prot.shape
+   ;; local libraries
+   network_peer
+   )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_let ppx_deriving_yojson)))

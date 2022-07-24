@@ -3,7 +3,19 @@
  (public_name snark_work_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel currency one_or_two signature_lib transaction_snark)
+ (libraries
+   ;; opam libraries
+   bin_prot.shape
+   core_kernel
+   base.caml
+   sexplib0
+   core
+   ;; local libraries
+   transaction_snark
+   signature_lib
+   one_or_two
+   currency
+   )
  (preprocess
   (pps ppx_jane ppx_deriving_yojson ppx_version))
  (instrumentation (backend bisect_ppx))

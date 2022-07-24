@@ -2,7 +2,16 @@
  (name logproc_lib)
  (public_name logproc_lib)
  (modules logproc_lib filter)
- (libraries interpolator_lib core_kernel yojson angstrom re2)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   yojson
+   angstrom
+   re2
+   ppx_inline_test.config
+   ;; local libraries
+   interpolator_lib
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
  (inline_tests))
@@ -14,7 +23,13 @@
  (name interpolator_lib)
  (public_name interpolator_lib)
  (modules interpolator)
- (libraries core_kernel yojson angstrom)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   yojson
+   angstrom
+   ;; local libraries
+)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
  (inline_tests))

@@ -93,8 +93,7 @@ let get_mina_binary () =
         (Result.ok_if_true
            (ns_get_executable_path buf count = 0)
            ~error:
-             (Error.of_string
-                "call to _NSGetExecutablePath failed unexpectedly"))
+             (Error.of_string "call to _NSGetExecutablePath failed unexpectedly") )
     in
     let s = string_from_ptr buf ~length:(!@count |> Unsigned.UInt32.to_int) in
     List.hd_exn @@ String.split s ~on:(Char.of_int 0 |> Option.value_exn)
@@ -160,12 +159,10 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
       [%log debug] "No PID file for %s" name ;
       Deferred.unit
 
+type output_type = [ `Chunks | `Lines ]
+
 (* Convert a Async.Reader.t into a Strict_pipe.Reader.t *)
-let reader_to_strict_pipe reader name output_type =
-  let r, w =
-    Strict_pipe.create ~name
-      (Strict_pipe.Buffered (`Capacity 100, `Overflow Crash))
-  in
+let reader_to_strict_pipe reader output_type =
   let pipe =
     match output_type with
     | `Chunks ->
@@ -173,17 +170,7 @@ let reader_to_strict_pipe reader name output_type =
     | `Lines ->
         Reader.lines reader
   in
-  don't_wait_for
-    (let%map () =
-       Pipe.iter_without_pushback pipe ~f:(fun msg ->
-           if not (Strict_pipe.Writer.is_closed w) then
-             try Strict_pipe.Writer.write w msg
-             with Strict_pipe.Overflow _ -> Strict_pipe.Writer.close w)
-     in
-     if not (Strict_pipe.Writer.is_closed w) then Strict_pipe.Writer.close w) ;
-  r
-
-type output_type = [ `Chunks | `Lines ]
+  Strict_pipe.Reader.of_linear_pipe { pipe; has_reader = false }
 
 let start_custom :
        logger:Logger.t
@@ -213,7 +200,7 @@ let start_custom :
              Deferred.Or_error.return ()
          | _ ->
              Deferred.Or_error.errorf "Config directory %s does not exist"
-               conf_dir)
+               conf_dir )
   in
   let lock_path = conf_dir ^/ name ^ ".lock" in
   let%bind () =
@@ -240,7 +227,7 @@ let start_custom :
          ; Some (Filename.dirname mina_binary_path ^/ name)
          ; Some ("mina-" ^ name)
          ; Some ("coda-" ^ name)
-         ])
+         ] )
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
   [%log info] "Custom child process $name started with pid $pid"
@@ -257,12 +244,8 @@ let start_custom :
          ~contents:(Pid.to_string @@ Process.pid process)
   in
   let terminated_ivar = Ivar.create () in
-  let stdout_pipe =
-    reader_to_strict_pipe (Process.stdout process) (name ^ "-stdout") stdout
-  in
-  let stderr_pipe =
-    reader_to_strict_pipe (Process.stderr process) (name ^ "-stderr") stderr
-  in
+  let stdout_pipe = reader_to_strict_pipe (Process.stdout process) stdout in
+  let stderr_pipe = reader_to_strict_pipe (Process.stderr process) stderr in
   let t =
     { process
     ; stdout_pipe
@@ -283,7 +266,7 @@ let start_custom :
       (let%bind () = after (Time.Span.of_sec 1.) in
        let%bind () = Writer.close @@ Process.stdin process in
        let%bind () = Reader.close @@ Process.stdout process in
-       Reader.close @@ Process.stderr process) ;
+       Reader.close @@ Process.stderr process ) ;
     let%bind () = Sys.remove lock_path in
     Ivar.fill terminated_ivar termination_status ;
     let log_bad_termination () =
@@ -348,7 +331,7 @@ let%test_module _ =
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dir
             (Filename.temp_dir_name ^/ "child-processes")
-            ~f)
+            ~f )
 
     let name = "tester.sh"
 
@@ -368,15 +351,14 @@ let%test_module _ =
           let%bind () =
             Strict_pipe.Reader.iter (stdout process) ~f:(fun line ->
                 [%test_eq: string] "hello\n" line ;
-                Deferred.unit)
+                Deferred.unit )
           in
           (* Pipe will be closed before the ivar is filled, so we need to wait a
              bit. *)
           let%bind () = after process_wait_timeout in
-          [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
-            (Some (Ok (Ok ())))
+          [%test_eq: Unix.Exit_or_signal.t Or_error.t option] (Some (Ok (Ok ())))
             (termination_status process) ;
-          Deferred.unit)
+          Deferred.unit )
 
     let%test_unit "killing works" =
       async_with_temp_dir (fun conf_dir ->
@@ -418,7 +400,7 @@ let%test_module _ =
           [%test_eq: Unix.Exit_or_signal.t] exit_or_signal
             (Error (`Signal Signal.term)) ;
           assert (Option.is_some @@ termination_status process) ;
-          Deferred.unit)
+          Deferred.unit )
 
     let%test_unit "if you spawn two processes it kills the earlier one" =
       async_with_temp_dir (fun conf_dir ->
@@ -442,5 +424,5 @@ let%test_module _ =
             (termination_status process2)
             None ;
           let%bind _ = kill process2 in
-          Deferred.unit)
+          Deferred.unit )
   end )

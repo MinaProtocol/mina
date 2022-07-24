@@ -25,10 +25,12 @@ in Pipeline.build Pipeline.Config::{
   },
   steps = [
     TestExecutive.build "integration_tests",
-    -- TestExecutive.execute "peers-reliability" dependsOn,
+    TestExecutive.execute "peers-reliability" dependsOn,
     TestExecutive.execute "chain-reliability" dependsOn,
     TestExecutive.execute "payment" dependsOn,
+    TestExecutive.execute "delegation" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
+    TestExecutive.execute "opt-block-prod" dependsOn,
     TestExecutive.execute "archive-node" dependsOn
 
   ]

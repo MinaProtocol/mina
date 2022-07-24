@@ -54,7 +54,11 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
             label = "Build Mina for ${DebianVersions.capitalName debVersion}",
             key = "build-deb-pkg",
             target = Size.XLarge,
-            retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
+            retries = [
+              Command.Retry::{
+                exit_status = Command.ExitStatus.Code +2,
+                limit = Some 2
+              } ] -- libp2p error
           },
 
         -- daemon devnet image
@@ -97,7 +101,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOnGitEnv,
           service="mina-rosetta",
           extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
           deb_codename="${DebianVersions.lowerName debVersion}",

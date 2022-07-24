@@ -220,9 +220,10 @@ struct
       List.partition_map l ~f:(fun tok' ->
           match tok with
           | None ->
-              `Fst tok'
+              Either.first tok'
           | Some tok ->
-              if Timer.equal_tok tok tok' then `Fst tok' else `Snd tok')
+              if Timer.equal_tok tok tok' then Either.first tok'
+              else Either.second tok' )
     in
     List.iter to_cancel ~f:(fun tok' -> Timer.cancel t.timer tok') ;
     add_back_timers t ~key:label ~data:to_put_back
@@ -277,7 +278,7 @@ struct
               (Condition_label.sexp_of_label l |> Sexp.to_string_hum)
               ()
         | `Ok ->
-            ()) ;
+            () ) ;
     let message_handlers = Message_label.Table.create () in
     List.iter message_conditions ~f:(fun (l, c, h) ->
         match Message_label.Table.add message_handlers ~key:l ~data:(c, h) with
@@ -286,7 +287,7 @@ struct
               (Message_label.sexp_of_label l |> Sexp.to_string_hum)
               ()
         | `Ok ->
-            ()) ;
+            () ) ;
     let timers = Timer_label.Table.create () in
     let triggered_timers_r, triggered_timers_w = Linear_pipe.create () in
     let t =
@@ -395,8 +396,7 @@ struct
         Error.tag e ~tag:"Send failed" |> Error.raise
 
   let send_multi t ~recipients msg =
-    Deferred.List.all
-      (List.map recipients ~f:(fun r -> send t ~recipient:r msg))
+    Deferred.List.all (List.map recipients ~f:(fun r -> send t ~recipient:r msg))
 
   let send_multi_exn t ~recipients msg =
     Deferred.List.all

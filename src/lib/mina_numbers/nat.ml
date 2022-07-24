@@ -35,7 +35,7 @@ struct
   let to_input t =
     Checked.map (to_bits t) ~f:(fun bits ->
         Random_oracle.Input.bitstring
-          (Bitstring_lib.Bitstring.Lsb_first.to_list bits))
+          (Bitstring_lib.Bitstring.Lsb_first.to_list bits) )
 
   let constant n = Integer.constant ~length:N.length_in_bits ~m (N.to_bigint n)
 
@@ -55,7 +55,7 @@ struct
         let bs = List.take (Field.unpack x) N.length_in_bits in
         (* TODO: Make this efficient *)
         List.foldi bs ~init:N.zero ~f:(fun i acc b ->
-            if b then N.(logor (shift_left one i) acc) else acc)
+            if b then N.(logor (shift_left one i) acc) else acc )
       in
       Typ.Read.map (Field.typ.read (Integer.to_field v)) ~f:of_field_elt
     in
@@ -76,12 +76,12 @@ struct
   let succ_if t c =
     make_checked (fun () ->
         let t = Integer.succ_if ~m t c in
-        t)
+        t )
 
   let succ t =
     make_checked (fun () ->
         let t = Integer.succ ~m t in
-        t)
+        t )
 
   let op op a b = make_checked (fun () -> op ~m a b)
 
@@ -163,7 +163,7 @@ struct
     Quickcheck.Generator.map
       ~f:(fun n -> N.of_string (Bignum_bigint.to_string n))
       (Bignum_bigint.gen_incl Bignum_bigint.zero
-         (Bignum_bigint.of_string N.(to_string max_int)))
+         (Bignum_bigint.of_string N.(to_string max_int)) )
 
   let gen_incl min max =
     let open Quickcheck.Let_syntax in
@@ -190,18 +190,19 @@ module Make32 () : UInt32 = struct
     end
   end]
 
-  include Make
-            (struct
-              include UInt32
+  include
+    Make
+      (struct
+        include UInt32
 
-              let random () =
-                let mask = if Random.bool () then one else zero in
-                let open UInt32.Infix in
-                logor (mask lsl 31)
-                  ( Int32.max_value |> Random.int32 |> Int64.of_int32
-                  |> UInt32.of_int64 )
-            end)
-            (Bits.UInt32)
+        let random () =
+          let mask = if Random.bool () then one else zero in
+          let open UInt32.Infix in
+          logor (mask lsl 31)
+            ( Int32.max_value |> Random.int32 |> Int64.of_int32
+            |> UInt32.of_int64 )
+      end)
+      (Bits.UInt32)
 
   let to_uint32 = Unsigned_extended.UInt32.to_uint32
 
@@ -223,17 +224,18 @@ module Make64 () : UInt64 = struct
     end
   end]
 
-  include Make
-            (struct
-              include UInt64
+  include
+    Make
+      (struct
+        include UInt64
 
-              let random () =
-                let mask = if Random.bool () then one else zero in
-                let open UInt64.Infix in
-                logor (mask lsl 63)
-                  (Int64.max_value |> Random.int64 |> UInt64.of_int64)
-            end)
-            (Bits.UInt64)
+        let random () =
+          let mask = if Random.bool () then one else zero in
+          let open UInt64.Infix in
+          logor (mask lsl 63)
+            (Int64.max_value |> Random.int64 |> UInt64.of_int64)
+      end)
+      (Bits.UInt64)
 
   let to_uint64 = Unsigned_extended.UInt64.to_uint64
 

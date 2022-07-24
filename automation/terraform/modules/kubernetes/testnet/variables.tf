@@ -203,7 +203,7 @@ variable "seed_configs" {
       libp2p_secret      = string,
       external_port      = number,
       external_ip        = string,
-      private_key_secret = string,
+      # private_key_secret = string,
       enableArchive      = bool,
       archiveAddress     = string
     })

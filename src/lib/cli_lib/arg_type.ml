@@ -10,6 +10,24 @@ let int16 =
   Command.Arg_type.map Command.Param.int
     ~f:(Fn.compose Or_error.ok_exn validate_int16)
 
+let pubsub_topic_mode =
+  let open Gossip_net.Libp2p in
+  Command.Arg_type.create (fun s ->
+      match s with
+      | "ro" ->
+          RO
+      | "rw" ->
+          RW
+      | "none" ->
+          N
+      | _ ->
+          eprintf "Invalid pubsub topic mode: %s" s ;
+          exit 1 )
+
+let pubsub_topic_mode_to_string mode =
+  let open Gossip_net.Libp2p in
+  match mode with RO -> "ro" | RW -> "rw" | N -> "none"
+
 let public_key_compressed =
   Command.Arg_type.create (fun s ->
       let error_string e =
@@ -24,7 +42,7 @@ let public_key_compressed =
         exit 1
       in
       try Public_key.of_base58_check_decompress_exn s
-      with e -> error_string (Error.of_exn e))
+      with e -> error_string (Error.of_exn e) )
 
 (* Hack to allow us to deprecate a value without needing to add an mli
  * just for this. We only want to have one "kind" of public key in the
@@ -37,7 +55,7 @@ include (
           | None ->
               failwith "Invalid key"
           | Some pk' ->
-              pk')
+              pk' )
   end :
     sig
       val public_key : Public_key.t Command.Arg_type.t
@@ -89,14 +107,14 @@ let log_level =
             |> String.concat ~sep:", " ) ;
           exit 14
       | Ok ll ->
-          ll)
+          ll )
 
 let user_command =
   Command.Arg_type.create (fun s ->
       try Mina_base.Signed_command.of_base58_check_exn s
       with e ->
         Error.tag (Error.of_exn e) ~tag:"Couldn't decode transaction id"
-        |> Error.raise)
+        |> Error.raise )
 
 module Work_selection_method = struct
   [%%versioned

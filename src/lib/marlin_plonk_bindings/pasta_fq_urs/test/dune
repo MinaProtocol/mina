@@ -1,5 +1,8 @@
 (executable
  (name test)
- (libraries marlin_plonk_bindings_pasta_fq_urs)
+ (libraries
+   marlin_plonk_bindings_pasta_fq_urs
+   marlin_plonk_bindings_pasta_fq
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))
