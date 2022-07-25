@@ -1867,7 +1867,7 @@ module Data = struct
     let update ~(constants : Constants.t) ~(previous_consensus_state : Value.t)
         ~(consensus_transition : Consensus_transition.t)
         ~(previous_protocol_state_hash : Mina_base.State_hash.t)
-        ~(supply_increase : Currency.Amount.t)
+        ~(supply_increase : Currency.Amount.Signed.t)
         ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
         ~(genesis_ledger_hash : Mina_base.Frozen_ledger_hash.t)
         ~(producer_vrf_result : Random_oracle.Digest.t)
@@ -1897,10 +1897,16 @@ module Data = struct
              ~f:(fun diff -> Ok diff)
       in
       let%map total_currency =
-        Amount.add previous_consensus_state.total_currency supply_increase
-        |> Option.map ~f:Or_error.return
-        |> Option.value
-             ~default:(Or_error.error_string "Failed to add total_currency")
+        let total, `Overflow overflow =
+          Amount.add_signed_flagged previous_consensus_state.total_currency
+            supply_increase
+        in
+        if overflow then
+          Or_error.errorf
+            !"New total currency less than zero. supply_increase: %{sexp: \
+              Amount.Signed.t} previous total currency: %{sexp: Amount.t}"
+            supply_increase previous_consensus_state.total_currency
+        else Ok total
       and () =
         if
           Consensus_transition.(
@@ -2059,7 +2065,7 @@ module Data = struct
              (negative_one ~genesis_ledger ~genesis_epoch_data ~constants
                 ~constraint_constants )
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
-           ~consensus_transition ~supply_increase:Currency.Amount.zero
+           ~consensus_transition ~supply_increase:Currency.Amount.Signed.zero
            ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
            ~block_stake_winner:genesis_winner_pk
            ~block_creator:genesis_winner_pk ~coinbase_receiver:genesis_winner_pk
@@ -2101,7 +2107,7 @@ module Data = struct
     let%snarkydef update_var (previous_state : var)
         (transition_data : Consensus_transition.var)
         (previous_protocol_state_hash : Mina_base.State_hash.var)
-        ~(supply_increase : Currency.Amount.var)
+        ~(supply_increase : Currency.Amount.Signed.var)
         ~(previous_blockchain_state_ledger_hash :
            Mina_base.Frozen_ledger_hash.var ) ~genesis_ledger_hash
         ~constraint_constants
@@ -2169,9 +2175,13 @@ module Data = struct
         compute_supercharge_coinbase ~winner_account
           ~global_slot:global_slot_since_genesis
       in
-      let%bind new_total_currency =
-        Currency.Amount.Checked.add previous_state.total_currency
+      let%bind new_total_currency, `Overflow overflow =
+        Currency.Amount.Checked.add_signed_flagged previous_state.total_currency
           supply_increase
+      in
+      let%bind () =
+        [%with_label "Total currency is greater than or equal to zero"]
+          (Boolean.Assert.is_true (Boolean.not overflow))
       in
       let%bind has_ancestor_in_same_checkpoint_window =
         same_checkpoint_window ~constants ~prev:prev_global_slot
@@ -2231,11 +2241,6 @@ module Data = struct
         }
       and blockchain_length =
         Length.Checked.succ previous_state.blockchain_length
-      (* TODO: keep track of total_currency in transaction snark. The current_slot
-       * implementation would allow an adversary to make then total_currency incorrect by
-       * not adding the coinbase to their account. *)
-      and new_total_currency =
-        Amount.Checked.add previous_state.total_currency supply_increase
       and epoch_count =
         Length.Checked.succ_if previous_state.epoch_count epoch_increased
       and min_window_density, sub_window_densities =
@@ -3600,7 +3605,7 @@ let%test_module "Proof of stake tests" =
       let consensus_transition : Consensus_transition.t =
         Global_slot.slot_number global_slot
       in
-      let supply_increase = Currency.Amount.of_int 42 in
+      let supply_increase = Currency.Amount.(Signed.of_unsigned (of_int 42)) in
       (* setup ledger, needed to compute producer_vrf_result here and handler below *)
       let open Mina_base in
       (* choose largest account as most likely to produce a block *)
@@ -3686,7 +3691,7 @@ let%test_module "Proof of stake tests" =
             ~compute:(As_prover.return previous_protocol_state_hash)
         in
         let%bind supply_increase =
-          exists Amount.typ ~compute:(As_prover.return supply_increase)
+          exists Amount.Signed.typ ~compute:(As_prover.return supply_increase)
         in
         let%bind previous_blockchain_state_ledger_hash =
           exists Mina_base.Frozen_ledger_hash.typ

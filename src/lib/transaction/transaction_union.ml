@@ -102,5 +102,5 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
 
 let fee_excess (t : t) = Transaction_union_payload.fee_excess t.payload
 
-let supply_increase (t : t) =
-  Transaction_union_payload.supply_increase t.payload
+let expected_supply_increase (t : t) =
+  Transaction_union_payload.expected_supply_increase t.payload

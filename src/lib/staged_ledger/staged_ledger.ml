@@ -503,9 +503,8 @@ module T = struct
       txn_state_view =
     let open Result.Let_syntax in
     (*TODO: check fee_excess as a result of applying the txns matches with this*)
-    let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
-    and supply_increase =
-      Transaction.supply_increase s |> to_staged_ledger_or_error
+    let%bind fee_excess =
+      Transaction.fee_excess s |> to_staged_ledger_or_error
     in
     let source_merkle_root =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
@@ -517,8 +516,22 @@ module T = struct
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
     let empty_local_state = Mina_state.Local_state.empty () in
-    let%map applied_txn =
-      Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
+    let%bind applied_txn =
+      ( match
+          Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
+            s
+        with
+      | Error e ->
+          Or_error.error_string
+            (sprintf
+               !"Error when applying transaction %{sexp: Transaction.t}: %s"
+               s (Error.to_string_hum e) )
+      | res ->
+          res )
+      |> to_staged_ledger_or_error
+    in
+    let%map supply_increase =
+      Ledger.Transaction_applied.supply_increase applied_txn
       |> to_staged_ledger_or_error
     in
     let target_merkle_root =
@@ -1650,6 +1663,8 @@ module T = struct
               Sequence.to_list_rev res.commands_rev
           ; completed_works = Sequence.to_list_rev res.completed_work_rev
           ; coinbase = to_at_most_one res.coinbase
+          ; internal_command_statuses =
+              [] (*updated later based on application result*)
           } )
     in
     let pre_diff_with_two (res : Resources.t) :
@@ -1659,6 +1674,8 @@ module T = struct
       { commands = Sequence.to_list_rev res.commands_rev
       ; completed_works = Sequence.to_list_rev res.completed_work_rev
       ; coinbase = res.coinbase
+      ; internal_command_statuses =
+          [] (*updated later based on application result*)
       }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
@@ -2722,6 +2739,7 @@ let%test_module "staged ledger tests" =
                 @@ ( { completed_works = List.take completed_works job_count1
                      ; commands = List.take txns slots
                      ; coinbase = Zero
+                     ; internal_command_statuses = []
                      }
                    , None )
             }
@@ -2731,6 +2749,7 @@ let%test_module "staged ledger tests" =
               ( { completed_works = List.take completed_works job_count1
                 ; commands = List.take txns slots
                 ; coinbase = Zero
+                ; internal_command_statuses = []
                 }
               , Some
                   { completed_works =
@@ -2738,19 +2757,12 @@ let%test_module "staged ledger tests" =
                       else List.drop completed_works job_count1 )
                   ; commands = txns_in_second_diff
                   ; coinbase = Zero
+                  ; internal_command_statuses = []
                   } )
             in
             { diff = compute_statuses ~ledger ~coinbase_amount diff }
       in
-      let empty_diff : Staged_ledger_diff.t =
-        { diff =
-            ( { completed_works = []
-              ; commands = []
-              ; coinbase = Staged_ledger_diff.At_most_two.Zero
-              }
-            , None )
-        }
-      in
+      let empty_diff = Staged_ledger_diff.empty_diff in
       Quickcheck.test gen_at_capacity
         ~sexp_of:
           [%sexp_of:

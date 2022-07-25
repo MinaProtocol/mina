@@ -105,7 +105,7 @@ module Job_view = struct
                   ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_r)
                   ]
               ] )
-        ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase)
+        ; ("Supply Increase", Currency.Amount.Signed.to_yojson s.supply_increase)
         ]
     in
     let job_to_yojson =
@@ -192,7 +192,7 @@ let create_expected_statement ~constraint_constants
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
-  let%bind after, _ =
+  let%bind after, applied_transaction =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction )
@@ -222,7 +222,9 @@ let create_expected_statement ~constraint_constants
         pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
-  let%map supply_increase = Transaction.supply_increase transaction in
+  let%map supply_increase =
+    Ledger.Transaction_applied.supply_increase applied_transaction
+  in
   { Transaction_snark.Statement.source =
       { ledger = source_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
@@ -259,7 +261,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
       in
       let%map fee_excess = Fee_excess.combine s.fee_excess s'.fee_excess
       and supply_increase =
-        Amount.add s.supply_increase s'.supply_increase
+        Amount.Signed.add s.supply_increase s'.supply_increase
         |> option "Error adding supply_increases"
       and _valid_pending_coinbase_stack =
         if
