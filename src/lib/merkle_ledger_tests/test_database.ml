@@ -3,7 +3,6 @@ open Test_stubs
 
 let%test_module "test functor on in memory databases" =
   ( module struct
-    module Intf = Merkle_ledger.Intf
     module Database = Merkle_ledger.Database
 
     module type DB =
@@ -556,6 +555,7 @@ let%test_module "test functor on in memory databases" =
       let depth = 4
     end
 
+    [@@@warning "-60"]
     module Mdb_d4 = Make_db (Depth_4)
 
     module Depth_30 = struct
@@ -563,4 +563,10 @@ let%test_module "test functor on in memory databases" =
     end
 
     module Mdb_d30 = Make_db (Depth_30)
+    [@@@warning "+60"]                   
   end )
+
+
+
+
+

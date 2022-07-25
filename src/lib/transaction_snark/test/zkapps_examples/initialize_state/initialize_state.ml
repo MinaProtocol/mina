@@ -23,7 +23,7 @@ let%test_module "Initialize state test" =
 
     let ( tag
         , _
-        , p_module
+        , _p_module
         , Pickles.Provers.[ initialize_prover; update_state_prover ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
@@ -37,8 +37,6 @@ let%test_module "Initialize state test" =
           [ Zkapps_initialize_state.initialize_rule pk_compressed
           ; Zkapps_initialize_state.update_state_rule pk_compressed
           ] )
-
-    module P = (val p_module)
 
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 

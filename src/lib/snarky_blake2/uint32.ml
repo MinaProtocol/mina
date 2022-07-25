@@ -26,7 +26,6 @@ end
 
 module Make (Impl : Snarky_backendless.Snark_intf.S) :
   S with module Impl := Impl = struct
-  module B = Bigint
   open Impl
   open Let_syntax
   module Unchecked = Unsigned.UInt32

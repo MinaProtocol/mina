@@ -2112,14 +2112,7 @@ let constraint_constants =
 let pickles_digest (choices : pickles_rule_js Js.js_array Js.t)
     (public_input_size : int) =
   let branches = choices##.length in
-  let max_proofs =
-    let choices = choices |> Js.to_array |> Array.to_list in
-    List.map choices ~f:(fun c ->
-        c##.proofsToVerify |> Js.to_array |> Array.length )
-    |> List.max_elt ~compare |> Option.value ~default:0
-  in
   let (module Branches) = nat_module branches in
-  let (module Max_proofs_verified) = nat_add_module max_proofs in
   let (Choices choices) = Choices.of_js ~public_input_size choices in
   try
     let _ =
@@ -2358,7 +2351,6 @@ module Ledger = struct
     module Account = Mina_base.Account
     module Account_id = Mina_base.Account_id
     module Ledger_hash = Mina_base.Ledger_hash
-    module Token_id = Mina_base.Token_id
 
     type t_ =
       { next_location : int

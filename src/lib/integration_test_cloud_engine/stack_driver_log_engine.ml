@@ -2,7 +2,6 @@ open Async
 open Core
 open Integration_test_lib.Util
 open Integration_test_lib
-module Timeout = Timeout_lib.Core_time
 module Node = Kubernetes_network.Node
 
 (** This implements Log_engine_intf for stack driver logs for integration tests

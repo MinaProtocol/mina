@@ -163,7 +163,7 @@ let%test_module "multisig_account" =
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               let spec = List.hd_exn specs in
-              let tag, _, (module P), Pickles.Provers.[ multisig_prover; _ ] =
+              let tag, _, (module _), Pickles.Provers.[ multisig_prover; _ ] =
                 let multisig_rule : _ Pickles.Inductive_rule.t =
                   let multisig_main (tx_commitment : Zkapp_statement.Checked.t)
                       : unit Checked.t =

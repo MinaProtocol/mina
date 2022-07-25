@@ -3,10 +3,7 @@ open Core_kernel
 open Mina_base
 open Signature_lib
 module Impl = Pickles.Impls.Step
-module Inner_curve = Snark_params.Tick.Inner_curve
 module Nat = Pickles_types.Nat
-module Local_state = Mina_state.Local_state
-module Parties_segment = Transaction_snark.Parties_segment
 
 let sk = Private_key.create ()
 
@@ -16,7 +13,7 @@ let pk_compressed = Public_key.compress pk
 
 let account_id = Account_id.create pk_compressed Token_id.default
 
-let tag, _, p_module, Pickles.Provers.[ prover ] =
+let tag, _, _p_module, Pickles.Provers.[ prover ] =
   Zkapps_examples.compile () ~cache:Cache_dir.cache ~auxiliary_typ:Impl.Typ.unit
     ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
@@ -25,8 +22,6 @@ let tag, _, p_module, Pickles.Provers.[ prover ] =
       (Genesis_constants.Constraint_constants.to_snark_keys_header
          constraint_constants )
     ~choices:(fun ~self:_ -> [ Zkapps_empty_update.rule pk_compressed ])
-
-module P = (val p_module)
 
 let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 

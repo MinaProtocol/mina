@@ -39,7 +39,6 @@ module Field = struct
       let to_latest x = x
     end
 
-    module Tests = struct end
   end]
 
   include Pasta.Fp

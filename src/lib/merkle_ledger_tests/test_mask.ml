@@ -858,6 +858,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       let depth = 4
     end
 
+    [@@@warning "-60"]                   
     module Mdb_d4 = Make_maskable_and_mask (Depth_4)
 
     module Depth_30 = struct
@@ -865,4 +866,5 @@ let%test_module "Test mask connected to underlying Merkle tree" =
     end
 
     module Mdb_d30 = Make_maskable_and_mask (Depth_30)
+    [@@@warning "+60"]                  
   end )
