@@ -1143,6 +1143,10 @@ let poseidon =
         val events = Js.string (zkapp_events :> string)
 
         val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+
+        val partyCons = Js.string (party_cons :> string)
+
+        val partyNode = Js.string (party_node :> string)
       end
   end
 
@@ -2309,6 +2313,8 @@ module Ledger = struct
 
   type account =
     < publicKey : group_class Js.t Js.readonly_prop
+    ; tokenId : field_class Js.t Js.readonly_prop
+    ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
     ; zkapp : zkapp_account Js.readonly_prop >
@@ -2428,6 +2434,12 @@ module Ledger = struct
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
 
+  let public_key_checked (pk : public_key) :
+      Signature_lib.Public_key.Compressed.var =
+    let x = pk##.g##.x##.value in
+    let y = pk##.g##.y##.value in
+    Signature_lib.Public_key.compress_var (x, y) |> Impl.run_checked
+
   let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
     { x = to_unchecked pk##.g##.x##.value
     ; is_odd = Bigint.(test_bit (of_field (to_unchecked pk##.g##.y##.value)) 0)
@@ -2439,8 +2451,22 @@ module Ledger = struct
       (fun () -> failwith "invalid scalar")
       Fn.id
 
-  let account_id pk =
-    Mina_base.Account_id.create (public_key pk) Mina_base.Token_id.default
+  let token_id_checked (token : field_class Js.t) =
+    token |> of_js_field |> Mina_base.Token_id.Checked.of_field
+
+  let token_id (token : field_class Js.t) : Mina_base.Token_id.t =
+    token |> of_js_field_unchecked |> Mina_base.Token_id.of_field
+
+  let default_token_id_js =
+    Mina_base.Token_id.default |> Mina_base.Token_id.to_field_unsafe
+    |> Field.constant |> to_js_field
+
+  let account_id_checked pk token =
+    Mina_base.Account_id.Checked.create (public_key_checked pk)
+      (token_id_checked token)
+
+  let account_id pk token =
+    Mina_base.Account_id.create (public_key pk) (token_id token)
 
   let max_state_size =
     Pickles_types.Nat.to_int Mina_base.Zkapp_state.Max_state_size.n
@@ -2514,6 +2540,9 @@ module Ledger = struct
       let x, y = Signature_lib.Public_key.decompress_exn pk in
       to_js_group (Field.constant x) (Field.constant y)
 
+    let token_id (token_id : Mina_base.Token_id.t) =
+      token_id |> Mina_base.Token_id.to_field_unsafe |> field
+
     let private_key (sk : Signature_lib.Private_key.t) = to_js_scalar sk
 
     let signature (sg : Signature_lib.Schnorr.Chunked.Signature.t) =
@@ -2527,6 +2556,10 @@ module Ledger = struct
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
+
+        val tokenId = token_id a.token_id
+
+        val tokenSymbol = Js.string a.token_symbol
 
         val balance = uint64 (Currency.Balance.to_uint64 a.balance)
 
@@ -2632,7 +2665,8 @@ module Ledger = struct
       val party = to_js_field_unchecked (party.elt.party_digest :> Impl.field)
 
       val calls =
-        to_js_field_unchecked (Parties.Digest.Forest.empty :> Impl.field)
+        to_js_field_unchecked
+          (Parties.Call_forest.hash party.elt.calls :> Impl.field)
     end
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
@@ -2744,7 +2778,7 @@ module Ledger = struct
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
   let add_account_exn (l : L.t) pk (balance : string) =
-    let account_id = account_id pk in
+    let account_id = account_id pk default_token_id_js in
     let bal_u64 = Unsigned.UInt64.of_string balance in
     let balance = Currency.Balance.of_uint64 bal_u64 in
     let a : Mina_base.Account.t =
@@ -2765,8 +2799,9 @@ module Ledger = struct
         add_account_exn l a##.publicKey (Js.to_string a##.balance) ) ;
     new%js ledger_constr l
 
-  let get_account l (pk : public_key) : account Js.optdef =
-    let loc = L.location_of_account l##.value (account_id pk) in
+  let get_account l (pk : public_key) (token : field_class Js.t) :
+      account Js.optdef =
+    let loc = L.location_of_account l##.value (account_id pk token) in
     let account = Option.bind loc ~f:(L.get l##.value) in
     To_js.option To_js.account account
 
@@ -2834,6 +2869,19 @@ module Ledger = struct
     in
     apply_parties_transaction l txn (Js.to_string account_creation_fee)
 
+  let create_token_account pk token =
+    account_id pk token |> Mina_base.Account_id.public_key
+    |> Signature_lib.Public_key.Compressed.to_string |> Js.string
+
+  let custom_token_id_checked pk token =
+    Mina_base.Account_id.Checked.derive_token_id
+      ~owner:(account_id_checked pk token)
+    |> Mina_base.Account_id.Digest.Checked.to_field_unsafe |> to_js_field
+
+  let custom_token_id_unchecked pk token =
+    Mina_base.Account_id.derive_token_id ~owner:(account_id pk token)
+    |> Mina_base.Token_id.to_field_unsafe |> to_js_field_unchecked
+
   let () =
     let static_method name f =
       Js.Unsafe.set ledger_class (Js.string name) (Js.wrap_callback f)
@@ -2841,11 +2889,10 @@ module Ledger = struct
     let method_ name (f : ledger_class Js.t -> _) =
       method_ ledger_class name f
     in
+    static_method "customTokenId" custom_token_id_unchecked ;
+    static_method "customTokenIdChecked" custom_token_id_checked ;
+    static_method "createTokenAccount" create_token_account ;
     static_method "create" create ;
-
-    static_method "hashParty" hash_party ;
-    static_method "hashTransaction" hash_transaction ;
-    static_method "hashTransactionChecked" hash_transaction_checked ;
 
     static_method "transactionCommitments" transaction_commitments ;
     static_method "zkappPublicInput" zkapp_public_input ;
@@ -2862,6 +2909,7 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
     static_method "memoToBase58" memo_to_base58 ;
 
+    static_method "hashPartyFromJson" hash_party ;
     static_method "hashPartyFromFields"
       (Checked.fields_to_hash
          (Mina_base.Party.Body.typ ())
