@@ -38,7 +38,6 @@ Pipeline.build
         }
     , steps =
       [ 
-        one "Bootstrap integration test (migrated)" "bootstrap_test" "./buildkite/scripts/old_integration_tests/test_bootstrap.sh"
-      , one "Shared state integration test (migrated)" "shared_state_test" "./buildkite/scripts/old_integration_tests/test_shared_state.sh"
+      one "Shared state integration test (migrated)" "shared_state_test" "./buildkite/scripts/old_integration_tests/test_shared_state.sh"
       ]
     }

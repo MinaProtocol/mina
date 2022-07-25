@@ -1093,6 +1093,127 @@ let%test_module "account timing check" =
                               Source_minimum_balance_violation ) )
                   then failwithf "Unexpected transaction error: %s" err_str () ) )
 
+    let gen_untimed_account_and_create_timed_account ~balance ~min_balance =
+      let open Quickcheck.Generator.Let_syntax in
+      let untimed =
+        let keypair = List.nth_exn keypairs 0 in
+        let balance = Currency.Balance.of_int 200_000_000_000_000 in
+        let nonce = Mina_numbers.Account_nonce.zero in
+        let balance_as_amount = Currency.Balance.to_amount balance in
+        (keypair, balance_as_amount, nonce, Account_timing.Untimed)
+      in
+      let ledger_init_state = Array.of_list [ untimed ] in
+      let sender_keypair = List.nth_exn keypairs 0 in
+      let zkapp_keypair = Signature_lib.Keypair.create () in
+      let fee = 1_000_000 in
+      let (create_timed_account_spec : Transaction_snark.For_tests.Spec.t) =
+        { sender = (sender_keypair, Account.Nonce.zero)
+        ; fee = Currency.Fee.of_int fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount =
+            Option.value_exn
+              Currency.Amount.(
+                add (of_int balance)
+                  (of_fee constraint_constants.account_creation_fee))
+        ; zkapp_account_keypairs = [ zkapp_keypair ]
+        ; memo =
+            Signed_command_memo.create_from_string_exn
+              "zkApp create timed account"
+        ; new_zkapp_account = true
+        ; snapp_update =
+            (let timing =
+               Zkapp_basic.Set_or_keep.Set
+                 ( { initial_minimum_balance =
+                       Currency.Balance.of_int min_balance
+                   ; cliff_time = Mina_numbers.Global_slot.of_int 1000
+                   ; cliff_amount = Currency.Amount.of_int 100_000_000
+                   ; vesting_period = Mina_numbers.Global_slot.of_int 10
+                   ; vesting_increment = Currency.Amount.of_int 100_000_000
+                   }
+                   : Party.Update.Timing_info.value )
+             in
+             { Party.Update.dummy with timing } )
+        ; current_auth = Permissions.Auth_required.Proof
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; sequence_events = []
+        ; preconditions = None
+        }
+      in
+      let timed_account_id =
+        Account_id.create
+          (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
+          Token_id.default
+      in
+      let parties, _, _, _ =
+        ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+            create_timed_account_spec
+        , timed_account_id
+        , create_timed_account_spec.snapp_update
+        , zkapp_keypair )
+      in
+      return (ledger_init_state, parties)
+
+    let%test_unit "zkApp command, timed account creation, min_balance > balance"
+        =
+      Quickcheck.test
+        ~seed:
+          (`Deterministic
+            "zkapp command, timed account creation, min_balance > balance" )
+        ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
+        (gen_untimed_account_and_create_timed_account ~balance:100_000_000
+           ~min_balance:100_000_000_000_000 )
+        ~f:(fun (ledger_init_state, parties) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              let _state_body, state_view =
+                state_body_and_view_at_slot Mina_numbers.Global_slot.(succ zero)
+              in
+              let result =
+                Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
+                  ~state_view ledger parties
+              in
+              check_zkapp_failure
+                Transaction_status.Failure.Source_minimum_balance_violation
+                result ) )
+
+    let%test_unit "zkApp command, account creation, min_balance = balance" =
+      Quickcheck.test
+        ~seed:
+          (`Deterministic
+            "zkApp command, account creation, min_balance = balance" )
+        ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
+        (gen_untimed_account_and_create_timed_account
+           ~balance:100_000_000_000_000 ~min_balance:100_000_000_000_000 )
+        ~f:(fun (ledger_init_state, parties) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              apply_zkapp_commands_at_slot ledger
+                Mina_numbers.Global_slot.(succ zero)
+                [ parties ] ) )
+
+    let%test_unit "zkApp command, account creation, min_balance < balance" =
+      Quickcheck.test
+        ~seed:
+          (`Deterministic
+            "zkapp command, account creation, min_balance < balace" )
+        ~sexp_of:[%sexp_of: Mina_ledger.Ledger.init_state * Parties.t] ~trials:1
+        (gen_untimed_account_and_create_timed_account
+           ~balance:150_000_000_000_000 ~min_balance:100_000_000_000_000 )
+        ~f:(fun (ledger_init_state, parties) ->
+          Mina_ledger.Ledger.with_ephemeral_ledger
+            ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
+              Mina_ledger.Ledger.apply_initial_ledger_state ledger
+                ledger_init_state ;
+              apply_zkapp_commands_at_slot ledger
+                Mina_numbers.Global_slot.(succ zero)
+                [ parties ] ) )
+
     let%test_unit "zkApp command, just before cliff time, insufficient balance"
         =
       let gen =
