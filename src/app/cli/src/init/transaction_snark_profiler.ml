@@ -214,7 +214,11 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
                   ; local_state = Mina_state.Local_state.empty ()
                   }
               ; supply_increase =
-                  Transaction.supply_increase t |> Or_error.ok_exn
+                  (let magnitude =
+                     Transaction.expected_supply_increase t |> Or_error.ok_exn
+                   in
+                   let sgn = Sgn.Pos in
+                   Currency.Amount.Signed.create ~magnitude ~sgn )
               ; fee_excess =
                   Transaction.fee_excess (Transaction.forget t)
                   |> Or_error.ok_exn
