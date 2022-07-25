@@ -675,8 +675,7 @@ end
 let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     ?account_ids_seen ~account_state_tbl ?vk ?failure ?(new_account = false)
     ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ?permissions_auth ?(required_balance_change : a option)
-    ?(required_balance : Currency.Balance.t option) ?protocol_state_view
+    ?permissions_auth ?(required_balance_change : a option) ?protocol_state_view
     ~zkapp_account_ids
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment :
@@ -693,12 +692,6 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
-  (* a required balance is associated with a new account *)
-  ( match (required_balance, new_account) with
-  | Some _, false ->
-      failwith "Required balance, but not new account"
-  | _ ->
-      () ) ;
   let%bind update =
     match update with
     | None ->
@@ -995,9 +988,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
 
 let gen_party_from ?(update = None) ?failure ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
-    ?required_balance_change ?required_balance ~zkapp_account_ids ~authorization
-    ~account_ids_seen ~available_public_keys ~ledger ~account_state_tbl
-    ?protocol_state_view ?vk () =
+    ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
+    ~available_public_keys ~ledger ~account_state_tbl ?protocol_state_view ?vk
+    () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1017,8 +1010,8 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
     gen_party_body_components ~update ?failure ~new_account ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?protocol_state_view ?vk ~zkapp_account_ids
-      ~account_ids_seen ~available_public_keys ?required_balance_change
-      ?required_balance ~ledger ~account_state_tbl
+      ~account_ids_seen ~available_public_keys ?required_balance_change ~ledger
+      ~account_state_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~new_account)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
@@ -1085,9 +1078,7 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
 *)
 let max_other_parties = 2
 
-let gen_parties_from ?failure
-    ?(constraint_constants = Genesis_constants.Constraint_constants.compiled)
-    ~(fee_payer_keypair : Signature_lib.Keypair.t)
+let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(zkapp_account_keypairs : Signature_lib.Keypair.t list)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
@@ -1366,7 +1357,9 @@ let gen_parties_from ?failure
           Currency.Amount.(
             Signed.of_unsigned
               ( scale
-                  (of_fee constraint_constants.account_creation_fee)
+                  (of_fee
+                     Genesis_constants.Constraint_constants.compiled
+                       .account_creation_fee )
                   num_new_accounts
               |> Option.value_exn )) )
       ~f:(fun acc party ->

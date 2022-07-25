@@ -1365,7 +1365,18 @@ struct
                   in
                   Or_error.errorf "Diff failed with verification failure(s): %s"
                     errs_string
-              | Error _ | Ok () ->
+              | Error errs ->
+                  let errs_string =
+                    List.map errs ~f:(fun err ->
+                        match err with
+                        | Command_failure cmd_err ->
+                            Yojson.Safe.to_string (Diff_error.to_yojson cmd_err)
+                        | Invalid_failure invalid ->
+                            Verifier.invalid_to_string invalid )
+                    |> String.concat ~sep:", "
+                  in
+                  failwith errs_string
+              | Ok () ->
                   let data =
                     List.filter_map diffs' ~f:(function
                       | Error (`Invalid_command | `Other_command_failed) ->
@@ -1700,6 +1711,9 @@ let%test_module _ =
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()) )
 
+    let `VK vk, `Prover _ =
+      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+
     module Mock_transition_frontier = struct
       module Breadcrumb = struct
         type t = Mock_staged_ledger.t
@@ -1715,7 +1729,7 @@ let%test_module _ =
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create ?vk : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
+      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let pipe_r, pipe_w =
           Broadcast_pipe.create
@@ -1730,16 +1744,9 @@ let%test_module _ =
                 @@ Currency.Balance.of_formatted_string "900000000.0" ) )
         in
         let zkappify_account (account : Account.t) : Account.t =
-          let verification_key =
-            Some
-              (Option.value vk
-                 ~default:
-                   With_hash.
-                     { data = Side_loaded_verification_key.dummy
-                     ; hash = Zkapp_account.dummy_vk_hash ()
-                     } )
+          let zkapp =
+            Some { Zkapp_account.default with verification_key = Some vk }
           in
-          let zkapp = Some { Zkapp_account.default with verification_key } in
           { account with zkapp }
         in
         let accounts =
@@ -1816,8 +1823,8 @@ let%test_module _ =
       in
       assert (List.is_sorted txns ~compare)
 
-    let setup_test ?vk ?expiry () =
-      let tf, best_tip_diff_w = Mock_transition_frontier.create ?vk () in
+    let setup_test ?expiry () =
+      let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let trust_system = Trust_system.null () in
       let config =
