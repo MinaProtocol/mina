@@ -18,39 +18,33 @@ type nonrec 'caml_f random_oracles =
   }
 
 type nonrec 'caml_f lookup_evaluations =
-  { sorted : 'caml_f array array
-  ; aggreg : 'caml_f array
-  ; table : 'caml_f array
-  ; runtime : 'caml_f array option
+  { sorted : 'caml_f array
+  ; aggreg : 'caml_f
+  ; table : 'caml_f
+  ; runtime : 'caml_f option
   }
 
 type nonrec 'caml_f proof_evaluations =
   { w :
-      'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-  ; z : 'caml_f array
-  ; s :
-      'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-      * 'caml_f array
-  ; generic_selector : 'caml_f array
-  ; poseidon_selector : 'caml_f array
+      'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+      * 'caml_f
+  ; z : 'caml_f
+  ; s : 'caml_f * 'caml_f * 'caml_f * 'caml_f * 'caml_f * 'caml_f
+  ; generic_selector : 'caml_f
+  ; poseidon_selector : 'caml_f
   ; lookup : 'caml_f lookup_evaluations option
   }
 
