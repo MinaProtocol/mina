@@ -1908,7 +1908,7 @@ let%test_module "legacy transactions using zkApp accounts" =
   ( module struct
     let memo = Signed_command_memo.create_from_string_exn "zkApp-legacy-txns"
 
-    let `VK vk, `Prover _snapp_prover = Lazy.force U.trivial_zkapp
+    let `VK vk, `Prover _zkapp_prover = Lazy.force U.trivial_zkapp
 
     let account ledger pk =
       let location =
