@@ -82,15 +82,15 @@ macro_rules! impl_proof {
             #[derive(Clone)]
             pub struct [<Wasm $field_name:camel ProofEvaluations>] {
                 #[wasm_bindgen(skip)]
-                pub w: Vec<Vec<$F>>,
+                pub w: WasmVector<$WasmF>,
                 #[wasm_bindgen(skip)]
-                pub z: WasmFlatVector<$WasmF>,
+                pub z: $WasmF,
                 #[wasm_bindgen(skip)]
-                pub s: Vec<Vec<$F>>,
+                pub s: WasmVector<$WasmF>,
                 #[wasm_bindgen(skip)]
-                pub generic_selector: WasmFlatVector<$WasmF>,
+                pub generic_selector: $WasmF,
                 #[wasm_bindgen(skip)]
-                pub poseidon_selector: WasmFlatVector<$WasmF>,
+                pub poseidon_selector: $WasmF,
                 // TODO: Lookup
             }
             type WasmProofEvaluations = [<Wasm $field_name:camel ProofEvaluations>];
@@ -99,109 +99,109 @@ macro_rules! impl_proof {
             impl [<Wasm $field_name:camel ProofEvaluations>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(
-                    w: WasmVecVecF,
-                    z: WasmFlatVector<$WasmF>,
-                    s: WasmVecVecF,
-                    generic_selector: WasmFlatVector<$WasmF>,
-                    poseidon_selector: WasmFlatVector<$WasmF>) -> Self {
-                    WasmProofEvaluations { w: w.0, z, s: s.0, generic_selector, poseidon_selector }
+                    w: WasmVector<$WasmF>,
+                    z: $WasmF,
+                    s: WasmVector<$WasmF>,
+                    generic_selector: $WasmF,
+                    poseidon_selector: $WasmF) -> Self {
+                    WasmProofEvaluations { w, z, s, generic_selector, poseidon_selector }
                 }
 
                 #[wasm_bindgen(getter)]
-                pub fn w(&self) -> WasmVecVecF {
-                    [<WasmVecVec $field_name:camel>](self.w.clone())
+                pub fn w(&self) -> WasmVector<$WasmF> {
+                    self.w.clone()
                 }
 
                 #[wasm_bindgen(getter)]
-                pub fn z(&self) -> WasmFlatVector<$WasmF> {
-                    self.z.clone()
+                pub fn z(&self) -> $WasmF {
+                    self.z
                 }
 
                 #[wasm_bindgen(getter)]
-                pub fn s(&self) -> WasmVecVecF {
-                    [<WasmVecVec $field_name:camel>](self.s.clone())
+                pub fn s(&self) -> WasmVector<$WasmF> {
+                    self.s.clone()
                 }
 
                 #[wasm_bindgen(getter)]
-                pub fn generic_selector(&self) -> WasmFlatVector<$WasmF> {
-                    self.generic_selector.clone()
+                pub fn generic_selector(&self) -> $WasmF {
+                    self.generic_selector
                 }
 
                 #[wasm_bindgen(getter)]
-                pub fn poseidon_selector(&self) -> WasmFlatVector<$WasmF> {
-                    self.poseidon_selector.clone()
+                pub fn poseidon_selector(&self) -> $WasmF {
+                    self.poseidon_selector
                 }
 
                 #[wasm_bindgen(setter)]
-                pub fn set_w(&mut self, x: WasmVecVecF) {
+                pub fn set_w(&mut self, x: WasmVector<$WasmF>) {
                     self.w = x.0
                 }
                 #[wasm_bindgen(setter)]
-                pub fn set_s(&mut self, x: WasmVecVecF) {
+                pub fn set_s(&mut self, x: WasmVector<$WasmF>) {
                     self.s = x.0
                 }
                 #[wasm_bindgen(setter)]
-                pub fn set_z(&mut self, x: WasmFlatVector<$WasmF>) {
+                pub fn set_z(&mut self, x: $WasmF) {
                     self.z = x
                 }
                 #[wasm_bindgen(setter)]
-                pub fn set_generic_selector(&mut self, x: WasmFlatVector<$WasmF>) {
+                pub fn set_generic_selector(&mut self, x: $WasmF) {
                     self.generic_selector = x
                 }
                 #[wasm_bindgen(setter)]
-                pub fn set_poseidon_selector(&mut self, x: WasmFlatVector<$WasmF>) {
+                pub fn set_poseidon_selector(&mut self, x: $WasmF) {
                     self.poseidon_selector = x
                 }
             }
 
-            impl From<&WasmProofEvaluations> for ProofEvaluations<Vec<$F>> {
+            impl From<&WasmProofEvaluations> for ProofEvaluations<$F> {
                 fn from(x: &WasmProofEvaluations) -> Self {
                     ProofEvaluations {
-                        w: array_init(|i| x.w[i].clone()),
-                        s: array_init(|i| x.s[i].clone()),
-                        z: x.z.iter().map(|a| a.clone().into()).collect(),
-                        generic_selector: x.generic_selector.iter().map(|a| a.clone().into()).collect(),
-                        poseidon_selector: x.poseidon_selector.iter().map(|a| a.clone().into()).collect(),
+                        w: array_init(|i| x.w[i].into()),
+                        s: array_init(|i| x.s[i].into()),
+                        z: x.z.into(),
+                        generic_selector: x.generic_selector.into(),
+                        poseidon_selector: x.poseidon_selector.into(),
                         // TODO
                         lookup: None
                     }
                 }
             }
 
-            impl From<WasmProofEvaluations> for ProofEvaluations<Vec<$F>> {
+            impl From<WasmProofEvaluations> for ProofEvaluations<$F> {
                 fn from(x: WasmProofEvaluations) -> Self {
                     ProofEvaluations {
-                        w: array_init(|i| x.w[i].clone()),
-                        s: array_init(|i| x.s[i].clone()),
-                        z: x.z.into_iter().map(Into::into).collect(),
-                        generic_selector: x.generic_selector.into_iter().map(Into::into).collect(),
-                        poseidon_selector: x.poseidon_selector.into_iter().map(Into::into).collect(),
+                        w: array_init(|i| x.w[i].into()),
+                        s: array_init(|i| x.s[i].into()),
+                        z: x.z.into(),
+                        generic_selector: x.generic_selector.into(),
+                        poseidon_selector: x.poseidon_selector.into(),
                         // TODO
                         lookup: None
                     }
                 }
             }
 
-            impl From<&ProofEvaluations<Vec<$F>>> for WasmProofEvaluations {
-                fn from(x: &ProofEvaluations<Vec<$F>>) -> Self {
+            impl From<&ProofEvaluations<$F>> for WasmProofEvaluations {
+                fn from(x: &ProofEvaluations<$F>) -> Self {
                     WasmProofEvaluations {
-                        w: x.w.to_vec(),
-                        s: x.s.to_vec(),
-                        z: x.z.iter().map(|a| a.clone().into()).collect(),
-                        generic_selector: x.generic_selector.iter().map(|a| a.clone().into()).collect(),
-                        poseidon_selector: x.poseidon_selector.iter().map(|a| a.clone().into()).collect(),
+                        w: x.w.iter().map(Into::into).collect(),
+                        s: x.s.iter().map(Into::into).collect(),
+                        z: x.z.into(),
+                        generic_selector: x.generic_selector.into(),
+                        poseidon_selector: x.poseidon_selector.into(),
                     }
                 }
             }
 
-            impl From<ProofEvaluations<Vec<$F>>> for WasmProofEvaluations {
-                fn from(x: ProofEvaluations<Vec<$F>>) -> Self {
+            impl From<ProofEvaluations<$F>> for WasmProofEvaluations {
+                fn from(x: ProofEvaluations<$F>) -> Self {
                     WasmProofEvaluations {
-                        w: x.w.to_vec(),
-                        s: x.s.to_vec(),
-                        z: x.z.into_iter().map(Into::into).collect(),
-                        generic_selector: x.generic_selector.into_iter().map(Into::into).collect(),
-                        poseidon_selector: x.poseidon_selector.into_iter().map(Into::into).collect(),
+                        w: x.w.iter().map(Into::into).collect(),
+                        s: x.s.iter().map(Into::into).collect(),
+                        z: x.z.into(),
+                        generic_selector: x.generic_selector.into(),
+                        poseidon_selector: x.poseidon_selector.into(),
                     }
                 }
             }
@@ -767,12 +767,12 @@ macro_rules! impl_proof {
                     sg: g,
                 };
                 let proof_evals = ProofEvaluations {
-                    w: array_init(|_| vec![$F::one()]),
-                    z: vec![$F::one()],
-                    s: array_init(|_| vec![$F::one()]),
+                    w: array_init(|_| $F::one()),
+                    z: $F::one(),
+                    s: array_init(|_| $F::one()),
                     lookup: None,
-                    generic_selector: vec![$F::one()],
-                    poseidon_selector: vec![$F::one()],
+                    generic_selector: $F::one(),
+                    poseidon_selector: $F::one(),
                 };
                 let evals = [proof_evals.clone(), proof_evals];
 
@@ -851,137 +851,4 @@ pub mod fq {
         WasmPlonkVerifierIndex,
         Fq
     );
-}
-
-#[cfg(test)]
-pub mod to_test {
-    use super::*;
-    use ark_ff::Zero as _;
-    use ark_poly::{univariate::DensePolynomial, UVPolynomial};
-    use commitment_dlog::{
-        commitment::{b_poly_coefficients, ceil_log2},
-        srs::{endos, SRS},
-    };
-    use kimchi::circuits::{
-        constraints::ConstraintSystem, gate::CircuitGate, gates::poseidon::round_to_cols,
-        wires::Wire,
-    };
-    use mina_curves::pasta::{fp::Fp, pallas::Affine as Other, vesta::Affine};
-    use oracle::poseidon::{ArithmeticSponge, Sponge, SpongeConstants};
-    use rand::SeedableRng;
-    use wasm_bindgen_test::*;
-
-    #[wasm_bindgen_test]
-    pub fn test_thing() {
-        let gates = {
-            let mut gates = vec![];
-
-            // poseidon
-            let first_row = Wire::new(1);
-            let last_row = Wire::new(12);
-            let rc = oracle::pasta::fp_kimchi::params().round_constants;
-            let (poseidon, _row) =
-                CircuitGate::<Fp>::create_poseidon_gadget(0, [first_row, last_row], &rc);
-            gates.extend(poseidon);
-
-            gates
-        };
-
-        let public = 0;
-
-        // set up
-        let rng = &mut rand::rngs::StdRng::from_seed([0u8; 32]);
-        let group_map = <Affine as CommitmentCurve>::Map::setup();
-
-        // create the index
-        let fp_sponge_params = oracle::pasta::fp_kimchi::params();
-        let cs = ConstraintSystem::<Fp>::create(gates, vec![], fp_sponge_params.clone(), public)
-            .unwrap();
-        let n = cs.domain.d1.size as usize;
-        let fq_sponge_params = oracle::pasta::fq_kimchi::params();
-        let (endo_q, _endo_r) = endos::<Other>();
-        let mut srs = SRS::create(n);
-        srs.add_lagrange_basis(cs.domain.d1);
-        let srs = std::sync::Arc::new(srs);
-        let index = ProverIndex::<Affine>::create(cs, fq_sponge_params, endo_q, srs);
-
-        // witness
-        let witness = {
-            let mut sponge =
-                ArithmeticSponge::<Fp, PlonkSpongeConstantsKimchi>::new(fp_sponge_params);
-
-            let POS_ROWS_PER_HASH = 11;
-            let ROUNDS_PER_ROW = 5;
-            let SPONGE_WIDTH = 3;
-            // witness for Poseidon permutation custom constraints
-            let mut witness_cols: [Vec<Fp>; COLUMNS] =
-                array_init(|_| vec![Fp::zero(); POS_ROWS_PER_HASH + 1 /* last output row */]);
-
-            // creates a random initial state
-            let init = vec![Fp::zero(), Fp::zero(), Fp::zero()];
-
-            // index
-            let first_row = 0;
-
-            // initialize the sponge in the circuit with our random state
-            let first_state_cols = &mut witness_cols[round_to_cols(0)];
-            for state_idx in 0..SPONGE_WIDTH {
-                first_state_cols[state_idx][first_row] = init[state_idx];
-            }
-
-            // set the sponge state
-            sponge.state = init.clone();
-
-            // for the poseidon rows
-            for row_idx in 0..POS_ROWS_PER_HASH {
-                let row = row_idx + first_row;
-                for round in 0..ROUNDS_PER_ROW {
-                    // the last round makes use of the next row
-                    let maybe_next_row = if round == ROUNDS_PER_ROW - 1 {
-                        row + 1
-                    } else {
-                        row
-                    };
-
-                    //
-                    let abs_round = round + row_idx * ROUNDS_PER_ROW;
-
-                    // apply the sponge and record the result in the witness
-                    // (this won't work if the circuit has an INITIAL_ARK)
-                    assert!(!PlonkSpongeConstantsKimchi::INITIAL_ARK);
-                    sponge.full_round(abs_round);
-
-                    // apply the sponge and record the result in the witness
-                    let cols_to_update = round_to_cols((round + 1) % ROUNDS_PER_ROW);
-                    witness_cols[cols_to_update]
-                        .iter_mut()
-                        .zip(sponge.state.iter())
-                        // update the state (last update is on the next row)
-                        .for_each(|(w, s)| w[maybe_next_row] = *s);
-                }
-            }
-
-            witness_cols
-        };
-
-        //
-        let prev = {
-            let k = ceil_log2(index.srs.g.len());
-            let chals: Vec<_> = (0..k).map(|_| Fp::zero()).collect();
-            let comm = {
-                let coeffs = b_poly_coefficients(&chals);
-                let b = DensePolynomial::from_coefficients_vec(coeffs);
-                index.srs.commit_non_hiding(&b, None)
-            };
-
-            (chals, comm)
-        };
-
-        // proof
-        ProverProof::create_recursive::<
-            DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
-            DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, &[], &index, vec![prev])
-        .unwrap();
-    }
 }
