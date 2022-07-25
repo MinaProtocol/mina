@@ -311,7 +311,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
       in
       let txn_state_view = Lazy.force curr_state_view in
       List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
-          let sparse_ledger', _ =
+          let sparse_ledger', applied_transaction =
             Sparse_ledger.apply_transaction ~constraint_constants
               ~txn_state_view sparse_ledger (Transaction.forget t)
             |> Or_error.ok_exn
@@ -319,6 +319,11 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
           let coinbase_stack_target =
             pending_coinbase_stack_target (Transaction.forget t)
               Pending_coinbase.Stack.empty
+          in
+          let supply_increase =
+            Mina_ledger.Ledger.Transaction_applied.supply_increase
+              applied_transaction
+            |> Or_error.ok_exn
           in
           let () =
             Transaction_snark.check_transaction ?preeval ~constraint_constants
@@ -330,7 +335,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
                 { source = Pending_coinbase.Stack.empty
                 ; target = coinbase_stack_target
                 }
-              ~zkapp_account1:None ~zkapp_account2:None
+              ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
               { Transaction_protocol_state.Poly.block_data =
                   Lazy.force state_body
               ; transaction = t
@@ -352,7 +357,7 @@ let generate_base_snarks_witness sparse_ledger0
       in
       let txn_state_view = Lazy.force curr_state_view in
       List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
-          let sparse_ledger', _ =
+          let sparse_ledger', applied_transaction =
             Sparse_ledger.apply_transaction ~constraint_constants
               ~txn_state_view sparse_ledger (Transaction.forget t)
             |> Or_error.ok_exn
@@ -360,6 +365,11 @@ let generate_base_snarks_witness sparse_ledger0
           let coinbase_stack_target =
             pending_coinbase_stack_target (Transaction.forget t)
               Pending_coinbase.Stack.empty
+          in
+          let supply_increase =
+            Mina_ledger.Ledger.Transaction_applied.supply_increase
+              applied_transaction
+            |> Or_error.ok_exn
           in
           let () =
             Transaction_snark.generate_transaction_witness ?preeval
@@ -372,7 +382,7 @@ let generate_base_snarks_witness sparse_ledger0
                     Pending_coinbase.Stack.empty
                 ; target = coinbase_stack_target
                 }
-              ~zkapp_account1:None ~zkapp_account2:None
+              ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
               { Transaction_protocol_state.Poly.transaction = t
               ; block_data = Lazy.force state_body
               }

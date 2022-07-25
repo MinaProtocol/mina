@@ -204,7 +204,7 @@ module Statement = struct
     module V2 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
-        , Currency.Amount.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
         , unit
@@ -222,7 +222,7 @@ module Statement = struct
       module V2 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
-          , Currency.Amount.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           , Pending_coinbase.Stack_versioned.Stable.V1.t
           , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t
@@ -236,7 +236,7 @@ module Statement = struct
 
     type var =
       ( Frozen_ledger_hash.var
-      , Currency.Amount.var
+      , Currency.Amount.Signed.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
       , Sok_message.Digest.Checked.t
@@ -244,7 +244,7 @@ module Statement = struct
       Poly.t
 
     let typ : (var, t) Tick.Typ.t =
-      Poly.typ Frozen_ledger_hash.typ Currency.Amount.typ
+      Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
         Pending_coinbase.Stack.typ Fee_excess.typ Sok_message.Digest.typ
         Local_state.typ
 
@@ -254,7 +254,7 @@ module Statement = struct
           [| Sok_message.Digest.to_input sok_digest
            ; Registers.to_input source
            ; Registers.to_input target
-           ; Amount.to_input supply_increase
+           ; Amount.Signed.to_input supply_increase
            ; Fee_excess.to_input fee_excess
           |]
       in
@@ -276,12 +276,15 @@ module Statement = struct
         let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
         let source = Registers.Checked.to_input source
         and target = Registers.Checked.to_input target in
+        let%bind supply_increase =
+          Amount.Signed.Checked.to_input supply_increase
+        in
         let input =
           Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
             [| Sok_message.Digest.Checked.to_input sok_digest
              ; source
              ; target
-             ; Amount.var_to_input supply_increase
+             ; supply_increase
              ; fee_excess
             |]
         in
@@ -345,7 +348,7 @@ module Statement = struct
     in
     let%map fee_excess = Fee_excess.combine s1.fee_excess s2.fee_excess
     and supply_increase =
-      Currency.Amount.add s1.supply_increase s2.supply_increase
+      Currency.Amount.Signed.add s1.supply_increase s2.supply_increase
       |> option "Error adding supply_increase"
     and () = registers_check_equal s1.target s2.source in
     ( { source = s1.source
@@ -364,7 +367,7 @@ module Statement = struct
     let%map source = Registers.gen
     and target = Registers.gen
     and fee_excess = Fee_excess.gen
-    and supply_increase = Currency.Amount.gen in
+    and supply_increase = Currency.Amount.Signed.gen in
     ({ source; target; fee_excess; supply_increase; sok_digest = () } : t)
 end
 
@@ -514,8 +517,8 @@ module Base = struct
         to the fee-payer if executing the user command will later fail.
     *)
     type 'bool t =
-      { predicate_failed : 'bool (* All *)
-      ; source_not_present : 'bool (* All *)
+      { predicate_failed : 'bool (* User commands *)
+      ; source_not_present : 'bool (* User commands *)
       ; receiver_not_present : 'bool (* Delegate, Mint_tokens *)
       ; amount_insufficient_to_create : 'bool (* Payment only *)
       ; token_cannot_create : 'bool (* Payment only, token<>default *)
@@ -2147,8 +2150,8 @@ module Base = struct
                statement.target.ledger ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
-            (Amount.Checked.assert_equal statement.supply_increase
-               Amount.(var_of_t zero) ) ) ;
+            (Amount.Signed.Checked.assert_equal statement.supply_increase
+               Amount.(Signed.Checked.of_unsigned (var_of_t zero)) ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
             (let expected = statement.fee_excess in
@@ -2250,6 +2253,20 @@ module Base = struct
         Mina_state.Protocol_state.Body.Value.t Snarky_backendless.Request.t
     | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
 
+  let%snarkydef add_burned_tokens acc_burned_tokens amount
+      ~is_coinbase_or_fee_transfer ~update_account =
+    let%bind accumulate_burned_tokens =
+      Boolean.all [ is_coinbase_or_fee_transfer; Boolean.not update_account ]
+    in
+    let%bind amt, `Overflow overflow =
+      Amount.Checked.add_flagged acc_burned_tokens amount
+    in
+    let%bind () =
+      Boolean.(Assert.any [ not accumulate_burned_tokens; not overflow ])
+    in
+    Amount.Checked.if_ accumulate_burned_tokens ~then_:amt
+      ~else_:acc_burned_tokens
+
   let%snarkydef apply_tagged_transaction
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       (type shifted)
@@ -2336,7 +2353,7 @@ module Base = struct
       Mina_state.Protocol_state.Body.consensus_state state_body
       |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
     in
-    (* Query user command predicted failure/success. *)
+    (* Query predicted failure/success. *)
     let%bind user_command_failure =
       User_command_failure.compute_as_prover ~constraint_constants
         ~txn_global_slot:current_global_slot txn
@@ -2479,6 +2496,7 @@ module Base = struct
       in
       Boolean.(is_coinbase_or_fee_transfer &&& fee_may_be_charged)
     in
+    let burned_tokens = ref Currency.Amount.(var_of_t zero) in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
         (Frozen_ledger_hash.modify_account_send
@@ -2513,11 +2531,33 @@ module Base = struct
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
              in
+             let permitted_to_send =
+               Account.Checked.has_permission ~to_:`Send account
+             in
+             let permitted_to_receive =
+               Account.Checked.has_permission ~to_:`Receive account
+             in
+             let%bind () =
+               [%with_label
+                 "Fee payer balance update should be permitted for all commands"]
+                 (Boolean.Assert.any
+                    [ Boolean.not is_user_command; permitted_to_send ] )
+             in
+             (*second fee receiver of a fee transfer and fee receiver of a coinbase transaction remain unchanged if
+                1. These accounts are not permitted to receive tokens and,
+                2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
+             let%bind update_account =
+               let%bind receiving_allowed =
+                 Boolean.all
+                   [ is_coinbase_or_fee_transfer; permitted_to_receive ]
+               in
+               Boolean.any [ is_user_command; receiving_allowed ]
+             in
              let%bind is_empty_and_writeable =
                (* If this is a coinbase with zero fee, do not create the
                   account, since the fee amount won't be enough to pay for it.
                *)
-               Boolean.(is_empty_and_writeable &&& not is_zero_fee)
+               Boolean.(all [ is_empty_and_writeable; not is_zero_fee ])
              in
              let%bind should_pay_to_create =
                (* Coinbases and fee transfers may create, or we may be creating
@@ -2549,8 +2589,17 @@ module Base = struct
                   Amount.Signed.Checked.(
                     add fee_payer_amount account_creation_fee) )
              in
+             let%bind () =
+               [%with_label "Burned tokens in fee payer"]
+                 (let%map amt =
+                    add_burned_tokens !burned_tokens
+                      (Amount.Checked.of_fee fee)
+                      ~is_coinbase_or_fee_transfer ~update_account
+                  in
+                  burned_tokens := amt )
+             in
              let txn_global_slot = current_global_slot in
-             let%bind `Min_balance _, timing =
+             let%bind timing =
                [%with_label "Check fee payer timing"]
                  (let%bind txn_amount =
                     let%bind sgn = Amount.Signed.Checked.sgn amount in
@@ -2568,12 +2617,20 @@ module Base = struct
                     [%with_label "Check fee payer timed balance"]
                       (Boolean.Assert.is_true ok)
                   in
-                  check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:(Some txn_amount) ~txn_global_slot )
+                  let%bind `Min_balance _, timing =
+                    check_timing ~balance_check ~timed_balance_check ~account
+                      ~txn_amount:(Some txn_amount) ~txn_global_slot
+                  in
+                  Account_timing.if_ update_account ~then_:timing
+                    ~else_:account.timing )
              in
              let%bind balance =
                [%with_label "Check payer balance"]
-                 (Balance.Checked.add_signed_amount account.balance amount)
+                 (let%bind updated_balance =
+                    Balance.Checked.add_signed_amount account.balance amount
+                  in
+                  Balance.Checked.if_ update_account ~then_:updated_balance
+                    ~else_:account.balance )
              in
              let%map public_key =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
@@ -2630,6 +2687,7 @@ module Base = struct
          Amount.Checked.sub base_amount coinbase_receiver_fee )
     in
     let receiver_overflow = ref Boolean.false_ in
+    let receiver_balance_update_permitted = ref Boolean.true_ in
     let%bind root_after_receiver_update =
       [%with_label "Update receiver"]
         (Frozen_ledger_hash.modify_account_recv
@@ -2643,6 +2701,20 @@ module Base = struct
                 - the receiver for a coinbase
                 - the first receiver for a fee transfer
              *)
+             let permitted_to_receive =
+               Account.Checked.has_permission ~to_:`Receive account
+             in
+             (*Account remains unchanged if balance update is not permitted for payments, fee_transfers and coinbase transactions*)
+             let%bind payment_or_internal_command =
+               Boolean.any [ is_payment; is_coinbase_or_fee_transfer ]
+             in
+             let%bind update_account =
+               Boolean.any
+                 [ Boolean.not payment_or_internal_command
+                 ; permitted_to_receive
+                 ]
+             in
+             receiver_balance_update_permitted := permitted_to_receive ;
              let%bind is_empty_failure =
                let%bind must_not_be_empty =
                  Boolean.(is_stake_delegation ||| is_mint_tokens)
@@ -2654,11 +2726,8 @@ module Base = struct
                  (Boolean.Assert.( = ) is_empty_failure
                     user_command_failure.receiver_not_present )
              in
-             let is_empty_and_writeable =
-               (* is_empty_and_writable && not is_empty_failure *)
-               Boolean.Unsafe.of_cvar
-               @@ Field.Var.(
-                    sub (is_empty_and_writeable :> t) (is_empty_failure :> t))
+             let%bind is_empty_and_writeable =
+               Boolean.(all [ is_empty_and_writeable; not is_empty_failure ])
              in
              let%bind should_pay_to_create =
                Boolean.(is_empty_and_writeable &&& not is_create_account)
@@ -2743,12 +2812,29 @@ module Base = struct
                Balance.Checked.if_ overflow ~then_:account.balance
                  ~else_:balance
              in
+             let%bind () =
+               [%with_label "Burned tokens in receiver"]
+                 (let%map amt =
+                    add_burned_tokens !burned_tokens receiver_increase
+                      ~is_coinbase_or_fee_transfer
+                      ~update_account:permitted_to_receive
+                  in
+                  burned_tokens := amt )
+             in
              let%bind user_command_fails =
                Boolean.(!receiver_overflow ||| user_command_fails)
              in
              let%bind is_empty_and_writeable =
-               (* Do not create a new account if the user command will fail. *)
-               Boolean.(is_empty_and_writeable &&& not user_command_fails)
+               (* Do not create a new account if the user command will fail or if receiving is not permitted *)
+               Boolean.all
+                 [ is_empty_and_writeable
+                 ; Boolean.not user_command_fails
+                 ; update_account
+                 ]
+             in
+             let%bind balance =
+               Balance.Checked.if_ update_account ~then_:balance
+                 ~else_:account.balance
              in
              let%bind may_delegate =
                (* Only default tokens may participate in delegation. *)
@@ -2839,13 +2925,45 @@ module Base = struct
                     (assert_r1cs not_fee_payer_is_source num_failures
                        num_failures ) )
              in
+             let permitted_to_update_delegate =
+               Account.Checked.has_permission ~to_:`Set_delegate account
+             in
+             let permitted_to_send =
+               Account.Checked.has_permission ~to_:`Send account
+             in
+             let permitted_to_receive =
+               Account.Checked.has_permission ~to_:`Receive account
+             in
+             (*Account remains unchanged if not permitted to send, receive, or set delegate*)
+             let%bind payment_permitted =
+               Boolean.all
+                 [ is_payment
+                 ; permitted_to_send
+                 ; !receiver_balance_update_permitted
+                 ]
+             in
+             let%bind update_account =
+               let%bind delegation_permitted =
+                 Boolean.all
+                   [ is_stake_delegation; permitted_to_update_delegate ]
+               in
+               let%bind fee_receiver_update_permitted =
+                 Boolean.all
+                   [ is_coinbase_or_fee_transfer; permitted_to_receive ]
+               in
+               Boolean.any
+                 [ payment_permitted
+                 ; delegation_permitted
+                 ; fee_receiver_update_permitted
+                 ]
+             in
              let%bind amount =
                (* Only payments should affect the balance at this stage. *)
-               if_ is_payment ~typ:Amount.typ ~then_:payload.body.amount
+               if_ payment_permitted ~typ:Amount.typ ~then_:payload.body.amount
                  ~else_:Amount.(var_of_t zero)
              in
              let txn_global_slot = current_global_slot in
-             let%bind `Min_balance _, timing =
+             let%bind timing =
                [%with_label "Check source timing"]
                  (let balance_check ok =
                     [%with_label
@@ -2867,8 +2985,12 @@ module Base = struct
                        Boolean.Assert.( = ) not_ok
                          user_command_failure.source_bad_timing )
                   in
-                  check_timing ~balance_check ~timed_balance_check ~account
-                    ~txn_amount:(Some amount) ~txn_global_slot )
+                  let%bind `Min_balance _, timing =
+                    check_timing ~balance_check ~timed_balance_check ~account
+                      ~txn_amount:(Some amount) ~txn_global_slot
+                  in
+                  Account_timing.if_ update_account ~then_:timing
+                    ~else_:account.timing )
              in
              let%bind balance, `Underflow underflow =
                Balance.Checked.sub_amount_flagged account.balance amount
@@ -2882,7 +3004,10 @@ module Base = struct
                     user_command_failure.source_insufficient_balance )
              in
              let%map delegate =
-               Public_key.Compressed.Checked.if_ is_stake_delegation
+               let%bind may_delegate =
+                 Boolean.all [ is_stake_delegation; update_account ]
+               in
+               Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
                  ~else_:account.delegate
              in
@@ -2938,8 +3063,19 @@ module Base = struct
              ~else_:user_command_excess )
     in
     let%bind supply_increase =
-      Amount.Checked.if_ is_coinbase ~then_:payload.body.amount
-        ~else_:Amount.(var_of_t zero)
+      [%with_label "Calculate supply increase"]
+        (let%bind expected_supply_increase =
+           Amount.Signed.Checked.if_ is_coinbase
+             ~then_:(Amount.Signed.Checked.of_unsigned payload.body.amount)
+             ~else_:Amount.(Signed.Checked.of_unsigned (var_of_t zero))
+         in
+         let%bind amt, `Overflow overflow =
+           Amount.Signed.Checked.(
+             add_flagged expected_supply_increase
+               (negate (of_unsigned !burned_tokens)))
+         in
+         let%map () = Boolean.Assert.is_true (Boolean.not overflow) in
+         amt )
     in
     let%map final_root =
       (* Ensure that only the fee-payer was charged if this was an invalid user
@@ -2969,7 +3105,7 @@ module Base = struct
         l1 : Frozen_ledger_hash.t,
         l2 : Frozen_ledger_hash.t,
         fee_excess : Amount.Signed.t,
-        supply_increase : Amount.t
+        supply_increase : Amount.Signed.t
         pc: Pending_coinbase_stack_state.t
   *)
   let%snarkydef main ~constraint_constants
@@ -3027,7 +3163,7 @@ module Base = struct
       [ [%with_label "equal roots"]
           (Frozen_ledger_hash.assert_equal root_after statement.target.ledger)
       ; [%with_label "equal supply_increases"]
-          (Currency.Amount.Checked.assert_equal supply_increase
+          (Currency.Amount.Signed.Checked.assert_equal supply_increase
              statement.supply_increase )
       ; [%with_label "equal fee excesses"]
           (Fee_excess.assert_equal_checked fee_excess statement.fee_excess)
@@ -3064,7 +3200,7 @@ end
 module Transition_data = struct
   type t =
     { proof : Proof_type.t
-    ; supply_increase : Amount.t
+    ; supply_increase : (Amount.t, Sgn.t) Signed_poly.t
     ; fee_excess : Fee_excess.t
     ; sok_digest : Sok_message.Digest.t
     ; pending_coinbase_stack_state : Pending_coinbase_stack_state.t
@@ -3126,7 +3262,7 @@ module Merge = struct
          Boolean.Assert.is_true valid_pending_coinbase_stack_transition )
     in
     let%bind supply_increase =
-      Amount.Checked.add s1.supply_increase s2.supply_increase
+      Amount.Signed.Checked.add s1.supply_increase s2.supply_increase
     in
     let%bind () =
       make_checked (fun () ->
@@ -3140,7 +3276,8 @@ module Merge = struct
         [ [%with_label "equal fee excesses"]
             (Fee_excess.assert_equal_checked fee_excess s.fee_excess)
         ; [%with_label "equal supply increases"]
-            (Amount.Checked.assert_equal supply_increase s.supply_increase)
+            (Amount.Signed.Checked.assert_equal supply_increase
+               s.supply_increase )
         ; [%with_label "equal source ledger hashes"]
             (Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger)
         ; [%with_label "equal target, source ledger hashes"]
@@ -3273,17 +3410,16 @@ module type S = sig
     t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
-let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
-    source target init_stack pending_coinbase_stack_state transaction state_body
-    handler =
+let check_transaction_union ?(preeval = false) ~constraint_constants
+    ~supply_increase sok_message source target init_stack
+    pending_coinbase_stack_state transaction state_body handler =
   if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
   let handler =
     Base.transaction_union_handler handler transaction state_body init_stack
   in
   let statement : Statement.With_sok.t =
-    Statement.Poly.with_empty_local_state ~source ~target
-      ~supply_increase:(Transaction_union.supply_increase transaction)
+    Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
       ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~sok_digest
@@ -3303,7 +3439,7 @@ let check_transaction_union ?(preeval = false) ~constraint_constants sok_message
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
-    ~zkapp_account2:_
+    ~zkapp_account2:_ ~supply_increase
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   let transaction =
@@ -3314,22 +3450,23 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
   | `Parties _ ->
       failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
-      check_transaction_union ?preeval ~constraint_constants sok_message source
-        target init_stack pending_coinbase_stack_state
+      check_transaction_union ?preeval ~constraint_constants ~supply_increase
+        sok_message source target init_stack pending_coinbase_stack_state
         (Transaction_union.of_transaction t)
         state_body handler
 
 let check_user_command ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state t_in_block handler =
+    ~init_stack ~pending_coinbase_stack_state ~supply_increase t_in_block
+    handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
   check_transaction ~constraint_constants ~sok_message ~source ~target
     ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:None
-    ~zkapp_account2:None
+    ~zkapp_account2:None ~supply_increase
     { t_in_block with transaction = Command (Signed_command user_command) }
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
-    sok_message source target transaction_in_block init_stack
+    ~supply_increase sok_message source target transaction_in_block init_stack
     pending_coinbase_stack_state handler =
   if preeval then failwith "preeval currently disabled" ;
   let transaction =
@@ -3341,8 +3478,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     Base.transaction_union_handler handler transaction state_body init_stack
   in
   let statement : Statement.With_sok.t =
-    Statement.Poly.with_empty_local_state ~source ~target
-      ~supply_increase:(Transaction_union.supply_increase transaction)
+    Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
       ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~sok_digest
@@ -3355,7 +3491,7 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
-    ~zkapp_account2:_
+    ~zkapp_account2:_ ~supply_increase
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   match
@@ -3367,7 +3503,7 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
       failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
       generate_transaction_union_witness ?preeval ~constraint_constants
-        sok_message source target
+        ~supply_increase sok_message source target
         { transaction_in_block with
           transaction = Transaction_union.of_transaction t
         }
@@ -3960,7 +4096,7 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
                   ; ledger = Sparse_ledger.merkle_root target_local.ledger
                   }
               }
-          ; supply_increase = Amount.zero
+          ; supply_increase = Amount.Signed.zero
           ; fee_excess
           ; sok_digest = Sok_message.Digest.default
           }

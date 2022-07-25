@@ -6178,7 +6178,7 @@
             },
             {
               "name": "supplyIncrease",
-              "description": "Increase in total coinbase reward ",
+              "description": "Increase in total supply",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6186,6 +6186,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "Use supplyChange"
+            },
+            {
+              "name": "supplyChange",
+              "description": "Increase/Decrease in total supply",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
                   "ofType": null
                 }
               },
