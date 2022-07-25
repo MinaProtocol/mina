@@ -147,12 +147,12 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         sg: g,
     };
     let proof_evals = ProofEvaluations {
-        w: array_init(|_| vec![Fq::one()]),
-        z: vec![Fq::one()],
-        s: array_init(|_| vec![Fq::one()]),
+        w: array_init(|_| Fq::one()),
+        z: Fq::one(),
+        s: array_init(|_| Fq::one()),
         lookup: None,
-        generic_selector: vec![Fq::one()],
-        poseidon_selector: vec![Fq::one()],
+        generic_selector: Fq::one(),
+        poseidon_selector: Fq::one(),
     };
     let evals = [proof_evals.clone(), proof_evals];
 
