@@ -280,7 +280,7 @@ let gen_snapp_ledger =
   (test_spec, kp)
 
 let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
-    ~snapp_prover test_spec ~init_ledger ~snapp_pk =
+    ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -290,7 +290,7 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
             ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
           let%bind parties =
-            Transaction_snark.For_tests.update_states ~snapp_prover
+            Transaction_snark.For_tests.update_states ~zkapp_prover
               ~constraint_constants test_spec
           in
           check_parties_with_merges_exn ?expected_failure ?state_body ledger

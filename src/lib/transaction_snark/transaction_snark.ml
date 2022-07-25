@@ -4497,7 +4497,7 @@ module For_tests = struct
     in
     parties
 
-  let update_states ?snapp_prover ~constraint_constants (spec : Spec.t) =
+  let update_states ?zkapp_prover ~constraint_constants (spec : Spec.t) =
     let ( `Parties { Parties.fee_payer; other_parties; memo }
         , `Sender_party sender_party
         , `Proof_parties snapp_parties
@@ -4530,7 +4530,7 @@ module For_tests = struct
                 match request with _ -> respond Unhandled
               in
               let prover =
-                match snapp_prover with
+                match zkapp_prover with
                 | Some prover ->
                     prover
                 | None ->

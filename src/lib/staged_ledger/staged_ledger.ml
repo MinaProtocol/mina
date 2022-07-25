@@ -2049,7 +2049,7 @@ let%test_module "staged ledger tests" =
 
     let logger = Logger.null ()
 
-    let `VK vk, `Prover snapp_prover =
+    let `VK vk, `Prover zkapp_prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
     let verifier =
@@ -2501,8 +2501,24 @@ let%test_module "staged ledger tests" =
       in
       let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
-          | Parties parties, _fee_payer_keypair, _keymap ->
-              User_command.Parties parties
+          | Parties parties_valid, _fee_payer_keypair, keymap ->
+              let parties_with_auths =
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Parties_builder.replace_authorizations ~keymap
+                      (Parties.Valid.forget parties_valid) )
+              in
+              let valid_parties_with_auths : Parties.Valid.t =
+                match
+                  Parties.Valid.to_valid parties_with_auths ~ledger
+                    ~get:Ledger.get
+                    ~location_of_account:Ledger.location_of_account
+                with
+                | Some ps ->
+                    ps
+                | None ->
+                    failwith "Could not create Parties.Valid.t"
+              in
+              User_command.Parties valid_parties_with_auths
           | Signed_command _, _, _ ->
               failwith "Expected a Parties, got a Signed command" )
       in
@@ -3807,7 +3823,7 @@ let%test_module "staged ledger tests" =
                     l
                   in
                   let%bind parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
                   let valid_parties =

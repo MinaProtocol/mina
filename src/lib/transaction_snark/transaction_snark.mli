@@ -521,7 +521,7 @@ module For_tests : sig
     -> Parties.t
 
   val update_states :
-       ?snapp_prover:
+       ?zkapp_prover:
          ( unit
          , unit
          , unit

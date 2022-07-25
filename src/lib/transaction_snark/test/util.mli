@@ -83,7 +83,7 @@ val test_snapp_update :
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
-  -> snapp_prover:
+  -> zkapp_prover:
        ( unit
        , unit
        , unit
