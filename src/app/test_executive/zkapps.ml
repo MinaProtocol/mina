@@ -103,14 +103,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     match expected_failure with
     | Some failure ->
         send_invalid_payment ~logger ~sender_pub_key:sender_pk
-          ~receiver_pub_key:receiver_pk ~amount ~fee ~nonce ~memo
-          ~token:Token_id.default ~valid_until ~raw_signature
-          ~expected_failure:failure node
+          ~receiver_pub_key:receiver_pk ~amount ~fee ~nonce ~memo ~valid_until
+          ~raw_signature ~expected_failure:failure node
     | None ->
         incr transactions_sent ;
         Network.Node.must_send_payment_with_raw_sig ~logger
           ~sender_pub_key:sender_pk ~receiver_pub_key:receiver_pk ~amount ~fee
-          ~nonce ~memo ~token:Token_id.default ~valid_until ~raw_signature node
+          ~nonce ~memo ~valid_until ~raw_signature node
         |> Malleable_error.ignore_m
 
   let run network t =

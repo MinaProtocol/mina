@@ -49,14 +49,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             substring )
 
   let send_invalid_payment ~logger node ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
-      ~expected_failure : unit Malleable_error.t =
+      ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature ~expected_failure :
+      unit Malleable_error.t =
     [%log info] "Sending payment, expected to fail" ;
     let expected_failure = String.lowercase expected_failure in
     match%bind.Deferred
       Network.Node.send_payment_with_raw_sig ~logger node ~sender_pub_key
-        ~receiver_pub_key ~amount ~fee ~nonce ~memo ~token ~valid_until
-        ~raw_signature
+        ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
     with
     | Ok _ ->
         [%log error] "Payment succeeded, expected error \"%s\"" expected_failure ;
