@@ -50,6 +50,7 @@ module Verifier_index_json = struct
     ; max_poly_size : int
     ; max_quot_size : int
     ; public : int
+    ; prev_challenges : int
     ; srs : 'sRS
     ; evals : 'polyComm verification_evals
     ; shifts : 'fr array
@@ -133,6 +134,7 @@ module Stable = struct
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
         ; max_quot_size
         ; public
+        ; prev_challenges = 2 (* Due to Wrap_hack *)
         ; srs
         ; evals =
             (let g (x, y) =
