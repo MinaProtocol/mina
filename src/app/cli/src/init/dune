@@ -108,6 +108,7 @@
    pickles
    pickles.backend
    snark_params
+   parties_builder
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh

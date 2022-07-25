@@ -14,8 +14,7 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 [%%inject "ledger_depth", ledger_depth]
 
-let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?prover
-    ?failure () =
+let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -123,7 +122,7 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?prover
   in
   let%bind parties =
     Parties_generators.gen_parties_from ~max_other_parties ~fee_payer_keypair
-      ~keymap ~ledger ~account_state_tbl ?vk ?prover ?failure ()
+      ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
   in
   let parties =
     Option.value_exn
@@ -133,8 +132,7 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?prover
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
 
-let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?prover ?failure
-    () =
+let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let%bind length =
     match length with
@@ -163,8 +161,8 @@ let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?prover ?failure
     if n <= 0 then return (List.rev parties_and_fee_payer_keypairs, init_ledger)
     else
       let%bind parties, fee_payer_keypair, keymap, ledger =
-        parties_with_ledger ?max_other_parties ~account_state_tbl ?vk ?prover
-          ?failure ()
+        parties_with_ledger ?max_other_parties ~account_state_tbl ?vk ?failure
+          ()
       in
       let parties_and_fee_payer_keypairs' =
         (parties, fee_payer_keypair, keymap) :: parties_and_fee_payer_keypairs

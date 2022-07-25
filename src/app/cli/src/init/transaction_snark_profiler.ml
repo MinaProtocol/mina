@@ -123,20 +123,19 @@ let create_ledger_and_zkapps num_transactions :
   let cmd_infos, ledger =
     Quickcheck.random_value
       (Mina_generators.User_command_generators.sequence_parties_with_ledger
-         ~max_other_parties ~length ~vk ~prover () )
+         ~max_other_parties ~length ~vk () )
   in
   let zkapps =
-    List.map cmd_infos ~f:(fun (user_cmd, _keypair, _keymap) -> user_cmd)
-  in
-  let txns =
-    List.map zkapps ~f:(fun cmd ->
-        match cmd with
+    List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->
+        match user_cmd with
+        | User_command.Parties parties_valid ->
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                Parties_builder.replace_authorizations ~prover ~keymap
+                  (Parties.Valid.forget parties_valid) )
         | User_command.Signed_command _ ->
-            failwith "Expected Parties"
-        | User_command.Parties parties ->
-            Parties.Valid.forget parties )
+            failwith "Expected Parties user command" )
   in
-  (ledger, txns)
+  (ledger, zkapps)
 
 let time thunk =
   let start = Time.now () in
