@@ -73,11 +73,8 @@ toc();
 tic("create deploy transaction");
 let partiesJsonDeploy = await deploy(SimpleZkapp, {
   zkappKey,
-  verificationKey,
   initialBalance,
-  feePayerKey: sender.privateKey,
-  shouldSignFeePayer: true,
-  transactionFee,
+  feePayer: { feePayerKey: sender.privateKey, fee: transactionFee },
 });
 toc();
 
