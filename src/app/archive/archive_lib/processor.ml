@@ -3393,32 +3393,7 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
         | Ok () ->
             Deferred.unit )
     | Transition_frontier _ ->
-        Deferred.unit
-    | Transaction_pool { added; removed = _ } ->
-        let%map _ =
-          Caqti_async.Pool.use
-            (fun (module Conn : CONNECTION) ->
-              let%map () =
-                Deferred.List.iter added ~f:(fun command ->
-                    match%map
-                      User_command.add_if_doesn't_exist (module Conn) command
-                    with
-                    | Ok _ ->
-                        ()
-                    | Error e ->
-                        [%log warn]
-                          ~metadata:
-                            [ ("error", `String (Caqti_error.show e))
-                            ; ( "command"
-                              , Mina_base.User_command.to_yojson command )
-                            ]
-                          "Failed to archive user command $command from \
-                           transaction pool: see $error" )
-              in
-              Ok () )
-            pool
-        in
-        () )
+        Deferred.unit )
 
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     pool =
