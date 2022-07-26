@@ -111,7 +111,7 @@ module T = struct
     ; validated_transitions_keyswaptest :
         ( 'worker
         , unit
-        , External_transition.Validated.t Pipe.Reader.t )
+        , Mina_block.Validated.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     }
 
@@ -134,7 +134,7 @@ module T = struct
         Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker : unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest :
-        unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
+        unit -> Mina_block.Validated.t Pipe.Reader.t Deferred.t
     ; coda_root_diff : unit -> Mina_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_initialization_finish_signal : unit -> unit Pipe.Reader.t Deferred.t
     ; coda_new_block :
@@ -296,8 +296,7 @@ module T = struct
     let validated_transitions_keyswaptest =
       C.create_pipe ~name:"validated_transitions_keyswaptest"
         ~f:validated_transitions_keyswaptest_impl ~bin_input:Unit.bin_t
-        ~bin_output:
-          [%bin_type_class: External_transition.Validated.Stable.Latest.t] ()
+        ~bin_output:[%bin_type_class: Mina_block.Validated.Stable.Latest.t] ()
 
     let replace_snark_worker_key =
       C.create_rpc ~name:"replace_snark_worker_key"
@@ -445,7 +444,7 @@ module T = struct
             ; consensus_local_state
             ; is_seed = List.is_empty peers
             ; genesis_ledger_hash =
-                Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+                Mina_ledger.Ledger.merkle_root (Lazy.force Genesis_ledger.t)
             ; constraint_constants
             ; consensus_constants = precomputed_values.consensus_constants
             ; log_gossip_heard =
@@ -532,16 +531,9 @@ module T = struct
             in
             let build_user_command_input amount sender_sk receiver_pk fee =
               let sender_pk = pk_of_sk sender_sk in
-              User_command_input.create ~fee ~fee_token:Token_id.default
-                ~fee_payer_pk:sender_pk ~signer:sender_pk ~memo
-                ~valid_until:None
-                ~body:
-                  (Payment
-                     { source_pk = sender_pk
-                     ; receiver_pk
-                     ; token_id = Token_id.default
-                     ; amount
-                     } )
+              User_command_input.create ~fee ~fee_payer_pk:sender_pk
+                ~signer:sender_pk ~memo ~valid_until:None
+                ~body:(Payment { source_pk = sender_pk; receiver_pk; amount })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
                      (Keypair.of_private_key_exn sender_sk) )
@@ -581,10 +573,7 @@ module T = struct
                  ~f:(fun t ->
                    Pipe.write_without_pushback_if_open
                      validated_transitions_keyswaptest_writer t ;
-                   let block_with_hash =
-                     External_transition.Validated.lower t
-                     |> Mina_block.Validated.forget
-                   in
+                   let block_with_hash = Mina_block.Validated.forget t in
                    let prev_state_hash =
                      With_hash.data block_with_hash
                      |> Mina_block.header |> Header.protocol_state

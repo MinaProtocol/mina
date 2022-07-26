@@ -29,12 +29,12 @@ open Snarkette
 module Field = struct
   open Core_kernel
 
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = Pasta.Fp.t [@@deriving equal, compare, yojson, sexp, hash]
+      type t = Pasta.Fp.t [@version_asserted] [@@deriving equal, compare, yojson, sexp, hash]
 
       let to_latest x = x
     end

@@ -87,7 +87,6 @@ _opam
 
 target
 release
-Cargo.lock
 .vscode
 
 ### IntelliJ IDEA ###

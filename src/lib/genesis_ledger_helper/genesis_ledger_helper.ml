@@ -208,7 +208,7 @@ module Ledger = struct
           ( module Genesis_ledger.Of_ledger (struct
             let t =
               lazy
-                (Ledger.create ~directory_name:dirname
+                (Mina_ledger.Ledger.create ~directory_name:dirname
                    ~depth:constraint_constants.ledger_depth () )
 
             let depth = constraint_constants.ledger_depth
@@ -217,9 +217,11 @@ module Ledger = struct
     packed
 
   let generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
-    Ledger.commit ledger ;
-    let dirname = Option.value_exn (Ledger.get_directory ledger) in
-    let root_hash = State_hash.to_base58_check @@ Ledger.merkle_root ledger in
+    Mina_ledger.Ledger.commit ledger ;
+    let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
+    let root_hash =
+      State_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
+    in
     let%bind () = Unix.mkdir ~p:() genesis_dir in
     let tar_path = genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix in
     [%log trace]
@@ -386,7 +388,8 @@ module Ledger = struct
                   { config with
                     hash =
                       Some
-                        (State_hash.to_base58_check @@ Ledger.merkle_root ledger)
+                        ( State_hash.to_base58_check
+                        @@ Mina_ledger.Ledger.merkle_root ledger )
                   }
                 in
                 let name, other_data =
@@ -428,7 +431,8 @@ module Ledger = struct
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
-                      State_hash.to_base58_check @@ Ledger.merkle_root ledger
+                      State_hash.to_base58_check
+                      @@ Mina_ledger.Ledger.merkle_root ledger
                     in
                     let tar_path =
                       genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
@@ -561,10 +565,12 @@ module Genesis_proof = struct
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
     in
+    let open Staged_ledger_diff in
     let protocol_state_with_hashes =
       Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
+        ~genesis_body_reference
     in
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants
@@ -576,6 +582,7 @@ module Genesis_proof = struct
     ; protocol_state_with_hashes
     ; constraint_system_digests = None
     ; genesis_constants
+    ; genesis_body_reference
     }
 
   let generate (inputs : Genesis_proof.Inputs.t) =
@@ -593,6 +600,7 @@ module Genesis_proof = struct
              ; genesis_constants = inputs.genesis_constants
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
+             ; genesis_body_reference = inputs.genesis_body_reference
              }
     | _ ->
         Deferred.return (Genesis_proof.create_values_no_proof inputs)
@@ -601,14 +609,14 @@ module Genesis_proof = struct
     (* TODO: Use [Writer.write_bin_prot]. *)
     Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
         let%bind wr = Writer.open_file filename in
-        Writer.write wr (Proof.Stable.V1.sexp_of_t proof |> Sexp.to_string) ;
+        Writer.write wr (Proof.Stable.V2.sexp_of_t proof |> Sexp.to_string) ;
         Writer.close wr )
 
   let load filename =
     (* TODO: Use [Reader.load_bin_prot]. *)
     Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
         Reader.file_contents filename
-        >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp )
+        >>| Sexp.of_string >>| Proof.Stable.V2.t_of_sexp )
 
   let id_to_json x =
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))
@@ -699,6 +707,7 @@ module Genesis_proof = struct
                   ; constraint_system_digests
                   ; proof_data =
                       Some { blockchain_proof_system_id; genesis_proof }
+                  ; genesis_body_reference = inputs.genesis_body_reference
                   }
                 , file )
           | Error err ->
@@ -744,6 +753,7 @@ module Genesis_proof = struct
           ; protocol_state_with_hashes = inputs.protocol_state_with_hashes
           ; constraint_system_digests = compiled.constraint_system_digests
           ; proof_data = Some proof_data
+          ; genesis_body_reference = inputs.genesis_body_reference
           }
         in
         let%map () =
@@ -926,7 +936,8 @@ let init_from_inputs ?(genesis_dir = Cache_dir.autogen_path) ~logger
   values
 
 let init_from_config_file ?genesis_dir ~logger ~proof_level
-    (config : Runtime_config.t) =
+    (config : Runtime_config.t) :
+    (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
     inputs_from_config_file ?genesis_dir ~logger ~proof_level config

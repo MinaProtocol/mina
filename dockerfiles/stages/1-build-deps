@@ -20,7 +20,7 @@ ARG GO_VERSION=1.16.5
 ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.52.1
+ARG RUST_VERSION=1.58.1
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
@@ -142,10 +142,10 @@ RUN git clone \
 # This package was particularly tricky to get to install correctly because of how the package's source code is structured.
 # To work around this, we install it as a dependency for a local go module and build the binary from the GOPATH.
 RUN mkdir go-tmp \
-    && cd go-tmp \
-    && /usr/lib/go/bin/go mod init local/build \
-    && /usr/lib/go/bin/go get capnproto.org/go/capnp/v3@$GO_CAPNP_VERSION \
-    && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
-    && sudo mv capnpc-go /usr/local/bin \
-    && cd - \
-    && sudo rm -rf go-tmp
+  && cd go-tmp \
+  && /usr/lib/go/bin/go mod init local/build \
+  && /usr/lib/go/bin/go get capnproto.org/go/capnp/v3@$GO_CAPNP_VERSION \
+  && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
+  && sudo mv capnpc-go /usr/local/bin \
+  && cd - \
+  && sudo rm -rf go-tmp

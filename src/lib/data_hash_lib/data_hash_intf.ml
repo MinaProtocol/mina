@@ -30,15 +30,15 @@ module type Basic = sig
 
   val var_to_hash_packed : var -> Random_oracle.Checked.Digest.t
 
-  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
-  val var_to_bits : var -> (Boolean.var list, _) Checked.t
+  val var_to_bits : var -> Boolean.var list Checked.t
 
   val typ : (var, t) Typ.t
 
-  val assert_equal : var -> var -> (unit, _) Checked.t
+  val assert_equal : var -> var -> unit Checked.t
 
-  val equal_var : var -> var -> (Boolean.var, _) Checked.t
+  val equal_var : var -> var -> Boolean.var Checked.t
 
   val var_of_t : t -> var
 
@@ -55,7 +55,7 @@ module type Basic = sig
 
   val of_base58_check_exn : string -> t
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+  val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 end
 
 module type Full_size = sig
@@ -67,11 +67,15 @@ module type Full_size = sig
 
   [%%ifdef consensus_mechanism]
 
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+  val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 
   val var_of_hash_packed : Random_oracle.Checked.Digest.t -> var
+
+  val var_to_field : var -> Random_oracle.Checked.Digest.t
 
   [%%endif]
 
   val of_hash : Field.t -> t
+
+  val to_field : t -> Field.t
 end

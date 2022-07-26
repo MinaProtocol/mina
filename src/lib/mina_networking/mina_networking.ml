@@ -1,6 +1,7 @@
 open Core
 open Async
 open Mina_base
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_block
 open Network_peer
 open Network_pool
@@ -155,15 +156,15 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving bin_io, version { rpc }]
 
         type response =
-          ( Staged_ledger.Scan_state.Stable.V1.t
+          ( Staged_ledger.Scan_state.Stable.V2.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t
-          * Mina_state.Protocol_state.Value.Stable.V1.t list )
+          * Pending_coinbase.Stable.V2.t
+          * Mina_state.Protocol_state.Value.Stable.V2.t list )
           option
         [@@deriving bin_io, version { rpc }]
 
@@ -224,12 +225,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving bin_io, sexp, version { rpc }]
 
-        type response = Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+        type response = Sync_ledger.Answer.Stable.V2.t Core.Or_error.Stable.V1.t
         [@@deriving bin_io, sexp, version { rpc }]
 
         let query_of_caller_model = Fn.id
@@ -289,23 +290,21 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = State_hash.Stable.V1.t list
         [@@deriving bin_io, sexp, version { rpc }]
 
-        type response = External_transition.Raw.Stable.V1.t list option
+        type response = Mina_block.Stable.V2.t list option
         [@@deriving bin_io, version { rpc }]
 
         let query_of_caller_model = Fn.id
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model =
-          Option.map ~f:(List.map ~f:External_transition.compose)
+        let response_of_callee_model = ident
 
-        let caller_model_of_response =
-          Option.map ~f:(List.map ~f:External_transition.decompose)
+        let caller_model_of_response = ident
       end
 
       module T' =
@@ -451,10 +450,6 @@ module Rpcs = struct
     end
   end
 
-  let map_proof_caryying_data_option ~f =
-    Option.map ~f:(fun { Proof_carrying_data.data; proof = hashes, block } ->
-        { Proof_carrying_data.data = f data; proof = (hashes, f block) } )
-
   module Get_ancestry = struct
     module Master = struct
       let name = "get_ancestry"
@@ -496,7 +491,7 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query =
           ( Consensus.Data.Consensus_state.Value.Stable.V1.t
@@ -505,9 +500,8 @@ module Rpcs = struct
         [@@deriving bin_io, sexp, version { rpc }]
 
         type response =
-          ( External_transition.Raw.Stable.V1.t
-          , State_body_hash.Stable.V1.t list
-            * External_transition.Raw.Stable.V1.t )
+          ( Mina_block.Stable.V2.t
+          , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
           option
         [@@deriving bin_io, version { rpc }]
@@ -516,11 +510,9 @@ module Rpcs = struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model =
-          map_proof_caryying_data_option ~f:External_transition.compose
+        let response_of_callee_model = ident
 
-        let caller_model_of_response =
-          map_proof_caryying_data_option ~f:External_transition.decompose
+        let caller_model_of_response = ident
       end
 
       module T' =
@@ -638,14 +630,13 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = unit [@@deriving bin_io, sexp, version { rpc }]
 
         type response =
-          ( External_transition.Raw.Stable.V1.t
-          , State_body_hash.Stable.V1.t list
-            * External_transition.Raw.Stable.V1.t )
+          ( Mina_block.Stable.V2.t
+          , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
           option
         [@@deriving bin_io, version { rpc }]
@@ -654,11 +645,9 @@ module Rpcs = struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model =
-          map_proof_caryying_data_option ~f:External_transition.compose
+        let response_of_callee_model = ident
 
-        let caller_model_of_response =
-          map_proof_caryying_data_option ~f:External_transition.decompose
+        let caller_model_of_response = ident
       end
 
       module T' =
@@ -1213,7 +1202,7 @@ let create (config : Config.t) ~sinks
                       , [ ("hash", Ledger_hash.to_yojson hash)
                         ; ( "query"
                           , Syncable_ledger.Query.to_yojson
-                              Ledger.Addr.to_yojson query )
+                              Mina_ledger.Ledger.Addr.to_yojson query )
                         ; ("error", Error_json.error_to_yojson err)
                         ] ) ))
           else return ()
@@ -1690,8 +1679,7 @@ module Sl_downloader = struct
       end)
       (struct
         type t =
-          (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
-          * Mina_base.Sync_ledger.Answer.t
+          (Mina_base.Ledger_hash.t * Sync_ledger.Query.t) * Sync_ledger.Answer.t
         [@@deriving to_yojson]
 
         let key = fst
@@ -1702,11 +1690,11 @@ end
 let glue_sync_ledger :
        t
     -> preferred:Peer.t list
-    -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
+    -> (Mina_base.Ledger_hash.t * Sync_ledger.Query.t)
        Pipe_lib.Linear_pipe.Reader.t
     -> ( Mina_base.Ledger_hash.t
-       * Mina_base.Sync_ledger.Query.t
-       * Mina_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
+       * Sync_ledger.Query.t
+       * Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit =
  fun t ~preferred query_reader response_writer ->
