@@ -133,6 +133,7 @@ let
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
+        DISABLE_CHECK_OPAM_SWITCH = "true";
         configurePhase = ''
           export MINA_ROOT="$PWD"
           patchShebangs .
