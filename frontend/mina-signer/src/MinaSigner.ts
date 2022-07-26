@@ -12,6 +12,7 @@ import type {
   StakeDelegation,
   Message,
   Party,
+  OtherParties,
   SignableData,
 } from "./TSTypes";
 
@@ -332,6 +333,14 @@ class Client {
    */
   public signParty(party: Party, privateKey: PrivateKey): Signed<Party> {
     const parties = JSON.stringify(party.parties.otherParties);
+    if (
+      party.feePayer.fee === undefined ||
+      party.feePayer.fee < this.getPartyMinimumFee(party.parties.otherParties)
+    ) {
+      throw `Fee must be greater than ${this.getPartyMinimumFee(
+        party.parties.otherParties
+      )}`;
+    }
     const memo = party.feePayer.memo ?? "";
     const fee = String(party.feePayer.fee);
     const nonce = String(party.feePayer.nonce);
@@ -415,6 +424,18 @@ class Client {
     } else {
       throw new Error(`Expected signable payload, got '${payload}'.`);
     }
+  }
+
+  /**
+   * Calculates the minimum fee of a party transaction. A fee for a party transaction is
+   * the sum of all parties plus the specified fee amount. If no fee is passed in, `0.001`
+   * is used (according to the Mina spec) by default.
+   * @param p A party object
+   * @param fee The fee per party amount
+   * @returns  The fee to be paid by the fee payer party
+   */
+  public getPartyMinimumFee(p: OtherParties, fee: number = 0.001) {
+    return p.reduce((accumulatedFee, _) => accumulatedFee + fee, 0);
   }
 }
 
