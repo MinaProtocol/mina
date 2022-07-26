@@ -41,9 +41,7 @@ module Transaction_pool = struct
   [@@deriving bin_io_unversioned]
 end
 
-type t =
-  | Transition_frontier of Transition_frontier.t
-  | Transaction_pool of Transaction_pool.t
+type t = Transition_frontier of Transition_frontier.t
 [@@deriving bin_io_unversioned]
 
 module Builder = struct
@@ -134,7 +132,4 @@ module Builder = struct
       ; tokens_used
       ; sender_receipt_chains_from_parent_ledger
       }
-
-  let user_commands user_commands =
-    Transaction_pool { Transaction_pool.added = user_commands; removed = [] }
 end
