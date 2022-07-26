@@ -13,7 +13,7 @@ use kimchi::circuits::polynomials::permutation::Shifts;
 use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
-use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine, vesta::Vesta as GAffineOther};
 use std::convert::TryInto;
 use std::path::Path;
 

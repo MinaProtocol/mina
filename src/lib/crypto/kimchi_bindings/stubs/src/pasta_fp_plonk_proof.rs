@@ -17,7 +17,7 @@ use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{
     fp::Fp,
     fq::Fq,
-    vesta::{Affine as GAffine, VestaParameters},
+    vesta::{Vesta as GAffine, VestaParameters},
 };
 use oracle::{
     constants::PlonkSpongeConstantsKimchi,
