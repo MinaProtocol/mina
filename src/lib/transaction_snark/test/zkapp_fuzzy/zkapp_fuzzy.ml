@@ -69,9 +69,14 @@ let generate_parties_and_apply_them_consecutively () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
-            Async.Thread_safe.block_on_async_exn (fun () ->
+             ~keymap ~ledger ~vk () )
+          ~f:(fun parties_dummy_auths ->
+            let open Async in
+            Thread_safe.block_on_async_exn (fun () ->
+                let%bind.Deferred parties =
+                  Parties_builder.replace_authorizations ~prover ~keymap
+                    parties_dummy_auths
+                in
                 [%log info]
                   ~metadata:
                     [ ("parties", Parties.to_yojson parties)
@@ -105,9 +110,14 @@ let generate_parties_and_apply_them_freshly () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
-            Async.Thread_safe.block_on_async_exn (fun () ->
+             ~keymap ~ledger ~vk () )
+          ~f:(fun parties_dummy_auths ->
+            let open Async in
+            Thread_safe.block_on_async_exn (fun () ->
+                let%bind.Deferred parties =
+                  Parties_builder.replace_authorizations ~prover ~keymap
+                    parties_dummy_auths
+                in
                 U.check_parties_with_merges_exn ledger [ parties ] ) )
       in
       for i = 0 to trials - 1 do
@@ -125,9 +135,14 @@ let mk_invalid_test ~num_of_fee_payers ~trials ~type_of_failure
           (Mina_generators.Parties_generators.gen_parties_from
              ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
-            Async.Thread_safe.block_on_async_exn (fun () ->
+             ~keymap ~ledger ~vk () )
+          ~f:(fun parties_dummy_auths ->
+            let open Async in
+            Thread_safe.block_on_async_exn (fun () ->
+                let%bind.Deferred parties =
+                  Parties_builder.replace_authorizations ~prover ~keymap
+                    parties_dummy_auths
+                in
                 [%log info]
                   ~metadata:[ ("parties", Parties.to_yojson parties) ]
                   "generated parties" ;
@@ -151,9 +166,14 @@ let test_timed_account () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk ~prover () )
-          ~f:(fun parties ->
-            Async.Thread_safe.block_on_async_exn (fun () ->
+             ~keymap ~ledger ~vk () )
+          ~f:(fun parties_dummy_auths ->
+            let open Async in
+            Thread_safe.block_on_async_exn (fun () ->
+                let%bind.Deferred parties =
+                  Parties_builder.replace_authorizations ~prover ~keymap
+                    parties_dummy_auths
+                in
                 [%log info]
                   ~metadata:[ ("parties", Parties.to_yojson parties) ]
                   "generated parties" ;
