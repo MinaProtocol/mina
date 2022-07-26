@@ -11,4 +11,5 @@
    sexplib0
    bin_prot.shape
    base.caml
+   ppx_version.runtime
 ))

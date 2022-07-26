@@ -138,6 +138,7 @@ CREATE TABLE zkapp_precondition_accounts
 , state_id                 int        NOT NULL    REFERENCES zkapp_states(id)
 , sequence_state_id        int                    REFERENCES zkapp_state_data(id)
 , proved_state             boolean
+, is_new                   boolean
 );
 
 /* invariants: precondition_account id is not NULL iff kind is 'full'

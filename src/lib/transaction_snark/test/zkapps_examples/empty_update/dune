@@ -38,6 +38,7 @@
    transaction_snark_tests
    with_hash
    zkapps_empty_update
+   zkapps_examples
    )
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane))

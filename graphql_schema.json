@@ -2582,6 +2582,14 @@
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "isNew",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -2647,6 +2655,12 @@
             },
             {
               "name": "provedState",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "isNew",
               "description": null,
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "defaultValue": null
@@ -6164,7 +6178,7 @@
             },
             {
               "name": "supplyIncrease",
-              "description": "Increase in total coinbase reward ",
+              "description": "Increase in total supply",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6172,6 +6186,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "Use supplyChange"
+            },
+            {
+              "name": "supplyChange",
+              "description": "Increase/Decrease in total supply",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
                   "ofType": null
                 }
               },
@@ -6732,6 +6762,14 @@
             },
             {
               "name": "provedState",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isNew",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },

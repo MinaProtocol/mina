@@ -23,6 +23,8 @@
    stdio
    result
    base.caml
+   integers
+   re2
    ;; local libraries
    key_gen
    integration_test_lib
@@ -47,7 +49,6 @@
    with_hash
    data_hash_lib
    generated_graphql_queries
-   integers
    mina_graphql
    )
 )

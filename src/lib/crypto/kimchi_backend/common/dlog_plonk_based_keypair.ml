@@ -53,7 +53,7 @@ module type Inputs_intf = sig
   module Index : sig
     type t
 
-    val create : Gate_vector.t -> int -> Urs.t -> t
+    val create : Gate_vector.t -> int -> int -> Urs.t -> t
   end
 
   module Curve : sig
@@ -153,10 +153,21 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
-  let create cs =
+  let create ~prev_challenges cs =
     let gates = Inputs.Constraint_system.finalize_and_get_gates cs in
     let public_input_size = Set_once.get_exn cs.public_input_size [%here] in
-    let index = Inputs.Index.create gates public_input_size (load_urs ()) in
+    let prev_challenges =
+      match Set_once.get cs.prev_challenges with
+      | None ->
+          Set_once.set_exn cs.prev_challenges [%here] prev_challenges ;
+          prev_challenges
+      | Some prev_challenges' ->
+          assert (prev_challenges = prev_challenges') ;
+          prev_challenges'
+    in
+    let index =
+      Inputs.Index.create gates public_input_size prev_challenges (load_urs ())
+    in
     { index; cs }
 
   let vk t = Inputs.Verifier_index.create t.index

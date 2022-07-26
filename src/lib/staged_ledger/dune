@@ -34,6 +34,7 @@
    ledger_proof
    logger
    transaction_snark
+   transaction_snark_tests
    transaction_snark_scan_state
    sgn
    mina_base
@@ -60,6 +61,8 @@
    random_oracle
    kimchi_backend
    pickles.backend
+   parties_builder
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

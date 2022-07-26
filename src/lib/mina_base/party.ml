@@ -221,10 +221,7 @@ module Update = struct
             F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
-            ( Pickles.Side_loaded.Verification_key.Stable.V2.t
-            , F.Stable.V1.t )
-            With_hash.Stable.V1.t
-            Set_or_keep.Stable.V1.t
+            Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         ; zkapp_uri : string Set_or_keep.Stable.V1.t
         ; token_symbol :
@@ -606,7 +603,7 @@ module Account_precondition = struct
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
-          sequenceState: null, provedState: null
+          sequenceState: null, provedState: null, isNew: null
         }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
