@@ -13,10 +13,10 @@ module Parties_segment_witness = struct
         { global_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V1.t
-              , unit Parties.Call_forest.With_hashes.Stable.V1.t )
+              , Parties.Call_forest.With_hashes.Stable.V1.t )
               Stack_frame.Stable.V1.t
             , ( ( ( Token_id.Stable.V1.t
-                  , unit Parties.Call_forest.With_hashes.Stable.V1.t )
+                  , Parties.Call_forest.With_hashes.Stable.V1.t )
                   Stack_frame.Stable.V1.t
                 , Stack_frame.Digest.Stable.V1.t )
                 With_hash.Stable.V1.t
@@ -28,6 +28,7 @@ module Parties_segment_witness = struct
             , Sparse_ledger.Stable.V2.t
             , bool
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+            , Mina_numbers.Index.Stable.V1.t
             , Transaction_status.Failure.Collection.Stable.V1.t )
             Mina_transaction_logic.Parties_logic.Local_state.Stable.V1.t
         ; start_parties :

@@ -46,6 +46,8 @@ module Digest : sig
 
     val of_field : Pickles.Impls.Step.Field.t -> t
 
+    val to_field_unsafe : t -> Pickles.Impls.Step.Field.t
+
     module Assert : sig
       val equal : t -> t -> unit
     end

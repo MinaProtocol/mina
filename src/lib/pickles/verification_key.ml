@@ -50,6 +50,7 @@ module Verifier_index_json = struct
     ; max_poly_size : int
     ; max_quot_size : int
     ; public : int
+    ; prev_challenges : int
     ; srs : 'sRS
     ; evals : 'polyComm verification_evals
     ; shifts : 'fr array
@@ -128,11 +129,12 @@ module Stable = struct
         in
         { domain =
             { log_size_of_group = log2_size
-            ; group_gen = Backend.Tock.Field.domain_generator log2_size
+            ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
             }
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
         ; max_quot_size
         ; public
+        ; prev_challenges = 2 (* Due to Wrap_hack *)
         ; srs
         ; evals =
             (let g (x, y) =

@@ -24,7 +24,8 @@
    snark_keys_header
    kimchi_backend.pasta
    test_util
-   )
+   ppx_version.runtime
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

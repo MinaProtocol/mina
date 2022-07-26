@@ -68,7 +68,7 @@ if (command === "deploy") {
     zkappKey,
     verificationKey,
     initialBalance,
-    feePayerKey,
+    feePayer: feePayerKey,
   });
 
   // mina-signer part

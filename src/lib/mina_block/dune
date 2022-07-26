@@ -54,6 +54,7 @@
    kimchi_pasta
    random_oracle
    random_oracle_input
-   )
+   ppx_version.runtime
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson)))

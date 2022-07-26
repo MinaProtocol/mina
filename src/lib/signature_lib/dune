@@ -36,6 +36,7 @@
    kimchi_backend
    h_list
    test_util
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

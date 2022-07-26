@@ -248,10 +248,10 @@ module Protocol = struct
     end]
   end
 
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Int64.t) Poly.Stable.V1.t
+      type t = (int, int, (Int64.t[@version_asserted])) Poly.Stable.V1.t
       [@@deriving equal, ord, hash]
 
       let to_latest = Fn.id

@@ -84,6 +84,7 @@ let otherParties = {
             state: [null, null, null, null, null, null, null, null],
             sequenceState: null,
             provedState: null,
+            isNew: null,
           },
         },
 
