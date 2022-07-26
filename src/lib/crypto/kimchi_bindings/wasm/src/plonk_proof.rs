@@ -809,7 +809,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
+    use mina_curves::pasta::{fp::Fp, vesta::Vesta as GAffine};
 
     impl_proof!(
         caml_pasta_fp_plonk_proof,
@@ -834,7 +834,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
+    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine};
 
     impl_proof!(
         caml_pasta_fq_plonk_proof,
@@ -866,7 +866,7 @@ pub mod to_test {
         constraints::ConstraintSystem, gate::CircuitGate, gates::poseidon::round_to_cols,
         wires::Wire,
     };
-    use mina_curves::pasta::{fp::Fp, pallas::Affine as Other, vesta::Affine};
+    use mina_curves::pasta::{fp::Fp, pallas::Pallas as Other, vesta::Vesta};
     use oracle::poseidon::{ArithmeticSponge, Sponge, SpongeConstants};
     use rand::SeedableRng;
     use wasm_bindgen_test::*;
@@ -891,7 +891,7 @@ pub mod to_test {
 
         // set up
         let rng = &mut rand::rngs::StdRng::from_seed([0u8; 32]);
-        let group_map = <Affine as CommitmentCurve>::Map::setup();
+        let group_map = <Vesta as CommitmentCurve>::Map::setup();
 
         // create the index
         let fp_sponge_params = oracle::pasta::fp_kimchi::params();
@@ -903,7 +903,7 @@ pub mod to_test {
         let mut srs = SRS::create(n);
         srs.add_lagrange_basis(cs.domain.d1);
         let srs = std::sync::Arc::new(srs);
-        let index = ProverIndex::<Affine>::create(cs, fq_sponge_params, endo_q, srs);
+        let index = ProverIndex::<Vesta>::create(cs, fq_sponge_params, endo_q, srs);
 
         // witness
         let witness = {
