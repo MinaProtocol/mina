@@ -185,7 +185,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let txn_state_view = Lazy.force curr_state_view in
   let open Async.Deferred.Let_syntax in
-  let%bind (base_proof_time, _, _), base_proofs =
+  let%bind (base_proof_time, _, _), base_proofs_rev =
     Async.Deferred.List.fold transitions
       ~init:((Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty), [])
       ~f:(fun ((max_span, sparse_ledger, coinbase_stack_source), proofs) t ->
@@ -232,14 +232,14 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
         let tm1 = Core.Unix.gettimeofday () in
         let span = Time.Span.of_sec (tm1 -. tm0) in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
-        , proofs @ [ proof ] ) )
+        , proof :: proofs ) )
   in
   let rec merge_all serial_time proofs =
     match proofs with
     | [ _ ] ->
         Async.Deferred.return serial_time
     | _ ->
-        let%bind layer_time, new_proofs =
+        let%bind layer_time, new_proofs_rev =
           Async.Deferred.List.fold (pair_up proofs) ~init:(Time.Span.zero, [])
             ~f:(fun (max_time, proofs) (x, y) ->
               let tm0 = Core.Unix.gettimeofday () in
@@ -254,11 +254,13 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
               in
               let tm1 = Core.Unix.gettimeofday () in
               let pair_time = Time.Span.of_sec (tm1 -. tm0) in
-              (Time.Span.max max_time pair_time, proofs @ [ proof ]) )
+              (Time.Span.max max_time pair_time, proof :: proofs) )
         in
-        merge_all (Time.Span.( + ) serial_time layer_time) new_proofs
+        merge_all
+          (Time.Span.( + ) serial_time layer_time)
+          (List.rev new_proofs_rev)
   in
-  let%map total_time = merge_all base_proof_time base_proofs in
+  let%map total_time = merge_all base_proof_time (List.rev base_proofs_rev) in
   format_time_span total_time
 
 let profile_zkapps ~verifier ledger partiess =
