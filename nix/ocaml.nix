@@ -14,7 +14,7 @@ let
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
-  export = opam-nix.importOpam ../src/opam.export;
+  export = opam-nix.importOpam ../opam.export;
   external-packages =
     getAttrs [ "sodium" "capnp" "rpc_parallel" "async_kernel" "base58" ]
     (builtins.mapAttrs (_: last) (opam-nix.listRepo external-repo));
