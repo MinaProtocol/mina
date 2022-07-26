@@ -7,7 +7,7 @@ open Mina_base
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
+    let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -87,7 +87,7 @@ let%test_module "Protocol state precondition tests" =
             }
           in
           U.test_snapp_update test_spec ~state_body ~init_ledger ~vk
-            ~snapp_prover
+            ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "generated protocol state predicate" =
@@ -128,7 +128,7 @@ let%test_module "Protocol state precondition tests" =
             }
           in
           U.test_snapp_update test_spec ~state_body ~init_ledger ~vk
-            ~snapp_prover
+            ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "invalid protocol state predicate in other parties" =
@@ -236,9 +236,7 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let ps =
                     Parties.Call_forest.With_hashes.of_parties_simple_list
-                      (List.map
-                         ~f:(fun p -> (p, ()))
-                         [ sender_party; snapp_party ] )
+                      [ sender_party; snapp_party ]
                   in
                   let other_parties_hash = Parties.Call_forest.hash ps in
                   let commitment =
@@ -297,7 +295,7 @@ let%test_module "Protocol state precondition tests" =
 
 let%test_module "Account precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
+    let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -336,7 +334,7 @@ let%test_module "Account precondition tests" =
           | Some pk ->
               Or_ignore.Check pk
         in
-        let state, sequence_state, proved_state =
+        let state, sequence_state, proved_state, is_new =
           match zkapp with
           | None ->
               let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -347,7 +345,8 @@ let%test_module "Account precondition tests" =
               in
               let sequence_state = Or_ignore.Ignore in
               let proved_state = Or_ignore.Ignore in
-              (state, sequence_state, proved_state)
+              let is_new = Or_ignore.Ignore in
+              (state, sequence_state, proved_state, is_new)
           | Some { app_state; sequence_state; proved_state; _ } ->
               let state =
                 Zkapp_state.V.map app_state ~f:(fun field ->
@@ -361,7 +360,9 @@ let%test_module "Account precondition tests" =
                 Or_ignore.Check (List.hd_exn fields)
               in
               let proved_state = Or_ignore.Check proved_state in
-              (state, sequence_state, proved_state)
+              (* the account is in the ledger *)
+              let is_new = Or_ignore.Check false in
+              (state, sequence_state, proved_state, is_new)
         in
         { Zkapp_precondition.Account.balance
         ; nonce
@@ -370,6 +371,7 @@ let%test_module "Account precondition tests" =
         ; state
         ; sequence_state
         ; proved_state
+        ; is_new
         }
       in
       Party.Account_precondition.Full predicate_account
@@ -420,7 +422,7 @@ let%test_module "Account precondition tests" =
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
                   let%bind parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
                   U.check_parties_with_merges_exn ~state_body ledger [ parties ] ) ) )
@@ -436,6 +438,7 @@ let%test_module "Account precondition tests" =
         let%map account_precondition =
           Mina_generators.Parties_generators
           .gen_account_precondition_from_account snapp_account
+            ~first_use_of_account:true
         in
         (l, account_precondition)
       in
@@ -480,7 +483,7 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let%bind parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
                   U.check_parties_with_merges_exn ~state_body ledger [ parties ] ) ) )
@@ -496,7 +499,7 @@ let%test_module "Account precondition tests" =
         in
         let%map account_precondition =
           Mina_generators.Parties_generators.(
-            gen_account_precondition_from_account
+            gen_account_precondition_from_account ~first_use_of_account:true
               ~failure:Invalid_account_precondition snapp_account)
         in
         (l, account_precondition)
@@ -532,7 +535,7 @@ let%test_module "Account precondition tests" =
                   in
                   let open Async.Deferred.Let_syntax in
                   let%bind parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
@@ -631,7 +634,7 @@ let%test_module "Account precondition tests" =
               in
               let ps =
                 Parties.Call_forest.With_hashes.of_parties_simple_list
-                  (List.map ~f:(fun p -> (p, ())) [ sender_party; snapp_party ])
+                  [ sender_party; snapp_party ]
               in
               let other_parties_hash = Parties.Call_forest.hash ps in
               let commitment =

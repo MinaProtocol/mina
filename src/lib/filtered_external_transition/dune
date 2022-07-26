@@ -24,6 +24,7 @@
    signature_lib
    mina_base.import
    mina_numbers
+   ppx_version.runtime
  )
  (preprocess
   (pps ppx_coda ppx_version ppx_deriving_yojson))

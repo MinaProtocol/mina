@@ -33,7 +33,8 @@
    random_oracle
    kimchi_backend.pasta
    data_hash_lib
-   )
+   ppx_version.runtime
+ )
  (inline_tests)
  (preprocess
   (pps ppx_snarky ppx_coda ppx_version ppx_jane ppx_compare))

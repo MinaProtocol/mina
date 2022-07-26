@@ -258,7 +258,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Option.value_map ledger_proof_opt
                 ~f:(fun (proof, _) ->
                   (Ledger_proof.statement proof).supply_increase )
-                ~default:Currency.Amount.zero
+                ~default:Currency.Amount.Signed.zero
             in
             let body_reference =
               Staged_ledger_diff.Body.compute_reference

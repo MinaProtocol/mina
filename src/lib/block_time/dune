@@ -27,6 +27,7 @@
    snarky.backendless
    random_oracle_input
    random_oracle
+   ppx_version.runtime
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_hash ppx_let

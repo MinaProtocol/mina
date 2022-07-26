@@ -9,7 +9,7 @@ open Mina_transaction
 
 let%test_module "Fee payer tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
+    let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
 
@@ -45,7 +45,7 @@ let%test_module "Fee payer tests" =
             ; preconditions = None
             }
           in
-          U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
+          U.test_snapp_update test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "update a snapp account with signature and fee paid by a \
@@ -72,7 +72,7 @@ let%test_module "Fee payer tests" =
             ; preconditions = None
             }
           in
-          U.test_snapp_update test_spec ~init_ledger ~vk ~snapp_prover
+          U.test_snapp_update test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "update a snapp account with proof and fee paid by the snapp \
@@ -101,7 +101,7 @@ let%test_module "Fee payer tests" =
           U.test_snapp_update
             ~snapp_permissions:
               (U.permissions_from_update snapp_update ~auth:Proof)
-            test_spec ~init_ledger ~vk ~snapp_prover
+            test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "update a snapp account with proof and fee paid by a \
@@ -131,7 +131,7 @@ let%test_module "Fee payer tests" =
           U.test_snapp_update
             ~snapp_permissions:
               (U.permissions_from_update snapp_update ~auth:Proof)
-            test_spec ~init_ledger ~vk ~snapp_prover
+            test_spec ~init_ledger ~vk ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "snapp transaction with non-existent fee payer account" =

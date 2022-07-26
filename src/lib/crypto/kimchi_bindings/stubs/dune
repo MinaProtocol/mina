@@ -1,49 +1,69 @@
-(data_only_dirs src)
+;; src/ contains no dune-related files
 
-(dirs :standard \ target)
+(data_only_dirs src)
 
 ;; Ignore target if it exists locally
 
-;; no sandbox, we want the path to the _build directory
-(rule
-  (target dune-build-root)
-  (deps (sandbox none))
-  (action
-   (system "echo -n $(realpath %{workspace_root}/..) > %{target}")))
+(dirs :standard \ target)
+
+;; we first create a `dune-build-root` file that contains the dune workspace root
 
 (rule
- (enabled_if (= %{env:MARLIN_PLONK_STUBS=n} n))
+ (target dune-build-root)
+ (deps
+  ; no sandbox, we want the path to the _build directory
+  (sandbox none))
+ (action
+  (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
+
+;;
+;; rules to build the static library for kimchi
+;;
+
+;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
+
+(rule
+ (enabled_if
+  (= %{env:MARLIN_PLONK_STUBS=n} n))
  (targets libwires_15_stubs.a)
  (deps
   Cargo.toml
-  ../../Cargo.toml
-  ../../rust-toolchain.toml
+  rust-toolchain.toml
   (source_tree src)
-  (source_tree binding_generation)
-  (source_tree ../wasm)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
-   (setenv CARGO_TARGET_DIR
+   (setenv
+    CARGO_TARGET_DIR
     "%{read:dune-build-root}/cargo_kimchi_stubs"
     (setenv
      RUSTFLAGS
      "-C target-feature=+bmi2,+adx"
      (run cargo build --release)))
-   (run cp %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a .))))
+   (run
+    cp
+    %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
+    .))))
 
-;; copy from $MARLIN_PLONK_STUBS if this exists
+;; this is used by nix
+
 (rule
- (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
+ (enabled_if
+  (<> %{env:MARLIN_PLONK_STUBS=n} n))
  (targets libwires_15_stubs.a)
- (deps (env_var MARLIN_PLONK_STUBS))
+ (deps
+  (env_var MARLIN_PLONK_STUBS))
  (action
   (progn
-   (copy %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a libwires_15_stubs.a))))
+   (copy
+    %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a
+    libwires_15_stubs.a))))
 
-;; libraries
+;;
+;; declare the libraries we're going to generate to match the bindings
+;;
 
 (library
  (public_name kimchi_types)
@@ -72,51 +92,53 @@
  (public_name kimchi_bindings)
  (name kimchi_bindings)
  (modules kimchi_bindings)
- (libraries
-   pasta_bindings
-   kimchi_types)
+ (libraries pasta_bindings kimchi_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests)
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
+;;
 ;; generate the OCaml bindings
+;;
+
+;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
 
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
- (enabled_if (= %{env:MARLIN_PLONK_STUBS=n} n))
+ (enabled_if
+  (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
-  Cargo.toml
   ../../../../.ocamlformat
-  ../../Cargo.toml
-  (source_tree ../../stubs)
-  (source_tree ../wasm)
+  Cargo.toml
+  rust-toolchain.toml
   (source_tree src)
-  (source_tree binding_generation)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
-  (chdir
-   binding_generation
-   (progn
-    (run rm -rf ./target)
-    (run rm -f ./Cargo.lock)
-    (setenv CARGO_TARGET_DIR "%{read:dune-build-root}/cargo_kimchi_bindgen"
-     (run cargo run %{targets}))
-    (run ocamlformat -i %{targets})))))
+  (progn
+   (run rm -rf ./target)
+   (run rm -f ./Cargo.lock)
+   (setenv
+    CARGO_TARGET_DIR
+    "%{read:dune-build-root}/cargo_kimchi_bindgen"
+    (run cargo run %{targets}))
+   (run ocamlformat -i %{targets}))))
 
-;; run from $MARLIN_PLONK_STUBS if this exists
+;; this is used by nix
+
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
- (enabled_if (<> %{env:MARLIN_PLONK_STUBS=n} n))
+ (enabled_if
+  (<> %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
-   ../../../../.ocamlformat
-   (env_var MARLIN_PLONK_STUBS))
+  ../../../../.ocamlformat
+  (env_var MARLIN_PLONK_STUBS))
  (action
   (progn
-   (run %{env:MARLIN_PLONK_STUBS=n}/bin/binding_generation %{targets})
+   (run %{env:MARLIN_PLONK_STUBS=n}/bin/wires_15_stubs %{targets})
    (run ocamlformat -i %{targets}))))

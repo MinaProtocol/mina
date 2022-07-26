@@ -42,6 +42,7 @@ let sample_block_sexp =
            (token_id
             0x0000000000000000000000000000000000000000000000000000000000000001)
            (excess ((magnitude 0) (sgn Pos))) (ledger 0) (success true)
+           (party_index 0)
            (failure_status_tbl ())))))
        (timestamp 1655382227041)
        (body_reference
@@ -241,7 +242,8 @@ let sample_block_sexp =
              (22499651728538207005910357716049978340631095673070502882028605031745076772395
               21266536673826554532093395738082641944736479358210082051896629070545311602022)))))
          (status Applied))))
-      (coinbase (One ())))
+      (coinbase (One ()))
+      (internal_command_statuses (Applied (Failed ((Update_not_permitted_balance) (Update_not_permitted_balance))))))
      ()))))
  (delta_transition_chain_proof
   (5582850020617837418082100114371302095819386849215536975366590036056158060076
@@ -493,6 +495,7 @@ let sample_block_json =
               },
               "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
               "success": true,
+              "party_index": "0",
               "failure_status_tbl": []
             }
           },
@@ -763,6 +766,10 @@ let sample_block_json =
           "coinbase": [
             "One",
             null
+          ],
+          "internal_command_statuses":[
+            ["Applied"],
+            ["Failed",[[["Update_not_permitted_balance"]],[["Update_not_permitted_balance"]]]]
           ]
         },
         null
