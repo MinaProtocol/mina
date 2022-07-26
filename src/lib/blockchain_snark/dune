@@ -23,6 +23,7 @@
    snarky.backendless
    snark_params
    mina_base
+   mina_transaction_logic
    mina_state
    pickles_types
    pickles
@@ -30,8 +31,8 @@
    currency
    sgn
    random_oracle
+   kimchi_backend.pasta
    data_hash_lib
-   pasta
    )
  (inline_tests)
  (preprocess
