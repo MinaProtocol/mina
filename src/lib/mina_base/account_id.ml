@@ -118,6 +118,8 @@ module Digest = struct
 
     let of_field = Fn.id
 
+    let to_field_unsafe = Fn.id
+
     module Assert = struct
       let equal : t -> t -> unit = Field.Assert.equal
     end

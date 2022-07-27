@@ -4,15 +4,17 @@
    Parties
 *)
 
+[%%import "/src/config.mlh"]
+
 open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 include User_command.Gen
 
 (* using Precomputed_values depth introduces a cyclic dependency *)
-let ledger_depth = 20
+[%%inject "ledger_depth", ledger_depth]
 
-let parties_with_ledger ?account_state_tbl ?vk ?failure () =
+let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -22,7 +24,11 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
      We'll put the fee payer account and max_other_parties accounts in the
      ledger, and have max_other_parties keypairs available for new accounts
   *)
-  let num_keypairs = (Parties_generators.max_other_parties * 2) + 2 in
+  let max_other_parties =
+    Option.value_map max_other_parties
+      ~default:Parties_generators.max_other_parties ~f:Fn.id
+  in
+  let num_keypairs = (max_other_parties * 2) + 2 in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let keymap =
     List.fold keypairs ~init:Public_key.Compressed.Map.empty
@@ -30,7 +36,7 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
         let key = Public_key.compress public_key in
         Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
   in
-  let num_keypairs_in_ledger = Parties_generators.max_other_parties + 1 in
+  let num_keypairs_in_ledger = max_other_parties + 1 in
   let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
@@ -89,7 +95,7 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
     let zkapp = Some { Zkapp_account.default with verification_key } in
     { account with permissions; zkapp }
   in
-  (* half Snapp accounts, half non-Snapp accounts *)
+  (* half zkApp accounts, half non-zkApp accounts *)
   let accounts =
     List.mapi account_ids_and_balances ~f:(fun ndx (account_id, balance) ->
         let account = Account.create account_id balance in
@@ -110,13 +116,13 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
             ()
       | Ok (`Added, _) ->
           () ) ;
-  (*to keep track of account states across transactions*)
+  (* to keep track of account states across transactions *)
   let account_state_tbl =
     Option.value account_state_tbl ~default:(Account_id.Table.create ())
   in
   let%bind parties =
-    Parties_generators.gen_parties_from ~fee_payer_keypair ~keymap ~ledger
-      ~account_state_tbl ?vk ?failure ()
+    Parties_generators.gen_parties_from ~max_other_parties ~fee_payer_keypair
+      ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
   in
   let parties =
     Option.value_exn
@@ -126,7 +132,7 @@ let parties_with_ledger ?account_state_tbl ?vk ?failure () =
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
 
-let sequence_parties_with_ledger ?length ?vk ?failure () =
+let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let%bind length =
     match length with
@@ -135,7 +141,7 @@ let sequence_parties_with_ledger ?length ?vk ?failure () =
     | None ->
         Quickcheck.Generator.small_non_negative_int
   in
-  (*Keep track of account states across multiple parties transaction*)
+  (* Keep track of account states across multiple parties transaction *)
   let account_state_tbl = Account_id.Table.create () in
   let merge_ledger source_ledger target_ledger =
     (* add all accounts in source to target *)
@@ -155,7 +161,8 @@ let sequence_parties_with_ledger ?length ?vk ?failure () =
     if n <= 0 then return (List.rev parties_and_fee_payer_keypairs, init_ledger)
     else
       let%bind parties, fee_payer_keypair, keymap, ledger =
-        parties_with_ledger ~account_state_tbl ?vk ?failure ()
+        parties_with_ledger ?max_other_parties ~account_state_tbl ?vk ?failure
+          ()
       in
       let parties_and_fee_payer_keypairs' =
         (parties, fee_payer_keypair, keymap) :: parties_and_fee_payer_keypairs

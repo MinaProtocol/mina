@@ -1773,6 +1773,49 @@ let%test_module _ =
 
     (** Assert the invariants of the locally generated command tracking system.
     *)
+
+    let `VK _, `Prover prover =
+      Lazy.force Transaction_snark_tests.Util.trivial_zkapp
+
+    let replace_parties_authorizations ~keymap cmds =
+      Deferred.List.map
+        (cmds : User_command.t list)
+        ~f:(function
+          | Parties parties_dummy_auths ->
+              let%map parties =
+                Parties_builder.replace_authorizations ~keymap ~prover
+                  parties_dummy_auths
+              in
+              User_command.Parties parties
+          | Signed_command _ ->
+              failwith "Expected Parties user command" )
+
+    let replace_valid_parties_authorizations ~keymap ~ledger valid_cmds :
+        User_command.Valid.t list Deferred.t =
+      Deferred.List.map
+        (valid_cmds : User_command.Valid.t list)
+        ~f:(function
+          | Parties parties_dummy_auths ->
+              let%map parties =
+                Parties_builder.replace_authorizations ~keymap ~prover
+                  (Parties.Valid.forget parties_dummy_auths)
+              in
+              let valid_parties =
+                let open Mina_ledger.Ledger in
+                match
+                  Parties.Valid.to_valid ~ledger ~get ~location_of_account
+                    parties
+                with
+                | Some ps ->
+                    ps
+                | None ->
+                    failwith "Could not create Parties.Valid.t"
+              in
+              User_command.Parties valid_parties
+          | Signed_command _ ->
+              failwith "Expected Parties valid user command" )
+
+    (** Assert the invariants of the locally generated command tracking system. *)
     let assert_locally_generated (pool : Test.Resource_pool.t) =
       ignore
         ( Hashtbl.merge pool.locally_generated_committed
@@ -1874,7 +1917,9 @@ let%test_module _ =
       List.map independent_cmds ~f:User_command.forget_check
 
     let mk_parties_cmds (pool : Test.Resource_pool.t) :
-        User_command.Valid.t list =
+        Mina_ledger.Ledger.t
+        * Private_key.t Public_key.Compressed.Map.t
+        * User_command.Valid.t list =
       let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
       let mk_ledger () =
         (* the Snapp generators want a Ledger.t, these tests have Base_ledger.t map, so
@@ -1917,7 +1962,7 @@ let%test_module _ =
         if n < Array.length test_keys / 2 then
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
-            let%map (parties : Parties.t) =
+            let%map (parties_dummy_auths : Parties.t) =
               Mina_generators.Parties_generators.gen_parties_from ~keymap
                 ~fee_payer_keypair ~ledger ()
             in
@@ -1925,7 +1970,7 @@ let%test_module _ =
               Option.value_exn
                 (Parties.Valid.to_valid ~ledger ~get:Mina_ledger.Ledger.get
                    ~location_of_account:Mina_ledger.Ledger.location_of_account
-                   parties )
+                   parties_dummy_auths )
             in
             User_command.Parties parties
           in
@@ -1935,10 +1980,16 @@ let%test_module _ =
       let result =
         Quickcheck.random_value ~seed:(`Deterministic "parties") (go 0 [])
       in
-      result
+      (ledger, keymap, result)
 
-    let mk_parties_cmds' (pool : Test.Resource_pool.t) : User_command.t list =
-      List.map (mk_parties_cmds pool) ~f:User_command.forget_check
+    let mk_parties_cmds' (pool : Test.Resource_pool.t) :
+        Private_key.t Public_key.Compressed.Map.t * User_command.t list =
+      let _ledger, keymap, cmds = mk_parties_cmds pool in
+      (* don't need to return the ledger, which is needed to re-validate Parties.t after
+         replacing authorizations; unlike mk_parties_cmds, the returned commands are not
+         User_command.Valid.t's
+      *)
+      (keymap, List.map cmds ~f:User_command.forget_check)
 
     type pool_apply = (User_command.t list, [ `Other of Error.t ]) Result.t
     [@@deriving sexp, compare]
@@ -2008,8 +2059,11 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
             setup_test ()
           in
-          mk_linear_case_test assert_pool_txs pool best_tip_diff_w
-            (mk_parties_cmds' pool) )
+          let keymap, parties_dummy_auths = mk_parties_cmds' pool in
+          let%bind parties =
+            replace_parties_authorizations ~keymap parties_dummy_auths
+          in
+          mk_linear_case_test assert_pool_txs pool best_tip_diff_w parties )
 
     let modify_ledger ~best_tip_ledger ~idx ~balance ~nonce =
       let acct_id =
@@ -2064,8 +2118,13 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
           in
+          let ledger, keymap, parties_dummy_auths = mk_parties_cmds pool in
+          let%bind parties =
+            replace_valid_parties_authorizations ~keymap ~ledger
+              parties_dummy_auths
+          in
           mk_remove_and_add_test assert_pool_txs pool best_tip_diff_w
-            best_tip_ref (mk_parties_cmds pool) )
+            best_tip_ref parties )
 
     let mk_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref cmds'
         =
@@ -2099,8 +2158,12 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
           in
+          let keymap, parties_dummy_auths = mk_parties_cmds' pool in
+          let%bind parties =
+            replace_parties_authorizations ~keymap parties_dummy_auths
+          in
           mk_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref
-            (mk_parties_cmds' pool) )
+            parties )
 
     let mk_payment' ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount
         () =
@@ -2255,8 +2318,13 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, best_tip_diff_w, (_, best_tip_ref) =
             setup_test ()
           in
+          let ledger, keymap, parties_dummy_auths = mk_parties_cmds pool in
+          let%bind parties =
+            replace_valid_parties_authorizations ~keymap ~ledger
+              parties_dummy_auths
+          in
           mk_now_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref
-            (mk_parties_cmds pool) )
+            parties )
 
     let mk_expired_not_accepted_test assert_pool_txs pool ~padding cmds =
       assert_pool_txs [] ;
@@ -2320,8 +2388,12 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
             setup_test ()
           in
-          mk_expired_not_accepted_test assert_pool_txs pool ~padding:55
-            (mk_parties_cmds pool) )
+          let ledger, keymap, parties_dummy_auths = mk_parties_cmds pool in
+          let%bind parties =
+            replace_valid_parties_authorizations ~keymap ~ledger
+              parties_dummy_auths
+          in
+          mk_expired_not_accepted_test assert_pool_txs pool ~padding:55 parties )
 
     let%test_unit "Expired transactions that are already in the pool are \
                    removed from the pool when best tip changes (user commands)"
@@ -2981,8 +3053,12 @@ let%test_module _ =
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
             setup_test ()
           in
-          mk_rebroadcastable_test assert_pool_txs pool best_tip_diff_w
-            (mk_parties_cmds pool) )
+          let ledger, keymap, parties_dummy_auths = mk_parties_cmds pool in
+          let%bind parties =
+            replace_valid_parties_authorizations ~keymap ~ledger
+              parties_dummy_auths
+          in
+          mk_rebroadcastable_test assert_pool_txs pool best_tip_diff_w parties )
 
     let%test_unit "apply user cmds and zkapps" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -2996,9 +3072,13 @@ let%test_module _ =
              therefore, the original nonces in the accounts are valid
           *)
           let take_len = num_cmds / 2 in
-          let snapp_cmds = List.take (mk_parties_cmds' pool) take_len in
+          let keymap, parties_dummy_auths = mk_parties_cmds' pool in
+          let%bind zkapp_cmds =
+            replace_parties_authorizations ~keymap
+              (List.take parties_dummy_auths take_len)
+          in
           let user_cmds = List.drop independent_cmds' take_len in
-          let all_cmds = snapp_cmds @ user_cmds in
+          let all_cmds = zkapp_cmds @ user_cmds in
           assert_pool_txs [] ;
           let%bind apply_res = verify_and_apply pool all_cmds in
           [%test_eq: pool_apply] (accepted_commands apply_res) (Ok all_cmds) ;

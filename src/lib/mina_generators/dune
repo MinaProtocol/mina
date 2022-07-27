@@ -2,7 +2,8 @@
  (name mina_generators)
  (public_name mina_generators)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_let ppx_version ppx_custom_printf))
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_let ppx_version ppx_custom_printf ppx_optcomp))
  (libraries
    ;; opam libraries
    yojson
