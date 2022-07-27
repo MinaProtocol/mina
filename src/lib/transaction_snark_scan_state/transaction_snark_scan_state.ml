@@ -22,13 +22,14 @@ module type Monad_with_Or_error_intf = sig
   type 'a t
 
   include Monad.S with type 'a t := 'a t
-     
-   module Or_error : sig
+
+  module Or_error : sig
     type nonrec 'a t = 'a Or_error.t t
 
     include Monad.S with type 'a t := 'a t
   end
-end[@@warning "-60"]
+end
+[@@warning "-60"]
 
 module Transaction_with_witness = struct
   [%%versioned
