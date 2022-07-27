@@ -235,7 +235,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
             Parties.Call_forest.With_hashes.of_parties_simple_list
-              [ (sender_party_data, ()); (snapp_party_data, ()) ]
+              [ sender_party_data; snapp_party_data ]
           in
           let other_parties_hash = Parties.Call_forest.hash ps in
           let memo = Signed_command_memo.empty in

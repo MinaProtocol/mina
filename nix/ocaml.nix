@@ -15,9 +15,8 @@ let
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam ../src/opam.export;
-  external-packages =
-    getAttrs [ "sodium" "capnp" "rpc_parallel" "async_kernel" "base58" ]
-    (builtins.mapAttrs (_: last) (opam-nix.listRepo external-repo));
+  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
+    (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   difference = a: b:
     filterAttrs (name: _: !builtins.elem name (builtins.attrNames b)) a;
@@ -134,6 +133,9 @@ let
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
+        # this is used to retrieve the path of the built static library
+        # and copy it from within a dune rule
+        # (see src/lib/crypto/kimchi_bindings/stubs/dune)
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
 
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";

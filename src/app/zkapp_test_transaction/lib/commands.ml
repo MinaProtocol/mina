@@ -26,7 +26,7 @@ let parse_field_element_or_hash_string s ~f =
   | Error e1 ->
       Error.raise (Error.tag ~tag:"Expected a field element" e1)
 
-let `VK vk, `Prover snapp_prover =
+let `VK vk, `Prover zkapp_prover =
   Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
 let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
@@ -356,7 +356,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -424,7 +424,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -460,7 +460,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -498,7 +498,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -534,7 +534,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -571,7 +571,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   (*Util.print_snapp_transaction parties ;*)

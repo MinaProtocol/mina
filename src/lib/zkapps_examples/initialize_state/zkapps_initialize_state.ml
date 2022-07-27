@@ -17,7 +17,7 @@ let initial_state =
     ]
 
 let initialize public_key =
-  Zkapps_examples.party_circuit (fun () ->
+  Zkapps_examples.wrap_main (fun () ->
       let party =
         Party_under_construction.In_circuit.create
           ~public_key:(Public_key.Compressed.var_of_t public_key)
@@ -42,7 +42,7 @@ let update_state_handler (new_state : Field.Constant.t list)
       respond Unhandled
 
 let update_state public_key =
-  Zkapps_examples.party_circuit (fun () ->
+  Zkapps_examples.wrap_main (fun () ->
       let party =
         Party_under_construction.In_circuit.create
           ~public_key:(Public_key.Compressed.var_of_t public_key)

@@ -617,8 +617,12 @@ struct
               in
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
-                    Cache.Step.read_or_generate cache k_p k_v
-                      (Snarky_backendless.Typ.unit ()) typ (fun () -> main) )
+                    Cache.Step.read_or_generate
+                      ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
+                      cache k_p k_v
+                      (Snarky_backendless.Typ.unit ())
+                      typ
+                      (fun () -> main) )
               in
               accum_dirty (Lazy.map pk ~f:snd) ;
               accum_dirty (Lazy.map vk ~f:snd) ;
@@ -707,8 +711,8 @@ struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Cache.Wrap.read_or_generate cache disk_key_prover disk_key_verifier
-              typ
+            Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
+              ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
               main )
       in

@@ -1104,7 +1104,7 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
   let authorization = Signature.dummy in
   ({ body; authorization } : Party.Fee_payer.t)
 
-(* keep max_other_parties small, so snapp integration tests don't need lots
+(* keep max_other_parties small, so zkApp integration tests don't need lots
    of block producers
 
    because the other parties are split into a permissions-setter
@@ -1116,10 +1116,11 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
 *)
 let max_other_parties = 2
 
-let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
+let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
+    ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?prover () =
+    ?account_state_tbl ~ledger ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -1397,31 +1398,20 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
       ~account_state_tbl ?protocol_state_view ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
-  let%bind memo = Signed_command_memo.gen in
-  let parties_dummy_signatures : Parties.t =
+  let%map memo = Signed_command_memo.gen in
+  let parties_dummy_authorizations : Parties.t =
     Parties.of_simple { fee_payer; other_parties; memo }
-  in
-  (* add fee payer keys to keymap, if not present *)
-  let keymap =
-    match
-      Signature_lib.Public_key.Compressed.Map.add keymap ~key:fee_payer_pk
-        ~data:fee_payer_keypair.private_key
-    with
-    | `Duplicate ->
-        keymap
-    | `Ok keymap' ->
-        keymap'
   in
   (* update receipt chain hashes in accounts table *)
   let receipt_elt =
     let _txn_commitment, full_txn_commitment =
       (* also computed in replace_authorizations, but easier just to re-compute here *)
-      Parties_builder.get_transaction_commitments parties_dummy_signatures
+      Parties_builder.get_transaction_commitments parties_dummy_authorizations
     in
     Receipt.Parties_elt.Parties_commitment full_txn_commitment
   in
   let fee_payer_acct_id =
-    Party.Fee_payer.account_id parties_dummy_signatures.fee_payer
+    Party.Fee_payer.account_id parties_dummy_authorizations.fee_payer
   in
   Account_id.Table.change account_state_tbl fee_payer_acct_id ~f:(function
     | None ->
@@ -1433,7 +1423,8 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
         in
         Some { account with receipt_chain_hash } ) ;
   let partys =
-    Parties.Call_forest.to_parties_list parties_dummy_signatures.other_parties
+    Parties.Call_forest.to_parties_list
+      parties_dummy_authorizations.other_parties
   in
   List.iteri partys ~f:(fun ndx party ->
       (* update receipt chain hash only for signature, proof authorizations *)
@@ -1452,6 +1443,4 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
                 Some { account with receipt_chain_hash } )
       | Control.None_given ->
           () ) ;
-  return
-  @@ Parties_builder.replace_authorizations ?prover ~keymap
-       parties_dummy_signatures
+  parties_dummy_authorizations

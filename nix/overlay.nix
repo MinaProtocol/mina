@@ -8,20 +8,16 @@ let
       # override stdenv.targetPlatform here, if neccesary
     };
   toolchainHashes = {
-    "1.58.0" = "sha256-eQBpSmy9+oHfVyPs0Ea+GVZ0fvIatj6QVhNhYKOJ6Jk=";
-    "nightly-2021-11-16" =
-      "sha256-ErdLrUf9f3L/JtM5ghbefBMgsjDMYN3YHDTfGc008b4=";
+    "1.58.1" = "sha256-NL+YHnOj1++1O7CAaQLijwAxKJW9SnHg8qsiOJ1m0Kk=";
+    "nightly-2021-11-16" = "sha256-ErdLrUf9f3L/JtM5ghbefBMgsjDMYN3YHDTfGc008b4=";
     # copy this line with the correct toolchain name
     "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
-  cargoHashes = narHashesFromCargoLock ../src/lib/crypto/Cargo.lock;
-  rustChannelFromToolchainFileOf = file:
-    with pkgs.lib;
-    let
-      inherit (pkgs.lib) hasPrefix removePrefix readFile warn;
-      toolchain = (builtins.fromTOML (readFile file)).toolchain;
-      # nice error message if the toolchain is missing
-      placeholderPos = builtins.unsafeGetAttrPos "placeholder" toolchainHashes;
+  rustChannelFromToolchainFileOf = file: with pkgs.lib; let
+    inherit (pkgs.lib) hasPrefix removePrefix readFile warn;
+    toolchain = (builtins.fromTOML (readFile file)).toolchain;
+    # nice error message if the toolchain is missing
+    placeholderPos = builtins.unsafeGetAttrPos "placeholder" toolchainHashes;
     in pkgs.rustChannelOf rec {
       channel = if hasPrefix "nightly-" toolchain.channel then
         "nightly"
@@ -84,27 +80,33 @@ in {
     ];
   });
 
-  # Rust stuff (for marlin_plonk_bindings_stubs)
-
-  crypto-rust =
-    (rustChannelFromToolchainFileOf ../src/lib/crypto/rust-toolchain.toml).rust;
-
+  #
   # Dependencies which aren't in nixpkgs and local packages which need networking to build
-  kimchi_bindings_stubs = (rustPlatformFor final.crypto-rust).buildRustPackage {
-    pname = "kimchi_bindings_stubs";
-    version = "0.1.0";
-    src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/.*)?)?$"
-      "^external(/wasm-bindgen-rayon(/.*)?)?"
-    ];
-    cargoBuildFlags = [ "-p wires_15_stubs" "-p binding_generation" ];
-    sourceRoot = "source/lib/crypto";
-    nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
-    # FIXME: tests fail
-    doCheck = false;
-    cargoLock.lockFile = ../src/lib/crypto/Cargo.lock;
-    cargoLock.outputHashes = cargoHashes;
-  };
+  #
+
+  # the kimchi bindings static library
+  kimchi_bindings_stubs = 
+    let 
+      toolchain = rustChannelFromToolchainFileOf ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
+      rust_platform = rustPlatformFor toolchain.rust;
+    in
+    rust_platform.buildRustPackage {
+      pname = "kimchi_bindings_stubs";
+      version = "0.1.0";
+      src = final.lib.sourceByRegex ../src [
+        "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
+        "^lib(/crypto(/proof-systems(/.*)?)?)?$"
+      ];
+      sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
+      nativeBuildInputs = [ pkgs.ocamlPackages_mina.ocaml ];
+      cargoLock = let
+        fixupLockFile = path: builtins.readFile path;
+      in {
+        lockFileContents = fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
+      };
+      # FIXME: tests fail
+      doCheck = false;
+    };
 
   go-capnproto2 = pkgs.buildGoModule rec {
     pname = "capnpc-go";
@@ -182,7 +184,7 @@ in {
 
   plonk_wasm = let
 
-    lock = ../src/lib/crypto/Cargo.lock;
+    lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -218,15 +220,13 @@ in {
     pname = "plonk_wasm";
     version = "0.1.0";
     src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/.*)?)?$"
-      "^lib/crypto/Cargo.(lock|toml)$"
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
     ];
-    sourceRoot = "source/lib/crypto";
+    sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
     nativeBuildInputs = [ pkgs.wasm-pack wasm-bindgen-cli ];
     cargoLock.lockFile = lock;
-    cargoLock.outputHashes = cargoHashes;
+    cargoLock.outputHashes = narHashesFromCargoLock lock;
 
     # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
     # Want to run after cargoSetupPostUnpackHook
@@ -242,7 +242,6 @@ in {
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
-      cd kimchi_bindings/wasm
       wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
       wasm-pack build --mode no-install --target web --out-dir $out/web ./.
       )

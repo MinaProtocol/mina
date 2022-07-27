@@ -507,6 +507,11 @@ struct
           Opt.scalar_challenge sponge
         in
         let open Plonk_types.Messages in
+        let without = Type.Without_degree_bound in
+        let absorb_g gs =
+          absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
+        in
+        Vector.iter ~f:(Array.iter ~f:(absorb sponge PC)) sg_old ;
         let x_hat =
           let domain = (which_branch, step_domains) in
           let public_input =
@@ -578,10 +583,6 @@ struct
                                (module Other_field.With_top_bit0)
                                g x ~num_bits ) ) ) )
           |> Inner_curve.negate
-        in
-        let without = Type.Without_degree_bound in
-        let absorb_g gs =
-          absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
         in
         absorb sponge PC (Boolean.true_, x_hat) ;
         let w_comm = messages.w_comm in

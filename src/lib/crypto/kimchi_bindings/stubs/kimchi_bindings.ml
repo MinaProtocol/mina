@@ -178,7 +178,7 @@ module Protocol = struct
     module Fp = struct
       type nonrec t
 
-      external create : Gates.Vector.Fp.t -> int -> SRS.Fp.t -> t
+      external create : Gates.Vector.Fp.t -> int -> int -> SRS.Fp.t -> t
         = "caml_pasta_fp_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fp_plonk_index_max_degree"
@@ -205,7 +205,7 @@ module Protocol = struct
     module Fq = struct
       type nonrec t
 
-      external create : Gates.Vector.Fq.t -> int -> SRS.Fq.t -> t
+      external create : Gates.Vector.Fq.t -> int -> int -> SRS.Fq.t -> t
         = "caml_pasta_fq_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fq_plonk_index_max_degree"

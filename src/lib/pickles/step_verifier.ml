@@ -520,6 +520,12 @@ struct
         let sample () = squeeze_challenge sponge in
         let sample_scalar () = squeeze_scalar sponge in
         let open Plonk_types.Messages.In_circuit in
+        let without = Type.Without_degree_bound in
+        let absorb_g gs = absorb sponge without gs in
+        let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
+          Wrap_hack.Checked.pad_commitments sg_old
+        in
+        Vector.iter ~f:(absorb sponge PC) sg_old ;
         let x_hat =
           with_label "x_hat" (fun () ->
               match domain with
@@ -536,8 +542,6 @@ struct
                        [ 0; 1; 2 ] )
                     ~public_input )
         in
-        let without = Type.Without_degree_bound in
-        let absorb_g gs = absorb sponge without gs in
         absorb sponge PC x_hat ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
@@ -582,9 +586,6 @@ struct
           *)
           let num_commitments_without_degree_bound = Nat.N26.n in
           let without_degree_bound =
-            let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
-              Wrap_hack.Checked.pad_commitments sg_old
-            in
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
               ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
