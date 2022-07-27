@@ -23,8 +23,8 @@ open Pickles_types
 
 module Padded_length = Nat.N2
 
-(** Pads a vector with `dummy` element to make it of size 2.
-    Warning: panics if the vector has more than one element.
+(** Pads a vector with [dummy] element to make it of size 2.
+    Warning: panics if the vector has more than two elements.
     *)
 let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
   let v = Vector.to_array v in

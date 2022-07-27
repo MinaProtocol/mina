@@ -1,11 +1,9 @@
-(** doc *)
-
 open Core_kernel
 open Backend
 open Pickles_types
 open Import
 
-(** hash `s` with blake2s and return `length` bits of the digest *)
+(** hash [s] with blake2s and return [length] bits of the digest *)
 let bits_random_oracle ~length s =
   (* blake2s with output of 32 bytes *)
   let h = Digestif.blake2s 32 in
