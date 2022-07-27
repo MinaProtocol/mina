@@ -1589,6 +1589,7 @@ module Object_lifetime_statistics = struct
 end
 
 [@@@warning "-60"]
+
 module Execution_times = struct
   let tracked_metrics = String.Table.create ()
 
@@ -1618,6 +1619,7 @@ module Execution_times = struct
 
   let () = CollectorRegistry.(register_pre_collect default sync_metrics)
 end
+
 [@@@warning "+60"]
 
 let generic_server ?forward_uri ~port ~logger ~registry () =

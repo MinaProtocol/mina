@@ -22,5 +22,5 @@ end
 
 let%test_module "test" =
   ( module struct
-      module _ = Test.Make_test (Make)
+    module _ = Test.Make_test (Make)
   end )

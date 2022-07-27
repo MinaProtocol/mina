@@ -311,7 +311,7 @@ end
 
 let%test_module "Address" =
   ( module struct
-     module _ = Make_test (struct
+    module _ = Make_test (struct
       let depth = 4
     end)
 

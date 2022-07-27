@@ -556,6 +556,7 @@ let%test_module "test functor on in memory databases" =
     end
 
     [@@@warning "-60"]
+
     module Mdb_d4 = Make_db (Depth_4)
 
     module Depth_30 = struct
@@ -563,10 +564,6 @@ let%test_module "test functor on in memory databases" =
     end
 
     module Mdb_d30 = Make_db (Depth_30)
-    [@@@warning "+60"]                   
+
+    [@@@warning "+60"]
   end )
-
-
-
-
-
