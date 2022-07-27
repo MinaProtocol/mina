@@ -91,7 +91,7 @@ macro_rules! impl_poly_comm {
 pub mod pallas {
     use super::*;
     use crate::arkworks::group_affine::WasmGPallas;
-    use mina_curves::pasta::pallas::Affine as GAffine;
+    use mina_curves::pasta::pallas::Pallas as GAffine;
 
     impl_poly_comm!(WasmGPallas, GAffine, Fq);
 }
@@ -99,7 +99,7 @@ pub mod pallas {
 pub mod vesta {
     use super::*;
     use crate::arkworks::group_affine::WasmGVesta;
-    use mina_curves::pasta::vesta::Affine as GAffine;
+    use mina_curves::pasta::vesta::Vesta as GAffine;
 
     impl_poly_comm!(WasmGVesta, GAffine, Fp);
 }

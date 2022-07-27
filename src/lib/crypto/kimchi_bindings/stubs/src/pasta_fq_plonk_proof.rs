@@ -17,7 +17,7 @@ use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{
     fp::Fp,
     fq::Fq,
-    pallas::{Affine as GAffine, PallasParameters},
+    pallas::{Pallas as GAffine, PallasParameters},
 };
 use oracle::{
     constants::PlonkSpongeConstantsKimchi,
