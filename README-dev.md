@@ -50,8 +50,8 @@ Refer to [/dev](/dev).
 
 Mina has a variety of opam and system dependencies.
 
-To get all the opam dependencies you need, you run `opam switch import
-opam.export`.
+To get all the opam dependencies you need, you run `opam switch import opam.export`.
+> *_NOTE:_*  The switch provides a `dune_wrapper` binary that you can use instead of dune, and will fail early if your switch becomes out of sync with the `opam.export` file.
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
