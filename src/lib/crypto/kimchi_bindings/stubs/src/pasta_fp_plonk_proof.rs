@@ -171,13 +171,10 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
         cols
     };
 
-    let fp_sponge_params = oracle::pasta::fp_kimchi::params();
-    let fq_sponge_params = oracle::pasta::fq_kimchi::params();
-
     let public_inputs = 1;
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
-    let cs = ConstraintSystem::<Fp>::create(gates, fp_sponge_params)
+    let cs = ConstraintSystem::<Fp>::create(gates)
         .runtime(Some(runtime_tables_setup))
         .public(public_inputs)
         .build()
@@ -189,7 +186,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 
     let (endo_q, _endo_r) = endos::<GOther>();
     let index =
-        ProverIndex::<GAffine>::create(cs, fq_sponge_params, endo_q, srs.0);
+        ProverIndex::<GAffine>::create(cs, endo_q, srs.0);
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
     let public_input = witness[0][0];
     let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
