@@ -18,8 +18,8 @@ use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{
     fp::Fp,
     fq::Fq,
-    pallas::{Affine as GOther},
-    vesta::{Affine as GAffine, VestaParameters},
+    pallas::{Pallas as GOther},
+    vesta::{Vesta as GAffine, VestaParameters},
 };
 use oracle::{
     constants::PlonkSpongeConstantsKimchi,
