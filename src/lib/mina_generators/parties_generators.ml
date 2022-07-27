@@ -1467,9 +1467,9 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     Receipt.Parties_elt.Parties_commitment full_txn_commitment
   in
   Account_id.Table.update account_state_tbl fee_payer_acct_id ~f:(function
-    | None | Some (_, `Ordinary_participant) ->
+    | None ->
         failwith "Expected fee payer account id to be in table"
-    | Some (account, `Fee_payer) ->
+    | Some (account, _) ->
         let receipt_chain_hash =
           Receipt.Chain_hash.cons_parties_commitment Mina_numbers.Index.zero
             receipt_elt account.Account.Poly.receipt_chain_hash
