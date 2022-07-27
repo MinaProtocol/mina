@@ -1864,6 +1864,7 @@ module Choices = struct
         (fun ~self ->
           let prevs = prevs ~self in
           { Pickles.Inductive_rule.identifier = Js.to_string rule##.identifier
+          ; uses_lookup = false
           ; prevs
           ; main =
               (fun { public_input } ->
