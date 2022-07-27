@@ -685,7 +685,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     ~(increment_nonce : b * bool) ~(f_token_id : Token_id.t -> c)
     ~(f_account_precondition :
        first_use_of_account:bool -> Account.t -> d Quickcheck.Generator.t )
-    ~(f_party_account_precondition : d -> Party.Account_precondition.t) ~ledger
+    ~(f_party_account_precondition : d -> Party.Account_precondition.t)
     ~authorization_tag () :
     (_, _, _, a, _, _, _, b, _, d, _) Party_body_components.t
     Quickcheck.Generator.t =
@@ -756,26 +756,21 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
             let%map zkapp_account_id =
               Quickcheck.Generator.of_list zkapp_account_ids
             in
-            match
-              let open Option.Let_syntax in
-              let%bind location =
-                Ledger.location_of_account ledger zkapp_account_id
-              in
-              Ledger.get ledger location
-            with
-            | Some account ->
-                (* get the latest state of this account *)
-                Account_id.Table.find_exn account_state_tbl
-                  (Account.identifier account)
-                |> fst
+            match Account_id.Table.find account_state_tbl zkapp_account_id with
             | None ->
                 failwith "gen_party_body: fail to find zkapp account"
+            | Some (_, `Fee_payer) | Some (_, `New_account) ->
+                failwith
+                  "gen_party_body: all zkapp accounts were new accounts or \
+                   used as fee_payer accounts"
+            | Some (acct, `Ordinary_participant) ->
+                acct
           else
             let accts =
               Account_id.Table.filteri account_state_tbl
                 ~f:(fun ~key:_ ~data:(_, role) ->
                   match role with
-                  | `Fee_payer ->
+                  | `Fee_payer | `New_account ->
                       false
                   | `Ordinary_participant ->
                       true )
@@ -957,7 +952,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
            ; delegate = delegate account
            ; zkapp = zkapp account
            }
-         , `Ordinary_participant )
+         , `New_account )
      | Some (updated_account, role) ->
          (* update entry in table *)
          ( { updated_account with
@@ -992,8 +987,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
 let gen_party_from ?(update = None) ?failure ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
     ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
-    ~available_public_keys ~ledger ~account_state_tbl ?protocol_state_view ?vk
-    () =
+    ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1013,7 +1007,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
     gen_party_body_components ~update ?failure ~new_account ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?protocol_state_view ?vk ~zkapp_account_ids
-      ~account_ids_seen ~available_public_keys ?required_balance_change ~ledger
+      ~account_ids_seen ~available_public_keys ?required_balance_change
       ~account_state_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~new_account)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
@@ -1031,7 +1025,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
   return { Party.Simple.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
+let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ?vk
     ?protocol_state_view ~account_state_tbl () :
     Party.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
@@ -1053,16 +1047,15 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
         account_precondition_gen acct )
       ~f_party_account_precondition:(fun nonce -> Nonce nonce)
       ~gen_use_full_commitment:(fun ~account_precondition:_ -> return ())
-      ~ledger ?protocol_state_view ~authorization_tag:Control.Tag.Signature ()
+      ?protocol_state_view ~authorization_tag:Control.Tag.Signature ()
   in
   Party_body_components.to_fee_payer body_components
 
-let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
-    ?protocol_state_view ?vk ~account_state_tbl () :
-    Party.Fee_payer.t Quickcheck.Generator.t =
+let gen_fee_payer ?failure ?permissions_auth ~account_id ?protocol_state_view
+    ?vk ~account_state_tbl () : Party.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
-    gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
+    gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ?vk
       ?protocol_state_view ~account_state_tbl ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
@@ -1139,12 +1132,12 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
   let account_ids_seen = Account_id.Hash_set.create () in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_acct_id ~ledger ?vk ~account_state_tbl ()
+      ~account_id:fee_payer_acct_id ?vk ~account_state_tbl ()
   in
   let zkapp_account_ids =
     Account_id.Table.filteri account_state_tbl ~f:(fun ~key:_ ~data:(a, role) ->
         match role with
-        | `Fee_payer ->
+        | `Fee_payer | `New_account ->
             false
         | `Ordinary_participant ->
             Option.is_some a.zkapp )
@@ -1155,7 +1148,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     let authorization = Control.Signature Signature.dummy in
     gen_party_from ?failure ~permissions_auth:Control.Tag.Signature
       ~zkapp_account_ids ~account_ids_seen ~authorization ~new_account:false
-      ~available_public_keys ~ledger
+      ~available_public_keys
       ~required_balance_change:Currency.Amount.Signed.zero ~account_state_tbl
       ?protocol_state_view ?vk ()
   in
@@ -1264,7 +1257,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
           let authorization = Control.Signature Signature.dummy in
           gen_party_from ~zkapp_account_ids ~account_ids_seen ~update ?failure
             ~authorization ~new_account:new_parties ~permissions_auth
-            ~zkapp_account ~available_public_keys ~ledger ~account_state_tbl
+            ~zkapp_account ~available_public_keys ~account_state_tbl
             ?protocol_state_view ?vk ()
         in
         let%bind party =
@@ -1337,8 +1330,8 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
           let permissions_auth = Control.Tag.Signature in
           gen_party_from ~update ?failure ~zkapp_account_ids ~account_ids_seen
             ~account_id ~authorization ~permissions_auth ~zkapp_account
-            ~available_public_keys ~ledger ~account_state_tbl
-            ?protocol_state_view ?vk ()
+            ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
+            ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
         go (party :: party0 :: acc) (n - 1)
