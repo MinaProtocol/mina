@@ -534,9 +534,10 @@ let compile :
            H4_6.T(Pickles.Inductive_rule).t = function
       | [] ->
           []
-      | { identifier; prevs; main } :: choices ->
+      | { identifier; prevs; main; uses_lookup } :: choices ->
           { identifier
           ; prevs
+          ; uses_lookup
           ; main =
               (fun main_input ->
                 let { Pickles.Inductive_rule.previous_proof_statements
