@@ -845,14 +845,18 @@ struct
       (sg_evals plonk.zeta, sg_evals zetaw)
     in
     let sponge_state =
-      let sg_eval_digest =
+      let challenge_digest =
         let opt_sponge = Opt_sponge.create sponge_params in
-        Vector.iter2 sg_evals1 sg_evals2 ~f:(fun sg_eval1 sg_eval2 ->
-            Opt_sponge.absorb opt_sponge sg_eval1 ;
-            Opt_sponge.absorb opt_sponge sg_eval2 ) ;
+        Vector.iter2
+          (Vector.trim actual_width_mask
+             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+          prev_challenges
+          ~f:(fun keep chals ->
+            Vector.iter chals ~f:(fun chal ->
+                Opt_sponge.absorb opt_sponge (keep, chal) ) ) ;
         Opt_sponge.squeeze opt_sponge
       in
-      Sponge.absorb sponge (`Field sg_eval_digest) ;
+      Sponge.absorb sponge (`Field challenge_digest) ;
       Sponge.absorb sponge (`Field ft_eval1) ;
       Sponge.absorb sponge (`Field (fst evals.public_input)) ;
       Sponge.absorb sponge (`Field (snd evals.public_input)) ;

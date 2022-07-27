@@ -152,26 +152,14 @@ let verify_heterogenous (ts : Instance.t list) =
           Vector.map ~f:Ipa.Step.compute_challenges
             statement.pass_through.old_bulletproof_challenges
         in
-        let sg_evals1, sg_evals2 =
-          let challenge_polys =
-            let vec =
-              Vector.map
-                ~f:(fun chals ->
-                  unstage (Wrap.challenge_polynomial (Vector.to_array chals)) )
-                old_bulletproof_challenges
-            in
-            fun pt -> Vector.map vec ~f:(fun f -> f pt)
-          in
-          (challenge_polys zeta, challenge_polys zetaw)
-        in
-        (let sg_eval_digest =
+        (let challenges_digest =
            let open Tick_field_sponge.Field in
            let sponge = create Tick_field_sponge.params in
-           Vector.iter2 sg_evals1 sg_evals2 ~f:(fun sg_eval1 sg_eval2 ->
-               absorb sponge sg_eval1 ; absorb sponge sg_eval2 ) ;
+           Vector.iter old_bulletproof_challenges
+             ~f:(Vector.iter ~f:(absorb sponge)) ;
            squeeze sponge
          in
-         absorb sg_eval_digest ;
+         absorb challenges_digest ;
          absorb evals.ft_eval1 ;
          let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
          let x1, x2 = evals.evals.public_input in

@@ -747,15 +747,14 @@ struct
       (sg_evals plonk.zeta, sg_evals zetaw)
     in
     let sponge_state =
-      (* Absorb evals *)
-      let sg_eval_digest =
+      (* Absorb bulletproof challenges *)
+      let challenge_digest =
         let sponge = Sponge.create sponge_params in
-        Vector.iter2 sg_evals1 sg_evals2 ~f:(fun sg_eval1 sg_eval2 ->
-            Sponge.absorb sponge sg_eval1 ;
-            Sponge.absorb sponge sg_eval2 ) ;
+        Vector.iter old_bulletproof_challenges
+          ~f:(Vector.iter ~f:(Sponge.absorb sponge)) ;
         Sponge.squeeze sponge
       in
-      Sponge.absorb sponge sg_eval_digest ;
+      Sponge.absorb sponge challenge_digest ;
       Sponge.absorb sponge ft_eval1 ;
       Sponge.absorb sponge (fst evals.public_input) ;
       Sponge.absorb sponge (snd evals.public_input) ;
