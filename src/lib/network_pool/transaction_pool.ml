@@ -1911,18 +1911,15 @@ let%test_module _ =
             let key = Public_key.compress public_key in
             Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
       in
-      let zkapp_account_keypairs =
-        List.filteri (Array.to_list test_keys) ~f:(fun ndx _ -> ndx mod 2 <> 0)
-      in
       let ledger = mk_ledger () in
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in
-        if n < Array.length test_keys then
+        if n < Array.length test_keys / 2 then
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
             let%map (parties : Parties.t) =
               Mina_generators.Parties_generators.gen_parties_from ~keymap
-                ~zkapp_account_keypairs ~fee_payer_keypair ~ledger ()
+                ~fee_payer_keypair ~ledger ()
             in
             let parties =
               Option.value_exn
@@ -2014,39 +2011,21 @@ let%test_module _ =
           mk_linear_case_test assert_pool_txs pool best_tip_diff_w
             (mk_parties_cmds' pool) )
 
-    let map_set_multi map pairs =
-      let rec go pairs =
-        match pairs with
-        | (k, v) :: pairs' ->
-            let pk = Public_key.compress test_keys.(k).public_key in
-            let key = Account_id.create pk Token_id.default in
-            Account_id.Table.set map ~key ~data:v ;
-            go pairs'
-        | [] ->
-            ()
+    let modify_ledger ~best_tip_ledger ~idx ~balance ~nonce =
+      let acct_id =
+        Account_id.create
+          (Signature_lib.Public_key.compress test_keys.(idx).public_key)
+          Token_id.default
       in
-      go pairs
-
-    let mk_account ~idx ~balance ~nonce =
-      let public_key = Public_key.compress @@ test_keys.(idx).public_key in
-      ( idx
-      , { Account.Poly.Stable.Latest.public_key
-        ; token_id = Token_id.default
-        ; token_permissions =
-            Token_permissions.Not_owned { account_disabled = false }
-        ; token_symbol = Account.Token_symbol.default
-        ; balance = Currency.Balance.of_int balance
-        ; nonce = Account.Nonce.of_int nonce
-        ; receipt_chain_hash = Receipt.Chain_hash.empty
-        ; delegate = Some public_key
-        ; voting_for =
-            Quickcheck.random_value ~seed:(`Deterministic "constant")
-              State_hash.gen
-        ; timing = Account.Timing.Untimed
-        ; permissions = Permissions.user_default
-        ; zkapp = None
-        ; zkapp_uri = ""
-        } )
+      Account_id.Table.update best_tip_ledger acct_id ~f:(function
+        | None ->
+            failwith "modify_ledger: fail to find the account"
+        | Some account ->
+            ( { account with
+                balance = Currency.Balance.of_int balance
+              ; nonce = Account.Nonce.of_int nonce
+              }
+              : Account.t ) )
 
     let mk_remove_and_add_test assert_pool_txs pool best_tip_diff_w best_tip_ref
         valid_cmds =
@@ -2056,8 +2035,8 @@ let%test_module _ =
       let cmds_to_apply = List.hd_exn cmds' :: List.drop cmds' 2 in
       let%bind apply_res = verify_and_apply pool cmds_to_apply in
       [%test_eq: pool_apply] (accepted_commands apply_res) (Ok cmds_to_apply) ;
-      map_set_multi !best_tip_ref
-        [ mk_account ~idx:1 ~balance:1_000_000_000_000 ~nonce:1 ] ;
+      modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:1
+        ~balance:1_000_000_000_000 ~nonce:1 ;
       let%bind () =
         Broadcast_pipe.Writer.write best_tip_diff_w
           ( { new_commands = List.map ~f:mk_with_status @@ List.take valid_cmds 1
@@ -2091,10 +2070,9 @@ let%test_module _ =
     let mk_invalid_test assert_pool_txs pool best_tip_diff_w best_tip_ref cmds'
         =
       assert_pool_txs [] ;
-      map_set_multi !best_tip_ref
-        [ mk_account ~idx:0 ~balance:0 ~nonce:0
-        ; mk_account ~idx:1 ~balance:1_000_000_000_000 ~nonce:1
-        ] ;
+      modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:0 ~balance:0 ~nonce:0 ;
+      modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:1
+        ~balance:1_000_000_000_000 ~nonce:1 ;
       (* need a best tip diff so the ref is actually read *)
       let%bind _ =
         Broadcast_pipe.Writer.write best_tip_diff_w
@@ -2214,8 +2192,8 @@ let%test_module _ =
         cmds =
       let cmds' = List.map cmds ~f:User_command.forget_check in
       assert_pool_txs [] ;
-      map_set_multi !best_tip_ref
-        [ mk_account ~idx:0 ~balance:1_000_000_000_000 ~nonce:1 ] ;
+      modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:0
+        ~balance:1_000_000_000_000 ~nonce:1 ;
       let%bind _ =
         Broadcast_pipe.Writer.write best_tip_diff_w
           ( { new_commands = List.map ~f:mk_with_status @@ List.take cmds 2
@@ -2246,7 +2224,7 @@ let%test_module _ =
         mk_payment ~sender_idx:0 ~fee:1_000_000_000 ~nonce:0 ~receiver_idx:5
           ~amount:999_000_000_000 ()
       in
-      map_set_multi !best_tip_ref [ mk_account ~idx:0 ~balance:0 ~nonce:1 ] ;
+      modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:0 ~balance:0 ~nonce:1 ;
       let%bind _ =
         Broadcast_pipe.Writer.write best_tip_diff_w
           ( { new_commands =
@@ -2382,8 +2360,8 @@ let%test_module _ =
           assert_pool_txs cmds_wo_check ;
           (* new commands from best tip diff should be removed from the pool *)
           (* update the nonce to be consistent with the commands in the block *)
-          map_set_multi !best_tip_ref
-            [ mk_account ~idx:0 ~balance:1_000_000_000_000_000 ~nonce:2 ] ;
+          modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:0
+            ~balance:1_000_000_000_000_000 ~nonce:2 ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands =
@@ -2521,10 +2499,10 @@ let%test_module _ =
           assert_pool_txs cmds_wo_check ;
           (* new commands from best tip diff should be removed from the pool *)
           (* update the nonce to be consistent with the commands in the block *)
-          map_set_multi !best_tip_ref
-            [ mk_account ~idx:0 ~balance:1_000_000_000_000_000 ~nonce:2
-            ; mk_account ~idx:1 ~balance:1_000_000_000_000_000 ~nonce:2
-            ] ;
+          modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:0
+            ~balance:1_000_000_000_000_000 ~nonce:2 ;
+          modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:1
+            ~balance:1_000_000_000_000_000 ~nonce:2 ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               ( { new_commands =
@@ -2677,11 +2655,10 @@ let%test_module _ =
           let ((_, ledger_ref2) as frontier2), _best_tip_diff_w2 =
             Mock_transition_frontier.create ()
           in
-          map_set_multi !ledger_ref2
-            [ mk_account ~idx:0 ~balance:20_000_000_000_000 ~nonce:5
-            ; mk_account ~idx:1 ~balance:0 ~nonce:0
-            ; mk_account ~idx:2 ~balance:0 ~nonce:1
-            ] ;
+          modify_ledger ~best_tip_ledger:!ledger_ref2 ~idx:0
+            ~balance:20_000_000_000_000 ~nonce:5 ;
+          modify_ledger ~best_tip_ledger:!ledger_ref2 ~idx:1 ~balance:0 ~nonce:0 ;
+          modify_ledger ~best_tip_ledger:!ledger_ref2 ~idx:2 ~balance:0 ~nonce:1 ;
           let%bind _ =
             Broadcast_pipe.Writer.write frontier_pipe_w (Some frontier2)
           in
@@ -2796,8 +2773,8 @@ let%test_module _ =
       let%bind apply_res = verify_and_apply pool txs in
       [%test_eq: pool_apply] (Ok txs) (accepted_commands apply_res) ;
       assert_pool_txs @@ txs ;
-      map_set_multi !best_tip_ref
-        [ mk_account ~idx:0 ~balance:970_000_000_000 ~nonce:1 ] ;
+      modify_ledger ~best_tip_ledger:!best_tip_ref ~idx:0
+        ~balance:970_000_000_000 ~nonce:1 ;
       let%bind () =
         Broadcast_pipe.Writer.write best_tip_diff_w
           { new_commands = List.map ~f:mk_with_status @@ [ committed_tx ]

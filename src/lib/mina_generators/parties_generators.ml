@@ -767,23 +767,26 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
                 (* get the latest state of this account *)
                 Account_id.Table.find_exn account_state_tbl
                   (Account.identifier account)
+                |> fst
             | None ->
                 failwith "gen_party_body: fail to find zkapp account"
           else
-            (* choose an account from the ledger *)
-            let%map index =
-              Int.gen_uniform_incl 0 (Ledger.num_accounts ledger - 1)
+            let accts =
+              Account_id.Table.filteri account_state_tbl
+                ~f:(fun ~key:_ ~data:(_, role) ->
+                  match role with
+                  | `Fee_payer ->
+                      false
+                  | `Ordinary_participant ->
+                      true )
+              |> Account_id.Table.data
             in
-            let account = Ledger.get_at_index_exn ledger index in
-            (*get the latest state of this account*)
-            let (account : Account.t) =
-              Account_id.Table.find_exn account_state_tbl
-                (Account.identifier account)
-            in
-            account
+            Quickcheck.Generator.of_list accts >>| fst
       | Some account_id ->
           (*get the latest state of the account*)
-          let acct = Account_id.Table.find_exn account_state_tbl account_id in
+          let acct =
+            Account_id.Table.find_exn account_state_tbl account_id |> fst
+          in
           if zkapp_account && Option.is_none acct.zkapp then
             failwith "gen_party_body: provided account has no snapp field" ;
           return acct
@@ -943,29 +946,29 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
            in
            Some { zk with app_state; sequence_state; proved_state }
    in
-   Account_id.Table.change account_state_tbl (Account.identifier account)
+   Account_id.Table.update account_state_tbl (Account.identifier account)
      ~f:(function
      | None ->
          (* new entry in table *)
-         Some
-           { account with
+         ( { account with
              balance =
                add_balance_and_balance_change account.balance balance_change
            ; nonce = nonce_incr account.nonce
            ; delegate = delegate account
            ; zkapp = zkapp account
            }
-     | Some updated_account ->
+         , `Ordinary_participant )
+     | Some (updated_account, role) ->
          (* update entry in table *)
-         Some
-           { updated_account with
+         ( { updated_account with
              balance =
                add_balance_and_balance_change updated_account.balance
                  balance_change
            ; nonce = nonce_incr updated_account.nonce
            ; delegate = delegate updated_account
            ; zkapp = zkapp updated_account
-           } ) ) ;
+           }
+         , role ) ) ) ;
   { Party_body_components.public_key
   ; update =
       ( if new_account then
@@ -1079,7 +1082,6 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
 let max_other_parties = 2
 
 let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
-    ~(zkapp_account_keypairs : Signature_lib.Keypair.t list)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?prover () =
@@ -1087,7 +1089,7 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
-  let fee_payer_account_id = Account_id.create fee_payer_pk Token_id.default in
+  let fee_payer_acct_id = Account_id.create fee_payer_pk Token_id.default in
   let ledger_accounts = Ledger.to_list ledger in
   (* table of public keys to accounts, updated when generating each party
 
@@ -1104,7 +1106,8 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
       (*Initialize account states*)
       Account_id.Table.update account_state_tbl acct_id ~f:(function
         | None ->
-            acct
+            if Account_id.equal acct_id fee_payer_acct_id then (acct, `Fee_payer)
+            else (acct, `Ordinary_participant)
         | Some a ->
             a ) ;
       if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
@@ -1135,15 +1138,18 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
   let account_ids_seen = Account_id.Hash_set.create () in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_account_id ~ledger ?vk ~account_state_tbl ()
+      ~account_id:fee_payer_acct_id ~ledger ?vk ~account_state_tbl ()
   in
   let zkapp_account_ids =
-    List.map zkapp_account_keypairs ~f:(fun keypair ->
-        Account_id.create
-          (Signature_lib.Public_key.compress keypair.public_key)
-          Token_id.default )
+    Account_id.Table.filteri account_state_tbl ~f:(fun ~key:_ ~data:(a, role) ->
+        match role with
+        | `Fee_payer ->
+            false
+        | `Ordinary_participant ->
+            Option.is_some a.zkapp )
+    |> Account_id.Table.keys
   in
-  Hash_set.add account_ids_seen fee_payer_account_id ;
+  Hash_set.add account_ids_seen fee_payer_acct_id ;
   let%bind balancing_party =
     let authorization = Control.Signature Signature.dummy in
     gen_party_from ?failure ~permissions_auth:Control.Tag.Signature
@@ -1385,13 +1391,14 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~f:(function
     | None ->
         failwith "account of balancing party is missing"
-    | Some account ->
-        { account with
-          balance =
-            Currency.Balance.add_signed_amount_flagged account.balance
-              balance_change
-            |> fst
-        } ) ;
+    | Some (account, role) ->
+        ( { account with
+            balance =
+              Currency.Balance.add_signed_amount_flagged account.balance
+                balance_change
+              |> fst
+          }
+        , role ) ) ;
   (* modify the account balance && nonce precondition of the balancing account to reflect the change*)
   let other_parties =
     balancing_party
@@ -1459,18 +1466,15 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
     in
     Receipt.Parties_elt.Parties_commitment full_txn_commitment
   in
-  let fee_payer_acct_id =
-    Party.Fee_payer.account_id parties_dummy_signatures.fee_payer
-  in
-  Account_id.Table.change account_state_tbl fee_payer_acct_id ~f:(function
-    | None ->
+  Account_id.Table.update account_state_tbl fee_payer_acct_id ~f:(function
+    | None | Some (_, `Ordinary_participant) ->
         failwith "Expected fee payer account id to be in table"
-    | Some account ->
+    | Some (account, `Fee_payer) ->
         let receipt_chain_hash =
           Receipt.Chain_hash.cons_parties_commitment Mina_numbers.Index.zero
             receipt_elt account.Account.Poly.receipt_chain_hash
         in
-        Some { account with receipt_chain_hash } ) ;
+        ({ account with receipt_chain_hash }, `Fee_payer) ) ;
   let partys =
     Parties.Call_forest.to_parties_list parties_dummy_signatures.other_parties
   in
@@ -1479,16 +1483,16 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
       match Party.authorization party with
       | Control.Proof _ | Control.Signature _ ->
           let acct_id = Party.account_id party in
-          Account_id.Table.change account_state_tbl acct_id ~f:(function
+          Account_id.Table.update account_state_tbl acct_id ~f:(function
             | None ->
                 failwith "Expected other party account id to be in table"
-            | Some account ->
+            | Some (account, role) ->
                 let receipt_chain_hash =
                   let party_index = Mina_numbers.Index.of_int (ndx + 1) in
                   Receipt.Chain_hash.cons_parties_commitment party_index
                     receipt_elt account.Account.Poly.receipt_chain_hash
                 in
-                Some { account with receipt_chain_hash } )
+                ({ account with receipt_chain_hash }, role) )
       | Control.None_given ->
           () ) ;
   return
