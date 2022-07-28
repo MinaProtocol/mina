@@ -36,6 +36,7 @@
    kimchi_backend.pasta
    merkle_mask
    merkle_ledger
+   merkle_list_verifier
    mina_base
    mina_transaction
    mina_transaction_logic
