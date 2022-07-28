@@ -960,10 +960,11 @@ let get_highest_fee :
 *)
 
 module Add_from_gossip_exn (M : Writer_result.S) = struct
-  let check_timestamp_predicate expiry_ns (user_command : User_command.t) : bool
-      =
-    let current_time = Time_ns.now () in
-    let expiry_time = Time_ns.(sub current_time expiry_ns) in
+  let check_timestamp_predicate (expiry_ns : Time_ns.Span.t)
+      (user_command : User_command.t) : bool =
+    let expiry = Block_time.Span.of_time_ns_span expiry_ns in
+    let current_time = Block_time.of_time_ns @@ Time_ns.now () in
+    let expiry_time = Block_time.sub current_time expiry in
     match user_command with
     | User_command.Signed_command _ ->
         true
@@ -973,21 +974,14 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
                let predicate = Party.protocol_state_precondition party in
                match predicate.timestamp with
                | Check { lower; upper } ->
-                   let lower =
-                     Block_time.to_time lower
-                     |> Time_ns.of_time_float_round_nearest_microsecond
-                   in
-                   let upper =
-                     Block_time.to_time upper
-                     |> Time_ns.of_time_float_round_nearest_microsecond
-                   in
                    (*Timestamp bounds are compared against slot start time of
                      the most recent block and that could be any number of slots
                      old. So give the transaction more time to be included*)
-                   Time_ns.(upper > expiry_time)
-                   && Time_ns.(lower < add current_time expiry_ns)
+                   Block_time.(upper <= expiry_time)
+                   || Block_time.(lower >= add current_time expiry)
                | _ ->
-                   true )
+                   false )
+        |> not
 
   let rec add_from_gossip_exn :
          config:Config.t

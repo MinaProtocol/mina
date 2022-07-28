@@ -164,6 +164,11 @@ module Time = struct
     let to_time_ns_span s =
       Time_ns.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
 
+    let of_time_ns_span ns : t =
+      let int64_ns = ns |> Time_ns.Span.to_int63_ns |> Int63.to_int64 in
+      (* convert to milliseconds *)
+      Int64.(int64_ns / 1_000_000L) |> UInt64.of_int64
+
     let to_string_hum s = to_time_ns_span s |> Time_ns.Span.to_string_hum
 
     let to_ms = UInt64.to_int64
@@ -250,6 +255,11 @@ module Time = struct
   let to_uint64 : t -> UInt64.t = to_span_since_epoch
 
   let to_string = Fn.compose Int64.to_string to_int64
+
+  let of_time_ns ns : t =
+    let int64_ns = ns |> Time_ns.to_int63_ns_since_epoch |> Int63.to_int64 in
+    (* convert to milliseconds *)
+    Int64.(int64_ns / 1_000_000L) |> UInt64.of_int64
 
   [%%if time_offsets]
 

@@ -116,6 +116,8 @@ module Time : sig
 
     val to_time_ns_span : t -> Core_kernel.Time_ns.Span.t
 
+    val of_time_ns_span : Core_kernel.Time_ns.Span.t -> t
+
     val to_string_hum : t -> string
 
     val to_ms : t -> Int64.t
@@ -193,6 +195,8 @@ module Time : sig
   val of_uint64 : Unsigned.UInt64.t -> t
 
   val to_uint64 : t -> Unsigned.UInt64.t
+
+  val of_time_ns : Time_ns.t -> t
 
   val to_string : t -> string
 
