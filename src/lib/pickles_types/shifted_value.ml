@@ -133,7 +133,7 @@ module Type1 = struct
   let equal equal (Shifted_value t1) (Shifted_value t2) = equal t1 t2
 end
 
-(* When the scalar field is larger than the inner field of the circuit,
+(** When the scalar field is larger than the inner field of the circuit,
    we need to encode a scalar [s] as a pair ((s >> 1), s & 1). In other
    words, the high bits, and then the low bit separately.
 
@@ -144,7 +144,6 @@ end
 
    This is a different notion of shifted value, so we have a separate type for it.
 *)
-
 module Type2 = struct
   [%%versioned
   module Stable = struct
