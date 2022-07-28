@@ -104,17 +104,13 @@ let%test_module "Archive node unit tests" =
             if ndx mod 2 = 0 then (account_id, account)
             else (account_id, zkappify_account account) )
       in
-      let zkapp_account_keypairs =
-        List.filteri (Array.to_list test_keys) ~f:(fun ndx _ -> ndx mod 2 <> 0)
-      in
       Array.map accounts ~f:(fun (account_id, account) ->
           Mina_ledger.Ledger.get_or_create_account ledger account_id account
           |> Or_error.ok_exn )
       |> fun _ ->
       let%map (parties : Parties.t) =
         Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
-          ~zkapp_account_keypairs ~keymap ~ledger
-          ~protocol_state_view:genesis_state_view ()
+          ~keymap ~ledger ~protocol_state_view:genesis_state_view ()
       in
       User_command.Parties parties
 
