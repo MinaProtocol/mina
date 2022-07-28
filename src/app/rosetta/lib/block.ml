@@ -1,15 +1,13 @@
-module Serializing = Graphql_lib.Serializing
-
 module Get_coinbase_and_genesis =
 [%graphql
 {|
   query {
     genesisBlock {
       creatorAccount {
-        publicKey @ppxCustom(module: "Serializing.String")
+        publicKey @ppxCustom(module: "Graphql_lib.Scalars.STRING")
       }
       winnerAccount {
-        publicKey @ppxCustom(module: "Serializing.String")
+        publicKey @ppxCustom(module: "Graphql_lib.Scalars.STRING")
       }
       protocolState {
         blockchainState {
