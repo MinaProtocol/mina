@@ -608,13 +608,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_create_accounts)
     in
     let%bind () =
-      let sender = List.hd_exn zkapp_keypairs in
-      let nonce = Account.Nonce.zero in
-      section_hard "Send payment from zkApp account"
-        (send_payment_from_zkapp_account ~constraint_constants ~node ~logger
-           sender nonce )
-    in
-    let%bind () =
       section_hard "Send a zkApp transaction to update permissions"
         (send_zkapp ~logger node parties_update_permissions)
     in
@@ -632,8 +625,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       let sender = List.hd_exn zkapp_keypairs in
+      let nonce = Account.Nonce.zero in
+      section_hard "Send a valid payment from zkApp account"
+        (send_payment_from_zkapp_account ~constraint_constants ~node ~logger
+           sender nonce )
+    in
+    let%bind () =
+      let sender = List.hd_exn zkapp_keypairs in
       let nonce = Account.Nonce.of_int 1 in
-      section_hard "Send invalid payment from zkApp account"
+      section_hard "Send an invalid payment from zkApp account"
         (send_payment_from_zkapp_account ~constraint_constants ~logger sender
            nonce ~node
            ~expected_failure:
