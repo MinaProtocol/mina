@@ -21,11 +21,14 @@
    ppx_inline_test.config
    uri
    ;;local libraries
+   kimchi_backend
    child_processes
    precomputed_values
    coda_genesis_ledger
    coda_runtime_config
    sgn
+   mina_base.util
+   kimchi_backend.pasta
    pickles
    pipe_lib
    block_time
@@ -35,7 +38,10 @@
    transition_frontier_base
    genesis_ledger_helper
    one_or_two
+   mina_caqti
+   mina_generators
    mina_base
+   mina_ledger
    mina_block
    transition_frontier
    logger
@@ -47,6 +53,7 @@
    pickles_types
    pickles.backend
    with_hash
+   mina_base.import
    consensus
    genesis_constants
    genesis_ledger_helper.lib
@@ -54,6 +61,11 @@
    verifier
    quickcheck_lib
    snark_params
+   mina_transaction
+   protocol_version
+   mina_version
+   staged_ledger_diff
+   ppx_version.runtime
  )
  (inline_tests)
  (modes native)

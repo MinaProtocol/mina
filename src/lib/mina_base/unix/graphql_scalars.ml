@@ -44,12 +44,3 @@ module LedgerHash =
 
       let doc = "Base58Check-encoded ledger hash"
     end)
-
-module TransactionHash =
-  Make_scalar_using_base58_check
-    (Mina_base.Transaction_hash)
-    (struct
-      let name = "TransactionHash"
-
-      let doc = "Base58Check-encoded transaction hash"
-    end)

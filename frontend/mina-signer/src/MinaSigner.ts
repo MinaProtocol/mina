@@ -2,7 +2,7 @@
 const JSOfOCaml_SDK = require("./client_sdk.bc.js");
 const minaSDK = JSOfOCaml_SDK.minaSDK;
 
-import {
+import type {
   Network,
   PublicKey,
   Keypair,
@@ -11,9 +11,22 @@ import {
   Payment,
   StakeDelegation,
   Message,
+  Party,
+  OtherParties,
+  SignableData,
 } from "./TSTypes";
 
+import { isPayment, isMessage, isStakeDelegation, isParty } from "./Utils";
+
 const defaultValidUntil = "4294967295";
+
+// Shut down wasm workers, which are not needed here
+if (globalThis.wasm_rayon_poolbuilder) {
+  globalThis.wasm_rayon_poolbuilder.free();
+  for (let worker of globalThis.wasm_workers) {
+    worker.terminate();
+  }
+}
 
 class Client {
   private network: Network;
@@ -317,6 +330,54 @@ class Client {
   }
 
   /**
+   * Sign a parties transaction using a private key.
+   *
+   * This type of transaction allows a user to update state on a given
+   * Smart Contract running on Mina.
+   *
+   * @param party A object representing a Parties tx
+   * @param privateKey The fee payer private key
+   * @returns Signed parties
+   */
+  public signParty(party: Party, privateKey: PrivateKey): Signed<Party> {
+    const parties = JSON.stringify(party.parties.otherParties);
+    if (
+      party.feePayer.fee === undefined ||
+      party.feePayer.fee < this.getPartyMinimumFee(party.parties.otherParties)
+    ) {
+      throw `Fee must be greater than ${this.getPartyMinimumFee(
+        party.parties.otherParties
+      )}`;
+    }
+    const memo = party.feePayer.memo ?? "";
+    const fee = String(party.feePayer.fee);
+    const nonce = String(party.feePayer.nonce);
+    const feePayer = String(party.feePayer.feePayer);
+    const signedParties = minaSDK.signParty(
+      parties,
+      {
+        feePayer,
+        fee,
+        nonce,
+        memo,
+      },
+      privateKey
+    );
+    return {
+      signature: JSON.parse(signedParties).feePayer.authorization,
+      data: {
+        parties: signedParties,
+        feePayer: {
+          feePayer,
+          fee,
+          nonce,
+          memo,
+        },
+      },
+    };
+  }
+
+  /**
    * Converts a Rosetta signed transaction to a JSON string that is
    * compatible with GraphQL. The JSON string is a representation of
    * a `Signed_command` which is what our GraphQL expects.
@@ -339,6 +400,50 @@ class Client {
    */
   public publicKeyToRaw(publicKey: string): string {
     return minaSDK.rawPublicKeyOfPublicKey(publicKey);
+  }
+
+  /**
+   * Signs an arbitrary payload using a private key. This function can sign messages,
+   * payments, stake delegations, and parties. If the payload is unrecognized, an Error
+   * is thrown.
+   *
+   * @param payload A signable payload
+   * @param key A valid keypair
+   * @returns A signed payload
+   */
+  public signTransaction(
+    payload: SignableData,
+    privateKey: PrivateKey
+  ): Signed<SignableData> {
+    if (isMessage(payload)) {
+      return this.signMessage(payload.message, {
+        publicKey: payload.publicKey,
+        privateKey,
+      });
+    }
+    if (isPayment(payload)) {
+      return this.signPayment(payload, privateKey);
+    }
+    if (isStakeDelegation(payload)) {
+      return this.signStakeDelegation(payload, privateKey);
+    }
+    if (isParty(payload)) {
+      return this.signParty(payload, privateKey);
+    } else {
+      throw new Error(`Expected signable payload, got '${payload}'.`);
+    }
+  }
+
+  /**
+   * Calculates the minimum fee of a party transaction. A fee for a party transaction is
+   * the sum of all parties plus the specified fee amount. If no fee is passed in, `0.001`
+   * is used (according to the Mina spec) by default.
+   * @param p A party object
+   * @param fee The fee per party amount
+   * @returns  The fee to be paid by the fee payer party
+   */
+  public getPartyMinimumFee(p: OtherParties, fee: number = 0.001) {
+    return p.reduce((accumulatedFee, _) => accumulatedFee + fee, 0);
   }
 }
 

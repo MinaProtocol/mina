@@ -8,7 +8,6 @@
    async_unix
    base.base_internalhash_types
    core
-   base.caml
    core_kernel
    ocamlgraph
    ppx_inline_test.config

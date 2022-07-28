@@ -18,4 +18,6 @@
    snarky.backendless
    random_oracle_input
    pickles_types
+   pickles.one_hot_vector
+   ppx_version.runtime
 ))

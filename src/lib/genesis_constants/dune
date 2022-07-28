@@ -9,7 +9,6 @@
    base
    bin_prot.shape
    core_kernel
-   ppx_version.runtime
    base.caml
    sexplib0
    integers
@@ -23,8 +22,10 @@
    mina_compile_config
    pickles.backend
    snark_keys_header
-   pasta
-   )
+   kimchi_backend.pasta
+   test_util
+   ppx_version.runtime
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

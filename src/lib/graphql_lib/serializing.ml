@@ -113,11 +113,11 @@ module State_hash : S_STRING with type t = Mina_base.State_hash.t = struct
   let serialize = unimplemented_serializer "state_hash"
 end
 
-module Transaction_hash : S_STRING with type t = Mina_base.Transaction_hash.t =
-struct
-  type t = Mina_base.Transaction_hash.t
+module Transaction_hash :
+  S_STRING with type t = Mina_transaction.Transaction_hash.t = struct
+  type t = Mina_transaction.Transaction_hash.t
 
-  let parse = Mina_base.Transaction_hash.of_base58_check_exn
+  let parse = Mina_transaction.Transaction_hash.of_base58_check_exn
 
   let serialize = unimplemented_serializer "transaction_hash"
 end
