@@ -18,7 +18,7 @@ module Sparse_ledger : module type of Mina_ledger.Sparse_ledger
 
 val ledger_depth : Ledger.index
 
-module T : Transaction_snark.S
+val snark_module : (module Transaction_snark.S) lazy_t
 
 val genesis_state_body : Transaction_protocol_state.Block_data.t
 
@@ -83,7 +83,7 @@ val test_snapp_update :
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
-  -> snapp_prover:
+  -> zkapp_prover:
        ( unit
        , unit
        , unit

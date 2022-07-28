@@ -261,7 +261,7 @@ pub mod fp {
     };
     use mina_curves::pasta::{
         fp::Fp,
-        vesta::{Affine as GAffine, VestaParameters},
+        vesta::{Vesta as GAffine, VestaParameters},
     };
 
     impl_oracles!(
@@ -286,7 +286,7 @@ pub mod fq {
     };
     use mina_curves::pasta::{
         fq::Fq,
-        pallas::{Affine as GAffine, PallasParameters},
+        pallas::{Pallas as GAffine, PallasParameters},
     };
 
     impl_oracles!(

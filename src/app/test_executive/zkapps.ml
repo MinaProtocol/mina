@@ -374,7 +374,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
-    let parties_mint_token, parties_mint_token2, parties_token_transfer =
+    let%bind.Deferred ( parties_mint_token
+                      , parties_mint_token2
+                      , parties_token_transfer ) =
       (* similar to tokens tests in transaction_snark/tests/zkapp_tokens.ml
          and `Mina_ledger.Ledger`
 
@@ -415,7 +417,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let fee_payer_pk =
         Signature_lib.Public_key.compress token_funder.public_key
       in
-      let parties_mint_token =
+      let%bind.Deferred parties_mint_token =
         let open Parties_builder in
         let with_dummy_signatures =
           mk_forest
@@ -432,7 +434,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
-      let parties_mint_token2 =
+      let%bind.Deferred parties_mint_token2 =
         let open Parties_builder in
         let with_dummy_signatures =
           mk_forest
@@ -453,7 +455,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
-      let parties_token_transfer =
+      let%map.Deferred parties_token_transfer =
         let open Parties_builder in
         (* lower fee than minting Parties.t *)
         let with_dummy_signatures =
