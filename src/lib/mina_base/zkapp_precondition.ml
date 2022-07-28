@@ -186,8 +186,11 @@ module Numeric = struct
     open Fields_derivers_zkapps.Derivers
 
     let block_time_inner obj =
+      let ( ^^ ) = Fn.compose in
       iso_string ~name:"BlockTime" ~js_type:UInt64
-        ~of_string:Block_time.of_string_exn ~to_string:Block_time.to_string obj
+        ~of_string:(Block_time.of_uint64 ^^ Unsigned_extended.UInt64.of_string)
+        ~to_string:(Unsigned_extended.UInt64.to_string ^^ Block_time.to_uint64)
+        obj
 
     let nonce obj = deriver "Nonce" uint32 obj
 
@@ -226,14 +229,6 @@ module Numeric = struct
           Fields.make_creator obj ~foo:!.(deriver "Int" int)
           |> finish "T" ~t_toplevel_annots
       end
-
-      let%test_unit "to string" =
-        [%test_eq: string] Block_time.(to_string max_value) "-1"
-
-      let%test_unit "of string" =
-        [%test_eq: Block_time.t]
-          Block_time.(of_string_exn "-1")
-          Block_time.max_value
 
       let%test_unit "roundtrip json" =
         let open Fields_derivers_zkapps.Derivers in
