@@ -207,6 +207,10 @@ module Time = struct
     UInt64.of_int64
       (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))
 
+  (* TODO: This has two issues:
+     -) Time.t can't hold the full uint64 range, so this can fail for large t
+     -) The int conversion causes negative timestamps if the highest bit is 1
+  *)
   let to_time t =
     Time.of_span_since_epoch
       (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
@@ -254,6 +258,7 @@ module Time = struct
 
   let to_uint64 : t -> UInt64.t = to_span_since_epoch
 
+  (* TODO: this serializes the max_value to "-1", which isn't very nice *)
   let to_string = Fn.compose Int64.to_string to_int64
 
   let of_time_ns ns : t =
