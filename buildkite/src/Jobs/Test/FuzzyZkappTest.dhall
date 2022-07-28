@@ -12,7 +12,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let buildTestCmd : Text -> Text -> Int -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(trials : Int) -> \(cmd_target : Size) ->
+let buildTestCmd : Text -> Text -> Natural -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(trials : Natural) -> \(cmd_target : Size) ->
+  let trials = Natural/show trials in
   Command.build
     Command.Config::{
       commands = RunInToolchain.runInToolchainStretch ([] : List Text)
