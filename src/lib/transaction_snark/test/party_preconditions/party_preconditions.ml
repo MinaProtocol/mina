@@ -7,7 +7,7 @@ open Mina_base
 
 let%test_module "Protocol state precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
+    let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -87,7 +87,7 @@ let%test_module "Protocol state precondition tests" =
             }
           in
           U.test_snapp_update test_spec ~state_body ~init_ledger ~vk
-            ~snapp_prover
+            ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "generated protocol state predicate" =
@@ -128,7 +128,7 @@ let%test_module "Protocol state precondition tests" =
             }
           in
           U.test_snapp_update test_spec ~state_body ~init_ledger ~vk
-            ~snapp_prover
+            ~zkapp_prover
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "invalid protocol state predicate in other parties" =
@@ -295,7 +295,7 @@ let%test_module "Protocol state precondition tests" =
 
 let%test_module "Account precondition tests" =
   ( module struct
-    let `VK vk, `Prover snapp_prover = Lazy.force U.trivial_zkapp
+    let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
 
@@ -422,7 +422,7 @@ let%test_module "Account precondition tests" =
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
                   let%bind parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
                   U.check_parties_with_merges_exn ~state_body ledger [ parties ] ) ) )
@@ -483,7 +483,7 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let%bind parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
                   U.check_parties_with_merges_exn ~state_body ledger [ parties ] ) ) )
@@ -535,7 +535,7 @@ let%test_module "Account precondition tests" =
                   in
                   let open Async.Deferred.Let_syntax in
                   let%bind parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init

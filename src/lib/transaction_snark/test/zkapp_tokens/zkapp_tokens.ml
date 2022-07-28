@@ -86,7 +86,7 @@ let%test_module "Zkapp tokens tests" =
                     in
                     nonce
                   in
-                  let create_token_parties =
+                  let%bind create_token_parties =
                     let open Parties_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
@@ -114,7 +114,7 @@ let%test_module "Zkapp tokens tests" =
                         (Public_key.compress token_owner.public_key)
                         Token_id.default
                       : Account.t ) ;
-                  let mint_token_parties =
+                  let%bind mint_token_parties =
                     let open Parties_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
@@ -138,7 +138,7 @@ let%test_module "Zkapp tokens tests" =
                       [ mint_token_parties ]
                   in
                   check_token_balance token_accounts.(0) custom_token_id 100 ;
-                  let mint_token2_parties =
+                  let%bind mint_token2_parties =
                     let open Parties_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =
@@ -166,7 +166,7 @@ let%test_module "Zkapp tokens tests" =
                       [ mint_token2_parties ]
                   in
                   check_token_balance token_accounts.(2) custom_token_id2 500 ;
-                  let token_transfer_parties =
+                  let%bind token_transfer_parties =
                     let open Parties_builder in
                     let nonce = nonce_from_ledger () in
                     let with_dummy_signatures =

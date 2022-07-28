@@ -105,9 +105,38 @@ module Call_forest = struct
     let mapi_forest' ~i t ~f =
       mapi_forest_with_trees' ~i t ~f:(fun i party _ -> f i party)
 
+    let rec deferred_mapi_with_trees' ~i (t : _ t) ~f =
+      let open Async_kernel.Deferred.Let_syntax in
+      let%bind l, calls =
+        deferred_mapi_forest_with_trees' ~i:(i + 1) t.calls ~f
+      in
+      let%map party = f i t.party t in
+      (l, { calls; party; party_digest = t.party_digest })
+
+    and deferred_mapi_forest_with_trees' ~i x ~f =
+      let open Async_kernel.Deferred.Let_syntax in
+      let rec go i acc = function
+        | [] ->
+            return (i, List.rev acc)
+        | t :: ts ->
+            let%bind l, elt' =
+              deferred_mapi_with_trees' ~i ~f (With_stack_hash.elt t)
+            in
+            go l (With_stack_hash.map t ~f:(fun _ -> elt') :: acc) ts
+      in
+      go i [] x
+
     let map_forest ~f t = mapi_forest' ~i:0 ~f:(fun _ x -> f x) t |> snd
 
     let mapi_forest ~f t = mapi_forest' ~i:0 ~f t |> snd
+
+    let deferred_map_forest ~f t =
+      let open Async_kernel.Deferred in
+      deferred_mapi_forest_with_trees' ~i:0 ~f:(fun _ x -> f x) t >>| snd
+
+    let deferred_mapi_forest ~f t =
+      let open Async_kernel.Deferred in
+      deferred_mapi_forest_with_trees' ~i:0 ~f t >>| snd
 
     let hash { party = _; calls; party_digest } =
       let stack_hash =
@@ -362,6 +391,8 @@ module Call_forest = struct
   let mapi = Tree.mapi_forest
 
   let mapi_with_trees = Tree.mapi_forest_with_trees
+
+  let deferred_mapi = Tree.deferred_mapi_forest
 
   let%test_unit "Party_or_stack.of_parties_list" =
     let parties_list_1 = [ 0; 0; 0; 0 ] in
