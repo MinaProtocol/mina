@@ -26,7 +26,7 @@ import (
 func newApp() *app {
 	outChan := make(chan *capnp.Message, 64)
 	ctx := context.Background()
-	return &app{
+	app := app{
 		P2p:                      nil,
 		Ctx:                      ctx,
 		Subs:                     make(map[uint64]subscription),
@@ -42,6 +42,15 @@ func newApp() *app {
 		metricsServer:            nil,
 		bitswapCtx:               NewBitswapCtx(ctx, outChan),
 	}
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+			if app.P2p != nil {
+				app.P2p.Logger.Infof("number of active streams: %d", len(app.Streams))
+			}
+		}
+	}()
+	return &app
 }
 
 func (app *app) SetConnectionHandlers() {
