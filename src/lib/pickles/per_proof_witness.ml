@@ -56,7 +56,11 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( Challenge.Make(Impl).t
       , Challenge.Make(Impl).t Scalar_challenge.t
       , Impl.Field.t Shifted_value.Type1.t
-      , Step_verifier.Make(Step_main_inputs).Other_field.t
+      , ( ( Challenge.Make(Impl).t Scalar_challenge.t
+          , Impl.Field.t Shifted_value.Type1.t )
+          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+        , Impl.Boolean.var )
+        Plonk_types.Opt.t
       , unit
       , Digest.Make(Impl).t
       , Challenge.Make(Impl).t Scalar_challenge.t Types.Bulletproof_challenge.t
@@ -103,7 +107,10 @@ module Constant = struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
-        , Tock.Field.t
+        , ( Challenge.Constant.t Scalar_challenge.t
+          , Tick.Field.t Shifted_value.Type1.t )
+          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+          option
         , unit
         , Digest.Constant.t
         , Challenge.Constant.t Scalar_challenge.t Types.Bulletproof_challenge.t
@@ -127,11 +134,10 @@ end
 
 open Core_kernel
 
-let lookup_config : Plonk_types.Lookup_config.t = { lookup = No; runtime = No }
-
-let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
+let typ (type n avar aval m) ~lookup (statement : (avar, aval) Impls.Step.Typ.t)
     (max_proofs_verified : n Nat.t) (branches : m Nat.t) :
     ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
+  let module Sc = Scalar_challenge in
   let open Impls.Step in
   let open Step_main_inputs in
   let open Step_verifier in
@@ -140,16 +146,21 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     ~value_of_hlist:Constant.of_hlist
     [ statement
     ; Wrap_proof.typ
-    ; Types.Wrap.Proof_state.In_circuit.typ ~challenge:Challenge.typ
-        ~scalar_challenge:Challenge.typ
+    ; Types.Wrap.Proof_state.In_circuit.typ
+        (module Impl)
+        ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~lookup
+        ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
+        ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
-        Other_field.typ
         (Snarky_backendless.Typ.unit ())
         Digest.typ
         (Branch_data.typ
            (module Impl)
            ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
-    ; Plonk_types.All_evals.typ (module Impl) lookup_config
+    ; Plonk_types.All_evals.typ
+        (module Impl)
+        (* Assume we have lookup iff we have runtime tables *)
+        { lookup; runtime = lookup }
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
     ; Vector.typ Inner_curve.typ max_proofs_verified
     ]
