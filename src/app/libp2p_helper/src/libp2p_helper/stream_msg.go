@@ -35,6 +35,7 @@ func (m AddStreamHandlerReq) handle(app *app, seqno uint64) *capnp.Message {
 			app.P2p.Logger.Errorf("failed to parse remote connection information, silently dropping stream: %s", err.Error())
 			return
 		}
+		app.P2p.Logger.Infof("opened inbound stream from peer: %s", peerinfo)
 		streamIdx := app.NextId()
 		app.StreamsMutex.Lock()
 		defer app.StreamsMutex.Unlock()
@@ -142,6 +143,9 @@ func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 		// Note: It is _very_ important that we call handleStreamReads here -- this is how the "caller" side of the stream starts listening to the responses from the RPCs. Do not remove.
 		handleStreamReads(app, stream, streamIdx)
 	}()
+
+	app.P2p.Logger.Infof("opened output stream to peer: %s", peerDecoded)
+
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
 		resp, err := m.NewOpenStream()
 		panicOnErr(err)
@@ -243,6 +247,12 @@ func (m SendStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 		n, err := stream.Write(data)
 		if err != nil {
 			// TODO check that it's correct to error out, not repeat writing
+			delete(app.Streams, streamId)
+			close_err := stream.Close()
+			if close_err != nil {
+				app.P2p.Logger.Errorf("failed to close stream %d after encountering write failure (%s): %s", streamId, err.Error(), close_err.Error())
+			}
+
 			return mkRpcRespError(seqno, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data))))
 		}
 		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
