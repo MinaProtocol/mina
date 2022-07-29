@@ -10,6 +10,8 @@ let don't_wait_for = Fn.compose don't_wait_for Deferred.ignore_m
 let peek_result action =
   Option.(join @@ map ~f:Result.ok @@ Deferred.peek action)
 
+let unit = Deferred.Result.return ()
+
 module Make () = struct
   let interrupt_ivar = Ivar.create ()
 

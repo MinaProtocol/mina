@@ -2,14 +2,18 @@
  (name transition_frontier_controller)
  (public_name transition_frontier_controller)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_mina))
+ (preprocess (pps ppx_version ppx_mina ppx_jane 
+ ))
  (libraries
    ;; opam libraries
    base
    async_kernel
+   async
    core_kernel
    core
+   sexplib0
    ;; local libraries
+   unix_timestamp
    transition_frontier
    data_hash_lib
    mina_metrics
@@ -36,4 +40,10 @@
    non_empty_list
    mina_net2
    bootstrap_controller
+   staged_ledger_diff
+   mina_state
+   interruptible
+   transaction_snark_work
+   one_or_two
+   mina_base.import
 ))

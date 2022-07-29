@@ -29,4 +29,6 @@ val don't_wait_for : unit t -> unit
 *)
 val peek_result : 'a t -> 'a option
 
+val unit : unit t
+
 module Make () : F
