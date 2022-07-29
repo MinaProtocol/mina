@@ -68,7 +68,7 @@ module Chunked = struct
             ~f:(fun (xs, acc, acc_n) (x, n) ->
               let n' = Int.(n + acc_n) in
               if Int.(n' < size_in_bits) then (xs, shift_left acc n + x, n')
-              else (acc :: xs, x, 0) )
+              else (acc :: xs, x, n) )
         in
         let xs = acc :: xs in
         Array.of_list_rev xs
