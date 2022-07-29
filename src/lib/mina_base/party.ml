@@ -452,6 +452,11 @@ module Update = struct
         ~checked:(Data_as_hash.deriver string)
         ~name:"StringWithHash" string
     in
+    let token_symbol =
+      with_checked
+        ~checked:(js_only (Js_layout.leaf_type (Custom "TokenSymbol")))
+        ~name:"TokenSymbol" string
+    in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
@@ -459,7 +464,7 @@ module Update = struct
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
          ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
-         ~token_symbol:!.(Set_or_keep.deriver string_with_hash)
+         ~token_symbol:!.(Set_or_keep.deriver token_symbol)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
