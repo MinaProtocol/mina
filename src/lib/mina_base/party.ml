@@ -671,7 +671,8 @@ module Preconditions = struct
   let to_input ({ network; account } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Zkapp_precondition.Protocol_state.to_input network
-      ; Random_oracle_input.Chunked.field (Account_precondition.digest account)
+      ; Zkapp_precondition.Account.to_input
+          (Account_precondition.to_full account)
       ]
 
   let gen =
@@ -701,8 +702,7 @@ module Preconditions = struct
     let to_input ({ network; account } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Zkapp_precondition.Protocol_state.Checked.to_input network
-        ; Random_oracle_input.Chunked.field
-            (Account_precondition.Checked.digest account)
+        ; Zkapp_precondition.Account.Checked.to_input account
         ]
   end
 
@@ -1111,8 +1111,8 @@ module Body = struct
           t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input public_key
-        ; Update.Checked.to_input update
         ; Token_id.Checked.to_input token_id
+        ; Update.Checked.to_input update
         ; Snark_params.Tick.Run.run_checked
             (Amount.Signed.Checked.to_input balance_change)
         ; Random_oracle_input.Chunked.packed
@@ -1185,8 +1185,8 @@ module Body = struct
         t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input public_key
-      ; Update.to_input update
       ; Token_id.to_input token_id
+      ; Update.to_input update
       ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events
