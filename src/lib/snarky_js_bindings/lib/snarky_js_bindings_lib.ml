@@ -2997,11 +2997,34 @@ module Ledger = struct
       let input = Party.Update.Timing_info.to_input value in
       random_oracle_input_to_js input
     in
+    let permissions_input (json : Js.js_string Js.t) : random_oracle_input_js =
+      let deriver = Mina_base.Permissions.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Mina_base.Permissions.to_input value in
+      random_oracle_input_to_js input
+    in
     let update_input (json : Js.js_string Js.t) : random_oracle_input_js =
       let deriver = Party.Update.deriver in
       let json = json |> Js.to_string |> Yojson.Safe.from_string in
       let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
       let input = Party.Update.to_input value in
+      random_oracle_input_to_js input
+    in
+    let account_precondition_input (json : Js.js_string Js.t) :
+        random_oracle_input_js =
+      let deriver = Mina_base.Zkapp_precondition.Account.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Mina_base.Zkapp_precondition.Account.to_input value in
+      random_oracle_input_to_js input
+    in
+    let network_precondition_input (json : Js.js_string Js.t) :
+        random_oracle_input_js =
+      let deriver = Mina_base.Zkapp_precondition.Protocol_state.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Mina_base.Zkapp_precondition.Protocol_state.to_input value in
       random_oracle_input_to_js input
     in
     let body_input (json : Js.js_string Js.t) : random_oracle_input_js =
@@ -3016,6 +3039,12 @@ module Ledger = struct
          val packInput = pack_input
 
          val timing = timing_input
+
+         val permissions = permissions_input
+
+         val accountPrecondition = account_precondition_input
+
+         val networkPrecondition = network_precondition_input
 
          val update = update_input
 
