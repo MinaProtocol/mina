@@ -152,6 +152,16 @@ type fully_invalid_with_header =
   , [ `Protocol_versions ] * unit Truth.false_t )
   with_header
 
+type pre_initial_valid_with_header =
+  ( [ `Time_received ] * unit Truth.true_t
+  , [ `Genesis_state ] * unit Truth.true_t
+  , [ `Proof ] * unit Truth.false_t
+  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+  , [ `Frontier_dependencies ] * unit Truth.false_t
+  , [ `Staged_ledger_diff ] * unit Truth.false_t
+  , [ `Protocol_versions ] * unit Truth.true_t )
+  with_header
+
 type initial_valid_with_header =
   ( [ `Time_received ] * unit Truth.true_t
   , [ `Genesis_state ] * unit Truth.true_t

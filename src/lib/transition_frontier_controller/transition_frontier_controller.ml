@@ -2,16 +2,7 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Mina_block
-
-module type CONTEXT = sig
-  val logger : Logger.t
-
-  val precomputed_values : Precomputed_values.t
-
-  val constraint_constants : Genesis_constants.Constraint_constants.t
-
-  val consensus_constants : Consensus.Constants.t
-end
+include Types
 
 let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~collected_transitions

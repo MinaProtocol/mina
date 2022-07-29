@@ -67,6 +67,8 @@ val closed : t -> unit Deferred.t
 
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
+val add_breadcrumbs_exn : t -> Breadcrumb.t list -> unit Deferred.t
+
 val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t

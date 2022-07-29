@@ -356,8 +356,7 @@ let genesis_state_hash { genesis_state_hash; _ } = genesis_state_hash
 let root_snarked_ledger { persistent_root_instance; _ } =
   Persistent_root.Instance.snarked_ledger persistent_root_instance
 
-let add_breadcrumb_exn t breadcrumb =
-  let open Deferred.Let_syntax in
+let add_breadcrumb_impl t breadcrumb =
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
   [%log' trace t.logger]
     ~metadata:
@@ -408,10 +407,16 @@ let add_breadcrumb_exn t breadcrumb =
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
-  let%bind sync_result =
+  (lite_diffs, diffs_with_mutants)
+
+let add_breadcrumbs_exn t breadcrumbs =
+  let res = List.map breadcrumbs ~f:(add_breadcrumb_impl t) in
+  let diffs = List.concat_map ~f:fst res in
+  let diffs_with_mutants = List.concat_map ~f:snd res in
+  let%bind.Deferred sync_result =
     (* Diffs get put into a buffer here. They're processed asynchronously, except for root transitions *)
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
-      ~diffs:lite_diffs
+      ~diffs
   in
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
@@ -421,6 +426,8 @@ let add_breadcrumb_exn t breadcrumb =
             has not been performed correctly" )
   |> Result.ok_exn ;
   Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs_with_mutants
+
+let add_breadcrumb_exn t breadcrumb = add_breadcrumbs_exn t [ breadcrumb ]
 
 (* proxy full frontier functions *)
 include struct

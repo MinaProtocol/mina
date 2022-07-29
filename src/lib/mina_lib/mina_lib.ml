@@ -1974,41 +1974,30 @@ let create ?wallets (config : Config.t) =
                       ~constants:consensus_constants ~time_received:now
                       consensus_state
                   with
-                  | Ok () -> (
-                      match source with
+                  | Ok () ->
+                      ( match source with
                       | `Gossip ->
                           [%str_log' info config.logger]
                             ~metadata:
                               [ ( "external_transition"
                                 , Mina_block.Validated.to_yojson transition )
                               ]
-                            (Rebroadcast_transition { state_hash = hash }) ;
+                            (Rebroadcast_transition { state_hash = hash })
                           (*send callback to libp2p to forward the gossiped transition*)
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept )
-                            valid_cb
                       | `Internal ->
                           (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
                           don't_wait_for
                             (Mina_networking.broadcast_state net
-                               (Mina_block.Validated.forget transition) ) ;
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept )
-                            valid_cb
+                               (Mina_block.Validated.forget transition) )
                       | `Catchup ->
                           (*Noop for directly downloaded transitions*)
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept )
-                            valid_cb )
+                          () ) ;
+                      Option.iter
+                        ~f:
+                          (Fn.flip
+                             Mina_net2.Validation_callback
+                             .fire_if_not_already_fired `Accept )
+                        valid_cb
                   | Error reason -> (
                       let timing_error_json =
                         match reason with

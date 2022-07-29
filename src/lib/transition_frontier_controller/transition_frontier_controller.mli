@@ -1,12 +1,4 @@
-module type CONTEXT = sig
-  val logger : Logger.t
-
-  val precomputed_values : Precomputed_values.t
-
-  val constraint_constants : Genesis_constants.Constraint_constants.t
-
-  val consensus_constants : Consensus.Constants.t
-end
+include module type of Types
 
 val run :
      context:(module CONTEXT)
@@ -17,14 +9,7 @@ val run :
   -> collected_transitions:Bootstrap_controller.Transition_cache.element list
   -> frontier:Transition_frontier.t
   -> network_transition_reader:
-       ( [< `Block of
-            Mina_block.Validation.initial_valid_with_block
-            Network_peer.Envelope.Incoming.t
-         | `Header of
-           Mina_block.Validation.initial_valid_with_header
-           Network_peer.Envelope.Incoming.t ]
-       * [< `Valid_cb of Mina_net2.Validation_callback.t option ] )
-       Pipe_lib.Strict_pipe.Reader.t
+       Types.produced_transition Pipe_lib.Strict_pipe.Reader.t
   -> producer_transition_reader:
        Transition_frontier.Breadcrumb.t Pipe_lib.Strict_pipe.Reader.t
   -> clear_reader:'a Pipe_lib.Strict_pipe.Reader.t
