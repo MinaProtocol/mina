@@ -22,11 +22,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; block_producers =
         [ { balance = "8000000000"; timing = Untimed }
-        ; { balance = "2000000000"; timing = Untimed }
+        ; { balance = "1000000000"; timing = Untimed }
         ]
     ; extra_genesis_accounts =
-        [ { balance = "3000000000"; timing = Untimed }
-        ; { balance = "3000000000"; timing = Untimed }
+        [ { balance = "3000"; timing = Untimed }
+        ; { balance = "3000"; timing = Untimed }
         ]
     ; num_archive_nodes = 1
     ; num_snark_workers = 2
@@ -608,20 +608,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_create_accounts)
     in
     let%bind () =
-      section_hard "Send a zkApp transaction to update permissions"
-        (send_zkapp ~logger node parties_update_permissions)
-    in
-    let%bind () =
       section_hard
         "Wait for zkapp to create accounts to be included in transition \
          frontier"
         (wait_for_zkapp parties_create_accounts)
-    in
-    let%bind () =
-      section_hard
-        "Wait for zkApp transaction to update permissions to be included in \
-         transition frontier"
-        (wait_for_zkapp parties_update_permissions)
     in
     let%bind () =
       let sender = List.hd_exn zkapp_keypairs in
@@ -629,6 +619,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a valid payment from zkApp account"
         (send_payment_from_zkapp_account ~constraint_constants ~node ~logger
            sender nonce )
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction to update permissions"
+        (send_zkapp ~logger node parties_update_permissions)
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkApp transaction to update permissions to be included in \
+         transition frontier"
+        (wait_for_zkapp parties_update_permissions)
     in
     let%bind () =
       let sender = List.hd_exn zkapp_keypairs in
