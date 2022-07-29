@@ -86,7 +86,7 @@ func main() {
 		Format: logging.JSONOutput,
 		Stderr: true,
 		Stdout: false,
-		Level:  logging.LevelWarn,
+		Level:  logging.LevelDebug,
 		File:   "",
 	})
 	helperLog := logging.Logger("helper top-level JSON handling")
