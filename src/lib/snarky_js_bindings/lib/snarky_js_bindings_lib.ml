@@ -2883,7 +2883,60 @@ module Ledger = struct
     Mina_base.Account_id.derive_token_id ~owner:(account_id pk token)
     |> Mina_base.Token_id.to_field_unsafe |> to_js_field_unchecked
 
+  type random_oracle_input_js =
+    < fields : field_class Js.t Js.js_array Js.t Js.readonly_prop
+    ; packed :
+        < field : field_class Js.t Js.readonly_prop
+        ; size : int Js.readonly_prop >
+        Js.t
+        Js.js_array
+        Js.t
+        Js.readonly_prop >
+    Js.t
+
+  let random_oracle_input_to_js
+      (input : Impl.field Random_oracle_input.Chunked.t) :
+      random_oracle_input_js =
+    let fields =
+      input.field_elements |> Array.map ~f:to_js_field_unchecked |> Js.array
+    in
+    let packed =
+      input.packeds
+      |> Array.map ~f:(fun (field, size) ->
+             object%js
+               val field = to_js_field_unchecked field
+
+               val size = size
+             end )
+      |> Js.array
+    in
+    object%js
+      val fields = fields
+
+      val packed = packed
+    end
+
+  let pack_input (input : random_oracle_input_js) :
+      field_class Js.t Js.js_array Js.t =
+    let field_elements =
+      input##.fields |> Js.to_array |> Array.map ~f:of_js_field_unchecked
+    in
+    let packeds =
+      input##.packed |> Js.to_array
+      |> Array.map ~f:(fun packed ->
+             let field = packed##.field |> of_js_field_unchecked in
+             let size = packed##.size in
+             (field, size) )
+    in
+    let input : Impl.field Random_oracle_input.Chunked.t =
+      { field_elements; packeds }
+    in
+    Random_oracle.pack_input input
+    |> Array.map ~f:to_js_field_unchecked
+    |> Js.array
+
   let () =
+    let static name thing = Js.Unsafe.set ledger_class (Js.string name) thing in
     let static_method name f =
       Js.Unsafe.set ledger_class (Js.string name) (Js.wrap_callback f)
     in
@@ -2934,6 +2987,40 @@ module Ledger = struct
       (fields_to_json (Mina_base.Party.Body.typ ()) body_to_json) ;
     static_method "fieldsOfJson"
       (fields_of_json (Mina_base.Party.Body.typ ()) body_of_json) ;
+
+    (* hash inputs for various party subtypes *)
+    (* TODO: this is for testing against JS impl, remove eventually *)
+    let timing_input (json : Js.js_string Js.t) : random_oracle_input_js =
+      let deriver = Party.Update.Timing_info.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Party.Update.Timing_info.to_input value in
+      random_oracle_input_to_js input
+    in
+    let update_input (json : Js.js_string Js.t) : random_oracle_input_js =
+      let deriver = Party.Update.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Party.Update.to_input value in
+      random_oracle_input_to_js input
+    in
+    let body_input (json : Js.js_string Js.t) : random_oracle_input_js =
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = body_of_json json in
+      let input = Party.Body.to_input value in
+      random_oracle_input_to_js input
+    in
+
+    static "hashInputFromJson"
+      (object%js
+         val packInput = pack_input
+
+         val timing = timing_input
+
+         val update = update_input
+
+         val body = body_input
+      end ) ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;
