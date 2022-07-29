@@ -4,6 +4,8 @@ open Pickles_types
 open Hlist
 module Sc = Kimchi_backend_common.Scalar_challenge
 
+type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+
 module Basic = struct
   type (_, _, _) t =
     | Field : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) t
@@ -63,6 +65,14 @@ type ('a, 'b, 'c) basic = ('a, 'b, 'c) Basic.t =
         )
         basic
 
+module type Bool_intf = sig
+  type var
+
+  val true_ : var
+
+  val false_ : var
+end
+
 module rec T : sig
   type (_, _, _) t =
     | B : ('a, 'b, 'env) Basic.t -> ('a, 'b, 'env) t
@@ -76,6 +86,14 @@ module rec T : sig
     | Struct :
         ('xs1, 'xs2, 'env) H2_1.T(T).t
         -> ('xs1 Hlist.HlistId.t, 'xs2 Hlist.HlistId.t, 'env) t
+    | Opt :
+        { inner : ('a1, 'a2, (< bool1 : bool ; bool2 : 'bool ; .. > as 'env)) t
+        ; flag : Plonk_types.Opt.Flag.t
+        ; dummy1 : 'a1
+        ; dummy2 : 'a2
+        ; bool : (module Bool_intf with type var = 'bool)
+        }
+        -> ('a1 option, ('a2, 'bool) Plonk_types.Opt.t, 'env) t
 end =
   T
 
@@ -85,8 +103,14 @@ type ('scalar, 'env) pack =
   { pack : 'a 'b. ('a, 'b, 'env) Basic.t -> 'b -> 'scalar array }
 
 let rec pack :
-    type t v env. ('scalar, env) pack -> (t, v, env) T.t -> v -> 'scalar array =
- fun p spec t ->
+    type t v env.
+       zero:'scalar
+    -> one:'scalar
+    -> ('scalar, env) pack
+    -> (t, v, env) T.t
+    -> v
+    -> 'scalar array =
+ fun ~zero ~one p spec t ->
   match spec with
   | B spec ->
       p.pack spec t
@@ -94,15 +118,23 @@ let rec pack :
       let { Sc.inner = t } = t in
       p.pack chal t
   | Vector (spec, _) ->
-      Array.concat_map (Vector.to_array t) ~f:(pack p spec)
+      Array.concat_map (Vector.to_array t) ~f:(pack ~zero ~one p spec)
   | Struct [] ->
       [||]
   | Struct (spec :: specs) ->
       let (hd :: tl) = t in
-      let hd = pack p spec hd in
-      Array.append hd (pack p (Struct specs) tl)
+      let hd = pack ~zero ~one p spec hd in
+      Array.append hd (pack ~zero ~one p (Struct specs) tl)
   | Array (spec, _) ->
-      Array.concat_map t ~f:(pack p spec)
+      Array.concat_map t ~f:(pack ~zero ~one p spec)
+  | Opt { inner; flag; dummy1 = _; dummy2 } -> (
+      match t with
+      | None ->
+          Array.append [| zero |] (pack ~zero ~one p inner dummy2)
+      | Some x ->
+          Array.append [| one |] (pack ~zero ~one p inner x)
+      | Maybe (b, x) ->
+          Array.append (p.pack Bool b) (pack ~zero ~one p inner x) )
 
 type ('f, 'env) typ =
   { typ :
@@ -140,6 +172,12 @@ let rec typ :
         |> transport_var
              ~there:(fun (x :: xs) -> (x, xs))
              ~back:(fun (x, xs) -> x :: xs)
+    | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
+        let bool = typ t (B Bool) in
+        let open B in
+        (* Always use the same "maybe" layout which is a boolean and then the value *)
+        Plonk_types.Opt.constant_layout_typ bool flag ~dummy:dummy1
+          ~dummy_var:dummy2 ~true_ ~false_ (typ t inner)
 
 type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
 
@@ -195,6 +233,26 @@ let rec etyp :
                  ~back:(fun (x, xs) -> x :: xs)
           , (fun (x, xs) -> f1 x :: f2 xs)
           , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
+    | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
+        let (T (bool, f_bool, f_bool')) = etyp e (B Bool) in
+        let (T (a, f_a, f_a')) = etyp e inner in
+        let opt_map ~f1 ~f2 (x : _ Plonk_types.Opt.t) : _ Plonk_types.Opt.t =
+          match x with
+          | None ->
+              None
+          | Some x ->
+              Some (f1 x)
+          | Maybe (b, x) ->
+              Maybe (f2 b, f1 x)
+        in
+        let f = opt_map ~f1:f_a ~f2:f_bool in
+        let f' = opt_map ~f1:f_a' ~f2:f_bool' in
+        T
+          ( Plonk_types.Opt.constant_layout_typ ~dummy:dummy1
+              ~dummy_var:(f_a' dummy2) ~true_:(f_bool' B.true_)
+              ~false_:(f_bool' B.false_) bool flag a
+          , f
+          , f' )
 
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
@@ -223,7 +281,7 @@ module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
 end
 
 let pack_basic (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field) =
+    ((module Impl) : field impl) =
   let open Impl in
   let module C = Common (Impl) in
   let open C in
@@ -253,7 +311,11 @@ let pack_basic (type field other_field other_field_var)
   in
   { pack }
 
-let pack impl t = pack (pack_basic impl) t
+let pack (type f) ((module Impl) as impl : f impl) t =
+  let open Impl in
+  pack (pack_basic impl) t
+    ~zero:(`Packed_bits (Field.zero, 1))
+    ~one:(`Packed_bits (Field.one, 1))
 
 let typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)

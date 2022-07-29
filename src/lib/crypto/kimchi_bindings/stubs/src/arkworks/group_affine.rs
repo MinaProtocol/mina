@@ -1,6 +1,6 @@
 use crate::arkworks::{CamlFp, CamlFq};
 use ark_ff::Zero;
-use mina_curves::pasta::{pallas::Affine as AffinePallas, vesta::Affine as AffineVesta};
+use mina_curves::pasta::{pallas::Pallas as AffinePallas, vesta::Vesta as AffineVesta};
 
 //
 // handy types

@@ -2840,8 +2840,11 @@ module Types = struct
           ~fields:
             [ arg "publicKey" ~typ:PublicKey.arg_typ
                 ~doc:
-                  "Public key of the account to receive coinbases. Block \
-                   production keys will receive the coinbases if none is given"
+                  (sprintf
+                     "Public key of the account to receive coinbases. Block \
+                      production keys will receive the coinbases if omitted. \
+                      %s"
+                     Cli_lib.Default.receiver_key_warning )
             ]
     end
 
@@ -2863,8 +2866,10 @@ module Types = struct
           ~fields:
             [ arg "publicKey" ~typ:PublicKey.arg_typ
                 ~doc:
-                  "Public key you wish to start snark-working on; null to stop \
-                   doing any snark work"
+                  (sprintf
+                     "Public key you wish to start snark-working on; null to \
+                      stop doing any snark work. %s"
+                     Cli_lib.Default.receiver_key_warning )
             ]
     end
 

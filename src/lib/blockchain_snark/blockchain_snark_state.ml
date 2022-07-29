@@ -374,6 +374,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
+  ; uses_lookup = false
   }
 
 module type S = sig

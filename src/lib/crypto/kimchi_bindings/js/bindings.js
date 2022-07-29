@@ -2285,3 +2285,9 @@ function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
         fq_vector[i] = a;
     });
 }
+
+// Provides: caml_pasta_fp_plonk_proof_example_with_lookup
+function caml_pasta_fp_plonk_proof_example_with_lookup() {
+    // This is only used in the pickles unit tests
+    throw new Error("Unimplemented caml_pasta_fp_plonk_proof_example_with_lookup");
+}

@@ -203,7 +203,7 @@ pub mod fp {
     use super::*;
     use crate::arkworks::{WasmGVesta, WasmPastaFp};
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
+    use mina_curves::pasta::{fp::Fp, vesta::Vesta as GAffine};
 
     impl_srs!(
         caml_fp_srs,
@@ -220,7 +220,7 @@ pub mod fq {
     use super::*;
     use crate::arkworks::{WasmGPallas, WasmPastaFq};
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
+    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine};
 
     impl_srs!(
         caml_fq_srs,
