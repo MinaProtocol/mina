@@ -1133,8 +1133,10 @@ let set_snark_worker =
   let public_key_flag =
     flag "--address" ~aliases:[ "address" ]
       ~doc:
-        "PUBLICKEY Public-key address you wish to start snark-working on; null \
-         to stop doing any snark work"
+        (sprintf
+           "PUBLICKEY Public-key address you wish to start snark-working on; \
+            null to stop doing any snark work. %s"
+           Cli_lib.Default.receiver_key_warning )
       (optional Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async
