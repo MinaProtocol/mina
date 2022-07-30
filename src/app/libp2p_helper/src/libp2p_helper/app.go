@@ -110,7 +110,7 @@ func (app *app) writeMsg(msg *capnp.Message) {
 		case <-app.Ctx.Done():
 			app.P2p.Logger.Debug("Droping message for sending, context closed (unblocked)")
 		case app.OutChan <- msg:
-			app.P2p.Logger.Info("Stacked message, unblocked...")
+			app.P2p.Logger.Warn("Stacked message, unblocked...")
 		}
 	}
 }
@@ -331,14 +331,19 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 	go func() {
 		buf := make([]byte, 4096)
 		tot := uint64(0)
+		f, _ := os.OpenFile("/tmp/dat4",
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		defer f.Close()
 		for {
 			n, err := stream.Read(buf)
 
 			if n != 0 {
+				f.WriteString(fmt.Sprintf("Received %d on %d (total=%d)\n", n, idx, tot+uint64(n)))
 				app.writeMsg(mkStreamMessageReceivedUpcall(idx, buf[:n]))
 			}
 
 			if err != nil && err != io.EOF {
+				f.WriteString(fmt.Sprintf("stream %d lost (total=%d): %s\n", idx, tot+uint64(n), err))
 				app.writeMsg(mkStreamLostUpcall(idx, fmt.Sprintf("read failure: %s", err.Error())))
 				return
 			}
@@ -346,10 +351,12 @@ func handleStreamReads(app *app, stream net.Stream, idx uint64) {
 			tot += uint64(n)
 
 			if err == io.EOF {
+				f.WriteString(fmt.Sprintf("stream %d EOF (total=%d)\n", idx, tot+uint64(n)))
 				app.P2p.MsgStats.UpdateMetrics(tot)
 				break
 			}
 		}
+		f.WriteString(fmt.Sprintf("stream %d complete (total=%d)\n", idx, tot))
 		app.writeMsg(mkStreamCompleteUpcall(idx))
 		err := stream.Close()
 		if err != nil {

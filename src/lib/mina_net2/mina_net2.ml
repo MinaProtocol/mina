@@ -492,6 +492,7 @@ let handle_push_message t push_message =
           let stream_id = stream_id_get m in
           let reason = reason_get m in
           let stream_id_str = Libp2p_ipc.stream_id_to_string stream_id in
+          [%log' info t.logger] "Stream lost %s" stream_id_str; 
           ( match Hashtbl.find t.streams stream_id_str with
           | Some stream ->
               let (`Stream_should_be_released should_release) =
@@ -513,6 +514,7 @@ let handle_push_message t push_message =
           let open StreamComplete in
           let stream_id = stream_id_get m in
           let stream_id_str = Libp2p_ipc.stream_id_to_string stream_id in
+          [%log' info t.logger] "Stream complete %s" stream_id_str; 
           match Hashtbl.find t.streams stream_id_str with
           | Some stream ->
               let (`Stream_should_be_released should_release) =

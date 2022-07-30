@@ -86,7 +86,7 @@ func main() {
 		Format: logging.JSONOutput,
 		Stderr: true,
 		Stdout: false,
-		Level:  logging.LevelWarn,
+		Level:  logging.LevelDebug,
 		File:   "",
 	})
 	helperLog := logging.Logger("helper top-level JSON handling")
@@ -147,6 +147,7 @@ func main() {
 	app := newApp()
 
 	go func() {
+		tot := 0
 		for {
 			msg := <-app.OutChan
 			bytes, err := msg.Marshal()
@@ -159,6 +160,8 @@ func main() {
 				panic(err)
 			}
 
+			tot += n
+
 			if n != len(bytes) {
 				// TODO: handle this correctly.
 				panic("short write :(")
@@ -167,6 +170,8 @@ func main() {
 			if err := app.Out.Flush(); err != nil {
 				panic(err)
 			}
+
+			helperLog.Errorf("Wrote total of %d bytes", tot)
 		}
 	}()
 

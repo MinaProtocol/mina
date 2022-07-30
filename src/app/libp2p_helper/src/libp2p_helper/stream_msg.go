@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 	"time"
 
 	ipc "libp2p_ipc"
@@ -39,8 +42,43 @@ func (m AddStreamHandlerReq) handle(app *app, seqno uint64) *capnp.Message {
 		app.StreamsMutex.Lock()
 		defer app.StreamsMutex.Unlock()
 		app.Streams[streamIdx] = stream
-		app.writeMsg(mkIncomingStreamUpcall(peerinfo, streamIdx, protocolId))
-		handleStreamReads(app, stream, streamIdx)
+		if protocolId == "echo" {
+			go func() {
+				os.WriteFile("/tmp/dat1", []byte("echo started"), 0644)
+				f, _ := os.OpenFile("/tmp/dat2",
+					os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				defer f.Close()
+				buf := make([]byte, 4096)
+				tot := uint64(0)
+				for {
+					n, err := stream.Read(buf)
+
+					if n != 0 {
+						stream.Write(buf[:n])
+					}
+
+					if err != nil && err != io.EOF {
+						return
+					}
+
+					tot += uint64(n)
+
+					f.WriteString(fmt.Sprintf("%d\n", tot))
+					if err == io.EOF {
+						app.P2p.MsgStats.UpdateMetrics(tot)
+						break
+					}
+				}
+				os.WriteFile("/tmp/dat3", []byte("echo finished"), 0644)
+				err := stream.Close()
+				if err != nil {
+					app.P2p.Logger.Warn("Error while closing the stream: ", err.Error())
+				}
+			}()
+		} else {
+			app.writeMsg(mkIncomingStreamUpcall(peerinfo, streamIdx, protocolId))
+			handleStreamReads(app, stream, streamIdx)
+		}
 	})
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
@@ -96,6 +134,7 @@ func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 	streamIdx := app.NextId()
 	var peerDecoded peer.ID
 	var protocolId string
+
 	err := func() error {
 		peerId, err := OpenStreamReqT(m).Peer()
 		if err != nil {
@@ -116,12 +155,27 @@ func (m OpenStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
 
+	if protocolId == "echo" {
+		streamIdx += 1000000
+	}
+
 	ctx, cancel := context.WithTimeout(app.Ctx, 30*time.Second)
 	defer cancel()
 
 	stream, err := app.P2p.Host.NewStream(ctx, peerDecoded, protocol.ID(protocolId))
 	if err != nil {
 		return mkRpcRespError(seqno, badp2p(err))
+	}
+
+	if protocolId == "echo" {
+		go func() {
+			time.Sleep(time.Second * 15)
+			testmsg := "This is a test. This is a test of the Outdoor Warning System. This is only a test."
+			testmsg = strings.Repeat(testmsg, 10)
+			for i := 0; i < 4; i++ {
+				stream.Write([]byte(testmsg))
+			}
+		}()
 	}
 
 	peer, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())

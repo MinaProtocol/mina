@@ -3,7 +3,7 @@ open Async
 open Mina_net2
 
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
+(* open Inline_test_quiet_logs *)
 
 let%test_module "coda network tests" =
   ( module struct
@@ -104,96 +104,133 @@ let%test_module "coda network tests" =
       (b, c, shutdown)
 
     (* TODO fails occasionally, uncomment after debugging it *)
-    let%test_unit "b_stream_c" =
-      let () = Core.Backtrace.elide := false in
-      let test_def () =
-        let open Deferred.Let_syntax in
-        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
-        let%bind b_peerid = me b >>| Keypair.to_peer_id in
-        let handler_finished = Ivar.create () in
-        let%bind () =
-          open_protocol b ~on_handler_error:`Raise ~protocol:"read_bytes"
-            (fun stream ->
-              let r, w = Libp2p_stream.pipes stream in
-              let rec go i =
-                if i = 0 then return ()
-                else
-                  let%bind s =
-                    match%map Pipe.read' ~max_queue_length:1 r with
-                    | `Eof ->
-                        failwith "Eof"
-                    | `Ok q ->
-                        Base.Queue.peek_exn q
-                  in
-                  let s' = ref s in
-                  let j = ref i in
-                  while not (String.is_empty !s') do
-                    let t = Printf.sprintf "%d" !j in
-                    if String.is_prefix ~prefix:t !s' then (
-                      s' := String.drop_prefix !s' (String.length t) ;
-                      j := !j - 1 )
-                    else
-                      failwith
-                        (Printf.sprintf "Unexpected string %s not matches %d" s
-                           !j )
-                  done ;
-                  go !j
-              in
-              go 1000
-              >>| fun () ->
-              Pipe.close w ;
-              Ivar.fill handler_finished () )
-          >>| Or_error.ok_exn
-        in
-        let%bind stream =
-          open_stream c ~protocol:"read_bytes" ~peer:b_peerid
-          >>| Or_error.ok_exn
-        in
-        let r, w = Libp2p_stream.pipes stream in
-        let rec go2 i =
-          if i = 0 then return ()
-          else Pipe.write w (Printf.sprintf "%d" i) >>= fun () -> go2 (i - 1)
-        in
-        let%bind () = go2 1000 in
-        Pipe.close w ;
-        let%bind () = Ivar.read handler_finished in
-        let%bind () = reset_stream c stream >>| Or_error.ok_exn in
-        let%bind _msgs = Pipe.read_all r in
-        shutdown ()
-      in
-      Async.Thread_safe.block_on_async_exn test_def
+    (* let%test_unit "b_stream_c" =
+       let () = Core.Backtrace.elide := false in
+       let test_def () =
+         let open Deferred.Let_syntax in
+         let%bind b, c, shutdown = setup_two_nodes "test_stream" in
+         let%bind b_peerid = me b >>| Keypair.to_peer_id in
+         let handler_finished = Ivar.create () in
+         let%bind () =
+           open_protocol b ~on_handler_error:`Raise ~protocol:"read_bytes"
+             (fun stream ->
+               let r, w = Libp2p_stream.pipes stream in
+               let rec go i =
+                 if i = 0 then return ()
+                 else
+                   let%bind s =
+                     match%map Pipe.read' ~max_queue_length:1 r with
+                     | `Eof ->
+                         failwith "Eof"
+                     | `Ok q ->
+                         Base.Queue.peek_exn q
+                   in
+                   let s' = ref s in
+                   let j = ref i in
+                   while not (String.is_empty !s') do
+                     let t = Printf.sprintf "%d" !j in
+                     if String.is_prefix ~prefix:t !s' then (
+                       s' := String.drop_prefix !s' (String.length t) ;
+                       j := !j - 1 )
+                     else
+                       failwith
+                         (Printf.sprintf "Unexpected string %s not matches %d" s
+                            !j )
+                   done ;
+                   go !j
+               in
+               go 1000
+               >>| fun () ->
+               Pipe.close w ;
+               Ivar.fill handler_finished () )
+           >>| Or_error.ok_exn
+         in
+         let%bind stream =
+           open_stream c ~protocol:"read_bytes" ~peer:b_peerid
+           >>| Or_error.ok_exn
+         in
+         let r, w = Libp2p_stream.pipes stream in
+         let rec go2 i =
+           if i = 0 then return ()
+           else Pipe.write w (Printf.sprintf "%d" i) >>= fun () -> go2 (i - 1)
+         in
+         let%bind () = go2 1000 in
+         Pipe.close w ;
+         let%bind () = Ivar.read handler_finished in
+         let%bind () = reset_stream c stream >>| Or_error.ok_exn in
+         let%bind _msgs = Pipe.read_all r in
+         shutdown ()
+       in
+       Async.Thread_safe.block_on_async_exn test_def *)
 
     let%test_unit "stream" =
+      let testmsg = String.concat @@ List.init 10 ~f:(const testmsg) in
+      let streamsN = 10000 in
+      let n = 1 in
+      let iters = 4 in
       let () = Core.Backtrace.elide := false in
       let test_def () =
         let open Deferred.Let_syntax in
         let%bind b, c, shutdown = setup_two_nodes "test_stream" in
         let%bind b_peerid = me b >>| Keypair.to_peer_id in
-        let handler_finished = Ivar.create () in
         let%bind () =
-          open_protocol b ~on_handler_error:`Raise ~protocol:"echo"
-            (fun stream ->
-              let r, w = Libp2p_stream.pipes stream in
-              let%map () = Pipe.transfer r w ~f:Fn.id in
-              Pipe.close w ;
-              Ivar.fill_if_empty handler_finished () )
+          open_protocol b ~on_handler_error:`Raise ~protocol:"echo" (fun _ ->
+              exit 14 (* Handled by libp2p helper *) )
           |> Deferred.Or_error.ok_exn
         in
-        let%bind stream =
-          open_stream c ~protocol:"echo" ~peer:b_peerid >>| Or_error.ok_exn
+        [%log info] "Started" ;
+        let%bind streams =
+          Deferred.List.init streamsN ~f:(fun _ ->
+              let%map stream =
+                open_stream c ~protocol:"echo" ~peer:b_peerid
+                >>| Or_error.ok_exn
+              in
+              (stream, ref 0) )
         in
-        let r, w = Libp2p_stream.pipes stream in
-        Pipe.write_without_pushback w testmsg ;
-        Pipe.close w ;
-        (* HACK: let our messages send before we reset.
-           It would be more principled to add synchronization. *)
-        let%bind () = after (Time.Span.of_sec 1.) in
-        let%bind () = reset_stream c stream >>| Or_error.ok_exn in
-        let%bind msg = Pipe.read_all r in
-        let msg = Queue.to_list msg |> String.concat in
-        assert (String.equal msg testmsg) ;
-        let%bind () = Ivar.read handler_finished in
-        let%bind () = close_protocol b ~protocol:"echo" in
+        let expected_string =
+          String.concat @@ List.init (n * iters) ~f:(const testmsg)
+        in
+        let expected_str_len = String.length expected_string in
+        let action =
+          Deferred.for_ 1 ~to_:iters ~do_:(fun i ->
+              Thread.delay 40. ;
+              Deferred.List.iteri ~how:`Parallel streams
+                ~f:(fun streamI (stream, pos) ->
+                  let r, _w = Libp2p_stream.pipes stream in
+                  let expected_str_rem =
+                    String.length testmsg * n * (iters - i)
+                  in
+                  if expected_str_rem >= expected_str_len - !pos then
+                    Deferred.unit
+                  else
+                    Deferred.repeat_until_finished ()
+                    @@ fun () ->
+                    match%map Pipe.read r with
+                    | `Eof ->
+                        failwith
+                          (sprintf
+                             "failed at i=%d streamI=%d pos=%d (out of %d)" i
+                             streamI !pos expected_str_len )
+                    | `Ok msg ->
+                        let len = String.length msg in
+                        [%log info] "iter=%d streamI=%d pos=%d: read %d bytes" i
+                          streamI !pos len ;
+                        let cur = String.sub expected_string ~pos:!pos ~len in
+                        pos := !pos + len ;
+                        if not (String.equal msg cur) then
+                          failwith (sprintf "not equal: %s %s" msg cur) ;
+                        if expected_str_rem >= expected_str_len - !pos then
+                          `Finished ()
+                        else `Repeat () ) )
+        in
+        let%bind () =
+          Deferred.choose
+            [ Deferred.choice action ident
+            ; Deferred.choice
+                (Async_kernel.after (Time_ns.Span.of_min 6.))
+                (fun _ -> failwith "timeout")
+            ]
+        in
         shutdown ()
       in
       Async.Thread_safe.block_on_async_exn test_def
