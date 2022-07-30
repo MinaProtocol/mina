@@ -1144,6 +1144,8 @@ let poseidon =
 
         val sequenceEvents = Js.string (zkapp_sequence_events :> string)
 
+        val body = Js.string (zkapp_body :> string)
+
         val partyCons = Js.string (party_cons :> string)
 
         val partyNode = Js.string (party_node :> string)
