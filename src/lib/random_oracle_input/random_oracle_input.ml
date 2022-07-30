@@ -58,22 +58,21 @@ module Chunked = struct
   *)
   let pack_to_fields (type t) (module F : Field_intf with type t = t)
       ~(pow2 : int -> t) { field_elements; packeds } =
-    if Array.length packeds = 0 then field_elements
-    else
-      let shift_left acc n = F.( * ) acc (pow2 n) in
-      let open F in
-      let packed_bits =
-        let xs, acc, _ =
-          Array.fold packeds ~init:([], zero, 0)
-            ~f:(fun (xs, acc, acc_n) (x, n) ->
-              let n' = Int.(n + acc_n) in
-              if Int.(n' < size_in_bits) then (xs, shift_left acc n + x, n')
-              else (acc :: xs, x, n) )
-        in
-        let xs = acc :: xs in
-        Array.of_list_rev xs
+    let shift_left acc n = F.( * ) acc (pow2 n) in
+    let open F in
+    let packed_bits =
+      let xs, acc, acc_n =
+        Array.fold packeds ~init:([], zero, 0)
+          ~f:(fun (xs, acc, acc_n) (x, n) ->
+            let n' = Int.(n + acc_n) in
+            if Int.(n' < size_in_bits) then (xs, shift_left acc n + x, n')
+            else (acc :: xs, x, n) )
       in
-      Array.append field_elements packed_bits
+      (* if acc_n = 0, packeds was empty (or acc holds 0 bits) and we don't want to append 0 *)
+      let xs = if acc_n > 0 then acc :: xs else xs in
+      Array.of_list_rev xs
+    in
+    Array.append field_elements packed_bits
 end
 
 module Legacy = struct
