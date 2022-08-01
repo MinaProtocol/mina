@@ -1,6 +1,6 @@
-use mina_curves::pasta::{pallas::Affine as GAffine, fq::Fq};
 use algebra::{One, Zero};
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
+use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
 
 use commitment_dlog::{
     commitment::{b_poly_coefficients, PolyComm},
@@ -128,6 +128,19 @@ pub fn caml_pasta_fq_urs_batch_accumulator_check(
     crate::urs_utils::batch_dlog_accumulator_check(
         &*urs,
         &comms.into_iter().map(From::from).collect(),
+        &chals.into_iter().map(From::from).collect(),
+    )
+}
+
+#[ocaml::func]
+pub fn caml_pasta_fq_urs_batch_accumulator_generate(
+    urs: CamlPastaFqUrs,
+    comms: ocaml::Int,
+    chals: Vec<Fq>,
+) -> Vec<GAffine> {
+    crate::urs_utils::batch_dlog_accumulator_generate(
+        &*urs,
+        comms as usize,
         &chals.into_iter().map(From::from).collect(),
     )
 }
