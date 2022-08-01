@@ -188,6 +188,19 @@ macro_rules! impl_srs {
             }
 
             #[wasm_bindgen]
+            pub fn [<$name:snake _batch_accumulator_generate>](
+                srs: &[Wasm $field_name:caml Srs>],
+                comms: i32,
+                chals: Vec<$WasmF>,
+            ) -> Vec<$WasmG> {
+                crate::urs_utils::batch_dlog_accumulator_generate::<$G>(
+                    &srs,
+                    comms as usize,
+                    &chals.into_iter().map(From::from).collect(),
+                ).into_iter().map(Into::into).collect()
+            }
+
+            #[wasm_bindgen]
             pub fn [<$name:snake _h>](srs: &[<Wasm $field_name:camel Srs>]) -> $WasmG {
                 srs.h.into()
             }
