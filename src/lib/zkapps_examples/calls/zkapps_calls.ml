@@ -2,36 +2,18 @@ open Core_kernel
 open Snark_params.Tick.Run
 open Signature_lib
 open Mina_base
-open Zkapps_examples
 
-let initial_state =
-  lazy
-    [ Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ]
+let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
 
 let initialize public_key =
-  Zkapps_examples.wrap_main (fun () ->
-      let party =
-        Party_under_construction.In_circuit.create
-          ~public_key:(Public_key.Compressed.var_of_t public_key)
-          ~token_id:Token_id.(Checked.constant default)
-          ()
-      in
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let initial_state =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
-      let party =
-        party |> Party_under_construction.In_circuit.assert_state_unproved
-        |> Party_under_construction.In_circuit.set_full_state initial_state
-      in
-      (party, None) )
+      party#assert_state_unproved ;
+      party#set_full_state initial_state ;
+      None )
 
 let call_data_hash ~old_state ~new_state ~blinding_value =
   let open Random_oracle.Checked in
@@ -70,13 +52,8 @@ let update_state_handler (old_state : Field.Constant.t list)
       respond Unhandled
 
 let update_state_call public_key =
-  Zkapps_examples.wrap_main (fun () ->
-      let party =
-        Party_under_construction.In_circuit.create
-          ~public_key:(Public_key.Compressed.var_of_t public_key)
-          ~token_id:Token_id.(Checked.constant default)
-          ()
-      in
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let old_state =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> Old_state)
       in
@@ -99,12 +76,10 @@ let update_state_call public_key =
         in
         Field.Assert.equal call_data_hash called_party.party.data.call_data
       in
-      let party =
-        party |> Party_under_construction.In_circuit.assert_state_proved
-        |> Party_under_construction.In_circuit.set_full_state old_state
-        |> Party_under_construction.In_circuit.call called_party sub_calls
-      in
-      (party, None) )
+      party#assert_state_proved ;
+      party#set_full_state old_state ;
+      party#call called_party sub_calls ;
+      None )
 
 type _ Snarky_backendless.Request.t +=
   | Call_input : Field.Constant.t list Snarky_backendless.Request.t
@@ -118,13 +93,8 @@ let call_handler (call_input : Field.Constant.t list)
       respond Unhandled
 
 let call public_key =
-  Zkapps_examples.wrap_main (fun () ->
-      let party =
-        Party_under_construction.In_circuit.create
-          ~public_key:(Public_key.Compressed.var_of_t public_key)
-          ~token_id:Token_id.(Checked.constant default)
-          ()
-      in
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let old_state =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> Call_input)
       in
@@ -136,11 +106,9 @@ let call public_key =
       let call_data_hash =
         call_data_hash ~old_state ~new_state ~blinding_value
       in
-      let party =
-        party |> Party_under_construction.In_circuit.assert_state_proved
-        |> Party_under_construction.In_circuit.set_call_data call_data_hash
-      in
-      (party, Some (new_state, blinding_value)) )
+      party#assert_state_proved ;
+      party#set_call_data call_data_hash ;
+      Some (new_state, blinding_value) )
 
 type _ Snarky_backendless.Request.t +=
   | Recursive_call_input : Field.Constant.t list Snarky_backendless.Request.t
@@ -167,13 +135,8 @@ let recursive_call_handler (recursive_call_input : Field.Constant.t list)
       respond Unhandled
 
 let recursive_call public_key =
-  Zkapps_examples.wrap_main (fun () ->
-      let party =
-        Party_under_construction.In_circuit.create
-          ~public_key:(Public_key.Compressed.var_of_t public_key)
-          ~token_id:Token_id.(Checked.constant default)
-          ()
-      in
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let old_state =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () ->
             Recursive_call_input )
@@ -205,27 +168,35 @@ let recursive_call public_key =
       let call_data_hash =
         call_data_hash ~old_state ~new_state ~blinding_value
       in
-      let party =
-        party |> Party_under_construction.In_circuit.assert_state_proved
-        |> Party_under_construction.In_circuit.set_call_data call_data_hash
-        |> Party_under_construction.In_circuit.call called_party sub_calls
-      in
-      (party, Some (new_state, blinding_value)) )
+      party#assert_state_proved ;
+      party#set_call_data call_data_hash ;
+      party#call called_party sub_calls ;
+      Some (new_state, blinding_value) )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Initialize snapp"; prevs = []; main = initialize public_key }
+  { identifier = "Initialize snapp"
+  ; prevs = []
+  ; main = initialize public_key
+  ; uses_lookup = false
+  }
 
 let update_state_call_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Update state call"
   ; prevs = []
   ; main = update_state_call public_key
+  ; uses_lookup = false
   }
 
 let call_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Call"; prevs = []; main = call public_key }
+  { identifier = "Call"
+  ; prevs = []
+  ; main = call public_key
+  ; uses_lookup = false
+  }
 
 let recursive_call_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Recursive call"
   ; prevs = []
   ; main = recursive_call public_key
+  ; uses_lookup = false
   }

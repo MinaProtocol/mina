@@ -7,163 +7,6 @@ open Signature_lib
 open Mina_base
 
 module Party_under_construction = struct
-  module Account_condition = struct
-    type t = { state_proved : bool option }
-
-    let create () = { state_proved = None }
-
-    let to_predicate ({ state_proved } : t) : Zkapp_precondition.Account.t =
-      (* TODO: Don't do this. *)
-      let default : Zkapp_precondition.Account.t =
-        { balance = Ignore
-        ; nonce = Ignore
-        ; receipt_chain_hash = Ignore
-        ; delegate = Ignore
-        ; state =
-            [ Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore ]
-        ; sequence_state = Ignore
-        ; proved_state = Ignore
-        ; is_new = Ignore
-        }
-      in
-      let proved_state =
-        match state_proved with
-        | None ->
-            default.proved_state
-        | Some state_proved ->
-            Zkapp_basic.Or_ignore.Check state_proved
-      in
-      { default with proved_state }
-
-    let assert_state_proved (t : t) =
-      match t.state_proved with
-      | None ->
-          { state_proved = Some true }
-      | Some b ->
-          if not b then failwith "State is already unproved" ;
-          t
-
-    let assert_state_unproved (t : t) =
-      match t.state_proved with
-      | None ->
-          { state_proved = Some false }
-      | Some b ->
-          if b then failwith "State is already proved" ;
-          t
-  end
-
-  module Update = struct
-    type t = { app_state : Field.Constant.t option Zkapp_state.V.t }
-
-    let create () =
-      { app_state = [ None; None; None; None; None; None; None; None ] }
-
-    let to_parties_update ({ app_state } : t) : Party.Update.t =
-      let default : Party.Update.t =
-        { app_state = [ Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
-        ; delegate = Keep
-        ; verification_key = Keep
-        ; permissions = Keep
-        ; zkapp_uri = Keep
-        ; token_symbol = Keep
-        ; timing = Keep
-        ; voting_for = Keep
-        }
-      in
-      let app_state =
-        Pickles_types.Vector.map ~f:Zkapp_basic.Set_or_keep.of_option app_state
-      in
-      { default with app_state }
-
-    let set_full_state app_state (_t : t) =
-      match app_state with
-      | [ a0; a1; a2; a3; a4; a5; a6; a7 ] ->
-          { app_state =
-              [ Some a0
-              ; Some a1
-              ; Some a2
-              ; Some a3
-              ; Some a4
-              ; Some a5
-              ; Some a6
-              ; Some a7
-              ]
-          }
-      | _ ->
-          failwith "Incorrect length of app_state"
-  end
-
-  type t =
-    { public_key : Public_key.Compressed.t
-    ; token_id : Token_id.t
-    ; account_condition : Account_condition.t
-    ; update : Update.t
-    }
-
-  let create ~public_key ?(token_id = Token_id.default) () =
-    { public_key
-    ; token_id
-    ; account_condition = Account_condition.create ()
-    ; update = Update.create ()
-    }
-
-  let to_party (t : t) : Party.Body.t =
-    { public_key = t.public_key
-    ; token_id = t.token_id
-    ; update = Update.to_parties_update t.update
-    ; balance_change = { magnitude = Amount.zero; sgn = Pos }
-    ; increment_nonce = false
-    ; events = []
-    ; sequence_events = []
-    ; call_data = Field.Constant.zero
-    ; preconditions =
-        { Party.Preconditions.network =
-            { snarked_ledger_hash = Ignore
-            ; timestamp = Ignore
-            ; blockchain_length = Ignore
-            ; min_window_density = Ignore
-            ; last_vrf_output = ()
-            ; total_currency = Ignore
-            ; global_slot_since_hard_fork = Ignore
-            ; global_slot_since_genesis = Ignore
-            ; staking_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
-            ; next_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
-            }
-        ; account = Full (Account_condition.to_predicate t.account_condition)
-        }
-    ; use_full_commitment = false
-    ; caller = t.token_id
-    }
-
-  let assert_state_unproved (t : t) =
-    { t with
-      account_condition =
-        Account_condition.assert_state_unproved t.account_condition
-    }
-
-  let assert_state_proved (t : t) =
-    { t with
-      account_condition =
-        Account_condition.assert_state_proved t.account_condition
-    }
-
-  let set_full_state app_state (t : t) =
-    { t with update = Update.set_full_state app_state t.update }
-
   module In_circuit = struct
     module Account_condition = struct
       type t = { state_proved : Boolean.var option }
@@ -398,6 +241,31 @@ module Party_under_construction = struct
   end
 end
 
+class party ~public_key ?token_id =
+  object
+    val mutable party =
+      Party_under_construction.In_circuit.create ~public_key ?token_id ()
+
+    method assert_state_proved =
+      party <- Party_under_construction.In_circuit.assert_state_proved party
+
+    method assert_state_unproved =
+      party <- Party_under_construction.In_circuit.assert_state_unproved party
+
+    method set_full_state app_state =
+      party <-
+        Party_under_construction.In_circuit.set_full_state app_state party
+
+    method set_call_data call_data =
+      party <- Party_under_construction.In_circuit.set_call_data call_data party
+
+    method call called_party sub_calls =
+      party <-
+        Party_under_construction.In_circuit.call called_party sub_calls party
+
+    method party_under_construction = party
+  end
+
 (* TODO: Move this somewhere convenient. *)
 let dummy_constraints () =
   let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
@@ -432,10 +300,12 @@ type return_type =
       list
   }
 
-let to_party party : Zkapp_statement.Checked.t * return_type Prover_value.t =
+let to_party (party : party) :
+    Zkapp_statement.Checked.t * return_type Prover_value.t =
   dummy_constraints () ;
   let party, calls =
-    Party_under_construction.In_circuit.to_party_and_calls party
+    Party_under_construction.In_circuit.to_party_and_calls
+      party#party_under_construction
   in
   let party_digest = Parties.Call_forest.Digest.Party.Checked.create party in
   let public_output : Zkapp_statement.Checked.t =
@@ -457,10 +327,12 @@ let to_party party : Zkapp_statement.Checked.t * return_type Prover_value.t =
 open Pickles_types
 open Hlist
 
-let wrap_main f { Pickles.Inductive_rule.public_input = () } =
-  let public_output, auxiliary_output = f () in
+let wrap_main ~public_key ?token_id f
+    { Pickles.Inductive_rule.public_input = () } =
+  let party = new party ~public_key ?token_id in
+  let auxiliary_output = f party in
   { Pickles.Inductive_rule.previous_proof_statements = []
-  ; public_output
+  ; public_output = party
   ; auxiliary_output
   }
 
@@ -493,7 +365,7 @@ let compile :
              , heightss
              , unit
              , unit
-             , Party_under_construction.In_circuit.t
+             , party
              , unit (* TODO: Remove? *)
              , auxiliary_var
              , auxiliary_value )
@@ -532,7 +404,7 @@ let compile :
            , heightss
            , unit
            , unit
-           , Party_under_construction.In_circuit.t
+           , party
            , unit
            , auxiliary_var
            , auxiliary_value )
