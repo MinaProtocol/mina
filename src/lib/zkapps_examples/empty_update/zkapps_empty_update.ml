@@ -18,10 +18,3 @@ let rule public_key : _ Pickles.Inductive_rule.t =
   ; main = main public_key
   ; uses_lookup = false
   }
-
-(* TODO: This shouldn't exist, the circuit should just return the requisite
-         value.
-*)
-let generate_party public_key =
-  Party_under_construction.create ~public_key ~token_id:Token_id.default ()
-  |> Party_under_construction.to_party

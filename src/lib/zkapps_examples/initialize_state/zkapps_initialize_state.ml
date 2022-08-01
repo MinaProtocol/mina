@@ -68,15 +68,3 @@ let update_state_rule public_key : _ Pickles.Inductive_rule.t =
   ; main = update_state public_key
   ; uses_lookup = false
   }
-
-let generate_initialize_party public_key =
-  Party_under_construction.create ~public_key ~token_id:Token_id.default ()
-  |> Party_under_construction.assert_state_unproved
-  |> Party_under_construction.set_full_state (Lazy.force initial_state)
-  |> Party_under_construction.to_party
-
-let generate_update_state_party public_key new_state =
-  Party_under_construction.create ~public_key ~token_id:Token_id.default ()
-  |> Party_under_construction.assert_state_proved
-  |> Party_under_construction.set_full_state new_state
-  |> Party_under_construction.to_party
