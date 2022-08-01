@@ -38,6 +38,4 @@ cd /workdir
 
 echo "Running replayer"
 mina-replayer --archive-uri postgres://postgres:$PGPASSWORD@localhost:5432/archive \
-	      --input-file $TEST_DIR/input.json --output-file /dev/null \
-          --continue-on-error # DO NOT MERGE
-exit 1
+	      --input-file $TEST_DIR/input.json --output-file /dev/null
