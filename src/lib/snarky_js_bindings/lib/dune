@@ -41,6 +41,7 @@
    snark_params
    sponge
    tuple_lib
+   unsigned_extended
    with_hash
    ;; js-specific libraries ;;
    js_of_ocaml
