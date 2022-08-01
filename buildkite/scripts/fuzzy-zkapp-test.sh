@@ -20,8 +20,8 @@ export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
 # skip running all of the tests that have already succeeded, since dune will
 # only retry those tests that failed.
 echo "--- Run fuzzy zkapp tests"
-time dune exec "${path}" --profile="${profile}" -j16 -- -trials "${trials}" || \
+time dune exec "${path}" --profile="${profile}" -j16 -- --trials "${trials}" || \
 (./scripts/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
- time dune exec "${path}" --profile="${profile}" -j16 -- -trials "${trials}" || \
+ time dune exec "${path}" --profile="${profile}" -j16 -- --trials "${trials}" || \
  (./scripts/link-coredumps.sh && false))
