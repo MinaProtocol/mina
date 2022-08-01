@@ -2121,9 +2121,7 @@ let pickles_digest (choices : pickles_rule_js Js.js_array Js.t)
   let (Choices choices) = Choices.of_js ~public_input_size choices in
   try
     let _ =
-      Pickles.compile_promise ~choices ~return_early_digest_exception:true
-        (module Public_input)
-        (module Public_input.Constant)
+      Pickles.compile_promise () ~choices ~return_early_digest_exception:true
         ~public_input:(Input (public_input_typ public_input_size))
         ~auxiliary_typ:Typ.unit
         ~branches:(module Branches)
@@ -2147,9 +2145,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let (module Max_proofs_verified) = nat_add_module max_proofs in
   let (Choices choices) = Choices.of_js ~public_input_size choices in
   let tag, _cache, p, provers =
-    Pickles.compile_promise ~choices
-      (module Public_input)
-      (module Public_input.Constant)
+    Pickles.compile_promise () ~choices
       ~public_input:(Input (public_input_typ public_input_size))
       ~auxiliary_typ:Typ.unit
       ~branches:(module Branches)

@@ -933,8 +933,6 @@ let compile_promise :
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?return_early_digest_exception:bool
-    -> (module Statement_var_intf with type t = a_var)
-    -> (module Statement_value_intf with type t = a_value)
     -> public_input:
          ( var
          , value
@@ -962,6 +960,7 @@ let compile_promise :
              , auxiliary_var
              , auxiliary_value )
              H4_6.T(Inductive_rule).t )
+    -> unit
     -> (var, value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
        * (module Proof_intf
@@ -976,9 +975,12 @@ let compile_promise :
            * (max_proofs_verified, max_proofs_verified) Proof.t )
            Promise.t )
          H3_2.T(Prover).t =
+ (* This function is an adapter between the user-facing Pickles.compile API
+    and the underlying Make(_).compile function which builds the circuits.
+ *)
  fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
-     (module A_var) (module A_value) ~public_input ~auxiliary_typ ~branches
-     ~max_proofs_verified ~name ~constraint_constants ~choices ->
+     ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+     ~constraint_constants ~choices () ->
   let self =
     match self with
     | None ->
@@ -986,6 +988,28 @@ let compile_promise :
     | Some self ->
         self
   in
+  (* Extract to_fields methods from the public input declaration. *)
+  let (a_var_to_fields : a_var -> _), (a_value_to_fields : a_value -> _) =
+    match public_input with
+    | Input (Typ typ) ->
+        ( (fun x -> fst (typ.var_to_fields x))
+        , fun x -> fst (typ.value_to_fields x) )
+    | Output _ ->
+        ((fun () -> [||]), fun () -> [||])
+    | Input_and_output (Typ typ, _) ->
+        ( (fun x -> fst (typ.var_to_fields x))
+        , fun x -> fst (typ.value_to_fields x) )
+  in
+  let module A_var = struct
+    type t = a_var
+
+    let to_field_elements = a_var_to_fields
+  end in
+  let module A_value = struct
+    type t = a_value
+
+    let to_field_elements = a_value_to_fields
+  end in
   let module Ret_var = struct
     type t = ret_var
   end in
@@ -1085,12 +1109,11 @@ let compile_promise :
   end in
   (self, cache_handle, (module P), provers)
 
-let compile ?self ?cache ?disk_keys a_var a_value ~public_input ~auxiliary_typ
-    ~branches ~max_proofs_verified ~name ~constraint_constants ~choices =
+let compile ?self ?cache ?disk_keys ~public_input ~auxiliary_typ ~branches
+    ~max_proofs_verified ~name ~constraint_constants ~choices () =
   let self, cache_handle, proof_module, provers =
-    compile_promise ?self ?cache ?disk_keys a_var a_value ~public_input
-      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices
+    compile_promise ?self ?cache ?disk_keys ~public_input ~auxiliary_typ
+      ~branches ~max_proofs_verified ~name ~constraint_constants ~choices ()
   in
   let rec adjust_provers :
       type a1 a2 a3 a4 s1 s2_inner.
@@ -1198,10 +1221,8 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
-              ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
+            compile_promise () ~public_input:(Input Field.typ)
+              ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
               ~name:"blockchain-snark"
@@ -1263,10 +1284,8 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
-              ~public_input:(Output Field.typ) ~auxiliary_typ:Typ.unit
+            compile_promise () ~public_input:(Output Field.typ)
+              ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
               ~name:"blockchain-snark"
@@ -1332,10 +1351,8 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
-              ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
+            compile_promise () ~public_input:(Input Field.typ)
+              ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N1)
               ~name:"blockchain-snark"
@@ -1438,10 +1455,8 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
-              ~public_input:(Input Field.typ) ~auxiliary_typ:Typ.unit
+            compile_promise () ~public_input:(Input Field.typ)
+              ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"blockchain-snark"
@@ -1572,10 +1587,8 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
-              ~public_input:(Output Field.typ) ~auxiliary_typ:Typ.unit
+            compile_promise () ~public_input:(Output Field.typ)
+              ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"blockchain-snark"
@@ -1695,9 +1708,7 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
+            compile_promise ()
               ~public_input:(Input_and_output (Field.typ, Field.typ))
               ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
@@ -1762,9 +1773,7 @@ let%test_module "test no side-loaded" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement.Constant)
+            compile_promise ()
               ~public_input:(Input_and_output (Field.typ, Field.typ))
               ~auxiliary_typ:Field.typ
               ~branches:(module Nat.N1)
