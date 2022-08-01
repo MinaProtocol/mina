@@ -28,13 +28,23 @@ type inputs =
   { test_inputs : test_inputs_with_cli_inputs
   ; test : test
   ; mina_image : string
-  ; archive_image : string
+  ; archive_image : string option
   ; debug : bool
   }
 
-let validate_inputs { mina_image; _ } =
-  if String.is_empty mina_image then
-    failwith "Mina image cannot be an empty string"
+let validate_inputs ~logger inputs (test_config : Test_config.t) :
+    unit Deferred.t =
+  if String.is_empty inputs.mina_image then (
+    [%log fatal] "mina-image argument cannot be an empty string" ;
+    exit 1 )
+  else if
+    test_config.num_archive_nodes > 0 && Option.is_none inputs.archive_image
+  then (
+    [%log fatal]
+      "This test uses archive nodes.  archive-image argument cannot be absent \
+       for this test" ;
+    exit 1 )
+  else Deferred.return ()
 
 let engines : engine list =
   [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
@@ -47,6 +57,7 @@ let tests : test list =
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
   ; ("delegation", (module Delegation_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
   ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
   ; ( "opt-block-prod"
@@ -248,12 +259,14 @@ let main inputs =
   let logger = Logger.create () in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
-    ; archive_node = inputs.archive_image
+    ; archive_node =
+        Option.value inputs.archive_image ~default:"archive_image_unused"
     ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
     ; bots = "minaprotocol/mina-bots:latest"
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
+  let%bind () = validate_inputs ~logger inputs T.config in
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
@@ -377,7 +390,6 @@ let main inputs =
   exit 0
 
 let start inputs =
-  validate_inputs inputs ;
   never_returns
     (Async.Scheduler.go_main ~main:(fun () -> don't_wait_for (main inputs)) ())
 
@@ -402,7 +414,7 @@ let archive_image_arg =
   let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
   Arg.(
     value
-      ( opt string "unused"
+      ( opt (some string) None
       & info [ "archive-image" ] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
 
 let debug_arg =

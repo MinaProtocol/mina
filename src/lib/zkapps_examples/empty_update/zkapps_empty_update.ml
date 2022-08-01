@@ -16,7 +16,11 @@ let main public_key =
       (party, ()) )
 
 let rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Empty update"; prevs = []; main = main public_key }
+  { identifier = "Empty update"
+  ; prevs = []
+  ; main = main public_key
+  ; uses_lookup = false
+  }
 
 (* TODO: This shouldn't exist, the circuit should just return the requisite
          value.

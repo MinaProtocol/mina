@@ -342,7 +342,7 @@ let fee_excess ({ body = { tag; amount; _ }; common = { fee; _ } } : t) =
   | Coinbase ->
       Fee_excess.of_single (Token_id.default, Fee.Signed.zero)
 
-let supply_increase (payload : payload) =
+let expected_supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->

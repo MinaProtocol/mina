@@ -62,10 +62,18 @@ let update_state public_key =
       (party, ()) )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Initialize snapp"; prevs = []; main = initialize public_key }
+  { identifier = "Initialize snapp"
+  ; prevs = []
+  ; main = initialize public_key
+  ; uses_lookup = false
+  }
 
 let update_state_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Update state"; prevs = []; main = update_state public_key }
+  { identifier = "Update state"
+  ; prevs = []
+  ; main = update_state public_key
+  ; uses_lookup = false
+  }
 
 let generate_initialize_party public_key =
   Party_under_construction.create ~public_key ~token_id:Token_id.default ()

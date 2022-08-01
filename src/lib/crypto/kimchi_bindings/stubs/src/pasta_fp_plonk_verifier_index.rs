@@ -13,7 +13,7 @@ use kimchi::circuits::polynomials::permutation::Shifts;
 use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
-use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+use mina_curves::pasta::{fp::Fp, pallas::Pallas as GAffineOther, vesta::Vesta as GAffine};
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -129,9 +129,6 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
 
             lookup_index: index.lookup_index.map(Into::into),
             linearization,
-
-            fr_sponge_params: oracle::pasta::fp_kimchi::params(),
-            fq_sponge_params: oracle::pasta::fq_kimchi::params(),
         }
     }
 }
@@ -143,21 +140,12 @@ pub fn read_raw(
 ) -> Result<VerifierIndex<GAffine>, ocaml::Error> {
     let path = Path::new(&path);
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-    let fq_sponge_params = oracle::pasta::fq_kimchi::params();
-    let fr_sponge_params = oracle::pasta::fp_kimchi::params();
-    VerifierIndex::<GAffine>::from_file(
-        Some(srs.0),
-        path,
-        offset.map(|x| x as u64),
-        endo_q,
-        fq_sponge_params,
-        fr_sponge_params,
-    )
-    .map_err(|_e| {
-        ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
-            .err()
-            .unwrap()
-    })
+    VerifierIndex::<GAffine>::from_file(Some(srs.0), path, offset.map(|x| x as u64), endo_q)
+        .map_err(|_e| {
+            ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
+                .err()
+                .unwrap()
+        })
 }
 
 //

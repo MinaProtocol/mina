@@ -5,7 +5,7 @@ use crate::srs::fp::WasmFpSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex as DlogIndex;
-use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+use mina_curves::pasta::{fp::Fp, pallas::Pallas as GAffineOther, vesta::Vesta as GAffine};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -49,7 +49,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     // }
 
     // create constraint system
-    let cs = match ConstraintSystem::<Fp>::create(gates, oracle::pasta::fp_kimchi::params())
+    let cs = match ConstraintSystem::<Fp>::create(gates)
         .public(public_ as usize)
         .prev_challenges(prev_challenges as usize)
         .build()
@@ -74,12 +74,7 @@ pub fn caml_pasta_fp_plonk_index_create(
 
     // create index
     Ok(WasmPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(
-            cs,
-            oracle::pasta::fq_kimchi::params(),
-            endo_q,
-            srs.0.clone(),
-        ),
+        DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone()),
     )))
 }
 
@@ -131,9 +126,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     // deserialize the index
     let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
         .map_err(|err| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", err)))?;
-    t.cs.fr_sponge_params = oracle::pasta::fp_kimchi::params();
     t.srs = srs.0.clone();
-    t.fq_sponge_params = oracle::pasta::fq_kimchi::params();
     let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;

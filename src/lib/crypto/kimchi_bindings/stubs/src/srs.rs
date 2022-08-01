@@ -166,7 +166,7 @@ macro_rules! impl_srs {
 pub mod fp {
     use super::*;
     use crate::arkworks::{CamlFp, CamlGVesta};
-    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
+    use mina_curves::pasta::{fp::Fp, vesta::Vesta as GAffine};
 
     impl_srs!(CamlFpSrs, CamlFp, CamlGVesta, Fp, GAffine);
 }
@@ -174,7 +174,7 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::arkworks::{CamlFq, CamlGPallas};
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
+    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine};
 
     impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, GAffine);
 }

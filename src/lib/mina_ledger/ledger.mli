@@ -144,13 +144,19 @@ module Transaction_applied : sig
 
   module Fee_transfer_applied : sig
     type t = Transaction_applied.Fee_transfer_applied.t =
-      { fee_transfer : Fee_transfer.t; new_accounts : Account_id.t list }
+      { fee_transfer : Fee_transfer.t With_status.t
+      ; new_accounts : Account_id.t list
+      ; burned_tokens : Currency.Amount.t
+      }
     [@@deriving sexp]
   end
 
   module Coinbase_applied : sig
     type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase : Coinbase.t; new_accounts : Account_id.t list }
+      { coinbase : Coinbase.t With_status.t
+      ; new_accounts : Account_id.t list
+      ; burned_tokens : Currency.Amount.t
+      }
     [@@deriving sexp]
   end
 
@@ -166,9 +172,13 @@ module Transaction_applied : sig
     { previous_hash : Ledger_hash.t; varying : Varying.t }
   [@@deriving sexp]
 
+  val burned_tokens : t -> Currency.Amount.t
+
+  val supply_increase : t -> Currency.Amount.Signed.t Or_error.t
+
   val transaction : t -> Transaction.t With_status.t
 
-  val user_command_status : t -> Transaction_status.t
+  val transaction_status : t -> Transaction_status.t
 end
 
 (** Raises if the ledger is full, or if an account already exists for the given

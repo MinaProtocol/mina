@@ -338,7 +338,7 @@ module T = struct
               snarked_ledger tx.data
           in
           let computed_status =
-            Ledger.Transaction_applied.user_command_status txn_with_info
+            Ledger.Transaction_applied.transaction_status txn_with_info
           in
           if Transaction_status.equal tx.status computed_status then Ok ()
           else
@@ -503,9 +503,8 @@ module T = struct
       txn_state_view =
     let open Result.Let_syntax in
     (*TODO: check fee_excess as a result of applying the txns matches with this*)
-    let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
-    and supply_increase =
-      Transaction.supply_increase s |> to_staged_ledger_or_error
+    let%bind fee_excess =
+      Transaction.fee_excess s |> to_staged_ledger_or_error
     in
     let source_merkle_root =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
@@ -517,8 +516,22 @@ module T = struct
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
     let empty_local_state = Mina_state.Local_state.empty () in
-    let%map applied_txn =
-      Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
+    let%bind applied_txn =
+      ( match
+          Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
+            s
+        with
+      | Error e ->
+          Or_error.error_string
+            (sprintf
+               !"Error when applying transaction %{sexp: Transaction.t}: %s"
+               s (Error.to_string_hum e) )
+      | res ->
+          res )
+      |> to_staged_ledger_or_error
+    in
+    let%map supply_increase =
+      Ledger.Transaction_applied.supply_increase applied_txn
       |> to_staged_ledger_or_error
     in
     let target_merkle_root =
@@ -579,7 +592,7 @@ module T = struct
       | Some status ->
           (* Validate that command status matches. *)
           let got_status =
-            Ledger.Transaction_applied.user_command_status applied_txn
+            Ledger.Transaction_applied.transaction_status applied_txn
           in
           if Transaction_status.equal status got_status then return ()
           else
@@ -1650,6 +1663,8 @@ module T = struct
               Sequence.to_list_rev res.commands_rev
           ; completed_works = Sequence.to_list_rev res.completed_work_rev
           ; coinbase = to_at_most_one res.coinbase
+          ; internal_command_statuses =
+              [] (*updated later based on application result*)
           } )
     in
     let pre_diff_with_two (res : Resources.t) :
@@ -1659,6 +1674,8 @@ module T = struct
       { commands = Sequence.to_list_rev res.commands_rev
       ; completed_works = Sequence.to_list_rev res.completed_work_rev
       ; coinbase = res.coinbase
+      ; internal_command_statuses =
+          [] (*updated later based on application result*)
       }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
@@ -2049,7 +2066,7 @@ let%test_module "staged ledger tests" =
 
     let logger = Logger.null ()
 
-    let `VK vk, `Prover snapp_prover =
+    let `VK vk, `Prover zkapp_prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
     let verifier =
@@ -2501,8 +2518,24 @@ let%test_module "staged ledger tests" =
       in
       let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
-          | Parties parties, _fee_payer_keypair, _keymap ->
-              User_command.Parties parties
+          | Parties parties_valid, _fee_payer_keypair, keymap ->
+              let parties_with_auths =
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Parties_builder.replace_authorizations ~keymap
+                      (Parties.Valid.forget parties_valid) )
+              in
+              let valid_parties_with_auths : Parties.Valid.t =
+                match
+                  Parties.Valid.to_valid parties_with_auths ~ledger
+                    ~get:Ledger.get
+                    ~location_of_account:Ledger.location_of_account
+                with
+                | Some ps ->
+                    ps
+                | None ->
+                    failwith "Could not create Parties.Valid.t"
+              in
+              User_command.Parties valid_parties_with_auths
           | Signed_command _, _, _ ->
               failwith "Expected a Parties, got a Signed command" )
       in
@@ -2722,6 +2755,7 @@ let%test_module "staged ledger tests" =
                 @@ ( { completed_works = List.take completed_works job_count1
                      ; commands = List.take txns slots
                      ; coinbase = Zero
+                     ; internal_command_statuses = []
                      }
                    , None )
             }
@@ -2731,6 +2765,7 @@ let%test_module "staged ledger tests" =
               ( { completed_works = List.take completed_works job_count1
                 ; commands = List.take txns slots
                 ; coinbase = Zero
+                ; internal_command_statuses = []
                 }
               , Some
                   { completed_works =
@@ -2738,19 +2773,12 @@ let%test_module "staged ledger tests" =
                       else List.drop completed_works job_count1 )
                   ; commands = txns_in_second_diff
                   ; coinbase = Zero
+                  ; internal_command_statuses = []
                   } )
             in
             { diff = compute_statuses ~ledger ~coinbase_amount diff }
       in
-      let empty_diff : Staged_ledger_diff.t =
-        { diff =
-            ( { completed_works = []
-              ; commands = []
-              ; coinbase = Staged_ledger_diff.At_most_two.Zero
-              }
-            , None )
-        }
-      in
+      let empty_diff = Staged_ledger_diff.empty_diff in
       Quickcheck.test gen_at_capacity
         ~sexp_of:
           [%sexp_of:
@@ -3807,7 +3835,7 @@ let%test_module "staged ledger tests" =
                     l
                   in
                   let%bind parties =
-                    Transaction_snark.For_tests.update_states ~snapp_prover
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
                       ~constraint_constants test_spec
                   in
                   let valid_parties =

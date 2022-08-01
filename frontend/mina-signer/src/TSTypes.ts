@@ -40,8 +40,16 @@ export type Payment = {
   readonly validUntil?: UInt32;
 };
 
+export type OtherParties = {
+  body: any;
+  authorization: any;
+}[];
+
 export type Party = {
-  readonly parties: any;
+  readonly parties: {
+    otherParties: OtherParties;
+  };
+
   readonly feePayer: {
     readonly feePayer: PublicKey;
     readonly fee: UInt64;

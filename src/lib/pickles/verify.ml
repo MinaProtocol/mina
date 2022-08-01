@@ -91,7 +91,12 @@ let verify_heterogenous (ts : Instance.t list) =
             _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
             =
           let chal = Challenge.Constant.to_tick_field in
-          { zeta; alpha; beta = chal plonk0.beta; gamma = chal plonk0.gamma }
+          { zeta
+          ; alpha
+          ; beta = chal plonk0.beta
+          ; gamma = chal plonk0.gamma
+          ; joint_combiner = Option.map ~f:sc plonk0.joint_combiner
+          }
         in
         let tick_combined_evals =
           Plonk_checks.evals_of_split_evals
@@ -127,6 +132,13 @@ let verify_heterogenous (ts : Instance.t list) =
           ; alpha = plonk0.alpha
           ; beta = plonk0.beta
           ; gamma = plonk0.gamma
+          ; lookup =
+              Option.map (Plonk_types.Opt.to_option p.lookup) ~f:(fun l ->
+                  { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+                    .Lookup
+                    .lookup_gate = l.lookup_gate
+                  ; joint_combiner = Option.value_exn plonk0.joint_combiner
+                  } )
           }
         in
         Timer.clock __LOC__ ;
