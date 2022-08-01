@@ -184,7 +184,7 @@ module Time : sig
 
   val of_time : Time.t -> t
 
-  val to_time : t -> Time.t
+  val to_time_exn : t -> Time.t
 
   val now : Controller.t -> t
 
@@ -198,7 +198,7 @@ module Time : sig
 
   val of_time_ns : Time_ns.t -> t
 
-  val to_string : t -> string
+  val to_string_exn : t -> string
 
   (** Strip time offset *)
   val to_string_system_time : Controller.t -> t -> string
