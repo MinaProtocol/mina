@@ -4,16 +4,7 @@ open Signature_lib
 open Zkapps_examples
 
 let initial_state =
-  lazy
-    [ Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ; Field.Constant.zero
-    ]
+  lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
 
 let initialize public_key =
   Zkapps_examples.wrap_main
