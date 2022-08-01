@@ -247,12 +247,6 @@ func (m SendStreamReq) handle(app *app, seqno uint64) *capnp.Message {
 		n, err := stream.Write(data)
 		if err != nil {
 			// TODO check that it's correct to error out, not repeat writing
-			delete(app.Streams, streamId)
-			close_err := stream.Close()
-			if close_err != nil {
-				app.P2p.Logger.Errorf("failed to close stream %d after encountering write failure (%s): %s", streamId, err.Error(), close_err.Error())
-			}
-
 			return mkRpcRespError(seqno, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data))))
 		}
 		return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {
