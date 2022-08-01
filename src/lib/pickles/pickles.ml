@@ -520,12 +520,13 @@ struct
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
-      let module M =
-        H4.Map (IR) (Branch_data)
-          (struct
-            let f :
-                type a b c d. (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t =
-             fun rule ->
+      let rec f :
+          type a b c d.
+          (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(Branch_data).t = function
+        | [] ->
+            []
+        | rule :: rules ->
+            let first =
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
@@ -536,9 +537,10 @@ struct
                       ~wrap_domains ~proofs_verifieds )
               in
               Timer.clock __LOC__ ; incr i ; res
-          end)
+            in
+            first :: f rules
       in
-      M.f choices
+      f choices
     in
     Timer.clock __LOC__ ;
     let step_domains =
