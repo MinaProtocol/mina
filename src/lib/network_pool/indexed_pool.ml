@@ -761,11 +761,7 @@ let expired_by_predicate (t : t) :
                 let predicate = Party.protocol_state_precondition party in
                 match predicate.timestamp with
                 | Check { upper; _ } ->
-                    let upper =
-                      Block_time.to_time upper
-                      |> Time_ns.of_time_float_round_nearest_microsecond
-                    in
-                    Time_ns.(upper < expiry_time)
+                    Block_time.(upper < of_time_ns expiry_time)
                 | _ ->
                     false ) )
   |> Sequence.map ~f:fst

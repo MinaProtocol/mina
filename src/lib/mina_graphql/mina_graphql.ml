@@ -117,7 +117,7 @@ module Reflection = struct
 
     let nn_time a x =
       reflect
-        (fun t -> Block_time.to_time t |> Time.to_string)
+        (fun t -> Block_time.to_time_exn t |> Time.to_string)
         ~typ:(non_null string) a x
 
     let nn_catchup_status a x =
