@@ -285,9 +285,13 @@ let to_party party : Zkapp_statement.Checked.t * return_type Prover_value.t =
 open Pickles_types
 open Hlist
 
-let wrap_main f { Pickles.Inductive_rule.public_input = () } =
+let wrap_main ~public_key ?token_id f
+    { Pickles.Inductive_rule.public_input = () } =
+  let party =
+    Party_under_construction.In_circuit.create ~public_key ?token_id ()
+  in
   { Pickles.Inductive_rule.previous_proof_statements = []
-  ; public_output = f ()
+  ; public_output = f party
   ; auxiliary_output = ()
   }
 

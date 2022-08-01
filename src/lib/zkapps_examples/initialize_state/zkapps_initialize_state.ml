@@ -1,7 +1,6 @@
 open Core_kernel
 open Snark_params.Tick.Run
 open Signature_lib
-open Mina_base
 open Zkapps_examples
 
 let initial_state =
@@ -17,13 +16,8 @@ let initial_state =
     ]
 
 let initialize public_key =
-  Zkapps_examples.wrap_main (fun () ->
-      let party =
-        Party_under_construction.In_circuit.create
-          ~public_key:(Public_key.Compressed.var_of_t public_key)
-          ~token_id:Token_id.(Checked.constant default)
-          ()
-      in
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let initial_state =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
@@ -42,13 +36,8 @@ let update_state_handler (new_state : Field.Constant.t list)
       respond Unhandled
 
 let update_state public_key =
-  Zkapps_examples.wrap_main (fun () ->
-      let party =
-        Party_under_construction.In_circuit.create
-          ~public_key:(Public_key.Compressed.var_of_t public_key)
-          ~token_id:Token_id.(Checked.constant default)
-          ()
-      in
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let new_state =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
       in

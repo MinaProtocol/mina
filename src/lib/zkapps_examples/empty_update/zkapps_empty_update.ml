@@ -1,16 +1,8 @@
 open Signature_lib
-open Mina_base
-open Zkapps_examples
 
-(* TODO: Should be able to *return* stmt instead of consuming it.
-         Modify snarky to do this.
-*)
 let main public_key =
-  Zkapps_examples.wrap_main (fun () ->
-      Party_under_construction.In_circuit.create
-        ~public_key:(Public_key.Compressed.var_of_t public_key)
-        ~token_id:Token_id.(Checked.constant default)
-        () )
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party -> party)
 
 let rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Empty update"
