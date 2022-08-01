@@ -207,13 +207,11 @@ module Time = struct
     UInt64.of_int64
       (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))
 
-  (* TODO: This has two issues:
-     -) Time.t can't hold the full uint64 range, so this can fail for large t
-     -) The int conversion causes negative timestamps if the highest bit is 1
-  *)
-  let to_time t =
-    Time.of_span_since_epoch
-      (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
+  (* TODO: Time.t can't hold the full uint64 range, so this can fail for large t *)
+  let to_time_exn t =
+    let t_int64 = UInt64.to_int64 t in
+    if Int64.(t_int64 < zero) then failwith "converting to negative timestamp" ;
+    Time.of_span_since_epoch (Time.Span.of_ms (Int64.to_float t_int64))
 
   [%%if time_offsets]
 
@@ -258,8 +256,11 @@ module Time = struct
 
   let to_uint64 : t -> UInt64.t = to_span_since_epoch
 
-  (* TODO: this serializes the max_value to "-1", which isn't very nice *)
-  let to_string = Fn.compose Int64.to_string to_int64
+  (* TODO: this can fail if the input has more than 63 bits, because it would be serialized to a negative number string *)
+  let to_string_exn t =
+    let t_int64 = UInt64.to_int64 t in
+    if Int64.(t_int64 < zero) then failwith "converting to negative timestamp" ;
+    Int64.to_string t_int64
 
   let of_time_ns ns : t =
     let int64_ns = ns |> Time_ns.to_int63_ns_since_epoch |> Int63.to_int64 in

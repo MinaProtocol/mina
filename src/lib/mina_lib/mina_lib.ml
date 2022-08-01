@@ -1060,7 +1060,7 @@ let check_and_stop_daemon t ~wait =
         | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm
         | Produce { time = tm; _ }
         | Produce_now { time = tm; _ } ->
-            let tm = Block_time.to_time tm in
+            let tm = Block_time.to_time_exn tm in
             (*Assuming it takes at most 1hr to bootstrap and catchup*)
             let next_block =
               Time.add tm
