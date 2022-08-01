@@ -1887,6 +1887,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
             ; public_output = ()
             ; auxiliary_output = ()
             } )
+      ; uses_lookup = false
       }
 
     module M = struct
@@ -1943,7 +1944,9 @@ let%test_module "test uncorrelated bulletproof_challenges" =
       end
 
       let compile :
-          (unit -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t)
+          (   unit
+           -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
+          )
           * _
           * _ =
         let self = tag in
@@ -2001,7 +2004,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
         end in
         let proofs_verifieds = Vector.[ 2 ] in
         let (T inner_step_data as step_data) =
-          Step_branch_data.create ~index:0
+          Step_branch_data.create ~index:0 ~step_uses_lookup:No
             ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
             ~self ~public_input:(Input typ) ~auxiliary_typ:typ
             A.to_field_elements A_value.to_field_elements rule ~wrap_domains
@@ -2010,8 +2013,8 @@ let%test_module "test uncorrelated bulletproof_challenges" =
         let step_domains = Vector.[ inner_step_data.domains ] in
         let step_keypair =
           let etyp =
-            Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-              ~wrap_rounds:Tock.Rounds.n
+            Impls.Step.input ~uses_lookup:No
+              ~proofs_verified:Max_proofs_verified.n ~wrap_rounds:Tock.Rounds.n
           in
           let (T (typ, _conv, conv_inv)) = etyp in
           let main () =
@@ -2045,8 +2048,12 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                , index
                , digest ) )
           in
-          Cache.Step.read_or_generate [] k_p k_v
-            (Snarky_backendless.Typ.unit ()) typ (fun () -> main)
+          Cache.Step.read_or_generate
+            ~prev_challenges:(Nat.to_int (fst inner_step_data.proofs_verified))
+            [] k_p k_v
+            (Snarky_backendless.Typ.unit ())
+            typ
+            (fun () -> main)
         in
         let step_vks =
           let module V = H4.To_vector (Lazy_keys) in
@@ -2116,8 +2123,8 @@ let%test_module "test uncorrelated bulletproof_challenges" =
           in
           let r =
             Common.time "wrap read or generate " (fun () ->
-                Cache.Wrap.read_or_generate [] disk_key_prover disk_key_verifier
-                  typ Typ.unit main )
+                Cache.Wrap.read_or_generate ~prev_challenges:2 []
+                  disk_key_prover disk_key_verifier typ Typ.unit main )
           in
           (r, disk_key_verifier)
         in
@@ -2145,9 +2152,10 @@ let%test_module "test uncorrelated bulletproof_challenges" =
             let _, prev_vars_length = b.proofs_verified in
             let step =
               let wrap_vk = Lazy.force wrap_vk in
-              S.f branch_data () ~prevs_length:prev_vars_length ~self
-                ~public_input:(Input typ) ~auxiliary_typ:Impls.Step.Typ.unit
-                ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
+              S.f branch_data () ~uses_lookup:No ~prevs_length:prev_vars_length
+                ~self ~public_input:(Input typ)
+                ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
+                ~self_dlog_plonk_index:wrap_vk.commitments
                 (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
                 wrap_vk.index
             in
@@ -2239,7 +2247,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                   let module O = Tick.Oracles in
                   let public_input =
                     tick_public_input_of_statement ~max_proofs_verified
-                      prev_statement_with_hashes
+                      ~uses_lookup:No prev_statement_with_hashes
                   in
                   let prev_challenges =
                     Vector.map ~f:Ipa.Step.compute_challenges
@@ -2293,6 +2301,11 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                       ; beta = O.beta o
                       ; gamma = O.gamma o
                       ; zeta = scalar_chal O.zeta
+                      ; joint_combiner =
+                          Option.map (O.joint_combiner_chal o)
+                            ~f:
+                              (Scalar_challenge.map
+                                 ~f:Challenge.Constant.of_tick_field )
                       }
                     in
                     let r = scalar_chal O.u in
@@ -2310,6 +2323,9 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                       let zeta = to_field plonk0.zeta
 
                       let alpha = to_field plonk0.alpha
+
+                      let joint_combiner =
+                        Option.map ~f:to_field plonk0.joint_combiner
                     end in
                     let domain =
                       Domain.Pow_2_roots_of_unity
@@ -2325,6 +2341,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                       { plonk0 with
                         zeta = As_field.zeta
                       ; alpha = As_field.alpha
+                      ; joint_combiner = As_field.joint_combiner
                       }
                     in
                     let tick_combined_evals =
@@ -2471,6 +2488,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                                 ; alpha = plonk0.alpha
                                 ; beta = chal plonk0.beta
                                 ; gamma = chal plonk0.gamma
+                                ; lookup = Plonk_types.Opt.None
                                 }
                             }
                         ; sponge_digest_before_evaluations =
@@ -2519,11 +2537,23 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                                 me_only =
                                   Wrap_hack.hash_dlog_me_only
                                     max_proofs_verified me_only_prepared
+                              ; deferred_values =
+                                  { next_statement.proof_state.deferred_values with
+                                    plonk =
+                                      { next_statement.proof_state
+                                          .deferred_values
+                                          .plonk
+                                        with
+                                        lookup = None
+                                      }
+                                  }
                               }
                           } )
                   in
                   ( { proof = next_proof
-                    ; statement = Types.Wrap.Statement.to_minimal next_statement
+                    ; statement =
+                        Types.Wrap.Statement.to_minimal
+                          ~to_option:Plonk_types.Opt.to_option next_statement
                     ; prev_evals =
                         { Plonk_types.All_evals.evals =
                             { public_input = x_hat
@@ -2557,6 +2587,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
         in
         let data : _ Types_map.Compiled.t =
           { branches = Branches.n
+          ; step_uses_lookup = No
           ; proofs_verifieds
           ; max_proofs_verified = (module Max_proofs_verified)
           ; public_input = typ
@@ -2629,6 +2660,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
               ~name:"recurse-on-bad" ~constraint_constants
               ~choices:(fun ~self ->
                 [ { identifier = "main"
+                  ; uses_lookup = false
                   ; prevs = [ tag; tag ]
                   ; main =
                       (fun { public_input = () } ->
@@ -2709,6 +2741,7 @@ let%test_module "test uncorrelated deferred b" =
     let rule : _ Inductive_rule.t =
       let open Impls.Step in
       { identifier = "main"
+      ; uses_lookup = false
       ; prevs = [ tag; tag ]
       ; main =
           (fun { public_input = () } ->
@@ -2785,7 +2818,9 @@ let%test_module "test uncorrelated deferred b" =
       end
 
       let compile :
-          (unit -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t)
+          (   unit
+           -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
+          )
           * _
           * _ =
         let self = tag in
@@ -2843,7 +2878,7 @@ let%test_module "test uncorrelated deferred b" =
         end in
         let proofs_verifieds = Vector.[ 2 ] in
         let (T inner_step_data as step_data) =
-          Step_branch_data.create ~index:0
+          Step_branch_data.create ~index:0 ~step_uses_lookup:No
             ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
             ~self ~public_input:(Input typ) ~auxiliary_typ:typ
             A.to_field_elements A_value.to_field_elements rule ~wrap_domains
@@ -2852,8 +2887,8 @@ let%test_module "test uncorrelated deferred b" =
         let step_domains = Vector.[ inner_step_data.domains ] in
         let step_keypair =
           let etyp =
-            Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-              ~wrap_rounds:Tock.Rounds.n
+            Impls.Step.input ~uses_lookup:No
+              ~proofs_verified:Max_proofs_verified.n ~wrap_rounds:Tock.Rounds.n
           in
           let (T (typ, _conv, conv_inv)) = etyp in
           let main () =
@@ -2887,8 +2922,12 @@ let%test_module "test uncorrelated deferred b" =
                , index
                , digest ) )
           in
-          Cache.Step.read_or_generate [] k_p k_v
-            (Snarky_backendless.Typ.unit ()) typ (fun () -> main)
+          Cache.Step.read_or_generate
+            ~prev_challenges:(Nat.to_int (fst inner_step_data.proofs_verified))
+            [] k_p k_v
+            (Snarky_backendless.Typ.unit ())
+            typ
+            (fun () -> main)
         in
         let step_vks =
           let module V = H4.To_vector (Lazy_keys) in
@@ -2958,8 +2997,8 @@ let%test_module "test uncorrelated deferred b" =
           in
           let r =
             Common.time "wrap read or generate " (fun () ->
-                Cache.Wrap.read_or_generate [] disk_key_prover disk_key_verifier
-                  typ Typ.unit main )
+                Cache.Wrap.read_or_generate ~prev_challenges:2 []
+                  disk_key_prover disk_key_verifier typ Typ.unit main )
           in
           (r, disk_key_verifier)
         in
@@ -2987,9 +3026,10 @@ let%test_module "test uncorrelated deferred b" =
             let _, prev_vars_length = b.proofs_verified in
             let step =
               let wrap_vk = Lazy.force wrap_vk in
-              S.f branch_data () ~prevs_length:prev_vars_length ~self
-                ~public_input:(Input typ) ~auxiliary_typ:Impls.Step.Typ.unit
-                ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
+              S.f branch_data () ~uses_lookup:No ~prevs_length:prev_vars_length
+                ~self ~public_input:(Input typ)
+                ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
+                ~self_dlog_plonk_index:wrap_vk.commitments
                 (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
                 wrap_vk.index
             in
@@ -3080,8 +3120,8 @@ let%test_module "test uncorrelated deferred b" =
                   in
                   let module O = Tick.Oracles in
                   let public_input =
-                    tick_public_input_of_statement ~max_proofs_verified
-                      prev_statement_with_hashes
+                    tick_public_input_of_statement ~uses_lookup:No
+                      ~max_proofs_verified prev_statement_with_hashes
                   in
                   let prev_challenges =
                     Vector.map ~f:Ipa.Step.compute_challenges
@@ -3135,6 +3175,11 @@ let%test_module "test uncorrelated deferred b" =
                       ; beta = O.beta o
                       ; gamma = O.gamma o
                       ; zeta = scalar_chal O.zeta
+                      ; joint_combiner =
+                          Option.map (O.joint_combiner_chal o)
+                            ~f:
+                              (Scalar_challenge.map
+                                 ~f:Challenge.Constant.of_tick_field )
                       }
                     in
                     let r = scalar_chal O.u in
@@ -3152,6 +3197,9 @@ let%test_module "test uncorrelated deferred b" =
                       let zeta = to_field plonk0.zeta
 
                       let alpha = to_field plonk0.alpha
+
+                      let joint_combiner =
+                        Option.map ~f:to_field plonk0.joint_combiner
                     end in
                     let domain =
                       Domain.Pow_2_roots_of_unity
@@ -3167,6 +3215,7 @@ let%test_module "test uncorrelated deferred b" =
                       { plonk0 with
                         zeta = As_field.zeta
                       ; alpha = As_field.alpha
+                      ; joint_combiner = As_field.joint_combiner
                       }
                     in
                     let tick_combined_evals =
@@ -3279,6 +3328,7 @@ let%test_module "test uncorrelated deferred b" =
                                 ; alpha = plonk0.alpha
                                 ; beta = chal plonk0.beta
                                 ; gamma = chal plonk0.gamma
+                                ; lookup = Plonk_types.Opt.None
                                 }
                             }
                         ; sponge_digest_before_evaluations =
@@ -3327,11 +3377,23 @@ let%test_module "test uncorrelated deferred b" =
                                 me_only =
                                   Wrap_hack.hash_dlog_me_only
                                     max_proofs_verified me_only_prepared
+                              ; deferred_values =
+                                  { next_statement.proof_state.deferred_values with
+                                    plonk =
+                                      { next_statement.proof_state
+                                          .deferred_values
+                                          .plonk
+                                        with
+                                        lookup = None
+                                      }
+                                  }
                               }
                           } )
                   in
                   ( { proof = next_proof
-                    ; statement = Types.Wrap.Statement.to_minimal next_statement
+                    ; statement =
+                        Types.Wrap.Statement.to_minimal
+                          ~to_option:Plonk_types.Opt.to_option next_statement
                     ; prev_evals =
                         { Plonk_types.All_evals.evals =
                             { public_input = x_hat
@@ -3365,6 +3427,7 @@ let%test_module "test uncorrelated deferred b" =
         in
         let data : _ Types_map.Compiled.t =
           { branches = Branches.n
+          ; step_uses_lookup = No
           ; proofs_verifieds
           ; max_proofs_verified = (module Max_proofs_verified)
           ; public_input = typ
@@ -3437,6 +3500,7 @@ let%test_module "test uncorrelated deferred b" =
               ~name:"recurse-on-bad" ~constraint_constants
               ~choices:(fun ~self ->
                 [ { identifier = "main"
+                  ; uses_lookup = false
                   ; prevs = [ tag; tag ]
                   ; main =
                       (fun { public_input = () } ->
