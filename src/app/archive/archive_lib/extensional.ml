@@ -62,6 +62,8 @@ module Internal_command = struct
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
+        ; status : string
+        ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
 

@@ -5,7 +5,7 @@ use crate::srs::fp::WasmFpSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex as DlogIndex;
-use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+use mina_curves::pasta::{fp::Fp, pallas::Pallas as GAffineOther, vesta::Vesta as GAffine};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -74,11 +74,7 @@ pub fn caml_pasta_fp_plonk_index_create(
 
     // create index
     Ok(WasmPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(
-            cs,
-            endo_q,
-            srs.0.clone(),
-        ),
+        DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone()),
     )))
 }
 
