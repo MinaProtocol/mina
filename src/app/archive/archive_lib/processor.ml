@@ -861,8 +861,12 @@ module Zkapp_timestamp_bounds = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (timestamp_bounds :
         Block_time.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
-    let timestamp_lower_bound = Block_time.to_string timestamp_bounds.lower in
-    let timestamp_upper_bound = Block_time.to_string timestamp_bounds.upper in
+    let timestamp_lower_bound =
+      Block_time.to_string_exn timestamp_bounds.lower
+    in
+    let timestamp_upper_bound =
+      Block_time.to_string_exn timestamp_bounds.upper
+    in
     let value = { timestamp_lower_bound; timestamp_upper_bound } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -2695,7 +2699,7 @@ module Block = struct
                 |> Unsigned.UInt32.to_int64
             ; timestamp =
                 Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.timestamp |> Block_time.to_string
+                |> Blockchain_state.timestamp |> Block_time.to_string_exn
             ; chain_status
             }
         in
@@ -3014,7 +3018,7 @@ module Block = struct
                 block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
                 block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
-            ; timestamp = Block_time.to_string block.timestamp
+            ; timestamp = Block_time.to_string_exn block.timestamp
             ; chain_status = Chain_status.to_string block.chain_status
             }
     in

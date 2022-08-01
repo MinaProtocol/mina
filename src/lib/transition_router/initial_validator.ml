@@ -75,7 +75,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ; ( "time_received"
       , `String
           (Time.to_string_abs
-             (Block_time.to_time time_received)
+             (Block_time.to_time_exn time_received)
              ~zone:Time.Zone.utc ) )
     ]
     @ metadata
@@ -218,7 +218,7 @@ module Duplicate_block_detector = struct
             ; ( "time_received"
               , `String
                   (Time.to_string_abs
-                     (Block_time.to_time time_received)
+                     (Block_time.to_time_exn time_received)
                      ~zone:Time.Zone.utc ) )
             ]
           in
@@ -333,7 +333,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                   ; ( "time_received"
                     , `String
                         (Time.to_string_abs
-                           (Block_time.to_time time_received)
+                           (Block_time.to_time_exn time_received)
                            ~zone:Time.Zone.utc ) )
                   ]
                 in
