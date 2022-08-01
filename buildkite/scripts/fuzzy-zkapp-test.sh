@@ -2,8 +2,8 @@
 
 set -eo pipefail
 
-if [[ $# -ne 2 ]]; then
-    echo "Usage: $0 <dune-profile> <path-to-source-tests>"
+if [[ $# -ne 3 ]]; then
+    echo "Usage: $0 <dune-profile> <path-to-source-tests> <number-of-trials>"
     exit 1
 fi
 
@@ -23,5 +23,5 @@ echo "--- Run fuzzy zkapp tests"
 time dune exec "${path}" --profile="${profile}" -j16 -- -trials "${trials}" || \
 (./scripts/link-coredumps.sh && \
  echo "--- Retrying failed unit tests" && \
- time dune exec "${path}" --profile="${profile}" -j16 || \
+ time dune exec "${path}" --profile="${profile}" -j16 -- -trials "${trials}" || \
  (./scripts/link-coredumps.sh && false))
