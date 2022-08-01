@@ -1,10 +1,8 @@
 open Core_kernel
 open Snark_params.Tick.Run
 open Signature_lib
-open Zkapps_examples
 
-let initial_state =
-  lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
+let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
 
 let initialize public_key =
   Zkapps_examples.wrap_main
@@ -12,8 +10,8 @@ let initialize public_key =
       let initial_state =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
-      party |> Party_under_construction.In_circuit.assert_state_unproved
-      |> Party_under_construction.In_circuit.set_full_state initial_state )
+      party#assert_state_unproved ;
+      party#set_full_state initial_state )
 
 type _ Snarky_backendless.Request.t +=
   | New_state : Field.Constant.t list Snarky_backendless.Request.t
@@ -32,8 +30,8 @@ let update_state public_key =
       let new_state =
         exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
       in
-      party |> Party_under_construction.In_circuit.assert_state_proved
-      |> Party_under_construction.In_circuit.set_full_state new_state )
+      party#assert_state_proved ;
+      party#set_full_state new_state )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize snapp"

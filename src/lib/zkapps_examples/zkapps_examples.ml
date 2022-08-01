@@ -226,6 +226,24 @@ module Party_under_construction = struct
   end
 end
 
+class party ~public_key ?token_id =
+  object
+    val mutable party =
+      Party_under_construction.In_circuit.create ~public_key ?token_id ()
+
+    method assert_state_proved =
+      party <- Party_under_construction.In_circuit.assert_state_proved party
+
+    method assert_state_unproved =
+      party <- Party_under_construction.In_circuit.assert_state_unproved party
+
+    method set_full_state app_state =
+      party <-
+        Party_under_construction.In_circuit.set_full_state app_state party
+
+    method party_under_construction = party
+  end
+
 (* TODO: Move this somewhere convenient. *)
 let dummy_constraints () =
   let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
@@ -260,10 +278,12 @@ type return_type =
       list
   }
 
-let to_party party : Zkapp_statement.Checked.t * return_type Prover_value.t =
+let to_party (party : party) :
+    Zkapp_statement.Checked.t * return_type Prover_value.t =
   dummy_constraints () ;
   let party, calls =
-    Party_under_construction.In_circuit.to_party_and_calls party
+    Party_under_construction.In_circuit.to_party_and_calls
+      party#party_under_construction
   in
   let party_digest = Parties.Call_forest.Digest.Party.Checked.create party in
   let public_output : Zkapp_statement.Checked.t =
@@ -287,11 +307,10 @@ open Hlist
 
 let wrap_main ~public_key ?token_id f
     { Pickles.Inductive_rule.public_input = () } =
-  let party =
-    Party_under_construction.In_circuit.create ~public_key ?token_id ()
-  in
+  let party = new party ~public_key ?token_id in
+  f party ;
   { Pickles.Inductive_rule.previous_proof_statements = []
-  ; public_output = f party
+  ; public_output = party
   ; auxiliary_output = ()
   }
 
@@ -324,7 +343,7 @@ let compile :
              , heightss
              , unit
              , unit
-             , Party_under_construction.In_circuit.t
+             , party
              , unit (* TODO: Remove? *)
              , auxiliary_var
              , auxiliary_value )
@@ -363,7 +382,7 @@ let compile :
            , heightss
            , unit
            , unit
-           , Party_under_construction.In_circuit.t
+           , party
            , unit
            , auxiliary_var
            , auxiliary_value )
