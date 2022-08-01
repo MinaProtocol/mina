@@ -30,7 +30,7 @@ DROP TABLE user_commands;
 
 DROP TYPE user_command_type;
 
-DROP TYPE user_command_status;
+DROP TYPE transaction_status;
 
 DROP TABLE zkapp_commands;
 

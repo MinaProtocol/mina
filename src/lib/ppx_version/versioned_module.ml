@@ -619,27 +619,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
                   Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
                     [%e estring ptype_name.txt]
                 in
-                match Ppx_version_runtime.Shapes.register path bin_shape_t with
-                | `Ok ->
-                    ()
-                | `Duplicate -> (
-                    (* versioned types inside functors that are called more than
-                       once will yield duplicates; OK if the shapes are the same
-                    *)
-                    match Ppx_version_runtime.Shapes.find path with
-                    | Some bin_shape_t' ->
-                        if
-                          not
-                            (Ppx_version_runtime.Shapes.equal_shapes bin_shape_t
-                               bin_shape_t' )
-                        then
-                          Core_kernel.failwithf
-                            "Different type shapes at path %s" path ()
-                        else ()
-                    | None ->
-                        Core_kernel.failwithf
-                          "Expected to find registered shape at path %s" path ()
-                    )]
+                Ppx_version_runtime.Shapes.register path bin_shape_t]
           else []
       | _ ->
           failwith "Expected single type declaration in structure item"

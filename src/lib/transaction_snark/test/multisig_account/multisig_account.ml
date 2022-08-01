@@ -211,6 +211,7 @@ let%test_module "multisig_account" =
                         ; public_output = ()
                         ; auxiliary_output = ()
                         } )
+                  ; uses_lookup = false
                   }
                 in
                 Pickles.compile ~cache:Cache_dir.cache
@@ -260,6 +261,7 @@ let%test_module "multisig_account" =
                             ; public_output = ()
                             ; auxiliary_output = ()
                             } )
+                      ; uses_lookup = false
                       }
                     ] )
               in
