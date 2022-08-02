@@ -2662,7 +2662,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise ~public_input:(Input Typ.unit)
+            compile_promise () ~public_input:(Input Typ.unit)
               ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
@@ -3500,7 +3500,7 @@ let%test_module "test uncorrelated deferred b" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise ~public_input:(Input Typ.unit)
+            compile_promise () ~public_input:(Input Typ.unit)
               ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
