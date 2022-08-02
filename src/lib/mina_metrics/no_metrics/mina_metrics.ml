@@ -69,6 +69,10 @@ module Cryptography = struct
   let snark_work_merge_time_sec : Snark_work_histogram.t = ()
 
   let snark_work_base_time_sec : Snark_work_histogram.t = ()
+
+  let transaction_length : Gauge.t = ()
+
+  let proof_parties : Gauge.t = ()
 end
 
 module Bootstrap = struct
