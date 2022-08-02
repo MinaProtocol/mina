@@ -186,7 +186,8 @@ let display
       ; local_state = Local_state.display local_state
       }
   ; timestamp =
-      Time.to_string_trimmed ~zone:Time.Zone.utc (Block_time.to_time timestamp)
+      Time.to_string_trimmed ~zone:Time.Zone.utc
+        (Block_time.to_time_exn timestamp)
   ; body_reference =
       Visualization.display_prefix_of_string
       @@ Consensus.Body_reference.to_hex body_reference

@@ -264,15 +264,6 @@ module Deriving = struct
 
   let ocaml_builtin_type_constructors = [ "list"; "array"; "option"; "ref" ]
 
-  let is_version_module vn =
-    let len = String.length vn in
-    len > 1
-    && Char.equal vn.[0] 'V'
-    &&
-    let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
-    String.for_all numeric_part ~f:Char.is_digit
-    && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
-
   (* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
   let is_jane_street_stable_module module_path =
     let hd_elt = List.hd_exn module_path in
@@ -280,7 +271,7 @@ module Deriving = struct
     &&
     match List.rev module_path with
     | vn :: "Stable" :: _ ->
-        is_version_module vn
+        Versioned_util.is_version_module vn
     | vn :: label :: "Stable" :: "Time" :: _
       when List.mem [ "Span"; "With_utc_sexp" ] label ~equal:String.equal ->
         (* special cases, maybe improper module structure *)
