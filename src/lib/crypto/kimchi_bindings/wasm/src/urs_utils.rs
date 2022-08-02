@@ -1,4 +1,4 @@
-use ark_ec::msm::VariableBaseMSM;
+use ark_ec::{msm::VariableBaseMSM, ProjectiveCurve};
 use ark_ff::{batch_inversion, One, PrimeField, UniformRand, Zero};
 use commitment_dlog::{
     commitment::{b_poly_coefficients, CommitmentCurve},
