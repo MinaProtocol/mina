@@ -93,8 +93,7 @@ let pack_statement max_proofs_verified ~lookup t =
        max_proofs_verified Backend.Tock.Rounds.n lookup )
     (Statement.to_data t ~option_map:Plonk_types.Opt.map)
 
-let shifts ~log2_size =
-  Common.tock_shifts ~log2_size |> Plonk_types.Shifts.map ~f:Impl.Field.constant
+let shifts ~log2_size = Common.tock_shifts ~log2_size
 
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant

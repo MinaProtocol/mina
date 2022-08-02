@@ -654,9 +654,7 @@ struct
           in
           Field.sub (go x 0) Field.one )
 
-  let shifts ~log2_size =
-    Common.tick_shifts ~log2_size
-    |> Plonk_types.Shifts.map ~f:Impl.Field.constant
+  let shifts ~log2_size = Common.tick_shifts ~log2_size
 
   let domain_generator ~log2_size =
     Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
