@@ -14,7 +14,8 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 [%%inject "ledger_depth", ledger_depth]
 
-let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
+let parties_with_ledger ?num_keypairs ?max_other_parties ?account_state_tbl ?vk
+    ?failure () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -25,10 +26,11 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
      ledger, and have max_other_parties keypairs available for new accounts
   *)
   let max_other_parties =
-    Option.value_map max_other_parties
-      ~default:Parties_generators.max_other_parties ~f:Fn.id
+    Option.value max_other_parties ~default:Parties_generators.max_other_parties
   in
-  let num_keypairs = (max_other_parties * 2) + 2 in
+  let num_keypairs =
+    Option.value num_keypairs ~default:((max_other_parties * 2) + 2)
+  in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let keymap =
     List.fold keypairs ~init:Public_key.Compressed.Map.empty
@@ -36,7 +38,7 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
         let key = Public_key.compress public_key in
         Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
   in
-  let num_keypairs_in_ledger = max_other_parties + 1 in
+  let num_keypairs_in_ledger = num_keypairs / 2 in
   let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
@@ -56,12 +58,12 @@ let parties_with_ledger ?max_other_parties ?account_state_tbl ?vk ?failure () =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_int min_cmd_fee
-      |> Int.( + ) 1_000_000_000_000_000
+      |> Int.( + ) 100_000_000_000_000_000
       |> Currency.Balance.of_int
     in
     (* max balance to avoid overflow when adding deltas *)
     let max_balance =
-      let max_bal = Currency.Balance.of_formatted_string "10000000.0" in
+      let max_bal = Currency.Balance.of_formatted_string "2000000000.0" in
       match
         Currency.Balance.add_amount min_balance
           (Currency.Balance.to_amount max_bal)
@@ -141,33 +143,32 @@ let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
     | None ->
         Quickcheck.Generator.small_non_negative_int
   in
+  let max_other_parties =
+    Option.value max_other_parties ~default:Parties_generators.max_other_parties
+  in
+  let num_keypairs = length * max_other_parties * 2 in
   (* Keep track of account states across multiple parties transaction *)
   let account_state_tbl = Account_id.Table.create () in
-  let merge_ledger source_ledger target_ledger =
-    (* add all accounts in source to target *)
-    Ledger.iteri source_ledger ~f:(fun _ndx acct ->
-        let acct_id = Account_id.create acct.public_key acct.token_id in
-        match Ledger.get_or_create_account target_ledger acct_id acct with
-        | Ok (`Added, _) ->
-            ()
-        | Ok (`Existed, _) ->
-            failwith "Account already existed in target ledger"
-        | Error err ->
-            failwithf "Could not add account to target ledger: %s"
-              (Error.to_string_hum err) () )
+  let%bind parties, fee_payer_keypair, keymap, ledger =
+    parties_with_ledger ~num_keypairs ~max_other_parties ~account_state_tbl ?vk
+      ?failure ()
   in
-  let init_ledger = Ledger.create ~depth:ledger_depth () in
   let rec go parties_and_fee_payer_keypairs n =
-    if n <= 0 then return (List.rev parties_and_fee_payer_keypairs, init_ledger)
+    if n <= 1 then return (List.rev parties_and_fee_payer_keypairs, ledger)
     else
-      let%bind parties, fee_payer_keypair, keymap, ledger =
-        parties_with_ledger ?max_other_parties ~account_state_tbl ?vk ?failure
-          ()
+      let%bind parties =
+        Parties_generators.gen_parties_from ~max_other_parties
+          ~fee_payer_keypair ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
+      in
+      let valid_parties =
+        Option.value_exn
+          (Parties.Valid.to_valid ~ledger ~get:Ledger.get
+             ~location_of_account:Ledger.location_of_account parties )
       in
       let parties_and_fee_payer_keypairs' =
-        (parties, fee_payer_keypair, keymap) :: parties_and_fee_payer_keypairs
+        (User_command.Parties valid_parties, fee_payer_keypair, keymap)
+        :: parties_and_fee_payer_keypairs
       in
-      merge_ledger ledger init_ledger ;
       go parties_and_fee_payer_keypairs' (n - 1)
   in
-  go [] length
+  go [ (parties, fee_payer_keypair, keymap) ] length
