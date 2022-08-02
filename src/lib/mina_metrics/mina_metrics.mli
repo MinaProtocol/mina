@@ -59,6 +59,10 @@ module Cryptography : sig
   val snark_work_merge_time_sec : Snark_work_histogram.t
 
   val snark_work_base_time_sec : Snark_work_histogram.t
+
+  val transaction_length : Gauge.t
+
+  val proof_parties : Gauge.t
 end
 
 module Bootstrap : sig

@@ -279,6 +279,19 @@ module Cryptography = struct
     Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
       ~subsystem
 
+  let transaction_length =
+    let help =
+      "Number of parties in a parties transaction (1 for simple transactions)"
+    in
+    Gauge.v "transaction_length" ~help ~namespace ~subsystem
+
+  let proof_parties =
+    let help =
+      "Number of parties with proof authorization in a parties transaction (0 \
+       for simple transactions)"
+    in
+    Gauge.v "proof_parties" ~help ~namespace ~subsystem
+
   (* TODO:
      let transaction_proving_time_ms =
        let help = "time elapsed while proving most recently generated transaction snark" in
