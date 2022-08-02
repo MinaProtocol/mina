@@ -153,7 +153,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                                   Time.(
                                     Span.to_ms
                                       (diff (now ())
-                                         (Block_time.to_time scheduled_time) ))
+                                         (Block_time.to_time_exn scheduled_time) ))
                               )
                             ] ;
                         Mina_block.Precomputed.to_yojson precomputed_block )
