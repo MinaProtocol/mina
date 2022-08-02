@@ -22,16 +22,17 @@ let buildTestCmd : Text -> Text -> Natural -> Size -> Command.Type = \(profile :
       key = "fuzzy-zkapp-unit-test-${profile}",
       target = cmd_target,
       docker = None Docker.Type,
-      artifact_paths = [ S.contains "core_dumps/*" ]
+      artifact_paths = [ S.contains "core_dumps/*" ],
+      timeout_in_minutes = 120
     }
 
 in
 
 Pipeline.build
   Pipeline.Config::{
-    spec = 
+    spec =
       let unitDirtyWhen = [
-        S.strictlyStart (S.contains "src/lib"),          
+        S.strictlyStart (S.contains "src/lib"),
         S.strictlyStart (S.contains "src/lib/transaction_snark/test/zkapp_fuzzy"),
         S.exactly "buildkite/src/Jobs/Test/FuzzyZkappTest" "dhall",
         S.exactly "buildkite/scripts/fuzzy-zkapp-test" "sh"
@@ -40,7 +41,7 @@ Pipeline.build
       in
 
       JobSpec::{
-        dirtyWhen = unitDirtyWhen,
+        (* dirtyWhen = unitDirtyWhen, *)
         path = "Test",
         name = "FuzzyZkappTest"
       },
