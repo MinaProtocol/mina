@@ -25,6 +25,7 @@
    run_in_thread
    test_util
    ppx_version.runtime
+   hex
  )
  (inline_tests)
  (preprocess
