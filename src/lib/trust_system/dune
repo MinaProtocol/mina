@@ -24,6 +24,7 @@
    network_peer
    run_in_thread
    test_util
+   hex
  )
  (inline_tests)
  (preprocess

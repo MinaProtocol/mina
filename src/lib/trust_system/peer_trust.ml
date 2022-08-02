@@ -457,8 +457,56 @@ module Make (Action : Action_intf) = Make0 (struct
   end
 
   module Config = String
-  module Db =
-    Rocksdb.Serializable.Make (Network_peer.Peer.Stable.V1) (Record.Stable.V1)
+
+  module Key = struct
+    include Network_peer.Peer.Stable.Latest
+
+    let bin_write_t buf ~pos t =
+      let sz = bin_write_t buf ~pos t in
+      let bytes = Bytes.create sz in
+      Bin_prot.Common.blit_buf_bytes buf bytes ~len:sz ;
+      Format.eprintf "WROTE DB KEY, LEN: %d@." sz ;
+      Format.eprintf "WROTE DB KEY HEX: %s@."
+        (Hex.Safe.to_hex @@ Bytes.to_string bytes) ;
+      sz
+
+    let bin_read_t buf ~pos_ref =
+      let start = !pos_ref in
+      let t = bin_read_t buf ~pos_ref in
+      let sz = !pos_ref - start in
+      Format.eprintf "READ DB KEY, LEN: %d@." sz ;
+      let bytes = Bytes.create sz in
+      Bin_prot.Common.blit_buf_bytes ~src_pos:start buf bytes ~len:sz ;
+      Format.eprintf "READ DB KEY HEX: %s@."
+        (Hex.Safe.to_hex @@ Bytes.to_string bytes) ;
+      t
+  end
+
+  module Value = struct
+    include Record.Stable.Latest
+
+    let bin_write_t buf ~pos t =
+      let sz = bin_write_t buf ~pos t in
+      let bytes = Bytes.create sz in
+      Bin_prot.Common.blit_buf_bytes buf bytes ~len:sz ;
+      Format.eprintf "WROTE DB VALUE, LEN: %d@." sz ;
+      Format.eprintf "WROTE DB VALUE HEX: %s@."
+        (Hex.Safe.to_hex @@ Bytes.to_string bytes) ;
+      sz
+
+    let bin_read_t buf ~pos_ref =
+      let start = !pos_ref in
+      let t = bin_read_t buf ~pos_ref in
+      let sz = !pos_ref - start in
+      Format.eprintf "READ DB VALUE, LEN: %d@." sz ;
+      let bytes = Bytes.create sz in
+      Bin_prot.Common.blit_buf_bytes ~src_pos:start buf bytes ~len:sz ;
+      Format.eprintf "READ DB VALUE HEX: %s@."
+        (Hex.Safe.to_hex @@ Bytes.to_string bytes) ;
+      t
+  end
+
+  module Db = Rocksdb.Serializable.Make (Key) (Value)
   module Action = Action
   include Log_events
 end)
