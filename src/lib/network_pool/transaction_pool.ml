@@ -1229,7 +1229,7 @@ struct
         Mina_metrics.(
           Gauge.set Transaction_pool.pool_size (Float.of_int pool_size_after) ;
           List.iter
-            (List.init (min 0 (pool_size_after - pool_size_before)) ~f:Fn.id)
+            (List.init (max 0 (pool_size_after - pool_size_before)) ~f:Fn.id)
             ~f:(fun _ ->
               Counter.inc_one Transaction_pool.transactions_added_to_pool )) ;
         (* partition the results *)
