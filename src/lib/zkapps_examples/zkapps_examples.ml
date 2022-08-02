@@ -92,11 +92,22 @@ module Party_under_construction = struct
           failwith "Incorrect length of app_state"
   end
 
+  module Events = struct
+    type t = { events : Field.Constant.t array list }
+
+    let create () = { events = [] }
+
+    let add_event t event : t = { events = event :: t.events }
+
+    let add_events t events : t = { events = events @ t.events }
+  end
+
   type t =
     { public_key : Public_key.Compressed.t
     ; token_id : Token_id.t
     ; account_condition : Account_condition.t
     ; update : Update.t
+    ; events : Events.t
     }
 
   let create ~public_key ?(token_id = Token_id.default) () =
@@ -104,6 +115,7 @@ module Party_under_construction = struct
     ; token_id
     ; account_condition = Account_condition.create ()
     ; update = Update.create ()
+    ; events = Events.create ()
     }
 
   let to_party (t : t) : Party.Body.t =
@@ -112,7 +124,7 @@ module Party_under_construction = struct
     ; update = Update.to_parties_update t.update
     ; balance_change = { magnitude = Amount.zero; sgn = Pos }
     ; increment_nonce = false
-    ; events = []
+    ; events = t.events.events
     ; sequence_events = []
     ; call_data = Field.Constant.zero
     ; preconditions =
@@ -162,6 +174,9 @@ module Party_under_construction = struct
 
   let set_full_state app_state (t : t) =
     { t with update = Update.set_full_state app_state t.update }
+
+  let set_events events (t : t) =
+    { t with events = Events.add_events t.events events }
 
   module In_circuit = struct
     module Account_condition = struct
@@ -289,11 +304,22 @@ module Party_under_construction = struct
             failwith "Incorrect length of app_state"
     end
 
+    module Events = struct
+      type t = { events : Field.Constant.t array list }
+
+      let create () = { events = [] }
+
+      let add_event t event : t = { events = event :: t.events }
+
+      let add_events t events : t = { events = events @ t.events }
+    end
+
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
+      ; events : Events.t
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default)) ()
@@ -302,6 +328,7 @@ module Party_under_construction = struct
       ; token_id
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
+      ; events = Events.create ()
       }
 
     let to_party_and_calls (t : t) :
@@ -322,7 +349,7 @@ module Party_under_construction = struct
         ; balance_change =
             var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
         ; increment_nonce = Boolean.false_
-        ; events = var_of_t Zkapp_account.Events.typ []
+        ; events = var_of_t Zkapp_account.Events.typ t.events.events
         ; sequence_events = var_of_t Zkapp_account.Events.typ []
         ; call_data = Field.zero
         ; preconditions =
@@ -380,6 +407,9 @@ module Party_under_construction = struct
 
     let set_full_state app_state (t : t) =
       { t with update = Update.set_full_state app_state t.update }
+
+    let set_events events (t : t) =
+      { t with events = Events.add_events t.events events }
   end
 end
 
