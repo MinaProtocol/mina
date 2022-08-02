@@ -45,13 +45,24 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     let shifts (type n) ((which, log2s) : (int, n) t)
         ~(shifts : log2_size:int -> Field.Constant.t array) :
         Field.t Pickles_types.Plonk_types.Shifts.t =
-      let shifts =
-        Vector.map log2s ~f:(fun d ->
-            Array.map ~f:Field.constant (shifts ~log2_size:d) )
-      in
-      let open Pickles_types.Plonk_types.Shifts in
-      let mk f = mask which (Vector.map shifts ~f) in
-      Array.init num_shifts ~f:(fun i -> mk (fun a -> a.(i)))
+      let all_shifts = Vector.map log2s ~f:(fun d -> shifts ~log2_size:d) in
+      match all_shifts with
+      | [] ->
+          Array.init num_shifts ~f:(fun _ -> Field.zero)
+      | shifts :: other_shiftss ->
+          let all_the_same =
+            Vector.for_all other_shiftss
+              ~f:(Array.for_all2_exn ~f:Field.Constant.equal shifts)
+          in
+          let disabled_not_the_same = true in
+          if all_the_same then Array.map ~f:Field.constant shifts
+          else if disabled_not_the_same then
+            failwith "Pseudo.Domain.shifts: found variable shifts"
+          else
+            let open Pickles_types.Plonk_types.Shifts in
+            let mk f = mask which (Vector.map all_shifts ~f) in
+            Array.init num_shifts ~f:(fun i ->
+                mk (fun a -> Field.constant a.(i)) )
 
     let generator (type n) ((which, log2s) : (int, n) t) ~domain_generator =
       mask which (Vector.map log2s ~f:(fun d -> domain_generator ~log2_size:d))
