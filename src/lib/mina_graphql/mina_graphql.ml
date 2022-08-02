@@ -302,90 +302,89 @@ module Types = struct
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
 
-    let interval : (_, (Time.Span.t * Time.Span.t) option) typ =
-      obj "Interval" ~fields:(fun _ ->
-          [ field "start" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ (start, _) ->
-                Time.Span.to_ms start |> Int64.of_float |> Int64.to_string )
-          ; field "stop" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, end_) ->
-                Time.Span.to_ms end_ |> Int64.of_float |> Int64.to_string )
-          ] )
+    (* let interval : (_, (Time.Span.t * Time.Span.t) option) typ = *)
+    (*   obj "Interval" ~fields:(fun _ -> *)
+    (*       [ field "start" ~typ:(non_null string) *)
+    (*           ~args:Arg.[] *)
+    (*           ~resolve:(fun _ (start, _) -> *)
+    (*             Time.Span.to_ms start |> Int64.of_float |> Int64.to_string ) *)
+    (*       ; field "stop" ~typ:(non_null string) *)
+    (*           ~args:Arg.[] *)
+    (*           ~resolve:(fun _ (_, end_) -> *)
+    (*             Time.Span.to_ms end_ |> Int64.of_float |> Int64.to_string ) *)
+    (*       ] ) *)
 
-    let histogram : (_, Perf_histograms.Report.t option) typ =
-      obj "Histogram" ~fields:(fun _ ->
-          let open Reflection.Shorthand in
-          List.rev
-          @@ Perf_histograms.Report.Fields.fold ~init:[]
-               ~values:(id ~typ:Schema.(non_null (list (non_null int))))
-               ~intervals:(id ~typ:(non_null (list (non_null interval))))
-               ~underflow:nn_int ~overflow:nn_int )
+    (* let histogram : (_, Perf_histograms.Report.t option) typ = *)
+    (*   obj "Histogram" ~fields:(fun _ -> *)
+    (*       let open Reflection.Shorthand in *)
+    (*       List.rev *)
+   (*       @@ Perf_histograms.Report.Fields.fold ~init:[] *)
+    (*            ~values:(id ~typ:Schema.(non_null (list (non_null int)))) *)
+    (*            ~intervals:(id ~typ:(non_null (list (non_null interval)))) *)
+    (*            ~underflow:nn_int ~overflow:nn_int ) *)
+
+    let histograms = Daemon_rpcs.Graphql_objects.histograms ()
 
     module Rpc_timings = Daemon_rpcs.Types.Status.Rpc_timings
     module Rpc_pair = Rpc_timings.Rpc_pair
 
-    let rpc_pair : (_, Perf_histograms.Report.t option Rpc_pair.t option) typ =
-      let h = Reflection.Shorthand.id ~typ:histogram in
-      obj "RpcPair" ~fields:(fun _ ->
-          List.rev @@ Rpc_pair.Fields.fold ~init:[] ~dispatch:h ~impl:h )
+    (* let rpc_pair : (_, Perf_histograms.Report.t option Rpc_pair.t option) typ = *)
+    (*   let h = Reflection.Shorthand.id ~typ:histogram in *)
+    (*   obj "RpcPair" ~fields:(fun _ -> *)
+    (*       List.rev @@ Rpc_pair.Fields.fold ~init:[] ~dispatch:h ~impl:h ) *)
 
-    let rpc_timings : (_, Rpc_timings.t option) typ =
-      let fd = Reflection.Shorthand.id ~typ:(non_null rpc_pair) in
-      obj "RpcTimings" ~fields:(fun _ ->
-          List.rev
-          @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd
-               ~answer_sync_ledger_query:fd ~get_ancestry:fd
-               ~get_transition_chain_proof:fd ~get_transition_chain:fd )
+    (* let rpc_timings : (_, Rpc_timings.t option) typ = *)
+    (*   let fd = Reflection.Shorthand.id ~typ:(non_null rpc_pair) in *)
+    (*   obj "RpcTimings" ~fields:(fun _ -> *)
+    (*       List.rev *)
+    (*       @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd *)
+    (*            ~answer_sync_ledger_query:fd ~get_ancestry:fd *)
+    (*            ~get_transition_chain_proof:fd ~get_transition_chain:fd ) *)
 
-    module Histograms = Daemon_rpcs.Types.Status.Histograms
+    (* module Histograms = Daemon_rpcs.Types.Status.Histograms *)
 
-    let histograms : (_, Histograms.t option) typ =
-      let h = Reflection.Shorthand.id ~typ:histogram in
-      obj "Histograms" ~fields:(fun _ ->
-          let open Reflection.Shorthand in
-          List.rev
-          @@ Histograms.Fields.fold ~init:[]
-               ~rpc_timings:(id ~typ:(non_null rpc_timings))
-               ~external_transition_latency:h
-               ~accepted_transition_local_latency:h
-               ~accepted_transition_remote_latency:h
-               ~snark_worker_transition_time:h ~snark_worker_merge_time:h )
+    (* let histograms : (_, Histograms.t option) typ = *)
+    (*   let h = Reflection.Shorthand.id ~typ:histogram in *)
+    (*   obj "Histograms" ~fields:(fun _ -> *)
+    (*       let open Reflection.Shorthand in *)
+    (*       List.rev *)
+    (*       @@ Histograms.Fields.fold ~init:[] *)
+    (*            ~rpc_timings:(id ~typ:(non_null rpc_timings)) *)
+    (*            ~external_transition_latency:h *)
+    (*            ~accepted_transition_local_latency:h *)
+    (*            ~accepted_transition_remote_latency:h *)
+    (*            ~snark_worker_transition_time:h ~snark_worker_merge_time:h ) *)
 
-    let consensus_configuration : (_, Consensus.Configuration.t option) typ =
-      obj "ConsensusConfiguration" ~fields:(fun _ ->
-          let open Reflection.Shorthand in
-          List.rev
-          @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int
-               ~k:nn_int ~slots_per_epoch:nn_int ~slot_duration:nn_int
-               ~epoch_duration:nn_int ~acceptable_network_delay:nn_int
-               ~genesis_state_timestamp:nn_time )
+    (* let consensus_configuration : (_, Consensus.Configuration.t option) typ = *)
+    (*   obj "ConsensusConfiguration" ~fields:(fun _ -> *)
+    (*       let open Reflection.Shorthand in *)
+    (*       List.rev *)
+    (*       @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int *)
+    (*            ~k:nn_int ~slots_per_epoch:nn_int ~slot_duration:nn_int *)
+    (*            ~epoch_duration:nn_int ~acceptable_network_delay:nn_int *)
+    (*            ~genesis_state_timestamp:nn_time ) *)
 
-    let peer : (_, Network_peer.Peer.Display.t option) typ =
-      obj "Peer" ~fields:(fun _ ->
-          let open Reflection.Shorthand in
-          List.rev
-          @@ Network_peer.Peer.Display.Fields.fold ~init:[] ~host:nn_string
-               ~libp2p_port:nn_int ~peer_id:nn_string )
+    let consensus_configuration = Consensus.Graphql_objects.consensus_configuration ()
+    let peer =  Network_peer_unix.Graphql_objects.peer ()
+    let addrs_and_ports = Node_addrs_and_ports_unix.Graphql_objects.addrs_and_ports ()
+    let metrics = Daemon_rpcs.Graphql_objects.metrics ()
+    (* let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ = *)
+    (*   obj "AddrsAndPorts" ~fields:(fun _ -> *)
+    (*       let open Reflection.Shorthand in *)
+    (*       List.rev *)
+    (*       @@ Node_addrs_and_ports.Display.Fields.fold ~init:[] *)
+    (*            ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int *)
+    (*            ~libp2p_port:nn_int ~peer:(id ~typ:peer) ) *)
 
-    let addrs_and_ports : (_, Node_addrs_and_ports.Display.t option) typ =
-      obj "AddrsAndPorts" ~fields:(fun _ ->
-          let open Reflection.Shorthand in
-          List.rev
-          @@ Node_addrs_and_ports.Display.Fields.fold ~init:[]
-               ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
-               ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
-
-    let metrics : (_, Daemon_rpcs.Types.Status.Metrics.t option) typ =
-      obj "Metrics" ~fields:(fun _ ->
-          let open Reflection.Shorthand in
-          List.rev
-          @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
-               ~block_production_delay:nn_int_list
-               ~transaction_pool_diff_received:nn_int
-               ~transaction_pool_diff_broadcasted:nn_int
-               ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int )
+    (* let metrics : (_, Daemon_rpcs.Types.Status.Metrics.t option) typ = *)
+    (*   obj "Metrics" ~fields:(fun _ -> *)
+    (*       let open Reflection.Shorthand in *)
+    (*       List.rev *)
+    (*       @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[] *)
+    (*            ~block_production_delay:nn_int_list *)
+    (*            ~transaction_pool_diff_received:nn_int *)
+    (*            ~transaction_pool_diff_broadcasted:nn_int *)
+    (*            ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int ) *)
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
@@ -445,56 +444,7 @@ module Types = struct
                   "Fee_transfer" )
         ] )
 
-  let account_timing : (Mina_lib.t, Account_timing.t option) typ =
-    obj "AccountTiming" ~fields:(fun _ ->
-        [ field "initial_mininum_balance" ~typ:uint64
-            ~doc:"The initial minimum balance for a time-locked account"
-            ~args:Arg.[]
-            ~resolve:(fun _ timing ->
-              match timing with
-              | Account_timing.Untimed ->
-                  None
-              | Timed timing_info ->
-                  Some (Balance.to_uint64 timing_info.initial_minimum_balance)
-              )
-        ; field "cliff_time" ~typ:uint32
-            ~doc:"The cliff time for a time-locked account"
-            ~args:Arg.[]
-            ~resolve:(fun _ timing ->
-              match timing with
-              | Account_timing.Untimed ->
-                  None
-              | Timed timing_info ->
-                  Some timing_info.cliff_time )
-        ; field "cliff_amount" ~typ:uint64
-            ~doc:"The cliff amount for a time-locked account"
-            ~args:Arg.[]
-            ~resolve:(fun _ timing ->
-              match timing with
-              | Account_timing.Untimed ->
-                  None
-              | Timed timing_info ->
-                  Some (Currency.Amount.to_uint64 timing_info.cliff_amount) )
-        ; field "vesting_period" ~typ:uint32
-            ~doc:"The vesting period for a time-locked account"
-            ~args:Arg.[]
-            ~resolve:(fun _ timing ->
-              match timing with
-              | Account_timing.Untimed ->
-                  None
-              | Timed timing_info ->
-                  Some timing_info.vesting_period )
-        ; field "vesting_increment" ~typ:uint64
-            ~doc:"The vesting increment for a time-locked account"
-            ~args:Arg.[]
-            ~resolve:(fun _ timing ->
-              match timing with
-              | Account_timing.Untimed ->
-                  None
-              | Timed timing_info ->
-                  Some (Currency.Amount.to_uint64 timing_info.vesting_increment)
-              )
-        ] )
+  let account_timing = Mina_base_unix.Graphql_objects.account_timing ()
 
   let completed_work =
     obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->

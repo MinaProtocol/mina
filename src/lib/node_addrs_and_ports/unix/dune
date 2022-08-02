@@ -1,17 +1,19 @@
 (library
- (name mina_base_unix)
- (public_name mina_base.unix)
+ (name node_addrs_and_ports_unix)
+ (public_name node_addrs_and_ports.unix)
  (libraries
    ;; opam libraries
    graphql-async
    yojson
    graphql
    integers
+   fieldslib
+   base
    ;; local libraries
    graphql_basic_scalars
-   mina_base
    graphql_wrapper
-   currency
+   node_addrs_and_ports
+   network_peer_unix
  )
  (preprocess (pps ppx_version))
  (instrumentation (backend bisect_ppx))

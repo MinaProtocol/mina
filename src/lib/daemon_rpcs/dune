@@ -17,6 +17,8 @@
    async.async_rpc
    async_rpc_kernel
    async_kernel
+   graphql
+   graphql-async
    ;; local libraries
    network_peer
    genesis_constants
@@ -32,6 +34,7 @@
    mina_base
    user_command_input
    perf_histograms
+   perf_histograms_unix
    sync_status
    node_addrs_and_ports
    mina_compile_config
@@ -39,6 +42,8 @@
    network_pool
    data_hash_lib
    trust_system
+   graphql_wrapper
+   graphql_basic_scalars
  )
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_compare ppx_deriving.make

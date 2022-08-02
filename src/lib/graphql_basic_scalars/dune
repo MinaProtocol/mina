@@ -9,6 +9,12 @@
    core
    graphql-async
    yojson
+   re2
+   graphql
+   ppx_fields_conv
+   fieldslib
+   ;; local libraries
+   graphql_wrapper
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version)))

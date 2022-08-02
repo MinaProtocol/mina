@@ -24,6 +24,7 @@
    core_kernel.uuid
    async_rpc_kernel
    sexp_diff_kernel
+   graphql
    ;; local libraries
    unsigned_extended
    fold_lib
@@ -71,6 +72,7 @@
    bitstring_lib
    pasta
    graphql_basic_scalars
+   graphql_wrapper
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess

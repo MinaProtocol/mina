@@ -47,7 +47,9 @@
    mina_state
    filtered_external_transition
    node_addrs_and_ports
+   node_addrs_and_ports_unix
    network_peer
+   network_peer_unix
    mina_base
    mina_block
    user_command_input

@@ -311,3 +311,5 @@ module Get_object_lifetime_statistics = struct
     Rpc.Rpc.create ~name:"Get_object_lifetime_statistics" ~version:0 ~bin_query
       ~bin_response
 end
+
+module Graphql_objects = Graphql_objects
