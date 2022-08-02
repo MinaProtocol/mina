@@ -39,6 +39,7 @@
    unsigned_extended
    precomputed_values
    transaction_inclusion_status
+   transaction_inclusion_status_unix
    graphql_lib
    block_time
    currency
@@ -56,6 +57,7 @@
    signature_lib
    transition_frontier
    sync_status
+   sync_status_unix
    consensus
    daemon_rpcs
    mina_numbers

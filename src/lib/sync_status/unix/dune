@@ -1,14 +1,15 @@
 (library
- (name mina_block_unix)
- (public_name mina_block.unix)
+ (name sync_status_unix)
+ (public_name sync_status.unix)
  (libraries
    ;; opam libraries
    graphql-async
    yojson
    graphql
+   base
    ;; local libraries
    graphql_basic_scalars
-   mina_block
+   sync_status
    graphql_wrapper
  )
  (preprocess (pps ppx_version))
