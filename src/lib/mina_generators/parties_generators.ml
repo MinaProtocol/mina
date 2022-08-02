@@ -49,10 +49,10 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
           (return { Zkapp_precondition.Closed_interval.lower; upper })
       in
       let%bind nonce =
-        let%bind balance_change_int = Int.gen_uniform_incl 1 100 in
-        let balance_change = Account.Nonce.of_int balance_change_int in
+        let%bind nonce_change_int = Int.gen_uniform_incl 1 100 in
+        let nonce_change = Account.Nonce.of_int nonce_change_int in
         let lower =
-          match Account.Nonce.sub nonce balance_change with
+          match Account.Nonce.sub nonce nonce_change with
           | None ->
               Account.Nonce.zero
           | Some nonce ->
@@ -60,7 +60,7 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
         in
         let upper =
           (* Nonce.add doesn't check for overflow, so check here *)
-          match Account.Nonce.(sub max_value) balance_change with
+          match Account.Nonce.(sub max_value) nonce_change with
           | None ->
               (* unreachable *)
               failwith
@@ -68,7 +68,7 @@ let gen_account_precondition_from_account ?failure ~first_use_of_account account
                  unexpectedly"
           | Some n ->
               if Account.Nonce.( < ) n nonce then Account.Nonce.max_value
-              else Account.Nonce.add nonce balance_change
+              else Account.Nonce.add nonce nonce_change
         in
         Or_ignore.gen
           (return { Zkapp_precondition.Closed_interval.lower; upper })
@@ -256,8 +256,7 @@ let gen_balance_change ?permissions_auth (account : Account.t) ~new_account =
           Quickcheck.Generator.of_list [ Sgn.Pos; Neg ]
   in
   (* if negative, magnitude constrained to balance in account
-         the effective balance is either what's in the account state table,
-         if provided, or what's in the ledger
+     the effective balance is what's in the account state table,
   *)
   let effective_balance = account.balance in
   let small_balance_change =
@@ -279,9 +278,6 @@ let gen_balance_change ?permissions_auth (account : Account.t) ~new_account =
   in
   match sgn with
   | Pos ->
-      (* if positive, the account balance does not impose a constraint on the magnitude; but
-         to avoid overflow over several Party.t, we'll limit the value
-      *)
       ({ magnitude; sgn = Sgn.Pos } : Currency.Amount.Signed.t)
   | Neg ->
       ({ magnitude; sgn = Sgn.Neg } : Currency.Amount.Signed.t)
