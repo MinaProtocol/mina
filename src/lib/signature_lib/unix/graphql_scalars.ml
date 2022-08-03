@@ -1,5 +1,5 @@
 module PublicKey :
-  Graphql_basic_scalars.S_JSON
+  Graphql_basic_scalars.Json_intf
     with type t = Signature_lib.Public_key.Compressed.t = struct
   type t = Signature_lib.Public_key.Compressed.t
 

@@ -4,10 +4,10 @@ module Get_coinbase_and_genesis =
   query {
     genesisBlock {
       creatorAccount {
-        publicKey @ppxCustom(module: "Graphql_lib.Scalars.STRING")
+        publicKey @ppxCustom(module: "Graphql_lib.Scalars.String_json")
       }
       winnerAccount {
-        publicKey @ppxCustom(module: "Graphql_lib.Scalars.STRING")
+        publicKey @ppxCustom(module: "Graphql_lib.Scalars.String_json")
       }
       protocolState {
         blockchainState {

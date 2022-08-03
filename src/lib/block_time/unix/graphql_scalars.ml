@@ -1,4 +1,5 @@
-module BlockTime = struct
+module BlockTime : Graphql_basic_scalars.Json_intf with type t = Block_time.t =
+struct
   type nonrec t = Block_time.t
 
   let parse json = Yojson.Basic.Util.to_string json |> Block_time.of_string_exn
