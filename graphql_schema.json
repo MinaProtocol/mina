@@ -489,7 +489,7 @@
             {
               "name": "publicKey",
               "description":
-                "Public key you wish to start snark-working on; null to stop doing any snark work",
+                "Public key you wish to start snark-working on; null to stop doing any snark work. Warning: If the key is from a zkApp account, the account's receive permission must be None.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -504,7 +504,7 @@
             {
               "name": "publicKey",
               "description":
-                "Public key you wish to start snark-working on; null to stop doing any snark work",
+                "Public key you wish to start snark-working on; null to stop doing any snark work. Warning: If the key is from a zkApp account, the account's receive permission must be None.",
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
@@ -549,7 +549,7 @@
             {
               "name": "publicKey",
               "description":
-                "Public key of the account to receive coinbases. Block production keys will receive the coinbases if none is given",
+                "Public key of the account to receive coinbases. Block production keys will receive the coinbases if omitted. Warning: If the key is from a zkApp account, the account's receive permission must be None.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -564,7 +564,7 @@
             {
               "name": "publicKey",
               "description":
-                "Public key of the account to receive coinbases. Block production keys will receive the coinbases if none is given",
+                "Public key of the account to receive coinbases. Block production keys will receive the coinbases if omitted. Warning: If the key is from a zkApp account, the account's receive permission must be None.",
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
@@ -2582,6 +2582,14 @@
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "isNew",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -2647,6 +2655,12 @@
             },
             {
               "name": "provedState",
+              "description": null,
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "defaultValue": null
+            },
+            {
+              "name": "isNew",
               "description": null,
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
               "defaultValue": null
@@ -6164,7 +6178,7 @@
             },
             {
               "name": "supplyIncrease",
-              "description": "Increase in total coinbase reward ",
+              "description": "Increase in total supply",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6172,6 +6186,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "Use supplyChange"
+            },
+            {
+              "name": "supplyChange",
+              "description": "Increase/Decrease in total supply",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
                   "ofType": null
                 }
               },
@@ -6732,6 +6762,14 @@
             },
             {
               "name": "provedState",
+              "description": null,
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isNew",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },

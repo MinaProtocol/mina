@@ -17,7 +17,7 @@ let initial_state =
     ]
 
 let initialize public_key =
-  Zkapps_examples.party_circuit (fun () ->
+  Zkapps_examples.wrap_main (fun () ->
       let party =
         Party_under_construction.In_circuit.create
           ~public_key:(Public_key.Compressed.var_of_t public_key)
@@ -42,7 +42,7 @@ let update_state_handler (new_state : Field.Constant.t list)
       respond Unhandled
 
 let update_state public_key =
-  Zkapps_examples.party_circuit (fun () ->
+  Zkapps_examples.wrap_main (fun () ->
       let party =
         Party_under_construction.In_circuit.create
           ~public_key:(Public_key.Compressed.var_of_t public_key)
@@ -56,10 +56,18 @@ let update_state public_key =
       |> Party_under_construction.In_circuit.set_full_state new_state )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Initialize snapp"; prevs = []; main = initialize public_key }
+  { identifier = "Initialize snapp"
+  ; prevs = []
+  ; main = initialize public_key
+  ; uses_lookup = false
+  }
 
 let update_state_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Update state"; prevs = []; main = update_state public_key }
+  { identifier = "Update state"
+  ; prevs = []
+  ; main = update_state public_key
+  ; uses_lookup = false
+  }
 
 let generate_initialize_party public_key =
   Party_under_construction.create ~public_key ~token_id:Token_id.default ()

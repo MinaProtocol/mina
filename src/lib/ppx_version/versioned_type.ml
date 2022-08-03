@@ -19,18 +19,16 @@
 
      [@@deriving version { option }]
 
-   where option is one of "rpc", "asserted", or "binable".
+   where option is one of "rpc" or "binable".
 
    Without options (the common case), the type must be named "t", and its definition
    occurs in the module hierarchy "Stable.Vn" or "Stable.Vn.T", where n is a positive integer.
 
-   The "asserted" option asserts that the type is versioned, to allow compilation
+   The "binable" option asserts that the type is versioned, to allow compilation
    to proceed. The types referred to in the type are not checked for versioning
-   with this option.
-
-   The "binable" option is a synonym for "asserted". It assumes that the type
-   will be serialized using a "Binable.Of_..." or "Make_binable" functors, which relies
-   on the serialization of some other type.
+   with this option. It assumes that the type will be serialized using a
+   "Binable.Of_..." or "Make_binable" functors, which relies on the serialization of
+   some other type.
 
    If "rpc" is true, again, the type must be named "query", "response", or "msg",
    and the type definition occurs in the hierarchy "Vn.T".
@@ -145,7 +143,7 @@ module Printing = struct
     }
 
   (* prints path_to_type:type_definition *)
-  let print_type ~loc:_ ~path (_rec_flag, type_decls) _rpc _asserted _binable =
+  let print_type ~loc:_ ~path (_rec_flag, type_decls) _rpc _binable =
     let module_path = module_path_list path in
     let path_len = List.length module_path in
     List.iteri module_path ~f:(fun i s ->
@@ -250,7 +248,7 @@ module Deriving = struct
       let version = [%e eint version]
 
       (* to prevent unused value warnings *)
-      let __ = version]
+      let (_ : _) = version]
 
   let ocaml_builtin_types =
     [ "bytes"
@@ -266,15 +264,6 @@ module Deriving = struct
 
   let ocaml_builtin_type_constructors = [ "list"; "array"; "option"; "ref" ]
 
-  let is_version_module vn =
-    let len = String.length vn in
-    len > 1
-    && Char.equal vn.[0] 'V'
-    &&
-    let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
-    String.for_all numeric_part ~f:Char.is_digit
-    && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
-
   (* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
   let is_jane_street_stable_module module_path =
     let hd_elt = List.hd_exn module_path in
@@ -282,7 +271,7 @@ module Deriving = struct
     &&
     match List.rev module_path with
     | vn :: "Stable" :: _ ->
-        is_version_module vn
+        Versioned_util.is_version_module vn
     | vn :: label :: "Stable" :: "Time" :: _
       when List.mem [ "Span"; "With_utc_sexp" ] label ~equal:String.equal ->
         (* special cases, maybe improper module structure *)
@@ -323,6 +312,7 @@ module Deriving = struct
           false
 
   let rec generate_core_type_version_decls type_name core_type =
+    let version_asserted_str = "version_asserted" in
     match core_type.ptyp_desc with
     | Ptyp_constr ({ txt; _ }, core_types) -> (
         match txt with
@@ -361,8 +351,16 @@ module Deriving = struct
             let core_type_decls =
               generate_version_lets_for_core_types type_name core_types
             in
-            if trustlisted_prefix prefix ~loc:core_type.ptyp_loc then
-              core_type_decls
+            (* type t = M.t [@version_asserted] *)
+            let version_asserted =
+              List.find core_type.ptyp_attributes ~f:(fun attr ->
+                  String.equal attr.attr_name.txt version_asserted_str )
+              |> Option.is_some
+            in
+            if
+              version_asserted
+              || trustlisted_prefix prefix ~loc:core_type.ptyp_loc
+            then core_type_decls
             else
               let loc = core_type.ptyp_loc in
               let pexp_loc = loc in
@@ -389,7 +387,7 @@ module Deriving = struct
                 ; pexp_attributes = []
                 }
               in
-              [%str let __ = [%e versioned_ident]] @ core_type_decls
+              [%str let (_ : _) = [%e versioned_ident]] @ core_type_decls
         | _ ->
             Location.raise_errorf ~loc:core_type.ptyp_loc
               "Unrecognized type constructor for versioned type" )
@@ -483,13 +481,13 @@ module Deriving = struct
     in
     constraint_type_version_decls @ main_type_version_decls
 
-  let generate_versioned_decls ~asserted generation_kind type_decl =
+  let generate_versioned_decls ~binable generation_kind type_decl =
     let module E = Ppxlib.Ast_builder.Make (struct
       let loc = type_decl.ptype_loc
     end) in
     let open E in
     let versioned_current = [%stri let __versioned__ = ()] in
-    if asserted then [ versioned_current ]
+    if binable then [ versioned_current ]
     else
       match generation_kind with
       | Rpc ->
@@ -515,15 +513,11 @@ module Deriving = struct
     type_decl1
 
   let generate_let_bindings_for_type_decl_str ~loc ~path (_rec_flag, type_decls)
-      rpc asserted binable =
-    (* binable is synonym for asserted,
-       in the sense that we don't require the type to be versioned
-    *)
-    let asserted = asserted || binable in
+      rpc binable =
     let type_decl = get_type_decl_representative type_decls in
-    if asserted && rpc then
+    if binable && rpc then
       Location.raise_errorf ~loc:type_decl.ptype_loc
-        "Options \"asserted\" and \"rpc\" cannot be combined" ;
+        "Options \"binable\" and \"rpc\" cannot be combined" ;
     let generation_kind = if rpc then Rpc else Plain in
     let module_path = module_path_list path in
     let inner3_modules = List.take (List.rev module_path) 3 in
@@ -536,7 +530,7 @@ module Deriving = struct
     else (
       validate_type_decl inner3_modules generation_kind type_decl ;
       let versioned_decls =
-        generate_versioned_decls ~asserted generation_kind type_decl
+        generate_versioned_decls ~binable generation_kind type_decl
       in
       let type_name = type_decl.ptype_name.txt in
       (* generate version number for Rpc response, but not for query, so we
@@ -574,12 +568,12 @@ let str_type_decl :
     (structure, rec_flag * type_declaration list) Ppxlib.Deriving.Generator.t =
   let args =
     let open Ppxlib.Deriving.Args in
-    empty +> flag "rpc" +> flag "asserted" +> flag "binable"
+    empty +> flag "rpc" +> flag "binable"
   in
-  let deriver ~loc ~path (rec_flag, type_decls) rpc asserted binable =
+  let deriver ~loc ~path (rec_flag, type_decls) rpc binable =
     (choose_deriver ~printing:Printing.print_type
        ~deriving:Deriving.generate_let_bindings_for_type_decl_str )
-      ~loc ~path (rec_flag, type_decls) rpc asserted binable
+      ~loc ~path (rec_flag, type_decls) rpc binable
   in
   Ppxlib.Deriving.Generator.make args deriver
 

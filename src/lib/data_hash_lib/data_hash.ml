@@ -105,13 +105,12 @@ struct
 end
 
 module T0 = struct
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     module V1 = struct
       [@@@with_all_version_tags]
 
-      type t = Field.t
-      [@@deriving sexp, compare, hash, version { asserted }, bin_io]
+      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
 
       let to_latest = Fn.id
     end

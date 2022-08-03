@@ -8,7 +8,7 @@ import type { Party, Signed } from "../src/TSTypes";
  * TODO: When there is an example of how to do this in the SnarkyJS repo,
  * use that example instead.
  */
-let otherParties = {
+let mockedParties = {
   otherParties: [
     {
       body: {
@@ -84,6 +84,7 @@ let otherParties = {
             state: [null, null, null, null, null, null, null, null],
             sequenceState: null,
             provedState: null,
+            isNew: null,
           },
         },
 
@@ -110,7 +111,7 @@ describe("Party", () => {
     const keypair = client.genKeys();
     const parties = client.signParty(
       {
-        parties: otherParties,
+        parties: mockedParties,
         feePayer: {
           feePayer: keypair.publicKey,
           fee: "1",
@@ -128,7 +129,7 @@ describe("Party", () => {
     const keypair = client.genKeys();
     const parties = client.signTransaction(
       {
-        parties: otherParties,
+        parties: mockedParties,
         feePayer: {
           feePayer: keypair.publicKey,
           fee: "1",
@@ -140,5 +141,27 @@ describe("Party", () => {
     ) as Signed<Party>;
     expect(parties.data).toBeDefined();
     expect(parties.signature).toBeDefined();
+  });
+
+  it("should throw an error if no fee is passed to the feePayer", () => {
+    const keypair = client.genKeys();
+    expect(() => {
+      client.signParty(
+        {
+          parties: mockedParties,
+          // @ts-ignore - fee is not defined
+          feePayer: {
+            feePayer: keypair.publicKey,
+            nonce: "0",
+            memo: "test memo",
+          },
+        },
+        keypair.privateKey
+      );
+    }).toThrowError("Fee must be greater than 0.001");
+  });
+
+  it("should calculate a correct minimum fee", () => {
+    expect(client.getPartyMinimumFee(mockedParties.otherParties, 1)).toBe(1);
   });
 });

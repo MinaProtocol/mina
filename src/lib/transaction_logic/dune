@@ -43,6 +43,7 @@
    snarky.backendless
    snark_params
    unsigned_extended
+   ppx_version.runtime
    with_hash)
  (instrumentation (backend bisect_ppx))
  (preprocess

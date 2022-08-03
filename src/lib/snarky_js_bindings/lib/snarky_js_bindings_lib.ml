@@ -340,19 +340,8 @@ let () =
      ; ("assertGte", Field.Assert.gte)
      ] ) ;
   method_ "assertEquals" (fun this (y : As_field.t) : unit ->
-      try Field.Assert.equal this##.value (As_field.value y)
-      with _ ->
-        console_log this ;
-        console_log (As_field.to_field_obj y) ;
-        let () = raise_error "assertEquals: not equal" in
-        () ) ;
+      Field.Assert.equal this##.value (As_field.value y) ) ;
 
-  (* TODO: bring back better error msg when .toString works in circuits *)
-  (* sprintf "assertEquals: %s != %s"
-         (Js.to_string this##toString)
-         (Js.to_string (As_field.to_field_obj y)##toString)
-     in
-     Js.raise_js_error (new%js Js.error_constr (Js.string s))) ; *)
   method_ "assertBoolean" (fun this : unit ->
       Impl.assert_ (Constraint.boolean this##.value) ) ;
   method_ "isZero" (fun this : bool_class Js.t ->
@@ -1154,6 +1143,12 @@ let poseidon =
         val events = Js.string (zkapp_events :> string)
 
         val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+
+        val body = Js.string (zkapp_body :> string)
+
+        val partyCons = Js.string (party_cons :> string)
+
+        val partyNode = Js.string (party_node :> string)
       end
   end
 
@@ -1388,7 +1383,7 @@ module Circuit = struct
          let ctor1 : _ Js.Optdef.t = (Obj.magic t1)##.constructor in
          let ctor2 : _ Js.Optdef.t = (Obj.magic t2)##.constructor in
          let has_methods ctor =
-           let has s = Js.to_bool (ctor##hasOwnProperty (Js.string s)) in
+           let has s = Js.Optdef.test (Js.Unsafe.get ctor (Js.string s)) in
            has "toFields" && has "ofFields"
          in
          if not (js_equal ctor1 ctor2) then
@@ -1408,7 +1403,11 @@ module Circuit = struct
              array_iter2 ks1 ks2 ~f:(fun k1 k2 ->
                  if not (js_equal k1 k2) then
                    raise_error "if: Arguments had mismatched types" ) ;
-             let result = new%js ctor1 in
+             (* we use Object.create to avoid calling the constructor with the wrong number of arguments *)
+             let result =
+               Js.Unsafe.global ##. Object##create
+                 (Js.Unsafe.coerce ctor1)##.prototype
+             in
              array_iter ks1 ~f:(fun k ->
                  Js.Unsafe.set result k
                    (if_magic b (Js.Unsafe.get t1 k) (Js.Unsafe.get t2 k)) ) ;
@@ -1476,6 +1475,34 @@ module Circuit = struct
     let kp = Impl.Keypair.generate ~prev_challenges:0 cs in
     new%js keypair_constr kp
 
+  let constraint_system (main : unit -> unit) =
+    let cs =
+      Impl.constraint_system
+        ~exposing:Impl.Data_spec.[]
+        ~return_typ:Snark_params.Tick.Typ.unit main
+    in
+    let rows = List.length cs.rows_rev in
+    let digest =
+      Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
+    in
+    (* TODO: to_json doesn't return anything; call into kimchi instead *)
+    let json =
+      Js.Unsafe.(
+        fun_call
+          global ##. JSON##.parse
+          [| inject
+               ( Backend.R1CS_constraint_system.to_json cs
+               |> Yojson.Safe.to_string |> Js.string )
+          |])
+    in
+    object%js
+      val rows = rows
+
+      val digest = digest
+
+      val json = json
+    end
+
   let prove (type w p) (c : (w, p) Circuit_main.t) (priv : w) (pub : p) kp :
       proof_class Js.t =
     let main, spec = main_and_input c in
@@ -1522,6 +1549,7 @@ module Circuit = struct
     := Js.wrap_callback (fun () : bool Js.t ->
            Js.bool (Impl.in_checked_computation ()) ) ;
     Js.Unsafe.set circuit (Js.string "if") if_ ;
+    Js.Unsafe.set circuit (Js.string "_constraintSystem") constraint_system ;
     circuit##.getVerificationKey
     := fun (vk : Verification_key.t) -> new%js verification_key_constr vk
 end
@@ -1838,6 +1866,7 @@ module Choices = struct
         (fun ~self ->
           let prevs = prevs ~self in
           { Pickles.Inductive_rule.identifier = Js.to_string rule##.identifier
+          ; uses_lookup = false
           ; prevs
           ; main =
               (fun { public_input } ->
@@ -2094,9 +2123,7 @@ let pickles_digest (choices : pickles_rule_js Js.js_array Js.t)
   let (Choices choices) = Choices.of_js ~public_input_size choices in
   try
     let _ =
-      Pickles.compile_promise ~choices ~return_early_digest_exception:true
-        (module Public_input)
-        (module Public_input.Constant)
+      Pickles.compile_promise () ~choices ~return_early_digest_exception:true
         ~public_input:(Input (public_input_typ public_input_size))
         ~auxiliary_typ:Typ.unit
         ~branches:(module Branches)
@@ -2120,9 +2147,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let (module Max_proofs_verified) = nat_add_module max_proofs in
   let (Choices choices) = Choices.of_js ~public_input_size choices in
   let tag, _cache, p, provers =
-    Pickles.compile_promise ~choices
-      (module Public_input)
-      (module Public_input.Constant)
+    Pickles.compile_promise () ~choices
       ~public_input:(Input (public_input_typ public_input_size))
       ~auxiliary_typ:Typ.unit
       ~branches:(module Branches)
@@ -2287,6 +2312,8 @@ module Ledger = struct
 
   type account =
     < publicKey : group_class Js.t Js.readonly_prop
+    ; tokenId : field_class Js.t Js.readonly_prop
+    ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
     ; zkapp : zkapp_account Js.readonly_prop >
@@ -2406,6 +2433,12 @@ module Ledger = struct
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
 
+  let public_key_checked (pk : public_key) :
+      Signature_lib.Public_key.Compressed.var =
+    let x = pk##.g##.x##.value in
+    let y = pk##.g##.y##.value in
+    Signature_lib.Public_key.compress_var (x, y) |> Impl.run_checked
+
   let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
     { x = to_unchecked pk##.g##.x##.value
     ; is_odd = Bigint.(test_bit (of_field (to_unchecked pk##.g##.y##.value)) 0)
@@ -2417,8 +2450,22 @@ module Ledger = struct
       (fun () -> failwith "invalid scalar")
       Fn.id
 
-  let account_id pk =
-    Mina_base.Account_id.create (public_key pk) Mina_base.Token_id.default
+  let token_id_checked (token : field_class Js.t) =
+    token |> of_js_field |> Mina_base.Token_id.Checked.of_field
+
+  let token_id (token : field_class Js.t) : Mina_base.Token_id.t =
+    token |> of_js_field_unchecked |> Mina_base.Token_id.of_field
+
+  let default_token_id_js =
+    Mina_base.Token_id.default |> Mina_base.Token_id.to_field_unsafe
+    |> Field.constant |> to_js_field
+
+  let account_id_checked pk token =
+    Mina_base.Account_id.Checked.create (public_key_checked pk)
+      (token_id_checked token)
+
+  let account_id pk token =
+    Mina_base.Account_id.create (public_key pk) (token_id token)
 
   let max_state_size =
     Pickles_types.Nat.to_int Mina_base.Zkapp_state.Max_state_size.n
@@ -2492,6 +2539,9 @@ module Ledger = struct
       let x, y = Signature_lib.Public_key.decompress_exn pk in
       to_js_group (Field.constant x) (Field.constant y)
 
+    let token_id (token_id : Mina_base.Token_id.t) =
+      token_id |> Mina_base.Token_id.to_field_unsafe |> field
+
     let private_key (sk : Signature_lib.Private_key.t) = to_js_scalar sk
 
     let signature (sg : Signature_lib.Schnorr.Chunked.Signature.t) =
@@ -2505,6 +2555,10 @@ module Ledger = struct
     let account (a : Mina_base.Account.t) : account =
       object%js
         val publicKey = public_key a.public_key
+
+        val tokenId = token_id a.token_id
+
+        val tokenSymbol = Js.string a.token_symbol
 
         val balance = uint64 (Currency.Balance.to_uint64 a.balance)
 
@@ -2606,10 +2660,13 @@ module Ledger = struct
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
     let party = List.nth_exn tx.other_parties party_index in
-    Public_input.Constant.to_js
-      [| (party.elt.party_digest :> Impl.field)
-       ; (Parties.Digest.Forest.empty :> Impl.field)
-      |]
+    object%js
+      val party = to_js_field_unchecked (party.elt.party_digest :> Impl.field)
+
+      val calls =
+        to_js_field_unchecked
+          (Parties.Call_forest.hash party.elt.calls :> Impl.field)
+    end
 
   let sign_field_element (x : field_class Js.t) (key : private_key) =
     Signature_lib.Schnorr.Chunked.sign (private_key key)
@@ -2720,7 +2777,7 @@ module Ledger = struct
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
   let add_account_exn (l : L.t) pk (balance : string) =
-    let account_id = account_id pk in
+    let account_id = account_id pk default_token_id_js in
     let bal_u64 = Unsigned.UInt64.of_string balance in
     let balance = Currency.Balance.of_uint64 bal_u64 in
     let a : Mina_base.Account.t =
@@ -2741,8 +2798,9 @@ module Ledger = struct
         add_account_exn l a##.publicKey (Js.to_string a##.balance) ) ;
     new%js ledger_constr l
 
-  let get_account l (pk : public_key) : account Js.optdef =
-    let loc = L.location_of_account l##.value (account_id pk) in
+  let get_account l (pk : public_key) (token : field_class Js.t) :
+      account Js.optdef =
+    let loc = L.location_of_account l##.value (account_id pk token) in
     let account = Option.bind loc ~f:(L.get l##.value) in
     To_js.option To_js.account account
 
@@ -2810,18 +2868,83 @@ module Ledger = struct
     in
     apply_parties_transaction l txn (Js.to_string account_creation_fee)
 
+  let create_token_account pk token =
+    account_id pk token |> Mina_base.Account_id.public_key
+    |> Signature_lib.Public_key.Compressed.to_string |> Js.string
+
+  let custom_token_id_checked pk token =
+    Mina_base.Account_id.Checked.derive_token_id
+      ~owner:(account_id_checked pk token)
+    |> Mina_base.Account_id.Digest.Checked.to_field_unsafe |> to_js_field
+
+  let custom_token_id_unchecked pk token =
+    Mina_base.Account_id.derive_token_id ~owner:(account_id pk token)
+    |> Mina_base.Token_id.to_field_unsafe |> to_js_field_unchecked
+
+  type random_oracle_input_js =
+    < fields : field_class Js.t Js.js_array Js.t Js.readonly_prop
+    ; packed :
+        < field : field_class Js.t Js.readonly_prop
+        ; size : int Js.readonly_prop >
+        Js.t
+        Js.js_array
+        Js.t
+        Js.readonly_prop >
+    Js.t
+
+  let random_oracle_input_to_js
+      (input : Impl.field Random_oracle_input.Chunked.t) :
+      random_oracle_input_js =
+    let fields =
+      input.field_elements |> Array.map ~f:to_js_field_unchecked |> Js.array
+    in
+    let packed =
+      input.packeds
+      |> Array.map ~f:(fun (field, size) ->
+             object%js
+               val field = to_js_field_unchecked field
+
+               val size = size
+             end )
+      |> Js.array
+    in
+    object%js
+      val fields = fields
+
+      val packed = packed
+    end
+
+  let pack_input (input : random_oracle_input_js) :
+      field_class Js.t Js.js_array Js.t =
+    let field_elements =
+      input##.fields |> Js.to_array |> Array.map ~f:of_js_field_unchecked
+    in
+    let packeds =
+      input##.packed |> Js.to_array
+      |> Array.map ~f:(fun packed ->
+             let field = packed##.field |> of_js_field_unchecked in
+             let size = packed##.size in
+             (field, size) )
+    in
+    let input : Impl.field Random_oracle_input.Chunked.t =
+      { field_elements; packeds }
+    in
+    Random_oracle.pack_input input
+    |> Array.map ~f:to_js_field_unchecked
+    |> Js.array
+
   let () =
+    let static name thing = Js.Unsafe.set ledger_class (Js.string name) thing in
     let static_method name f =
       Js.Unsafe.set ledger_class (Js.string name) (Js.wrap_callback f)
     in
     let method_ name (f : ledger_class Js.t -> _) =
       method_ ledger_class name f
     in
+    static_method "customTokenId" custom_token_id_unchecked ;
+    static_method "customTokenIdChecked" custom_token_id_checked ;
+    static_method "createTokenAccount" create_token_account ;
     static_method "create" create ;
-
-    static_method "hashParty" hash_party ;
-    static_method "hashTransaction" hash_transaction ;
-    static_method "hashTransactionChecked" hash_transaction_checked ;
 
     static_method "transactionCommitments" transaction_commitments ;
     static_method "zkappPublicInput" zkapp_public_input ;
@@ -2838,6 +2961,7 @@ module Ledger = struct
     static_method "fieldOfBase58" field_of_base58 ;
     static_method "memoToBase58" memo_to_base58 ;
 
+    static_method "hashPartyFromJson" hash_party ;
     static_method "hashPartyFromFields"
       (Checked.fields_to_hash
          (Mina_base.Party.Body.typ ())
@@ -2861,6 +2985,69 @@ module Ledger = struct
       (fields_to_json (Mina_base.Party.Body.typ ()) body_to_json) ;
     static_method "fieldsOfJson"
       (fields_of_json (Mina_base.Party.Body.typ ()) body_of_json) ;
+
+    (* hash inputs for various party subtypes *)
+    (* TODO: this is for testing against JS impl, remove eventually *)
+    let timing_input (json : Js.js_string Js.t) : random_oracle_input_js =
+      let deriver = Party.Update.Timing_info.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Party.Update.Timing_info.to_input value in
+      random_oracle_input_to_js input
+    in
+    let permissions_input (json : Js.js_string Js.t) : random_oracle_input_js =
+      let deriver = Mina_base.Permissions.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Mina_base.Permissions.to_input value in
+      random_oracle_input_to_js input
+    in
+    let update_input (json : Js.js_string Js.t) : random_oracle_input_js =
+      let deriver = Party.Update.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Party.Update.to_input value in
+      random_oracle_input_to_js input
+    in
+    let account_precondition_input (json : Js.js_string Js.t) :
+        random_oracle_input_js =
+      let deriver = Mina_base.Zkapp_precondition.Account.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Mina_base.Zkapp_precondition.Account.to_input value in
+      random_oracle_input_to_js input
+    in
+    let network_precondition_input (json : Js.js_string Js.t) :
+        random_oracle_input_js =
+      let deriver = Mina_base.Zkapp_precondition.Protocol_state.deriver in
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = Fields_derivers_zkapps.(of_json (deriver @@ o ()) json) in
+      let input = Mina_base.Zkapp_precondition.Protocol_state.to_input value in
+      random_oracle_input_to_js input
+    in
+    let body_input (json : Js.js_string Js.t) : random_oracle_input_js =
+      let json = json |> Js.to_string |> Yojson.Safe.from_string in
+      let value = body_of_json json in
+      let input = Party.Body.to_input value in
+      random_oracle_input_to_js input
+    in
+
+    static "hashInputFromJson"
+      (object%js
+         val packInput = pack_input
+
+         val timing = timing_input
+
+         val permissions = permissions_input
+
+         val accountPrecondition = account_precondition_input
+
+         val networkPrecondition = network_precondition_input
+
+         val update = update_input
+
+         val body = body_input
+      end ) ;
 
     method_ "getAccount" get_account ;
     method_ "addAccount" add_account ;

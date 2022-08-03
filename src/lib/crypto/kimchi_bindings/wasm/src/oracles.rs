@@ -93,8 +93,8 @@ macro_rules! impl_oracles {
             {
                 fn from(ro: RandomOracles<$F>) -> Self {
                     Self {
-                        joint_combiner_chal: ro.joint_combiner.map(|x| x.0.0.into()),
-                        joint_combiner: ro.joint_combiner.map(|x| x.1.into()),
+                        joint_combiner_chal: ro.joint_combiner.as_ref().map(|x| x.0.0.into()),
+                        joint_combiner: ro.joint_combiner.as_ref().map(|x| x.1.into()),
                         beta: ro.beta.into(),
                         gamma: ro.gamma.into(),
                         alpha_chal: ro.alpha_chal.0.into(),
@@ -261,7 +261,7 @@ pub mod fp {
     };
     use mina_curves::pasta::{
         fp::Fp,
-        vesta::{Affine as GAffine, VestaParameters},
+        vesta::{Vesta as GAffine, VestaParameters},
     };
 
     impl_oracles!(
@@ -286,7 +286,7 @@ pub mod fq {
     };
     use mina_curves::pasta::{
         fq::Fq,
-        pallas::{Affine as GAffine, PallasParameters},
+        pallas::{Pallas as GAffine, PallasParameters},
     };
 
     impl_oracles!(

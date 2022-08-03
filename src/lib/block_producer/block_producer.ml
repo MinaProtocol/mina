@@ -258,7 +258,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Option.value_map ledger_proof_opt
                 ~f:(fun (proof, _) ->
                   (Ledger_proof.statement proof).supply_increase )
-                ~default:Currency.Amount.zero
+                ~default:Currency.Amount.Signed.zero
             in
             let body_reference =
               Staged_ledger_diff.Body.compute_reference
@@ -815,7 +815,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                         Time.(
                           Span.to_ms
                           @@ diff (now ())
-                          @@ Block_time.to_time scheduled_time)) ;
+                          @@ Block_time.to_time_exn scheduled_time)) ;
                     let%bind.Async.Deferred () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
@@ -1297,7 +1297,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           Mina_metrics.Block_producer.(
             Block_production_delay_histogram.observe block_production_delay
               Time.(
-                Span.to_ms @@ diff (now ()) @@ Block_time.to_time scheduled_time)) ;
+                Span.to_ms
+                @@ diff (now ())
+                @@ Block_time.to_time_exn scheduled_time)) ;
           let%bind.Async.Deferred () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in
@@ -1352,7 +1354,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         | Some (precomputed_block, precomputed_blocks) ->
             let new_time_offset =
               Time.diff (Time.now ())
-                (Block_time.to_time precomputed_block.Precomputed.scheduled_time)
+                (Block_time.to_time_exn
+                   precomputed_block.Precomputed.scheduled_time )
             in
             [%log info]
               "Changing time offset from $old_time_offset to $new_time_offset"

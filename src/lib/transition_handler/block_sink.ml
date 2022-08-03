@@ -53,13 +53,15 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       let%bind () = on_push () in
       Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
       let state = Envelope.Incoming.data e in
-      let processing_start_time = Block_time.(now time_controller |> to_time) in
+      let processing_start_time =
+        Block_time.(now time_controller |> to_time_exn)
+      in
       don't_wait_for
         ( match%map Mina_net2.Validation_callback.await cb with
         | Some `Accept ->
             let processing_time_span =
               Time.diff
-                Block_time.(now time_controller |> to_time)
+                Block_time.(now time_controller |> to_time_exn)
                 processing_start_time
             in
             Mina_metrics.Block_latency.(
@@ -68,11 +70,11 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
             () ) ;
       Perf_histograms.add_span ~name:"external_transition_latency"
         (Core.Time.abs_diff
-           Block_time.(now time_controller |> to_time)
+           Block_time.(now time_controller |> to_time_exn)
            Mina_block.(
              header state |> Header.protocol_state
              |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-             |> Block_time.to_time) ) ;
+             |> Block_time.to_time_exn) ) ;
       Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
       if log_gossip_heard then
         [%str_log info]

@@ -221,10 +221,7 @@ module Update = struct
             F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
-            ( Pickles.Side_loaded.Verification_key.Stable.V2.t
-            , F.Stable.V1.t )
-            With_hash.Stable.V1.t
-            Set_or_keep.Stable.V1.t
+            Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         ; zkapp_uri : string Set_or_keep.Stable.V1.t
         ; token_symbol :
@@ -455,6 +452,11 @@ module Update = struct
         ~checked:(Data_as_hash.deriver string)
         ~name:"StringWithHash" string
     in
+    let token_symbol =
+      with_checked
+        ~checked:(js_only (Js_layout.leaf_type (Custom "TokenSymbol")))
+        ~name:"TokenSymbol" string
+    in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
@@ -462,7 +464,7 @@ module Update = struct
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
          ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
-         ~token_symbol:!.(Set_or_keep.deriver string_with_hash)
+         ~token_symbol:!.(Set_or_keep.deriver token_symbol)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
@@ -606,7 +608,7 @@ module Account_precondition = struct
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
-          sequenceState: null, provedState: null
+          sequenceState: null, provedState: null, isNew: null
         }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
@@ -669,7 +671,8 @@ module Preconditions = struct
   let to_input ({ network; account } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Zkapp_precondition.Protocol_state.to_input network
-      ; Random_oracle_input.Chunked.field (Account_precondition.digest account)
+      ; Zkapp_precondition.Account.to_input
+          (Account_precondition.to_full account)
       ]
 
   let gen =
@@ -699,8 +702,7 @@ module Preconditions = struct
     let to_input ({ network; account } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Zkapp_precondition.Protocol_state.Checked.to_input network
-        ; Random_oracle_input.Chunked.field
-            (Account_precondition.Checked.digest account)
+        ; Zkapp_precondition.Account.Checked.to_input account
         ]
   end
 
@@ -954,14 +956,6 @@ module Body = struct
     ; call_depth
     }
 
-  (* * Balance change for the fee payer is always going to be Neg, so represent it using
-       an unsigned fee,
-     * token id is always going to be the default, so use unit value as a
-       placeholder,
-     * increment nonce must always be true for a fee payer, so use unit as a
-       placeholder.
-     TODO: what about use_full_commitment? it's unit here and bool there
-  *)
   module Fee_payer = struct
     [%%versioned
     module Stable = struct
@@ -1117,8 +1111,8 @@ module Body = struct
           t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input public_key
-        ; Update.Checked.to_input update
         ; Token_id.Checked.to_input token_id
+        ; Update.Checked.to_input update
         ; Snark_params.Tick.Run.run_checked
             (Amount.Signed.Checked.to_input balance_change)
         ; Random_oracle_input.Chunked.packed
@@ -1191,8 +1185,8 @@ module Body = struct
         t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input public_key
-      ; Update.to_input update
       ; Token_id.to_input token_id
+      ; Update.to_input update
       ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events

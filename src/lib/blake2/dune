@@ -16,4 +16,4 @@
    ppx_inline_test.config
    ;; local libraries
    test_util
- ))
+   ppx_version.runtime))

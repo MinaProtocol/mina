@@ -148,10 +148,7 @@ module Stable = struct
   module V2 = struct
     type t =
       ( Zkapp_state.Value.Stable.V1.t
-      , ( Side_loaded_verification_key.Stable.V2.t
-        , F.Stable.V1.t )
-        With_hash.Stable.V1.t
-        option
+      , Verification_key_wire.Stable.V1.t option
       , Mina_numbers.Zkapp_version.Stable.V1.t
       , F.Stable.V1.t
       , Mina_numbers.Global_slot.Stable.V1.t
@@ -165,7 +162,7 @@ end]
 
 type t =
   ( Zkapp_state.Value.t
-  , (Side_loaded_verification_key.t, F.t) With_hash.t option
+  , Verification_key_wire.t option
   , Mina_numbers.Zkapp_version.t
   , F.t
   , Mina_numbers.Global_slot.t
@@ -176,16 +173,6 @@ type t =
 let () =
   let _f : unit -> (t, Stable.Latest.t) Type_equal.t = fun () -> Type_equal.T in
   ()
-
-open Pickles_types
-
-let digest_vk (t : Side_loaded_verification_key.t) =
-  Random_oracle.(
-    hash ~init:Hash_prefix_states.side_loaded_vk
-      (pack_input (Side_loaded_verification_key.to_input t)))
-
-let dummy_vk_hash =
-  Memo.unit (fun () -> digest_vk Side_loaded_verification_key.dummy)
 
 [%%ifdef consensus_mechanism]
 
@@ -201,6 +188,8 @@ module Checked = struct
     , Mina_numbers.Global_slot.Checked.t
     , Boolean.var )
     Poly.t
+
+  open Pickles_types
 
   let to_input' (t : _ Poly.t) =
     let open Random_oracle.Input.Chunked in
@@ -237,6 +226,8 @@ module Checked = struct
       hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input' t)))
 end
 
+[%%define_locally Verification_key_wire.(digest_vk, dummy_vk_hash)]
+
 let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
@@ -262,7 +253,7 @@ let to_input (t : t) =
   let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
   let app_state v =
-    Random_oracle.Input.Chunked.field_elements (Vector.to_array v)
+    Random_oracle.Input.Chunked.field_elements (Pickles_types.Vector.to_array v)
   in
   Poly.Fields.fold ~init:[] ~app_state:(f app_state)
     ~verification_key:
@@ -278,7 +269,9 @@ let to_input (t : t) =
 
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non zkapp" account. *)
-  { app_state = Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
+  { app_state =
+      Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
+          F.zero )
   ; verification_key = None
   ; zkapp_version = Mina_numbers.Zkapp_version.zero
   ; sequence_state =

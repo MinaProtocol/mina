@@ -66,8 +66,9 @@ module Chunked = struct
           ~f:(fun (xs, acc, acc_n) (x, n) ->
             let n' = Int.(n + acc_n) in
             if Int.(n' < size_in_bits) then (xs, shift_left acc n + x, n')
-            else (acc :: xs, zero, 0) )
+            else (acc :: xs, x, n) )
       in
+      (* if acc_n = 0, packeds was empty (or acc holds 0 bits) and we don't want to append 0 *)
       let xs = if acc_n > 0 then acc :: xs else xs in
       Array.of_list_rev xs
     in

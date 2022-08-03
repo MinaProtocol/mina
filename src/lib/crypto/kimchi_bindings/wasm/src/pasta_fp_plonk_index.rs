@@ -7,8 +7,8 @@ use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex as DlogIndex;
 use mina_curves::pasta::{
     fp::Fp,
-    pallas::Affine as GAffineOther,
-    vesta::{Affine as GAffine, VestaParameters},
+    pallas::Pallas as GAffineOther,
+    vesta::{Vesta as GAffine, VestaParameters},
 };
 use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
@@ -54,7 +54,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     // }
 
     // create constraint system
-    let cs = match ConstraintSystem::<Fp>::create(gates, oracle::pasta::fp_kimchi::params())
+    let cs = match ConstraintSystem::<Fp>::create(gates)
         .public(public_ as usize)
         .prev_challenges(prev_challenges as usize)
         .build()
@@ -77,12 +77,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
-    let mut index = DlogIndex::<GAffine>::create(
-        cs,
-        oracle::pasta::fq_kimchi::params(),
-        endo_q,
-        srs.0.clone(),
-    );
+    let mut index = DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
     // Compute and cache the verifier index digest
     index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
 
@@ -138,9 +133,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     // deserialize the index
     let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
         .map_err(|err| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", err)))?;
-    t.cs.fr_sponge_params = oracle::pasta::fp_kimchi::params();
     t.srs = srs.0.clone();
-    t.fq_sponge_params = oracle::pasta::fq_kimchi::params();
     let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;

@@ -43,8 +43,8 @@ spec:
         resources:
           limits:
           requests:
-            memory: 32.0Gi
-            cpu: 12.0
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
         image: {{ $.Values.mina.image }}
         {{ if $.Values.mina.useCustomEntrypoint -}}
         command: [{{ $.Values.mina.customEntrypoint }}]
