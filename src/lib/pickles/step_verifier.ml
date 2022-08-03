@@ -880,8 +880,51 @@ struct
     let actual_width_mask = branch_data.proofs_verified_mask in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
-    Sponge.absorb sponge (`Field ft_eval1) ;
+    let scalar =
+      SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
+    in
+    let plonk =
+      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
+        ~f:Fn.id ~scalar plonk
+    in
+    let domain =
+      match step_domains with
+      | `Known ds ->
+          domain_for_compiled ds branch_data
+      | `Side_loaded ->
+          ( side_loaded_domain ~log2_size:branch_data.domain_log2
+            :> _ Plonk_checks.plonk_domain )
+    in
+    let zetaw = Field.mul domain#generator plonk.zeta in
+    let sg_olds =
+      with_label "sg_olds" (fun () ->
+          Vector.map prev_challenges ~f:(fun chals ->
+              unstage (challenge_polynomial (Vector.to_array chals)) ) )
+    in
+    let sg_evals1, sg_evals2 =
+      let sg_evals pt =
+        Vector.map2
+          ~f:(fun keep f -> (keep, f pt))
+          (Vector.trim actual_width_mask
+             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+          sg_olds
+      in
+      (sg_evals plonk.zeta, sg_evals zetaw)
+    in
     let sponge_state =
+      let challenge_digest =
+        let opt_sponge = Opt_sponge.create sponge_params in
+        Vector.iter2
+          (Vector.trim actual_width_mask
+             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+          prev_challenges
+          ~f:(fun keep chals ->
+            Vector.iter chals ~f:(fun chal ->
+                Opt_sponge.absorb opt_sponge (keep, chal) ) ) ;
+        Opt_sponge.squeeze opt_sponge
+      in
+      Sponge.absorb sponge (`Field challenge_digest) ;
+      Sponge.absorb sponge (`Field ft_eval1) ;
       Sponge.absorb sponge (`Field (fst evals.public_input)) ;
       Sponge.absorb sponge (`Field (snd evals.public_input)) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
@@ -900,22 +943,6 @@ struct
     let xi_correct =
       Field.equal xi_actual (match xi with { SC.SC.inner = xi } -> xi)
     in
-    let scalar =
-      SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
-    in
-    let plonk =
-      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
-        ~f:Fn.id ~scalar plonk
-    in
-    let domain =
-      match step_domains with
-      | `Known ds ->
-          domain_for_compiled ds branch_data
-      | `Side_loaded ->
-          ( side_loaded_domain ~log2_size:branch_data.domain_log2
-            :> _ Plonk_checks.plonk_domain )
-    in
-    let zetaw = Field.mul domain#generator plonk.zeta in
     let xi = scalar xi in
     let r = scalar (SC.SC.create r_actual) in
     let plonk_minimal = Plonk.to_minimal plonk ~to_option:Opt.to_option in
@@ -973,12 +1000,13 @@ struct
       print_fp "ft_eval1" ft_eval1 ;
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       let actual_combined_inner_product =
-        let sg_olds =
-          with_label "sg_olds" (fun () ->
-              Vector.map prev_challenges ~f:(fun chals ->
-                  unstage (challenge_polynomial (Vector.to_array chals)) ) )
-        in
-        let combine ~ft pt x_hat (e : (Field.t array, _) Evals.In_circuit.t) =
+        let combine ~ft ~sg_evals x_hat
+            (e : (Field.t array, _) Evals.In_circuit.t) =
+          let sg_evals =
+            sg_evals |> Vector.to_list
+            |> List.map ~f:(fun (keep, eval) ->
+                   [| Plonk_types.Opt.Maybe (keep, eval) |] )
+          in
           let a =
             Evals.In_circuit.to_list e
             |> List.map ~f:(function
@@ -989,22 +1017,17 @@ struct
                  | Maybe (b, a) ->
                      Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
           in
-          let sg_evals =
-            Vector.map2
-              (Vector.trim actual_width_mask
-                 (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
-              sg_olds
-              ~f:(fun keep f -> [| Plonk_types.Opt.Maybe (keep, f pt) |])
-            |> Vector.to_list
-          in
           let v =
             List.append sg_evals ([| Some x_hat |] :: [| Some ft |] :: a)
           in
           Common.combined_evaluation (module Impl) ~xi v
         in
         with_label "combine" (fun () ->
-            combine ~ft:ft_eval0 plonk.zeta evals1.public_input evals1.evals
-            + (r * combine ~ft:ft_eval1 zetaw evals2.public_input evals2.evals) )
+            combine ~ft:ft_eval0 ~sg_evals:sg_evals1 evals1.public_input
+              evals1.evals
+            + r
+              * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 evals2.public_input
+                  evals2.evals )
       in
       let expected =
         Shifted_value.Type1.to_field
