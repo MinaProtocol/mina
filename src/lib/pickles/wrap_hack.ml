@@ -24,7 +24,7 @@ open Pickles_types
 module Padded_length = Nat.N2
 
 (** Pads a vector with [dummy] element to make it of size 2.
-    Warning: panics if the vector has more than two elements.
+    Warning: raises an exception if the vector has more than two elements.
     *)
 let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
   let v = Vector.to_array v in
@@ -91,9 +91,8 @@ module Checked = struct
            Dummy.Ipa.Wrap.challenges_computed )
       chalss
 
-  (** pads `commitments` up to length 2 *)
+  (** Pads `commitments` with dummy sg to make it of length 2. *)
   let pad_commitments (commitments : _ Vector.t) =
-    (* use dummy sg to pad the commitments vector to a length 2 *)
     let sg = Lazy.force Dummy.Ipa.Wrap.sg in
     let f = Impls.Step.Field.constant in
     let dummy = Tuple_lib.Double.map ~f sg in

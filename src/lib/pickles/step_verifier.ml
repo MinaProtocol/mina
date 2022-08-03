@@ -70,7 +70,7 @@ struct
       (Inner_curve.to_field_elements g2)
     |> Boolean.all
 
-  (** Absorbs [t] (of type [ty] into the sponge [sponge]. *)
+  (** Absorbs [t] (of type [ty]) into the sponge [sponge]. *)
   let absorb sponge ty t =
     absorb
       ~absorb_field:(fun x -> Sponge.absorb sponge (`Field x))
