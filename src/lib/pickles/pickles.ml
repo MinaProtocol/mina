@@ -768,7 +768,10 @@ struct
         let step_vk = fst (Lazy.force step_vk) in
         let wrap ?handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
-          let%bind.Promise proof, return_value, auxiliary_value =
+          let%bind.Promise ( proof
+                           , return_value
+                           , auxiliary_value
+                           , actual_wrap_domains ) =
             step handler ~maxes:(module Maxes) next_state
           in
           let proof =
@@ -2173,7 +2176,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
             let pairing_vk = fst (Lazy.force step_vk) in
             let wrap =
               let wrap_vk = Lazy.force wrap_vk in
-              let%bind.Promise proof, (), () = step ~maxes:(module Maxes) in
+              let%bind.Promise proof, (), (), _ = step ~maxes:(module Maxes) in
               let proof =
                 { proof with
                   statement =
@@ -3045,7 +3048,7 @@ let%test_module "test uncorrelated deferred b" =
             let pairing_vk = fst (Lazy.force step_vk) in
             let wrap =
               let wrap_vk = Lazy.force wrap_vk in
-              let%bind.Promise proof, (), () = step ~maxes:(module Maxes) in
+              let%bind.Promise proof, (), (), _ = step ~maxes:(module Maxes) in
               let proof =
                 { proof with
                   statement =

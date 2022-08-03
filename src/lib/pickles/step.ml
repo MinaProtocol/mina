@@ -81,7 +81,8 @@ struct
         , (_, Max_proofs_verified.n) Vector.t )
         P.Base.Step.t
       * ret_value
-      * auxiliary_value )
+      * auxiliary_value
+      * (int, prevs_length) Vector.t )
       Promise.t =
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
@@ -132,7 +133,8 @@ struct
            * ( value
              , local_max_proofs_verified
              , m )
-             Per_proof_witness.Constant.No_app_state.t =
+             Per_proof_witness.Constant.No_app_state.t
+           * [ `Actual_wrap_domain of int ] =
      fun dlog_vk dlog_index app_state (T t) tag ~must_verify ->
       let t =
         { t with
@@ -461,7 +463,8 @@ struct
         }
       , prev_statement_with_hashes
       , x_hat
-      , witness )
+      , witness
+      , `Actual_wrap_domain dlog_vk.domain.log_size_of_group )
     in
     let challenge_polynomial_commitments = ref None in
     let unfinalized_proofs = ref None in
@@ -471,13 +474,15 @@ struct
     let prev_proofs = ref None in
     let return_value = ref None in
     let auxiliary_value = ref None in
+    let actual_wrap_domains = ref None in
     let compute_prev_proof_parts prev_proof_requests =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
           , x_hats'
           , witnesses'
-          , prev_proofs' ) =
+          , prev_proofs'
+          , actual_wrap_domains' ) =
         let rec go :
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
@@ -493,11 +498,12 @@ struct
                  , ns
                  , ms )
                  H3.T(Per_proof_witness.Constant.No_app_state).t
-               * (ns, ns) H2.T(Proof).t =
+               * (ns, ns) H2.T(Proof).t
+               * (int, k) Vector.t =
          fun ts prev_proof_stmts l ->
           match (ts, prev_proof_stmts, l) with
           | [], [], Z ->
-              ([], [], [], [], [], [])
+              ([], [], [], [], [], [], [])
           | ( t :: ts
             , { public_input = app_state
               ; proof = p
@@ -512,10 +518,16 @@ struct
                   let d = Types_map.lookup_basic t in
                   (d.wrap_vk, d.wrap_key)
               in
-              let `Sg sg, u, s, x, w =
+              let `Sg sg, u, s, x, w, `Actual_wrap_domain domain =
                 expand_proof dlog_vk dlog_index app_state p t ~must_verify
-              and sgs, us, ss, xs, ws, ps = go ts prev_proof_stmts l in
-              (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws, p :: ps)
+              and sgs, us, ss, xs, ws, ps, domains = go ts prev_proof_stmts l in
+              ( sg :: sgs
+              , u :: us
+              , s :: ss
+              , x :: xs
+              , w :: ws
+              , p :: ps
+              , domain :: domains )
           | _, _ :: _, _ ->
               .
           | _, [], _ ->
@@ -528,7 +540,8 @@ struct
       statements_with_hashes := Some statements_with_hashes' ;
       x_hats := Some x_hats' ;
       witnesses := Some witnesses' ;
-      prev_proofs := Some prev_proofs'
+      prev_proofs := Some prev_proofs' ;
+      actual_wrap_domains := Some actual_wrap_domains'
     in
     let unfinalized_proofs_extended =
       lazy
@@ -747,5 +760,6 @@ struct
             lte Max_proofs_verified.n Dummy.evals
       }
     , Option.value_exn !return_value
-    , Option.value_exn !auxiliary_value )
+    , Option.value_exn !auxiliary_value
+    , Option.value_exn !actual_wrap_domains )
 end
