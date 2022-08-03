@@ -642,39 +642,8 @@ struct
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
-      Timer.clock __LOC__ ;
-      let prev_wrap_domains =
-        let module M =
-          H4.Map (IR) (H4.T (E04 (Domains)))
-            (struct
-              let f :
-                  type a b c d.
-                  (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
-               fun rule ->
-                let module M =
-                  H4.Map (Tag) (E04 (Domains))
-                    (struct
-                      let f (type a b c d) (t : (a, b, c, d) Tag.t) : Domains.t
-                          =
-                        Types_map.lookup_map t ~self:self.id
-                          ~default:wrap_domains ~f:(function
-                          | `Compiled d ->
-                              d.wrap_domains
-                          | `Side_loaded d ->
-                              Common.wrap_domains
-                                ~proofs_verified:
-                                  ( d.permanent.max_proofs_verified |> Nat.Add.n
-                                  |> Nat.to_int ) )
-                    end)
-                in
-                M.f rule.Inductive_rule.prevs
-            end)
-        in
-        M.f choices
-      in
-      Timer.clock __LOC__ ;
       Wrap_main.wrap_main full_signature prev_varss_length step_vks
-        proofs_verifieds step_domains prev_wrap_domains max_proofs_verified
+        proofs_verifieds step_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
