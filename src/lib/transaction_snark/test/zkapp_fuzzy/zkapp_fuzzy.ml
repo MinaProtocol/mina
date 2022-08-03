@@ -222,33 +222,39 @@ let test_timed_account () =
       done )
 
 let () =
-  Backtrace.elide := false ;
-  Async.Scheduler.set_record_backtraces true ;
-  let num_of_fee_payers = 5 in
-  let trials = 2 in
-  generate_parties_and_apply_them_consecutively () ;
-  generate_parties_and_apply_them_freshly () ;
-  let open Mina_generators.Parties_generators in
-  let open Transaction_status.Failure in
-  mk_invalid_test ~num_of_fee_payers ~trials
-    ~type_of_failure:Invalid_protocol_state_precondition
-    ~expected_failure_status:Protocol_state_precondition_unsatisfied ;
-  mk_invalid_test ~num_of_fee_payers ~trials
-    ~type_of_failure:(Update_not_permitted `App_state)
-    ~expected_failure_status:Update_not_permitted_app_state ;
-  mk_invalid_test ~num_of_fee_payers ~trials
-    ~type_of_failure:(Update_not_permitted `Verification_key)
-    ~expected_failure_status:Update_not_permitted_verification_key ;
-  mk_invalid_test ~num_of_fee_payers ~trials
-    ~type_of_failure:(Update_not_permitted `Zkapp_uri)
-    ~expected_failure_status:Update_not_permitted_zkapp_uri ;
-  mk_invalid_test ~num_of_fee_payers ~trials
-    ~type_of_failure:(Update_not_permitted `Token_symbol)
-    ~expected_failure_status:Update_not_permitted_token_symbol ;
-  mk_invalid_test ~num_of_fee_payers ~trials
-    ~type_of_failure:(Update_not_permitted `Voting_for)
-    ~expected_failure_status:Update_not_permitted_voting_for ;
-  mk_invalid_test ~num_of_fee_payers ~trials
-    ~type_of_failure:(Update_not_permitted `Balance)
-    ~expected_failure_status:Update_not_permitted_balance ;
-  test_timed_account ()
+  Command.run
+  @@ Command.basic ~summary:"fuzzy zkapp tests"
+       (let open Command.Let_syntax in
+       let%map trials =
+         Command.Param.(
+           flag "--trials" ~doc:"NUM number of trials for the tests"
+             (required int))
+       in
+       fun () ->
+         let num_of_fee_payers = 5 in
+         generate_parties_and_apply_them_consecutively () ;
+         generate_parties_and_apply_them_freshly () ;
+         let open Mina_generators.Parties_generators in
+         let open Transaction_status.Failure in
+         mk_invalid_test ~num_of_fee_payers ~trials
+           ~type_of_failure:Invalid_protocol_state_precondition
+           ~expected_failure_status:Protocol_state_precondition_unsatisfied ;
+         mk_invalid_test ~num_of_fee_payers ~trials
+           ~type_of_failure:(Update_not_permitted `App_state)
+           ~expected_failure_status:Update_not_permitted_app_state ;
+         mk_invalid_test ~num_of_fee_payers ~trials
+           ~type_of_failure:(Update_not_permitted `Verification_key)
+           ~expected_failure_status:Update_not_permitted_verification_key ;
+         mk_invalid_test ~num_of_fee_payers ~trials
+           ~type_of_failure:(Update_not_permitted `Zkapp_uri)
+           ~expected_failure_status:Update_not_permitted_zkapp_uri ;
+         mk_invalid_test ~num_of_fee_payers ~trials
+           ~type_of_failure:(Update_not_permitted `Token_symbol)
+           ~expected_failure_status:Update_not_permitted_token_symbol ;
+         mk_invalid_test ~num_of_fee_payers ~trials
+           ~type_of_failure:(Update_not_permitted `Voting_for)
+           ~expected_failure_status:Update_not_permitted_voting_for ;
+         mk_invalid_test ~num_of_fee_payers ~trials
+           ~type_of_failure:(Update_not_permitted `Balance)
+           ~expected_failure_status:Update_not_permitted_balance ;
+         test_timed_account ())

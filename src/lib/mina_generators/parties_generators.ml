@@ -16,6 +16,8 @@ type failure =
       | `Token_symbol
       | `Balance ]
 
+type role = [ `Fee_payer | `New_account | `Ordinary_participant ]
+
 let gen_account_precondition_from_account ?failure ~first_use_of_account account
     =
   let open Quickcheck.Let_syntax in
@@ -1476,3 +1478,51 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
       | Control.None_given ->
           () ) ;
   parties_dummy_authorizations
+
+let gen_list_of_parties_from ?failure ?max_other_parties
+    ~(fee_payer_keypairs : Signature_lib.Keypair.t list) ~keymap
+    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?length () =
+  let account_state_tbl =
+    match account_state_tbl with
+    | None ->
+        let tbl = Account_id.Table.create () in
+        let accounts = Ledger.to_list ledger in
+        List.iter accounts ~f:(fun acct ->
+            let acct_id = Account.identifier acct in
+            Account_id.Table.update tbl acct_id ~f:(function
+              | None ->
+                  (acct, `Ordinary_participant)
+              | Some a ->
+                  a ) ) ;
+        List.iter fee_payer_keypairs ~f:(fun fee_payer_keypair ->
+            let acct_id =
+              Account_id.create
+                (Signature_lib.Public_key.compress fee_payer_keypair.public_key)
+                Token_id.default
+            in
+            Account_id.Table.update tbl acct_id ~f:(function
+              | None ->
+                  failwith "fee_payer not in ledger"
+              | Some (a, _) ->
+                  (a, `Fee_payer) ) ) ;
+        tbl
+    | Some tbl ->
+        tbl
+  in
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind length =
+    match length with None -> Int.gen_uniform_incl 1 10 | Some n -> return n
+  in
+  let rec go n acc =
+    if n > 0 then
+      let%bind fee_payer_keypair =
+        Quickcheck.Generator.of_list fee_payer_keypairs
+      in
+      let%bind new_parties =
+        gen_parties_from ?failure ?max_other_parties ~fee_payer_keypair ~keymap
+          ~account_state_tbl ~ledger ?protocol_state_view ?vk ()
+      in
+      go (n - 1) (new_parties :: acc)
+    else return (List.rev acc)
+  in
+  go length []

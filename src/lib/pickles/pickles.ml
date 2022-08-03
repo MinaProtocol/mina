@@ -2662,10 +2662,8 @@ let%test_module "test uncorrelated bulletproof_challenges" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement)
-              ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
+            compile_promise () ~public_input:(Input Typ.unit)
+              ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"recurse-on-bad" ~constraint_constants
@@ -3502,10 +3500,8 @@ let%test_module "test uncorrelated deferred b" =
 
       let tag, _, p, Provers.[ step ] =
         Common.time "compile" (fun () ->
-            compile_promise
-              (module Statement)
-              (module Statement)
-              ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
+            compile_promise () ~public_input:(Input Typ.unit)
+              ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
               ~name:"recurse-on-bad" ~constraint_constants
@@ -3599,8 +3595,6 @@ let%test_module "test" =
 
         let tag, _, p, Provers.[prove; _] =
           compile
-            (module Statement)
-            (module Statement.Constant)
             ~typ:Field.typ
             ~return_typ:Typ.unit
             ~branches:(module Nat.N2) (* Should be able to set to 1 *)
@@ -3649,8 +3643,6 @@ let%test_module "test" =
 
       let tag, _, p, Provers.[base; preimage_base; merge] =
         compile
-          (module Statement)
-          (module Statement.Constant)
           ~typ:Field.typ
           ~return_typ:Typ.unit
           ~branches:(module Nat.N3)
@@ -3751,8 +3743,6 @@ let%test_module "test" =
       let tag, _, p, Provers.[step] =
         Common.time "compile" (fun () ->
             compile
-              (module Statement)
-              (module Statement.Constant)
               ~return_typ:(Input Field.typ)
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N2)
