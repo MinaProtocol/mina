@@ -198,6 +198,8 @@ module Inner_curve = struct
   let if_ = T.if_
 end
 
+module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
+
 module Generators = struct
   let h =
     lazy

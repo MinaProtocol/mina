@@ -743,44 +743,41 @@ module Account = struct
             (Option.value ~default:tc.default a.delegate)) )
     ]
     @
-    match a.zkapp with
-    | None ->
-        []
-    | Some zkapp ->
-        [ ( Transaction_status.Failure
-            .Account_sequence_state_precondition_unsatisfied
-          , match
-              List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
-                  Eq_data.(
-                    check
-                      (Lazy.force Tc.sequence_state)
-                      ~label:"" sequence_state state)
-                  |> Or_error.is_ok )
-            with
-            | None ->
-                Error (Error.createf "Sequence state mismatch")
-            | Some _ ->
-                Ok () )
-        ]
-        @ List.mapi
-            Vector.(to_list (zip state zkapp.app_state))
-            ~f:(fun i (c, v) ->
-              let failure =
-                Transaction_status.Failure
-                .Account_app_state_precondition_unsatisfied
-                  i
-              in
-              ( failure
-              , Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v) ) )
-        @ [ ( Transaction_status.Failure
-              .Account_proved_state_precondition_unsatisfied
-            , Eq_data.(
-                check ~label:"proved_state" Tc.boolean proved_state
-                  zkapp.proved_state) )
-          ]
-        @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
-            , Eq_data.(check ~label:"is_new" Tc.boolean is_new new_account) )
-          ]
+    let zkapp = Option.value ~default:Zkapp_account.default a.zkapp in
+    [ ( Transaction_status.Failure
+        .Account_sequence_state_precondition_unsatisfied
+      , match
+          List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
+              Eq_data.(
+                check
+                  (Lazy.force Tc.sequence_state)
+                  ~label:"" sequence_state state)
+              |> Or_error.is_ok )
+        with
+        | None ->
+            Error (Error.createf "Sequence state mismatch")
+        | Some _ ->
+            Ok () )
+    ]
+    @ List.mapi
+        Vector.(to_list (zip state zkapp.app_state))
+        ~f:(fun i (c, v) ->
+          let failure =
+            Transaction_status.Failure
+            .Account_app_state_precondition_unsatisfied
+              i
+          in
+          (failure, Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v))
+          )
+    @ [ ( Transaction_status.Failure
+          .Account_proved_state_precondition_unsatisfied
+        , Eq_data.(
+            check ~label:"proved_state" Tc.boolean proved_state
+              zkapp.proved_state) )
+      ]
+    @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
+        , Eq_data.(check ~label:"is_new" Tc.boolean is_new new_account) )
+      ]
 
   let check ~new_account ~check t a =
     List.iter
