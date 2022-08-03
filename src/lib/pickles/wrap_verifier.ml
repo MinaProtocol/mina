@@ -37,9 +37,10 @@ let challenge_polynomial ~one ~add ~mul chals =
 
 let num_possible_domains = Nat.S Wrap_hack.Padded_length.n
 
-let all_possible_domains () =
-  Vector.init num_possible_domains ~f:(fun proofs_verified ->
-      (Common.wrap_domains ~proofs_verified).h )
+let all_possible_domains =
+  Memo.unit (fun () ->
+      Vector.init num_possible_domains ~f:(fun proofs_verified ->
+          (Common.wrap_domains ~proofs_verified).h ) )
 
 module Make
     (Inputs : Inputs
