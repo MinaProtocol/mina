@@ -789,7 +789,7 @@ struct
             Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
               full_signature.maxes wrap_requests
               ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
-              ~step_plonk_indices:(Lazy.force step_vks) ~wrap_domains
+              ~step_plonk_indices:(Lazy.force step_vks) ~actual_wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in

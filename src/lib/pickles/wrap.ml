@@ -395,7 +395,7 @@ let wrap
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
-    ~wrap_domains ~step_plonk_indices pk
+    ~actual_wrap_domains ~step_plonk_indices pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
@@ -477,6 +477,20 @@ let wrap
         k prev_statement_with_hashes.proof_state
     | Which_branch ->
         k which_index
+    | Wrap_domain_indices ->
+        let all_possible_domains = Wrap_verifier.all_possible_domains () in
+        let wrap_domain_indices =
+          Vector.map actual_wrap_domains ~f:(fun domain_size ->
+              let domain_index =
+                Vector.foldi ~init:0 all_possible_domains
+                  ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
+                    if Int.equal domain domain_size then j else acc )
+              in
+              Tock.Field.of_int domain_index )
+        in
+        k
+          (Vector.extend_exn wrap_domain_indices max_proofs_verified
+             Tock.Field.one )
     | _ ->
         Snarky_backendless.Request.unhandled
   in
