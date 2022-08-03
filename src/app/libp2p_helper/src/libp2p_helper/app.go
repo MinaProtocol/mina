@@ -46,7 +46,7 @@ func newApp() *app {
 		for {
 			time.Sleep(5 * time.Second)
 			if app.P2p != nil {
-				app.P2p.Logger.Infof("number of active streams: %d", len(app.Streams))
+				app.P2p.Logger.Warnf("number of active streams: %d", len(app.Streams))
 			}
 		}
 	}()
