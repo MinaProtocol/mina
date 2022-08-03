@@ -404,7 +404,7 @@ macro_rules! impl_verification_key {
                         endomul_scalar_comm: (&evals.endomul_scalar_comm).into(),
                         // TODO
                         chacha_comm: None,
-                        range_check_comm: vec![],
+                        range_check_comm: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_w3(domain)).unwrap();
