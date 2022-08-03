@@ -74,9 +74,6 @@
    trust_system
    mina_base.import
    ppx_version.runtime
-   ;snarky_integer
-   ;bitstring_lib
-   ;pasta
    graphql_basic_scalars
  )
  (preprocessor_deps "../../config.mlh")
