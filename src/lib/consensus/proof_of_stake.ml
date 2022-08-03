@@ -10,7 +10,6 @@ open Bitstring_lib
 open Num_util
 module Time = Block_time
 module Run = Snark_params.Tick.Run
-module Graphql_base_types = Graphql_lib.Base_types
 module Length = Mina_numbers.Length
 
 let make_checked t =
@@ -660,7 +659,7 @@ module Data = struct
               ~resolve:(fun _ { Poly.hash; _ } ->
                 Mina_base.Frozen_ledger_hash.to_base58_check hash )
           ; field "totalCurrency"
-              ~typ:(non_null @@ Graphql_base_types.uint64 ())
+              ~typ:(non_null @@ Graphql_basic_scalars.UInt64.typ ())
               ~args:Arg.[]
               ~resolve:(fun _ { Poly.total_currency; _ } ->
                 Amount.to_uint64 total_currency )
@@ -966,7 +965,7 @@ module Data = struct
                 ~resolve:(fun _ { Poly.lock_checkpoint; _ } ->
                   Lock_checkpoint.resolve lock_checkpoint )
             ; field "epochLength"
-                ~typ:(non_null @@ Graphql_base_types.uint32 ())
+                ~typ:(non_null @@ Graphql_basic_scalars.UInt32.typ ())
                 ~args:Arg.[]
                 ~resolve:(fun _ { Poly.epoch_length; _ } ->
                   Mina_numbers.Length.to_uint32 epoch_length )
@@ -2386,7 +2385,8 @@ module Data = struct
       let open Graphql_async in
       let open Schema in
       let uint32, uint64 =
-        (Graphql_base_types.uint32 (), Graphql_base_types.uint64 ())
+        ( Graphql_basic_scalars.UInt32.typ ()
+        , Graphql_basic_scalars.UInt64.typ () )
       in
       obj "ConsensusState" ~fields:(fun _ ->
           [ field "blockchainLength" ~typ:(non_null uint32)

@@ -148,20 +148,22 @@ end
 
 module Types = struct
   open Schema
-  open Graphql_lib.Base_types
 
-  let public_key = public_key ()
+  include struct
+    open Graphql_lib.Scalars
 
-  let uint64 = uint64 ()
+    let public_key = PublicKey.typ ()
 
-  let uint32 = uint32 ()
+    let uint64 = UInt64.typ ()
 
-  let token_id = token_id ()
+    let uint32 = UInt32.typ ()
 
-  let json : ('context, Yojson.Basic.t option) typ =
-    scalar "JSON" ~doc:"Arbitrary JSON" ~coerce:Fn.id
+    let token_id = TokenId.typ ()
 
-  let epoch_seed = epoch_seed ()
+    let json = JSON.typ ()
+
+    let epoch_seed = EpochSeed.typ ()
+  end
 
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
