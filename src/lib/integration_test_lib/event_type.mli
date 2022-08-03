@@ -115,6 +115,12 @@ module Gossip : sig
   end
 end
 
+module Snark_work_failed : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
@@ -126,6 +132,7 @@ type 'a t =
   | Block_gossip : Gossip.Block.t t
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
+  | Snark_work_failed : Snark_work_failed.t t
 
 val to_string : 'a t -> string
 
