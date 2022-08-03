@@ -116,6 +116,7 @@ type ( 'prev_vars
   ; main :
          'a_var main_input
       -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
+  ; uses_lookup : bool
   }
 
 module T

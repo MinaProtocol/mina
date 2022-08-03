@@ -63,7 +63,7 @@ module Length = Make_numeric (Mina_numbers.Length)
 module Block_time = Make_numeric (struct
   type t = Block_time.t
 
-  let to_string = Block_time.to_string
+  let to_string = Block_time.to_string_exn
 
   let of_string = Block_time.of_string_exn
 

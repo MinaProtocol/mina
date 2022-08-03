@@ -339,6 +339,21 @@ let fill_in_internal_commands pool block_state_hash =
       let%bind receiver = account_identifier_of_id internal_cmd.receiver_id in
       let fee = Currency.Fee.of_string internal_cmd.fee in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let%bind block_internal_cmd =
+        query_db ~f:(fun db ->
+            Processor.Block_and_internal_command.load db ~block_id
+              ~internal_command_id ~sequence_no ~secondary_sequence_no )
+      in
+      let status = block_internal_cmd.status in
+      let failure_reason =
+        Option.map block_internal_cmd.failure_reason ~f:(fun s ->
+            match Transaction_status.Failure.of_string s with
+            | Ok s ->
+                s
+            | Error err ->
+                failwithf "Not a transaction status failure: %s, error: %s" s
+                  err () )
+      in
       let cmd =
         { Extensional.Internal_command.sequence_no
         ; secondary_sequence_no
@@ -346,6 +361,8 @@ let fill_in_internal_commands pool block_state_hash =
         ; receiver
         ; fee
         ; hash
+        ; status
+        ; failure_reason
         }
       in
       return cmd )
