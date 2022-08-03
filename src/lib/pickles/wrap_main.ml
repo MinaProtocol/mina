@@ -211,14 +211,14 @@ let wrap_main
         , Field.t )
         Types.Wrap.Statement.In_circuit.t ) =
     with_label __LOC__ (fun () ->
-        let which_branch =
+        let which_branch' =
           exists
             (Typ.transport Field.typ ~there:Field.Constant.of_int
                ~back:(fun _ -> failwith "unimplemented") )
             ~request:(fun () -> Req.Which_branch)
         in
         let which_branch =
-          One_hot_vector.of_index which_branch ~length:branches
+          One_hot_vector.of_index which_branch' ~length:branches
         in
         let actual_proofs_verified_mask =
           Util.ones_vector
@@ -326,15 +326,38 @@ let wrap_main
                    For each step branch in this proof system,
                     a list of the wrap domains in the proofs inside there.
                 *)
-                let wrap_domains :
-                    ( _ Plonk_checks.plonk_domain
-                    , Max_proofs_verified.n )
-                    Vector.t =
-                  Vector.map domainses ~f:(fun possible_wrap_domains ->
+                let wrap_domains =
+                  let num_domains = Nat.S Wrap_hack.Padded_length.n in
+                  let all_possible_domains =
+                    Vector.init num_domains ~f:(fun proofs_verified ->
+                        (Common.wrap_domains ~proofs_verified).h )
+                  in
+                  let domainses =
+                    Vector.to_array domainses |> Array.map ~f:Vector.to_array
+                  in
+                  Vector.init Max_proofs_verified.n ~f:(fun i ->
+                      let which_branch =
+                        let which_branch =
+                          exists Field.typ ~compute:(fun () ->
+                              let index =
+                                As_prover.read Field.typ which_branch'
+                                |> Field.Constant.to_string |> Int.of_string
+                              in
+                              let (Pow_2_roots_of_unity domain_size) =
+                                domainses.(i).(index).h
+                              in
+                              let domain_index =
+                                Vector.foldi ~init:0 all_possible_domains
+                                  ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
+                                    if Int.equal domain domain_size then j
+                                    else acc )
+                              in
+                              Field.Constant.of_int domain_index )
+                        in
+                        One_hot_vector.of_index which_branch ~length:num_domains
+                      in
                       Pseudo.Domain.to_domain ~shifts ~domain_generator
-                        ( which_branch
-                        , Vector.map ~f:(fun ds -> ds.h) possible_wrap_domains
-                        ) )
+                        (which_branch, all_possible_domains) )
                 in
                 Vector.mapn
                   [ (* This is padded to max_proofs_verified for the benefit of wrapping with dummy unfinalized proofs *)
