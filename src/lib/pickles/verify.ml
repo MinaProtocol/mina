@@ -211,6 +211,25 @@ let verify_heterogenous (ts : Instance.t list) =
           in
           Tick.Field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
         in
+        let () =
+          let [ Pow_2_roots_of_unity greatest_wrap_domain
+              ; _
+              ; Pow_2_roots_of_unity least_wrap_domain
+              ] =
+            Wrap_verifier.all_possible_domains ()
+          in
+          let actual_wrap_domain = key.index.domain.log_size_of_group in
+          check
+            ( lazy
+                (sprintf !"wrap_domain: %i > %i" actual_wrap_domain
+                   least_wrap_domain )
+            , Int.( <= ) actual_wrap_domain least_wrap_domain ) ;
+          check
+            ( lazy
+                (sprintf !"wrap_domain: %i < %i" actual_wrap_domain
+                   greatest_wrap_domain )
+            , Int.( >= ) actual_wrap_domain greatest_wrap_domain )
+        in
         List.iter
           ~f:(fun (s, x, y) -> check_eq s x y)
           (* Both these values can actually be omitted from the proof on the wire since we recompute them
