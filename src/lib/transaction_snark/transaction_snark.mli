@@ -3,6 +3,7 @@ open Mina_base
 open Mina_transaction
 open Snark_params
 open Mina_state
+open Currency
 module Transaction_validator = Transaction_validator
 
 (** For debugging. Logs to stderr the inputs to the top hash. *)
@@ -136,7 +137,7 @@ module Statement : sig
     module V2 : sig
       type t =
         ( Frozen_ledger_hash.Stable.V1.t
-        , Currency.Amount.Stable.V1.t
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
         , unit
@@ -152,7 +153,7 @@ module Statement : sig
       module V2 : sig
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
-          , Currency.Amount.Stable.V1.t
+          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           , Pending_coinbase.Stack_versioned.Stable.V1.t
           , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t
@@ -164,7 +165,7 @@ module Statement : sig
 
     type var =
       ( Frozen_ledger_hash.var
-      , Currency.Amount.var
+      , Amount.Signed.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
       , Sok_message.Digest.Checked.t
@@ -253,6 +254,7 @@ val check_transaction :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> zkapp_account1:Zkapp_account.t option
   -> zkapp_account2:Zkapp_account.t option
+  -> supply_increase:Amount.Signed.t
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -264,6 +266,7 @@ val check_user_command :
   -> target:Frozen_ledger_hash.t
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+  -> supply_increase:Amount.Signed.t
   -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -278,6 +281,7 @@ val generate_transaction_witness :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> zkapp_account1:Zkapp_account.t option
   -> zkapp_account2:Zkapp_account.t option
+  -> supply_increase:Amount.Signed.t
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -521,7 +525,7 @@ module For_tests : sig
     -> Parties.t
 
   val update_states :
-       ?snapp_prover:
+       ?zkapp_prover:
          ( unit
          , unit
          , unit

@@ -90,7 +90,7 @@ module Node = struct
     ; ("pod_id", `String node.pod_id)
     ]
 
-  module Serializing = Graphql_lib.Serializing
+  module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
     let ingress_uri node =
@@ -115,7 +115,7 @@ module Node = struct
     ({|
       mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+          public_key: publicKey
         }
       }
     |}
@@ -214,7 +214,7 @@ module Node = struct
           stateHash
           commandTransactionCount
           creatorAccount {
-            publicKey
+            publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           }
         }
       }
@@ -241,11 +241,11 @@ module Node = struct
     {|
       query ($public_key: PublicKey!, $token: UInt64) {
         account (publicKey : $public_key, token : $token) {
-          balance { liquid @ppxCustom(module: "Serializing.Balance")
-                    locked @ppxCustom(module: "Serializing.Balance")
-                    total @ppxCustom(module: "Serializing.Balance")
+          balance { liquid
+                    locked
+                    total
                   }
-          delegate
+          delegate @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           nonce
           permissions { editSequenceState
                         editState
@@ -262,11 +262,11 @@ module Node = struct
           sequenceEvents
           zkappState
           zkappUri
-          timing { cliffTime
-                   cliffAmount
-                   vestingPeriod
-                   vestingIncrement
-                   initialMinimumBalance
+          timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   cliffAmount @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   vestingIncrement @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   initialMinimumBalance @ppxCustom(module: "Graphql_lib.Scalars.JSON")
                  }
           token
           tokenSymbol
@@ -441,9 +441,11 @@ module Node = struct
                      "the nonce from get_balance is None, which should be \
                       impossible"
               |> Mina_numbers.Account_nonce.of_string
-          ; total_balance = acc.balance.total
-          ; liquid_balance_opt = acc.balance.liquid
-          ; locked_balance_opt = acc.balance.locked
+          ; total_balance = Currency.Balance.of_uint64 acc.balance.total
+          ; liquid_balance_opt =
+              Option.map ~f:Currency.Balance.of_uint64 acc.balance.liquid
+          ; locked_balance_opt =
+              Option.map ~f:Currency.Balance.of_uint64 acc.balance.locked
           }
 
   let must_get_account_data ~logger t ~account_id =
@@ -1185,9 +1187,9 @@ let all_pod_ids t = Map.keys t.nodes_by_pod_id
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
-  let max_polls = 60 (* 15 mins *) in
-  let all_pods =
-    all_nodes network
+  let max_polls = 40 (* 10 mins *) in
+  let all_pods_set =
+    all_pods network
     |> List.map ~f:(fun { pod_id; _ } -> pod_id)
     |> String.Set.of_list
   in
@@ -1208,63 +1210,84 @@ let initialize_infra ~logger network =
            let parts = String.split line ~on:':' in
            assert (List.length parts = 2) ;
            (List.nth_exn parts 0, List.nth_exn parts 1) )
-    |> List.filter ~f:(fun (pod_name, _) -> String.Set.mem all_pods pod_name)
+    |> List.filter ~f:(fun (pod_name, _) ->
+           String.Set.mem all_pods_set pod_name )
+    (* this filters out the archive bootstrap pods, since they aren't in all_pods_set.  in fact the bootstrap pods aren't tracked at all in the framework *)
     |> String.Map.of_alist_exn
   in
   let rec poll n =
     [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
-    let is_successful_pod_status = String.equal "Running" in
-    let poll_again () =
-      if n < max_polls then
-        let%bind () =
-          after poll_interval |> Deferred.bind ~f:Malleable_error.return
-        in
-        poll (n + 1)
-      else (
-        [%log fatal] "Not all pods were assigned to nodes and ready in time." ;
-        Malleable_error.hard_error_string ~exit_code:4
-          "Some pods either were not assigned to nodes or did not deploy \
-           properly." )
-    in
+    let is_successful_pod_status status = String.equal "Running" status in
     match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
     | Ok str ->
         let pod_statuses = parse_pod_statuses str in
+        [%log debug] "pod_statuses: \n %s"
+          ( String.Map.to_alist pod_statuses
+          |> List.map ~f:(fun (key, data) -> key ^ ": " ^ data ^ "\n")
+          |> String.concat ) ;
+        [%log debug] "all_pods: \n %s"
+          (String.Set.elements all_pods_set |> String.concat ~sep:", ") ;
         let all_pods_are_present =
-          List.for_all (String.Set.elements all_pods) ~f:(fun pod_id ->
+          List.for_all (String.Set.elements all_pods_set) ~f:(fun pod_id ->
               String.Map.mem pod_statuses pod_id )
         in
         let any_pods_are_not_running =
+          (* there could be duplicate keys... *)
           List.exists
             (String.Map.data pod_statuses)
             ~f:(Fn.compose not is_successful_pod_status)
         in
         if not all_pods_are_present then (
+          let present_pods = String.Map.keys pod_statuses in
           [%log fatal]
             "Not all pods were found when querying namespace; this indicates a \
-             deployment error. Refusing to continue. Expected pods: [%s]"
-            (String.Set.elements all_pods |> String.concat ~sep:"; ") ;
+             deployment error. Refusing to continue. \n\
+             Expected pods: [%s].  \n\
+             Present pods: [%s]"
+            (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
+            (present_pods |> String.concat ~sep:"; ") ;
           Malleable_error.hard_error_string ~exit_code:5
             "Some pods were not found in namespace." )
-        else if any_pods_are_not_running then (
+        else if any_pods_are_not_running then
           let failed_pod_statuses =
             List.filter (String.Map.to_alist pod_statuses)
               ~f:(fun (_, status) -> not (is_successful_pod_status status))
           in
-          [%log debug] "Got bad pod statuses, polling again ($failed_statuses"
-            ~metadata:
-              [ ( "failed_statuses"
-                , `Assoc
-                    (List.Assoc.map failed_pod_statuses ~f:(fun v -> `String v))
-                )
-              ] ;
-          poll_again () )
+          if n > 0 then (
+            [%log debug] "Got bad pod statuses, polling again ($failed_statuses"
+              ~metadata:
+                [ ( "failed_statuses"
+                  , `Assoc
+                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
+                           `String v ) ) )
+                ] ;
+            let%bind () =
+              after poll_interval |> Deferred.bind ~f:Malleable_error.return
+            in
+            poll (n - 1) )
+          else (
+            [%log fatal]
+              "Got bad pod statuses, not all pods were assigned to nodes and \
+               ready in time.  pod statuses: ($failed_statuses"
+              ~metadata:
+                [ ( "failed_statuses"
+                  , `Assoc
+                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
+                           `String v ) ) )
+                ] ;
+            Malleable_error.hard_error_string ~exit_code:4
+              "Some pods either were not assigned to nodes or did not deploy \
+               properly." )
         else return ()
     | Error _ ->
         [%log debug] "`kubectl get pods` timed out, polling again" ;
-        poll_again ()
+        let%bind () =
+          after poll_interval |> Deferred.bind ~f:Malleable_error.return
+        in
+        poll n
   in
   [%log info] "Waiting for pods to be assigned nodes and become ready" ;
-  let res = poll 0 in
+  let res = poll max_polls in
   match%bind.Deferred res with
   | Error _ ->
       [%log error] "Not all pods were assigned nodes, cannot proceed!" ;

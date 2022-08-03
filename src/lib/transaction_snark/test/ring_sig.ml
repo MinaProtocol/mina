@@ -56,6 +56,7 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
+  ; uses_lookup = false
   }
 
 let%test_unit "1-of-1" =
@@ -121,9 +122,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           let spec = List.hd_exn specs in
           let tag, _, (module P), Pickles.Provers.[ ringsig_prover; _ ] =
-            Pickles.compile ~cache:Cache_dir.cache
-              (module Zkapp_statement.Checked)
-              (module Zkapp_statement)
+            Pickles.compile () ~cache:Cache_dir.cache
               ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N2)
               ~max_proofs_verified:(module Nat.N2)

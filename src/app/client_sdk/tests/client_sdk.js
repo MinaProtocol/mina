@@ -8,18 +8,23 @@ let resolve = (file) => path.resolve(dir, file);
 let build = "../../../../_build/default";
 let wasmPath = resolve(`${build}/src/lib/crypto/kimchi_bindings/js/node_js`);
 let clientSdkPath = resolve(`${build}/src/app/client_sdk/client_sdk.bc.js`);
-let nodeModules = "node_modules";
-let nodeModulesExists = fs.existsSync(nodeModules);
 
 // set up node_modules
+let nodeModules = "node_modules";
+let nodeModulesExists = fs.existsSync(nodeModules);
 if (!nodeModulesExists) {
   fs.mkdirSync(nodeModules);
+}
+if (!nodeModulesExists || !fs.existsSync(`${nodeModules}/client_sdk`)) {
+  fs.mkdirSync(`${nodeModules}/client_sdk`);
+}
+if (!nodeModulesExists || !fs.existsSync(`${nodeModules}/env`)) {
   fs.mkdirSync(`${nodeModules}/env`);
   fs.writeFileSync(`${nodeModules}/env/index.js`, "module.exports = {};");
-  fs.mkdirSync(`${nodeModules}/client_sdk`);
 }
 
 function copy(source, target) {
+  if (fs.existsSync(target)) fs.unlinkSync(target);
   return childProcess.execSync(`cp -R ${source} ${target}`);
 }
 

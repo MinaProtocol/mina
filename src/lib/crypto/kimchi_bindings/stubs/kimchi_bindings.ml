@@ -127,6 +127,13 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t array
         -> bool = "caml_fp_srs_batch_accumulator_check"
 
+      external batch_accumulator_generate :
+           t
+        -> int
+        -> Pasta_bindings.Fp.t array
+        -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
+        = "caml_fp_srs_batch_accumulator_generate"
+
       external urs_h : t -> Pasta_bindings.Fq.t Kimchi_types.or_infinity
         = "caml_fp_srs_h"
     end
@@ -169,6 +176,13 @@ module Protocol = struct
         -> Pasta_bindings.Fq.t array
         -> bool = "caml_fq_srs_batch_accumulator_check"
 
+      external batch_accumulator_generate :
+           t
+        -> int
+        -> Pasta_bindings.Fq.t array
+        -> Pasta_bindings.Fp.t Kimchi_types.or_infinity array
+        = "caml_fq_srs_batch_accumulator_generate"
+
       external urs_h : t -> Pasta_bindings.Fp.t Kimchi_types.or_infinity
         = "caml_fq_srs_h"
     end
@@ -178,7 +192,7 @@ module Protocol = struct
     module Fp = struct
       type nonrec t
 
-      external create : Gates.Vector.Fp.t -> int -> SRS.Fp.t -> t
+      external create : Gates.Vector.Fp.t -> int -> int -> SRS.Fp.t -> t
         = "caml_pasta_fp_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fp_plonk_index_max_degree"
@@ -205,7 +219,7 @@ module Protocol = struct
     module Fq = struct
       type nonrec t
 
-      external create : Gates.Vector.Fq.t -> int -> SRS.Fq.t -> t
+      external create : Gates.Vector.Fq.t -> int -> int -> SRS.Fq.t -> t
         = "caml_pasta_fq_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fq_plonk_index_max_degree"
@@ -422,6 +436,16 @@ module Protocol = struct
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
            Kimchi_types.prover_proof = "caml_pasta_fp_plonk_proof_create"
+
+      external example_with_lookup :
+           SRS.Fp.t
+        -> bool
+        -> Index.Fp.t
+           * Pasta_bindings.Fp.t
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_lookup"
 
       external verify :
            ( Pasta_bindings.Fp.t

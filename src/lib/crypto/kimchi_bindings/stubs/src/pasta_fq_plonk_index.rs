@@ -2,7 +2,7 @@ use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
-use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine, vesta::Vesta as GAffineOther};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -38,6 +38,7 @@ impl ocaml::custom::Custom for CamlPastaFqPlonkIndex {
 pub fn caml_pasta_fq_plonk_index_create(
     gates: CamlPastaFqPlonkGateVectorPtr,
     public: ocaml::Int,
+    prev_challenges: ocaml::Int,
     srs: CamlFqSrs,
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
     let gates: Vec<_> = gates
@@ -52,8 +53,9 @@ pub fn caml_pasta_fq_plonk_index_create(
         .collect();
 
     // create constraint system
-    let cs = match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq_kimchi::params())
+    let cs = match ConstraintSystem::<Fq>::create(gates)
         .public(public as usize)
+        .prev_challenges(prev_challenges as usize)
         .build()
     {
         Err(_) => {
@@ -78,7 +80,7 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     // create index
     Ok(CamlPastaFqPlonkIndex(Box::new(
-        ProverIndex::<GAffine>::create(cs, oracle::pasta::fp_kimchi::params(), endo_q, srs.clone()),
+        ProverIndex::<GAffine>::create(cs, endo_q, srs.clone()),
     )))
 }
 
@@ -139,9 +141,7 @@ pub fn caml_pasta_fq_plonk_index_read(
 
     // deserialize the index
     let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
-    t.cs.fr_sponge_params = oracle::pasta::fq_kimchi::params();
     t.srs = srs.clone();
-    t.fq_sponge_params = oracle::pasta::fp_kimchi::params();
 
     let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
     t.linearization = linearization;

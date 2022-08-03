@@ -47,7 +47,7 @@ let [command, zkappKeyBase58, feePayerKeyBase58, feePayerNonce] =
   process.argv.slice(2);
 zkappKeyBase58 ||= PrivateKey.random().toBase58();
 feePayerKeyBase58 ||= PrivateKey.random().toBase58();
-feePayerNonce ||= command === "update" ? "2" : "0";
+feePayerNonce ||= command === "update" ? "1" : "0";
 console.log(
   `simple-zkapp.js: Running "${command}" with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and fee payer nonce ${feePayerNonce}`
 );
@@ -68,7 +68,7 @@ if (command === "deploy") {
     zkappKey,
     verificationKey,
     initialBalance,
-    feePayerKey,
+    feePayer: feePayerKey,
   });
 
   // mina-signer part

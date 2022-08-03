@@ -320,6 +320,8 @@ module Snark_work : sig
 
   val snark_work_timed_out_rpc : Counter.t
 
+  val snark_work_failed_rpc : Counter.t
+
   val snark_pool_size : Gauge.t
 
   val pending_snark_work : Gauge.t

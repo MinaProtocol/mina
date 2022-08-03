@@ -18,7 +18,7 @@ module Sparse_ledger : module type of Mina_ledger.Sparse_ledger
 
 val ledger_depth : Ledger.index
 
-module T : Transaction_snark.S
+val snark_module : (module Transaction_snark.S) lazy_t
 
 val genesis_state_body : Transaction_protocol_state.Block_data.t
 
@@ -83,7 +83,7 @@ val test_snapp_update :
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
-  -> snapp_prover:
+  -> zkapp_prover:
        ( unit
        , unit
        , unit
@@ -126,9 +126,16 @@ module Wallet : sig
 
   val user_command :
        fee_payer:t
-    -> source_pk:Signature_lib.Public_key.Compressed.t
     -> receiver_pk:Signature_lib.Public_key.Compressed.t
     -> int
+    -> Currency.Fee.t
+    -> Mina_numbers.Account_nonce.t
+    -> Mina_base.Signed_command_memo.t
+    -> Mina_base.Signed_command.With_valid_signature.t
+
+  val stake_delegation :
+       fee_payer:t
+    -> delegate_pk:Signature_lib.Public_key.Compressed.t
     -> Currency.Fee.t
     -> Mina_numbers.Account_nonce.t
     -> Mina_base.Signed_command_memo.t
@@ -136,3 +143,10 @@ module Wallet : sig
 end
 
 val check_balance : Account_id.t -> int -> Ledger.t -> unit
+
+val test_transaction_union :
+     ?expected_failure:Transaction_status.Failure.t list
+  -> ?txn_global_slot:Mina_numbers.Global_slot.t
+  -> Ledger.t
+  -> Mina_transaction.Transaction.Valid.t
+  -> unit

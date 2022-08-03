@@ -76,10 +76,12 @@ let get_balance_graphql =
          | Some account ->
              if Token_id.(equal default) token then
                printf "Balance: %s mina\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 ( Currency.Balance.to_formatted_string
+                 @@ Currency.Balance.of_uint64 account.balance.total )
              else
                printf "Balance: %s tokens\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 ( Currency.Balance.to_formatted_string
+                 @@ Currency.Balance.of_uint64 account.balance.total )
          | None ->
              printf "There are no funds in this account\n" ) )
 
@@ -1027,7 +1029,6 @@ let pooled_zkapp_commands =
 
 let to_signed_fee_exn sign magnitude =
   let sgn = match sign with `PLUS -> Sgn.Pos | `MINUS -> Neg in
-  let magnitude = Currency.Fee.of_uint64 magnitude in
   Currency.Fee.Signed.create ~sgn ~magnitude
 
 let pending_snark_work =
@@ -1049,19 +1050,19 @@ let pending_snark_work =
                     ~f:(fun bundle ->
                       Array.map bundle.workBundle ~f:(fun w ->
                           let f = w.fee_excess in
-                          let hash_of_string =
-                            Mina_base.Frozen_ledger_hash.of_base58_check_exn
-                          in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
-                              to_signed_fee_exn f.sign f.fee_magnitude
+                              to_signed_fee_exn f.sign
+                                (Currency.Amount.of_uint64 f.fee_magnitude)
                           ; supply_increase =
                               Currency.Amount.of_uint64 w.supply_increase
                           ; source_ledger_hash =
-                              hash_of_string w.source_ledger_hash
+                              Mina_base.Epoch_seed.of_base58_check_exn
+                                w.source_ledger_hash
                           ; target_ledger_hash =
-                              hash_of_string w.target_ledger_hash
+                              Mina_base.Epoch_seed.of_base58_check_exn
+                                w.target_ledger_hash
                           } ) )
                     response.pendingSnarkWork )
              in
@@ -1133,8 +1134,10 @@ let set_snark_worker =
   let public_key_flag =
     flag "--address" ~aliases:[ "address" ]
       ~doc:
-        "PUBLICKEY Public-key address you wish to start snark-working on; null \
-         to stop doing any snark work"
+        (sprintf
+           "PUBLICKEY Public-key address you wish to start snark-working on; \
+            null to stop doing any snark work. %s"
+           Cli_lib.Default.receiver_key_warning )
       (optional Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async
@@ -1173,7 +1176,8 @@ let set_snark_work_fee =
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
                (Currency.Fee.to_int fee)
-               (Unsigned.UInt64.to_int response.setSnarkWorkFee.lastFee) ) )
+               ( Currency.Fee.to_int
+               @@ Currency.Fee.of_uint64 response.setSnarkWorkFee.lastFee ) ) )
 
 let import_key =
   Command.async
@@ -1424,7 +1428,8 @@ let list_accounts =
                        \  Locked: %b\n"
                        (i + 1)
                        (Public_key.Compressed.to_base58_check w.public_key)
-                       (Currency.Balance.to_formatted_string w.balance.total)
+                       ( Currency.Balance.to_formatted_string
+                       @@ Currency.Balance.of_uint64 w.balance.total )
                        (Option.value ~default:true w.locked) ) ;
                  Ok () )
          | Error (`Failed_request _ as err) ->
@@ -1755,7 +1760,7 @@ let compile_time_constants =
            `Assoc
              [ ( "genesis_state_timestamp"
                , `String
-                   ( Block_time.to_time
+                   ( Block_time.to_time_exn
                        consensus_constants.genesis_state_timestamp
                    |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
                    ) )

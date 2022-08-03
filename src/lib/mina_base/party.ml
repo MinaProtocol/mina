@@ -452,6 +452,11 @@ module Update = struct
         ~checked:(Data_as_hash.deriver string)
         ~name:"StringWithHash" string
     in
+    let token_symbol =
+      with_checked
+        ~checked:(js_only (Js_layout.leaf_type (Custom "TokenSymbol")))
+        ~name:"TokenSymbol" string
+    in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
@@ -459,7 +464,7 @@ module Update = struct
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
          ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
-         ~token_symbol:!.(Set_or_keep.deriver string_with_hash)
+         ~token_symbol:!.(Set_or_keep.deriver token_symbol)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
@@ -666,7 +671,8 @@ module Preconditions = struct
   let to_input ({ network; account } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Zkapp_precondition.Protocol_state.to_input network
-      ; Random_oracle_input.Chunked.field (Account_precondition.digest account)
+      ; Zkapp_precondition.Account.to_input
+          (Account_precondition.to_full account)
       ]
 
   let gen =
@@ -696,8 +702,7 @@ module Preconditions = struct
     let to_input ({ network; account } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Zkapp_precondition.Protocol_state.Checked.to_input network
-        ; Random_oracle_input.Chunked.field
-            (Account_precondition.Checked.digest account)
+        ; Zkapp_precondition.Account.Checked.to_input account
         ]
   end
 
@@ -1106,8 +1111,8 @@ module Body = struct
           t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input public_key
-        ; Update.Checked.to_input update
         ; Token_id.Checked.to_input token_id
+        ; Update.Checked.to_input update
         ; Snark_params.Tick.Run.run_checked
             (Amount.Signed.Checked.to_input balance_change)
         ; Random_oracle_input.Chunked.packed
@@ -1180,8 +1185,8 @@ module Body = struct
         t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input public_key
-      ; Update.to_input update
       ; Token_id.to_input token_id
+      ; Update.to_input update
       ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events

@@ -168,7 +168,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
     { sok_digest = Mina_base.Sok_message.Digest.default
     ; source = reg (Protocol_state.blockchain_state prev_state)
     ; target = reg (Protocol_state.blockchain_state curr)
-    ; supply_increase = Currency.Amount.zero
+    ; supply_increase = Currency.Amount.Signed.zero
     ; fee_excess = Fee_excess.zero
     }
   in
