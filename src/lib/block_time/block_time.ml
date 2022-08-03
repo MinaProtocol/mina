@@ -269,18 +269,17 @@ module Time = struct
 
   [%%if time_offsets]
 
-  let to_string_system_time (offset : Controller.t) (t : t) : string =
-    let t2 : t =
-      of_span_since_epoch
-        Span.(to_span_since_epoch t + of_time_span (offset ()))
-    in
-    Int64.to_string (to_int64 t2)
+  let to_system_time (offset : Controller.t) (t : t) =
+    of_span_since_epoch Span.(to_span_since_epoch t + of_time_span (offset ()))
 
   [%%else]
 
-  let to_string_system_time _ = Fn.compose Int64.to_string to_int64
+  let to_system_time (_offset : Controller.t) (t : t) = t
 
   [%%endif]
+
+  let to_string_system_time_exn (offset : Controller.t) (t : t) : string =
+    to_system_time offset t |> to_string_exn
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch
