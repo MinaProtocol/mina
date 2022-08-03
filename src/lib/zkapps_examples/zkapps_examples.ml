@@ -305,13 +305,18 @@ module Party_under_construction = struct
     end
 
     module Events = struct
-      type t = { events : Field.Constant.t array list }
+      type t = { events : Field.t array list }
 
       let create () = { events = [] }
 
-      let add_event t event : t = { events = event :: t.events }
-
       let add_events t events : t = { events = events @ t.events }
+
+      let to_parties_events ({ events } : t) : Zkapp_account.Events.var =
+        let empty_var : Zkapp_account.Events.var =
+          exists ~compute:(fun () -> []) Zkapp_account.Events.typ
+        in
+        Core_kernel.List.fold events ~init:empty_var
+          ~f:Zkapp_account.Events.push_checked
     end
 
     type t =
@@ -349,7 +354,7 @@ module Party_under_construction = struct
         ; balance_change =
             var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
         ; increment_nonce = Boolean.false_
-        ; events = var_of_t Zkapp_account.Events.typ t.events.events
+        ; events = Events.to_parties_events t.events
         ; sequence_events = var_of_t Zkapp_account.Events.typ []
         ; call_data = Field.zero
         ; preconditions =
