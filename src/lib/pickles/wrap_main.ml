@@ -336,27 +336,12 @@ let wrap_main
                         , Vector.map ~f:(fun ds -> ds.h) possible_wrap_domains
                         ) )
                 in
-                let max_quot_sizes =
-                  Vector.map domainses ~f:(fun ds ->
-                      ( which_branch
-                      , Vector.map ds ~f:(fun d ->
-                            Common.max_quot_size_int (Domain.size d.h) ) ) )
-                in
-                let actual_proofs_verifieds =
-                  padded
-                  |> Vector.map ~f:(fun proofs_verifieds_in_slot ->
-                         Pseudo.choose
-                           (which_branch, proofs_verifieds_in_slot)
-                           ~f:Field.of_int )
-                in
                 Vector.mapn
                   [ (* This is padded to max_proofs_verified for the benefit of wrapping with dummy unfinalized proofs *)
                     prev_proof_state.unfinalized_proofs
                   ; old_bp_chals
-                  ; actual_proofs_verifieds
                   ; evals
                   ; wrap_domains
-                  ; max_quot_sizes
                   ]
                   ~f:(fun
                        [ { deferred_values
@@ -364,10 +349,8 @@ let wrap_main
                          ; should_finalize
                          }
                        ; old_bulletproof_challenges
-                       ; actual_proofs_verified
                        ; evals
                        ; wrap_domain
-                       ; max_quot_size
                        ]
                      ->
                     let sponge =
@@ -397,7 +380,6 @@ let wrap_main
                       with_label __LOC__ (fun () ->
                           finalize_other_proof
                             (module Wrap_hack.Padded_length)
-                            ~actual_proofs_verified
                             ~domain:(wrap_domain :> _ Plonk_checks.plonk_domain)
                             ~sponge ~old_bulletproof_challenges deferred_values
                             evals )

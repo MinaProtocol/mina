@@ -774,8 +774,7 @@ struct
      3. Check that the "b" value was computed correctly.
      4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
-      (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ?actual_proofs_verified ~domain ~sponge
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _
