@@ -127,6 +127,13 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t array
         -> bool = "caml_fp_srs_batch_accumulator_check"
 
+      external batch_accumulator_generate :
+           t
+        -> int
+        -> Pasta_bindings.Fp.t array
+        -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
+        = "caml_fp_srs_batch_accumulator_generate"
+
       external urs_h : t -> Pasta_bindings.Fq.t Kimchi_types.or_infinity
         = "caml_fp_srs_h"
     end
@@ -168,6 +175,13 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t Kimchi_types.or_infinity array
         -> Pasta_bindings.Fq.t array
         -> bool = "caml_fq_srs_batch_accumulator_check"
+
+      external batch_accumulator_generate :
+           t
+        -> int
+        -> Pasta_bindings.Fq.t array
+        -> Pasta_bindings.Fp.t Kimchi_types.or_infinity array
+        = "caml_fq_srs_batch_accumulator_generate"
 
       external urs_h : t -> Pasta_bindings.Fp.t Kimchi_types.or_infinity
         = "caml_fq_srs_h"
@@ -422,6 +436,16 @@ module Protocol = struct
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
            Kimchi_types.prover_proof = "caml_pasta_fp_plonk_proof_create"
+
+      external example_with_lookup :
+           SRS.Fp.t
+        -> bool
+        -> Index.Fp.t
+           * Pasta_bindings.Fp.t
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_lookup"
 
       external verify :
            ( Pasta_bindings.Fp.t

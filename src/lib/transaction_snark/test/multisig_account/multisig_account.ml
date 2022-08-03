@@ -211,11 +211,10 @@ let%test_module "multisig_account" =
                         ; public_output = ()
                         ; auxiliary_output = ()
                         } )
+                  ; uses_lookup = false
                   }
                 in
-                Pickles.compile ~cache:Cache_dir.cache
-                  (module Zkapp_statement.Checked)
-                  (module Zkapp_statement)
+                Pickles.compile () ~cache:Cache_dir.cache
                   ~public_input:(Input Zkapp_statement.typ)
                   ~auxiliary_typ:Typ.unit
                   ~branches:(module Nat.N2)
@@ -260,6 +259,7 @@ let%test_module "multisig_account" =
                             ; public_output = ()
                             ; auxiliary_output = ()
                             } )
+                      ; uses_lookup = false
                       }
                     ] )
               in

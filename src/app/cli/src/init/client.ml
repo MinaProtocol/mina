@@ -1133,8 +1133,10 @@ let set_snark_worker =
   let public_key_flag =
     flag "--address" ~aliases:[ "address" ]
       ~doc:
-        "PUBLICKEY Public-key address you wish to start snark-working on; null \
-         to stop doing any snark work"
+        (sprintf
+           "PUBLICKEY Public-key address you wish to start snark-working on; \
+            null to stop doing any snark work. %s"
+           Cli_lib.Default.receiver_key_warning )
       (optional Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async
@@ -1755,7 +1757,7 @@ let compile_time_constants =
            `Assoc
              [ ( "genesis_state_timestamp"
                , `String
-                   ( Block_time.to_time
+                   ( Block_time.to_time_exn
                        consensus_constants.genesis_state_timestamp
                    |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
                    ) )

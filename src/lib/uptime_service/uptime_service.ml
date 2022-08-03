@@ -415,7 +415,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
       let four_slots_span = make_slots_span 4.0 in
       let wait_until_iteration_start block_tm =
         let now = Block_time.now time_controller in
-        if Block_time.( < ) now block_tm then at (Block_time.to_time block_tm)
+        if Block_time.( < ) now block_tm then
+          at (Block_time.to_time_exn block_tm)
         else (
           [%log warn]
             "In uptime service, current block time is past desired start of \
@@ -448,14 +449,15 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                      uptime service" ;
                   None
               | Produce prod_tm | Produce_now prod_tm ->
-                  Some (Block_time.to_time prod_tm.time) )
+                  Some (Block_time.to_time_exn prod_tm.time) )
         in
         [%log trace]
           "Waiting for next 5-slot boundary to start work in uptime service"
           ~metadata:
             [ ("boundary_block_time", Block_time.to_yojson next_block_tm)
             ; ( "boundary_time"
-              , `String (Block_time.to_time next_block_tm |> Time.to_string) )
+              , `String (Block_time.to_time_exn next_block_tm |> Time.to_string)
+              )
             ] ;
         (* wait in Deferred monad *)
         let%bind () = wait_until_iteration_start next_block_tm in
@@ -501,7 +503,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                     *)
                     let four_slots_from_start =
                       Block_time.add next_block_tm four_slots_span
-                      |> Block_time.to_time
+                      |> Block_time.to_time_exn
                     in
                     if Time.( <= ) next_producer_time four_slots_from_start then
                       (* send a block w/ SNARK work, then the produced block *)
