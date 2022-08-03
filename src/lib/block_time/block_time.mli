@@ -116,6 +116,8 @@ module Time : sig
 
     val to_time_ns_span : t -> Core_kernel.Time_ns.Span.t
 
+    val of_time_ns_span : Core_kernel.Time_ns.Span.t -> t
+
     val to_string_hum : t -> string
 
     val to_ms : t -> Int64.t
@@ -182,7 +184,7 @@ module Time : sig
 
   val of_time : Time.t -> t
 
-  val to_time : t -> Time.t
+  val to_time_exn : t -> Time.t
 
   val now : Controller.t -> t
 
@@ -194,10 +196,15 @@ module Time : sig
 
   val to_uint64 : t -> Unsigned.UInt64.t
 
-  val to_string : t -> string
+  val of_time_ns : Time_ns.t -> t
+
+  val to_string_exn : t -> string
 
   (** Strip time offset *)
-  val to_string_system_time : Controller.t -> t -> string
+  val to_string_system_time_exn : Controller.t -> t -> string
+
+  (** Strip time offset *)
+  val to_system_time : Controller.t -> t -> t
 
   val of_string_exn : string -> t
 

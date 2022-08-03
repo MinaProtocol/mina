@@ -112,7 +112,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<GAffine> {
 
             chacha_comm,
 
-            range_check_comm: vec![],
+            range_check_comm: None,
 
             shift,
             zkpm: {

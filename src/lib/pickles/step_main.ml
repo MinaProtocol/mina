@@ -48,7 +48,8 @@ let verify_one
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~sponge ~prev_challenges proof_state.deferred_values prev_proof_evals )
+          ~step_uses_lookup:d.step_uses_lookup ~sponge ~prev_challenges
+          proof_state.deferred_values prev_proof_evals )
   in
   let branch_data = proof_state.deferred_values.branch_data in
   let statement =
@@ -83,7 +84,22 @@ let verify_one
   in
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
+        verify
+          ~lookup_parameters:
+            { use = d.step_uses_lookup
+            ; zero =
+                { var =
+                    { challenge = Field.zero
+                    ; scalar = Shifted_value Field.zero
+                    }
+                ; value =
+                    { challenge = Limb_vector.Challenge.Constant.zero
+                    ; scalar =
+                        Shifted_value.Type1.Shifted_value Field.Constant.zero
+                    }
+                }
+            }
+          ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
           ~is_base_case:(Boolean.not should_verify)
           ~sg_old:prev_challenge_polynomial_commitments ~proof:wrap_proof
           ~wrap_verification_key:d.wrap_key statement unfinalized )
@@ -179,6 +195,29 @@ let step_main :
         Per_proof_witness.Constant.No_app_state.t )
       Typ.t
   end in
+  let uses_lookup (d : _ Tag.t) =
+    if Type_equal.Id.same self.id d.id then basic.step_uses_lookup
+    else Types_map.uses_lookup d
+  in
+  let lookup_usage =
+    let rec go :
+        type e pvars pvals ns1 ns2 br.
+           (pvars, pvals, ns1, ns2) H4.T(Tag).t
+        -> (pvars, br) Length.t
+        -> (Plonk_types.Opt.Flag.t, br) Vector.t =
+     fun ds ld ->
+      match (ds, ld) with
+      | [], Z ->
+          []
+      | d :: ds, S ld ->
+          uses_lookup d :: go ds ld
+      | [], _ ->
+          .
+      | _ :: _, _ ->
+          .
+    in
+    go rule.prevs proofs_verified
+  in
   let prev_proof_typs =
     let rec join :
         type e pvars pvals ns1 ns2 br.
@@ -194,7 +233,9 @@ let step_main :
       | [], [], [], Z, Z, Z ->
           []
       | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->
-          let t = Per_proof_witness.typ Typ.unit n1 n2 in
+          let t =
+            Per_proof_witness.typ Typ.unit n1 n2 ~lookup:(uses_lookup d)
+          in
           t :: join ds ns1 ns2 ld ln1 ln2
       | [], _, _, _, _, _ ->
           .
@@ -303,9 +344,12 @@ let step_main :
               Req.Proof_with_datas )
         and unfinalized_proofs =
           exists
-            (Vector.typ
-               (Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n)
-               Max_proofs_verified.n )
+            (Vector.typ'
+               (Vector.map
+                  ~f:(fun uses_lookup ->
+                    Unfinalized.typ ~wrap_rounds:Backend.Tock.Rounds.n
+                      ~uses_lookup )
+                  (Vector.extend lookup_usage lte Max_proofs_verified.n No) ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
         and pass_through =
           exists (Vector.typ Digest.typ Max_proofs_verified.n)
@@ -382,6 +426,7 @@ let step_main :
                     ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
+                    ; step_uses_lookup = basic.step_uses_lookup
                     }
                   in
                   let module M =

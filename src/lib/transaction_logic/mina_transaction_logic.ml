@@ -190,7 +190,7 @@ module Transaction_applied = struct
     | Coinbase c ->
         With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-  let user_command_status : t -> Transaction_status.t =
+  let transaction_status : t -> Transaction_status.t =
    fun { varying; _ } ->
     match varying with
     | Command
@@ -281,7 +281,7 @@ module type S = sig
 
     val transaction : t -> Transaction.t With_status.t
 
-    val user_command_status : t -> Transaction_status.t
+    val transaction_status : t -> Transaction_status.t
   end
 
   module Global_state : sig
@@ -599,7 +599,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       | Coinbase c ->
           With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
-    let user_command_status : t -> Transaction_status.t =
+    let transaction_status : t -> Transaction_status.t =
      fun { varying; _ } ->
       match varying with
       | Command
@@ -1773,6 +1773,17 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       Transaction_status.Failure.Collection.t =
     match s with [] -> [ f ] | h :: t -> h :: f :: t
 
+  (*Structure of the failure status:
+     I. Only one fee transfer in the transaction (`One) and it fails:
+        [[failure]]
+     II. Two fee transfers in the transaction (`Two)-
+      Both fee transfers fail:
+        [[failure-of-first-fee-transfer]; [failure-of-second-fee-transfer]]
+      First succeeds and second one fails:
+        [[];[failure-of-second-fee-transfer]]
+      First fails and second succeeds:
+        [[failure-of-first-fee-transfer];[]]
+  *)
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance
       ~modify_timing =
     let open Or_error.Let_syntax in
@@ -1885,6 +1896,16 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     Transaction_applied.Fee_transfer_applied.
       { fee_transfer = ft_with_status; new_accounts; burned_tokens }
 
+  (*Structure of the failure status:
+     I. No fee transfer and coinbase transfer fails: [[failure]]
+     II. With fee transfer-
+      Both fee transfer and coinbase fails:
+        [[failure-of-fee-transfer]; [failure-of-coinbase]]
+      Fee transfer succeeds and coinbase fails:
+        [[];[failure-of-coinbase]]
+      Fee transfer fails and coinbase succeeds:
+        [[failure-of-fee-transfer];[]]
+  *)
   let apply_coinbase ~constraint_constants ~txn_global_slot t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
         ({ receiver; fee_transfer; amount = coinbase_amount } as cb : Coinbase.t)

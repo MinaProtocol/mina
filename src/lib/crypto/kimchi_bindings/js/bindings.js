@@ -986,6 +986,15 @@ var caml_fp_srs_batch_accumulator_check = function (srs, comms, chals) {
     return ok;
 };
 
+// Provides: caml_fp_srs_batch_accumulator_generate
+// Requires: plonk_wasm, rust_affine_to_caml_affine, caml_array_of_rust_vector, caml_fp_vector_to_rust
+var caml_fp_srs_batch_accumulator_generate = function (srs, comms, chals) {
+    var rust_chals = caml_fp_vector_to_rust(chals);
+    var rust_comms = plonk_wasm.caml_fp_srs_batch_accumulator_generate(srs, comms, rust_chals);
+    var rust_comms = caml_array_of_rust_vector(rust_comms, plonk_wasm.WasmGVesta, rust_affine_to_caml_affine, false);
+    return ok;
+};
+
 // Provides: caml_fp_srs_h
 // Requires: plonk_wasm, rust_affine_to_caml_affine
 var caml_fp_srs_h = function (t) {
@@ -1056,6 +1065,15 @@ var caml_fq_srs_batch_accumulator_check = function (srs, comms, chals) {
     var rust_comms = caml_array_to_rust_vector(comms, rust_affine_of_caml_affine, plonk_wasm.caml_pallas_affine_one);
     var rust_chals = caml_fq_vector_to_rust(chals);
     var ok = plonk_wasm.caml_fq_srs_batch_accumulator_check(srs, rust_comms, rust_chals);
+    return ok;
+};
+
+// Provides: caml_fq_srs_batch_accumulator_generate
+// Requires: plonk_wasm, rust_affine_to_caml_affine, caml_array_of_rust_vector, caml_fq_vector_to_rust
+var caml_fq_srs_batch_accumulator_generate = function (srs, comms, chals) {
+    var rust_chals = caml_fq_vector_to_rust(chals);
+    var rust_comms = plonk_wasm.caml_fq_srs_batch_accumulator_generate(srs, comms, rust_chals);
+    var rust_comms = caml_array_of_rust_vector(rust_comms, plonk_wasm.WasmGPallas, rust_affine_to_caml_affine, false);
     return ok;
 };
 
@@ -2284,4 +2302,10 @@ function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
     new_fq_vector.forEach(function (a, i) {
         fq_vector[i] = a;
     });
+}
+
+// Provides: caml_pasta_fp_plonk_proof_example_with_lookup
+function caml_pasta_fp_plonk_proof_example_with_lookup() {
+    // This is only used in the pickles unit tests
+    throw new Error("Unimplemented caml_pasta_fp_plonk_proof_example_with_lookup");
 }

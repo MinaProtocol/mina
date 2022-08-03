@@ -117,7 +117,7 @@ module Reflection = struct
 
     let nn_time a x =
       reflect
-        (fun t -> Block_time.to_time t |> Time.to_string)
+        (fun t -> Block_time.to_time_exn t |> Time.to_string)
         ~typ:(non_null string) a x
 
     let nn_catchup_status a x =
@@ -170,15 +170,22 @@ let get_ledger_and_breadcrumb coda =
 
 module Types = struct
   open Schema
-  open Graphql_lib.Base_types
 
-  let public_key = public_key ()
+  include struct
+    open Graphql_lib.Scalars
 
-  let uint64 = uint64 ()
+    let public_key = PublicKey.typ ()
 
-  let uint32 = uint32 ()
+    let uint64 = UInt64.typ ()
 
-  let token_id = token_id ()
+    let uint32 = UInt32.typ ()
+
+    let token_id = TokenId.typ ()
+
+    let json = JSON.typ ()
+
+    let epoch_seed = EpochSeed.typ ()
+  end
 
   let account_id : (Mina_lib.t, Account_id.t option) typ =
     obj "AccountId" ~fields:(fun _ ->
@@ -189,11 +196,6 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ id -> Mina_base.Account_id.token_id id)
         ] )
-
-  let json : ('context, Yojson.Basic.t option) typ =
-    scalar "JSON" ~doc:"Arbitrary JSON" ~coerce:Fn.id
-
-  let epoch_seed = epoch_seed ()
 
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
@@ -239,14 +241,14 @@ module Types = struct
               let constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              Block_time.to_string @@ C.start_time ~constants global_slot )
+              Block_time.to_string_exn @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun { ctx = coda; _ } global_slot ->
               let constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              Block_time.to_string @@ C.end_time ~constants global_slot )
+              Block_time.to_string_exn @@ C.end_time ~constants global_slot )
         ] )
 
   let consensus_time_with_global_slot_since_genesis =
@@ -653,7 +655,7 @@ module Types = struct
               let timestamp =
                 Mina_state.Blockchain_state.timestamp blockchain_state
               in
-              Block_time.to_string timestamp )
+              Block_time.to_string_exn timestamp )
         ; field "utcDate" ~typ:(non_null string)
             ~doc:
               (Doc.date
@@ -667,7 +669,7 @@ module Types = struct
               let timestamp =
                 Mina_state.Blockchain_state.timestamp blockchain_state
               in
-              Block_time.to_string_system_time
+              Block_time.to_string_system_time_exn
                 (Mina_lib.time_controller coda)
                 timestamp )
         ; field "snarkedLedgerHash" ~typ:(non_null string)
@@ -2264,7 +2266,8 @@ module Types = struct
                 with exn -> Error (Exn.to_string exn) )
             | _ ->
                 Error "Expected string for block time" )
-          ~to_json:(function (t : input) -> `String (Block_time.to_string t))
+          ~to_json:(function
+            | (t : input) -> `String (Block_time.to_string_exn t) )
     end
 
     module Length = struct
@@ -2840,8 +2843,11 @@ module Types = struct
           ~fields:
             [ arg "publicKey" ~typ:PublicKey.arg_typ
                 ~doc:
-                  "Public key of the account to receive coinbases. Block \
-                   production keys will receive the coinbases if none is given"
+                  (sprintf
+                     "Public key of the account to receive coinbases. Block \
+                      production keys will receive the coinbases if omitted. \
+                      %s"
+                     Cli_lib.Default.receiver_key_warning )
             ]
     end
 
@@ -2863,8 +2869,10 @@ module Types = struct
           ~fields:
             [ arg "publicKey" ~typ:PublicKey.arg_typ
                 ~doc:
-                  "Public key you wish to start snark-working on; null to stop \
-                   doing any snark work"
+                  (sprintf
+                     "Public key you wish to start snark-working on; null to \
+                      stop doing any snark work. %s"
+                     Cli_lib.Default.receiver_key_warning )
             ]
     end
 
