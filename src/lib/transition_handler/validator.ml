@@ -85,12 +85,12 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
               let transition_time =
                 Mina_block.header transition
                 |> Header.protocol_state |> Protocol_state.blockchain_state
-                |> Blockchain_state.timestamp |> Block_time.to_time
+                |> Blockchain_state.timestamp |> Block_time.to_time_exn
               in
               Perf_histograms.add_span
                 ~name:"accepted_transition_remote_latency"
                 (Core_kernel.Time.diff
-                   Block_time.(now time_controller |> to_time)
+                   Block_time.(now time_controller |> to_time_exn)
                    transition_time ) ;
               Writer.write valid_transition_writer
                 (`Block cached_transition, `Valid_cb vc)

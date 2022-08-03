@@ -2490,6 +2490,7 @@ module Hooks = struct
   module Rpcs = struct
     open Async
 
+    [%%versioned_rpc
     module Get_epoch_ledger = struct
       module Master = struct
         let name = "get_epoch_ledger"
@@ -2527,13 +2528,11 @@ module Hooks = struct
       module V2 = struct
         module T = struct
           type query = Mina_base.Ledger_hash.Stable.V1.t
-          [@@deriving bin_io, version { rpc }]
 
           type response =
             ( Mina_ledger.Sparse_ledger.Stable.V2.t
             , string )
             Core_kernel.Result.Stable.V1.t
-          [@@deriving bin_io, version { rpc }]
 
           let query_of_caller_model = Fn.id
 
@@ -2619,7 +2618,7 @@ module Hooks = struct
                    from $peer: $error" ) ;
             if Ivar.is_full ivar then [%log error] "Ivar.fill bug is here!" ;
             Ivar.fill ivar response )
-    end
+    end]
 
     open Network_peer.Rpc_intf
 

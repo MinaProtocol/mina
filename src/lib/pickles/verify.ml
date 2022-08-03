@@ -44,7 +44,7 @@ let verify_heterogenous (ts : Instance.t list) =
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
-  let in_circuit_plonks =
+  let in_circuit_plonks, computed_bp_chals =
     List.map ts
       ~f:(fun
            (T
@@ -76,6 +76,7 @@ let verify_heterogenous (ts : Instance.t list) =
             ; combined_inner_product
             ; branch_data
             ; bulletproof_challenges
+            ; b
             } =
           Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
             ~scalar:sc statement.proof_state.deferred_values
@@ -91,7 +92,12 @@ let verify_heterogenous (ts : Instance.t list) =
             _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
             =
           let chal = Challenge.Constant.to_tick_field in
-          { zeta; alpha; beta = chal plonk0.beta; gamma = chal plonk0.gamma }
+          { zeta
+          ; alpha
+          ; beta = chal plonk0.beta
+          ; gamma = chal plonk0.gamma
+          ; joint_combiner = Option.map ~f:sc plonk0.joint_combiner
+          }
         in
         let tick_combined_evals =
           Plonk_checks.evals_of_split_evals
@@ -127,6 +133,13 @@ let verify_heterogenous (ts : Instance.t list) =
           ; alpha = plonk0.alpha
           ; beta = plonk0.beta
           ; gamma = plonk0.gamma
+          ; lookup =
+              Option.map (Plonk_types.Opt.to_option p.lookup) ~f:(fun l ->
+                  { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+                    .Lookup
+                    .lookup_gate = l.lookup_gate
+                  ; joint_combiner = Option.value_exn plonk0.joint_combiner
+                  } )
           }
         in
         Timer.clock __LOC__ ;
@@ -183,19 +196,33 @@ let verify_heterogenous (ts : Instance.t list) =
             , Tick_field.equal x y )
         in
         Timer.clock __LOC__ ;
+        let bulletproof_challenges =
+          Ipa.Step.compute_challenges bulletproof_challenges
+        in
         Timer.clock __LOC__ ;
+        let shifted_value =
+          Shifted_value.Type1.to_field (module Tick.Field) ~shift:Shifts.tick1
+        in
+        let b_actual =
+          let challenge_poly =
+            unstage
+              (Wrap.challenge_polynomial
+                 (Vector.to_array bulletproof_challenges) )
+          in
+          Tick.Field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
+        in
         List.iter
           ~f:(fun (s, x, y) -> check_eq s x y)
           (* Both these values can actually be omitted from the proof on the wire since we recompute them
              anyway. *)
           [ ("xi", xi, xi_actual)
           ; ( "combined_inner_product"
-            , Shifted_value.Type1.to_field
-                (module Tick.Field)
-                combined_inner_product ~shift:Shifts.tick1
+            , shifted_value combined_inner_product
             , combined_inner_product_actual )
+          ; ("b", shifted_value b, b_actual)
           ] ;
-        plonk )
+        (plonk, bulletproof_challenges) )
+    |> List.unzip
   in
   let open Backend.Tock.Proof in
   let open Promise.Let_syntax in

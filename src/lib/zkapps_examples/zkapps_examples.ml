@@ -534,9 +534,10 @@ let compile :
            H4_6.T(Pickles.Inductive_rule).t = function
       | [] ->
           []
-      | { identifier; prevs; main } :: choices ->
+      | { identifier; prevs; main; uses_lookup } :: choices ->
           { identifier
           ; prevs
+          ; uses_lookup
           ; main =
               (fun main_input ->
                 let { Pickles.Inductive_rule.previous_proof_statements
@@ -557,15 +558,8 @@ let compile :
     in
     go (choices ~self)
   in
-  let module Statement = struct
-    type t = unit
-
-    let to_field_elements () = [||]
-  end in
   let tag, cache_handle, proof, provers =
-    Pickles.compile ?self ?cache ?disk_keys
-      (module Statement)
-      (module Statement)
+    Pickles.compile () ?self ?cache ?disk_keys
       ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices

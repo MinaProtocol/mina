@@ -189,6 +189,14 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _e = Fields_derivers_js.Js_layout.skip obj in
     Fields_derivers_json.Of_yojson.skip obj
 
+  let js_only js_layout obj : _ Unified_input.t =
+    let _a = Graphql.Fields.skip obj in
+    let _b = Graphql.Args.skip obj in
+    let _c = Fields_derivers_json.To_yojson.skip obj in
+    let _d = Fields_derivers_graphql.Graphql_query.skip obj in
+    obj#js_layout := js_layout ;
+    Fields_derivers_json.Of_yojson.skip obj
+
   let int obj : _ Unified_input.t =
     let _a = Graphql.Fields.int obj in
     let _b = Graphql.Args.int obj in

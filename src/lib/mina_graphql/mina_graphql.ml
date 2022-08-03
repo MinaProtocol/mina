@@ -117,7 +117,7 @@ module Reflection = struct
 
     let nn_time a x =
       reflect
-        (fun t -> Block_time.to_time t |> Time.to_string)
+        (fun t -> Block_time.to_time_exn t |> Time.to_string)
         ~typ:(non_null string) a x
 
     let nn_catchup_status a x =
@@ -241,14 +241,14 @@ module Types = struct
               let constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              Block_time.to_string @@ C.start_time ~constants global_slot )
+              Block_time.to_string_exn @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun { ctx = coda; _ } global_slot ->
               let constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              Block_time.to_string @@ C.end_time ~constants global_slot )
+              Block_time.to_string_exn @@ C.end_time ~constants global_slot )
         ] )
 
   let consensus_time_with_global_slot_since_genesis =
@@ -655,7 +655,7 @@ module Types = struct
               let timestamp =
                 Mina_state.Blockchain_state.timestamp blockchain_state
               in
-              Block_time.to_string timestamp )
+              Block_time.to_string_exn timestamp )
         ; field "utcDate" ~typ:(non_null string)
             ~doc:
               (Doc.date
@@ -2266,7 +2266,8 @@ module Types = struct
                 with exn -> Error (Exn.to_string exn) )
             | _ ->
                 Error "Expected string for block time" )
-          ~to_json:(function (t : input) -> `String (Block_time.to_string t))
+          ~to_json:(function
+            | (t : input) -> `String (Block_time.to_string_exn t) )
     end
 
     module Length = struct
@@ -2842,8 +2843,11 @@ module Types = struct
           ~fields:
             [ arg "publicKey" ~typ:PublicKey.arg_typ
                 ~doc:
-                  "Public key of the account to receive coinbases. Block \
-                   production keys will receive the coinbases if none is given"
+                  (sprintf
+                     "Public key of the account to receive coinbases. Block \
+                      production keys will receive the coinbases if omitted. \
+                      %s"
+                     Cli_lib.Default.receiver_key_warning )
             ]
     end
 
@@ -2865,8 +2869,10 @@ module Types = struct
           ~fields:
             [ arg "publicKey" ~typ:PublicKey.arg_typ
                 ~doc:
-                  "Public key you wish to start snark-working on; null to stop \
-                   doing any snark work"
+                  (sprintf
+                     "Public key you wish to start snark-working on; null to \
+                      stop doing any snark work. %s"
+                     Cli_lib.Default.receiver_key_warning )
             ]
     end
 

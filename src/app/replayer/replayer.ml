@@ -1272,7 +1272,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   ~next_epoch_ledger
             | `Zkapp_command ->
                 let%bind () =
-                  run_checks_on_slot_change uc.global_slot_since_genesis
+                  run_checks_on_slot_change zkc.global_slot_since_genesis
                 in
                 let%bind () = run_zkapp_command ~logger ~pool ~ledger zkc in
                 apply_commands internal_cmds user_cmds zkcs
