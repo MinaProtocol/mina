@@ -58,7 +58,9 @@ struct
               !"%s: %{sexp:Challenge.Constant.t}\n%!"
               lab (read Challenge.typ chal))
 
-  (** Debug function to print a [Field.t]. *)
+  (** Debug function to print a [Field.t].
+      Only works if the [debug] global is set.
+    *)
   let print_fp lab x =
     if debug then
       as_prover
@@ -448,7 +450,6 @@ struct
     in
     x_hat
 
-  (** ??? *)
   let incrementally_verify_proof (type b)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(domain :
