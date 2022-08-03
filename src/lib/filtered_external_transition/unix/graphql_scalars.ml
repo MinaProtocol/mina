@@ -1,4 +1,6 @@
-module FeeTransferType = struct
+module FeeTransferType :
+  Graphql_basic_scalars.Json_intf
+    with type t = Filtered_external_transition.Fee_transfer_type.t = struct
   type t = Filtered_external_transition.Fee_transfer_type.t
 
   let parse json : t =

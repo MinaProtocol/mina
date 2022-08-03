@@ -9,7 +9,7 @@
 
 open Graphql_async.Schema
 
-module type S_JSON = sig
+module type Json_intf = sig
   type t
 
   val parse : Yojson.Basic.t -> t
@@ -27,7 +27,7 @@ let unsigned_scalar_scalar ~to_string typ_name =
          (Stdlib.String.lowercase_ascii typ_name) )
     ~coerce:(fun num -> `String (to_string num))
 
-module UInt32 : S_JSON with type t = Unsigned.UInt32.t = struct
+module UInt32 : Json_intf with type t = Unsigned.UInt32.t = struct
   type t = Unsigned.UInt32.t
 
   let parse json = Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
@@ -38,7 +38,7 @@ module UInt32 : S_JSON with type t = Unsigned.UInt32.t = struct
     unsigned_scalar_scalar ~to_string:Unsigned.UInt32.to_string "UInt32"
 end
 
-module UInt64 : S_JSON with type t = Unsigned.UInt64.t = struct
+module UInt64 : Json_intf with type t = Unsigned.UInt64.t = struct
   type t = Unsigned.UInt64.t
 
   let parse json = Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
@@ -59,7 +59,7 @@ module JSON = struct
   let typ () = scalar "JSON" ~doc:"Arbitrary JSON" ~coerce:serialize
 end
 
-module STRING : S_JSON with type t = string = struct
+module String_json : Json_intf with type t = string = struct
   type t = string
 
   let parse json = Yojson.Basic.Util.to_string json
@@ -99,11 +99,11 @@ module Make_scalar_using_to_string (T : sig
   val to_string : t -> string
 
   val of_string : string -> t
-end) (SCALAR : sig
+end) (Scalar : sig
   val name : string
 
   val doc : string
-end) : S_JSON with type t = T.t = struct
+end) : Json_intf with type t = T.t = struct
   type t = T.t
 
   let parse json = Yojson.Basic.Util.to_string json |> T.of_string
@@ -111,7 +111,7 @@ end) : S_JSON with type t = T.t = struct
   let serialize x = `String (T.to_string x)
 
   let typ () =
-    Graphql_async.Schema.scalar SCALAR.name ~doc:SCALAR.doc ~coerce:serialize
+    Graphql_async.Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
 end
 
 module Make_scalar_using_base58_check (T : sig
@@ -120,11 +120,11 @@ module Make_scalar_using_base58_check (T : sig
   val to_base58_check : t -> string
 
   val of_base58_check_exn : string -> t
-end) (SCALAR : sig
+end) (Scalar : sig
   val name : string
 
   val doc : string
-end) : S_JSON with type t = T.t = struct
+end) : Json_intf with type t = T.t = struct
   type t = T.t
 
   let parse json = Yojson.Basic.Util.to_string json |> T.of_base58_check_exn
@@ -132,5 +132,5 @@ end) : S_JSON with type t = T.t = struct
   let serialize x = `String (T.to_base58_check x)
 
   let typ () =
-    Graphql_async.Schema.scalar SCALAR.name ~doc:SCALAR.doc ~coerce:serialize
+    Graphql_async.Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
 end

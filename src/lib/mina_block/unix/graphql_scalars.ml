@@ -1,5 +1,5 @@
 module PrecomputedBlockProof :
-  Graphql_basic_scalars.S_JSON with type t = Mina_block.Precomputed.Proof.t =
+  Graphql_basic_scalars.Json_intf with type t = Mina_block.Precomputed.Proof.t =
 struct
   open Mina_block.Precomputed.Proof
 

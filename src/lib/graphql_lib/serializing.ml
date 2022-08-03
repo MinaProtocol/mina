@@ -60,11 +60,11 @@ module type S = sig
   val serialize : t -> conv
 end
 
-module type S_JSON = S with type conv := Yojson.Basic.t
+module type Json_intf = S with type conv := Yojson.Basic.t
 
-module type S_STRING = S with type conv := string
+module type String_intf = S with type conv := string
 
-module Optional (F : S_JSON) : S_JSON with type t = F.t option = struct
+module Optional (F : Json_intf) : Json_intf with type t = F.t option = struct
   type t = F.t option
 
   let parse = optional ~f:F.parse
@@ -72,7 +72,7 @@ module Optional (F : S_JSON) : S_JSON with type t = F.t option = struct
   let serialize = Encoders.optional ~f:F.serialize
 end
 
-module Int64 : S_JSON with type t = Signed.Int64.t = struct
+module Int64 : Json_intf with type t = Signed.Int64.t = struct
   type t = Signed.Int64.t
 
   let parse json = Yojson.Basic.Util.to_string json |> Int64.of_string
@@ -81,7 +81,7 @@ module Int64 : S_JSON with type t = Signed.Int64.t = struct
 end
 
 module Public_key_s :
-  S_STRING with type t = Signature_lib.Public_key.Compressed.t = struct
+  String_intf with type t = Signature_lib.Public_key.Compressed.t = struct
   type t = Signature_lib.Public_key.Compressed.t
 
   let parse = Signature_lib.Public_key.of_base58_check_decompress_exn
@@ -97,7 +97,7 @@ module Token_s = struct
   let serialize (x : t) = unimplemented_serializer "token" x
 end
 
-module Memo : S_STRING with type t = Mina_base.Signed_command_memo.t = struct
+module Memo : String_intf with type t = Mina_base.Signed_command_memo.t = struct
   type t = Mina_base.Signed_command_memo.t
 
   let parse = Mina_base.Signed_command_memo.of_base58_check_exn
@@ -105,7 +105,7 @@ module Memo : S_STRING with type t = Mina_base.Signed_command_memo.t = struct
   let serialize = Mina_base.Signed_command_memo.to_base58_check
 end
 
-module State_hash : S_STRING with type t = Mina_base.State_hash.t = struct
+module State_hash : String_intf with type t = Mina_base.State_hash.t = struct
   type t = Mina_base.State_hash.t
 
   let parse = Mina_base.State_hash.of_base58_check_exn
@@ -113,8 +113,8 @@ module State_hash : S_STRING with type t = Mina_base.State_hash.t = struct
   let serialize = unimplemented_serializer "state_hash"
 end
 
-module Transaction_hash : S_STRING with type t = Mina_base.Transaction_hash.t =
-struct
+module Transaction_hash :
+  String_intf with type t = Mina_base.Transaction_hash.t = struct
   type t = Mina_base.Transaction_hash.t
 
   let parse = Mina_base.Transaction_hash.of_base58_check_exn
