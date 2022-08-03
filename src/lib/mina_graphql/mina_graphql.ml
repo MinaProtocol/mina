@@ -669,7 +669,7 @@ module Types = struct
               let timestamp =
                 Mina_state.Blockchain_state.timestamp blockchain_state
               in
-              Block_time.to_string_system_time
+              Block_time.to_string_system_time_exn
                 (Mina_lib.time_controller coda)
                 timestamp )
         ; field "snarkedLedgerHash" ~typ:(non_null string)

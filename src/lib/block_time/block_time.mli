@@ -201,7 +201,7 @@ module Time : sig
   val to_string_exn : t -> string
 
   (** Strip time offset *)
-  val to_string_system_time : Controller.t -> t -> string
+  val to_string_system_time_exn : Controller.t -> t -> string
 
   (** Strip time offset *)
   val to_system_time : Controller.t -> t -> t

@@ -278,8 +278,8 @@ module Time = struct
 
   [%%endif]
 
-  let to_string_system_time (offset : Controller.t) (t : t) : string =
-    to_system_time offset t |> to_string
+  let to_string_system_time_exn (offset : Controller.t) (t : t) : string =
+    to_system_time offset t |> to_string_exn
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch
