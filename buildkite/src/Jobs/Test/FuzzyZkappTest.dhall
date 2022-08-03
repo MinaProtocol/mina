@@ -22,8 +22,7 @@ let buildTestCmd : Text -> Text -> Natural -> Size -> Command.Type = \(profile :
       key = "fuzzy-zkapp-unit-test-${profile}",
       target = cmd_target,
       docker = None Docker.Type,
-      artifact_paths = [ S.contains "core_dumps/*" ],
-      timeout_in_minutes = 120
+      artifact_paths = [ S.contains "core_dumps/*" ]
     }
 
 in
@@ -41,7 +40,7 @@ Pipeline.build
       in
 
       JobSpec::{
-        (* dirtyWhen = unitDirtyWhen, *)
+        dirtyWhen = [] : List S.Type,
         path = "Test",
         name = "FuzzyZkappTest"
       },
