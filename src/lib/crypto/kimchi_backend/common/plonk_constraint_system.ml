@@ -303,7 +303,6 @@ type ('f, 'rust_gates) t =
 
 (* TODO: rename Fp to F or Field *)
 
-(** ? *)
 module Make
     (Fp : Field.S)
     (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly. 

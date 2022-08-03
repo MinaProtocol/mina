@@ -24,7 +24,7 @@ struct
 
   (* Other_field.size > Field.size *)
   module Other_field = struct
-    let size_in_bits = Field.size_in_bits
+    let size_in_bits = Other_field.size_in_bits
 
     module Constant = Other_field
 
@@ -33,6 +33,9 @@ struct
     let typ = Impls.Step.Other_field.typ
   end
 
+  (** Debug function to print a curve point over [Tick].
+      Only works if the [debug] global is set.
+    *)
   let print_g lab (x, y) =
     if debug then
       as_prover
@@ -43,6 +46,9 @@ struct
                 %!"
               lab (read_var x) (read_var y))
 
+  (** Debug function to print a [Challenge.Constant.t].
+      Only works if the [debug] global is set.
+    *)
   let print_chal lab chal =
     if debug then
       as_prover
@@ -52,6 +58,7 @@ struct
               !"%s: %{sexp:Challenge.Constant.t}\n%!"
               lab (read Challenge.typ chal))
 
+  (** Debug function to print a [Field.t]. *)
   let print_fp lab x =
     if debug then
       as_prover
@@ -84,6 +91,7 @@ struct
   let scalar_to_field s =
     SC.to_field_checked (module Impl) s ~endo:Endo.Wrap_inner_curve.scalar
 
+  (** Asserts that the variable [a] has [n] bits. *)
   let assert_n_bits ~n a =
     (* Scalar_challenge.to_field_checked has the side effect of
         checking that the input fits in n bits. *)
@@ -93,6 +101,10 @@ struct
           (SC.SC.create a) ~endo:Endo.Wrap_inner_curve.scalar ~num_bits:n
         : Field.t )
 
+  (** Returns the lowest 128 bits of [x].
+      If [constrain_low_bits] is not set,
+      the result is not constrained to be in [0, 2^128).
+    *)
   let lowest_128_bits ~constrain_low_bits x =
     let assert_128_bits = assert_n_bits ~n:128 in
     Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
@@ -436,6 +448,7 @@ struct
     in
     x_hat
 
+  (** ??? *)
   let incrementally_verify_proof (type b)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
       ~(domain :
@@ -453,6 +466,7 @@ struct
          , _ Shifted_value.Type2.t )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
+        (* fiat-shamir functions *)
         let receive ty f =
           with_label "receive" (fun () ->
               let x = f messages in
@@ -463,10 +477,16 @@ struct
         let open Plonk_types.Messages.In_circuit in
         let without = Type.Without_degree_bound in
         let absorb_g gs = absorb sponge without gs in
+
+        (* pad commitments sg_old *)
         let sg_old : (_, Wrap_hack.Padded_length.n) Vector.t =
           Wrap_hack.Checked.pad_commitments sg_old
         in
+
+        (* absorb sg_old *)
         Vector.iter ~f:(absorb sponge PC) sg_old ;
+
+        (* compute x_hat *)
         let x_hat =
           with_label "x_hat" (fun () ->
               match domain with
@@ -488,17 +508,34 @@ struct
                         | `Packed_bits (b, n) ->
                             (b, n) ) ) )
         in
+
+        (* absorb x_hat *)
         absorb sponge PC x_hat ;
+
+        (* absorb w_comm *)
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+
+        (* sample beta *)
         let beta = sample () in
+
+        (* same gamma *)
         let gamma = sample () in
+
+        (* absorb z_comm *)
         let z_comm = receive without z_comm in
+
+        (* sample alpha *)
         let alpha = sample_scalar () in
+
+        (* absorb t_comm *)
         let t_comm = receive without t_comm in
+
+        (* absorb zeta *)
         let zeta = sample_scalar () in
+
         (* At this point, we should use the previous "bulletproof_challenges" to
-           compute to compute f(beta_1) outside the snark
+           compute f(beta_1) outside the snark
            where f is the polynomial corresponding to sg_old
         *)
         let sponge_before_evaluations = Sponge.copy sponge in
@@ -515,12 +552,16 @@ struct
           Vector.split m.sigma_comm
             (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
         in
+
+        (* compute commitment to ft *)
         let ft_comm =
           with_label __LOC__ (fun () ->
               Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast2
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
                 ~verification_key:m ~plonk ~alpha ~t_comm )
         in
+
+        (* compute IPA challenges *)
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
              1. The polynomial commitments
@@ -543,6 +584,8 @@ struct
                  (Wrap_hack.Padded_length.add
                     num_commitments_without_degree_bound ) )
           in
+
+          (* check bulletproof challenges *)
           with_label "check_bulletproof" (fun () ->
               check_bulletproof
                 ~pcs_batch:
@@ -552,6 +595,8 @@ struct
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
+
+        (* check deferred values *)
         assert_eq_deferred_values
           { alpha = plonk.alpha
           ; beta = plonk.beta
@@ -1047,6 +1092,9 @@ struct
       proof new_accumulator : Boolean.var =
     Boolean.false_
 
+  (** Implements the partial verification of the wrap proof, 
+      as well as application data proofs.
+    *)
   let verify ~proofs_verified ~is_base_case ~sg_old
       ~(proof : Wrap_proof.Checked.t) ~wrap_domain ~wrap_verification_key
       statement

@@ -13,6 +13,9 @@ module Max_degree = struct
   let wrap = 1 lsl wrap_log2
 end
 
+(** The shifts used in the permutation, for each curve.
+    See https://o1-labs.github.io/proof-systems/specs/kimchi.html#common-index
+  *)
 let tick_shifts, tock_shifts =
   let mk g =
     let f =

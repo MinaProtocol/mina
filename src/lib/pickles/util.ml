@@ -87,28 +87,37 @@ let seal (type f)
       let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
       Field.Assert.equal x y ; y
 
+(** Obtain the lowest 128 bits of [x]. 
+    If [constrain_low_bits] is set, constraint the lowest bits to be in [0, 2^128).
+
+    This is useful for example to avoid constraining
+    scalar challenges we produce.
+  *)
 let lowest_128_bits (type f) ~constrain_low_bits ~assert_128_bits
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x =
   let open Impl in
+  (* 2^n *)
   let pow2 =
-    (* 2 ^ n *)
     let rec pow2 x i =
       if i = 0 then x else pow2 Field.Constant.(x + x) (i - 1)
     in
     fun n -> pow2 Field.Constant.one n
   in
+  (* splits x in the middle (lo is the lower 128 bits) *)
   let lo, hi =
     exists
       Typ.(field * field)
       ~compute:(fun () ->
-        let lo, hi =
-          Field.Constant.unpack (As_prover.read_var x)
-          |> Fn.flip List.split_n 128
-        in
+        let bits = Field.Constant.unpack (As_prover.read_var x) in
+        let lo, hi = List.split_n bits 128 in
         (Field.Constant.project lo, Field.Constant.project hi) )
   in
+  (* constraint the high bits to be in [0, 2^128) *)
   assert_128_bits hi ;
+  (* if constrain_low_bits is set, constrain that lo is in [0, 2^128)
+  *)
   if constrain_low_bits then assert_128_bits lo ;
+  (* constraint that lo + 2^128 * hi = x *)
   Field.Assert.equal x Field.(lo + scale hi (pow2 128)) ;
   lo
 
