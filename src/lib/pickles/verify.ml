@@ -256,7 +256,8 @@ let verify_heterogenous (ts : Instance.t list) =
             ->
            let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
              { pass_through =
-                 Common.hash_step_me_only ~app_state:A_value.to_field_elements
+                 Common.hash_messages_for_next_step_proof
+                   ~app_state:A_value.to_field_elements
                    (Reduced_me_only.Step.prepare
                       ~dlog_plonk_index:key.commitments
                       { t.statement.pass_through with app_state } )
@@ -265,7 +266,8 @@ let verify_heterogenous (ts : Instance.t list) =
                    deferred_values =
                      { t.statement.proof_state.deferred_values with plonk }
                  ; me_only =
-                     Wrap_hack.hash_dlog_me_only Max_proofs_verified.n
+                     Wrap_hack.hash_messages_for_next_wrap_proof
+                       Max_proofs_verified.n
                        (Reduced_me_only.Wrap.prepare
                           t.statement.proof_state.me_only )
                  }

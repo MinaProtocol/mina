@@ -220,7 +220,7 @@ struct
                fun x -> fst (typ.value_to_fields x)
              in
              (* TODO: Only do this hashing when necessary *)
-             Common.hash_step_me_only
+             Common.hash_messages_for_next_step_proof
                (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
                   statement.pass_through )
                ~app_state:to_field_elements )
@@ -243,7 +243,8 @@ struct
                     }
                 }
             ; me_only =
-                Wrap_hack.hash_dlog_me_only Local_max_proofs_verified.n
+                Wrap_hack.hash_messages_for_next_wrap_proof
+                  Local_max_proofs_verified.n
                   { old_bulletproof_challenges = prev_challenges
                   ; challenge_polynomial_commitment =
                       statement.proof_state.me_only
@@ -614,14 +615,15 @@ struct
         | x :: xs, _ :: ms, S n ->
             x :: pad xs ms n
         | [], m :: ms, S n ->
-            let t : _ Types.Wrap.Proof_state.Me_only.t =
+            let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
                   Vector.init Max_proofs_verified.n ~f:(fun _ ->
                       Dummy.Ipa.Wrap.challenges_computed )
               }
             in
-            Wrap_hack.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
+            Wrap_hack.hash_messages_for_next_wrap_proof Max_proofs_verified.n t
+            :: pad [] ms n
       in
       lazy
         (pad

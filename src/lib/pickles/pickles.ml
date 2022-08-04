@@ -156,8 +156,8 @@ let pad_local_max_proofs_verifieds
 open Kimchi_backend
 
 module Me_only = struct
-  module Wrap = Types.Wrap.Proof_state.Me_only
-  module Step = Types.Step.Proof_state.Me_only
+  module Wrap = Types.Wrap.Proof_state.Messages_for_next_wrap_proof
+  module Step = Types.Step.Proof_state.Messages_for_next_step_proof
 end
 
 module Proof_ = P.Base
@@ -2229,7 +2229,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                             (* TODO: Careful here... the length of
                                old_buletproof_challenges inside the me_only
                                might not be correct *)
-                            Common.hash_step_me_only
+                            Common.hash_messages_for_next_step_proof
                               ~app_state:to_field_elements
                               (P.Base.Me_only.Step.prepare ~dlog_plonk_index
                                  prev_statement.proof_state.me_only )
@@ -2246,8 +2246,8 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                                    Nat.eq_exn max_proofs_verified
                                      (Vector.length m.old_bulletproof_challenges)
                                  in
-                                 Wrap_hack.hash_dlog_me_only max_proofs_verified
-                                   m
+                                 Wrap_hack.hash_messages_for_next_wrap_proof
+                                   max_proofs_verified m
                              end)
                          in
                         let module V = H1.To_vector (Digest.Constant) in
@@ -2546,7 +2546,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                           ; proof_state =
                               { next_statement.proof_state with
                                 me_only =
-                                  Wrap_hack.hash_dlog_me_only
+                                  Wrap_hack.hash_messages_for_next_wrap_proof
                                     max_proofs_verified me_only_prepared
                               ; deferred_values =
                                   { next_statement.proof_state.deferred_values with
@@ -3101,7 +3101,7 @@ let%test_module "test uncorrelated deferred b" =
                             (* TODO: Careful here... the length of
                                old_buletproof_challenges inside the me_only
                                might not be correct *)
-                            Common.hash_step_me_only
+                            Common.hash_messages_for_next_step_proof
                               ~app_state:to_field_elements
                               (P.Base.Me_only.Step.prepare ~dlog_plonk_index
                                  prev_statement.proof_state.me_only )
@@ -3118,8 +3118,8 @@ let%test_module "test uncorrelated deferred b" =
                                    Nat.eq_exn max_proofs_verified
                                      (Vector.length m.old_bulletproof_challenges)
                                  in
-                                 Wrap_hack.hash_dlog_me_only max_proofs_verified
-                                   m
+                                 Wrap_hack.hash_messages_for_next_wrap_proof
+                                   max_proofs_verified m
                              end)
                          in
                         let module V = H1.To_vector (Digest.Constant) in
@@ -3384,7 +3384,7 @@ let%test_module "test uncorrelated deferred b" =
                           ; proof_state =
                               { next_statement.proof_state with
                                 me_only =
-                                  Wrap_hack.hash_dlog_me_only
+                                  Wrap_hack.hash_messages_for_next_wrap_proof
                                     max_proofs_verified me_only_prepared
                               ; deferred_values =
                                   { next_statement.proof_state.deferred_values with

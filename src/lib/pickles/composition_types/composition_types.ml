@@ -318,7 +318,7 @@ module Wrap = struct
 
     (** The component of the proof accumulation state that is only computed on by the
         "wrapping" proof system, and that can be handled opaquely by any "step" circuits. *)
-    module Me_only = struct
+    module Messages_for_next_wrap_proof = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
@@ -444,7 +444,7 @@ module Wrap = struct
 
   (** The component of the proof accumulation state that is only computed on by the
       "stepping" proof system, and that can be handled opaquely by any "wrap" circuits. *)
-  module Pass_through = struct
+  module Messages_for_next_step_proof = struct
     type ('g, 's, 'challenge_polynomial_commitments, 'bulletproof_challenges) t =
       { app_state : 's
             (** The actual application-level state (e.g., for Mina, this is the protocol state which contains the
@@ -849,8 +849,9 @@ module Step = struct
       end
     end
 
-    module Pass_through = Wrap.Proof_state.Me_only
-    module Me_only = Wrap.Pass_through
+    module Messages_for_next_wrap_proof =
+      Wrap.Proof_state.Messages_for_next_wrap_proof
+    module Messages_for_next_step_proof = Wrap.Messages_for_next_step_proof
 
     module Per_proof = struct
       (** For each proof that a step circuit verifies, we do not verify the whole proof.

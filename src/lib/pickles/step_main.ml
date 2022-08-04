@@ -50,21 +50,21 @@ let verify_one
           proof_state.deferred_values prev_proof_evals )
   in
   let branch_data = proof_state.deferred_values.branch_data in
-  let sponge_after_index, hash_me_only =
+  let sponge_after_index, hash_messages_for_next_step_proof =
     let to_field_elements =
       let (Typ typ) = d.public_input in
       fun x -> fst (typ.var_to_fields x)
     in
-    let sponge_after_index, hash_me_only =
+    let sponge_after_index, hash_messages_for_next_step_proof =
       (* TODO: Don't rehash when it's not necessary *)
-      hash_me_only_opt ~index:d.wrap_key to_field_elements
+      hash_messages_for_next_step_proof_opt ~index:d.wrap_key to_field_elements
     in
-    (sponge_after_index, unstage hash_me_only)
+    (sponge_after_index, unstage hash_messages_for_next_step_proof)
   in
   let statement =
-    let prev_me_only =
+    let prev_messages_for_next_step_proof =
       with_label __LOC__ (fun () ->
-          hash_me_only ~widths:d.proofs_verifieds
+          hash_messages_for_next_step_proof ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
             ~proofs_verified_mask:
               (Vector.trim branch_data.proofs_verified_mask
@@ -79,7 +79,7 @@ let verify_one
             ; old_bulletproof_challenges = prev_challenges
             } )
     in
-    { Types.Wrap.Statement.pass_through = prev_me_only
+    { Types.Wrap.Statement.pass_through = prev_messages_for_next_step_proof
     ; proof_state = { proof_state with me_only = pass_through }
     }
   in
@@ -459,7 +459,7 @@ let step_main :
               in
               Boolean.Assert.all vs ; chalss )
         in
-        let me_only =
+        let messages_for_next_step_proof =
           let challenge_polynomial_commitments =
             let module M =
               H3.Map (Per_proof_witness) (E03 (Inner_curve))
@@ -474,13 +474,15 @@ let step_main :
             let module V = H3.To_vector (Inner_curve) in
             V.f proofs_verified (M.f prevs)
           in
-          with_label "hash_me_only" (fun () ->
-              let hash_me_only =
+          with_label "hash_messages_for_next_step_proof" (fun () ->
+              let hash_messages_for_next_step_proof =
                 let to_field_elements =
                   let (Typ typ) = basic.public_input in
                   fun x -> fst (typ.var_to_fields x)
                 in
-                unstage (hash_me_only ~index:dlog_plonk_index to_field_elements)
+                unstage
+                  (hash_messages_for_next_step_proof ~index:dlog_plonk_index
+                     to_field_elements )
               in
               let (app_state : var) =
                 match public_input with
@@ -491,7 +493,7 @@ let step_main :
                 | Input_and_output _ ->
                     (app_state, ret_var)
               in
-              hash_me_only
+              hash_messages_for_next_step_proof
                 { app_state
                 ; dlog_plonk_index
                 ; challenge_polynomial_commitments
@@ -500,7 +502,8 @@ let step_main :
                     bulletproof_challenges
                 } )
         in
-        ( { Types.Step.Statement.proof_state = { unfinalized_proofs; me_only }
+        ( { Types.Step.Statement.proof_state =
+              { unfinalized_proofs; me_only = messages_for_next_step_proof }
           ; pass_through
           }
           : ( (Unfinalized.t, max_proofs_verified) Vector.t

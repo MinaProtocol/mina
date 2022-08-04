@@ -426,7 +426,8 @@ let wrap
              (* TODO: Careful here... the length of
                 old_buletproof_challenges inside the me_only
                 might not be correct *)
-             Common.hash_step_me_only ~app_state:to_field_elements
+             Common.hash_messages_for_next_step_proof
+               ~app_state:to_field_elements
                (P.Base.Me_only.Step.prepare ~dlog_plonk_index
                   prev_statement.proof_state.me_only ) )
         }
@@ -435,7 +436,7 @@ let wrap
            H1.Map (P.Base.Me_only.Wrap.Prepared) (E01 (Digest.Constant))
              (struct
                let f (type n) (m : n P.Base.Me_only.Wrap.Prepared.t) =
-                 Wrap_hack.hash_dlog_me_only
+                 Wrap_hack.hash_messages_for_next_wrap_proof
                    (Vector.length m.old_bulletproof_challenges)
                    m
              end)
@@ -559,8 +560,8 @@ let wrap
           ; proof_state =
               { next_statement.proof_state with
                 me_only =
-                  Wrap_hack.hash_dlog_me_only max_proofs_verified
-                    me_only_prepared
+                  Wrap_hack.hash_messages_for_next_wrap_proof
+                    max_proofs_verified me_only_prepared
               ; deferred_values =
                   { next_statement.proof_state.deferred_values with
                     plonk =

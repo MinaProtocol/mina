@@ -47,19 +47,20 @@ let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
   |> Vector.to_list
 
 (* Hash the me only, padding first. *)
-let hash_dlog_me_only (type n) (max_proofs_verified : n Nat.t)
+let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
     (t :
       ( Tick.Curve.Affine.t
       , (_, n) Vector.t )
-      Composition_types.Wrap.Proof_state.Me_only.t ) =
+      Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
   let t =
     { t with
       old_bulletproof_challenges = pad_challenges t.old_bulletproof_challenges
     }
   in
   Tock_field_sponge.digest Tock_field_sponge.params
-    (Composition_types.Wrap.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ]) )
+    (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
+     .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ])
+    )
 
 (* Pad the me_only of a proof *)
 let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
@@ -111,15 +112,18 @@ module Checked = struct
       let s2 = full_state sponge in
       [| s0; s1; s2 |] )
 
+  let hash_constant_messages_for_next_wrap_proof =
+    hash_messages_for_next_wrap_proof
+
   (* TODO: No need to hash the entire bulletproof challenges. Could
      just hash the segment of the public input LDE corresponding to them
      that we compute when verifying the previous proof. That is a commitment
      to them. *)
-  let hash_me_only (type n) (max_proofs_verified : n Nat.t)
+  let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
       (t :
         ( Wrap_main_inputs.Inner_curve.t
         , ((Impls.Wrap.Field.t, Backend.Tock.Rounds.n) Vector.t, n) Vector.t )
-        Composition_types.Wrap.Proof_state.Me_only.t ) =
+        Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t ) =
     let open Wrap_main_inputs in
     let sponge =
       (* The sponge states we would reach if we absorbed the padding challenges *)
@@ -135,18 +139,19 @@ module Checked = struct
       }
     in
     Array.iter ~f:(Sponge.absorb sponge)
-      (Composition_types.Wrap.Proof_state.Me_only.to_field_elements
-         ~g1:Inner_curve.to_field_elements t ) ;
+      (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
+       .to_field_elements ~g1:Inner_curve.to_field_elements t ) ;
     Sponge.squeeze_field sponge
 
   (* Check that the pre-absorbing technique works. I.e., that it's consistent with
-     the actual definition of hash_dlog_me_only. *)
-  let%test_unit "hash_me_only correct" =
+     the actual definition of hash_messages_for_next_wrap_proof. *)
+  let%test_unit "hash_messages_for_next_wrap_proof correct" =
     let open Impls.Wrap in
     let test (type n) (n : n Nat.t) =
-      let me_only : _ Composition_types.Wrap.Proof_state.Me_only.t =
+      let messages_for_next_wrap_proof :
+          _ Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
         let g = Wrap_main_inputs.Inner_curve.Constant.random () in
-        { Composition_types.Wrap.Proof_state.Me_only
+        { Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
           .challenge_polynomial_commitment = g
         ; old_bulletproof_challenges =
             Vector.init n ~f:(fun _ ->
@@ -155,16 +160,16 @@ module Checked = struct
       in
       Internal_Basic.Test.test_equal ~sexp_of_t:Field.Constant.sexp_of_t
         ~equal:Field.Constant.equal
-        (Composition_types.Wrap.Proof_state.Me_only.typ
+        (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.typ
            Wrap_main_inputs.Inner_curve.typ
            (Vector.typ Field.typ Backend.Tock.Rounds.n)
            ~length:n )
         Field.typ
-        (fun t -> make_checked (fun () -> hash_me_only n t))
+        (fun t -> make_checked (fun () -> hash_messages_for_next_wrap_proof n t))
         (fun t ->
-          hash_dlog_me_only n t |> Digest.Constant.to_bits
-          |> Impls.Wrap.Field.Constant.project )
-        me_only
+          hash_constant_messages_for_next_wrap_proof n t
+          |> Digest.Constant.to_bits |> Impls.Wrap.Field.Constant.project )
+        messages_for_next_wrap_proof
     in
     test Nat.N0.n ; test Nat.N1.n ; test Nat.N2.n
 end
