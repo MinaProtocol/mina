@@ -119,16 +119,13 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) :
                       ()
               in
               let use_full_commitment = body.use_full_commitment in
-              printf "generating signature\n%!" ;
               let signature = sign_for_party ~use_full_commitment sk in
               return (Control.Signature signature)
           | Proof _ -> (
               match prover with
               | None ->
-                  printf "not generating proof\n%!" ;
                   return authorization
               | Some prover ->
-                  printf "generating proof\n%!" ;
                   let txn_stmt = Zkapp_statement.of_tree tree in
                   let handler
                       (Snarky_backendless.Request.With { request; respond }) =
@@ -139,7 +136,6 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) :
                   in
                   Control.Proof proof )
           | None_given ->
-              printf "generating neither signature nor proof\n%!" ;
               return authorization
         in
         { Party.body; authorization = authorization_with_valid_signature } )
