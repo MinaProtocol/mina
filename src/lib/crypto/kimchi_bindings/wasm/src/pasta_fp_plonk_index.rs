@@ -5,7 +5,12 @@ use crate::srs::fp::WasmFpSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex as DlogIndex;
-use mina_curves::pasta::{fp::Fp, pallas::Pallas as GAffineOther, vesta::Vesta as GAffine};
+use mina_curves::pasta::{
+    fp::Fp,
+    pallas::Pallas as GAffineOther,
+    vesta::{Vesta as GAffine, VestaParameters},
+};
+use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -72,10 +77,12 @@ pub fn caml_pasta_fp_plonk_index_create(
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
+    let mut index = DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
+    // Compute and cache the verifier index digest
+    index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
+
     // create index
-    Ok(WasmPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone()),
-    )))
+    Ok(WasmPastaFpPlonkIndex(Box::new(index)))
 }
 
 #[wasm_bindgen]

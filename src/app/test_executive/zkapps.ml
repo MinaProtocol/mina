@@ -603,6 +603,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           [%log info] "Received new snark work" ;
           Deferred.return `Continue )
     in
+    let snark_work_failure_subscription =
+      Event_router.on (event_router t) Snark_work_failed ~f:(fun _ _ ->
+          [%log error]
+            "A snark worker encountered an error while creating a proof" ;
+          Deferred.return `Continue )
+    in
     let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
         (send_zkapp ~logger node parties_create_accounts)
@@ -777,6 +783,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
+    Event_router.cancel (event_router t) snark_work_failure_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger

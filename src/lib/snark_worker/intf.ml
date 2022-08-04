@@ -107,6 +107,19 @@ module type Rpcs_versioned_S = sig
 
     module Latest = V2
   end
+
+  module Failed_to_generate_snark : sig
+    module V2 : sig
+      type query = Work.Spec.t * Signature_lib.Public_key.Compressed.t
+      [@@deriving bin_io]
+
+      type response = unit [@@deriving bin_io]
+
+      val rpc : (query, response) Rpc.Rpc.t
+    end
+
+    module Latest = V2
+  end
 end
 
 (* result of Functor.Make *)
@@ -125,6 +138,12 @@ module type S0 = sig
     module Submit_work :
       Rpc_master
         with type Master.T.query = Work.Result.t
+         and type Master.T.response = unit
+
+    module Failed_to_generate_snark :
+      Rpc_master
+        with type Master.T.query =
+          Work.Spec.t * Signature_lib.Public_key.Compressed.t
          and type Master.T.response = unit
   end
 

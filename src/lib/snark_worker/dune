@@ -9,6 +9,7 @@
    sexplib0
    async_kernel
    base
+   base.caml
    async
    core
    core_kernel.hash_heap
