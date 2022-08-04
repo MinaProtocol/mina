@@ -34,3 +34,4 @@ require (
 )
 
 replace libp2p_ipc => ../../../libp2p_ipc
+replace github.com/libp2p/go-libp2p-connmgr => ../../../external/go-libp2p-connmgr

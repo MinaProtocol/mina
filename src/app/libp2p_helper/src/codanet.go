@@ -220,6 +220,7 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 		return
 	}
 
+	logger.Warnf("triggering connection trimming because we have %d peers and our high water is %d", len(net.Peers()), info.HighWater)
 	cm.TrimOpenConns(context.Background())
 
 	if !cm.minaPeerExchange {
