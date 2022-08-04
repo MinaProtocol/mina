@@ -483,9 +483,9 @@ fi
 # Start sending transactions
 
 if $transactions; then
-  folder=$nodesfolder/fish_1
-  keyfile=$ledgerfolder/online_fish_keys/online_fish_account_1
-  pubkey=$(cat $ledgerfolder/online_fish_keys/online_fish_account_1.pub)
+  folder=$nodesfolder/fish_0
+  keyfile=$ledgerfolder/online_fish_keys/online_fish_account_0
+  pubkey=$(cat $ledgerfolder/online_fish_keys/online_fish_account_0.pub)
   rest_server="http://127.0.0.1:$(($FISH_START_PORT + 1))/graphql"
   printf "\n"
   echo "Waiting for node to be up to start sending transactions..."
