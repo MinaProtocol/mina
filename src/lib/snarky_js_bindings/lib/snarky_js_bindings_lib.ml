@@ -2819,36 +2819,33 @@ module Ledger = struct
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
   (* low-level building blocks for encoding *)
-  let field_to_binary_string (field : field_class Js.t) =
-    field |> of_js_field_unchecked
-    |> Binable.to_string (module Field.Constant)
-    |> Js.string
+  let field_to_bytes (field : field_class Js.t) =
+    field |> of_js_field_unchecked |> Binable.to_string (module Field.Constant)
 
-  let field_of_binary_string (bin_string : Js.js_string Js.t) : field_class Js.t
-      =
-    bin_string |> Js.to_string
+  let field_of_bytes bin_string : field_class Js.t =
+    bin_string
     |> Binable.of_string (module Field.Constant)
     |> to_js_field_unchecked
 
-  let binary_string_to_base58_check (bin_string : Js.js_string Js.t)
-      (version_byte : int) : Js.js_string Js.t =
+  let binary_string_to_base58_check bin_string (version_byte : int) :
+      Js.js_string Js.t =
     let module T = struct
       let version_byte = Char.of_int_exn version_byte
 
       let description = "none"
     end in
     let module B58 = Base58_check.Make (T) in
-    bin_string |> Js.to_string |> B58.encode |> Js.string
+    bin_string |> B58.encode |> Js.string
 
   let binary_string_of_base58_check (base58 : Js.js_string Js.t)
-      (version_byte : int) : Js.js_string Js.t =
+      (version_byte : int) =
     let module T = struct
       let version_byte = Char.of_int_exn version_byte
 
       let description = "none"
     end in
     let module B58 = Base58_check.Make (T) in
-    base58 |> Js.to_string |> B58.decode_exn |> Js.string
+    base58 |> Js.to_string |> B58.decode_exn
 
   let add_account_exn (l : L.t) pk (balance : string) =
     let account_id = account_id pk default_token_id_js in
@@ -3043,25 +3040,18 @@ module Ledger = struct
         val receiptChainHash = Char.to_int receipt_chain_hash
       end
     in
-    let receipt_chain_hash_to_base58 (x : field_class Js.t) : Js.js_string Js.t
-        =
-      x |> of_js_field_unchecked |> Mina_base.Receipt.Chain_hash.to_base58_check
-      |> Js.string
-    in
     static "encoding"
       (object%js
-         val fieldToBinaryString = field_to_binary_string
-
-         val fieldOfBinaryString = field_of_binary_string
-
          val toBase58 = binary_string_to_base58_check
 
          val ofBase58 = binary_string_of_base58_check
 
          val versionBytes = version_bytes
 
-         (* TODO figure out how to do in JS and remove *)
-         val receiptChainHashToBase58 = receipt_chain_hash_to_base58
+         (* these are actually implemented in JS, let's keep them here for tests *)
+         val fieldToOcamlBytes = field_to_bytes
+
+         val fieldOfOcamlBytes = field_of_bytes
       end ) ;
 
     static_method "hashPartyFromJson" hash_party ;
