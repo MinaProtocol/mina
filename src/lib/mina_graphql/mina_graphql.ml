@@ -170,15 +170,22 @@ let get_ledger_and_breadcrumb coda =
 
 module Types = struct
   open Schema
-  open Graphql_lib.Base_types
 
-  let public_key = public_key ()
+  include struct
+    open Graphql_lib.Scalars
 
-  let uint64 = uint64 ()
+    let public_key = PublicKey.typ ()
 
-  let uint32 = uint32 ()
+    let uint64 = UInt64.typ ()
 
-  let token_id = token_id ()
+    let uint32 = UInt32.typ ()
+
+    let token_id = TokenId.typ ()
+
+    let json = JSON.typ ()
+
+    let epoch_seed = EpochSeed.typ ()
+  end
 
   let account_id : (Mina_lib.t, Account_id.t option) typ =
     obj "AccountId" ~fields:(fun _ ->
@@ -189,11 +196,6 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ id -> Mina_base.Account_id.token_id id)
         ] )
-
-  let json : ('context, Yojson.Basic.t option) typ =
-    scalar "JSON" ~doc:"Arbitrary JSON" ~coerce:Fn.id
-
-  let epoch_seed = epoch_seed ()
 
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
@@ -667,7 +669,7 @@ module Types = struct
               let timestamp =
                 Mina_state.Blockchain_state.timestamp blockchain_state
               in
-              Block_time.to_string_system_time
+              Block_time.to_string_system_time_exn
                 (Mina_lib.time_controller coda)
                 timestamp )
         ; field "snarkedLedgerHash" ~typ:(non_null string)

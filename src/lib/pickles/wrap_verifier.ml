@@ -789,9 +789,26 @@ struct
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
-    Sponge.absorb sponge ft_eval1 ;
+    let plonk = map_plonk_to_field plonk in
+    let zetaw = Field.mul domain#generator plonk.zeta in
+    let sg_evals1, sg_evals2 =
+      let sg_olds =
+        Vector.map old_bulletproof_challenges ~f:(fun chals ->
+            unstage (challenge_polynomial (Vector.to_array chals)) )
+      in
+      let sg_evals pt = Vector.map sg_olds ~f:(fun f -> f pt) in
+      (sg_evals plonk.zeta, sg_evals zetaw)
+    in
     let sponge_state =
-      (* Absorb evals *)
+      (* Absorb bulletproof challenges *)
+      let challenge_digest =
+        let sponge = Sponge.create sponge_params in
+        Vector.iter old_bulletproof_challenges
+          ~f:(Vector.iter ~f:(Sponge.absorb sponge)) ;
+        Sponge.squeeze sponge
+      in
+      Sponge.absorb sponge challenge_digest ;
+      Sponge.absorb sponge ft_eval1 ;
       Sponge.absorb sponge (fst evals.public_input) ;
       Sponge.absorb sponge (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
@@ -814,8 +831,6 @@ struct
     let xi = scalar_to_field xi in
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (SC.SC.create r_actual) in
-    let plonk = map_plonk_to_field plonk in
-    let zetaw = Field.mul domain#generator plonk.zeta in
     let plonk_minimal =
       Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option
     in
@@ -853,12 +868,8 @@ struct
           in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =
-            let sg_olds =
-              Vector.map old_bulletproof_challenges ~f:(fun chals ->
-                  unstage (challenge_polynomial (Vector.to_array chals)) )
-            in
-            let combine ~ft pt x_hat (e : (Field.t array, _) Evals.In_circuit.t)
-                =
+            let combine ~ft ~sg_evals x_hat
+                (e : (Field.t array, _) Evals.In_circuit.t) =
               let a =
                 Evals.In_circuit.to_list e
                 |> List.map ~f:(function
@@ -870,8 +881,7 @@ struct
                          Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
               in
               let sg_evals =
-                Vector.map sg_olds ~f:(fun f ->
-                    [| Plonk_types.Opt.Some (f pt) |] )
+                Vector.map sg_evals ~f:(fun x -> [| Plonk_types.Opt.Some x |])
                 |> Vector.to_list
                 (* TODO: This was the code before the wrap hack was put in
                    match actual_proofs_verified with
@@ -892,8 +902,11 @@ struct
               in
               Common.combined_evaluation (module Impl) ~xi v
             in
-            combine ~ft:ft_eval0 plonk.zeta evals1.public_input evals1.evals
-            + (r * combine ~ft:ft_eval1 zetaw evals2.public_input evals2.evals)
+            combine ~ft:ft_eval0 ~sg_evals:sg_evals1 evals1.public_input
+              evals1.evals
+            + r
+              * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 evals2.public_input
+                  evals2.evals
           in
           with_label __LOC__ (fun () ->
               equal

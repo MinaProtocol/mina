@@ -208,6 +208,18 @@ module Make (Inputs : Intf.Inputs_intf) :
           (* Pause to wait for stdout to flush *)
           match%bind perform state public_key work with
           | Error e ->
+              let%bind () =
+                match%map
+                  dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+                    shutdown_on_disconnect (work, public_key) daemon_address
+                with
+                | Error e ->
+                    [%log error]
+                      "Couldn't inform the daemon about the snark work failure"
+                      ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                | Ok () ->
+                    ()
+              in
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics logger ;
