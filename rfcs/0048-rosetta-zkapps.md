@@ -64,8 +64,8 @@ Luckily this is made extremely clear by the shape of the zkApps transaction stru
 
 The following intends to be an exhaustive list of those sorts of operations:
 
-1. `Zkapps_fee_payer_dec`
-2. `Zkapps_balance_change`
+1. `Zkapp_fee_payer_dec`
+2. `Zkapp_balance_change`
 
 Note that only balance changes that correspond with the default MINA token (`token_id` = 1) should be considered as changes here.
 
