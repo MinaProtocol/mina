@@ -2819,14 +2819,6 @@ module Ledger = struct
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
   (* low-level building blocks for encoding *)
-  let field_to_bytes (field : field_class Js.t) =
-    field |> of_js_field_unchecked |> Binable.to_string (module Field.Constant)
-
-  let field_of_bytes bin_string : field_class Js.t =
-    bin_string
-    |> Binable.of_string (module Field.Constant)
-    |> to_js_field_unchecked
-
   let binary_string_to_base58_check bin_string (version_byte : int) :
       Js.js_string Js.t =
     let module T = struct
@@ -3028,8 +3020,11 @@ module Ledger = struct
     static_method "publicKeyOfString" public_key_of_string ;
     static_method "privateKeyToString" private_key_to_string ;
     static_method "privateKeyOfString" private_key_of_string ;
+
+    (* these are implemented in JS, but kept here for consistency tests *)
     static_method "fieldToBase58" field_to_base58 ;
     static_method "fieldOfBase58" field_of_base58 ;
+
     static_method "memoToBase58" memo_to_base58 ;
 
     let version_bytes =
@@ -3047,11 +3042,6 @@ module Ledger = struct
          val ofBase58 = binary_string_of_base58_check
 
          val versionBytes = version_bytes
-
-         (* these are actually implemented in JS, let's keep them here for tests *)
-         val fieldToOcamlBytes = field_to_bytes
-
-         val fieldOfOcamlBytes = field_of_bytes
       end ) ;
 
     static_method "hashPartyFromJson" hash_party ;
