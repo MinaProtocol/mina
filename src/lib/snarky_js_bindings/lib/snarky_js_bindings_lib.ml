@@ -2305,7 +2305,15 @@ module Ledger = struct
 
   type private_key = < s : scalar_class Js.t Js.prop > Js.t
 
-  type public_key = < g : group_class Js.t Js.readonly_prop > Js.t
+  (* type public_key = < g : group_class Js.t Js.readonly_prop > Js.t *)
+
+  type public_key =
+    < g :
+        < x : field_class Js.t Js.readonly_prop
+        ; isOdd : bool_class Js.t Js.readonly_prop >
+        Js.t
+        Js.readonly_prop >
+    Js.t
 
   type zkapp_account =
     < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
@@ -2448,15 +2456,16 @@ module Ledger = struct
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
 
+  (* let bool (x : Bool.t) =
+     match x with Constant y -> y | y -> Impl.As_prover.read_var y *)
+
   let public_key_checked (pk : public_key) :
       Signature_lib.Public_key.Compressed.var =
-    let x = pk##.g##.x##.value in
-    let y = pk##.g##.y##.value in
-    Signature_lib.Public_key.compress_var (x, y) |> Impl.run_checked
+    { x = pk##.g##.x##.value; is_odd = pk##.g##.isOdd##.value }
 
   let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
     { x = to_unchecked pk##.g##.x##.value
-    ; is_odd = Bigint.(test_bit (of_field (to_unchecked pk##.g##.y##.value)) 0)
+    ; is_odd = pk##.g##.isOdd##.value |> bool_constant |> Option.value_exn
     }
 
   let private_key (key : private_key) : Signature_lib.Private_key.t =
@@ -2538,9 +2547,17 @@ module Ledger = struct
           Unsigned.UInt64.to_string n |> Field.Constant.of_string |> field
       end
 
-    let public_key (pk : Signature_lib.Public_key.Compressed.t) =
-      let x, y = Signature_lib.Public_key.decompress_exn pk in
-      to_js_group (Field.constant x) (Field.constant y)
+    let public_key (pk : Signature_lib.Public_key.Compressed.t) : public_key =
+      object%js
+        val g =
+          object%js
+            val x = to_js_field_unchecked pk.x
+
+            val isOdd =
+              new%js bool_constr
+                (As_bool.of_boolean @@ Boolean.var_of_value pk.is_odd)
+          end
+      end
 
     let token_id (token_id : Mina_base.Token_id.t) =
       token_id |> Mina_base.Token_id.to_field_unsafe |> field
@@ -2590,13 +2607,8 @@ module Ledger = struct
       end
 
     let account (a : Mina_base.Account.t) : account =
-      let to_public_key pk =
-        object%js
-          val g = public_key pk
-        end
-      in
       object%js
-        val publicKey = to_public_key a.public_key
+        val publicKey = public_key a.public_key
 
         val tokenId = token_id a.token_id
 
@@ -2608,7 +2620,7 @@ module Ledger = struct
 
         val receiptChainHash = field (a.receipt_chain_hash :> Impl.field)
 
-        val delegate = option to_public_key a.delegate
+        val delegate = option public_key a.delegate
 
         val votingFor = field (a.voting_for :> Impl.field)
 
@@ -2793,7 +2805,7 @@ module Ledger = struct
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
     |> Js.string
 
-  let public_key_of_string (pk_base58 : Js.js_string Js.t) : group_class Js.t =
+  let public_key_of_string (pk_base58 : Js.js_string Js.t) : public_key =
     pk_base58 |> Js.to_string
     |> Signature_lib.Public_key.Compressed.of_base58_check_exn
     |> To_js.public_key
