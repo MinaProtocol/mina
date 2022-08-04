@@ -209,7 +209,7 @@ module Party_under_construction = struct
           | None ->
               default.proved_state
           | Some state_proved ->
-              Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.true_
+              Zkapp_basic.Or_ignore.Checked.make_unsafe Boolean.true_
                 state_proved
         in
         { default with proved_state }
