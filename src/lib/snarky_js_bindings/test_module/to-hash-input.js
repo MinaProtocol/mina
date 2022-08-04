@@ -118,7 +118,7 @@ console.log("all hash inputs are consistent! 🎉");
 shutdown();
 
 function testInput(Module, toInputOcaml, value) {
-  let json = Module.toJson(value);
+  let json = Module.toJSON(value);
   // console.log(json);
   let input1 = inputFromOcaml(toInputOcaml(JSON.stringify(json)));
   let input2 = Module.toInput(value);
