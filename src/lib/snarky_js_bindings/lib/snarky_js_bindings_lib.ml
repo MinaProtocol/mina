@@ -3033,6 +3033,12 @@ module Ledger = struct
         val tokenIdKey = Char.to_int token_id_key
 
         val receiptChainHash = Char.to_int receipt_chain_hash
+
+        val ledgerHash = Char.to_int ledger_hash
+
+        val epochSeed = Char.to_int epoch_seed
+
+        val stateHash = Char.to_int state_hash
       end
     in
     static "encoding"
