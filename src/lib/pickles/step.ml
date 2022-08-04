@@ -138,7 +138,8 @@ struct
         { t with
           statement =
             { t.statement with
-              pass_through = { t.statement.pass_through with app_state }
+              messages_for_next_step_proof =
+                { t.statement.messages_for_next_step_proof with app_state }
             }
         }
       in
@@ -215,7 +216,7 @@ struct
           , _
           , _ )
           Wrap.Statement.In_circuit.t =
-        { pass_through =
+        { messages_for_next_step_proof =
             (let to_field_elements =
                let (Typ typ) = data.public_input in
                fun x -> fst (typ.value_to_fields x)
@@ -223,7 +224,7 @@ struct
              (* TODO: Only do this hashing when necessary *)
              Common.hash_messages_for_next_step_proof
                (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
-                  statement.pass_through )
+                  statement.messages_for_next_step_proof )
                ~app_state:to_field_elements )
         ; proof_state =
             { statement.proof_state with
@@ -262,8 +263,8 @@ struct
         O.create dlog_vk
           ( Vector.map2
               (Vector.extend_exn
-                 statement.pass_through.challenge_polynomial_commitments
-                 Local_max_proofs_verified.n
+                 statement.messages_for_next_step_proof
+                   .challenge_polynomial_commitments Local_max_proofs_verified.n
                  (Lazy.force Dummy.Ipa.Wrap.sg) )
               (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
               prev_challenges
@@ -350,14 +351,15 @@ struct
         ; prev_proof_evals = t.prev_evals
         ; prev_challenge_polynomial_commitments =
             Vector.extend_exn
-              t.statement.pass_through.challenge_polynomial_commitments
-              Local_max_proofs_verified.n
+              t.statement.messages_for_next_step_proof
+                .challenge_polynomial_commitments Local_max_proofs_verified.n
               (Lazy.force Dummy.Ipa.Wrap.sg)
             (* TODO: This computation is also redone elsewhere. *)
         ; prev_challenges =
             Vector.extend_exn
-              (Vector.map t.statement.pass_through.old_bulletproof_challenges
-                 ~f:Ipa.Step.compute_challenges )
+              (Vector.map
+                 t.statement.messages_for_next_step_proof
+                   .old_bulletproof_challenges ~f:Ipa.Step.compute_challenges )
               Local_max_proofs_verified.n Dummy.Ipa.Step.challenges_computed
         ; wrap_proof =
             { opening =
@@ -654,7 +656,7 @@ struct
           k ()
       | Req.Unfinalized_proofs ->
           k (Lazy.force unfinalized_proofs_extended)
-      | Req.Pass_through ->
+      | Req.Messages_for_next_wrap_proof ->
           k (Lazy.force pass_through_padded)
       | _ -> (
           match handler with
@@ -720,7 +722,7 @@ struct
             (t.proof.openings.evals, t.proof.openings.ft_eval1)
         end )
     in
-    let pass_through =
+    let messages_for_next_wrap_proof =
       let rec go : type a a. (a, a) H2.T(P).t -> a H1.T(P.Base.Me_only.Wrap).t =
         function
         | [] ->
@@ -735,7 +737,7 @@ struct
           { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
           ; messages_for_next_step_proof = Lazy.force next_statement_me_only
           }
-      ; pass_through
+      ; messages_for_next_wrap_proof
       }
     in
     ( { P.Base.Step.proof = next_proof

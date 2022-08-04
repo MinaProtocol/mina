@@ -775,10 +775,10 @@ struct
             { proof with
               statement =
                 { proof.statement with
-                  pass_through =
+                  messages_for_next_wrap_proof =
                     pad_pass_throughs
                       (module Maxes)
-                      proof.statement.pass_through
+                      proof.statement.messages_for_next_wrap_proof
                 }
             }
           in
@@ -796,8 +796,10 @@ struct
               { proof with
                 statement =
                   { proof.statement with
-                    pass_through =
-                      { proof.statement.pass_through with app_state = () }
+                    messages_for_next_step_proof =
+                      { proof.statement.messages_for_next_step_proof with
+                        app_state = ()
+                      }
                   }
               } )
         in
@@ -1105,7 +1107,7 @@ let compile_promise :
 
     let verify ts = verify_promise ts |> Promise.to_deferred
 
-    let statement (T p : t) = p.statement.pass_through.app_state
+    let statement (T p : t) = p.statement.messages_for_next_step_proof.app_state
   end in
   (self, cache_handle, (module P), provers)
 
@@ -2178,10 +2180,10 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                 { proof with
                   statement =
                     { proof.statement with
-                      pass_through =
+                      messages_for_next_wrap_proof =
                         pad_pass_throughs
                           (module Maxes)
-                          proof.statement.pass_through
+                          proof.statement.messages_for_next_wrap_proof
                     }
                 }
               in
@@ -2220,7 +2222,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                           let f = P.Base.Me_only.Wrap.prepare
                         end)
                     in
-                    M.f prev_statement.pass_through
+                    M.f prev_statement.messages_for_next_wrap_proof
                   in
                   let prev_statement_with_hashes : _ Types.Step.Statement.t =
                     { proof_state =
@@ -2235,7 +2237,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                                  prev_statement.proof_state
                                    .messages_for_next_step_proof )
                         }
-                    ; pass_through =
+                    ; messages_for_next_wrap_proof =
                         (let module M =
                            H1.Map
                              (P.Base.Me_only.Wrap.Prepared)
@@ -2508,7 +2510,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                               sponge_digest_before_evaluations
                         ; messages_for_next_wrap_proof
                         }
-                    ; pass_through =
+                    ; messages_for_next_step_proof =
                         prev_statement.proof_state.messages_for_next_step_proof
                     }
                   in
@@ -2544,7 +2546,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                           [ input ]
                           ~return_typ:(Snarky_backendless.Typ.unit ())
                           (fun x () : unit -> wrap_main (conv x))
-                          { pass_through =
+                          { messages_for_next_step_proof =
                               prev_statement_with_hashes.proof_state
                                 .messages_for_next_step_proof
                           ; proof_state =
@@ -2591,8 +2593,10 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                 { proof with
                   statement =
                     { proof.statement with
-                      pass_through =
-                        { proof.statement.pass_through with app_state = () }
+                      messages_for_next_step_proof =
+                        { proof.statement.messages_for_next_step_proof with
+                          app_state = ()
+                        }
                     }
                 }
             in
@@ -2636,7 +2640,8 @@ let%test_module "test uncorrelated bulletproof_challenges" =
           (Lazy.force verification_key)
           ts
 
-      let statement (T p : t) = p.statement.pass_through.app_state
+      let statement (T p : t) =
+        p.statement.messages_for_next_step_proof.app_state
     end
 
     let proof_with_stmt =
@@ -3054,10 +3059,10 @@ let%test_module "test uncorrelated deferred b" =
                 { proof with
                   statement =
                     { proof.statement with
-                      pass_through =
+                      messages_for_next_wrap_proof =
                         pad_pass_throughs
                           (module Maxes)
-                          proof.statement.pass_through
+                          proof.statement.messages_for_next_wrap_proof
                     }
                 }
               in
@@ -3096,7 +3101,7 @@ let%test_module "test uncorrelated deferred b" =
                           let f = P.Base.Me_only.Wrap.prepare
                         end)
                     in
-                    M.f prev_statement.pass_through
+                    M.f prev_statement.messages_for_next_wrap_proof
                   in
                   let prev_statement_with_hashes : _ Types.Step.Statement.t =
                     { proof_state =
@@ -3111,7 +3116,7 @@ let%test_module "test uncorrelated deferred b" =
                                  prev_statement.proof_state
                                    .messages_for_next_step_proof )
                         }
-                    ; pass_through =
+                    ; messages_for_next_wrap_proof =
                         (let module M =
                            H1.Map
                              (P.Base.Me_only.Wrap.Prepared)
@@ -3350,7 +3355,7 @@ let%test_module "test uncorrelated deferred b" =
                               sponge_digest_before_evaluations
                         ; messages_for_next_wrap_proof
                         }
-                    ; pass_through =
+                    ; messages_for_next_step_proof =
                         prev_statement.proof_state.messages_for_next_step_proof
                     }
                   in
@@ -3386,7 +3391,7 @@ let%test_module "test uncorrelated deferred b" =
                           [ input ]
                           ~return_typ:(Snarky_backendless.Typ.unit ())
                           (fun x () : unit -> wrap_main (conv x))
-                          { pass_through =
+                          { messages_for_next_step_proof =
                               prev_statement_with_hashes.proof_state
                                 .messages_for_next_step_proof
                           ; proof_state =
@@ -3433,8 +3438,10 @@ let%test_module "test uncorrelated deferred b" =
                 { proof with
                   statement =
                     { proof.statement with
-                      pass_through =
-                        { proof.statement.pass_through with app_state = () }
+                      messages_for_next_step_proof =
+                        { proof.statement.messages_for_next_step_proof with
+                          app_state = ()
+                        }
                     }
                 }
             in
@@ -3478,7 +3485,8 @@ let%test_module "test uncorrelated deferred b" =
           (Lazy.force verification_key)
           ts
 
-      let statement (T p : t) = p.statement.pass_through.app_state
+      let statement (T p : t) =
+        p.statement.messages_for_next_step_proof.app_state
     end
 
     let proof_with_stmt =

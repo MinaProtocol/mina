@@ -406,14 +406,14 @@ let wrap
         , max_proofs_verified )
         Vector.t )
       P.Base.Step.t ) =
-  let prev_me_only =
+  let messages_for_next_wrap_proof =
     let module M =
       H1.Map (P.Base.Me_only.Wrap) (P.Base.Me_only.Wrap.Prepared)
         (struct
           let f = P.Base.Me_only.Wrap.prepare
         end)
     in
-    M.f prev_statement.pass_through
+    M.f prev_statement.messages_for_next_wrap_proof
   in
   let prev_statement_with_hashes : _ Types.Step.Statement.t =
     { proof_state =
@@ -431,7 +431,7 @@ let wrap
                (P.Base.Me_only.Step.prepare ~dlog_plonk_index
                   prev_statement.proof_state.messages_for_next_step_proof ) )
         }
-    ; pass_through =
+    ; messages_for_next_wrap_proof =
         (let module M =
            H1.Map (P.Base.Me_only.Wrap.Prepared) (E01 (Digest.Constant))
              (struct
@@ -442,7 +442,8 @@ let wrap
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in
-        V.f Max_local_max_proof_verifieds.length (M.f prev_me_only) )
+        V.f Max_local_max_proof_verifieds.length
+          (M.f messages_for_next_wrap_proof) )
     }
   in
   let handler (Snarky_backendless.Request.With { request; respond }) =
@@ -460,7 +461,9 @@ let wrap
             end)
         in
         let module V = H1.To_vector (Step_acc) in
-        k (V.f Max_local_max_proof_verifieds.length (M.f prev_me_only))
+        k
+          (V.f Max_local_max_proof_verifieds.length
+             (M.f messages_for_next_wrap_proof) )
     | Old_bulletproof_challenges ->
         let module M =
           H1.Map (P.Base.Me_only.Wrap.Prepared) (Challenges_vector.Constant)
@@ -469,7 +472,7 @@ let wrap
                 t.old_bulletproof_challenges
             end)
         in
-        k (M.f prev_me_only)
+        k (M.f messages_for_next_wrap_proof)
     | Messages ->
         k proof.messages
     | Openings_proof ->
@@ -506,7 +509,8 @@ let wrap
     in
     let module V = H1.To_vector (Tick.Curve.Affine) in
     Vector.trim
-      (V.f Max_local_max_proof_verifieds.length (M.f prev_me_only))
+      (V.f Max_local_max_proof_verifieds.length
+         (M.f messages_for_next_wrap_proof) )
       lte
   in
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
@@ -528,7 +532,8 @@ let wrap
             Digest.Constant.of_tick_field sponge_digest_before_evaluations
         ; messages_for_next_wrap_proof
         }
-    ; pass_through = prev_statement.proof_state.messages_for_next_step_proof
+    ; messages_for_next_step_proof =
+        prev_statement.proof_state.messages_for_next_step_proof
     }
   in
   let me_only_prepared =
@@ -558,7 +563,7 @@ let wrap
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler )
-          { pass_through =
+          { messages_for_next_step_proof =
               prev_statement_with_hashes.proof_state
                 .messages_for_next_step_proof
           ; proof_state =

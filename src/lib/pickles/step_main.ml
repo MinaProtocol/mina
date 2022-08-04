@@ -32,8 +32,8 @@ let verify_one
      ; prev_challenge_polynomial_commitments
      } :
       _ Per_proof_witness.t ) (d : _ Types_map.For_step.t)
-    (pass_through : Digest.t) (unfinalized : Unfinalized.t) (should_verify : B.t)
-    : _ Vector.t * B.t =
+    (messages_for_next_wrap_proof : Digest.t) (unfinalized : Unfinalized.t)
+    (should_verify : B.t) : _ Vector.t * B.t =
   Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
   let finalized, chals =
     with_label __LOC__ (fun () ->
@@ -79,9 +79,9 @@ let verify_one
             ; old_bulletproof_challenges = prev_challenges
             } )
     in
-    { Types.Wrap.Statement.pass_through = prev_messages_for_next_step_proof
-    ; proof_state =
-        { proof_state with messages_for_next_wrap_proof = pass_through }
+    { Types.Wrap.Statement.messages_for_next_step_proof =
+        prev_messages_for_next_step_proof
+    ; proof_state = { proof_state with messages_for_next_wrap_proof }
     }
   in
   let verified =
@@ -354,9 +354,9 @@ let step_main :
                       ~uses_lookup )
                   (Vector.extend lookup_usage lte Max_proofs_verified.n No) ) )
             ~request:(fun () -> Req.Unfinalized_proofs)
-        and pass_through =
+        and messages_for_next_wrap_proof =
           exists (Vector.typ Digest.typ Max_proofs_verified.n)
-            ~request:(fun () -> Req.Pass_through)
+            ~request:(fun () -> Req.Messages_for_next_wrap_proof)
         in
         let prevs =
           (* Inject the app-state values into the per-proof witnesses. *)
@@ -409,7 +409,8 @@ let step_main :
                 let pass_throughs =
                   with_label "pass_throughs" (fun () ->
                       let module V = H1.Of_vector (Digest) in
-                      V.f proofs_verified (Vector.trim pass_through lte) )
+                      V.f proofs_verified
+                        (Vector.trim messages_for_next_wrap_proof lte) )
                 and unfinalized_proofs =
                   let module H = H1.Of_vector (Unfinalized) in
                   H.f proofs_verified (Vector.trim unfinalized_proofs lte)
@@ -505,7 +506,7 @@ let step_main :
         in
         ( { Types.Step.Statement.proof_state =
               { unfinalized_proofs; messages_for_next_step_proof }
-          ; pass_through
+          ; messages_for_next_wrap_proof
           }
           : ( (Unfinalized.t, max_proofs_verified) Vector.t
             , Field.t

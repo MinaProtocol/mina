@@ -63,7 +63,8 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.start __LOC__ ;
         let statement =
           { statement with
-            pass_through = { statement.pass_through with app_state }
+            messages_for_next_step_proof =
+              { statement.messages_for_next_step_proof with app_state }
           }
         in
         let open Types.Wrap.Proof_state in
@@ -163,7 +164,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let old_bulletproof_challenges =
           Vector.map ~f:Ipa.Step.compute_challenges
-            statement.pass_through.old_bulletproof_challenges
+            statement.messages_for_next_step_proof.old_bulletproof_challenges
         in
         (let challenges_digest =
            let open Tick_field_sponge.Field in
@@ -256,12 +257,14 @@ let verify_heterogenous (ts : Instance.t list) =
               plonk
             ->
            let prepared_statement : _ Types.Wrap.Statement.In_circuit.t =
-             { pass_through =
+             { messages_for_next_step_proof =
                  Common.hash_messages_for_next_step_proof
                    ~app_state:A_value.to_field_elements
                    (Reduced_me_only.Step.prepare
                       ~dlog_plonk_index:key.commitments
-                      { t.statement.pass_through with app_state } )
+                      { t.statement.messages_for_next_step_proof with
+                        app_state
+                      } )
              ; proof_state =
                  { t.statement.proof_state with
                    deferred_values =
@@ -289,7 +292,7 @@ let verify_heterogenous (ts : Instance.t list) =
                        ; commitment = g
                        } )
                      (Vector.extend_exn
-                        t.statement.pass_through
+                        t.statement.messages_for_next_step_proof
                           .challenge_polynomial_commitments
                         Max_proofs_verified.n
                         (Lazy.force Dummy.Ipa.Wrap.sg) )

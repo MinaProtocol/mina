@@ -156,7 +156,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                     Vector.init h ~f:(fun _ -> Dummy.Ipa.Wrap.challenges)
                 }
             }
-        ; pass_through =
+        ; messages_for_next_step_proof =
             { app_state = ()
             ; old_bulletproof_challenges =
                 (* Not sure if this should be w or h honestly ...*)
@@ -226,20 +226,24 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   let to_repr (T t) : Repr.t =
     let lte =
       Nat.lte_exn
-        (Vector.length t.statement.pass_through.challenge_polynomial_commitments)
+        (Vector.length
+           t.statement.messages_for_next_step_proof
+             .challenge_polynomial_commitments )
         W.n
     in
     { t with
       statement =
         { t.statement with
-          pass_through =
-            { t.statement.pass_through with
+          messages_for_next_step_proof =
+            { t.statement.messages_for_next_step_proof with
               challenge_polynomial_commitments =
                 At_most.of_vector
-                  t.statement.pass_through.challenge_polynomial_commitments lte
+                  t.statement.messages_for_next_step_proof
+                    .challenge_polynomial_commitments lte
             ; old_bulletproof_challenges =
                 At_most.of_vector
-                  t.statement.pass_through.old_bulletproof_challenges lte
+                  t.statement.messages_for_next_step_proof
+                    .old_bulletproof_challenges lte
             }
         }
     }
@@ -247,10 +251,12 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   let of_repr (r : Repr.t) : t =
     let (Vector.T challenge_polynomial_commitments) =
       At_most.to_vector
-        r.statement.pass_through.challenge_polynomial_commitments
+        r.statement.messages_for_next_step_proof
+          .challenge_polynomial_commitments
     in
     let (Vector.T old_bulletproof_challenges) =
-      At_most.to_vector r.statement.pass_through.old_bulletproof_challenges
+      At_most.to_vector
+        r.statement.messages_for_next_step_proof.old_bulletproof_challenges
     in
     let T =
       Nat.eq_exn
@@ -261,8 +267,8 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
       { r with
         statement =
           { r.statement with
-            pass_through =
-              { r.statement.pass_through with
+            messages_for_next_step_proof =
+              { r.statement.messages_for_next_step_proof with
                 challenge_polynomial_commitments
               ; old_bulletproof_challenges
               }

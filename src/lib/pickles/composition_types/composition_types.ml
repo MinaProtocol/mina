@@ -559,7 +559,7 @@ module Wrap = struct
              , 'fp
              , 'messages_for_next_wrap_proof
              , 'digest
-             , 'pass_through
+             , 'messages_for_next_step_proof
              , 'bp_chals
              , 'index )
              t =
@@ -572,7 +572,7 @@ module Wrap = struct
               , 'bp_chals
               , 'index )
               Proof_state.Stable.V1.t
-          ; pass_through : 'pass_through
+          ; messages_for_next_step_proof : 'messages_for_next_step_proof
           }
         [@@deriving compare, yojson, sexp, hash, equal]
       end
@@ -587,7 +587,7 @@ module Wrap = struct
                , 'fp
                , 'messages_for_next_wrap_proof
                , 'digest
-               , 'pass_through
+               , 'messages_for_next_step_proof
                , 'bp_chals
                , 'index )
                t =
@@ -598,7 +598,7 @@ module Wrap = struct
             , 'fp
             , 'messages_for_next_wrap_proof
             , 'digest
-            , 'pass_through
+            , 'messages_for_next_step_proof
             , 'bp_chals
             , 'index )
             Stable.V1.t
@@ -614,7 +614,7 @@ module Wrap = struct
            , 'lookup_opt
            , 'messages_for_next_wrap_proof
            , 'digest
-           , 'pass_through
+           , 'messages_for_next_step_proof
            , 'bp_chals
            , 'index )
            t =
@@ -627,7 +627,7 @@ module Wrap = struct
         , 'fp
         , 'messages_for_next_wrap_proof
         , 'digest
-        , 'pass_through
+        , 'messages_for_next_step_proof
         , 'bp_chals
         , 'index )
         Stable.Latest.t
@@ -677,8 +677,8 @@ module Wrap = struct
                ; messages_for_next_wrap_proof
                  (* messages_for_next_wrap_proof is represented as a digest (and then unhashed) inside the circuit *)
                }
-           ; pass_through
-             (* pass_through is represented as a digest inside the circuit *)
+           ; messages_for_next_step_proof
+             (* messages_for_next_step_proof is represented as a digest inside the circuit *)
            } :
             _ t ) ~option_map =
         let open Vector in
@@ -692,7 +692,7 @@ module Wrap = struct
         let digest =
           [ sponge_digest_before_evaluations
           ; messages_for_next_wrap_proof
-          ; pass_through
+          ; messages_for_next_step_proof
           ]
         in
         let index = [ branch_data ] in
@@ -734,7 +734,7 @@ module Wrap = struct
         let [ alpha; zeta; xi ] = scalar_challenge in
         let [ sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof
-            ; pass_through
+            ; messages_for_next_step_proof
             ] =
           digest
         in
@@ -770,7 +770,7 @@ module Wrap = struct
             ; sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof
             }
-        ; pass_through
+        ; messages_for_next_step_proof
         }
     end
 
@@ -1126,10 +1126,13 @@ module Step = struct
   end
 
   module Statement = struct
-    type ('unfinalized_proofs, 'messages_for_next_step_proof, 'pass_through) t =
+    type ( 'unfinalized_proofs
+         , 'messages_for_next_step_proof
+         , 'messages_for_next_wrap_proof )
+         t =
       { proof_state :
           ('unfinalized_proofs, 'messages_for_next_step_proof) Proof_state.t
-      ; pass_through : 'pass_through
+      ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
             (** The component of the proof accumulation state that is only computed on by the
         "wrapping" proof system, and that can be handled opaquely by any "step" circuits. *)
       }
@@ -1137,26 +1140,28 @@ module Step = struct
 
     let to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
-        ; pass_through
+        ; messages_for_next_wrap_proof
         } ~option_map =
       let open Hlist.HlistId in
       [ Vector.map unfinalized_proofs
           ~f:(Proof_state.Per_proof.In_circuit.to_data ~option_map)
       ; messages_for_next_step_proof
-      ; pass_through
+      ; messages_for_next_wrap_proof
       ]
 
     let of_data
         Hlist.HlistId.
-          [ unfinalized_proofs; messages_for_next_step_proof; pass_through ]
-        ~option_map =
+          [ unfinalized_proofs
+          ; messages_for_next_step_proof
+          ; messages_for_next_wrap_proof
+          ] ~option_map =
       { proof_state =
           { unfinalized_proofs =
               Vector.map unfinalized_proofs
                 ~f:(Proof_state.Per_proof.In_circuit.of_data ~option_map)
           ; messages_for_next_step_proof
           }
-      ; pass_through
+      ; messages_for_next_wrap_proof
       }
 
     let spec impl proofs_verified bp_log2 lookup =
