@@ -80,7 +80,8 @@ let verify_one
             } )
     in
     { Types.Wrap.Statement.pass_through = prev_messages_for_next_step_proof
-    ; proof_state = { proof_state with me_only = pass_through }
+    ; proof_state =
+        { proof_state with messages_for_next_wrap_proof = pass_through }
     }
   in
   let verified =
@@ -503,7 +504,7 @@ let step_main :
                 } )
         in
         ( { Types.Step.Statement.proof_state =
-              { unfinalized_proofs; me_only = messages_for_next_step_proof }
+              { unfinalized_proofs; messages_for_next_step_proof }
           ; pass_through
           }
           : ( (Unfinalized.t, max_proofs_verified) Vector.t

@@ -197,7 +197,7 @@ let wrap_main
                ; bulletproof_challenges
                }
            ; sponge_digest_before_evaluations
-           ; me_only = messages_for_next_wrap_proof_digest
+           ; messages_for_next_wrap_proof = messages_for_next_wrap_proof_digest
            }
        ; pass_through
        } :

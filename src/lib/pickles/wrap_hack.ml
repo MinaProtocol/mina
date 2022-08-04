@@ -62,7 +62,7 @@ let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
      .to_field_elements t ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [ x; y ])
     )
 
-(* Pad the me_only of a proof *)
+(* Pad the messages_for_next_wrap_proof of a proof *)
 let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
     Proof.Proofs_verified_max.t =
   T
@@ -71,11 +71,12 @@ let pad_proof (type mlmb) (T p : (mlmb, _) Proof.t) :
         { p.statement with
           proof_state =
             { p.statement.proof_state with
-              me_only =
-                { p.statement.proof_state.me_only with
+              messages_for_next_wrap_proof =
+                { p.statement.proof_state.messages_for_next_wrap_proof with
                   old_bulletproof_challenges =
                     pad_vector
-                      p.statement.proof_state.me_only.old_bulletproof_challenges
+                      p.statement.proof_state.messages_for_next_wrap_proof
+                        .old_bulletproof_challenges
                       ~dummy:Dummy.Ipa.Wrap.challenges
                 }
             }

@@ -201,7 +201,8 @@ struct
       let prev_challenges =
         (* TODO: This is redone in the call to Wrap_reduced_me_only.prepare *)
         Vector.map ~f:Ipa.Wrap.compute_challenges
-          statement.proof_state.me_only.old_bulletproof_challenges
+          statement.proof_state.messages_for_next_wrap_proof
+            .old_bulletproof_challenges
       in
       let prev_statement_with_hashes :
           ( _
@@ -242,12 +243,12 @@ struct
                             } )
                     }
                 }
-            ; me_only =
+            ; messages_for_next_wrap_proof =
                 Wrap_hack.hash_messages_for_next_wrap_proof
                   Local_max_proofs_verified.n
                   { old_bulletproof_challenges = prev_challenges
                   ; challenge_polynomial_commitment =
-                      statement.proof_state.me_only
+                      statement.proof_state.messages_for_next_wrap_proof
                         .challenge_polynomial_commitment
                   }
             }
@@ -343,7 +344,9 @@ struct
       let witness : _ Per_proof_witness.Constant.No_app_state.t =
         { app_state = ()
         ; proof_state =
-            { prev_statement_with_hashes.proof_state with me_only = () }
+            { prev_statement_with_hashes.proof_state with
+              messages_for_next_wrap_proof = ()
+            }
         ; prev_proof_evals = t.prev_evals
         ; prev_challenge_polynomial_commitments =
             Vector.extend_exn
@@ -628,7 +631,7 @@ struct
       lazy
         (pad
            (Vector.map (Option.value_exn !statements_with_hashes) ~f:(fun s ->
-                s.proof_state.me_only ) )
+                s.proof_state.messages_for_next_wrap_proof ) )
            Maxes.maxes Maxes.length )
     in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
@@ -668,7 +671,8 @@ struct
                type res = Tick.Curve.Affine.t
 
                let f (T t : _ P.t) =
-                 t.statement.proof_state.me_only.challenge_polynomial_commitment
+                 t.statement.proof_state.messages_for_next_wrap_proof
+                   .challenge_polynomial_commitment
              end )
          in
          (* emphatically NOT padded with dummies *)
@@ -722,14 +726,14 @@ struct
         | [] ->
             []
         | T t :: tl ->
-            t.statement.proof_state.me_only :: go tl
+            t.statement.proof_state.messages_for_next_wrap_proof :: go tl
       in
       go (Option.value_exn !prev_proofs)
     in
     let next_statement : _ Types.Step.Statement.t =
       { proof_state =
           { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
-          ; me_only = Lazy.force next_statement_me_only
+          ; messages_for_next_step_proof = Lazy.force next_statement_me_only
           }
       ; pass_through
       }

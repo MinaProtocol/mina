@@ -235,7 +235,8 @@ let verify_heterogenous (ts : Instance.t list) =
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
       (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
-           ( t.statement.proof_state.me_only.challenge_polynomial_commitment
+           ( t.statement.proof_state.messages_for_next_wrap_proof
+               .challenge_polynomial_commitment
            , Ipa.Step.compute_challenges
                t.statement.proof_state.deferred_values.bulletproof_challenges ) )
       )
@@ -265,11 +266,11 @@ let verify_heterogenous (ts : Instance.t list) =
                  { t.statement.proof_state with
                    deferred_values =
                      { t.statement.proof_state.deferred_values with plonk }
-                 ; me_only =
+                 ; messages_for_next_wrap_proof =
                      Wrap_hack.hash_messages_for_next_wrap_proof
                        Max_proofs_verified.n
                        (Reduced_me_only.Wrap.prepare
-                          t.statement.proof_state.me_only )
+                          t.statement.proof_state.messages_for_next_wrap_proof )
                  }
              }
            in
@@ -292,8 +293,8 @@ let verify_heterogenous (ts : Instance.t list) =
                           .challenge_polynomial_commitments
                         Max_proofs_verified.n
                         (Lazy.force Dummy.Ipa.Wrap.sg) )
-                     t.statement.proof_state.me_only.old_bulletproof_challenges ) )
-           ) ) )
+                     t.statement.proof_state.messages_for_next_wrap_proof
+                       .old_bulletproof_challenges ) ) ) ) )
   in
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   match result () with

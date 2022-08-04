@@ -2225,14 +2225,15 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                   let prev_statement_with_hashes : _ Types.Step.Statement.t =
                     { proof_state =
                         { prev_statement.proof_state with
-                          me_only =
+                          messages_for_next_step_proof =
                             (* TODO: Careful here... the length of
                                old_buletproof_challenges inside the me_only
                                might not be correct *)
                             Common.hash_messages_for_next_step_proof
                               ~app_state:to_field_elements
                               (P.Base.Me_only.Step.prepare ~dlog_plonk_index
-                                 prev_statement.proof_state.me_only )
+                                 prev_statement.proof_state
+                                   .messages_for_next_step_proof )
                         }
                     ; pass_through =
                         (let module M =
@@ -2262,7 +2263,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                   in
                   let prev_challenges =
                     Vector.map ~f:Ipa.Step.compute_challenges
-                      prev_statement.proof_state.me_only
+                      prev_statement.proof_state.messages_for_next_step_proof
                         .old_bulletproof_challenges
                   in
                   let actual_proofs_verified = Vector.length prev_challenges in
@@ -2474,7 +2475,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                             step_vk.domain.log_size_of_group
                       }
                     in
-                    let me_only : _ P.Base.Me_only.Wrap.t =
+                    let messages_for_next_wrap_proof : _ P.Base.Me_only.Wrap.t =
                       { challenge_polynomial_commitment = sg_new
                       ; old_bulletproof_challenges =
                           Vector.map
@@ -2505,14 +2506,15 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                         ; sponge_digest_before_evaluations =
                             Digest.Constant.of_tick_field
                               sponge_digest_before_evaluations
-                        ; me_only
+                        ; messages_for_next_wrap_proof
                         }
-                    ; pass_through = prev_statement.proof_state.me_only
+                    ; pass_through =
+                        prev_statement.proof_state.messages_for_next_step_proof
                     }
                   in
                   let me_only_prepared =
                     P.Base.Me_only.Wrap.prepare
-                      next_statement.proof_state.me_only
+                      next_statement.proof_state.messages_for_next_wrap_proof
                   in
                   let%map.Promise next_proof =
                     let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
@@ -2527,7 +2529,8 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                               ~message:
                                 ( Vector.map2
                                     (Vector.extend_exn
-                                       prev_statement.proof_state.me_only
+                                       prev_statement.proof_state
+                                         .messages_for_next_step_proof
                                          .challenge_polynomial_commitments
                                        max_proofs_verified
                                        (Lazy.force Dummy.Ipa.Wrap.sg) )
@@ -2542,10 +2545,11 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                           ~return_typ:(Snarky_backendless.Typ.unit ())
                           (fun x () : unit -> wrap_main (conv x))
                           { pass_through =
-                              prev_statement_with_hashes.proof_state.me_only
+                              prev_statement_with_hashes.proof_state
+                                .messages_for_next_step_proof
                           ; proof_state =
                               { next_statement.proof_state with
-                                me_only =
+                                messages_for_next_wrap_proof =
                                   Wrap_hack.hash_messages_for_next_wrap_proof
                                     max_proofs_verified me_only_prepared
                               ; deferred_values =
@@ -3097,14 +3101,15 @@ let%test_module "test uncorrelated deferred b" =
                   let prev_statement_with_hashes : _ Types.Step.Statement.t =
                     { proof_state =
                         { prev_statement.proof_state with
-                          me_only =
+                          messages_for_next_step_proof =
                             (* TODO: Careful here... the length of
                                old_buletproof_challenges inside the me_only
                                might not be correct *)
                             Common.hash_messages_for_next_step_proof
                               ~app_state:to_field_elements
                               (P.Base.Me_only.Step.prepare ~dlog_plonk_index
-                                 prev_statement.proof_state.me_only )
+                                 prev_statement.proof_state
+                                   .messages_for_next_step_proof )
                         }
                     ; pass_through =
                         (let module M =
@@ -3134,7 +3139,7 @@ let%test_module "test uncorrelated deferred b" =
                   in
                   let prev_challenges =
                     Vector.map ~f:Ipa.Step.compute_challenges
-                      prev_statement.proof_state.me_only
+                      prev_statement.proof_state.messages_for_next_step_proof
                         .old_bulletproof_challenges
                   in
                   let actual_proofs_verified = Vector.length prev_challenges in
@@ -3311,7 +3316,7 @@ let%test_module "test uncorrelated deferred b" =
                             step_vk.domain.log_size_of_group
                       }
                     in
-                    let me_only : _ P.Base.Me_only.Wrap.t =
+                    let messages_for_next_wrap_proof : _ P.Base.Me_only.Wrap.t =
                       { challenge_polynomial_commitment =
                           proof.openings.proof.challenge_polynomial_commitment
                       ; old_bulletproof_challenges =
@@ -3343,14 +3348,15 @@ let%test_module "test uncorrelated deferred b" =
                         ; sponge_digest_before_evaluations =
                             Digest.Constant.of_tick_field
                               sponge_digest_before_evaluations
-                        ; me_only
+                        ; messages_for_next_wrap_proof
                         }
-                    ; pass_through = prev_statement.proof_state.me_only
+                    ; pass_through =
+                        prev_statement.proof_state.messages_for_next_step_proof
                     }
                   in
                   let me_only_prepared =
                     P.Base.Me_only.Wrap.prepare
-                      next_statement.proof_state.me_only
+                      next_statement.proof_state.messages_for_next_wrap_proof
                   in
                   let%map.Promise next_proof =
                     let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
@@ -3365,7 +3371,8 @@ let%test_module "test uncorrelated deferred b" =
                               ~message:
                                 ( Vector.map2
                                     (Vector.extend_exn
-                                       prev_statement.proof_state.me_only
+                                       prev_statement.proof_state
+                                         .messages_for_next_step_proof
                                          .challenge_polynomial_commitments
                                        max_proofs_verified
                                        (Lazy.force Dummy.Ipa.Wrap.sg) )
@@ -3380,10 +3387,11 @@ let%test_module "test uncorrelated deferred b" =
                           ~return_typ:(Snarky_backendless.Typ.unit ())
                           (fun x () : unit -> wrap_main (conv x))
                           { pass_through =
-                              prev_statement_with_hashes.proof_state.me_only
+                              prev_statement_with_hashes.proof_state
+                                .messages_for_next_step_proof
                           ; proof_state =
                               { next_statement.proof_state with
-                                me_only =
+                                messages_for_next_wrap_proof =
                                   Wrap_hack.hash_messages_for_next_wrap_proof
                                     max_proofs_verified me_only_prepared
                               ; deferred_values =

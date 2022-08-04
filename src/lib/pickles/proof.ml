@@ -150,7 +150,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 }
             ; sponge_digest_before_evaluations =
                 Digest.Constant.of_tock_field Tock.Field.zero
-            ; me_only =
+            ; messages_for_next_wrap_proof =
                 { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
                 ; old_bulletproof_challenges =
                     Vector.init h ~f:(fun _ -> Dummy.Ipa.Wrap.challenges)

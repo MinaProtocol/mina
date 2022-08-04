@@ -418,7 +418,7 @@ let wrap
   let prev_statement_with_hashes : _ Types.Step.Statement.t =
     { proof_state =
         { prev_statement.proof_state with
-          me_only =
+          messages_for_next_step_proof =
             (let to_field_elements =
                let (Typ typ) = typ in
                fun x -> fst (typ.value_to_fields x)
@@ -429,7 +429,7 @@ let wrap
              Common.hash_messages_for_next_step_proof
                ~app_state:to_field_elements
                (P.Base.Me_only.Step.prepare ~dlog_plonk_index
-                  prev_statement.proof_state.me_only ) )
+                  prev_statement.proof_state.messages_for_next_step_proof ) )
         }
     ; pass_through =
         (let module M =
@@ -488,7 +488,8 @@ let wrap
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges
-      prev_statement.proof_state.me_only.old_bulletproof_challenges
+      prev_statement.proof_state.messages_for_next_step_proof
+        .old_bulletproof_challenges
   in
   let actual_proofs_verified = Vector.length prev_challenges in
   let lte =
@@ -513,7 +514,7 @@ let wrap
       ~actual_proofs_verified
   in
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
-    let me_only : _ P.Base.Me_only.Wrap.t =
+    let messages_for_next_wrap_proof : _ P.Base.Me_only.Wrap.t =
       { challenge_polynomial_commitment =
           proof.openings.proof.challenge_polynomial_commitment
       ; old_bulletproof_challenges =
@@ -525,13 +526,14 @@ let wrap
         { deferred_values
         ; sponge_digest_before_evaluations =
             Digest.Constant.of_tick_field sponge_digest_before_evaluations
-        ; me_only
+        ; messages_for_next_wrap_proof
         }
-    ; pass_through = prev_statement.proof_state.me_only
+    ; pass_through = prev_statement.proof_state.messages_for_next_step_proof
     }
   in
   let me_only_prepared =
-    P.Base.Me_only.Wrap.prepare next_statement.proof_state.me_only
+    P.Base.Me_only.Wrap.prepare
+      next_statement.proof_state.messages_for_next_wrap_proof
   in
   let%map.Promise next_proof =
     let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
@@ -543,7 +545,7 @@ let wrap
               ~message:
                 ( Vector.map2
                     (Vector.extend_exn
-                       prev_statement.proof_state.me_only
+                       prev_statement.proof_state.messages_for_next_step_proof
                          .challenge_polynomial_commitments max_proofs_verified
                        (Lazy.force Dummy.Ipa.Wrap.sg) )
                     me_only_prepared.old_bulletproof_challenges
@@ -556,10 +558,12 @@ let wrap
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
             Impls.Wrap.handle (fun () : unit -> wrap_main (conv x)) handler )
-          { pass_through = prev_statement_with_hashes.proof_state.me_only
+          { pass_through =
+              prev_statement_with_hashes.proof_state
+                .messages_for_next_step_proof
           ; proof_state =
               { next_statement.proof_state with
-                me_only =
+                messages_for_next_wrap_proof =
                   Wrap_hack.hash_messages_for_next_wrap_proof
                     max_proofs_verified me_only_prepared
               ; deferred_values =

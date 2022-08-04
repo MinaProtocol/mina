@@ -352,7 +352,7 @@ module Wrap = struct
         type ( 'plonk
              , 'scalar_challenge
              , 'fp
-             , 'me_only
+             , 'messages_for_next_wrap_proof
              , 'digest
              , 'bp_chals
              , 'index )
@@ -365,7 +365,7 @@ module Wrap = struct
               , 'index )
               Deferred_values.Stable.V1.t
           ; sponge_digest_before_evaluations : 'digest
-          ; me_only : 'me_only
+          ; messages_for_next_wrap_proof : 'messages_for_next_wrap_proof
                 (** Parts of the statement not needed by the other circuit. Represented as a hash inside the
               circuit which is then "unhashed". *)
           }
@@ -378,7 +378,7 @@ module Wrap = struct
            , 'scalar_challenge
            , 'scalar_challenge_opt
            , 'fp
-           , 'me_only
+           , 'messages_for_next_wrap_proof
            , 'digest
            , 'bp_chals
            , 'index )
@@ -386,7 +386,7 @@ module Wrap = struct
         ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
         , 'scalar_challenge
         , 'fp
-        , 'me_only
+        , 'messages_for_next_wrap_proof
         , 'digest
         , 'bp_chals
         , 'index )
@@ -399,7 +399,7 @@ module Wrap = struct
            , 'scalar_challenge
            , 'fp
            , 'lookup_opt
-           , 'me_only
+           , 'messages_for_next_wrap_proof
            , 'digest
            , 'bp_chals
            , 'index )
@@ -411,7 +411,7 @@ module Wrap = struct
           Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
         , 'fp
-        , 'me_only
+        , 'messages_for_next_wrap_proof
         , 'digest
         , 'bp_chals
         , 'index )
@@ -423,13 +423,13 @@ module Wrap = struct
       let typ (type f fp)
           (impl : (module Snarky_backendless.Snark_intf.Run with type field = f))
           ~lookup ~dummy_scalar ~dummy_scalar_challenge ~challenge
-          ~scalar_challenge (fp : (fp, _, f) Snarky_backendless.Typ.t) me_only
-          digest index =
+          ~scalar_challenge (fp : (fp, _, f) Snarky_backendless.Typ.t)
+          messages_for_next_wrap_proof digest index =
         Snarky_backendless.Typ.of_hlistable
           [ Deferred_values.In_circuit.typ impl ~lookup ~dummy_scalar
               ~dummy_scalar_challenge ~challenge ~scalar_challenge fp index
           ; digest
-          ; me_only
+          ; messages_for_next_wrap_proof
           ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
@@ -557,7 +557,7 @@ module Wrap = struct
         type ( 'plonk
              , 'scalar_challenge
              , 'fp
-             , 'me_only
+             , 'messages_for_next_wrap_proof
              , 'digest
              , 'pass_through
              , 'bp_chals
@@ -567,7 +567,7 @@ module Wrap = struct
               ( 'plonk
               , 'scalar_challenge
               , 'fp
-              , 'me_only
+              , 'messages_for_next_wrap_proof
               , 'digest
               , 'bp_chals
               , 'index )
@@ -585,7 +585,7 @@ module Wrap = struct
           type ( 'challenge
                , 'scalar_challenge
                , 'fp
-               , 'me_only
+               , 'messages_for_next_wrap_proof
                , 'digest
                , 'pass_through
                , 'bp_chals
@@ -596,7 +596,7 @@ module Wrap = struct
               Proof_state.Deferred_values.Plonk.Minimal.Stable.V1.t
             , 'scalar_challenge
             , 'fp
-            , 'me_only
+            , 'messages_for_next_wrap_proof
             , 'digest
             , 'pass_through
             , 'bp_chals
@@ -612,7 +612,7 @@ module Wrap = struct
            , 'scalar_challenge
            , 'fp
            , 'lookup_opt
-           , 'me_only
+           , 'messages_for_next_wrap_proof
            , 'digest
            , 'pass_through
            , 'bp_chals
@@ -625,7 +625,7 @@ module Wrap = struct
           Proof_state.Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
         , 'fp
-        , 'me_only
+        , 'messages_for_next_wrap_proof
         , 'digest
         , 'pass_through
         , 'bp_chals
@@ -674,8 +674,8 @@ module Wrap = struct
                        }
                    }
                ; sponge_digest_before_evaluations
-               ; me_only
-                 (* me_only is represented as a digest (and then unhashed) inside the circuit *)
+               ; messages_for_next_wrap_proof
+                 (* messages_for_next_wrap_proof is represented as a digest (and then unhashed) inside the circuit *)
                }
            ; pass_through
              (* pass_through is represented as a digest inside the circuit *)
@@ -690,7 +690,10 @@ module Wrap = struct
         let challenge = [ beta; gamma ] in
         let scalar_challenge = [ alpha; zeta; xi ] in
         let digest =
-          [ sponge_digest_before_evaluations; me_only; pass_through ]
+          [ sponge_digest_before_evaluations
+          ; messages_for_next_wrap_proof
+          ; pass_through
+          ]
         in
         let index = [ branch_data ] in
         Hlist.HlistId.
@@ -729,7 +732,10 @@ module Wrap = struct
         in
         let [ beta; gamma ] = challenge in
         let [ alpha; zeta; xi ] = scalar_challenge in
-        let [ sponge_digest_before_evaluations; me_only; pass_through ] =
+        let [ sponge_digest_before_evaluations
+            ; messages_for_next_wrap_proof
+            ; pass_through
+            ] =
           digest
         in
         let [ branch_data ] = index in
@@ -762,7 +768,7 @@ module Wrap = struct
                     }
                 }
             ; sponge_digest_before_evaluations
-            ; me_only
+            ; messages_for_next_wrap_proof
             }
         ; pass_through
         }
@@ -1066,32 +1072,32 @@ module Step = struct
              ~back:(of_data ~option_map:Opt.map)
     end
 
-    type ('unfinalized_proofs, 'me_only) t =
+    type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
       { unfinalized_proofs : 'unfinalized_proofs
             (** A vector of the "per-proof" structures defined above, one for each proof
     that the step-circuit partially verifies. *)
-      ; me_only : 'me_only
+      ; messages_for_next_step_proof : 'messages_for_next_step_proof
             (** The component of the proof accumulation state that is only computed on by the
           "stepping" proof system, and that can be handled opaquely by any "wrap" circuits. *)
       }
     [@@deriving sexp, compare, yojson, hlist]
 
-    let spec unfinalized_proofs me_only =
+    let spec unfinalized_proofs messages_for_next_step_proof =
       let open Spec in
-      Struct [ unfinalized_proofs; me_only ]
+      Struct [ unfinalized_proofs; messages_for_next_step_proof ]
 
     include struct
       open Hlist.HlistId
 
-      let to_data { unfinalized_proofs; me_only } =
+      let to_data { unfinalized_proofs; messages_for_next_step_proof } =
         [ Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.to_data
-        ; me_only
+        ; messages_for_next_step_proof
         ]
 
-      let of_data [ unfinalized_proofs; me_only ] =
+      let of_data [ unfinalized_proofs; messages_for_next_step_proof ] =
         { unfinalized_proofs =
             Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.of_data
-        ; me_only
+        ; messages_for_next_step_proof
         }
     end
 
@@ -1110,38 +1116,45 @@ module Step = struct
       let unfinalized_proofs =
         Vector.typ' (Vector.map proofs_verified ~f:per_proof)
       in
-      let me_only = Spec.typ impl fq ~assert_16_bits (B Spec.Digest) in
+      let messages_for_next_step_proof =
+        Spec.typ impl fq ~assert_16_bits (B Spec.Digest)
+      in
       Snarky_backendless.Typ.of_hlistable
-        [ unfinalized_proofs; me_only ]
+        [ unfinalized_proofs; messages_for_next_step_proof ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
 
   module Statement = struct
-    type ('unfinalized_proofs, 'me_only, 'pass_through) t =
-      { proof_state : ('unfinalized_proofs, 'me_only) Proof_state.t
+    type ('unfinalized_proofs, 'messages_for_next_step_proof, 'pass_through) t =
+      { proof_state :
+          ('unfinalized_proofs, 'messages_for_next_step_proof) Proof_state.t
       ; pass_through : 'pass_through
             (** The component of the proof accumulation state that is only computed on by the
         "wrapping" proof system, and that can be handled opaquely by any "step" circuits. *)
       }
     [@@deriving sexp, compare, yojson]
 
-    let to_data { proof_state = { unfinalized_proofs; me_only }; pass_through }
-        ~option_map =
+    let to_data
+        { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
+        ; pass_through
+        } ~option_map =
       let open Hlist.HlistId in
       [ Vector.map unfinalized_proofs
           ~f:(Proof_state.Per_proof.In_circuit.to_data ~option_map)
-      ; me_only
+      ; messages_for_next_step_proof
       ; pass_through
       ]
 
-    let of_data Hlist.HlistId.[ unfinalized_proofs; me_only; pass_through ]
+    let of_data
+        Hlist.HlistId.
+          [ unfinalized_proofs; messages_for_next_step_proof; pass_through ]
         ~option_map =
       { proof_state =
           { unfinalized_proofs =
               Vector.map unfinalized_proofs
                 ~f:(Proof_state.Per_proof.In_circuit.of_data ~option_map)
-          ; me_only
+          ; messages_for_next_step_proof
           }
       ; pass_through
       }
