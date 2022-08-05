@@ -664,7 +664,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
     List.last pooled_transactions
     |> Option.map
          ~f:
-           (Fn.compose User_command.target_nonce
+           (Fn.compose User_command.expected_target_nonce
               Transaction_hash.User_command_with_valid_signature.command )
   in
   match txn_pool_nonce with

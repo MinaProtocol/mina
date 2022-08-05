@@ -190,13 +190,15 @@ let application_nonce (t : t) =
   | Parties p ->
       Parties.application_nonce p
 
+let expected_target_nonce t = Account.Nonce.succ (application_nonce t)
+
 (** The target nonce is what the nonce of the fee payer will be after a user command is applied. *)
-let target_nonce (t : t) =
+let target_nonce_on_success (t : t) =
   match t with
   | Signed_command x ->
       Account.Nonce.succ (Signed_command.nonce x)
   | Parties p ->
-      Parties.target_nonce p
+      Parties.target_nonce_on_success p
 
 let fee_token (t : t) =
   match t with

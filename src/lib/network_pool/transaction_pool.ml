@@ -364,11 +364,11 @@ struct
           match Indexed_pool.get_highest_fee pool with
           | Some cmd -> (
               match
-                Indexed_pool.handle_committed_txn pool
-                  cmd
-                  (* we have the invariant that the transactions currently
-                     in the pool are always valid against the best tip, so
-                     no need to check balances here *)
+                Indexed_pool.handle_committed_txn pool cmd
+                  ~application_status:None
+                    (* we have the invariant that the transactions currently
+                       in the pool are always valid against the best tip, so
+                       no need to check balances here *)
                   ~fee_payer_balance:Currency.Amount.max_int
                   ~fee_payer_nonce:
                     ( Transaction_hash.User_command_with_valid_signature.command
@@ -648,7 +648,8 @@ struct
                   ~data:time_added ) ;
             let p', dropped =
               match
-                Indexed_pool.handle_committed_txn p cmd' ~fee_payer_balance
+                Indexed_pool.handle_committed_txn p cmd'
+                  ~application_status:(Some cmd.status) ~fee_payer_balance
                   ~fee_payer_nonce
               with
               | Ok res ->
