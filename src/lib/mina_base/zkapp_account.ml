@@ -30,7 +30,9 @@ module Events = struct
 
   let push_event acc event = push_hash acc (Event.hash event)
 
-  let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
+  let hash (x : t) =
+    (* fold_right so the empty hash is used at the end of the events *)
+    List.fold_right ~init:(Lazy.force empty_hash) ~f:(Fn.flip push_event) x
 
   let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
 

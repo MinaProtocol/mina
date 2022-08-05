@@ -21,9 +21,9 @@ let update_events_handler (updated_events : Field.Constant.t array list)
   | _ ->
       respond Unhandled
 
-let num_events = 4
+let num_events = 5
 
-let event_length = 5
+let event_length = 7
 
 let update_events public_key =
   Zkapps_examples.wrap_main (fun () ->

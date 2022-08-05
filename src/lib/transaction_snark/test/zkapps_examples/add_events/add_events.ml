@@ -80,10 +80,9 @@ let%test_module "Add events test" =
     module Add_events = struct
       let events =
         let open Zkapps_add_events in
-        (* TODO: test fails if field is sum of outer and inner, why? *)
-        List.init num_events ~f:(fun _outer ->
+        List.init num_events ~f:(fun outer ->
             Array.init event_length ~f:(fun inner ->
-                Snark_params.Tick.Field.of_int inner ) )
+                Snark_params.Tick.Field.of_int (outer + inner) ) )
 
       let party, () =
         Async.Thread_safe.block_on_async_exn
@@ -202,7 +201,7 @@ let%test_module "Add events test" =
           if i > 1 then assert (not @@ List.is_empty party.body.events)
           else assert (List.is_empty party.body.events) )
 
-    let%test_unit "Initialize and add events" =
+    let%test_unit "Initialize and add several events" =
       let parties, account =
         []
         |> Parties.Call_forest.cons_tree Add_events.party
@@ -223,9 +222,11 @@ let%test_module "Add events test" =
         List.concat_map parties_with_events ~f:(fun party -> party.body.events)
       in
       let all_events_hash = Mina_base.Zkapp_account.Events.hash all_events in
-      (* verify the hash *)
+      (* verify the hash; Events.hash does a fold_right, so we use verify_right
+         to match that
+      *)
       match
-        Events_verifier.verify
+        Events_verifier.verify_right
           ~init:(Lazy.force Mina_base.Zkapp_account.Events.empty_hash)
           all_events all_events_hash
       with

@@ -97,8 +97,6 @@ module Party_under_construction = struct
 
     let create () = { events = [] }
 
-    let add_event t event : t = { events = event :: t.events }
-
     let add_events t events : t = { events = events @ t.events }
   end
 
@@ -309,14 +307,15 @@ module Party_under_construction = struct
 
       let create () = { events = [] }
 
-      let add_events t events : t = { events = events @ t.events }
+      let add_events t events : t = { events = t.events @ events }
 
       let to_parties_events ({ events } : t) : Zkapp_account.Events.var =
         let empty_var : Zkapp_account.Events.var =
           exists ~compute:(fun () -> []) Zkapp_account.Events.typ
         in
-        Core_kernel.List.fold events ~init:empty_var
-          ~f:Zkapp_account.Events.push_checked
+        (* matches fold_right in Zkapp_account.Events.hash *)
+        Core_kernel.List.fold_right events ~init:empty_var
+          ~f:(Core_kernel.Fn.flip Zkapp_account.Events.push_checked)
     end
 
     type t =
