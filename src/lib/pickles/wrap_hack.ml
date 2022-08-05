@@ -101,7 +101,7 @@ module Checked = struct
   (* We precompute the sponge states that would result from absorbing
      0, 1, or 2 dummy challenge vectors. This is used to speed up hashing
      inside the circuit. *)
-  let dummy_me_only_sponge_states =
+  let dummy_messages_for_next_wrap_proof_sponge_states =
     lazy
       (let module S = Tock_field_sponge.Field in
       let full_state s = (S.state s, s.sponge_state) in
@@ -130,9 +130,10 @@ module Checked = struct
       (* The sponge states we would reach if we absorbed the padding challenges *)
       let s = Sponge.create sponge_params in
       let state, sponge_state =
-        (Lazy.force dummy_me_only_sponge_states).(2
-                                                  - Nat.to_int
-                                                      max_proofs_verified)
+        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(2
+                                                                       - Nat
+                                                                         .to_int
+                                                                           max_proofs_verified)
       in
       { s with
         state = Array.map state ~f:Impls.Wrap.Field.constant

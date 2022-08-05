@@ -260,7 +260,7 @@ let verify_heterogenous (ts : Instance.t list) =
              { messages_for_next_step_proof =
                  Common.hash_messages_for_next_step_proof
                    ~app_state:A_value.to_field_elements
-                   (Reduced_me_only.Step.prepare
+                   (Reduced_messages_for_next_proof_over_same_field.Step.prepare
                       ~dlog_plonk_index:key.commitments
                       { t.statement.messages_for_next_step_proof with
                         app_state
@@ -272,7 +272,8 @@ let verify_heterogenous (ts : Instance.t list) =
                  ; messages_for_next_wrap_proof =
                      Wrap_hack.hash_messages_for_next_wrap_proof
                        Max_proofs_verified.n
-                       (Reduced_me_only.Wrap.prepare
+                       (Reduced_messages_for_next_proof_over_same_field.Wrap
+                        .prepare
                           t.statement.proof_state.messages_for_next_wrap_proof )
                  }
              }

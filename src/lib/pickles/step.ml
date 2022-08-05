@@ -200,7 +200,7 @@ struct
       let T = Local_max_proofs_verified.eq in
       let statement = t.statement in
       let prev_challenges =
-        (* TODO: This is redone in the call to Wrap_reduced_me_only.prepare *)
+        (* TODO: This is redone in the call to Reduced_messages_for_next_proof_over_same_field.Wrap.prepare *)
         Vector.map ~f:Ipa.Wrap.compute_challenges
           statement.proof_state.messages_for_next_wrap_proof
             .old_bulletproof_challenges
@@ -223,7 +223,8 @@ struct
              in
              (* TODO: Only do this hashing when necessary *)
              Common.hash_messages_for_next_step_proof
-               (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
+               (Reduced_messages_for_next_proof_over_same_field.Step.prepare
+                  ~dlog_plonk_index:dlog_index
                   statement.messages_for_next_step_proof )
                ~app_state:to_field_elements )
         ; proof_state =
@@ -569,7 +570,8 @@ struct
         (Option.value_exn !prev_proofs)
         branch_data.rule.prevs prev_values_length
     in
-    let next_statement_me_only : _ Reduced_me_only.Step.t Lazy.t =
+    let messages_for_next_step_proof :
+        _ Reduced_messages_for_next_proof_over_same_field.Step.t Lazy.t =
       lazy
         (let old_bulletproof_challenges =
            extract_from_proofs
@@ -599,10 +601,11 @@ struct
          ; old_bulletproof_challenges
          } )
     in
-    let next_me_only_prepared =
+    let messages_for_next_step_proof_prepared =
       lazy
-        (Reduced_me_only.Step.prepare ~dlog_plonk_index:self_dlog_plonk_index
-           (Lazy.force next_statement_me_only) )
+        (Reduced_messages_for_next_proof_over_same_field.Step.prepare
+           ~dlog_plonk_index:self_dlog_plonk_index
+           (Lazy.force messages_for_next_step_proof) )
     in
     let pass_through_padded =
       let rec pad :
@@ -680,8 +683,8 @@ struct
          (* emphatically NOT padded with dummies *)
          Vector.(
            map2 to_fold_in
-             (Lazy.force next_me_only_prepared).old_bulletproof_challenges
-             ~f:(fun commitment chals ->
+             (Lazy.force messages_for_next_step_proof_prepared)
+               .old_bulletproof_challenges ~f:(fun commitment chals ->
                { Tick.Proof.Challenge_polynomial.commitment
                ; challenges = Vector.to_array chals
                } )
@@ -723,7 +726,10 @@ struct
         end )
     in
     let messages_for_next_wrap_proof =
-      let rec go : type a a. (a, a) H2.T(P).t -> a H1.T(P.Base.Me_only.Wrap).t =
+      let rec go :
+          type a a.
+             (a, a) H2.T(P).t
+          -> a H1.T(P.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function
         | [] ->
             []
@@ -735,7 +741,8 @@ struct
     let next_statement : _ Types.Step.Statement.t =
       { proof_state =
           { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
-          ; messages_for_next_step_proof = Lazy.force next_statement_me_only
+          ; messages_for_next_step_proof =
+              Lazy.force messages_for_next_step_proof
           }
       ; messages_for_next_wrap_proof
       }
