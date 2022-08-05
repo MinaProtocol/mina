@@ -607,7 +607,7 @@ struct
            ~dlog_plonk_index:self_dlog_plonk_index
            (Lazy.force messages_for_next_step_proof) )
     in
-    let pass_through_padded =
+    let messages_for_next_wrap_proof_padded =
       let rec pad :
           type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
@@ -660,7 +660,7 @@ struct
       | Req.Unfinalized_proofs ->
           k (Lazy.force unfinalized_proofs_extended)
       | Req.Messages_for_next_wrap_proof ->
-          k (Lazy.force pass_through_padded)
+          k (Lazy.force messages_for_next_wrap_proof_padded)
       | _ -> (
           match handler with
           | Some f ->

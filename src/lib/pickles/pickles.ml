@@ -169,13 +169,13 @@ module Statement_with_proof = struct
     ('max_width, 'max_width) Proof.t
 end
 
-let pad_pass_throughs
+let pad_messages_for_next_wrap_proof
     (type local_max_proofs_verifieds max_local_max_proofs_verifieds
     max_proofs_verified )
     (module M : Hlist.Maxes.S
       with type ns = max_local_max_proofs_verifieds
        and type length = max_proofs_verified )
-    (pass_throughs :
+    (messages_for_next_wrap_proofs :
       local_max_proofs_verifieds
       H1.T(Proof_.Messages_for_next_proof_over_same_field.Wrap).t ) =
   let dummy_chals = Dummy.Ipa.Wrap.challenges in
@@ -207,7 +207,7 @@ let pad_pass_throughs
         in
         messages_for_next_wrap_proof :: go maxes messages_for_next_wrap_proofs
   in
-  go M.maxes pass_throughs
+  go M.maxes messages_for_next_wrap_proofs
 
 module Verification_key = struct
   include Verification_key
@@ -781,7 +781,7 @@ struct
               statement =
                 { proof.statement with
                   messages_for_next_wrap_proof =
-                    pad_pass_throughs
+                    pad_messages_for_next_wrap_proof
                       (module Maxes)
                       proof.statement.messages_for_next_wrap_proof
                 }
@@ -2186,7 +2186,7 @@ let%test_module "test uncorrelated bulletproof_challenges" =
                   statement =
                     { proof.statement with
                       messages_for_next_wrap_proof =
-                        pad_pass_throughs
+                        pad_messages_for_next_wrap_proof
                           (module Maxes)
                           proof.statement.messages_for_next_wrap_proof
                     }
@@ -3092,7 +3092,7 @@ let%test_module "test uncorrelated deferred b" =
                   statement =
                     { proof.statement with
                       messages_for_next_wrap_proof =
-                        pad_pass_throughs
+                        pad_messages_for_next_wrap_proof
                           (module Maxes)
                           proof.statement.messages_for_next_wrap_proof
                     }

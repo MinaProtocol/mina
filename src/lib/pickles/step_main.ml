@@ -385,29 +385,38 @@ let step_main :
                   -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
                   -> (vars, n) Length.t
                   -> (_, n) Vector.t * B.t list =
-               fun proofs datas pass_throughs unfinalizeds stmts pi ->
+               fun proofs datas messages_for_next_wrap_proofs unfinalizeds stmts
+                   pi ->
                 match
-                  (proofs, datas, pass_throughs, unfinalizeds, stmts, pi)
+                  ( proofs
+                  , datas
+                  , messages_for_next_wrap_proofs
+                  , unfinalizeds
+                  , stmts
+                  , pi )
                 with
                 | [], [], [], [], [], Z ->
                     ([], [])
                 | ( p :: proofs
                   , d :: datas
-                  , pass_through :: pass_throughs
+                  , messages_for_next_wrap_proof
+                    :: messages_for_next_wrap_proofs
                   , unfinalized :: unfinalizeds
                   , { proof_must_verify = should_verify; _ } :: stmts
                   , S pi ) ->
                     let chals, v =
-                      verify_one p d pass_through unfinalized should_verify
+                      verify_one p d messages_for_next_wrap_proof unfinalized
+                        should_verify
                     in
                     let chalss, vs =
-                      go proofs datas pass_throughs unfinalizeds stmts pi
+                      go proofs datas messages_for_next_wrap_proofs unfinalizeds
+                        stmts pi
                     in
                     (chals :: chalss, v :: vs)
               in
               let chalss, vs =
-                let pass_throughs =
-                  with_label "pass_throughs" (fun () ->
+                let messages_for_next_wrap_proofs =
+                  with_label "messages_for_next_wrap_proofs" (fun () ->
                       let module V = H1.Of_vector (Digest) in
                       V.f proofs_verified
                         (Vector.trim messages_for_next_wrap_proof lte) )
@@ -456,7 +465,7 @@ let step_main :
                   in
                   M.f rule.prevs
                 in
-                go prevs datas pass_throughs unfinalized_proofs
+                go prevs datas messages_for_next_wrap_proofs unfinalized_proofs
                   previous_proof_statements proofs_verified
               in
               Boolean.Assert.all vs ; chalss )
