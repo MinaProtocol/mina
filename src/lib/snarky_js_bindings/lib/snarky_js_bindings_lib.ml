@@ -2308,11 +2308,8 @@ module Ledger = struct
   (* type public_key = < g : group_class Js.t Js.readonly_prop > Js.t *)
 
   type public_key =
-    < g :
-        < x : field_class Js.t Js.readonly_prop
-        ; isOdd : bool_class Js.t Js.readonly_prop >
-        Js.t
-        Js.readonly_prop >
+    < x : field_class Js.t Js.readonly_prop
+    ; isOdd : bool_class Js.t Js.readonly_prop >
     Js.t
 
   type zkapp_account =
@@ -2461,11 +2458,11 @@ module Ledger = struct
 
   let public_key_checked (pk : public_key) :
       Signature_lib.Public_key.Compressed.var =
-    { x = pk##.g##.x##.value; is_odd = pk##.g##.isOdd##.value }
+    { x = pk##.x##.value; is_odd = pk##.isOdd##.value }
 
   let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
-    { x = to_unchecked pk##.g##.x##.value
-    ; is_odd = pk##.g##.isOdd##.value |> bool_constant |> Option.value_exn
+    { x = to_unchecked pk##.x##.value
+    ; is_odd = pk##.isOdd##.value |> bool_constant |> Option.value_exn
     }
 
   let private_key (key : private_key) : Signature_lib.Private_key.t =
@@ -2549,14 +2546,11 @@ module Ledger = struct
 
     let public_key (pk : Signature_lib.Public_key.Compressed.t) : public_key =
       object%js
-        val g =
-          object%js
-            val x = to_js_field_unchecked pk.x
+        val x = to_js_field_unchecked pk.x
 
-            val isOdd =
-              new%js bool_constr
-                (As_bool.of_boolean @@ Boolean.var_of_value pk.is_odd)
-          end
+        val isOdd =
+          new%js bool_constr
+            (As_bool.of_boolean @@ Boolean.var_of_value pk.is_odd)
       end
 
     let token_id (token_id : Mina_base.Token_id.t) =
