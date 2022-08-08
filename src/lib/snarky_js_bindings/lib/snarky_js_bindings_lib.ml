@@ -2305,8 +2305,6 @@ module Ledger = struct
 
   type private_key = < s : scalar_class Js.t Js.prop > Js.t
 
-  (* type public_key = < g : group_class Js.t Js.readonly_prop > Js.t *)
-
   type public_key =
     < x : field_class Js.t Js.readonly_prop
     ; isOdd : bool_class Js.t Js.readonly_prop >
@@ -2452,9 +2450,6 @@ module Ledger = struct
 
   let create_new_account_exn (t : L.t) account_id account =
     L.create_new_account t account_id account |> Or_error.ok_exn
-
-  (* let bool (x : Bool.t) =
-     match x with Constant y -> y | y -> Impl.As_prover.read_var y *)
 
   let public_key_checked (pk : public_key) :
       Signature_lib.Public_key.Compressed.var =
