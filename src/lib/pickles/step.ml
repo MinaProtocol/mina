@@ -312,8 +312,7 @@ struct
         let joint_combiner = O.joint_combiner o
       end in
       let w =
-        Tock.Field.domain_generator
-          ~log2_size:(Domain.log2_size data.wrap_domains.h)
+        Tock.Field.domain_generator ~log2_size:dlog_vk.domain.log_size_of_group
       in
       let zetaw = Tock.Field.mul As_field.zeta w in
       let new_bulletproof_challenges, b =
@@ -372,7 +371,8 @@ struct
       let tock_domain =
         Plonk_checks.domain
           (module Tock.Field)
-          data.wrap_domains.h ~shifts:Common.tock_shifts
+          (Pow_2_roots_of_unity dlog_vk.domain.log_size_of_group)
+          ~shifts:Common.tock_shifts
           ~domain_generator:Backend.Tock.Field.domain_generator
       in
       let tock_combined_evals =
