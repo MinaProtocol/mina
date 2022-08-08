@@ -94,6 +94,7 @@ module Call_data = struct
       ~var_of_hlist:Circuit.of_hlist [ Input.typ; Output.typ ]
 end
 
+(** Circuit requests, to get values and run code outside of the snark. *)
 type _ Snarky_backendless.Request.t +=
   | Old_state : Field.Constant.t Snarky_backendless.Request.t
   | (* TODO: Tweak pickles so this can be an explicit input. *)
@@ -105,6 +106,27 @@ type _ Snarky_backendless.Request.t +=
          * Zkapp_call_forest.party
          * Zkapp_call_forest.t )
          Snarky_backendless.Request.t
+
+(** Helper function for executing zkApp calls. *)
+let execute_call party call_inputs =
+  let call_outputs, called_party, sub_calls =
+    exists
+      (Typ.tuple3 Call_data.Output.typ
+         (Zkapp_call_forest.Checked.party_typ ())
+         Zkapp_call_forest.typ )
+      ~request:(fun () ->
+        let input = As_prover.read Call_data.Input.typ call_inputs in
+        Execute_call input )
+  in
+  let () =
+    (* Check that previous party's call data is consistent. *)
+    let call_data_digest =
+      Call_data.Circuit.digest { input = call_inputs; output = call_outputs }
+    in
+    Field.Assert.equal call_data_digest called_party.party.data.call_data
+  in
+  party#call called_party sub_calls ;
+  call_outputs.new_state
 
 (** State to initialize the zkApp to after deployment. *)
 let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
@@ -145,27 +167,11 @@ let update_state_call public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let old_state = exists Field.typ ~request:(fun () -> Old_state) in
-      let call_inputs = { Call_data.Input.Circuit.old_state } in
-      let call_outputs, called_party, sub_calls =
-        exists
-          (Typ.tuple3 Call_data.Output.typ
-             (Zkapp_call_forest.Checked.party_typ ())
-             Zkapp_call_forest.typ )
-          ~request:(fun () ->
-            let input = As_prover.read Call_data.Input.typ call_inputs in
-            Execute_call input )
-      in
-      let () =
-        (* Check that previous party's call data is consistent. *)
-        let call_data_digest =
-          Call_data.Circuit.digest
-            { input = call_inputs; output = call_outputs }
-        in
-        Field.Assert.equal call_data_digest called_party.party.data.call_data
-      in
+      let new_state = execute_call party { old_state } in
+      ignore new_state ;
+      (* TODO *)
       party#assert_state_proved ;
       party#set_state 0 old_state ;
-      party#call called_party sub_calls ;
       None )
 
 let call_handler (call_input : Call_data.Input.Constant.t)
@@ -212,26 +218,10 @@ let recursive_call public_key =
       let call_inputs =
         exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
       in
-      let recursive_call_outputs, called_party, sub_calls =
-        exists
-          (Typ.tuple3 Call_data.Output.typ
-             (Zkapp_call_forest.Checked.party_typ ())
-             Zkapp_call_forest.typ )
-          ~request:(fun () ->
-            let input = As_prover.read Call_data.Input.typ call_inputs in
-            Execute_call input )
-      in
-      let () =
-        (* Check that previous party's call data is consistent. *)
-        let call_data_digest =
-          Call_data.Circuit.digest
-            { input = call_inputs; output = recursive_call_outputs }
-        in
-        Field.Assert.equal call_data_digest called_party.party.data.call_data
-      in
+      let new_state = execute_call party call_inputs in
       let blinding_value = exists Field.typ ~compute:Field.Constant.random in
       let modify_value = exists Field.typ ~compute:Field.Constant.random in
-      let new_state = Field.add recursive_call_outputs.new_state modify_value in
+      let new_state = Field.add new_state modify_value in
       let call_outputs =
         { Call_data.Output.Circuit.blinding_value; new_state }
       in
@@ -240,7 +230,6 @@ let recursive_call public_key =
       in
       party#assert_state_proved ;
       party#set_call_data call_data_hash ;
-      party#call called_party sub_calls ;
       Some call_outputs )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
