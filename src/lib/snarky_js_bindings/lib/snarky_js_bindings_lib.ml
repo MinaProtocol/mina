@@ -2830,7 +2830,7 @@ module Ledger = struct
     let module T = struct
       let version_byte = Char.of_int_exn version_byte
 
-      let description = "none"
+      let description = "any"
     end in
     let module B58 = Base58_check.Make (T) in
     bin_string |> B58.encode |> Js.string
@@ -2840,7 +2840,7 @@ module Ledger = struct
     let module T = struct
       let version_byte = Char.of_int_exn version_byte
 
-      let description = "none"
+      let description = "any"
     end in
     let module B58 = Base58_check.Make (T) in
     base58 |> Js.to_string |> B58.decode_exn

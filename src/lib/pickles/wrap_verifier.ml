@@ -35,6 +35,13 @@ let challenge_polynomial ~one ~add ~mul chals =
       in
       prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
 
+let num_possible_domains = Nat.S Wrap_hack.Padded_length.n
+
+let all_possible_domains =
+  Memo.unit (fun () ->
+      Vector.init num_possible_domains ~f:(fun proofs_verified ->
+          (Common.wrap_domains ~proofs_verified).h ) )
+
 module Make
     (Inputs : Inputs
                 with type Impl.field = Tock.Field.t
@@ -71,6 +78,10 @@ struct
         match x with Shifted_value x -> Sponge.absorb sponge x
     end
   end
+
+  let num_possible_domains = num_possible_domains
+
+  let all_possible_domains = all_possible_domains
 
   let print_g lab (x, y) =
     if debug then
@@ -786,8 +797,7 @@ struct
      3. Check that the "b" value was computed correctly.
      4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
-      (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ?actual_proofs_verified ~domain ~sponge
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _
