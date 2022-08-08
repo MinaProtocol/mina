@@ -244,7 +244,7 @@ module Party_under_construction = struct
     let set_state idx data (t : t) =
       { t with update = Update.set_state idx data t.update }
 
-    let call party calls (t : t) =
+    let register_call party calls (t : t) =
       { t with rev_calls = (party, calls) :: t.rev_calls }
 
     let set_call_data call_data (t : t) = { t with call_data = Some call_data }
@@ -272,9 +272,10 @@ class party ~public_key ?token_id =
     method set_call_data call_data =
       party <- Party_under_construction.In_circuit.set_call_data call_data party
 
-    method call called_party sub_calls =
+    method register_call called_party sub_calls =
       party <-
-        Party_under_construction.In_circuit.call called_party sub_calls party
+        Party_under_construction.In_circuit.register_call called_party sub_calls
+          party
 
     method party_under_construction = party
   end

@@ -125,7 +125,7 @@ let execute_call party call_inputs =
     in
     Field.Assert.equal call_data_digest called_party.party.data.call_data
   in
-  party#call called_party sub_calls ;
+  party#register_call called_party sub_calls ;
   call_outputs.new_state
 
 (** State to initialize the zkApp to after deployment. *)
