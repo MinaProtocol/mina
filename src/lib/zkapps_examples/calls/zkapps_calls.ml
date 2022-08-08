@@ -109,7 +109,8 @@ type _ Snarky_backendless.Request.t +=
          Snarky_backendless.Request.t
 
 (** Helper function for executing zkApp calls. *)
-let execute_call party call_inputs =
+let execute_call party old_state =
+  let call_inputs = { Call_data.Input.Circuit.old_state } in
   let call_outputs, called_party, sub_calls =
     exists
       (Typ.tuple3 Call_data.Output.typ
@@ -168,7 +169,7 @@ let update_state_call public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let old_state = exists Field.typ ~request:(fun () -> Old_state) in
-      let new_state = execute_call party { old_state } in
+      let new_state = execute_call party old_state in
       party#assert_state_proved ;
       party#set_state 0 new_state ;
       None )
@@ -222,10 +223,10 @@ let recursive_call_handler (recursive_call_input : Call_data.Input.Constant.t)
 let recursive_call public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
-      let call_inputs =
+      let ({ Call_data.Input.Circuit.old_state } as call_inputs) =
         exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
       in
-      let new_state = execute_call party call_inputs in
+      let new_state = execute_call party old_state in
       let blinding_value = exists Field.typ ~compute:Field.Constant.random in
       let increase_amount =
         exists Field.typ ~request:(fun () -> Increase_amount)
