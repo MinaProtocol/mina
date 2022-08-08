@@ -66,6 +66,12 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
       | [] ->
           Array.init num_shifts ~f:(fun _ -> Field.zero)
       | shifts :: other_shiftss ->
+          (* Runtime check that the shifts across all domains are consistent.
+             The optimisation below will not work if this is not true; if the
+             domain size or the shifts are modified such that this becomes
+             false, [disabled_not_the_same] can be set to true to enable
+             dynamic selection within the circuit.
+          *)
           let all_the_same =
             Vector.for_all other_shiftss
               ~f:(Array.for_all2_exn ~f:Field.Constant.equal shifts)
