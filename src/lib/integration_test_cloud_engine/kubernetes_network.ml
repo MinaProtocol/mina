@@ -90,7 +90,7 @@ module Node = struct
     ; ("pod_id", `String node.pod_id)
     ]
 
-  module Serializing = Graphql_lib.Serializing
+  module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
     let ingress_uri node =
@@ -115,7 +115,7 @@ module Node = struct
     ({|
       mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+          public_key: publicKey
         }
       }
     |}
@@ -214,7 +214,7 @@ module Node = struct
           stateHash
           commandTransactionCount
           creatorAccount {
-            publicKey
+            publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           }
         }
       }
@@ -241,11 +241,11 @@ module Node = struct
     {|
       query ($public_key: PublicKey!, $token: UInt64) {
         account (publicKey : $public_key, token : $token) {
-          balance { liquid @ppxCustom(module: "Serializing.Balance")
-                    locked @ppxCustom(module: "Serializing.Balance")
-                    total @ppxCustom(module: "Serializing.Balance")
+          balance { liquid
+                    locked
+                    total
                   }
-          delegate
+          delegate @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           nonce
           permissions { editSequenceState
                         editState
@@ -262,11 +262,11 @@ module Node = struct
           sequenceEvents
           zkappState
           zkappUri
-          timing { cliffTime
-                   cliffAmount
-                   vestingPeriod
-                   vestingIncrement
-                   initialMinimumBalance
+          timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   cliffAmount @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   vestingIncrement @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   initialMinimumBalance @ppxCustom(module: "Graphql_lib.Scalars.JSON")
                  }
           token
           tokenSymbol
@@ -441,9 +441,11 @@ module Node = struct
                      "the nonce from get_balance is None, which should be \
                       impossible"
               |> Mina_numbers.Account_nonce.of_string
-          ; total_balance = acc.balance.total
-          ; liquid_balance_opt = acc.balance.liquid
-          ; locked_balance_opt = acc.balance.locked
+          ; total_balance = Currency.Balance.of_uint64 acc.balance.total
+          ; liquid_balance_opt =
+              Option.map ~f:Currency.Balance.of_uint64 acc.balance.liquid
+          ; locked_balance_opt =
+              Option.map ~f:Currency.Balance.of_uint64 acc.balance.locked
           }
 
   let must_get_account_data ~logger t ~account_id =

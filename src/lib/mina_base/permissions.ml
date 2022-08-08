@@ -341,6 +341,7 @@ module Poly = struct
       ~receive:(f controller) ~set_zkapp_uri:(f controller)
       ~edit_sequence_state:(f controller) ~set_token_symbol:(f controller)
       ~increment_nonce:(f controller) ~set_voting_for:(f controller)
+    |> List.rev
     |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 end
 

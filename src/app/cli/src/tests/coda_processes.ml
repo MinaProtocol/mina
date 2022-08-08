@@ -49,7 +49,7 @@ let net_configs n =
 let offset (consensus_constants : Consensus.Constants.t) =
   Core.Time.(
     diff (now ())
-      (Block_time.to_time consensus_constants.genesis_state_timestamp))
+      (Block_time.to_time_exn consensus_constants.genesis_state_timestamp))
 
 let local_configs ?block_production_interval
     ?(block_production_keys = Fn.const None)
@@ -71,7 +71,7 @@ let local_configs ?block_production_interval
           Genesis_constants.genesis_timestamp_of_string timestamp
       | None ->
           (Lazy.force Precomputed_values.compiled_inputs).consensus_constants
-            .genesis_state_timestamp |> Block_time.to_time
+            .genesis_state_timestamp |> Block_time.to_time_exn
     in
     Core.Time.(diff (now ())) genesis_state_timestamp
   in

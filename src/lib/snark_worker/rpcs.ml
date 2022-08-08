@@ -59,4 +59,24 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     include Master.T
     include Versioned_rpc.Both_convert.Plain.Make (Master)
   end
+
+  module Failed_to_generate_snark = struct
+    module Master = struct
+      let name = "failed_to_generate_snark"
+
+      module T = struct
+        type query =
+          (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t Work.Spec.t
+          * Public_key.Compressed.t
+
+        type response = unit
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    include Versioned_rpc.Both_convert.Plain.Make (Master)
+  end
 end

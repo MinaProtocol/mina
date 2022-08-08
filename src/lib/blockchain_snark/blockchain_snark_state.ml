@@ -342,8 +342,6 @@ end
 
 module Statement_var = struct
   type t = Protocol_state.Value.t Data_as_hash.t
-
-  let to_field_elements (t : t) = [| Data_as_hash.hash t |]
 end
 
 type tag = (Statement_var.t, Statement.t, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
@@ -430,10 +428,8 @@ end) : S = struct
   open T
 
   let tag, cache_handle, p, Pickles.Provers.[ step ] =
-    Pickles.compile ~cache:Cache_dir.cache
-      (module Statement_var)
-      (module Statement)
-      ~public_input:(Input typ) ~auxiliary_typ:Typ.unit
+    Pickles.compile () ~cache:Cache_dir.cache ~public_input:(Input typ)
+      ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

@@ -50,18 +50,21 @@ let verify_one
           proof_state.deferred_values prev_proof_evals )
   in
   let branch_data = proof_state.deferred_values.branch_data in
+  let sponge_after_index, hash_me_only =
+    let to_field_elements =
+      let (Typ typ) = d.public_input in
+      fun x -> fst (typ.var_to_fields x)
+    in
+    let sponge_after_index, hash_me_only =
+      (* TODO: Don't rehash when it's not necessary *)
+      hash_me_only_opt ~index:d.wrap_key to_field_elements
+    in
+    (sponge_after_index, unstage hash_me_only)
+  in
   let statement =
     let prev_me_only =
       with_label __LOC__ (fun () ->
-          let hash =
-            let to_field_elements =
-              let (Typ typ) = d.public_input in
-              fun x -> fst (typ.var_to_fields x)
-            in
-            (* TODO: Don't rehash when it's not necessary *)
-            unstage (hash_me_only_opt ~index:d.wrap_key to_field_elements)
-          in
-          hash ~widths:d.proofs_verifieds
+          hash_me_only ~widths:d.proofs_verifieds
             ~max_width:(Nat.Add.n d.max_proofs_verified)
             ~proofs_verified_mask:
               (Vector.trim branch_data.proofs_verified_mask
@@ -99,8 +102,9 @@ let verify_one
             }
           ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
           ~is_base_case:(Boolean.not should_verify)
-          ~sg_old:prev_challenge_polynomial_commitments ~proof:wrap_proof
-          ~wrap_verification_key:d.wrap_key statement unfinalized )
+          ~sponge_after_index ~sg_old:prev_challenge_polynomial_commitments
+          ~proof:wrap_proof ~wrap_verification_key:d.wrap_key statement
+          unfinalized )
   in
   if debug then
     as_prover

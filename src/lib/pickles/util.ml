@@ -9,13 +9,17 @@ let rec absorb :
     -> absorb_scalar:(scalar -> unit)
     -> g1_to_field_elements:(g1 -> f list)
     -> mask_g1_opt:(g1_opt -> g1)
-    -> (a, < scalar : scalar ; g1 : g1 ; g1_opt : g1_opt >) Type.t
+    -> ( a
+       , < scalar : scalar ; g1 : g1 ; g1_opt : g1_opt ; base_field : f > )
+       Type.t
     -> a
     -> unit =
  fun ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt ty t ->
   match ty with
   | PC ->
       List.iter ~f:absorb_field (g1_to_field_elements t)
+  | Field ->
+      absorb_field t
   | Scalar ->
       absorb_scalar t
   | Without_degree_bound ->

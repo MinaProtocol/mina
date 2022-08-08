@@ -44,7 +44,7 @@ let verify_heterogenous (ts : Instance.t list) =
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
-  let in_circuit_plonks =
+  let in_circuit_plonks, computed_bp_chals =
     List.map ts
       ~f:(fun
            (T
@@ -76,6 +76,7 @@ let verify_heterogenous (ts : Instance.t list) =
             ; combined_inner_product
             ; branch_data
             ; bulletproof_challenges
+            ; b
             } =
           Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
             ~scalar:sc statement.proof_state.deferred_values
@@ -160,31 +161,37 @@ let verify_heterogenous (ts : Instance.t list) =
           in
           (absorb sponge, squeeze)
         in
-        ( absorb evals.ft_eval1 ;
-          let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
-          let x1, x2 = evals.evals.public_input in
-          absorb x1 ;
-          absorb x2 ;
-          List.iter xs ~f:(fun (x1, x2) ->
-              Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
+        let old_bulletproof_challenges =
+          Vector.map ~f:Ipa.Step.compute_challenges
+            statement.pass_through.old_bulletproof_challenges
+        in
+        (let challenges_digest =
+           let open Tick_field_sponge.Field in
+           let sponge = create Tick_field_sponge.params in
+           Vector.iter old_bulletproof_challenges
+             ~f:(Vector.iter ~f:(absorb sponge)) ;
+           squeeze sponge
+         in
+         absorb challenges_digest ;
+         absorb evals.ft_eval1 ;
+         let xs = Plonk_types.Evals.to_absorption_sequence evals.evals.evals in
+         let x1, x2 = evals.evals.public_input in
+         absorb x1 ;
+         absorb x2 ;
+         List.iter xs ~f:(fun (x1, x2) ->
+             Array.iter ~f:absorb x1 ; Array.iter ~f:absorb x2 ) ) ;
         let xi_actual = squeeze () in
         let r_actual = squeeze () in
         Timer.clock __LOC__ ;
         (* TODO: The deferred values "bulletproof_challenges" should get routed
            into a "batch dlog Tick acc verifier" *)
-        let actual_proofs_verified =
-          Vector.length statement.pass_through.old_bulletproof_challenges
-        in
+        let actual_proofs_verified = Vector.length old_bulletproof_challenges in
         Timer.clock __LOC__ ;
         let combined_inner_product_actual =
           Wrap.combined_inner_product ~env:tick_env ~plonk:tick_plonk_minimal
             ~domain:tick_domain ~ft_eval1:evals.ft_eval1
             ~actual_proofs_verified:(Nat.Add.create actual_proofs_verified)
-            evals.evals
-            ~old_bulletproof_challenges:
-              (Vector.map ~f:Ipa.Step.compute_challenges
-                 statement.pass_through.old_bulletproof_challenges )
-            ~r:r_actual ~xi ~zeta ~zetaw
+            evals.evals ~old_bulletproof_challenges ~r:r_actual ~xi ~zeta ~zetaw
         in
         let check_eq lab x y =
           check
@@ -195,19 +202,33 @@ let verify_heterogenous (ts : Instance.t list) =
             , Tick_field.equal x y )
         in
         Timer.clock __LOC__ ;
+        let bulletproof_challenges =
+          Ipa.Step.compute_challenges bulletproof_challenges
+        in
         Timer.clock __LOC__ ;
+        let shifted_value =
+          Shifted_value.Type1.to_field (module Tick.Field) ~shift:Shifts.tick1
+        in
+        let b_actual =
+          let challenge_poly =
+            unstage
+              (Wrap.challenge_polynomial
+                 (Vector.to_array bulletproof_challenges) )
+          in
+          Tick.Field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
+        in
         List.iter
           ~f:(fun (s, x, y) -> check_eq s x y)
           (* Both these values can actually be omitted from the proof on the wire since we recompute them
              anyway. *)
           [ ("xi", xi, xi_actual)
           ; ( "combined_inner_product"
-            , Shifted_value.Type1.to_field
-                (module Tick.Field)
-                combined_inner_product ~shift:Shifts.tick1
+            , shifted_value combined_inner_product
             , combined_inner_product_actual )
+          ; ("b", shifted_value b, b_actual)
           ] ;
-        plonk )
+        (plonk, bulletproof_challenges) )
+    |> List.unzip
   in
   let open Backend.Tock.Proof in
   let open Promise.Let_syntax in

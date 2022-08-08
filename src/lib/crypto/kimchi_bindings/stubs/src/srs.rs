@@ -152,6 +152,20 @@ macro_rules! impl_srs {
 
             #[ocaml_gen::func]
             #[ocaml::func]
+            pub fn [<$name:snake _batch_accumulator_generate>](
+                srs: $name,
+                comms: ocaml::Int,
+                chals: Vec<$CamlF>,
+            ) -> Vec<$CamlG> {
+                crate::urs_utils::batch_dlog_accumulator_generate::<$G>(
+                    &srs,
+                    comms as usize,
+                    &chals.into_iter().map(From::from).collect(),
+                ).into_iter().map(Into::into).collect()
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
             pub fn [<$name:snake _h>](srs: $name) -> $CamlG {
                 srs.h.into()
             }
