@@ -42,6 +42,22 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Domain = struct
     let num_shifts = Nat.to_int Pickles_types.Plonk_types.Permuts.n
 
+    (** Compute the 'shifts' used by the kimchi permutation argument.
+
+        These values are selected deterministically-randomly to appear outside
+        of the domain, so that every choice of [i] and [shift] results in a
+        distinct value for [shift * domain_generator ^ i].
+
+        Note that, for each different domain size, we attempt to use the same
+        [shifts], and only sample different ones if the shifts are already a
+        member of the domain (ie. there exists some [i] such that
+        [shift = domain_generator ^ i]). This ensures that the invariant above
+        is satisfied.
+        Optimisation: since the shifts for the domains that we use in practise
+        are all the same -- none of them have 2-adic order < largest domain
+        size -- we can hard-code the shifts instead of using a one-hot mask,
+        and this function adds no constraints to the circuit.
+    *)
     let shifts (type n) ((which, log2s) : (int, n) t)
         ~(shifts : log2_size:int -> Field.Constant.t array) :
         Field.t Pickles_types.Plonk_types.Shifts.t =
@@ -54,6 +70,13 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
             Vector.for_all other_shiftss
               ~f:(Array.for_all2_exn ~f:Field.Constant.equal shifts)
           in
+          (* Set to true if we do not want to allow dynamic selection of the
+             shifts at runtime.
+             This is possible because of the optimisation outlined in the
+             doc-comment above, but this option and the original code is left
+             here in case we transition to a larger domain size that uses
+             different shifts than those for smaller domains.
+          *)
           let disabled_not_the_same = true in
           if all_the_same then Array.map ~f:Field.constant shifts
           else if disabled_not_the_same then
