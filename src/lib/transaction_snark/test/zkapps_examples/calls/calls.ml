@@ -62,8 +62,8 @@ let%test_module "Initialize state test" =
         , Pickles.Provers.
             [ initialize_prover
             ; update_state_call_prover
-            ; call_prover
-            ; recursive_call_prover
+            ; add_prover
+            ; add_and_call_prover
             ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:(option_typ Zkapps_calls.Call_data.Output.typ)
@@ -76,13 +76,13 @@ let%test_module "Initialize state test" =
         ~choices:(fun ~self:_ ->
           [ Zkapps_calls.initialize_rule pk_compressed
           ; Zkapps_calls.update_state_call_rule pk_compressed
-          ; Zkapps_calls.call_rule pk_compressed
-          ; Zkapps_calls.recursive_call_rule pk_compressed
+          ; Zkapps_calls.add_rule pk_compressed
+          ; Zkapps_calls.add_and_call_rule pk_compressed
           ] )
 
     type calls_kind =
-      | Recurse of Snark_params.Tick.Run.Field.Constant.t * calls_kind
-      | Call of Snark_params.Tick.Run.Field.Constant.t
+      | Add_and_call of Snark_params.Tick.Run.Field.Constant.t * calls_kind
+      | Add of Snark_params.Tick.Run.Field.Constant.t
 
     module P = (val p_module)
 
@@ -144,22 +144,22 @@ let%test_module "Initialize state test" =
             * Zkapp_call_forest.party
             * Zkapp_call_forest.t =
           match calls_kind with
-          | Call increase_amount ->
+          | Add increase_amount ->
               let tree, aux =
                 Async.Thread_safe.block_on_async_exn
-                  (call_prover
-                     ~handler:(Zkapps_calls.call_handler input increase_amount) )
+                  (add_prover
+                     ~handler:(Zkapps_calls.add_handler input increase_amount) )
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
               , tree.calls )
-          | Recurse (increase_amount, calls_kind) ->
+          | Add_and_call (increase_amount, calls_kind) ->
               let tree, aux =
                 Async.Thread_safe.block_on_async_exn
-                  (recursive_call_prover
+                  (add_and_call_prover
                      ~handler:
-                       (Zkapps_calls.recursive_call_handler input
-                          increase_amount (make_call calls_kind) ) )
+                       (Zkapps_calls.add_and_call_handler input increase_amount
+                          (make_call calls_kind) ) )
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
@@ -260,7 +260,7 @@ let%test_module "Initialize state test" =
       let account =
         []
         |> Parties.Call_forest.cons_tree
-             (Update_state_party.party (Call increments.(0)))
+             (Update_state_party.party (Add increments.(0)))
         |> Parties.Call_forest.cons_tree Initialize_party.party
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
@@ -284,7 +284,7 @@ let%test_module "Initialize state test" =
         []
         |> Parties.Call_forest.cons_tree
              (Update_state_party.party
-                (Recurse (increments.(0), Call increments.(1))) )
+                (Add_and_call (increments.(0), Add increments.(1))) )
         |> Parties.Call_forest.cons_tree Initialize_party.party
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
@@ -308,9 +308,9 @@ let%test_module "Initialize state test" =
         []
         |> Parties.Call_forest.cons_tree
              (Update_state_party.party
-                (Recurse
+                (Add_and_call
                    ( increments.(0)
-                   , Recurse (increments.(1), Call increments.(2)) ) ) )
+                   , Add_and_call (increments.(1), Add increments.(2)) ) ) )
         |> Parties.Call_forest.cons_tree Initialize_party.party
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
@@ -334,11 +334,12 @@ let%test_module "Initialize state test" =
         []
         |> Parties.Call_forest.cons_tree
              (Update_state_party.party
-                (Recurse
+                (Add_and_call
                    ( increments.(0)
-                   , Recurse
+                   , Add_and_call
                        ( increments.(1)
-                       , Recurse (increments.(2), Call increments.(3)) ) ) ) )
+                       , Add_and_call (increments.(2), Add increments.(3)) ) )
+                ) )
         |> Parties.Call_forest.cons_tree Initialize_party.party
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties

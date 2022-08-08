@@ -165,6 +165,15 @@ let update_state_handler (old_state : Field.Constant.t)
   | _ ->
       respond Unhandled
 
+(** Rule to update the zkApp state.
+
+    Asserts that the state was last updated by a proof (ie. that the zkApp has
+    been correctly initialized, and all subsequent updates have been via proof
+    executions).
+
+    This calls into another zkApp method whose shape matches [Call_data], and
+    uses the output value as the new state.
+*)
 let update_state_call public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
@@ -174,7 +183,7 @@ let update_state_call public_key =
       party#set_state 0 new_state ;
       None )
 
-let call_handler (call_input : Call_data.Input.Constant.t)
+let add_handler (call_input : Call_data.Input.Constant.t)
     (increase_amount : Field.Constant.t)
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
@@ -185,7 +194,21 @@ let call_handler (call_input : Call_data.Input.Constant.t)
   | _ ->
       respond Unhandled
 
-let call public_key =
+(** Callable zkApp addition rule.
+
+    Takes the input from the call data, increases it by a number determined by
+    the prover (via the [Increase_amount] request), and constructs the call
+    data
+{[
+  { input = { old_state }
+  ; output =
+    { blinding_value = random () ; new_state = old_state + increase_amount } }
+]}
+
+    This also returns the [output] part of the call data to the prover, so that
+    it can be passed to the calling zkApp execution.
+*)
+let add public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let input =
@@ -198,11 +221,10 @@ let call public_key =
       let new_state = Field.add input.old_state increase_amount in
       let output = { Call_data.Output.Circuit.blinding_value; new_state } in
       let call_data_digest = Call_data.Circuit.digest { input; output } in
-      party#assert_state_proved ;
       party#set_call_data call_data_digest ;
       Some output )
 
-let recursive_call_handler (recursive_call_input : Call_data.Input.Constant.t)
+let add_and_call_handler (add_and_call_input : Call_data.Input.Constant.t)
     (increase_amount : Field.Constant.t)
     (execute_call :
          Call_data.Input.Constant.t
@@ -212,7 +234,7 @@ let recursive_call_handler (recursive_call_input : Call_data.Input.Constant.t)
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
   | Get_call_input ->
-      respond (Provide recursive_call_input)
+      respond (Provide add_and_call_input)
   | Increase_amount ->
       respond (Provide increase_amount)
   | Execute_call input ->
@@ -220,25 +242,42 @@ let recursive_call_handler (recursive_call_input : Call_data.Input.Constant.t)
   | _ ->
       respond Unhandled
 
-let recursive_call public_key =
+(** Callable zkApp addition-and-call rule.
+
+    Takes the input from the call data, and uses it to call into another zkApp
+    method whose shape matches [Call_data].
+    The output value of this sub-call is used as the intermediate state, which
+    is then increased by a number determined by the prover (via the
+    [Increase_amount] request).
+    The return value is exposed to the caller by constructing the call data
+{[
+  { input = { old_state }
+  ; output =
+    { blinding_value = random ()
+    ; new_state = intermediate_state + increase_amount } }
+]}
+
+    This also returns the [output] part of the call data to the prover, so that
+    it can be passed to the calling zkApp execution.
+*)
+let add_and_call public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let ({ Call_data.Input.Circuit.old_state } as call_inputs) =
         exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
       in
-      let new_state = execute_call party old_state in
+      let intermediate_state = execute_call party old_state in
       let blinding_value = exists Field.typ ~compute:Field.Constant.random in
       let increase_amount =
         exists Field.typ ~request:(fun () -> Increase_amount)
       in
-      let new_state = Field.add new_state increase_amount in
+      let new_state = Field.add intermediate_state increase_amount in
       let call_outputs =
         { Call_data.Output.Circuit.blinding_value; new_state }
       in
       let call_data_hash =
         Call_data.Circuit.digest { input = call_inputs; output = call_outputs }
       in
-      party#assert_state_proved ;
       party#set_call_data call_data_hash ;
       Some call_outputs )
 
@@ -256,16 +295,12 @@ let update_state_call_rule public_key : _ Pickles.Inductive_rule.t =
   ; uses_lookup = false
   }
 
-let call_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Call"
-  ; prevs = []
-  ; main = call public_key
-  ; uses_lookup = false
-  }
+let add_rule public_key : _ Pickles.Inductive_rule.t =
+  { identifier = "Add"; prevs = []; main = add public_key; uses_lookup = false }
 
-let recursive_call_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Recursive call"
+let add_and_call_rule public_key : _ Pickles.Inductive_rule.t =
+  { identifier = "Add-and-call call"
   ; prevs = []
-  ; main = recursive_call public_key
+  ; main = add_and_call public_key
   ; uses_lookup = false
   }
