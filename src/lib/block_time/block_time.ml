@@ -164,6 +164,11 @@ module Time = struct
     let to_time_ns_span s =
       Time_ns.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
 
+    let of_time_ns_span ns : t =
+      let int64_ns = ns |> Time_ns.Span.to_int63_ns |> Int63.to_int64 in
+      (* convert to milliseconds *)
+      Int64.(int64_ns / 1_000_000L) |> UInt64.of_int64
+
     let to_string_hum s = to_time_ns_span s |> Time_ns.Span.to_string_hum
 
     let to_ms = UInt64.to_int64
@@ -202,9 +207,11 @@ module Time = struct
     UInt64.of_int64
       (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))
 
-  let to_time t =
-    Time.of_span_since_epoch
-      (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
+  (* TODO: Time.t can't hold the full uint64 range, so this can fail for large t *)
+  let to_time_exn t =
+    let t_int64 = UInt64.to_int64 t in
+    if Int64.(t_int64 < zero) then failwith "converting to negative timestamp" ;
+    Time.of_span_since_epoch (Time.Span.of_ms (Int64.to_float t_int64))
 
   [%%if time_offsets]
 
@@ -249,22 +256,30 @@ module Time = struct
 
   let to_uint64 : t -> UInt64.t = to_span_since_epoch
 
-  let to_string = Fn.compose Int64.to_string to_int64
+  (* TODO: this can fail if the input has more than 63 bits, because it would be serialized to a negative number string *)
+  let to_string_exn t =
+    let t_int64 = UInt64.to_int64 t in
+    if Int64.(t_int64 < zero) then failwith "converting to negative timestamp" ;
+    Int64.to_string t_int64
+
+  let of_time_ns ns : t =
+    let int64_ns = ns |> Time_ns.to_int63_ns_since_epoch |> Int63.to_int64 in
+    (* convert to milliseconds *)
+    Int64.(int64_ns / 1_000_000L) |> UInt64.of_int64
 
   [%%if time_offsets]
 
-  let to_string_system_time (offset : Controller.t) (t : t) : string =
-    let t2 : t =
-      of_span_since_epoch
-        Span.(to_span_since_epoch t + of_time_span (offset ()))
-    in
-    Int64.to_string (to_int64 t2)
+  let to_system_time (offset : Controller.t) (t : t) =
+    of_span_since_epoch Span.(to_span_since_epoch t + of_time_span (offset ()))
 
   [%%else]
 
-  let to_string_system_time _ = Fn.compose Int64.to_string to_int64
+  let to_system_time (_offset : Controller.t) (t : t) = t
 
   [%%endif]
+
+  let to_string_system_time_exn (offset : Controller.t) (t : t) : string =
+    to_system_time offset t |> to_string_exn
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch

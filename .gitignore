@@ -99,3 +99,7 @@ release
 .env
 .envrc
 .direnv/
+
+# pipenv
+Pipfile
+Pipfile.lock

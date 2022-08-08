@@ -364,8 +364,6 @@ val compile_promise :
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
   -> ?return_early_digest_exception:bool
-  -> (module Statement_var_intf with type t = 'a_var)
-  -> (module Statement_value_intf with type t = 'a_value)
   -> public_input:
        ( 'var
        , 'value
@@ -392,6 +390,7 @@ val compile_promise :
            , 'auxiliary_var
            , 'auxiliary_value )
            H4_6.T(Inductive_rule).t )
+  -> unit
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
@@ -416,8 +415,6 @@ val compile :
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
-  -> (module Statement_var_intf with type t = 'a_var)
-  -> (module Statement_value_intf with type t = 'a_value)
   -> public_input:
        ( 'var
        , 'value
@@ -444,6 +441,7 @@ val compile :
            , 'auxiliary_var
            , 'auxiliary_value )
            H4_6.T(Inductive_rule).t )
+  -> unit
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf
