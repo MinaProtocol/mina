@@ -35,6 +35,13 @@ let challenge_polynomial ~one ~add ~mul chals =
       in
       prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
 
+let num_possible_domains = Nat.S Wrap_hack.Padded_length.n
+
+let all_possible_domains =
+  Memo.unit (fun () ->
+      Vector.init num_possible_domains ~f:(fun proofs_verified ->
+          (Common.wrap_domains ~proofs_verified).h ) )
+
 module Make
     (Inputs : Inputs
                 with type Impl.field = Tock.Field.t
@@ -71,6 +78,10 @@ struct
         match x with Shifted_value x -> Sponge.absorb sponge x
     end
   end
+
+  let num_possible_domains = num_possible_domains
+
+  let all_possible_domains = all_possible_domains
 
   let print_g lab (x, y) =
     if debug then
@@ -506,11 +517,23 @@ struct
         let sample_scalar () : Scalar_challenge.t =
           Opt.scalar_challenge sponge
         in
+        let index_digest =
+          with_label "absorb verifier index" (fun () ->
+              let index_sponge = Sponge.create sponge_params in
+              Array.iter
+                (Types.index_to_field_elements
+                   ~g:(fun (z : Inputs.Inner_curve.t) ->
+                     List.to_array (Inner_curve.to_field_elements z) )
+                   m )
+                ~f:(fun x -> Sponge.absorb index_sponge x) ;
+              Sponge.squeeze_field index_sponge )
+        in
         let open Plonk_types.Messages in
         let without = Type.Without_degree_bound in
         let absorb_g gs =
           absorb sponge without (Array.map gs ~f:(fun g -> (Boolean.true_, g)))
         in
+        absorb sponge Field (Boolean.true_, index_digest) ;
         Vector.iter ~f:(Array.iter ~f:(absorb sponge PC)) sg_old ;
         let x_hat =
           let domain = (which_branch, step_domains) in
@@ -774,8 +797,7 @@ struct
      3. Check that the "b" value was computed correctly.
      4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
-      (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ?actual_proofs_verified ~domain ~sponge
+      (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _

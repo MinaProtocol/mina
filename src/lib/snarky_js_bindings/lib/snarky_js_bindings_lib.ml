@@ -2305,18 +2305,33 @@ module Ledger = struct
 
   type private_key = < s : scalar_class Js.t Js.prop > Js.t
 
-  type public_key = < g : group_class Js.t Js.prop > Js.t
+  type public_key = < g : group_class Js.t Js.readonly_prop > Js.t
 
   type zkapp_account =
-    < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop > Js.t
+    < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
+    ; verificationKey :
+        < hash : field_class Js.t Js.readonly_prop
+        ; data : Mina_base.Side_loaded_verification_key.t Js.readonly_prop >
+        Js.t
+        Js.optdef
+        Js.readonly_prop
+    ; zkappVersion : int Js.readonly_prop
+    ; sequenceState : field_class Js.t Js.js_array Js.t Js.readonly_prop
+    ; lastSequenceSlot : int Js.readonly_prop
+    ; provedState : bool_class Js.t Js.readonly_prop >
+    Js.t
 
   type account =
-    < publicKey : group_class Js.t Js.readonly_prop
+    (* TODO: permissions, timing *)
+    < publicKey : public_key Js.readonly_prop
     ; tokenId : field_class Js.t Js.readonly_prop
     ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; balance : js_uint64 Js.readonly_prop
     ; nonce : js_uint32 Js.readonly_prop
-    ; zkapp : zkapp_account Js.readonly_prop >
+    ; receiptChainHash : field_class Js.t Js.readonly_prop
+    ; delegate : public_key Js.optdef Js.readonly_prop
+    ; votingFor : field_class Js.t Js.readonly_prop
+    ; zkapp : zkapp_account Js.optdef Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -2523,18 +2538,6 @@ module Ledger = struct
           Unsigned.UInt64.to_string n |> Field.Constant.of_string |> field
       end
 
-    let app_state (a : Mina_base.Account.t) =
-      let xs = new%js Js.array_empty in
-      ( match a.zkapp with
-      | Some s ->
-          Pickles_types.Vector.iter s.app_state ~f:(fun x ->
-              ignore (xs##push (field x)) )
-      | None ->
-          for _ = 0 to max_state_size - 1 do
-            xs##push (field Field.Constant.zero) |> ignore
-          done ) ;
-      xs
-
     let public_key (pk : Signature_lib.Public_key.Compressed.t) =
       let x, y = Signature_lib.Public_key.decompress_exn pk in
       to_js_group (Field.constant x) (Field.constant y)
@@ -2552,9 +2555,48 @@ module Ledger = struct
         val s = to_js_scalar s
       end
 
-    let account (a : Mina_base.Account.t) : account =
+    let option (transform : 'a -> 'b) (x : 'a option) =
+      Js.Optdef.option (Option.map x ~f:transform)
+
+    let app_state s =
+      let xs = new%js Js.array_empty in
+      Pickles_types.Vector.iter s ~f:(fun x -> ignore (xs##push (field x))) ;
+      xs
+
+    let verification_key
+        (vk : (Mina_base.Side_loaded_verification_key.t, Impl.field) With_hash.t)
+        =
       object%js
-        val publicKey = public_key a.public_key
+        val hash = field (With_hash.hash vk)
+
+        val data = With_hash.data vk
+      end
+
+    let zkapp_account (a : Mina_base.Zkapp_account.t) : zkapp_account =
+      object%js
+        val appState = app_state a.app_state
+
+        val verificationKey = option verification_key a.verification_key
+
+        val zkappVersion = Mina_numbers.Zkapp_version.to_int a.zkapp_version
+
+        val sequenceState = app_state a.sequence_state
+
+        val lastSequenceSlot =
+          Mina_numbers.Global_slot.to_int a.last_sequence_slot
+
+        val provedState =
+          new%js bool_constr (As_bool.of_js_bool @@ Js.bool a.proved_state)
+      end
+
+    let account (a : Mina_base.Account.t) : account =
+      let to_public_key pk =
+        object%js
+          val g = public_key pk
+        end
+      in
+      object%js
+        val publicKey = to_public_key a.public_key
 
         val tokenId = token_id a.token_id
 
@@ -2564,14 +2606,14 @@ module Ledger = struct
 
         val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
 
-        val zkapp =
-          object%js
-            val appState = app_state a
-          end
-      end
+        val receiptChainHash = field (a.receipt_chain_hash :> Impl.field)
 
-    let option (transform : 'a -> 'b) (x : 'a option) =
-      Js.Optdef.option (Option.map x ~f:transform)
+        val delegate = option to_public_key a.delegate
+
+        val votingFor = field (a.voting_for :> Impl.field)
+
+        val zkapp = option zkapp_account a.zkapp
+      end
   end
 
   module Party = Mina_base.Party
@@ -2776,6 +2818,27 @@ module Ledger = struct
     Js.string @@ Mina_base.Signed_command_memo.to_base58_check
     @@ Mina_base.Signed_command_memo.create_from_string_exn @@ Js.to_string memo
 
+  (* low-level building blocks for encoding *)
+  let binary_string_to_base58_check bin_string (version_byte : int) :
+      Js.js_string Js.t =
+    let module T = struct
+      let version_byte = Char.of_int_exn version_byte
+
+      let description = "any"
+    end in
+    let module B58 = Base58_check.Make (T) in
+    bin_string |> B58.encode |> Js.string
+
+  let binary_string_of_base58_check (base58 : Js.js_string Js.t)
+      (version_byte : int) =
+    let module T = struct
+      let version_byte = Char.of_int_exn version_byte
+
+      let description = "any"
+    end in
+    let module B58 = Base58_check.Make (T) in
+    base58 |> Js.to_string |> B58.decode_exn
+
   let add_account_exn (l : L.t) pk (balance : string) =
     let account_id = account_id pk default_token_id_js in
     let bal_u64 = Unsigned.UInt64.of_string balance in
@@ -2957,9 +3020,35 @@ module Ledger = struct
     static_method "publicKeyOfString" public_key_of_string ;
     static_method "privateKeyToString" private_key_to_string ;
     static_method "privateKeyOfString" private_key_of_string ;
+
+    (* these are implemented in JS, but kept here for consistency tests *)
     static_method "fieldToBase58" field_to_base58 ;
     static_method "fieldOfBase58" field_of_base58 ;
+
     static_method "memoToBase58" memo_to_base58 ;
+
+    let version_bytes =
+      let open Base58_check.Version_bytes in
+      object%js
+        val tokenIdKey = Char.to_int token_id_key
+
+        val receiptChainHash = Char.to_int receipt_chain_hash
+
+        val ledgerHash = Char.to_int ledger_hash
+
+        val epochSeed = Char.to_int epoch_seed
+
+        val stateHash = Char.to_int state_hash
+      end
+    in
+    static "encoding"
+      (object%js
+         val toBase58 = binary_string_to_base58_check
+
+         val ofBase58 = binary_string_of_base58_check
+
+         val versionBytes = version_bytes
+      end ) ;
 
     static_method "hashPartyFromJson" hash_party ;
     static_method "hashPartyFromFields"
