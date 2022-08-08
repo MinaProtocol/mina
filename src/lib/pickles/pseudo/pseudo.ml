@@ -83,9 +83,11 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
             failwith "Pseudo.Domain.shifts: found variable shifts"
           else
             let open Pickles_types.Plonk_types.Shifts in
-            let mk f = mask which (Vector.map all_shifts ~f) in
-            Array.init num_shifts ~f:(fun i ->
-                mk (fun a -> Field.constant a.(i)) )
+            let get_ith_shift i =
+              mask which
+                (Vector.map all_shifts ~f:(fun a -> Field.constant a.(i)))
+            in
+            Array.init num_shifts ~f:get_ith_shift
 
     let generator (type n) ((which, log2s) : (int, n) t) ~domain_generator =
       mask which (Vector.map log2s ~f:(fun d -> domain_generator ~log2_size:d))
