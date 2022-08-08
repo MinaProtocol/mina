@@ -1,0 +1,14 @@
+(library
+ (name mina_transaction_unix)
+ (public_name mina_transaction.unix)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   yojson
+   ;; local libraries
+   graphql_basic_scalars
+   mina_transaction
+ )
+ (preprocess (pps ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Utils that depends on the unix library"))

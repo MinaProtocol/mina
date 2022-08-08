@@ -196,9 +196,9 @@ let wrap_main
                ; bulletproof_challenges
                }
            ; sponge_digest_before_evaluations
-           ; me_only = me_only_digest
+           ; messages_for_next_wrap_proof = messages_for_next_wrap_proof_digest
            }
-       ; pass_through
+       ; messages_for_next_step_proof
        } :
         ( _
         , _
@@ -408,15 +408,17 @@ let wrap_main
               chals )
         in
         let prev_statement =
-          let prev_me_onlys =
+          let prev_messages_for_next_wrap_proof =
             Vector.map2 prev_step_accs old_bp_chals
               ~f:(fun sacc (T (max_local_max_proofs_verified, chals)) ->
-                Wrap_hack.Checked.hash_me_only max_local_max_proofs_verified
+                Wrap_hack.Checked.hash_messages_for_next_wrap_proof
+                  max_local_max_proofs_verified
                   { challenge_polynomial_commitment = sacc
                   ; old_bulletproof_challenges = chals
                   } )
           in
-          { Types.Step.Statement.pass_through = prev_me_onlys
+          { Types.Step.Statement.messages_for_next_wrap_proof =
+              prev_messages_for_next_wrap_proof
           ; proof_state = prev_proof_state
           }
         in
@@ -481,9 +483,10 @@ let wrap_main
         with_label __LOC__ (fun () ->
             Boolean.Assert.is_true bulletproof_success ) ;
         with_label __LOC__ (fun () ->
-            Field.Assert.equal me_only_digest
-              (Wrap_hack.Checked.hash_me_only Max_proofs_verified.n
-                 { Types.Wrap.Proof_state.Me_only
+            Field.Assert.equal messages_for_next_wrap_proof_digest
+              (Wrap_hack.Checked.hash_messages_for_next_wrap_proof
+                 Max_proofs_verified.n
+                 { Types.Wrap.Proof_state.Messages_for_next_wrap_proof
                    .challenge_polynomial_commitment =
                      openings_proof.challenge_polynomial_commitment
                  ; old_bulletproof_challenges = new_bulletproof_challenges

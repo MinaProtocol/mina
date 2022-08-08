@@ -1,4 +1,4 @@
-module Serializing = Graphql_lib.Serializing
+module Scalars = Graphql_lib.Scalars
 
 module Get_options_metadata =
 [%graphql
@@ -7,7 +7,7 @@ module Get_options_metadata =
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
-            fee @ppxCustom(module: "Serializing.UInt64")
+            fee
           }
         }
       }
@@ -18,7 +18,7 @@ module Get_options_metadata =
 
       account(publicKey: $sender, token: $token_id) {
         balance {
-          blockHeight @ppxCustom(module: "Serializing.UInt32")
+          blockHeight
           stateHash
         }
         nonce

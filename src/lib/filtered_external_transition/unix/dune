@@ -1,0 +1,15 @@
+(library
+ (name filtered_external_transition_unix)
+ (public_name filtered_external_transition.unix)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   yojson
+   ;; local libraries
+   graphql_basic_scalars
+   filtered_external_transition
+ )
+ (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Utils that depends on the unix library"))
