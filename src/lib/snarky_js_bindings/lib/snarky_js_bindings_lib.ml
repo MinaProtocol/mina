@@ -2880,30 +2880,6 @@ module Ledger = struct
         Mina_base.Zkapp_precondition.Protocol_state.View.t ->
       json |> Js.to_string |> Yojson.Safe.from_string |> of_json
 
-  let dummy_state_view : Mina_base.Zkapp_precondition.Protocol_state.View.t =
-    let epoch_data =
-      { Mina_base.Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger =
-          { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
-          ; total_currency = Currency.Amount.zero
-          }
-      ; seed = Field.Constant.zero
-      ; start_checkpoint = Field.Constant.zero
-      ; lock_checkpoint = Field.Constant.zero
-      ; epoch_length = Mina_numbers.Length.zero
-      }
-    in
-    { snarked_ledger_hash = Field.Constant.zero
-    ; timestamp = Block_time.zero
-    ; blockchain_length = Mina_numbers.Length.zero
-    ; min_window_density = Mina_numbers.Length.zero
-    ; last_vrf_output = ()
-    ; total_currency = Currency.Amount.zero
-    ; global_slot_since_hard_fork = Mina_numbers.Global_slot.zero
-    ; global_slot_since_genesis = Mina_numbers.Global_slot.zero
-    ; staking_epoch_data = epoch_data
-    ; next_epoch_data = epoch_data
-    }
-
   let apply_parties_transaction l (txn : Parties.t)
       (account_creation_fee : string) (network_state : Mina_base.Zkapp_precondition.Protocol_state.View.t) =
     check_party_signatures txn ;
