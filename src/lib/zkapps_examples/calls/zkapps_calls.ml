@@ -3,8 +3,16 @@ open Snark_params.Tick.Run
 open Signature_lib
 open Mina_base
 
+(** State to initialize the zkApp to after deployment. *)
 let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
 
+(** Rule to initialize the zkApp.
+
+    Asserts that the state was not last updated by a proof (ie. the zkApp is
+    freshly deployed, or that the state was modified -- tampered with --
+    without using a proof).
+    The app state is set to the initial state.
+*)
 let initialize public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
