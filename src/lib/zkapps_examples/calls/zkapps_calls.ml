@@ -109,7 +109,11 @@ type _ Snarky_backendless.Request.t +=
          * Zkapp_call_forest.t )
          Snarky_backendless.Request.t
 
-(** Helper function for executing zkApp calls. *)
+(** Helper function for executing zkApp calls.
+
+    The particular details of the called party are determined by the handler
+    for the [Execute_call] request.
+*)
 let execute_call party old_state =
   let call_inputs = { Call_data.Input.Circuit.old_state } in
   let call_outputs, called_party, sub_calls =
