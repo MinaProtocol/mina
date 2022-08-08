@@ -244,17 +244,15 @@ let add_and_call_handler (add_and_call_input : Call_data.Input.Constant.t)
 
 (** Callable zkApp addition-and-call rule.
 
-    Takes the input from the call data, and uses it to call into another zkApp
-    method whose shape matches [Call_data].
-    The output value of this sub-call is used as the intermediate state, which
-    is then increased by a number determined by the prover (via the
-    [Increase_amount] request).
+    Takes the input from the call data, increases it by a number determined by
+    the prover (via the [Increase_amount] request), passes the result as the
+    input to another zkApp call method whose shape matches [Call_data].
     The return value is exposed to the caller by constructing the call data
 {[
   { input = { old_state }
   ; output =
     { blinding_value = random ()
-    ; new_state = intermediate_state + increase_amount } }
+    ; new_state = call_other_zkapp(old_state + increase_amount) } }
 ]}
 
     This also returns the [output] part of the call data to the prover, so that
@@ -266,12 +264,12 @@ let add_and_call public_key =
       let ({ Call_data.Input.Circuit.old_state } as call_inputs) =
         exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
       in
-      let intermediate_state = execute_call party old_state in
       let blinding_value = exists Field.typ ~compute:Field.Constant.random in
       let increase_amount =
         exists Field.typ ~request:(fun () -> Increase_amount)
       in
-      let new_state = Field.add intermediate_state increase_amount in
+      let intermediate_state = Field.add old_state increase_amount in
+      let new_state = execute_call party intermediate_state in
       let call_outputs =
         { Call_data.Output.Circuit.blinding_value; new_state }
       in
