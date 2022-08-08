@@ -66,8 +66,7 @@ let%test_module "Initialize state test" =
             ; recursive_call_prover
             ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
-        ~auxiliary_typ:
-          (option_typ Impl.(Typ.(list ~length:8 Field.typ * Field.typ)))
+        ~auxiliary_typ:(option_typ Impl.(Typ.(Field.typ * Field.typ)))
         ~branches:(module Nat.N4)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
@@ -135,12 +134,12 @@ let%test_module "Initialize state test" =
     end
 
     module Update_state_party = struct
-      let old_state = List.init 8 ~f:(fun _ -> Snark_params.Tick.Field.one)
+      let old_state = Snark_params.Tick.Field.one
 
       let handler (calls_kind : calls_kind) old_state =
         let open Snark_params.Tick.Run in
         let rec make_call calls_kind input :
-            (Field.Constant.t list * Field.Constant.t)
+            (Field.Constant.t * Field.Constant.t)
             * Zkapp_call_forest.party
             * Zkapp_call_forest.t =
           match calls_kind with

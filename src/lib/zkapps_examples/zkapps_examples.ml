@@ -131,6 +131,13 @@ module Party_under_construction = struct
             }
         | _ ->
             failwith "Incorrect length of app_state"
+
+      let set_state i value (t : t) =
+        if i < 0 || i >= 8 then failwith "Incorrect index" ;
+        { app_state =
+            Pickles_types.Vector.mapi t.app_state ~f:(fun j old_value ->
+                if i = j then Some value else old_value )
+        }
     end
 
     type t =
@@ -234,6 +241,9 @@ module Party_under_construction = struct
     let set_full_state app_state (t : t) =
       { t with update = Update.set_full_state app_state t.update }
 
+    let set_state idx data (t : t) =
+      { t with update = Update.set_state idx data t.update }
+
     let call party calls (t : t) =
       { t with rev_calls = (party, calls) :: t.rev_calls }
 
@@ -251,6 +261,9 @@ class party ~public_key ?token_id =
 
     method assert_state_unproved =
       party <- Party_under_construction.In_circuit.assert_state_unproved party
+
+    method set_state idx data =
+      party <- Party_under_construction.In_circuit.set_state idx data party
 
     method set_full_state app_state =
       party <-
