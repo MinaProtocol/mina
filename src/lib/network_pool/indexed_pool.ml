@@ -222,7 +222,7 @@ module For_tests = struct
                 Transaction_hash.User_command_with_valid_signature.command tx
               in
               [%test_eq: Account_nonce.t]
-                (User_command.application_nonce unchecked)
+                (User_command.applicable_at_nonce unchecked)
                 curr_nonce ;
               check_consistent tx ;
               ( User_command.expected_target_nonce unchecked
@@ -257,12 +257,12 @@ module For_tests = struct
           applicable ) ;
       let tx' =
         F_sequence.find sender_txs ~f:(fun cmd ->
-            let application_nonce =
+            let applicable_at_nonce =
               cmd |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.application_nonce
+              |> User_command.applicable_at_nonce
             in
-            Account_nonce.equal application_nonce
-            @@ User_command.application_nonce unchecked )
+            Account_nonce.equal applicable_at_nonce
+            @@ User_command.applicable_at_nonce unchecked )
         |> Option.value_exn
       in
       [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx tx'
@@ -570,13 +570,13 @@ let remove_with_dependents_exn :
   assert (not @@ F_sequence.is_empty sender_queue) ;
   let cmd_nonce =
     Transaction_hash.User_command_with_valid_signature.command cmd
-    |> User_command.application_nonce
+    |> User_command.applicable_at_nonce
   in
   let cmd_index =
     F_sequence.findi sender_queue ~f:(fun cmd' ->
         let nonce =
           Transaction_hash.User_command_with_valid_signature.command cmd'
-          |> User_command.application_nonce
+          |> User_command.applicable_at_nonce
         in
         (* we just compare nonce equality since the command we are looking for already exists in the sequence *)
         Account_nonce.equal nonce cmd_nonce )
@@ -687,7 +687,7 @@ let revalidate :
       let first_cmd = F_sequence.head_exn queue in
       let first_nonce =
         first_cmd |> Transaction_hash.User_command_with_valid_signature.command
-        |> User_command.application_nonce
+        |> User_command.applicable_at_nonce
       in
       if Account_nonce.(current_nonce < first_nonce) then
         let dropped, t'' = remove_with_dependents_exn' t first_cmd in
@@ -698,7 +698,7 @@ let revalidate :
           F_sequence.findi queue ~f:(fun cmd' ->
               let nonce =
                 Transaction_hash.User_command_with_valid_signature.command cmd'
-                |> User_command.application_nonce
+                |> User_command.applicable_at_nonce
               in
               Account_nonce.equal nonce current_nonce )
           |> Option.value ~default:(F_sequence.length queue)
@@ -841,8 +841,8 @@ let handle_committed_txn :
       in
       if
         Account_nonce.(
-          User_command.application_nonce committed'
-          <> User_command.application_nonce first_cmd')
+          User_command.applicable_at_nonce committed'
+          <> User_command.applicable_at_nonce first_cmd')
       then
         Error
           (`Queued_txns_by_sender
@@ -1030,7 +1030,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
     let unchecked = Transaction_hash.User_command.data unchecked_cmd in
     let fee = User_command.fee unchecked in
     let fee_per_wu = User_command.fee_per_wu unchecked in
-    let cmd_application_nonce = User_command.application_nonce unchecked in
+    let cmd_applicable_at_nonce = User_command.applicable_at_nonce unchecked in
     (* Result errors indicate problems with the command, while assert failures
        indicate bugs in Mina. *)
     let%bind consumed =
@@ -1067,10 +1067,10 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
               (* nothing queued for this sender *)
               let%bind () =
                 Result.ok_if_true
-                  (Account_nonce.equal current_nonce cmd_application_nonce)
+                  (Account_nonce.equal current_nonce cmd_applicable_at_nonce)
                   ~error:
                     (Invalid_nonce
-                       (`Expected current_nonce, cmd_application_nonce) )
+                       (`Expected current_nonce, cmd_applicable_at_nonce) )
                 (* C1/1a *)
               in
               let%map () =
@@ -1093,17 +1093,17 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
     | Some (queued_cmds, reserved_currency) ->
         assert (not @@ F_sequence.is_empty queued_cmds) ;
         (* C1/C1b *)
-        let queue_application_nonce =
+        let queue_applicable_at_nonce =
           F_sequence.head_exn queued_cmds
           |> Transaction_hash.User_command_with_valid_signature.command
-          |> User_command.application_nonce
+          |> User_command.applicable_at_nonce
         in
         let queue_target_nonce =
           F_sequence.last_exn queued_cmds
           |> Transaction_hash.User_command_with_valid_signature.command
           |> User_command.expected_target_nonce
         in
-        if Account_nonce.equal queue_target_nonce cmd_application_nonce then (
+        if Account_nonce.equal queue_target_nonce cmd_applicable_at_nonce then (
           (* this command goes on the end *)
           let%bind reserved_currency' =
             M.of_result
@@ -1134,28 +1134,28 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           in
           by_sender := { !by_sender with data = Some new_state } ;
           (cmd, Sequence.empty) )
-        else if Account_nonce.equal queue_application_nonce current_nonce then (
+        else if Account_nonce.equal queue_applicable_at_nonce current_nonce then (
           (* we're replacing a command *)
           let%bind () =
             Result.ok_if_true
-              (Account_nonce.between ~low:queue_application_nonce
-                 ~high:queue_target_nonce cmd_application_nonce )
+              (Account_nonce.between ~low:queue_applicable_at_nonce
+                 ~high:queue_target_nonce cmd_applicable_at_nonce )
               ~error:
                 (Invalid_nonce
-                   ( `Between (queue_application_nonce, queue_target_nonce)
-                   , cmd_application_nonce ) )
+                   ( `Between (queue_applicable_at_nonce, queue_target_nonce)
+                   , cmd_applicable_at_nonce ) )
             |> M.of_result
             (* C1/C1b *)
           in
           let replacement_index =
             F_sequence.findi queued_cmds ~f:(fun cmd' ->
-                let cmd_application_nonce' =
+                let cmd_applicable_at_nonce' =
                   Transaction_hash.User_command_with_valid_signature.command
                     cmd'
-                  |> User_command.application_nonce
+                  |> User_command.applicable_at_nonce
                 in
-                Account_nonce.compare cmd_application_nonce
-                  cmd_application_nonce'
+                Account_nonce.compare cmd_applicable_at_nonce
+                  cmd_applicable_at_nonce'
                 <= 0 )
             |> Option.value_exn
           in
@@ -1167,8 +1167,8 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             |> Transaction_hash.User_command_with_valid_signature.command
           in
           assert (
-            Account_nonce.compare cmd_application_nonce
-              (User_command.application_nonce to_drop)
+            Account_nonce.compare cmd_applicable_at_nonce
+              (User_command.applicable_at_nonce to_drop)
             <= 0 ) ;
           (* We check the fee increase twice because we need to be sure the
              subtraction is safe. *)
@@ -1265,7 +1265,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           M.of_result
             (Error
                (Invalid_nonce
-                  (`Expected queue_target_nonce, cmd_application_nonce) ) )
+                  (`Expected queue_target_nonce, cmd_applicable_at_nonce) ) )
 end
 
 module Add_from_gossip_exn0 = Add_from_gossip_exn (Writer_result)
@@ -1363,7 +1363,7 @@ let add_from_backtrack :
              (unchecked |> User_command.expected_target_nonce)
              ( first_queued
              |> Transaction_hash.User_command_with_valid_signature.command
-             |> User_command.application_nonce ) )
+             |> User_command.applicable_at_nonce ) )
       then
         failwith
         @@ sprintf
@@ -1741,13 +1741,13 @@ let%test_module _ =
             let replace_nonce =
               replace_cmd
               |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.application_nonce
+              |> User_command.applicable_at_nonce
             in
             List.findi setup_cmds ~f:(fun _i cmd ->
                 let cmd_nonce =
                   cmd
                   |> Transaction_hash.User_command_with_valid_signature.command
-                  |> User_command.application_nonce
+                  |> User_command.applicable_at_nonce
                 in
                 Account_nonce.compare replace_nonce cmd_nonce <= 0 )
             |> Option.value_exn
@@ -1756,11 +1756,11 @@ let%test_module _ =
             Account_nonce.to_int
               ( replace_cmd
               |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.application_nonce )
+              |> User_command.applicable_at_nonce )
             - Account_nonce.to_int
                 ( List.hd_exn setup_cmds
                 |> Transaction_hash.User_command_with_valid_signature.command
-                |> User_command.application_nonce )
+                |> User_command.applicable_at_nonce )
           in
           Printf.printf
             !"replacement indices: new=%d, old=%d\n%!"
