@@ -67,7 +67,7 @@ The following intends to be an exhaustive list of those sorts of operations:
 1. `Zkapp_fee_payer_dec`
 2. `Zkapp_balance_change`
 
-Note that only balance changes that correspond with the default MINA token (`token_id` = 1) should be considered as changes here.
+Note that only balance changes that correspond with the default MINA token (`token_id` = 'wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf' -- the base58check representation of the Field element "one") should be considered as changes here.
 
 There are many new types of failures and they're per-party in zkApps transactions. These are enumerated in [`transaction_status.ml`](https://github.com/MinaProtocol/mina/blob/a6e5f182855b3f4b4afb0ea8636760e618e2f7a0/src/lib/mina_base/transaction_status.ml). They can be pulled from the `zkapp_party_failures` table in the archive database. Since the errors are already per-party, they're easily associated with operations on a one-to-one basis. These can be added verbatim to as ["reason metadata"](https://github.com/MinaProtocol/mina/blob/a6e5f182855b3f4b4afb0ea8636760e618e2f7a0/src/lib/rosetta_lib/user_command_info.ml#L449) to those operations with a `Failed` label.
 
