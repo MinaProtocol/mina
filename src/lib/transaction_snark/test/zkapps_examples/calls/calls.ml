@@ -80,7 +80,9 @@ let%test_module "Initialize state test" =
           ; Zkapps_calls.recursive_call_rule pk_compressed
           ] )
 
-    type calls_kind = Recurse of calls_kind | Call
+    type calls_kind =
+      | Recurse of Snark_params.Tick.Run.Field.Constant.t * calls_kind
+      | Call of Snark_params.Tick.Run.Field.Constant.t
 
     module P = (val p_module)
 
@@ -134,7 +136,7 @@ let%test_module "Initialize state test" =
     end
 
     module Update_state_party = struct
-      let old_state = Snark_params.Tick.Field.one
+      let old_state = Snark_params.Tick.Field.zero
 
       let handler (calls_kind : calls_kind) old_state =
         let rec make_call calls_kind input :
@@ -142,21 +144,22 @@ let%test_module "Initialize state test" =
             * Zkapp_call_forest.party
             * Zkapp_call_forest.t =
           match calls_kind with
-          | Call ->
+          | Call increase_amount ->
               let tree, aux =
                 Async.Thread_safe.block_on_async_exn
-                  (call_prover ~handler:(Zkapps_calls.call_handler input))
+                  (call_prover
+                     ~handler:(Zkapps_calls.call_handler input increase_amount) )
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
               , tree.calls )
-          | Recurse calls_kind ->
+          | Recurse (increase_amount, calls_kind) ->
               let tree, aux =
                 Async.Thread_safe.block_on_async_exn
                   (recursive_call_prover
                      ~handler:
                        (Zkapps_calls.recursive_call_handler input
-                          (make_call calls_kind) ) )
+                          increase_amount (make_call calls_kind) ) )
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
@@ -248,9 +251,16 @@ let%test_module "Initialize state test" =
           Ledger.get ledger loc )
 
     let%test_unit "Initialize and update nonrecursive" =
+      let increments =
+        Array.init 1 ~f:(fun _ -> Snark_params.Tick.Field.random ())
+      in
+      let expected_result =
+        Array.reduce_exn ~f:Snark_params.Tick.Field.add increments
+      in
       let account =
         []
-        |> Parties.Call_forest.cons_tree (Update_state_party.party Call)
+        |> Parties.Call_forest.cons_tree
+             (Update_state_party.party (Call increments.(0)))
         |> Parties.Call_forest.cons_tree Initialize_party.party
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
@@ -258,16 +268,23 @@ let%test_module "Initialize state test" =
       let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
-      assert (Snark_params.Tick.Field.(equal one) first_state) ;
+      assert (Snark_params.Tick.Field.equal expected_result first_state) ;
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
 
     let%test_unit "Initialize and update single recursive" =
+      let increments =
+        Array.init 2 ~f:(fun _ -> Snark_params.Tick.Field.random ())
+      in
+      let expected_result =
+        Array.reduce_exn ~f:Snark_params.Tick.Field.add increments
+      in
       let account =
         []
         |> Parties.Call_forest.cons_tree
-             (Update_state_party.party (Recurse Call))
+             (Update_state_party.party
+                (Recurse (increments.(0), Call increments.(1))) )
         |> Parties.Call_forest.cons_tree Initialize_party.party
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
@@ -275,16 +292,25 @@ let%test_module "Initialize state test" =
       let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
-      assert (Snark_params.Tick.Field.(equal one) first_state) ;
+      assert (Snark_params.Tick.Field.equal expected_result first_state) ;
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
 
     let%test_unit "Initialize and update double recursive" =
+      let increments =
+        Array.init 3 ~f:(fun _ -> Snark_params.Tick.Field.random ())
+      in
+      let expected_result =
+        Array.reduce_exn ~f:Snark_params.Tick.Field.add increments
+      in
       let account =
         []
         |> Parties.Call_forest.cons_tree
-             (Update_state_party.party (Recurse (Recurse Call)))
+             (Update_state_party.party
+                (Recurse
+                   ( increments.(0)
+                   , Recurse (increments.(1), Call increments.(2)) ) ) )
         |> Parties.Call_forest.cons_tree Initialize_party.party
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
@@ -292,16 +318,27 @@ let%test_module "Initialize state test" =
       let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
-      assert (Snark_params.Tick.Field.(equal one) first_state) ;
+      assert (Snark_params.Tick.Field.equal expected_result first_state) ;
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
 
     let%test_unit "Initialize and update triple recursive" =
+      let increments =
+        Array.init 4 ~f:(fun _ -> Snark_params.Tick.Field.random ())
+      in
+      let expected_result =
+        Array.reduce_exn ~f:Snark_params.Tick.Field.add increments
+      in
       let account =
         []
         |> Parties.Call_forest.cons_tree
-             (Update_state_party.party (Recurse (Recurse (Recurse Call))))
+             (Update_state_party.party
+                (Recurse
+                   ( increments.(0)
+                   , Recurse
+                       ( increments.(1)
+                       , Recurse (increments.(2), Call increments.(3)) ) ) ) )
         |> Parties.Call_forest.cons_tree Initialize_party.party
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
@@ -309,7 +346,7 @@ let%test_module "Initialize state test" =
       let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
-      assert (Snark_params.Tick.Field.(equal one) first_state) ;
+      assert (Snark_params.Tick.Field.equal expected_result first_state) ;
       Pickles_types.Vector.iter
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state

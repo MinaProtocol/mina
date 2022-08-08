@@ -100,6 +100,7 @@ type _ Snarky_backendless.Request.t +=
   | (* TODO: Tweak pickles so this can be an explicit input. *)
       Get_call_input :
       Call_data.Input.Constant.t Snarky_backendless.Request.t
+  | Increase_amount : Field.Constant.t Snarky_backendless.Request.t
   | Execute_call :
       Call_data.Input.Constant.t
       -> ( Call_data.Output.Constant.t
@@ -168,17 +169,18 @@ let update_state_call public_key =
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let old_state = exists Field.typ ~request:(fun () -> Old_state) in
       let new_state = execute_call party { old_state } in
-      ignore new_state ;
-      (* TODO *)
       party#assert_state_proved ;
-      party#set_state 0 old_state ;
+      party#set_state 0 new_state ;
       None )
 
 let call_handler (call_input : Call_data.Input.Constant.t)
+    (increase_amount : Field.Constant.t)
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
   | Get_call_input ->
       respond (Provide call_input)
+  | Increase_amount ->
+      respond (Provide increase_amount)
   | _ ->
       respond Unhandled
 
@@ -189,8 +191,10 @@ let call public_key =
         exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
       in
       let blinding_value = exists Field.typ ~compute:Field.Constant.random in
-      let modify_value = exists Field.typ ~compute:Field.Constant.random in
-      let new_state = Field.add input.old_state modify_value in
+      let increase_amount =
+        exists Field.typ ~request:(fun () -> Increase_amount)
+      in
+      let new_state = Field.add input.old_state increase_amount in
       let output = { Call_data.Output.Circuit.blinding_value; new_state } in
       let call_data_digest = Call_data.Circuit.digest { input; output } in
       party#assert_state_proved ;
@@ -198,6 +202,7 @@ let call public_key =
       Some output )
 
 let recursive_call_handler (recursive_call_input : Call_data.Input.Constant.t)
+    (increase_amount : Field.Constant.t)
     (execute_call :
          Call_data.Input.Constant.t
       -> Call_data.Output.Constant.t
@@ -207,6 +212,8 @@ let recursive_call_handler (recursive_call_input : Call_data.Input.Constant.t)
   match request with
   | Get_call_input ->
       respond (Provide recursive_call_input)
+  | Increase_amount ->
+      respond (Provide increase_amount)
   | Execute_call input ->
       respond (Provide (execute_call input))
   | _ ->
@@ -220,8 +227,10 @@ let recursive_call public_key =
       in
       let new_state = execute_call party call_inputs in
       let blinding_value = exists Field.typ ~compute:Field.Constant.random in
-      let modify_value = exists Field.typ ~compute:Field.Constant.random in
-      let new_state = Field.add new_state modify_value in
+      let increase_amount =
+        exists Field.typ ~request:(fun () -> Increase_amount)
+      in
+      let new_state = Field.add new_state increase_amount in
       let call_outputs =
         { Call_data.Output.Circuit.blinding_value; new_state }
       in
