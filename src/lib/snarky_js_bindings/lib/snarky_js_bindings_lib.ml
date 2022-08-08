@@ -2870,6 +2870,16 @@ module Ledger = struct
   let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
     add_account_exn l##.value pk (Js.to_string balance)
 
+  let protocol_state_of_json =
+    let deriver =
+      Mina_base.Zkapp_precondition.Protocol_state.View.deriver
+      @@ Fields_derivers_zkapps.o ()
+    in
+    let of_json = Fields_derivers_zkapps.of_json deriver in
+    fun (json : Js.js_string Js.t) :
+        Mina_base.Zkapp_precondition.Protocol_state.View.t ->
+      json |> Js.to_string |> Yojson.Safe.from_string |> of_json
+
   let dummy_state_view : Mina_base.Zkapp_precondition.Protocol_state.View.t =
     let epoch_data =
       { Mina_base.Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger =

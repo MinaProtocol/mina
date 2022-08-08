@@ -1117,6 +1117,39 @@ module Protocol_state = struct
           Epoch_data.Poly.t )
         Poly.t
     end
+
+    let epoch_data_deriver obj =
+      let open Fields_derivers_zkapps.Derivers in
+      let ledger obj' =
+        let ( !. ) =
+          ( !. ) ~t_fields_annots:Epoch_ledger.Poly.t_fields_annots
+        in
+        Epoch_ledger.Poly.Fields.make_creator obj' ~hash:!.field
+          ~total_currency:!.amount
+        |> finish "EpochLedger"
+             ~t_toplevel_annots:Epoch_ledger.Poly.t_toplevel_annots
+      in
+      let ( !. ) = ( !. ) ~t_fields_annots:Epoch_data.Poly.t_fields_annots in
+      Epoch_data.Poly.Fields.make_creator obj ~ledger:!.ledger ~seed:!.field
+        ~start_checkpoint:!.field ~lock_checkpoint:!.field
+        ~epoch_length:!.uint32
+      |> finish "EpochData" ~t_toplevel_annots:Epoch_data.Poly.t_toplevel_annots
+
+    let deriver obj =
+      let open Fields_derivers_zkapps.Derivers in
+      let ( !. ) ?skip_data =
+        ( !. ) ?skip_data ~t_fields_annots:Poly.t_fields_annots
+      in
+      let last_vrf_output = ( !. ) ~skip_data:() skip in
+      Poly.Fields.make_creator obj ~snarked_ledger_hash:!.field
+        ~timestamp:!.Numeric.Derivers.block_time_inner
+        ~blockchain_length:!.uint32 ~min_window_density:!.uint32
+        ~last_vrf_output ~total_currency:!.amount
+        ~global_slot_since_hard_fork:!.uint32
+        ~global_slot_since_genesis:!.uint32
+        ~staking_epoch_data:!.epoch_data_deriver
+        ~next_epoch_data:!.epoch_data_deriver
+      |> finish "NetworkView" ~t_toplevel_annots:Poly.t_toplevel_annots
   end
 
   module Checked = struct
