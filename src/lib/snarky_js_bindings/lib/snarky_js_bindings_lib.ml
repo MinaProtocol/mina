@@ -2905,11 +2905,11 @@ module Ledger = struct
     }
 
   let apply_parties_transaction l (txn : Parties.t)
-      (account_creation_fee : string) =
+      (account_creation_fee : string) (network_state : Mina_base.Zkapp_precondition.Protocol_state.View.t) =
     check_party_signatures txn ;
     let ledger = l##.value in
     let applied_exn =
-      T.apply_parties_unchecked ~state_view:dummy_state_view
+      T.apply_parties_unchecked ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee
@@ -2935,11 +2935,14 @@ module Ledger = struct
     Js.array @@ Array.of_list account_list
 
   let apply_json_transaction l (tx_json : Js.js_string Js.t)
-      (account_creation_fee : Js.js_string Js.t) =
+      (account_creation_fee : Js.js_string Js.t) (network_json : Js.js_string Js.t) =
     let txn =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    apply_parties_transaction l txn (Js.to_string account_creation_fee)
+    let network_state =
+      protocol_state_of_json network_json
+    in
+    apply_parties_transaction l txn (Js.to_string account_creation_fee) network_state
 
   let create_token_account pk token =
     account_id pk token |> Mina_base.Account_id.public_key
