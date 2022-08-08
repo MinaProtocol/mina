@@ -147,6 +147,7 @@ module Rules = struct
     (** State to initialize the zkApp to after deployment. *)
     let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
 
+    (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
@@ -183,6 +184,7 @@ module Rules = struct
       uses the output value as the new state.
   *)
   module Update_state = struct
+    (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
         (old_state : Field.Constant.t)
         (execute_call :
@@ -233,6 +235,7 @@ module Rules = struct
       that it can be passed to the calling zkApp execution.
   *)
   module Add = struct
+    (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
         (call_input : Call_data.Input.Constant.t)
         (increase_amount : Field.Constant.t)
@@ -291,6 +294,7 @@ module Rules = struct
       that it can be passed to the calling zkApp execution.
   *)
   module Add_and_call = struct
+    (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
         (add_and_call_input : Call_data.Input.Constant.t)
         (increase_amount : Field.Constant.t)

@@ -56,6 +56,7 @@ let%test_module "Composability test" =
         ; check = (fun _ -> assert false)
         }
 
+    (* Build the provers for the various rules. *)
     let ( tag
         , _
         , p_module
@@ -80,6 +81,7 @@ let%test_module "Composability test" =
           ; Zkapps_calls.Rules.Add_and_call.rule
           ] )
 
+    (** The type of call to dispatch. *)
     type calls_kind =
       | Add_and_call of Snark_params.Tick.Run.Field.Constant.t * calls_kind
       | Add of Snark_params.Tick.Run.Field.Constant.t
@@ -142,6 +144,16 @@ let%test_module "Composability test" =
     module Update_state_party = struct
       let old_state = Snark_params.Tick.Field.zero
 
+      (** The request handler to use when running this party.
+
+          This handler accepts a [calls_kind] and fills in the [Execute_call]
+          handlers with either the 'add' prover or the 'add-and-call' prover,
+          depending on the structure described by [calls_kind].
+
+          When the desired call is 'add-and-call', this handler recursively
+          builds the handler for the add-and-call circuit, inserting the
+          behaviour for [Execute_call] according to the given [calls_kind].
+      *)
       let handler (calls_kind : calls_kind) old_state =
         let rec make_call calls_kind input :
             Zkapps_calls.Call_data.Output.Constant.t
