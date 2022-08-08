@@ -3,26 +3,6 @@ open Snark_params.Tick.Run
 open Signature_lib
 open Mina_base
 
-(** State to initialize the zkApp to after deployment. *)
-let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
-
-(** Rule to initialize the zkApp.
-
-    Asserts that the state was not last updated by a proof (ie. the zkApp is
-    freshly deployed, or that the state was modified -- tampered with --
-    without using a proof).
-    The app state is set to the initial state.
-*)
-let initialize public_key =
-  Zkapps_examples.wrap_main
-    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
-      let initial_state =
-        List.map ~f:Field.constant (Lazy.force initial_state)
-      in
-      party#assert_state_unproved ;
-      party#set_full_state initial_state ;
-      None )
-
 (** The type underlying the opaque call data digest field used by the call
     rules.
 *)
@@ -116,15 +96,38 @@ end
 
 type _ Snarky_backendless.Request.t +=
   | Old_state : Field.Constant.t Snarky_backendless.Request.t
-  | Call_data :
+  | (* TODO: Tweak pickles so this can be an explicit input. *)
+      Get_call_input :
+      Call_data.Input.Constant.t Snarky_backendless.Request.t
+  | Execute_call :
       Call_data.Input.Constant.t
       -> ( Call_data.Output.Constant.t
          * Zkapp_call_forest.party
          * Zkapp_call_forest.t )
          Snarky_backendless.Request.t
 
+(** State to initialize the zkApp to after deployment. *)
+let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
+
+(** Rule to initialize the zkApp.
+
+    Asserts that the state was not last updated by a proof (ie. the zkApp is
+    freshly deployed, or that the state was modified -- tampered with --
+    without using a proof).
+    The app state is set to the initial state.
+*)
+let initialize public_key =
+  Zkapps_examples.wrap_main
+    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
+      let initial_state =
+        List.map ~f:Field.constant (Lazy.force initial_state)
+      in
+      party#assert_state_unproved ;
+      party#set_full_state initial_state ;
+      None )
+
 let update_state_handler (old_state : Field.Constant.t)
-    (compute_call :
+    (execute_call :
          Call_data.Input.Constant.t
       -> Call_data.Output.Constant.t
          * Zkapp_call_forest.party
@@ -133,8 +136,8 @@ let update_state_handler (old_state : Field.Constant.t)
   match request with
   | Old_state ->
       respond (Provide old_state)
-  | Call_data input ->
-      respond (Provide (compute_call input))
+  | Execute_call input ->
+      respond (Provide (execute_call input))
   | _ ->
       respond Unhandled
 
@@ -150,7 +153,7 @@ let update_state_call public_key =
              Zkapp_call_forest.typ )
           ~request:(fun () ->
             let input = As_prover.read Call_data.Input.typ call_inputs in
-            Call_data input )
+            Execute_call input )
       in
       let () =
         (* Check that previous party's call data is consistent. *)
@@ -165,13 +168,10 @@ let update_state_call public_key =
       party#call called_party sub_calls ;
       None )
 
-type _ Snarky_backendless.Request.t +=
-  | Call_input : Call_data.Input.Constant.t Snarky_backendless.Request.t
-
 let call_handler (call_input : Call_data.Input.Constant.t)
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
-  | Call_input ->
+  | Get_call_input ->
       respond (Provide call_input)
   | _ ->
       respond Unhandled
@@ -179,7 +179,9 @@ let call_handler (call_input : Call_data.Input.Constant.t)
 let call public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
-      let input = exists Call_data.Input.typ ~request:(fun () -> Call_input) in
+      let input =
+        exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
+      in
       let blinding_value = exists Field.typ ~compute:Field.Constant.random in
       let modify_value = exists Field.typ ~compute:Field.Constant.random in
       let new_state = Field.add input.old_state modify_value in
@@ -189,28 +191,18 @@ let call public_key =
       party#set_call_data call_data_digest ;
       Some output )
 
-type _ Snarky_backendless.Request.t +=
-  | Recursive_call_input :
-      Call_data.Input.Constant.t Snarky_backendless.Request.t
-  | Recursive_call_data :
-      Call_data.Input.Constant.t
-      -> ( Call_data.Output.Constant.t
-         * Zkapp_call_forest.party
-         * Zkapp_call_forest.t )
-         Snarky_backendless.Request.t
-
 let recursive_call_handler (recursive_call_input : Call_data.Input.Constant.t)
-    (compute_call :
+    (execute_call :
          Call_data.Input.Constant.t
       -> Call_data.Output.Constant.t
          * Zkapp_call_forest.party
          * Zkapp_call_forest.t )
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
-  | Recursive_call_input ->
+  | Get_call_input ->
       respond (Provide recursive_call_input)
-  | Recursive_call_data input ->
-      respond (Provide (compute_call input))
+  | Execute_call input ->
+      respond (Provide (execute_call input))
   | _ ->
       respond Unhandled
 
@@ -218,7 +210,7 @@ let recursive_call public_key =
   Zkapps_examples.wrap_main
     ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
       let call_inputs =
-        exists Call_data.Input.typ ~request:(fun () -> Recursive_call_input)
+        exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
       in
       let recursive_call_outputs, called_party, sub_calls =
         exists
@@ -227,7 +219,7 @@ let recursive_call public_key =
              Zkapp_call_forest.typ )
           ~request:(fun () ->
             let input = As_prover.read Call_data.Input.typ call_inputs in
-            Recursive_call_data input )
+            Execute_call input )
       in
       let () =
         (* Check that previous party's call data is consistent. *)
