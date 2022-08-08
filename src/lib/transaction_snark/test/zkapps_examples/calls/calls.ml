@@ -74,10 +74,10 @@ let%test_module "Composability test" =
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants )
         ~choices:(fun ~self:_ ->
-          [ Zkapps_calls.initialize_rule
-          ; Zkapps_calls.update_state_call_rule
-          ; Zkapps_calls.add_rule
-          ; Zkapps_calls.add_and_call_rule
+          [ Zkapps_calls.Rules.Initialize_state.rule
+          ; Zkapps_calls.Rules.Update_state.rule
+          ; Zkapps_calls.Rules.Add.rule
+          ; Zkapps_calls.Rules.Add_and_call.rule
           ] )
 
     type calls_kind =
@@ -135,7 +135,8 @@ let%test_module "Composability test" =
       let party, _ =
         Async.Thread_safe.block_on_async_exn
           (initialize_prover
-             ~handler:(Zkapps_calls.initialize_state_handler pk_compressed) )
+             ~handler:
+               (Zkapps_calls.Rules.Initialize_state.handler pk_compressed) )
     end
 
     module Update_state_party = struct
@@ -152,7 +153,7 @@ let%test_module "Composability test" =
                 Async.Thread_safe.block_on_async_exn
                   (add_prover
                      ~handler:
-                       (Zkapps_calls.add_handler pk_compressed input
+                       (Zkapps_calls.Rules.Add.handler pk_compressed input
                           increase_amount ) )
               in
               ( Option.value_exn aux
@@ -163,14 +164,14 @@ let%test_module "Composability test" =
                 Async.Thread_safe.block_on_async_exn
                   (add_and_call_prover
                      ~handler:
-                       (Zkapps_calls.add_and_call_handler pk_compressed input
-                          increase_amount (make_call calls_kind) ) )
+                       (Zkapps_calls.Rules.Add_and_call.handler pk_compressed
+                          input increase_amount (make_call calls_kind) ) )
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
               , tree.calls )
         in
-        Zkapps_calls.update_state_handler pk_compressed old_state
+        Zkapps_calls.Rules.Update_state.handler pk_compressed old_state
           (make_call calls_kind)
 
       let party calls_kind =
