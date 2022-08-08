@@ -1513,6 +1513,25 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         in
         { t with failure_status_tbl; success = t.success && b }
 
+      let add_cancelled_status (t : t) ~is_last_party =
+        if (not t.success) && is_last_party then
+          let failure_status_tbl =
+            let rec go acc = function
+              | [] ->
+                  acc
+              | [ fee_payer_status ] ->
+                  fee_payer_status :: acc
+              | [] :: tl ->
+                  (*no errors in this party but cancelled due to some invalid party in the transaction*)
+                  go ([ Transaction_status.Failure.Cancelled ] :: acc) tl
+              | hd :: tl ->
+                  go (hd :: acc) tl
+            in
+            go [] t.failure_status_tbl
+          in
+          { t with failure_status_tbl }
+        else t
+
       let update_failure_status_tbl (t : t) failure_status b =
         match failure_status with
         | None ->

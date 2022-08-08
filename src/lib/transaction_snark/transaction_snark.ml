@@ -1588,6 +1588,8 @@ module Base = struct
         let add_check (t : t) _failure b =
           { t with success = Bool.(t.success &&& b) }
 
+        let add_cancelled_status t ~is_last_party:_ = t
+
         let update_failure_status_tbl (t : t) _failure_status b =
           add_check
             (t : t)

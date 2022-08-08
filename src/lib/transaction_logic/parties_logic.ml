@@ -786,6 +786,8 @@ module type Inputs_intf = sig
 
     val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
 
+    val add_cancelled_status : t -> is_last_party:Bool.t -> t
+
     val update_failure_status_tbl : t -> Bool.failure_status -> Bool.t -> t
 
     val add_new_failure_status_bucket : t -> t
@@ -1588,6 +1590,9 @@ module Make (Inputs : Inputs_intf) = struct
       assert_with_failure_status_tbl
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
+    let local_state =
+      Local_state.add_cancelled_status local_state ~is_last_party
+    in
     let global_state =
       Global_state.set_ledger ~should_update:update_global_state global_state
         local_state.ledger
