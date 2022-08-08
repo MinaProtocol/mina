@@ -27,4 +27,5 @@
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_version)))
+   ppx_version
+   h_list.ppx)))

@@ -66,7 +66,7 @@ let%test_module "Initialize state test" =
             ; recursive_call_prover
             ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
-        ~auxiliary_typ:(option_typ Impl.(Typ.(Field.typ * Field.typ)))
+        ~auxiliary_typ:(option_typ Zkapps_calls.Call_data.Output.typ)
         ~branches:(module Nat.N4)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
@@ -137,9 +137,8 @@ let%test_module "Initialize state test" =
       let old_state = Snark_params.Tick.Field.one
 
       let handler (calls_kind : calls_kind) old_state =
-        let open Snark_params.Tick.Run in
         let rec make_call calls_kind input :
-            (Field.Constant.t * Field.Constant.t)
+            Zkapps_calls.Call_data.Output.Constant.t
             * Zkapp_call_forest.party
             * Zkapp_call_forest.t =
           match calls_kind with
@@ -256,11 +255,12 @@ let%test_module "Initialize state test" =
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
       in
-      let zkapp_state =
+      let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
+      assert (Snark_params.Tick.Field.(equal one) first_state) ;
       Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
+        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
 
     let%test_unit "Initialize and update single recursive" =
@@ -272,11 +272,12 @@ let%test_module "Initialize state test" =
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
       in
-      let zkapp_state =
+      let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
+      assert (Snark_params.Tick.Field.(equal one) first_state) ;
       Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
+        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
 
     let%test_unit "Initialize and update double recursive" =
@@ -288,11 +289,12 @@ let%test_module "Initialize state test" =
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
       in
-      let zkapp_state =
+      let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
+      assert (Snark_params.Tick.Field.(equal one) first_state) ;
       Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
+        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
 
     let%test_unit "Initialize and update triple recursive" =
@@ -304,10 +306,11 @@ let%test_module "Initialize state test" =
         |> Parties.Call_forest.cons Deploy_party.party
         |> test_parties
       in
-      let zkapp_state =
+      let (first_state :: zkapp_state) =
         (Option.value_exn (Option.value_exn account).zkapp).app_state
       in
+      assert (Snark_params.Tick.Field.(equal one) first_state) ;
       Pickles_types.Vector.iter
-        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal one) x))
+        ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
   end )
