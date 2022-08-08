@@ -96,6 +96,7 @@ end
 
 (** Circuit requests, to get values and run code outside of the snark. *)
 type _ Snarky_backendless.Request.t +=
+  | Public_key : Public_key.Compressed.t Snarky_backendless.Request.t
   | Old_state : Field.Constant.t Snarky_backendless.Request.t
   | (* TODO: Tweak pickles so this can be an explicit input. *)
       Get_call_input :
@@ -133,6 +134,14 @@ let execute_call party old_state =
 (** State to initialize the zkApp to after deployment. *)
 let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
 
+let initialize_state_handler (public_key : Public_key.Compressed.t)
+    (Snarky_backendless.Request.With { request; respond }) =
+  match request with
+  | Public_key ->
+      respond (Provide public_key)
+  | _ ->
+      respond Unhandled
+
 (** Rule to initialize the zkApp.
 
     Asserts that the state was not last updated by a proof (ie. the zkApp is
@@ -140,17 +149,22 @@ let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
     without using a proof).
     The app state is set to the initial state.
 *)
-let initialize public_key =
-  Zkapps_examples.wrap_main
-    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
+let initialize input =
+  let public_key =
+    exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
+  in
+  Zkapps_examples.wrap_main ~public_key
+    (fun party ->
       let initial_state =
         List.map ~f:Field.constant (Lazy.force initial_state)
       in
       party#assert_state_unproved ;
       party#set_full_state initial_state ;
       None )
+    input
 
-let update_state_handler (old_state : Field.Constant.t)
+let update_state_handler (public_key : Public_key.Compressed.t)
+    (old_state : Field.Constant.t)
     (execute_call :
          Call_data.Input.Constant.t
       -> Call_data.Output.Constant.t
@@ -158,6 +172,8 @@ let update_state_handler (old_state : Field.Constant.t)
          * Zkapp_call_forest.t )
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
+  | Public_key ->
+      respond (Provide public_key)
   | Old_state ->
       respond (Provide old_state)
   | Execute_call input ->
@@ -174,19 +190,26 @@ let update_state_handler (old_state : Field.Constant.t)
     This calls into another zkApp method whose shape matches [Call_data], and
     uses the output value as the new state.
 *)
-let update_state_call public_key =
-  Zkapps_examples.wrap_main
-    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
+let update_state_call input =
+  let public_key =
+    exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
+  in
+  Zkapps_examples.wrap_main ~public_key
+    (fun party ->
       let old_state = exists Field.typ ~request:(fun () -> Old_state) in
       let new_state = execute_call party old_state in
       party#assert_state_proved ;
       party#set_state 0 new_state ;
       None )
+    input
 
-let add_handler (call_input : Call_data.Input.Constant.t)
+let add_handler (public_key : Public_key.Compressed.t)
+    (call_input : Call_data.Input.Constant.t)
     (increase_amount : Field.Constant.t)
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
+  | Public_key ->
+      respond (Provide public_key)
   | Get_call_input ->
       respond (Provide call_input)
   | Increase_amount ->
@@ -208,9 +231,12 @@ let add_handler (call_input : Call_data.Input.Constant.t)
     This also returns the [output] part of the call data to the prover, so that
     it can be passed to the calling zkApp execution.
 *)
-let add public_key =
-  Zkapps_examples.wrap_main
-    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
+let add input =
+  let public_key =
+    exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
+  in
+  Zkapps_examples.wrap_main ~public_key
+    (fun party ->
       let input =
         exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
       in
@@ -223,8 +249,10 @@ let add public_key =
       let call_data_digest = Call_data.Circuit.digest { input; output } in
       party#set_call_data call_data_digest ;
       Some output )
+    input
 
-let add_and_call_handler (add_and_call_input : Call_data.Input.Constant.t)
+let add_and_call_handler (public_key : Public_key.Compressed.t)
+    (add_and_call_input : Call_data.Input.Constant.t)
     (increase_amount : Field.Constant.t)
     (execute_call :
          Call_data.Input.Constant.t
@@ -233,6 +261,8 @@ let add_and_call_handler (add_and_call_input : Call_data.Input.Constant.t)
          * Zkapp_call_forest.t )
     (Snarky_backendless.Request.With { request; respond }) =
   match request with
+  | Public_key ->
+      respond (Provide public_key)
   | Get_call_input ->
       respond (Provide add_and_call_input)
   | Increase_amount ->
@@ -258,9 +288,12 @@ let add_and_call_handler (add_and_call_input : Call_data.Input.Constant.t)
     This also returns the [output] part of the call data to the prover, so that
     it can be passed to the calling zkApp execution.
 *)
-let add_and_call public_key =
-  Zkapps_examples.wrap_main
-    ~public_key:(Public_key.Compressed.var_of_t public_key) (fun party ->
+let add_and_call input =
+  let public_key =
+    exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
+  in
+  Zkapps_examples.wrap_main ~public_key
+    (fun party ->
       let ({ Call_data.Input.Circuit.old_state } as call_inputs) =
         exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
       in
@@ -278,27 +311,28 @@ let add_and_call public_key =
       in
       party#set_call_data call_data_hash ;
       Some call_outputs )
+    input
 
-let initialize_rule public_key : _ Pickles.Inductive_rule.t =
+let initialize_rule : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize snapp"
   ; prevs = []
-  ; main = initialize public_key
+  ; main = initialize
   ; uses_lookup = false
   }
 
-let update_state_call_rule public_key : _ Pickles.Inductive_rule.t =
+let update_state_call_rule : _ Pickles.Inductive_rule.t =
   { identifier = "Update state call"
   ; prevs = []
-  ; main = update_state_call public_key
+  ; main = update_state_call
   ; uses_lookup = false
   }
 
-let add_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Add"; prevs = []; main = add public_key; uses_lookup = false }
+let add_rule : _ Pickles.Inductive_rule.t =
+  { identifier = "Add"; prevs = []; main = add; uses_lookup = false }
 
-let add_and_call_rule public_key : _ Pickles.Inductive_rule.t =
+let add_and_call_rule : _ Pickles.Inductive_rule.t =
   { identifier = "Add-and-call call"
   ; prevs = []
-  ; main = add_and_call public_key
+  ; main = add_and_call
   ; uses_lookup = false
   }

@@ -9,7 +9,7 @@ module Local_state = Mina_state.Local_state
 module Parties_segment = Transaction_snark.Parties_segment
 module Statement = Transaction_snark.Statement
 
-let%test_module "Initialize state test" =
+let%test_module "Composability test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
@@ -74,10 +74,10 @@ let%test_module "Initialize state test" =
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants )
         ~choices:(fun ~self:_ ->
-          [ Zkapps_calls.initialize_rule pk_compressed
-          ; Zkapps_calls.update_state_call_rule pk_compressed
-          ; Zkapps_calls.add_rule pk_compressed
-          ; Zkapps_calls.add_and_call_rule pk_compressed
+          [ Zkapps_calls.initialize_rule
+          ; Zkapps_calls.update_state_call_rule
+          ; Zkapps_calls.add_rule
+          ; Zkapps_calls.add_and_call_rule
           ] )
 
     type calls_kind =
@@ -132,7 +132,10 @@ let%test_module "Initialize state test" =
     end
 
     module Initialize_party = struct
-      let party, _ = Async.Thread_safe.block_on_async_exn initialize_prover
+      let party, _ =
+        Async.Thread_safe.block_on_async_exn
+          (initialize_prover
+             ~handler:(Zkapps_calls.initialize_state_handler pk_compressed) )
     end
 
     module Update_state_party = struct
@@ -148,7 +151,9 @@ let%test_module "Initialize state test" =
               let tree, aux =
                 Async.Thread_safe.block_on_async_exn
                   (add_prover
-                     ~handler:(Zkapps_calls.add_handler input increase_amount) )
+                     ~handler:
+                       (Zkapps_calls.add_handler pk_compressed input
+                          increase_amount ) )
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
@@ -158,14 +163,15 @@ let%test_module "Initialize state test" =
                 Async.Thread_safe.block_on_async_exn
                   (add_and_call_prover
                      ~handler:
-                       (Zkapps_calls.add_and_call_handler input increase_amount
-                          (make_call calls_kind) ) )
+                       (Zkapps_calls.add_and_call_handler pk_compressed input
+                          increase_amount (make_call calls_kind) ) )
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
               , tree.calls )
         in
-        Zkapps_calls.update_state_handler old_state (make_call calls_kind)
+        Zkapps_calls.update_state_handler pk_compressed old_state
+          (make_call calls_kind)
 
       let party calls_kind =
         Async.Thread_safe.block_on_async_exn
