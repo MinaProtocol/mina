@@ -161,23 +161,31 @@ let%test_module "Composability test" =
             * Zkapp_call_forest.t =
           match calls_kind with
           | Add increase_amount ->
+              (* Execute the 'add' rule. *)
+              let handler =
+                Zkapps_calls.Rules.Add.handler pk_compressed input
+                  increase_amount
+              in
               let tree, aux =
-                Async.Thread_safe.block_on_async_exn
-                  (add_prover
-                     ~handler:
-                       (Zkapps_calls.Rules.Add.handler pk_compressed input
-                          increase_amount ) )
+                Async.Thread_safe.block_on_async_exn (add_prover ~handler)
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
               , tree.calls )
           | Add_and_call (increase_amount, calls_kind) ->
+              (* Execute the 'add-and-call' rule *)
+              let handler =
+                (* Build the handler for the call in 'add-and-call' rule by
+                   recursively calling this function on the remainder of
+                   [calls_kind].
+                *)
+                let execute_call = make_call calls_kind in
+                Zkapps_calls.Rules.Add_and_call.handler pk_compressed input
+                  increase_amount execute_call
+              in
               let tree, aux =
                 Async.Thread_safe.block_on_async_exn
-                  (add_and_call_prover
-                     ~handler:
-                       (Zkapps_calls.Rules.Add_and_call.handler pk_compressed
-                          input increase_amount (make_call calls_kind) ) )
+                  (add_and_call_prover ~handler)
               in
               ( Option.value_exn aux
               , { data = tree.party; hash = tree.party_digest }
