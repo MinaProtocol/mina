@@ -430,13 +430,7 @@ module Eq_data = struct
   let typ { Tc.default = ignore; typ = t; _ } = typ ~ignore t
 end
 
-module Hash = struct
-  include Eq_data
-
-  let to_input tc = to_input tc
-
-  let typ = typ
-end
+module Hash = Eq_data
 
 module Leaf_typs = struct
   let public_key () =
