@@ -1,16 +1,17 @@
 module Serializing = Graphql_lib.Serializing
+module Scalars = Graphql_lib.Scalars
 module Get_status =
 [%graphql
 {|
   query {
     genesisBlock {
       stateHash
-    }
+   }
     bestChain(maxLength: 1) {
       stateHash
       protocolState {
         blockchainState {
-          utcDate @ppxCustom(module: "Serializing.Int64_s")
+          utcDate
         }
         consensusState {
           blockHeight @ppxCustom(module: "Serializing.Int64")
@@ -278,7 +279,7 @@ module Status = struct
           else Some [|{
               stateHash = "STATE_HASH_TIP";
               protocolState = {
-                blockchainState = {utcDate = Int64.of_int_exn 1_594_854_566};
+                blockchainState = {utcDate = Int64.to_string @@ Int64.of_int_exn 1_594_854_566};
                 consensusState = {blockHeight = Int64.of_int_exn 4 }
               }
             }|];
