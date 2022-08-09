@@ -43,6 +43,8 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/crypto/blake2b"
+
+	patcher "github.com/o1-labs/go-libp2p-kad-dht-patcher"
 )
 
 const NodeStatusTimeout = 10 * time.Second
@@ -209,57 +211,6 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	logger.Debugf("%s connected to %s", c.LocalPeer(), c.RemotePeer())
 	cm.OnConnect(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
-
-	info := cm.GetInfo()
-	if len(net.Peers()) <= info.HighWater {
-		return
-	}
-
-	cm.TrimOpenConns(context.Background())
-
-	if !cm.minaPeerExchange {
-		return
-	}
-
-	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
-
-	defer func() {
-		go func() {
-			// small delay to allow for remote peer to read from stream
-			time.Sleep(time.Millisecond * 400)
-			_ = c.Close()
-		}()
-	}()
-
-	// select random subset of our peers to send over, then disconnect
-	if cm.getRandomPeers == nil {
-		logger.Error("getRandomPeers function not set")
-		return
-	}
-
-	peers := cm.getRandomPeers(info.LowWater, c.RemotePeer())
-	bz, err := json.Marshal(peers)
-	if err != nil {
-		logger.Error("failed to marshal peers", err)
-		return
-	}
-
-	stream, err := cm.host.NewStream(cm.ctx, c.RemotePeer(), pxProtocolID)
-	if err != nil {
-		logger.Debug("failed to open stream", err)
-		return
-	}
-
-	n, err := stream.Write(bz)
-	if err != nil {
-		logger.Debug("failed to write to stream", err)
-		return
-	} else if n != len(bz) {
-		logger.Debug("failed to write all data to stream")
-		return
-	}
-
-	logger.Debugf("wrote peers to stream %s", stream.Protocol())
 }
 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
@@ -292,6 +243,9 @@ type Helper struct {
 	Seeds             []peer.AddrInfo
 	NodeStatus        []byte
 	pxDiscoveries     chan peer.AddrInfo
+	// TODO: use this function to notify helper
+	// about the peers that provided useful data
+	HeartbeatPeer func(peer.ID)
 }
 
 type MessageStats struct {
@@ -778,6 +732,13 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	// custom validator to omit the ipns validation.
 	rv := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
 
+	lanPatcher := patcher.NewPatcher()
+	wanPatcher := patcher.NewPatcher()
+	lanPatcher.MaxProtected = 20
+	wanPatcher.MaxProtected = 20
+	lanPatcher.ProtectionRate = .1
+	wanPatcher.ProtectionRate = .1
+
 	var kad *dual.DHT
 
 	// TODO is it fine to have 1 << 20?
@@ -826,6 +787,8 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 					dual.DHTOption(dht.BootstrapPeers(seeds...)),
 					dual.DHTOption(dht.ProtocolPrefix("/coda")),
 				)
+				lanPatcher.Patch(kad.LAN)
+				wanPatcher.Patch(kad.WAN)
 				return kad, err
 			})),
 		p2p.UserAgent("github.com/codaprotocol/coda/tree/master/src/app/libp2p_helper"),
@@ -862,6 +825,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		MsgStats:          &MessageStats{min: math.MaxUint64},
 		Seeds:             seeds,
 		pxDiscoveries:     nil,
+		HeartbeatPeer: func(p peer.ID) {
+			lanPatcher.Heartbeat(p)
+			wanPatcher.Heartbeat(p)
+		},
 	}
 
 	if !minaPeerExchange {
