@@ -26,6 +26,7 @@ require (
 	github.com/libp2p/go-mplex v0.3.0
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multihash v0.0.15
+	github.com/o1-labs/go-libp2p-kad-dht-patcher v1.0.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/shirou/gopsutil/v3 v3.21.11
 	github.com/stretchr/testify v1.7.0
