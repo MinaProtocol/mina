@@ -437,6 +437,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
           Deferred.return @@ Mina_lib.add_work coda work )
+    ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+        (fun
+          ()
+          ((_work_spec, _prover_pk) :
+            Snark_worker.Work.Spec.t * Signature_lib.Public_key.Compressed.t )
+        ->
+          [%str_log error] Snark_worker.Generating_snark_work_failed ;
+          Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
+          Deferred.unit )
     ]
   in
   let create_graphql_server ~bind_to_address ~schema ~server_description port =

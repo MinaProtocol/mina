@@ -332,6 +332,8 @@ module Snark_work = struct
 
   let snark_work_timed_out_rpc : Counter.t = ()
 
+  let snark_work_failed_rpc : Counter.t = ()
+
   let snark_pool_size : Gauge.t = ()
 
   let pending_snark_work : Gauge.t = ()

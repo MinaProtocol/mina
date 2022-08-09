@@ -29,6 +29,14 @@ let diff_formatter =
   in
   Format.formatter_of_out_functions out_funs'
 
+let is_version_module name =
+  let len = String.length name in
+  len > 1
+  && Char.equal name.[0] 'V'
+  &&
+  let rest = String.sub name ~pos:1 ~len:(len - 1) in
+  (not @@ Char.equal rest.[0] '0') && String.for_all rest ~f:Char.is_digit
+
 let validate_module_version module_version loc =
   let len = String.length module_version in
   if not (Char.equal module_version.[0] 'V' && len > 1) then

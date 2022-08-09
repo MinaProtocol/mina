@@ -2357,7 +2357,7 @@ let%test_module _ =
             of_time_exn ~constants:consensus_constants current_time
             |> end_time ~constants:consensus_constants)
         in
-        at (Block_time.to_time slot_end)
+        at (Block_time.to_time_exn slot_end)
       in
       let curr_slot = current_global_slot () in
       let slot_padding = Mina_numbers.Global_slot.of_int padding in

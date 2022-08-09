@@ -7,7 +7,7 @@ open Zkapp_basic
 module Events = struct
   module Event = struct
     (* Arbitrary hash input, encoding determined by the zkApp's developer. *)
-    type t = Field.t array
+    type t = Field.t array [@@deriving equal]
 
     let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
 
@@ -21,7 +21,7 @@ module Events = struct
     [%%endif]
   end
 
-  type t = Event.t list
+  type t = Event.t list [@@deriving equal]
 
   let empty_hash = lazy Random_oracle.(salt "MinaSnappEventsEmpty" |> digest)
 
@@ -30,7 +30,9 @@ module Events = struct
 
   let push_event acc event = push_hash acc (Event.hash event)
 
-  let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
+  let hash (x : t) =
+    (* fold_right so the empty hash is used at the end of the events *)
+    List.fold_right ~init:(Lazy.force empty_hash) ~f:(Fn.flip push_event) x
 
   let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
 
@@ -46,6 +48,8 @@ module Events = struct
     Snark_params.Tick.Field.(
       Checked.equal (Data_as_hash.hash e) (Var.constant (Lazy.force empty_hash)))
 
+  let empty_stack_msg = "Attempted to pop an empty stack"
+
   let pop_checked (events : var) : Event.t Data_as_hash.t * var =
     let open Run in
     let hd, tl =
@@ -54,7 +58,7 @@ module Events = struct
         ~compute:(fun () ->
           match As_prover.read typ events with
           | [] ->
-              failwith "Attempted to pop an empty stack"
+              failwith empty_stack_msg
           | event :: events ->
               (event, events) )
     in
@@ -86,6 +90,49 @@ module Events = struct
     with_checked
       ~checked:(Data_as_hash.deriver events)
       ~name:"Events" events obj
+
+  let%test_unit "checked push/pop inverse" =
+    let open Quickcheck in
+    let events =
+      random_value
+        (Generator.list_with_length 11
+           (Generator.list_with_length 7 Field.gen) )
+      |> List.map ~f:Array.of_list
+    in
+    let events_vars = List.map events ~f:(Array.map ~f:Field.Var.constant) in
+    let f () () =
+      Run.as_prover (fun () ->
+          let empty_var = Run.exists typ ~compute:(fun _ -> []) in
+          let pushed =
+            List.fold_right events_vars ~init:empty_var
+              ~f:(Fn.flip push_checked)
+          in
+          let popped =
+            let rec go acc var =
+              try
+                let event_with_hash, tl_var = pop_checked var in
+                let event =
+                  Run.As_prover.read
+                    (Data_as_hash.typ ~hash:Event.hash)
+                    event_with_hash
+                in
+                go (event :: acc) tl_var
+              with
+              | Snarky_backendless.Checked_runner.Runtime_error
+                  (_, _, Failure s, _)
+              when String.equal s empty_stack_msg
+              ->
+                List.rev acc
+            in
+            go [] pushed
+          in
+          assert (equal events popped) )
+    in
+    match Snark_params.Tick.Run.run_and_check f with
+    | Ok () ->
+        ()
+    | Error err ->
+        failwithf "Error from run_and_check: %s" (Error.to_string_hum err) ()
 
   [%%endif]
 end

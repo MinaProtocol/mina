@@ -3341,9 +3341,7 @@ let time lab f =
 
 let system ~proof_level ~constraint_constants =
   time "Transaction_snark.system" (fun () ->
-      Pickles.compile ~cache:Cache_dir.cache
-        (module Statement.With_sok.Checked)
-        (module Statement.With_sok)
+      Pickles.compile () ~cache:Cache_dir.cache
         ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
         ~branches:(module Nat.N5)
         ~max_proofs_verified:(module Nat.N2)
@@ -4322,9 +4320,7 @@ module For_tests = struct
         ; uses_lookup = false
         }
       in
-      Pickles.compile ~cache:Cache_dir.cache
-        (module Zkapp_statement.Checked)
-        (module Zkapp_statement)
+      Pickles.compile () ~cache:Cache_dir.cache
         ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N2) (* You have to put 2 here... *)

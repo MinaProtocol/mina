@@ -23,6 +23,7 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
+   base58_check
    block_time
    currency
    data_hash_lib
@@ -41,6 +42,7 @@
    snark_params
    sponge
    tuple_lib
+   unsigned_extended
    with_hash
    ;; js-specific libraries ;;
    js_of_ocaml

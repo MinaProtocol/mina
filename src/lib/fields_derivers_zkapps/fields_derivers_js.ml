@@ -130,13 +130,11 @@ module Js_layout = struct
         ] ;
     obj
 
-  let option x obj ~(js_type : [ `Implicit | `Flagged_option | `Or_undefined ])
-      : _ Input.t =
+  let option x obj ~(js_type : [ `Flagged_option | `Or_undefined ]) : _ Input.t
+      =
     let inner = !(x#js_layout) in
     let js_type =
       match js_type with
-      | `Implicit ->
-          "implicit"
       | `Flagged_option ->
           "flaggedOption"
       | `Or_undefined ->

@@ -92,11 +92,20 @@ module Party_under_construction = struct
           failwith "Incorrect length of app_state"
   end
 
+  module Events = struct
+    type t = { events : Field.Constant.t array list }
+
+    let create () = { events = [] }
+
+    let add_events t events : t = { events = events @ t.events }
+  end
+
   type t =
     { public_key : Public_key.Compressed.t
     ; token_id : Token_id.t
     ; account_condition : Account_condition.t
     ; update : Update.t
+    ; events : Events.t
     }
 
   let create ~public_key ?(token_id = Token_id.default) () =
@@ -104,6 +113,7 @@ module Party_under_construction = struct
     ; token_id
     ; account_condition = Account_condition.create ()
     ; update = Update.create ()
+    ; events = Events.create ()
     }
 
   let to_party (t : t) : Party.Body.t =
@@ -112,7 +122,7 @@ module Party_under_construction = struct
     ; update = Update.to_parties_update t.update
     ; balance_change = { magnitude = Amount.zero; sgn = Pos }
     ; increment_nonce = false
-    ; events = []
+    ; events = t.events.events
     ; sequence_events = []
     ; call_data = Field.Constant.zero
     ; preconditions =
@@ -163,6 +173,9 @@ module Party_under_construction = struct
   let set_full_state app_state (t : t) =
     { t with update = Update.set_full_state app_state t.update }
 
+  let set_events events (t : t) =
+    { t with events = Events.add_events t.events events }
+
   module In_circuit = struct
     module Account_condition = struct
       type t = { state_proved : Boolean.var option }
@@ -209,7 +222,7 @@ module Party_under_construction = struct
           | None ->
               default.proved_state
           | Some state_proved ->
-              Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.true_
+              Zkapp_basic.Or_ignore.Checked.make_unsafe Boolean.true_
                 state_proved
         in
         { default with proved_state }
@@ -289,11 +302,28 @@ module Party_under_construction = struct
             failwith "Incorrect length of app_state"
     end
 
+    module Events = struct
+      type t = { events : Field.t array list }
+
+      let create () = { events = [] }
+
+      let add_events t events : t = { events = t.events @ events }
+
+      let to_parties_events ({ events } : t) : Zkapp_account.Events.var =
+        let empty_var : Zkapp_account.Events.var =
+          exists ~compute:(fun () -> []) Zkapp_account.Events.typ
+        in
+        (* matches fold_right in Zkapp_account.Events.hash *)
+        Core_kernel.List.fold_right events ~init:empty_var
+          ~f:(Core_kernel.Fn.flip Zkapp_account.Events.push_checked)
+    end
+
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
+      ; events : Events.t
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default)) ()
@@ -302,6 +332,7 @@ module Party_under_construction = struct
       ; token_id
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
+      ; events = Events.create ()
       }
 
     let to_party_and_calls (t : t) :
@@ -322,7 +353,7 @@ module Party_under_construction = struct
         ; balance_change =
             var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
         ; increment_nonce = Boolean.false_
-        ; events = var_of_t Zkapp_account.Events.typ []
+        ; events = Events.to_parties_events t.events
         ; sequence_events = var_of_t Zkapp_account.Events.typ []
         ; call_data = Field.zero
         ; preconditions =
@@ -380,6 +411,9 @@ module Party_under_construction = struct
 
     let set_full_state app_state (t : t) =
       { t with update = Update.set_full_state app_state t.update }
+
+    let set_events events (t : t) =
+      { t with events = Events.add_events t.events events }
   end
 end
 
@@ -558,15 +592,8 @@ let compile :
     in
     go (choices ~self)
   in
-  let module Statement = struct
-    type t = unit
-
-    let to_field_elements () = [||]
-  end in
   let tag, cache_handle, proof, provers =
-    Pickles.compile ?self ?cache ?disk_keys
-      (module Statement)
-      (module Statement)
+    Pickles.compile () ?self ?cache ?disk_keys
       ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices

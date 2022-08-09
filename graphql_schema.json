@@ -10896,7 +10896,7 @@
           "kind": "SCALAR",
           "name": "TokenId",
           "description":
-            "String representation of a token's base58 identifier",
+            "String representation of a token's UInt64 identifier",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
