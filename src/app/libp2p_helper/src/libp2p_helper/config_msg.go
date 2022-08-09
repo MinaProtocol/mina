@@ -433,7 +433,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		int(m.MinConnections()),
 		int(m.MaxConnections()),
 		m.MinaPeerExchange(),
-		time.Millisecond,
+		time.Second*15,
 		knownPrivateIpNets,
 	)
 	if err != nil {
