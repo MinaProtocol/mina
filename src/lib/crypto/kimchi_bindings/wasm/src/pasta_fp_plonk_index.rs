@@ -37,6 +37,8 @@ pub fn caml_pasta_fp_plonk_index_create(
     prev_challenges: i32,
     srs: &WasmSrs,
 ) -> Result<WasmPastaFpPlonkIndex, JsValue> {
+    console_error_panic_hook::set_once();
+
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
     let gates: Vec<_> = gates
         .0
