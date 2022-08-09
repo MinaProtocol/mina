@@ -141,7 +141,7 @@ let validate_transaction =
       let[@alert "--deprecated"] first = Caml.Stream.peek jsons in
       match first with
       | None ->
-          Format.printf "Empty transactions list is not supported@." ;
+          Format.printf "Could not parse any transactions@." ;
           exit 1
       | _ ->
           Format.printf "All transactions were valid@." ;
