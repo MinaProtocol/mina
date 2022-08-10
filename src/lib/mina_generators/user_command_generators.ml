@@ -154,7 +154,11 @@ let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
       ?failure ()
   in
   let rec go parties_and_fee_payer_keypairs n =
-    if n <= 1 then return (List.rev parties_and_fee_payer_keypairs, ledger)
+    if n <= 1 then
+      return
+        ( (parties, fee_payer_keypair, keymap)
+          :: List.rev parties_and_fee_payer_keypairs
+        , ledger )
     else
       let%bind parties =
         Parties_generators.gen_parties_from ~max_other_parties
@@ -171,4 +175,4 @@ let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
       in
       go parties_and_fee_payer_keypairs' (n - 1)
   in
-  go [ (parties, fee_payer_keypair, keymap) ] length
+  go [] length

@@ -783,7 +783,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
             Account_id.Table.find_exn account_state_tbl account_id |> fst
           in
           if zkapp_account && Option.is_none acct.zkapp then
-            failwith "gen_party_body: provided account has no snapp field" ;
+            failwith "gen_party_body: provided account has no zkapp field" ;
           return acct
   in
   let public_key = account.public_key in
