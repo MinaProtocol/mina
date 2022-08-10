@@ -17,6 +17,16 @@ type role = [ `Fee_payer | `New_account | `Ordinary_participant ]
 
 val max_other_parties : int
 
+val gen_account_precondition_from_account :
+     ?failure:failure
+  -> first_use_of_account:bool
+  -> Account.t
+  -> Party.Account_precondition.t Quickcheck.Generator.t
+
+val gen_protocol_state_precondition :
+     Zkapp_precondition.Protocol_state.View.t
+  -> Zkapp_precondition.Protocol_state.t Quickcheck.Generator.t
+
 (** `gen_parties_from` generates a parties and record the change of accounts accordingly
     in `account_state_tbl`. Note that `account_state_tbl` is optional. If it's not provided
     then it would be computed from the ledger. If you plan to generate several parties,
