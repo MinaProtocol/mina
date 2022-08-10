@@ -672,8 +672,9 @@ end
 *)
 let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     ?account_ids_seen ~account_state_tbl ?vk ?failure ?(new_account = false)
-    ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
-    ?permissions_auth ?(required_balance_change : a option) ?protocol_state_view
+    ?(token_account = false) ?(zkapp_account = false) ?(is_fee_payer = false)
+    ?available_public_keys ?permissions_auth
+    ?(required_balance_change : a option) ?protocol_state_view
     ~zkapp_account_ids
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment :
@@ -731,7 +732,15 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           (* available public key no longer available *)
           Signature_lib.Public_key.Compressed.Table.remove available_pks
             available_pk ;
-          let account_id = Account_id.create available_pk Token_id.default in
+          let account_id =
+            if token_account then
+              let custom_token_id =
+                Account_id.derive_token_id
+                  ~owner:(Account_id.create available_pk Token_id.default)
+              in
+              Account_id.create available_pk custom_token_id
+            else Account_id.create available_pk Token_id.default
+          in
           let account_with_pk =
             Account.create account_id (Currency.Balance.of_int 0)
           in
@@ -983,9 +992,10 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   }
 
 let gen_party_from ?(update = None) ?failure ?(new_account = false)
-    ?(zkapp_account = false) ?account_id ?permissions_auth
-    ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
-    ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk () =
+    ?(token_account = false) ?(zkapp_account = false) ?account_id
+    ?permissions_auth ?required_balance_change ~zkapp_account_ids ~authorization
+    ~account_ids_seen ~available_public_keys ~account_state_tbl
+    ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1002,7 +1012,8 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
         false
   in
   let%bind body_components =
-    gen_party_body_components ~update ?failure ~new_account ~zkapp_account
+    gen_party_body_components ~update ?failure ~new_account ~token_account
+      ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?protocol_state_view ?vk ~zkapp_account_ids
       ~account_ids_seen ~available_public_keys ?required_balance_change
@@ -1156,6 +1167,10 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
       let open Permissions in
       if n <= 0 then return (List.rev acc)
       else
+        (* Token account would only be created as new accounts. *)
+        let%bind token_account =
+          if new_parties then Quickcheck.Generator.bool else return false
+        in
         (* choose a random authorization
 
            first Party.t updates the permissions, using the Signature authorization,
@@ -1230,15 +1245,8 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
               in
               (auth_tag, Some update)
           | _ ->
-              (* Since zkapp account would trigger new account generation, and for new account
-                 verification keys are not in the ledger, so for now we can only use `Signature`
-                 or `None_given` for authorization. This could be fixed by passing the list
-                 of zkapp account into the generator function
-              *)
               let%map tag =
-                if new_parties then
-                  Quickcheck.Generator.of_list
-                    [ Control.Tag.Signature; None_given ]
+                if new_parties then return Control.Tag.Signature
                 else Control.Tag.gen
               in
               (tag, None)
@@ -1254,9 +1262,12 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
           (* Signature authorization to start *)
           let authorization = Control.Signature Signature.dummy in
           gen_party_from ~zkapp_account_ids ~account_ids_seen ~update ?failure
-            ~authorization ~new_account:new_parties ~permissions_auth
-            ~zkapp_account ~available_public_keys ~account_state_tbl
-            ?protocol_state_view ?vk ()
+            ~authorization ~new_account:new_parties ~token_account
+            ~permissions_auth ~zkapp_account ~available_public_keys
+            ~account_state_tbl ?protocol_state_view ?vk ()
+        in
+        let required_balance_change =
+          if token_account then Some Currency.Amount.Signed.zero else None
         in
         let%bind party =
           (* authorization according to chosen permissions auth *)
@@ -1329,7 +1340,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
           gen_party_from ~update ?failure ~zkapp_account_ids ~account_ids_seen
             ~account_id ~authorization ~permissions_auth ~zkapp_account
             ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
-            ()
+            ?required_balance_change ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
         go (party :: party0 :: acc) (n - 1)
@@ -1361,11 +1372,13 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
                   num_new_accounts
               |> Option.value_exn )) )
       ~f:(fun acc party ->
-        match Currency.Amount.Signed.add acc party.body.balance_change with
-        | Some sum ->
-            sum
-        | None ->
-            failwith "Overflow adding other parties balances" )
+        if Token_id.equal Token_id.default party.body.token_id then
+          match Currency.Amount.Signed.add acc party.body.balance_change with
+          | Some sum ->
+              sum
+          | None ->
+              failwith "Overflow adding other parties balances"
+        else acc )
   in
 
   (* modify the balancing party with balance change to yield a zero sum
