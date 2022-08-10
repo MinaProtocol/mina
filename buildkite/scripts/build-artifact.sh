@@ -46,3 +46,5 @@ make publish_debs
 
 echo "--- Copy artifacts to cloud"
 # buildkite-agent artifact upload occurs outside of docker after this script exits
+
+git diff --exit-code
