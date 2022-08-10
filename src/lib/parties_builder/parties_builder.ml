@@ -40,7 +40,7 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
         ; valid_until = None
         ; nonce = fee_payer_nonce
         }
-    ; authorization = Signature.dummy
+    ; authorization = Signature Signature.dummy
     }
   in
   let memo =
@@ -96,7 +96,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) :
     sign_for_party ~use_full_commitment:true fee_payer_sk
   in
   let fee_payer_with_valid_signature =
-    { parties.fee_payer with authorization = fee_payer_signature }
+    { parties.fee_payer with authorization = Signature fee_payer_signature }
   in
   let open Async_kernel.Deferred.Let_syntax in
   let%map other_parties_with_valid_signatures =

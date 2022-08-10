@@ -79,7 +79,7 @@ let fee_payer =
         public_key = pk_compressed
       ; fee = Currency.Fee.(of_int 100)
       }
-  ; authorization = Signature.dummy
+  ; authorization = Signature Signature.dummy
   }
 
 let full_commitment =
@@ -96,8 +96,9 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
       when Public_key.Compressed.equal public_key pk_compressed ->
         { fee_payer with
           authorization =
-            Schnorr.Chunked.sign sk
-              (Random_oracle.Input.Chunked.field full_commitment)
+            Signature
+              (Schnorr.Chunked.sign sk
+                 (Random_oracle.Input.Chunked.field full_commitment) )
         }
     | fee_payer ->
         fee_payer
@@ -126,7 +127,8 @@ let sign_all ({ fee_payer; other_parties; memo } : Parties.t) : Parties.t =
 
 let parties : Parties.t =
   sign_all
-    { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
+    { fee_payer =
+        { body = fee_payer.body; authorization = Signature Signature.dummy }
     ; other_parties
     ; memo
     }

@@ -176,7 +176,7 @@ let%test_module "Protocol state precondition tests" =
                         ; nonce = sender_nonce
                         }
                         (*To be updated later*)
-                    ; authorization = Signature.dummy
+                    ; authorization = Signature Signature.dummy
                     }
                   in
                   let sender_party : Party.Simple.t =
@@ -255,7 +255,9 @@ let%test_module "Protocol state precondition tests" =
                       Signature_lib.Schnorr.Chunked.sign sender.private_key
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
-                    { fee_payer with authorization = fee_payer_signature_auth }
+                    { fee_payer with
+                      authorization = Signature fee_payer_signature_auth
+                    }
                   in
                   let sender_party : Party.Simple.t =
                     let signature_auth : Signature.t =
@@ -577,7 +579,7 @@ let%test_module "Account precondition tests" =
                     ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
                     }
                     (*To be updated later*)
-                ; authorization = Signature.dummy
+                ; authorization = Signature Signature.dummy
                 }
               in
               let sender_party : Party.Simple.t =
@@ -653,7 +655,9 @@ let%test_module "Account precondition tests" =
                   Signature_lib.Schnorr.Chunked.sign sender.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
-                { fee_payer with authorization = fee_payer_signature_auth }
+                { fee_payer with
+                  authorization = Signature fee_payer_signature_auth
+                }
               in
               let sender_party =
                 let signature_auth : Signature.t =

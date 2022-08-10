@@ -2241,7 +2241,7 @@ module For_tests = struct
               ; nonce = actual_nonce
               }
               (* Real signature added in below *)
-          ; authorization = Signature.dummy
+          ; authorization = Signature Signature.dummy
           }
       ; other_parties =
           [ { body =
@@ -2323,7 +2323,7 @@ module For_tests = struct
         (Random_oracle.Input.Chunked.field full_commitment)
     in
     { parties with
-      fee_payer = { parties.fee_payer with authorization = signature }
+      fee_payer = { parties.fee_payer with authorization = Signature signature }
     ; other_parties
     }
 

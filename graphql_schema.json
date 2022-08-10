@@ -815,8 +815,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Signature",
+                  "kind": "INPUT_OBJECT",
+                  "name": "ControlInput",
                   "ofType": null
                 }
               },
@@ -846,8 +846,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Signature",
+                  "kind": "INPUT_OBJECT",
+                  "name": "ControlInput",
                   "ofType": null
                 }
               },
@@ -6553,51 +6553,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "SnappProof",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "Control",
-          "description": null,
-          "fields": [
-            {
-              "name": "proof",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "SnappProof",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "signature",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "Signature",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "NonceInterval",
           "description": null,
@@ -8057,6 +8012,51 @@
         },
         {
           "kind": "SCALAR",
+          "name": "SnappProof",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "Control",
+          "description": null,
+          "fields": [
+            {
+              "name": "proof",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "SnappProof",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "signature",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Signature",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "Fee",
           "description": null,
           "fields": null,
@@ -8157,8 +8157,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Signature",
+                  "kind": "OBJECT",
+                  "name": "Control",
                   "ofType": null
                 }
               },

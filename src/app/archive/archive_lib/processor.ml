@@ -3086,7 +3086,7 @@ module Block = struct
           ~f:(fun acc ({ fee_payer; other_parties; memo; _ } as zkapp_cmd) ->
             (* add authorizations, not stored in the db *)
             let (fee_payer : Party.Fee_payer.t) =
-              { body = fee_payer; authorization = Signature.dummy }
+              { body = fee_payer; authorization = Signature Signature.dummy }
             in
             let (other_parties : Party.Simple.t list) =
               List.map other_parties

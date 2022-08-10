@@ -2730,7 +2730,9 @@ module Ledger = struct
     in
     ( match party_index with
     | Fee_payer ->
-        { tx with fee_payer = { tx.fee_payer with authorization = signature } }
+        { tx with
+          fee_payer = { tx.fee_payer with authorization = Signature signature }
+        }
     | Other_party i ->
         { tx with
           other_parties =
@@ -2746,7 +2748,7 @@ module Ledger = struct
   let sign_other_party tx_json key i = sign_party tx_json key (Other_party i)
 
   let check_party_signatures parties =
-    let ({ fee_payer; other_parties; memo } : Parties.t) = parties in
+    let ({ fee_payer; other_parties = _; memo } : Parties.t) = parties in
     let tx_commitment = Parties.commitment parties in
     let full_tx_commitment =
       Parties.Transaction_commitment.create_complete tx_commitment
@@ -2773,10 +2775,8 @@ module Ledger = struct
                  (key_to_string pk) )
           else ()
     in
-
-    check_signature "fee payer" fee_payer.authorization
-      fee_payer.body.public_key full_tx_commitment ;
-    List.iteri (Parties.Call_forest.to_parties_list other_parties)
+    List.iteri
+      (Parties.Call_forest.to_parties_list (Parties.all_parties parties))
       ~f:(fun i p ->
         let commitment =
           if p.body.use_full_commitment then full_tx_commitment

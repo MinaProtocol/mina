@@ -67,10 +67,9 @@ let check :
                     (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          check_signature fee_payer.authorization fee_payer.body.public_key
-            full_tx_commitment ;
           let parties_with_hashes_list =
-            other_parties |> Zkapp_statement.zkapp_statements_of_forest'
+            parties_with_vk |> Parties.Verifiable.all_parties
+            |> Zkapp_statement.zkapp_statements_of_forest'
             |> Parties.Call_forest.With_hashes_and_data
                .to_parties_with_hashes_list
           in

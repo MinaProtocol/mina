@@ -40,7 +40,7 @@ let%test_module "Zkapp payments tests" =
                 ; valid_until = None
                 ; nonce = acct1.account.nonce
                 }
-            ; authorization = Signature.dummy
+            ; authorization = Signature Signature.dummy
             }
         ; other_parties =
             [ { body =

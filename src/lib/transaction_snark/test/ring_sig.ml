@@ -183,7 +183,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                 ; nonce = sender_nonce
                 }
                 (* Real signature added in below *)
-            ; authorization = Signature.dummy
+            ; authorization = Signature Signature.dummy
             }
           in
           let sender_party_data : Party.Simple.t =
@@ -275,8 +275,9 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             in
             { fee_payer with
               authorization =
-                Signature_lib.Schnorr.Chunked.sign sender.private_key
-                  (Random_oracle.Input.Chunked.field txn_comm)
+                Signature
+                  (Signature_lib.Schnorr.Chunked.sign sender.private_key
+                     (Random_oracle.Input.Chunked.field txn_comm) )
             }
           in
           let sender : Party.Simple.t =

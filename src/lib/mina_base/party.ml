@@ -1348,12 +1348,67 @@ module T = struct
 end
 
 module Fee_payer = struct
+  module Authorization = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | Proof of Pickles.Side_loaded.Proof.Stable.V2.t
+          | Signature of Signature.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let to_record : t -> Control.As_record.t = function
+      | Proof p ->
+          { proof = Some p; signature = None }
+      | Signature s ->
+          { proof = None; signature = Some s }
+
+    let of_record : Control.As_record.t -> t = function
+      | { proof = Some p; _ } ->
+          Proof p
+      | { signature = Some s; _ } ->
+          Signature s
+      | _ ->
+          failwith
+            "Fee_payer.Authorization.of_record: Expected either a signature or \
+             a proof"
+
+    let deriver obj =
+      Fields_derivers_zkapps.Derivers.iso_record ~of_record ~to_record
+        Control.As_record.deriver obj
+
+    let gen_with_dummies : t Quickcheck.Generator.t =
+      let gen =
+        lazy
+          (Quickcheck.Generator.of_list
+             (let dummy_proof =
+                let n2 = Pickles_types.Nat.N2.n in
+                let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
+                Proof proof
+              in
+              let dummy_signature = Signature Signature.dummy in
+              [ dummy_proof; dummy_signature ] ) )
+      in
+      Quickcheck.Generator.create (fun ~size ~random ->
+          Quickcheck.Generator.generate (Lazy.force gen) ~size ~random )
+
+    let to_control : t -> Control.t = function
+      | Proof proof ->
+          Proof proof
+      | Signature signature ->
+          Signature signature
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         { body : Body.Fee_payer.Stable.V1.t
-        ; authorization : Signature.Stable.V1.t
+        ; authorization : Authorization.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
@@ -1363,8 +1418,8 @@ module Fee_payer = struct
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    let%map body = Body.Fee_payer.gen in
-    let authorization = Signature.dummy in
+    let%bind body = Body.Fee_payer.gen in
+    let%map authorization = Authorization.gen_with_dummies in
     { body; authorization }
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
@@ -1379,7 +1434,7 @@ module Fee_payer = struct
     Account_id.create t.body.public_key Token_id.default
 
   let to_party (t : t) : T.t =
-    { authorization = Control.Signature t.authorization
+    { authorization = Authorization.to_control t.authorization
     ; body = Body.of_fee_payer t.body
     }
 
@@ -1387,12 +1442,12 @@ module Fee_payer = struct
     let open Fields_derivers_zkapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
-      ~authorization:!.Control.signature_deriver
+      ~authorization:!.Authorization.deriver
     |> finish "ZkappPartyFeePayer" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let dummy : t =
-      { body = Body.Fee_payer.dummy; authorization = Signature.dummy }
+      { body = Body.Fee_payer.dummy; authorization = Signature Signature.dummy }
     in
     let open Fields_derivers_zkapps.Derivers in
     let full = o () in
@@ -1406,7 +1461,9 @@ let account_id (t : t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
 
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
-  { authorization = Signature authorization; body = Body.of_fee_payer body }
+  { authorization = Fee_payer.Authorization.to_control authorization
+  ; body = Body.of_fee_payer body
+  }
 
 (** The change in balance to apply to the target account of this party.
       When this is negative, the amount will be withdrawn from the account and

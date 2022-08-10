@@ -111,7 +111,7 @@ let%test_module "Initialize state test" =
               public_key = pk_compressed
             ; fee = Currency.Fee.(of_int 100)
             }
-        ; authorization = Signature.dummy
+        ; authorization = Signature Signature.dummy
         }
       in
       let memo_hash = Signed_command_memo.hash memo in
@@ -130,8 +130,9 @@ let%test_module "Initialize state test" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
-                    (Random_oracle.Input.Chunked.field full_commitment)
+                  Signature
+                    (Schnorr.Chunked.sign sk
+                       (Random_oracle.Input.Chunked.field full_commitment) )
               }
           | fee_payer ->
               fee_payer

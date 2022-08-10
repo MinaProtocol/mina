@@ -1101,7 +1101,7 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
       ?protocol_state_view ~account_state_tbl ()
   in
   (* real signature to be added when this data inserted into a Parties.t *)
-  let authorization = Signature.dummy in
+  let authorization = Party.Fee_payer.Authorization.Signature Signature.dummy in
   ({ body; authorization } : Party.Fee_payer.t)
 
 (* keep max_other_parties small, so zkApp integration tests don't need lots

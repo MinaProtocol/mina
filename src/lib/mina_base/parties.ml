@@ -1049,7 +1049,9 @@ let parties (t : t) : _ Call_forest.t =
   let body = Party.Body.of_fee_payer p.body in
   let fee_payer : Party.t =
     let p = t.fee_payer in
-    { authorization = Control.Signature p.authorization; body }
+    { authorization = Party.Fee_payer.Authorization.to_control p.authorization
+    ; body
+    }
   in
   Call_forest.cons fee_payer t.other_parties
 
@@ -1184,6 +1186,19 @@ module Verifiable = struct
       let to_latest = Fn.id
     end
   end]
+
+  let all_parties ({ fee_payer; other_parties; memo = _ } : t) :
+      'data Call_forest.With_hashes_and_data.t =
+    let fee_payer = Party.Fee_payer.to_party fee_payer in
+    let fee_payer_digest = Call_forest.Digest.Party.create fee_payer in
+    let elt =
+      { Call_forest.Tree.party = (fee_payer, (* TODO *) None)
+      ; party_digest = fee_payer_digest
+      ; calls = other_parties
+      }
+    in
+    let tree_hash = Call_forest.Digest.Tree.create elt in
+    [ { elt; stack_hash = Call_forest.Digest.Forest.(cons tree_hash empty) } ]
 end
 
 let of_verifiable (t : Verifiable.t) : t =
@@ -1191,6 +1206,22 @@ let of_verifiable (t : Verifiable.t) : t =
   ; other_parties = Call_forest.map t.other_parties ~f:fst
   ; memo = t.memo
   }
+
+let all_parties ({ fee_payer; other_parties; memo = _ } : t) :
+    ( (Party.t, Digest.Party.t, Digest.Forest.t) Call_forest.tree
+    , Digest.Forest.t )
+    With_stack_hash.t
+    list =
+  let fee_payer = Party.Fee_payer.to_party fee_payer in
+  let fee_payer_digest = Call_forest.Digest.Party.create fee_payer in
+  let elt =
+    { Call_forest.Tree.party = fee_payer
+    ; party_digest = fee_payer_digest
+    ; calls = other_parties
+    }
+  in
+  let tree_hash = Call_forest.Digest.Tree.create elt in
+  [ { elt; stack_hash = Call_forest.Digest.Forest.(cons tree_hash empty) } ]
 
 module Transaction_commitment = struct
   module Stable = Kimchi_backend.Pasta.Basic.Fp.Stable
@@ -1421,7 +1452,9 @@ let dummy =
     { body = Party.Body.dummy; authorization = Control.dummy_of_tag Signature }
   in
   let fee_payer : Party.Fee_payer.t =
-    { body = Party.Body.Fee_payer.dummy; authorization = Signature.dummy }
+    { body = Party.Body.Fee_payer.dummy
+    ; authorization = Signature Signature.dummy
+    }
   in
   { fee_payer
   ; other_parties = Call_forest.cons party []

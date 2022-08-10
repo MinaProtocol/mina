@@ -4410,7 +4410,7 @@ module For_tests = struct
                       Some upper )
           ; nonce
           }
-      ; authorization = Signature.dummy
+      ; authorization = Signature Signature.dummy
       }
     in
     let preconditions' =
@@ -4558,7 +4558,7 @@ module For_tests = struct
             Signature_lib.Schnorr.Chunked.sign fee_payer_kp.private_key
               (Random_oracle.Input.Chunked.field full_commitment)
       in
-      { fee_payer with authorization = fee_payer_signature_auth }
+      { fee_payer with authorization = Signature fee_payer_signature_auth }
     in
     let sender_party =
       Option.map sender_party ~f:(fun s : Party.Simple.t ->
@@ -4802,7 +4802,7 @@ module For_tests = struct
           ; nonce = sender_nonce
           }
           (* Real signature added in below *)
-      ; authorization = Signature.dummy
+      ; authorization = Signature Signature.dummy
       }
     in
     let sender_party_data : Party.Simple.t =
@@ -4887,7 +4887,7 @@ module For_tests = struct
         (Random_oracle.Input.Chunked.field txn_comm)
     in
     let fee_payer =
-      { fee_payer with authorization = fee_payer_signature_auth }
+      { fee_payer with authorization = Signature fee_payer_signature_auth }
     in
     let sender_signature_auth =
       Signature_lib.Schnorr.Chunked.sign sender.private_key
