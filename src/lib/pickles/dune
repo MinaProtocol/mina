@@ -60,4 +60,5 @@
    tuple_lib
    promise
    kimchi_backend.common
+   ppx_version.runtime
 ))

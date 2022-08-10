@@ -90,7 +90,7 @@ module Node = struct
     ; ("pod_id", `String node.pod_id)
     ]
 
-  module Serializing = Graphql_lib.Serializing
+  module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
     let ingress_uri node =
@@ -108,16 +108,18 @@ module Node = struct
 
     (* graphql_ppx uses Stdlib symbols instead of Base *)
     open Stdlib
+    module Encoders = Mina_graphql.Types.Input
 
     module Unlock_account =
     [%graphql
-    {|
-      mutation ($password: String!, $public_key: PublicKey!) {
+    ({|
+      mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+          public_key: publicKey
         }
       }
-    |}]
+    |}
+    [@encoders Encoders] )]
 
     module Send_test_payments =
     [%graphql
@@ -127,7 +129,7 @@ module Node = struct
       $amount: UInt64!,
       $fee: UInt64!,
       $repeat_count: UInt32!,
-      $repeat_delay_ms: UInt32!) {
+      $repeat_delay_ms: UInt32!) @encoders(module: "Encoders"){
         sendTestPayments(
           senders: $senders, receiver: $receiver, amount: $amount, fee: $fee,
           repeat_count: $repeat_count,
@@ -138,15 +140,8 @@ module Node = struct
     module Send_payment =
     [%graphql
     {|
-      mutation ($sender: PublicKey!,
-      $receiver: PublicKey!,
-      $amount: UInt64!,
-      $token: UInt64,
-      $fee: UInt64!,
-      $nonce: UInt32,
-      $memo: String) {
-        sendPayment(input:
-          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+     mutation ($input: SendPaymentInput!)@encoders(module: "Encoders"){
+        sendPayment(input: $input){
             payment {
               id
               nonce
@@ -159,23 +154,13 @@ module Node = struct
     module Send_payment_with_raw_sig =
     [%graphql
     {|
-      mutation (
-        $sender: PublicKey!,
-        $receiver: PublicKey!,
-        $amount: UInt64!,
-        $token: UInt64!,
-        $fee: UInt64!,
-        $nonce: UInt32!,
-        $memo: String!,
-        $validUntil: UInt32!,
-        $rawSignature: String!
-      )
+     mutation (
+     $input:SendPaymentInput!,
+     $rawSignature: String!
+     )@encoders(module: "Encoders")
       {
         sendPayment(
-          input:
-          {
-            from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo, validUntil: $validUntil
-          },
+          input:$input,
           signature: {rawSignature: $rawSignature}
         )
         {
@@ -191,15 +176,8 @@ module Node = struct
     module Send_delegation =
     [%graphql
     {|
-      mutation ($sender: PublicKey!,
-      $receiver: PublicKey!,
-      $amount: UInt64!,
-      $token: UInt64,
-      $fee: UInt64!,
-      $nonce: UInt32,
-      $memo: String) {
-        sendDelegation(input:
-          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+      mutation ($input: SendDelegationInput!) @encoders(module: "Encoders"){
+        sendDelegation(input:$input){
             delegation {
               id
               nonce
@@ -231,12 +209,12 @@ module Node = struct
     module Best_chain =
     [%graphql
     {|
-      query ($max_length: Int) {
+      query ($max_length: Int) @encoders(module: "Encoders"){
         bestChain (maxLength: $max_length) {
           stateHash
           commandTransactionCount
           creatorAccount {
-            publicKey
+            publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           }
         }
       }
@@ -263,11 +241,11 @@ module Node = struct
     {|
       query ($public_key: PublicKey!, $token: UInt64) {
         account (publicKey : $public_key, token : $token) {
-          balance { liquid @ppxCustom(module: "Serializing.Balance")
-                    locked @ppxCustom(module: "Serializing.Balance")
-                    total @ppxCustom(module: "Serializing.Balance")
+          balance { liquid
+                    locked
+                    total
                   }
-          delegate
+          delegate @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           nonce
           permissions { editSequenceState
                         editState
@@ -284,11 +262,11 @@ module Node = struct
           sequenceEvents
           zkappState
           zkappUri
-          timing { cliffTime
-                   cliffAmount
-                   vestingPeriod
-                   vestingIncrement
-                   initialMinimumBalance
+          timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   cliffAmount @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   vestingIncrement @ppxCustom(module: "Graphql_lib.Scalars.JSON")
+                   initialMinimumBalance @ppxCustom(module: "Graphql_lib.Scalars.JSON")
                  }
           token
           tokenSymbol
@@ -463,9 +441,11 @@ module Node = struct
                      "the nonce from get_balance is None, which should be \
                       impossible"
               |> Mina_numbers.Account_nonce.of_string
-          ; total_balance = acc.balance.total
-          ; liquid_balance_opt = acc.balance.liquid
-          ; locked_balance_opt = acc.balance.locked
+          ; total_balance = Currency.Balance.of_uint64 acc.balance.total
+          ; liquid_balance_opt =
+              Option.map ~f:Currency.Balance.of_uint64 acc.balance.liquid
+          ; locked_balance_opt =
+              Option.map ~f:Currency.Balance.of_uint64 acc.balance.locked
           }
 
   let must_get_account_data ~logger t ~account_id =
@@ -718,24 +698,19 @@ module Node = struct
       let unlock_account_obj =
         Graphql.Unlock_account.(
           make
-          @@ makeVariables ~password:node_password
-               ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ())
+          @@ makeVariables ~password:node_password ~public_key:sender_pub_key ())
       in
       exec_graphql_request ~logger ~node:t ~initial_delay_sec:0.
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _unlock_acct_obj = unlock_sender_account_graphql () in
     let send_payment_graphql () =
+      let input =
+        Mina_graphql.Types.Input.SendPaymentInput.make_input
+          ~from:sender_pub_key ~to_:receiver_pub_key ~amount ~fee ()
+      in
       let send_payment_obj =
-        Graphql.Send_payment.(
-          make
-          @@ makeVariables
-               ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-               ~amount:(Graphql_lib.Encoders.amount amount)
-               ~fee:(Graphql_lib.Encoders.fee fee)
-               ())
+        Graphql.Send_payment.(make @@ makeVariables ~input ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
         send_payment_obj
@@ -798,14 +773,14 @@ module Node = struct
                           f.failures
                         |> Array.to_list |> List.rev )
                       :: acc )
-            |> Mina_base.Transaction_status.Failure.Collection.display_to_yojson
+            |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
             |> Yojson.Safe.to_string )
     in
     let zkapp_id = sent_zkapp_obj.internalSendZkapp.zkapp.id in
     [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
     return zkapp_id
 
-  let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+  let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
     let sender_pk_str =
@@ -818,23 +793,19 @@ module Node = struct
         Graphql.Unlock_account.(
           make
           @@ makeVariables ~password:"naughty blue worm"
-               ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ())
+               ~public_key:sender_pub_key ())
       in
       exec_graphql_request ~logger ~node:t
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
     let send_delegation_graphql () =
+      let input =
+        Mina_graphql.Types.Input.SendDelegationInput.make_input
+          ~from:sender_pub_key ~to_:receiver_pub_key ~fee ()
+      in
       let send_delegation_obj =
-        Graphql.Send_delegation.(
-          make
-          @@ makeVariables
-               ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-               ~amount:(Graphql_lib.Encoders.amount amount)
-               ~fee:(Graphql_lib.Encoders.fee fee)
-               ())
+        Graphql.Send_delegation.(make @@ makeVariables ~input ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_delegation_graphql"
         send_delegation_obj
@@ -856,25 +827,20 @@ module Node = struct
     res
 
   let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~token
-      ~(valid_until : Mina_numbers.Global_slot.t) ~raw_signature =
+      ~amount ~fee ~nonce ~memo ~(valid_until : Mina_numbers.Global_slot.t)
+      ~raw_signature =
     [%log info] "Sending a payment with raw signature"
       ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
     let send_payment_graphql () =
       let open Graphql.Send_payment_with_raw_sig in
-      let variables =
-        makeVariables
-          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-          ~amount:(Graphql_lib.Encoders.amount amount)
-          ~token:(Graphql_lib.Encoders.token token)
-          ~fee:(Graphql_lib.Encoders.fee fee)
-          ~nonce:(Graphql_lib.Encoders.nonce nonce)
-          ~memo
-          ~validUntil:(Graphql_lib.Encoders.nonce valid_until)
-          ~rawSignature:raw_signature ()
+      let input =
+        Mina_graphql.Types.Input.SendPaymentInput.make_input
+          ~from:sender_pub_key ~to_:receiver_pub_key ~amount ~fee ~memo ~nonce
+          ~valid_until:(Mina_numbers.Global_slot.to_uint32 valid_until)
+          ()
       in
+      let variables = makeVariables ~input ~rawSignature:raw_signature () in
       let send_payment_obj = make variables in
       let variables_json_basic =
         variablesToJson (serializeVariables variables)
@@ -905,14 +871,13 @@ module Node = struct
     res
 
   let must_send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
+      ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature =
     send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
+      ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount
-      ~fee =
-    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
+    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
@@ -924,16 +889,10 @@ module Node = struct
       let send_payment_obj =
         Graphql.Send_test_payments.(
           make
-          @@ makeVariables
-               ~senders:
-                 (Array.of_list
-                    (List.map ~f:Signature_lib.Private_key.to_yojson senders) )
-               ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
-               ~amount:(Graphql_lib.Encoders.amount amount)
-               ~fee:(Graphql_lib.Encoders.fee fee)
-               ~repeat_count:(Graphql_lib.Encoders.uint32 repeat_count)
-               ~repeat_delay_ms:(Graphql_lib.Encoders.uint32 repeat_delay_ms)
-               ())
+          @@ makeVariables ~senders ~receiver:receiver_pub_key
+               ~amount:(Currency.Amount.to_uint64 amount)
+               ~fee:(Currency.Fee.to_uint64 fee)
+               ~repeat_count ~repeat_delay_ms ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
         send_payment_obj
@@ -1228,9 +1187,9 @@ let all_pod_ids t = Map.keys t.nodes_by_pod_id
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
-  let max_polls = 60 (* 15 mins *) in
-  let all_pods =
-    all_nodes network
+  let max_polls = 40 (* 10 mins *) in
+  let all_pods_set =
+    all_pods network
     |> List.map ~f:(fun { pod_id; _ } -> pod_id)
     |> String.Set.of_list
   in
@@ -1251,63 +1210,84 @@ let initialize_infra ~logger network =
            let parts = String.split line ~on:':' in
            assert (List.length parts = 2) ;
            (List.nth_exn parts 0, List.nth_exn parts 1) )
-    |> List.filter ~f:(fun (pod_name, _) -> String.Set.mem all_pods pod_name)
+    |> List.filter ~f:(fun (pod_name, _) ->
+           String.Set.mem all_pods_set pod_name )
+    (* this filters out the archive bootstrap pods, since they aren't in all_pods_set.  in fact the bootstrap pods aren't tracked at all in the framework *)
     |> String.Map.of_alist_exn
   in
   let rec poll n =
     [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
-    let is_successful_pod_status = String.equal "Running" in
-    let poll_again () =
-      if n < max_polls then
-        let%bind () =
-          after poll_interval |> Deferred.bind ~f:Malleable_error.return
-        in
-        poll (n + 1)
-      else (
-        [%log fatal] "Not all pods were assigned to nodes and ready in time." ;
-        Malleable_error.hard_error_string ~exit_code:4
-          "Some pods either were not assigned to nodes or did not deploy \
-           properly." )
-    in
+    let is_successful_pod_status status = String.equal "Running" status in
     match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
     | Ok str ->
         let pod_statuses = parse_pod_statuses str in
+        [%log debug] "pod_statuses: \n %s"
+          ( String.Map.to_alist pod_statuses
+          |> List.map ~f:(fun (key, data) -> key ^ ": " ^ data ^ "\n")
+          |> String.concat ) ;
+        [%log debug] "all_pods: \n %s"
+          (String.Set.elements all_pods_set |> String.concat ~sep:", ") ;
         let all_pods_are_present =
-          List.for_all (String.Set.elements all_pods) ~f:(fun pod_id ->
+          List.for_all (String.Set.elements all_pods_set) ~f:(fun pod_id ->
               String.Map.mem pod_statuses pod_id )
         in
         let any_pods_are_not_running =
+          (* there could be duplicate keys... *)
           List.exists
             (String.Map.data pod_statuses)
             ~f:(Fn.compose not is_successful_pod_status)
         in
         if not all_pods_are_present then (
+          let present_pods = String.Map.keys pod_statuses in
           [%log fatal]
             "Not all pods were found when querying namespace; this indicates a \
-             deployment error. Refusing to continue. Expected pods: [%s]"
-            (String.Set.elements all_pods |> String.concat ~sep:"; ") ;
+             deployment error. Refusing to continue. \n\
+             Expected pods: [%s].  \n\
+             Present pods: [%s]"
+            (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
+            (present_pods |> String.concat ~sep:"; ") ;
           Malleable_error.hard_error_string ~exit_code:5
             "Some pods were not found in namespace." )
-        else if any_pods_are_not_running then (
+        else if any_pods_are_not_running then
           let failed_pod_statuses =
             List.filter (String.Map.to_alist pod_statuses)
               ~f:(fun (_, status) -> not (is_successful_pod_status status))
           in
-          [%log debug] "Got bad pod statuses, polling again ($failed_statuses"
-            ~metadata:
-              [ ( "failed_statuses"
-                , `Assoc
-                    (List.Assoc.map failed_pod_statuses ~f:(fun v -> `String v))
-                )
-              ] ;
-          poll_again () )
+          if n > 0 then (
+            [%log debug] "Got bad pod statuses, polling again ($failed_statuses"
+              ~metadata:
+                [ ( "failed_statuses"
+                  , `Assoc
+                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
+                           `String v ) ) )
+                ] ;
+            let%bind () =
+              after poll_interval |> Deferred.bind ~f:Malleable_error.return
+            in
+            poll (n - 1) )
+          else (
+            [%log fatal]
+              "Got bad pod statuses, not all pods were assigned to nodes and \
+               ready in time.  pod statuses: ($failed_statuses"
+              ~metadata:
+                [ ( "failed_statuses"
+                  , `Assoc
+                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
+                           `String v ) ) )
+                ] ;
+            Malleable_error.hard_error_string ~exit_code:4
+              "Some pods either were not assigned to nodes or did not deploy \
+               properly." )
         else return ()
     | Error _ ->
         [%log debug] "`kubectl get pods` timed out, polling again" ;
-        poll_again ()
+        let%bind () =
+          after poll_interval |> Deferred.bind ~f:Malleable_error.return
+        in
+        poll n
   in
   [%log info] "Waiting for pods to be assigned nodes and become ready" ;
-  let res = poll 0 in
+  let res = poll max_polls in
   match%bind.Deferred res with
   | Error _ ->
       [%log error] "Not all pods were assigned nodes, cannot proceed!" ;

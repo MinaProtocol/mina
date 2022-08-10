@@ -221,10 +221,7 @@ module Update = struct
             F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
-            ( Pickles.Side_loaded.Verification_key.Stable.V2.t
-            , F.Stable.V1.t )
-            With_hash.Stable.V1.t
-            Set_or_keep.Stable.V1.t
+            Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
         ; zkapp_uri : string Set_or_keep.Stable.V1.t
         ; token_symbol :
@@ -455,6 +452,11 @@ module Update = struct
         ~checked:(Data_as_hash.deriver string)
         ~name:"StringWithHash" string
     in
+    let token_symbol =
+      with_checked
+        ~checked:(js_only (Js_layout.leaf_type (Custom "TokenSymbol")))
+        ~name:"TokenSymbol" string
+    in
     finish "PartyUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
@@ -462,7 +464,7 @@ module Update = struct
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
          ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
-         ~token_symbol:!.(Set_or_keep.deriver string_with_hash)
+         ~token_symbol:!.(Set_or_keep.deriver token_symbol)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
@@ -606,7 +608,7 @@ module Account_precondition = struct
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
-          sequenceState: null, provedState: null
+          sequenceState: null, provedState: null, isNew: null
         }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
@@ -669,7 +671,8 @@ module Preconditions = struct
   let to_input ({ network; account } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Zkapp_precondition.Protocol_state.to_input network
-      ; Random_oracle_input.Chunked.field (Account_precondition.digest account)
+      ; Zkapp_precondition.Account.to_input
+          (Account_precondition.to_full account)
       ]
 
   let gen =
@@ -699,8 +702,7 @@ module Preconditions = struct
     let to_input ({ network; account } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Zkapp_precondition.Protocol_state.Checked.to_input network
-        ; Random_oracle_input.Chunked.field
-            (Account_precondition.Checked.digest account)
+        ; Zkapp_precondition.Account.Checked.to_input account
         ]
   end
 
@@ -954,27 +956,14 @@ module Body = struct
     ; call_depth
     }
 
-  (* * Balance change for the fee payer is always going to be Neg, so represent it using
-       an unsigned fee,
-     * token id is always going to be the default, so use unit value as a
-       placeholder,
-     * increment nonce must always be true for a fee payer, so use unit as a
-       placeholder.
-     TODO: what about use_full_commitment? it's unit here and bool there
-  *)
   module Fee_payer = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
-          ; update : Update.Stable.V1.t
           ; fee : Fee.Stable.V1.t
-          ; events : Events'.Stable.V1.t
-          ; sequence_events : Events'.Stable.V1.t
-          ; protocol_state_precondition :
-              Zkapp_precondition.Protocol_state.Stable.V1.t
-                [@name "networkPrecondition"]
+          ; valid_until : Global_slot.Stable.V1.t option [@name "validUntil"]
           ; nonce : Account_nonce.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
@@ -986,28 +975,15 @@ module Body = struct
     let gen : t Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%map public_key = Public_key.Compressed.gen
-      and update = Update.gen ()
       and fee = Currency.Fee.gen
-      and nonce = Account.Nonce.gen
-      and events = return []
-      and sequence_events = return []
-      and protocol_state_precondition = Zkapp_precondition.Protocol_state.gen in
-      { public_key
-      ; update
-      ; fee
-      ; events
-      ; sequence_events
-      ; protocol_state_precondition
-      ; nonce
-      }
+      and valid_until = Option.quickcheck_generator Global_slot.gen
+      and nonce = Account.Nonce.gen in
+      { public_key; fee; valid_until; nonce }
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
-      ; update = Update.dummy
       ; fee = Fee.zero
-      ; events = []
-      ; sequence_events = []
-      ; protocol_state_precondition = Zkapp_precondition.Protocol_state.accept
+      ; valid_until = None
       ; nonce = Account_nonce.zero
       }
 
@@ -1018,9 +994,10 @@ module Body = struct
           ~of_string:Fee.of_string
       in
       let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
-      Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
-        ~fee:!.fee ~events:!.Events.deriver ~sequence_events:!.Events.deriver
-        ~protocol_state_precondition:!.Zkapp_precondition.Protocol_state.deriver
+      Fields.make_creator obj ~public_key:!.public_key ~fee:!.fee
+        ~valid_until:
+          !.Fields_derivers_zkapps.Derivers.(
+              option ~js_type:`Or_undefined @@ uint32 @@ o ())
         ~nonce:!.uint32
       |> finish "FeePayerPartyBody" ~t_toplevel_annots
 
@@ -1034,15 +1011,22 @@ module Body = struct
   let of_fee_payer (t : Fee_payer.t) : t =
     { public_key = t.public_key
     ; token_id = Token_id.default
-    ; update = t.update
+    ; update = Update.noop
     ; balance_change =
         { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
     ; increment_nonce = true
-    ; events = t.events
-    ; sequence_events = t.sequence_events
+    ; events = []
+    ; sequence_events = []
     ; call_data = Field.zero
     ; preconditions =
-        { Preconditions.network = t.protocol_state_precondition
+        { Preconditions.network =
+            (let valid_until =
+               Option.value ~default:Global_slot.max_value t.valid_until
+             in
+             { Zkapp_precondition.Protocol_state.accept with
+               global_slot_since_genesis =
+                 Check { lower = Global_slot.zero; upper = valid_until }
+             } )
         ; account = Account_precondition.Nonce t.nonce
         }
     ; use_full_commitment = true
@@ -1052,11 +1036,11 @@ module Body = struct
   let to_fee_payer_exn (t : t) : Fee_payer.t =
     let { public_key
         ; token_id = _
-        ; update
+        ; update = _
         ; balance_change
         ; increment_nonce = _
-        ; events
-        ; sequence_events
+        ; events = _
+        ; sequence_events = _
         ; call_data = _
         ; preconditions
         ; use_full_commitment = _
@@ -1075,14 +1059,14 @@ module Body = struct
       | Full _ | Accept ->
           failwith "Expected a nonce for fee payer account precondition"
     in
-    { public_key
-    ; update
-    ; fee
-    ; events
-    ; sequence_events
-    ; protocol_state_precondition = preconditions.network
-    ; nonce
-    }
+    let valid_until =
+      match preconditions.network.global_slot_since_genesis with
+      | Ignore ->
+          None
+      | Check { upper; _ } ->
+          Some upper
+    in
+    { public_key; fee; valid_until; nonce }
 
   module Checked = struct
     module Type_of_var (V : sig
@@ -1127,8 +1111,8 @@ module Body = struct
           t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Public_key.Compressed.Checked.to_input public_key
-        ; Update.Checked.to_input update
         ; Token_id.Checked.to_input token_id
+        ; Update.Checked.to_input update
         ; Snark_params.Tick.Run.run_checked
             (Amount.Signed.Checked.to_input balance_change)
         ; Random_oracle_input.Chunked.packed
@@ -1201,8 +1185,8 @@ module Body = struct
         t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Public_key.Compressed.to_input public_key
-      ; Update.to_input update
       ; Token_id.to_input token_id
+      ; Update.to_input update
       ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events

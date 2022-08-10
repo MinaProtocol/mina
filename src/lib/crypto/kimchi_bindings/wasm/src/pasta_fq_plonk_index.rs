@@ -5,7 +5,12 @@ use crate::srs::fq::WasmFqSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex as DlogIndex;
-use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+use mina_curves::pasta::{
+    fq::Fq,
+    pallas::{Pallas as GAffine, PallasParameters},
+    vesta::Vesta as GAffineOther,
+};
+use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -29,8 +34,11 @@ pub struct WasmPastaFqPlonkIndex(#[wasm_bindgen(skip)] pub Box<DlogIndex<GAffine
 pub fn caml_pasta_fq_plonk_index_create(
     gates: &WasmGateVector,
     public_: i32,
+    prev_challenges: i32,
     srs: &WasmSrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsValue> {
+    console_error_panic_hook::set_once();
+
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
     let gates: Vec<_> = gates
         .0
@@ -50,8 +58,9 @@ pub fn caml_pasta_fq_plonk_index_create(
     } */
 
     // create constraint system
-    let cs = match ConstraintSystem::<Fq>::create(gates, oracle::pasta::fq_kimchi::params())
+    let cs = match ConstraintSystem::<Fq>::create(gates)
         .public(public_ as usize)
+        .prev_challenges(prev_challenges as usize)
         .build()
     {
         Err(_) => {
@@ -72,15 +81,12 @@ pub fn caml_pasta_fq_plonk_index_create(
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
+    let mut index = DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
+    // Compute and cache the verifier index digest
+    index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
+
     // create index
-    Ok(WasmPastaFqPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(
-            cs,
-            oracle::pasta::fp_kimchi::params(),
-            endo_q,
-            srs.0.clone(),
-        ),
-    )))
+    Ok(WasmPastaFqPlonkIndex(Box::new(index)))
 }
 
 #[wasm_bindgen]
@@ -131,9 +137,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     // deserialize the index
     let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
         .map_err(|err| JsValue::from_str(&format!("caml_pasta_fq_plonk_index_read: {}", err)))?;
-    t.cs.fr_sponge_params = oracle::pasta::fq_kimchi::params();
     t.srs = srs.0.clone();
-    t.fq_sponge_params = oracle::pasta::fp_kimchi::params();
     let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;

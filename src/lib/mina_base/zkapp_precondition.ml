@@ -180,7 +180,7 @@ module Numeric = struct
 
   let deriver name inner obj =
     let closed_interval obj' = Closed_interval.deriver ~name inner obj' in
-    Or_ignore.deriver_implicit closed_interval obj
+    Or_ignore.deriver closed_interval obj
 
   module Derivers = struct
     open Fields_derivers_zkapps.Derivers
@@ -240,12 +240,16 @@ module Numeric = struct
   let gen gen_a compare_a = Or_ignore.gen (Closed_interval.gen gen_a compare_a)
 
   let to_input { zero; max_value; to_input; _ } (t : 'a t) =
-    Closed_interval.to_input ~f:to_input
+    Flagged_option.to_input'
+      ~f:(Closed_interval.to_input ~f:to_input)
+      ~field_of_bool
       ( match t with
-      | Check x ->
-          x
       | Ignore ->
-          { lower = zero; upper = max_value } )
+          { is_some = false
+          ; data = { Closed_interval.lower = zero; upper = max_value }
+          }
+      | Check x ->
+          { is_some = true; data = x } )
 
   module Checked = struct
     type 'a t = 'a Closed_interval.t Or_ignore.Checked.t
@@ -264,14 +268,13 @@ module Numeric = struct
       let is_constant ({ lower; upper } : _ Closed_interval.t) =
         lower = upper
       in
-      Or_ignore.Checked.map t ~f_implicit:is_constant
-        ~f_explicit:(fun { is_some; data } ->
-          Boolean.( &&& ) is_some (is_constant data) )
+      Boolean.( &&& )
+        (Or_ignore.Checked.is_check t)
+        (is_constant (Or_ignore.Checked.data t))
   end
 
-  let typ { equal = eq; zero; max_value; typ; _ } =
-    Or_ignore.typ_implicit (Closed_interval.typ typ)
-      ~equal:(Closed_interval.equal eq)
+  let typ { zero; max_value; typ; _ } =
+    Or_ignore.typ (Closed_interval.typ typ)
       ~ignore:{ Closed_interval.lower = zero; upper = max_value }
 
   let check ~label { compare; _ } (t : 'a t) (x : 'a) =
@@ -402,17 +405,13 @@ module Eq_data = struct
         }
   end
 
-  let to_input ~explicit { Tc.default; to_input; _ } (t : _ t) =
-    if explicit then
-      Flagged_option.to_input' ~f:to_input ~field_of_bool
-        ( match t with
-        | Ignore ->
-            { is_some = false; data = default }
-        | Check data ->
-            { is_some = true; data } )
-    else to_input (match t with Ignore -> default | Check x -> x)
-
-  let to_input_explicit tc = to_input ~explicit:true tc
+  let to_input { Tc.default; to_input; _ } (t : _ t) =
+    Flagged_option.to_input' ~f:to_input ~field_of_bool
+      ( match t with
+      | Ignore ->
+          { is_some = false; data = default }
+      | Check data ->
+          { is_some = true; data } )
 
   let to_input_checked { Tc.to_input_checked; _ } (t : _ Checked.t) =
     Checked.to_input t ~f:to_input_checked
@@ -428,28 +427,18 @@ module Eq_data = struct
         if equal x y then Ok ()
         else Or_error.errorf "Equality check failed: %s" label
 
-  let typ_implicit { Tc.equal; default = ignore; typ; _ } =
-    typ_implicit ~equal ~ignore typ
-
-  let typ_explicit { Tc.default = ignore; typ; _ } = typ_explicit ~ignore typ
+  let typ { Tc.default = ignore; typ = t; _ } = typ ~ignore t
 end
 
-module Hash = struct
-  include Eq_data
-
-  let to_input tc = to_input ~explicit:true tc
-
-  let typ = typ_explicit
-end
+module Hash = Eq_data
 
 module Leaf_typs = struct
   let public_key () =
-    Public_key.Compressed.(
-      Or_ignore.typ_explicit ~ignore:invalid_public_key typ)
+    Public_key.Compressed.(Or_ignore.typ ~ignore:invalid_public_key typ)
 
   open Eq_data.Tc
 
-  let field = Eq_data.typ_explicit field
+  let field = Eq_data.typ field
 
   let receipt_chain_hash = Hash.typ receipt_chain_hash
 
@@ -477,23 +466,6 @@ module Leaf_typs = struct
 end
 
 module Account = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('balance, 'nonce, 'receipt_chain_hash, 'pk, 'field) t =
-          { balance : 'balance
-          ; nonce : 'nonce
-          ; receipt_chain_hash : 'receipt_chain_hash
-          ; public_key : 'pk
-          ; delegate : 'pk
-          ; state : 'field Zkapp_state.V.Stable.V1.t
-          }
-        [@@deriving annot, hlist, sexp, equal, yojson, hash, compare]
-      end
-    end]
-  end
-
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -505,39 +477,11 @@ module Account = struct
         ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; sequence_state : F.Stable.V1.t Eq_data.Stable.V1.t
         ; proved_state : bool Eq_data.Stable.V1.t
+        ; is_new : bool Eq_data.Stable.V1.t
         }
       [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type t =
-        ( Balance.Stable.V1.t Numeric.Stable.V1.t
-        , Account_nonce.Stable.V1.t Numeric.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        , F.Stable.V1.t Eq_data.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
-
-      let to_latest
-          ({ balance
-           ; nonce
-           ; receipt_chain_hash
-           ; public_key = _
-           ; delegate
-           ; state
-           } :
-            t ) : V2.t =
-        { balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; state
-        ; sequence_state = Ignore
-        ; proved_state = Ignore
-        }
     end
   end]
 
@@ -560,7 +504,8 @@ module Account = struct
       let field_gen = Quickcheck.Generator.return (F.of_int n) in
       Or_ignore.gen field_gen
     in
-    let%map proved_state = Or_ignore.gen Quickcheck.Generator.bool in
+    let%bind proved_state = Or_ignore.gen Quickcheck.Generator.bool in
+    let%map is_new = Or_ignore.gen Quickcheck.Generator.bool in
     { balance
     ; nonce
     ; receipt_chain_hash
@@ -568,6 +513,7 @@ module Account = struct
     ; state
     ; sequence_state
     ; proved_state
+    ; is_new
     }
 
   let accept : t =
@@ -579,6 +525,7 @@ module Account = struct
         Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
     ; sequence_state = Ignore
     ; proved_state = Ignore
+    ; is_new = Ignore
     }
 
   let is_accept : t -> bool = equal accept
@@ -591,8 +538,9 @@ module Account = struct
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
       ~delegate:!.(Or_ignore.deriver public_key)
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
-      ~sequence_state:!.(Or_ignore.deriver_implicit field)
+      ~sequence_state:!.(Or_ignore.deriver field)
       ~proved_state:!.(Or_ignore.deriver bool)
+      ~is_new:!.(Or_ignore.deriver bool)
     |> finish "AccountPrecondition" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
@@ -616,6 +564,7 @@ module Account = struct
        ; state
        ; sequence_state
        ; proved_state
+       ; is_new
        } :
         t ) =
     let open Random_oracle_input.Chunked in
@@ -623,12 +572,12 @@ module Account = struct
       [ Numeric.(to_input Tc.balance balance)
       ; Numeric.(to_input Tc.nonce nonce)
       ; Hash.(to_input Tc.receipt_chain_hash receipt_chain_hash)
-      ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
+      ; Eq_data.(to_input (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
-          (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
-      ; Eq_data.(to_input ~explicit:false (Lazy.force Tc.sequence_state))
-          sequence_state
-      ; Eq_data.(to_input_explicit Tc.boolean) proved_state
+          (Vector.map state ~f:Eq_data.(to_input Tc.field))
+      ; Eq_data.(to_input (Lazy.force Tc.sequence_state)) sequence_state
+      ; Eq_data.(to_input Tc.boolean) proved_state
+      ; Eq_data.(to_input Tc.boolean) is_new
       ]
 
   let digest t =
@@ -645,6 +594,7 @@ module Account = struct
       ; state : Field.Var.t Eq_data.Checked.t Zkapp_state.V.t
       ; sequence_state : Field.Var.t Eq_data.Checked.t
       ; proved_state : Boolean.var Eq_data.Checked.t
+      ; is_new : Boolean.var Eq_data.Checked.t
       }
     [@@deriving hlist]
 
@@ -656,6 +606,7 @@ module Account = struct
          ; state
          ; sequence_state
          ; proved_state
+         ; is_new
          } :
           t ) =
       let open Random_oracle_input.Chunked in
@@ -669,11 +620,12 @@ module Account = struct
         ; Eq_data.(to_input_checked (Lazy.force Tc.sequence_state))
             sequence_state
         ; Eq_data.(to_input_checked Tc.boolean) proved_state
+        ; Eq_data.(to_input_checked Tc.boolean) is_new
         ]
 
     open Impl
 
-    let checks
+    let checks ~new_account
         { balance
         ; nonce
         ; receipt_chain_hash
@@ -681,6 +633,7 @@ module Account = struct
         ; state
         ; sequence_state
         ; proved_state
+        ; is_new
         } (a : Account.Checked.Unhashed.t) =
       [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
         , Numeric.(Checked.check Tc.balance balance a.balance) )
@@ -721,9 +674,14 @@ module Account = struct
           , Eq_data.(check_checked Tc.boolean proved_state a.zkapp.proved_state)
           )
         ]
+      @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
+          , Eq_data.(check_checked Tc.boolean is_new new_account) )
+        ]
 
-    let check ~check t a =
-      List.iter ~f:(fun (failure, passed) -> check failure passed) (checks t a)
+    let check ~new_account ~check t a =
+      List.iter
+        ~f:(fun (failure, passed) -> check failure passed)
+        (checks ~new_account t a)
 
     let digest (t : t) =
       Random_oracle.Checked.(
@@ -738,15 +696,16 @@ module Account = struct
       ; nonce
       ; receipt_chain_hash
       ; public_key ()
-      ; Zkapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
-      ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
+      ; Zkapp_state.typ (Or_ignore.typ Field.typ ~ignore:Field.zero)
+      ; Or_ignore.typ Field.typ
           ~ignore:(Lazy.force Zkapp_account.Sequence_events.empty_hash)
-      ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
+      ; Or_ignore.typ Boolean.typ ~ignore:false
+      ; Or_ignore.typ Boolean.typ ~ignore:false
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let checks
+  let checks ~new_account
       { balance
       ; nonce
       ; receipt_chain_hash
@@ -754,6 +713,7 @@ module Account = struct
       ; state
       ; sequence_state
       ; proved_state
+      ; is_new
       } (a : Account.t) =
     [ ( Transaction_status.Failure.Account_balance_precondition_unsatisfied
       , Numeric.(check ~label:"balance" Tc.balance balance a.balance) )
@@ -771,46 +731,46 @@ module Account = struct
             (Option.value ~default:tc.default a.delegate)) )
     ]
     @
-    match a.zkapp with
-    | None ->
-        []
-    | Some zkapp ->
-        [ ( Transaction_status.Failure
-            .Account_sequence_state_precondition_unsatisfied
-          , match
-              List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
-                  Eq_data.(
-                    check
-                      (Lazy.force Tc.sequence_state)
-                      ~label:"" sequence_state state)
-                  |> Or_error.is_ok )
-            with
-            | None ->
-                Error (Error.createf "Sequence state mismatch")
-            | Some _ ->
-                Ok () )
-        ]
-        @ List.mapi
-            Vector.(to_list (zip state zkapp.app_state))
-            ~f:(fun i (c, v) ->
-              let failure =
-                Transaction_status.Failure
-                .Account_app_state_precondition_unsatisfied
-                  i
-              in
-              ( failure
-              , Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v) ) )
-        @ [ ( Transaction_status.Failure
-              .Account_proved_state_precondition_unsatisfied
-            , Eq_data.(
-                check ~label:"proved_state" Tc.boolean proved_state
-                  zkapp.proved_state) )
-          ]
+    let zkapp = Option.value ~default:Zkapp_account.default a.zkapp in
+    [ ( Transaction_status.Failure
+        .Account_sequence_state_precondition_unsatisfied
+      , match
+          List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
+              Eq_data.(
+                check
+                  (Lazy.force Tc.sequence_state)
+                  ~label:"" sequence_state state)
+              |> Or_error.is_ok )
+        with
+        | None ->
+            Error (Error.createf "Sequence state mismatch")
+        | Some _ ->
+            Ok () )
+    ]
+    @ List.mapi
+        Vector.(to_list (zip state zkapp.app_state))
+        ~f:(fun i (c, v) ->
+          let failure =
+            Transaction_status.Failure
+            .Account_app_state_precondition_unsatisfied
+              i
+          in
+          (failure, Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v))
+          )
+    @ [ ( Transaction_status.Failure
+          .Account_proved_state_precondition_unsatisfied
+        , Eq_data.(
+            check ~label:"proved_state" Tc.boolean proved_state
+              zkapp.proved_state) )
+      ]
+    @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
+        , Eq_data.(check ~label:"is_new" Tc.boolean is_new new_account) )
+      ]
 
-  let check ~check t a =
+  let check ~new_account ~check t a =
     List.iter
       ~f:(fun (failure, res) -> check failure (Result.is_ok res))
-      (checks t a)
+      (checks ~new_account t a)
 end
 
 module Protocol_state = struct
@@ -1540,21 +1500,6 @@ module Other = struct
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type t =
-        ( Account.Stable.V1.t
-        , Account_state.Stable.V1.t Transition.Stable.V1.t
-        , F.Stable.V1.t Hash.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, equal, yojson, hash, compare]
-
-      let to_latest ({ predicate; account_transition; account_vk } : t) : V2.t =
-        { predicate = Account.Stable.V1.to_latest predicate
-        ; account_transition
-        ; account_vk
-        }
-    end
   end]
 
   module Checked = struct
@@ -1631,25 +1576,6 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
-
-  module V1 = struct
-    type t =
-      ( Account.Stable.V1.t
-      , Protocol_state.Stable.V1.t
-      , Other.Stable.V1.t
-      , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
-      Poly.Stable.V1.t
-    [@@deriving sexp, equal, yojson, hash, compare]
-
-    let to_latest
-        ({ self_predicate; other; fee_payer; protocol_state_predicate } : t) :
-        V2.t =
-      { self_predicate = Account.Stable.V1.to_latest self_predicate
-      ; other = Other.Stable.V1.to_latest other
-      ; fee_payer
-      ; protocol_state_predicate
-      }
-  end
 end]
 
 module Digested = F
@@ -1660,7 +1586,7 @@ let to_input ({ self_predicate; other; fee_payer; protocol_state_predicate } : t
   List.reduce_exn ~f:append
     [ Account.to_input self_predicate
     ; Other.to_input other
-    ; Eq_data.(to_input_explicit (Tc.public_key ())) fee_payer
+    ; Eq_data.(to_input (Tc.public_key ())) fee_payer
     ; Protocol_state.to_input protocol_state_predicate
     ]
 
@@ -1702,6 +1628,6 @@ let typ () : (Checked.t, Stable.Latest.t) Typ.t =
   Poly.typ
     [ Account.typ ()
     ; Other.typ ()
-    ; Eq_data.(typ_explicit (Tc.public_key ()))
+    ; Eq_data.(typ (Tc.public_key ()))
     ; Protocol_state.typ
     ]

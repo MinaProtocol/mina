@@ -69,6 +69,7 @@
    work_selector
    mina_compile_config
    unsigned_extended
+   ppx_version.runtime
  )
 
  (preprocessor_deps ../../../../config.mlh)

@@ -16,9 +16,14 @@ type failure =
       | `Token_symbol
       | `Balance ]
 
-let gen_account_precondition_from_account ?failure account =
+(* whether we should create a new account in the ledger *)
+let should_create_account ?account_id ~new_account ~zkapp_account =
+  new_account || (zkapp_account && Option.is_none account_id)
+
+let gen_account_precondition_from_account ?failure ~first_use_of_account account
+    =
   let open Quickcheck.Let_syntax in
-  let { Account.Poly.balance; nonce; receipt_chain_hash; delegate; zkapp; _ } =
+  let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
     account
   in
   (* choose constructor *)
@@ -72,7 +77,10 @@ let gen_account_precondition_from_account ?failure account =
         Or_ignore.gen
           (return { Zkapp_precondition.Closed_interval.lower; upper })
       in
-      let receipt_chain_hash = Or_ignore.Check receipt_chain_hash in
+      let receipt_chain_hash =
+        if first_use_of_account then Or_ignore.Check receipt_chain_hash
+        else Or_ignore.Ignore
+      in
       let%bind delegate =
         match delegate with
         | None ->
@@ -80,7 +88,7 @@ let gen_account_precondition_from_account ?failure account =
         | Some pk ->
             Or_ignore.gen (return pk)
       in
-      let%bind state, sequence_state, proved_state =
+      let%bind state, sequence_state, proved_state, is_new =
         match zkapp with
         | None ->
             let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -91,7 +99,8 @@ let gen_account_precondition_from_account ?failure account =
             in
             let sequence_state = Or_ignore.Ignore in
             let proved_state = Or_ignore.Ignore in
-            return (state, sequence_state, proved_state)
+            let is_new = Or_ignore.Ignore in
+            return (state, sequence_state, proved_state, is_new)
         | Some { Zkapp_account.app_state; sequence_state; proved_state; _ } ->
             let state =
               Zkapp_state.V.map app_state ~f:(fun field ->
@@ -106,7 +115,12 @@ let gen_account_precondition_from_account ?failure account =
               return (Or_ignore.Check (List.nth_exn fields ndx))
             in
             let proved_state = Or_ignore.Check proved_state in
-            return (state, sequence_state, proved_state)
+            let is_new =
+              (* when we apply the generated Parties.t, the account is always in the ledger
+              *)
+              Or_ignore.Check false
+            in
+            return (state, sequence_state, proved_state, is_new)
       in
       return
         { Zkapp_precondition.Account.balance
@@ -116,6 +130,7 @@ let gen_account_precondition_from_account ?failure account =
         ; state
         ; sequence_state
         ; proved_state
+        ; is_new
         }
     in
     match failure with
@@ -611,11 +626,17 @@ module Party_body_components = struct
 
   let to_fee_payer t : Party.Body.Fee_payer.t =
     { public_key = t.public_key
-    ; update = t.update
     ; fee = t.balance_change
-    ; events = t.events
-    ; sequence_events = t.sequence_events
-    ; protocol_state_precondition = t.protocol_state_precondition
+    ; valid_until =
+        ( match
+            t.protocol_state_precondition
+              .Zkapp_precondition.Protocol_state.Poly.global_slot_since_genesis
+          with
+        | Zkapp_basic.Or_ignore.Ignore ->
+            None
+        | Zkapp_basic.Or_ignore.Check
+            { Zkapp_precondition.Closed_interval.upper; _ } ->
+            Some upper )
     ; nonce = t.account_precondition
     }
 
@@ -644,9 +665,11 @@ end
    `unit` for the fee payer, and `bool` for other parties.
    The type `c` is associated with the `token_id` field, which is `unit` for the
    fee payer, and `Token_id.t` for other parties.
+   The type `d` is associated with the `account_precondition` field, which is
+   a nonce for the fee payer, and `Account_precondition.t` for other parties
 *)
 let gen_party_body_components (type a b c d) ?(update = None) ?account_id
-    ~account_state_tbl ?vk ?failure ?(new_account = false)
+    ?account_ids_seen ~account_state_tbl ?vk ?failure ?(new_account = false)
     ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
     ?permissions_auth ?(required_balance_change : a option)
     ?(required_balance : Currency.Balance.t option) ?protocol_state_view
@@ -656,7 +679,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
        -> b Quickcheck.Generator.t )
     ~(f_balance_change : a -> Currency.Amount.Signed.t)
     ~(increment_nonce : b * bool) ~(f_token_id : Token_id.t -> c)
-    ~f_account_predcondition
+    ~(f_account_precondition :
+       first_use_of_account:bool -> Account.t -> d Quickcheck.Generator.t )
     ~(f_party_account_precondition : d -> Party.Account_precondition.t) ~ledger
     ~authorization_tag () :
     (_, _, _, a, _, _, _, b, _, d, _) Party_body_components.t
@@ -664,15 +688,15 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
-  (* if it's a Snapp account, and we haven't provided an account id, then
-     we have to create a new account; not all ledger accounts are Snapp accounts,
+  (* if it's a zkApp account, and we haven't provided an account id, then
+     we have to create a new account; not all ledger accounts are zkApp accounts,
      so we can't just pick a ledger account
   *)
-  let new_account =
-    new_account || (zkapp_account && Option.is_none account_id)
+  let create_new_account =
+    should_create_account ?account_id ~new_account ~zkapp_account
   in
   (* a required balance is associated with a new account *)
-  ( match (required_balance, new_account) with
+  ( match (required_balance, create_new_account) with
   | Some _, false ->
       failwith "Required balance, but not new account"
   | _ ->
@@ -684,10 +708,10 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     | Some update ->
         return update
   in
-  (*party_increment_nonce for fee payer is unit and increment_nonce is true*)
+  (* party_increment_nonce for fee payer is unit and increment_nonce is true *)
   let party_increment_nonce, increment_nonce = increment_nonce in
   let%bind account =
-    if new_account then (
+    if create_new_account then (
       if Option.is_some account_id then
         failwith
           "gen_party_body: new party is true, but an account id, presumably \
@@ -695,8 +719,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
       match available_public_keys with
       | None ->
           failwith
-            "gen_party_body: new_account is true, but available_public_keys \
-             not provided"
+            "gen_party_body: create_new_account is true, but \
+             available_public_keys not provided"
       | Some available_pks ->
           let low, high =
             match required_balance with
@@ -756,10 +780,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           | Ok (`Added, _) ->
               ()
           | Ok (`Existed, _) ->
-              failwith "gen_party_body: account for new party already in ledger"
+              failwith "account for new party already in ledger"
           | Error err ->
-              failwithf
-                "gen_party_body: could not add account to ledger new party: %s"
+              failwithf "could not add account to ledger for new party: %s"
                 (Error.to_string_hum err) () ) ;
           account )
     else
@@ -783,8 +806,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
           match Ledger.location_of_account ledger account_id with
           | None ->
               failwithf
-                "gen_party_body: could not find account location for passed \
-                 account id with public key %s and token_id %s"
+                "could not find account location for passed account id with \
+                 public key %s and token_id %s"
                 (Signature_lib.Public_key.Compressed.to_base58_check
                    (Account_id.public_key account_id) )
                 (Account_id.token_id account_id |> Token_id.to_string)
@@ -794,20 +817,19 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
               | None ->
                   (* should be unreachable *)
                   failwithf
-                    "gen_party_body: could not find account for passed account \
-                     id with public key %s and token id %s"
+                    "could not find account for passed account id with public \
+                     key %s and token id %s"
                     (Signature_lib.Public_key.Compressed.to_base58_check
                        (Account_id.public_key account_id) )
                     (Account_id.token_id account_id |> Token_id.to_string)
                     ()
               | Some _acct ->
-                  (*get the latest state of the account*)
+                  (* get the latest state of the account *)
                   let acct =
                     Account_id.Table.find_exn account_state_tbl account_id
                   in
                   if zkapp_account && Option.is_none acct.zkapp then
-                    failwith
-                      "gen_party_body: provided account has no snapp field" ;
+                    failwith "provided account has no zkapp account field" ;
                   return acct ) )
   in
   let public_key = account.public_key in
@@ -837,7 +859,19 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     field_array_list_gen ~max_array_len:4 ~max_list_len:6
   in
   let%bind call_data = Snark_params.Tick.Field.gen in
-  let%bind account_precondition = f_account_predcondition account in
+  let first_use_of_account =
+    let account_id = Account_id.create public_key token_id in
+    match account_ids_seen with
+    | None ->
+        (* fee payer *)
+        true
+    | Some hash_set ->
+        (* other partys *)
+        not @@ Hash_set.mem hash_set account_id
+  in
+  let%bind account_precondition =
+    f_account_precondition ~first_use_of_account account
+  in
   (* update the depth when generating `other_parties` in Parties.t *)
   let call_depth = 0 in
   let%bind use_full_commitment =
@@ -882,71 +916,76 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
      match c with Zkapp_basic.Set_or_keep.Set x -> x | Keep -> default
    in
    let delegate (account : Account.t) =
-     Option.map
-       ~f:(fun delegate -> value_to_be_updated update.delegate ~default:delegate)
-       account.delegate
+     if is_fee_payer then account.delegate
+     else
+       Option.map
+         ~f:(fun delegate ->
+           value_to_be_updated update.delegate ~default:delegate )
+         account.delegate
    in
    let zkapp (account : Account.t) =
-     match account.zkapp with
-     | None ->
-         None
-     | Some zk ->
-         (*TODO: Deduplicate this from what's in parties logic to get the
-            account precondition right*)
-         let app_state =
-           let account_app_state = zk.app_state in
-           List.zip_exn
-             (Zkapp_state.V.to_list update.app_state)
-             (Zkapp_state.V.to_list account_app_state)
-           |> List.map ~f:(fun (to_be_updated, current) ->
-                  value_to_be_updated to_be_updated ~default:current )
-           |> Zkapp_state.V.of_list_exn
-         in
-         let sequence_state =
-           let [ s1'; s2'; s3'; s4'; s5' ] = zk.sequence_state in
-           let last_sequence_slot = zk.last_sequence_slot in
-           (* Push events to s1. *)
-           let is_empty = List.is_empty sequence_events in
-           let s1_updated =
-             Party.Sequence_events.push_events s1' sequence_events
+     if is_fee_payer then account.zkapp
+     else
+       match account.zkapp with
+       | None ->
+           None
+       | Some zk ->
+           (*TODO: Deduplicate this from what's in parties logic to get the
+              account precondition right*)
+           let app_state =
+             let account_app_state = zk.app_state in
+             List.zip_exn
+               (Zkapp_state.V.to_list update.app_state)
+               (Zkapp_state.V.to_list account_app_state)
+             |> List.map ~f:(fun (to_be_updated, current) ->
+                    value_to_be_updated to_be_updated ~default:current )
+             |> Zkapp_state.V.of_list_exn
            in
-           let s1 = if is_empty then s1' else s1_updated in
-           let txn_global_slot =
-             Option.value_map protocol_state_view ~default:last_sequence_slot
-               ~f:(fun ps ->
-                 ps
-                   .Zkapp_precondition.Protocol_state.Poly
-                    .global_slot_since_genesis )
+           let sequence_state =
+             let [ s1'; s2'; s3'; s4'; s5' ] = zk.sequence_state in
+             let last_sequence_slot = zk.last_sequence_slot in
+             (* Push events to s1. *)
+             let is_empty = List.is_empty sequence_events in
+             let s1_updated =
+               Party.Sequence_events.push_events s1' sequence_events
+             in
+             let s1 = if is_empty then s1' else s1_updated in
+             let txn_global_slot =
+               Option.value_map protocol_state_view ~default:last_sequence_slot
+                 ~f:(fun ps ->
+                   ps
+                     .Zkapp_precondition.Protocol_state.Poly
+                      .global_slot_since_genesis )
+             in
+             (* Shift along if last update wasn't this slot  *)
+             let is_this_slot =
+               Mina_numbers.Global_slot.equal txn_global_slot last_sequence_slot
+             in
+             let is_full_and_different_slot = (not is_empty) && is_this_slot in
+             let s5 = if is_full_and_different_slot then s5' else s4' in
+             let s4 = if is_full_and_different_slot then s4' else s3' in
+             let s3 = if is_full_and_different_slot then s3' else s2' in
+             let s2 = if is_full_and_different_slot then s2' else s1' in
+             ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
            in
-           (* Shift along if last update wasn't this slot  *)
-           let is_this_slot =
-             Mina_numbers.Global_slot.equal txn_global_slot last_sequence_slot
+           let proved_state =
+             let keeping_app_state =
+               List.for_all ~f:Fn.id
+                 (List.map ~f:Zkapp_basic.Set_or_keep.is_keep
+                    (Pickles_types.Vector.to_list update.app_state) )
+             in
+             let changing_entire_app_state =
+               List.for_all ~f:Fn.id
+                 (List.map ~f:Zkapp_basic.Set_or_keep.is_set
+                    (Pickles_types.Vector.to_list update.app_state) )
+             in
+             let proof_verifies = Control.Tag.(equal Proof authorization_tag) in
+             if keeping_app_state then zk.proved_state
+             else if proof_verifies then
+               if changing_entire_app_state then true else zk.proved_state
+             else false
            in
-           let is_full_and_different_slot = (not is_empty) && is_this_slot in
-           let s5 = if is_full_and_different_slot then s5' else s4' in
-           let s4 = if is_full_and_different_slot then s4' else s3' in
-           let s3 = if is_full_and_different_slot then s3' else s2' in
-           let s2 = if is_full_and_different_slot then s2' else s1' in
-           ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
-         in
-         let proved_state =
-           let keeping_app_state =
-             List.for_all ~f:Fn.id
-               (List.map ~f:Zkapp_basic.Set_or_keep.is_keep
-                  (Pickles_types.Vector.to_list update.app_state) )
-           in
-           let changing_entire_app_state =
-             List.for_all ~f:Fn.id
-               (List.map ~f:Zkapp_basic.Set_or_keep.is_set
-                  (Pickles_types.Vector.to_list update.app_state) )
-           in
-           let proof_verifies = Control.Tag.(equal Proof authorization_tag) in
-           if keeping_app_state then zk.proved_state
-           else if proof_verifies then
-             if changing_entire_app_state then true else zk.proved_state
-           else false
-         in
-         Some { zk with app_state; sequence_state; proved_state }
+           Some { zk with app_state; sequence_state; proved_state }
    in
    Account_id.Table.change account_state_tbl (Account.identifier account)
      ~f:(function
@@ -988,8 +1027,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
 
 let gen_party_from ?(update = None) ?failure ?(new_account = false)
     ?(zkapp_account = false) ?account_id ?permissions_auth
-    ?required_balance_change ?required_balance ~authorization
-    ~available_public_keys ~ledger ~account_state_tbl ?vk () =
+    ?required_balance_change ?required_balance ~authorization ~account_ids_seen
+    ~available_public_keys ~ledger ~account_state_tbl ?protocol_state_view ?vk
+    () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1008,11 +1048,13 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
   let%bind body_components =
     gen_party_body_components ~update ?failure ~new_account ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
-      ?permissions_auth ?account_id ?vk ~available_public_keys
-      ?required_balance_change ?required_balance ~ledger ~account_state_tbl
+      ?permissions_auth ?account_id ?protocol_state_view ?vk ~account_ids_seen
+      ~available_public_keys ?required_balance_change ?required_balance ~ledger
+      ~account_state_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
-      ~f_account_predcondition:(gen_account_precondition_from_account ?failure)
+      ~f_account_precondition:(fun ~first_use_of_account acct ->
+        gen_account_precondition_from_account ~first_use_of_account acct )
       ~f_party_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
         gen_use_full_commitment ~increment_nonce ~account_precondition
@@ -1020,6 +1062,8 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
       ~authorization_tag:(Control.tag authorization)
   in
   let body = Party_body_components.to_typical_party body_components in
+  let account_id = Account_id.create body.public_key body.token_id in
+  Hash_set.add account_ids_seen account_id ;
   return { Party.Simple.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
@@ -1040,7 +1084,8 @@ let gen_party_body_fee_payer ?failure ?permissions_auth ~account_id ~ledger ?vk
         *)
         assert (Token_id.equal token_id Token_id.default) ;
         () )
-      ~f_account_predcondition:account_precondition_gen
+      ~f_account_precondition:(fun ~first_use_of_account:_ acct ->
+        account_precondition_gen acct )
       ~f_party_account_precondition:(fun nonce -> Nonce nonce)
       ~gen_use_full_commitment:(fun ~account_precondition:_ -> return ())
       ~ledger ?protocol_state_view ~authorization_tag:Control.Tag.Signature ()
@@ -1059,7 +1104,7 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
   let authorization = Signature.dummy in
   ({ body; authorization } : Party.Fee_payer.t)
 
-(* keep max_other_parties small, so snapp integration tests don't need lots
+(* keep max_other_parties small, so zkApp integration tests don't need lots
    of block producers
 
    because the other parties are split into a permissions-setter
@@ -1071,10 +1116,11 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ~ledger
 *)
 let max_other_parties = 2
 
-let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
+let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
+    ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
-    ?account_state_tbl ~ledger ?protocol_state_view ?vk ?prover () =
+    ?account_state_tbl ~ledger ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -1121,11 +1167,15 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:() ) ;
     tbl
   in
+  (* account ids seen, to generate receipt chain hash precondition only if
+     a party with a given account id has not been encountered before
+  *)
+  let account_ids_seen = Account_id.Hash_set.create () in
   let%bind fee_payer =
     gen_fee_payer ?failure ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_account_id ~ledger ?protocol_state_view ?vk
-      ~account_state_tbl ()
+      ~account_id:fee_payer_account_id ~ledger ?vk ~account_state_tbl ()
   in
+  Hash_set.add account_ids_seen fee_payer_account_id ;
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     let rec go acc n =
       let open Zkapp_basic in
@@ -1220,10 +1270,10 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           (* Signature authorization to start *)
           let authorization = Control.Signature Signature.dummy in
           let required_balance_change = Currency.Amount.Signed.zero in
-          gen_party_from ~update ?failure ~authorization
+          gen_party_from ~account_ids_seen ~update ?failure ~authorization
             ~new_account:new_parties ~permissions_auth ~zkapp_account
             ~available_public_keys ~required_balance_change ~ledger
-            ~account_state_tbl ?vk ()
+            ~account_state_tbl ?protocol_state_view ?vk ()
         in
         let%bind party =
           (* authorization according to chosen permissions auth *)
@@ -1293,9 +1343,10 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           in
           (* if we use this account again, it will have a Signature authorization *)
           let permissions_auth = Control.Tag.Signature in
-          gen_party_from ~update ?failure ~account_id ~authorization
-            ~permissions_auth ~zkapp_account ~available_public_keys ~ledger
-            ~account_state_tbl ?vk ()
+          gen_party_from ~update ?failure ~account_ids_seen ~account_id
+            ~authorization ~permissions_auth ~zkapp_account
+            ~available_public_keys ~ledger ~account_state_tbl
+            ?protocol_state_view ?vk ()
         in
         (* this list will be reversed, so `party0` will execute before `party` *)
         go (party :: party0 :: acc) (n - 1)
@@ -1342,26 +1393,54 @@ let gen_parties_from ?failure ~(fee_payer_keypair : Signature_lib.Keypair.t)
           None
     in
     let authorization = Control.Signature Signature.dummy in
-    gen_party_from ?failure ~authorization ~new_account:true
+    gen_party_from ?failure ~account_ids_seen ~authorization ~new_account:true
       ~available_public_keys ~ledger ~required_balance_change ?required_balance
-      ~account_state_tbl ?vk ()
+      ~account_state_tbl ?protocol_state_view ?vk ()
   in
   let other_parties = balancing_party :: other_parties0 in
-  let%bind memo = Signed_command_memo.gen in
-  let parties_dummy_signatures : Parties.t =
+  let%map memo = Signed_command_memo.gen in
+  let parties_dummy_authorizations : Parties.t =
     Parties.of_simple { fee_payer; other_parties; memo }
   in
-  (* add fee payer keys to keymap, if not present *)
-  let keymap =
-    match
-      Signature_lib.Public_key.Compressed.Map.add keymap ~key:fee_payer_pk
-        ~data:fee_payer_keypair.private_key
-    with
-    | `Duplicate ->
-        keymap
-    | `Ok keymap' ->
-        keymap'
+  (* update receipt chain hashes in accounts table *)
+  let receipt_elt =
+    let _txn_commitment, full_txn_commitment =
+      (* also computed in replace_authorizations, but easier just to re-compute here *)
+      Parties_builder.get_transaction_commitments parties_dummy_authorizations
+    in
+    Receipt.Parties_elt.Parties_commitment full_txn_commitment
   in
-  return
-  @@ Parties_builder.replace_authorizations ?prover ~keymap
-       parties_dummy_signatures
+  let fee_payer_acct_id =
+    Party.Fee_payer.account_id parties_dummy_authorizations.fee_payer
+  in
+  Account_id.Table.change account_state_tbl fee_payer_acct_id ~f:(function
+    | None ->
+        failwith "Expected fee payer account id to be in table"
+    | Some account ->
+        let receipt_chain_hash =
+          Receipt.Chain_hash.cons_parties_commitment Mina_numbers.Index.zero
+            receipt_elt account.Account.Poly.receipt_chain_hash
+        in
+        Some { account with receipt_chain_hash } ) ;
+  let partys =
+    Parties.Call_forest.to_parties_list
+      parties_dummy_authorizations.other_parties
+  in
+  List.iteri partys ~f:(fun ndx party ->
+      (* update receipt chain hash only for signature, proof authorizations *)
+      match Party.authorization party with
+      | Control.Proof _ | Control.Signature _ ->
+          let acct_id = Party.account_id party in
+          Account_id.Table.change account_state_tbl acct_id ~f:(function
+            | None ->
+                failwith "Expected other party account id to be in table"
+            | Some account ->
+                let receipt_chain_hash =
+                  let party_index = Mina_numbers.Index.of_int (ndx + 1) in
+                  Receipt.Chain_hash.cons_parties_commitment party_index
+                    receipt_elt account.Account.Poly.receipt_chain_hash
+                in
+                Some { account with receipt_chain_hash } )
+      | Control.None_given ->
+          () ) ;
+  parties_dummy_authorizations

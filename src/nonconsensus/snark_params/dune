@@ -14,6 +14,7 @@
    ;; local libraries
    bignum_bigint
    snarkette
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

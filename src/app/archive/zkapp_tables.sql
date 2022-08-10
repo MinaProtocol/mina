@@ -138,6 +138,7 @@ CREATE TABLE zkapp_precondition_accounts
 , state_id                 int        NOT NULL    REFERENCES zkapp_states(id)
 , sequence_state_id        int                    REFERENCES zkapp_state_data(id)
 , proved_state             boolean
+, is_new                   boolean
 );
 
 /* invariants: precondition_account id is not NULL iff kind is 'full'
@@ -231,11 +232,8 @@ CREATE TABLE zkapp_network_precondition
 CREATE TABLE zkapp_fee_payer_body
 ( id                                    serial    PRIMARY KEY
 , account_identifier_id                 int       NOT NULL REFERENCES account_identifiers(id)
-, update_id                             int       NOT NULL REFERENCES zkapp_updates(id)
 , fee                                   text      NOT NULL
-, events_id                             int       NOT NULL REFERENCES zkapp_events(id)
-, sequence_events_id                    int       NOT NULL REFERENCES zkapp_events(id)
-, zkapp_network_precondition_id  int       NOT NULL REFERENCES zkapp_network_precondition(id)
+, valid_until                           bigint
 , nonce                                 bigint    NOT NULL
 );
 

@@ -39,6 +39,7 @@
    allocation_functor
    snarky.intf
    promise
+   ppx_version.runtime
 ))
 
 (rule

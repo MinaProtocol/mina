@@ -31,6 +31,10 @@ module Wrap = struct
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
               , Field.Constant.t Shifted_value.Type2.t
+              , ( Challenge.Constant.t Scalar_challenge.t
+                , Field.Constant.t Shifted_value.Type2.t )
+                Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+                option
               , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
                 , Tock.Rounds.n )
                 Vector.t
@@ -48,6 +52,7 @@ module Wrap = struct
           , Tick.Field.t )
           Plonk_types.Openings.Bulletproof.t
           t
+      | Wrap_domain_indices : (Field.Constant.t, max_proofs_verified) Vector.t t
   end
 
   type ('mb, 'ml) t =
@@ -78,6 +83,11 @@ module Wrap = struct
                 , Challenge.Constant.t Scalar_challenge.t
                 , Tock.Field.t Shifted_value.Type2.t
                 , ( Challenge.Constant.t Scalar_challenge.t
+                  , Tock.Field.t Shifted_value.Type2.t )
+                  Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
+                  .t
+                  option
+                , ( Challenge.Constant.t Scalar_challenge.t
                     Bulletproof_challenge.t
                   , Tock.Rounds.n )
                   Vector.t
@@ -95,6 +105,7 @@ module Wrap = struct
             , Tick.Field.t )
             Plonk_types.Openings.Bulletproof.t
             t
+        | Wrap_domain_indices : (Tock.Field.t, max_proofs_verified) Vector.t t
     end in
     (module R)
 end
@@ -114,9 +125,14 @@ module Step = struct
 
     type local_branches
 
+    type auxiliary_value
+
     type _ t +=
-      | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
-      | Prev_inputs : prev_values H1.T(Id).t t
+      | Compute_prev_proof_parts :
+          ( prev_values
+          , local_signature )
+          H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+          -> unit t
       | Proof_with_datas :
           ( prev_values
           , local_signature
@@ -126,19 +142,22 @@ module Step = struct
       | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
       | App_state : statement t
       | Return_value : return_value -> unit t
+      | Auxiliary_value : auxiliary_value -> unit t
       | Unfinalized_proofs :
           (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
-      | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
+      | Messages_for_next_wrap_proof :
+          (Digest.Constant.t, max_proofs_verified) Vector.t t
   end
 
   let create :
-      type local_signature local_branches statement return_value prev_values prev_ret_values max_proofs_verified.
+      type local_signature local_branches statement return_value auxiliary_value prev_values prev_ret_values max_proofs_verified.
          unit
       -> (module S
             with type local_signature = local_signature
              and type local_branches = local_branches
              and type statement = statement
              and type return_value = return_value
+             and type auxiliary_value = auxiliary_value
              and type prev_values = prev_values
              and type max_proofs_verified = max_proofs_verified ) =
    fun () ->
@@ -149,6 +168,8 @@ module Step = struct
 
       type nonrec return_value = return_value
 
+      type nonrec auxiliary_value = auxiliary_value
+
       type nonrec prev_values = prev_values
 
       type nonrec local_signature = local_signature
@@ -156,8 +177,11 @@ module Step = struct
       type nonrec local_branches = local_branches
 
       type _ t +=
-        | Compute_prev_proof_parts : prev_values H1.T(E01(Bool)).t -> unit t
-        | Prev_inputs : prev_values H1.T(Id).t t
+        | Compute_prev_proof_parts :
+            ( prev_values
+            , local_signature )
+            H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+            -> unit t
         | Proof_with_datas :
             ( prev_values
             , local_signature
@@ -167,9 +191,11 @@ module Step = struct
         | Wrap_index : Tock.Curve.Affine.t Plonk_verification_key_evals.t t
         | App_state : statement t
         | Return_value : return_value -> unit t
+        | Auxiliary_value : auxiliary_value -> unit t
         | Unfinalized_proofs :
             (Unfinalized.Constant.t, max_proofs_verified) Vector.t t
-        | Pass_through : (Digest.Constant.t, max_proofs_verified) Vector.t t
+        | Messages_for_next_wrap_proof :
+            (Digest.Constant.t, max_proofs_verified) Vector.t t
     end in
     (module R)
 end

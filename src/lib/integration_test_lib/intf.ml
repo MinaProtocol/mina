@@ -84,7 +84,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
@@ -98,7 +97,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
@@ -108,7 +106,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Deferred.Or_error.t
 
@@ -117,7 +114,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
@@ -357,6 +353,7 @@ module Dsl = struct
       | Nodes_to_synchronize
       | Signed_command_to_be_included_in_frontier
       | Ledger_proofs_emitted_since_genesis
+      | Block_height_growth
       | Zkapp_to_be_included_in_frontier
 
     val wait_condition_id : t -> wait_condition_id
@@ -372,6 +369,8 @@ module Dsl = struct
     val nodes_to_initialize : Engine.Network.Node.t list -> t
 
     val blocks_to_be_produced : int -> t
+
+    val block_height_growth : height_growth:int -> t
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 

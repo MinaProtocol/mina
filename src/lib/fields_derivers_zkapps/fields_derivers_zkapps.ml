@@ -118,19 +118,32 @@ module Make (Schema : Graphql_intf.Schema) = struct
 
     Fields_derivers_graphql.Graphql_query.scalar obj
 
-  exception
-    Invalid_rich_scalar of
-      [ `Uint
-      | `Field
-      | `Token_id
-      | `Public_key
-      | `Amount
-      | `Balance
-      | `Unit
-      | `Proof
-      | `Verification_key ]
+  let invalid_scalar_to_string = function
+    | `Uint ->
+        "Uint"
+    | `Field ->
+        "Field"
+    | `Token_id ->
+        "Token_id"
+    | `Public_key ->
+        "Public_key"
+    | `Amount ->
+        "Amount"
+    | `Balance ->
+        "Balance"
+    | `Unit ->
+        "Unit"
+    | `Proof ->
+        "Proof"
+    | `Verification_key ->
+        "Verification_key"
+    | `Signature ->
+        "Signature"
 
-  let except ~f v x = try f x with _ -> raise (Invalid_rich_scalar v)
+  let raise_invalid_scalar t s =
+    failwith ("Invalid rich scalar: " ^ invalid_scalar_to_string t ^ " " ^ s)
+
+  let except ~f v (x : string) = try f x with _ -> raise_invalid_scalar v x
 
   let iso_string ?doc ~name ~js_type obj ~(to_string : 'a -> string)
       ~(of_string : string -> 'a) =
@@ -174,6 +187,14 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _c = Fields_derivers_json.To_yojson.skip obj in
     let _d = Fields_derivers_graphql.Graphql_query.skip obj in
     let _e = Fields_derivers_js.Js_layout.skip obj in
+    Fields_derivers_json.Of_yojson.skip obj
+
+  let js_only js_layout obj : _ Unified_input.t =
+    let _a = Graphql.Fields.skip obj in
+    let _b = Graphql.Args.skip obj in
+    let _c = Fields_derivers_json.To_yojson.skip obj in
+    let _d = Fields_derivers_graphql.Graphql_query.skip obj in
+    obj#js_layout := js_layout ;
     Fields_derivers_json.Of_yojson.skip obj
 
   let int obj : _ Unified_input.t =
@@ -223,12 +244,13 @@ module Make (Schema : Graphql_intf.Schema) = struct
     let _e = Fields_derivers_js.Js_layout.option ~js_type x obj in
     Fields_derivers_json.Of_yojson.option x obj
 
-  let list (x : _ Unified_input.t) obj : _ Unified_input.t =
+  let list ?(static_length : int option) (x : _ Unified_input.t) obj :
+      _ Unified_input.t =
     let _a = Graphql.Fields.list x obj in
     let _b = Graphql.Args.list x obj in
     let _c = Fields_derivers_json.To_yojson.list x obj in
     let _d = Fields_derivers_graphql.Graphql_query.list x obj in
-    let _e = Fields_derivers_js.Js_layout.list x obj in
+    let _e = Fields_derivers_js.Js_layout.list ?static_length x obj in
     Fields_derivers_json.Of_yojson.list x obj
 
   let iso ~map ~contramap (x : _ Unified_input.t) obj : _ Unified_input.t =
@@ -506,7 +528,7 @@ let proof obj : _ Unified_input.t =
     | Ok proof ->
         proof
     | Error _err ->
-        raise (Invalid_rich_scalar `Proof)
+        raise_invalid_scalar `Proof s
   in
   iso_string obj ~name:"SnappProof" ~js_type:String
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
@@ -557,7 +579,15 @@ let%test_module "Test" =
       end
     end
 
-    module Schema = Graphql_schema.Make (IO)
+    module Field_error = struct
+      type t = string
+
+      let message_of_field_error t = t
+
+      let extensions_of_field_error _t = None
+    end
+
+    module Schema = Graphql_schema.Make (IO) (Field_error)
     module Derivers = Make (Schema)
     include Derivers
     module Public_key = Signature_lib.Public_key.Compressed

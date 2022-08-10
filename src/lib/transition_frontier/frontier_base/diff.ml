@@ -6,6 +6,8 @@ type full = Full
 
 type lite = Lite
 
+[@@@alert "-deprecated"]
+
 module Dummy_binable1 (T : sig
   type 'a t
 end) =
@@ -35,6 +37,8 @@ end) =
 
       let of_binable _ = assert false
     end)
+
+[@@@alert "+deprecated"]
 
 module Node = struct
   [%%versioned_binable

@@ -54,7 +54,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Util.assert_peers_cant_be_partitioned ~max_disconnections:2
            initial_connectivity_data )
     in
-    let%bind _ =
+    let%bind () =
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
@@ -63,7 +63,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
            (Node.id node_c) ;
-         let%bind _ =
+         let%bind () =
            wait_for t
              ( Wait_condition.blocks_to_be_produced 1
              (* Extend the wait timeout, only 2/3 of stake is online. *)

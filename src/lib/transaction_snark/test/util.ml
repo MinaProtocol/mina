@@ -31,11 +31,13 @@ end
 
 let ledger_depth = constraint_constants.ledger_depth
 
-module T = Transaction_snark.Make (struct
-  let constraint_constants = constraint_constants
+let snark_module =
+  lazy
+    ( module Transaction_snark.Make (struct
+      let constraint_constants = constraint_constants
 
-  let proof_level = proof_level
-end)
+      let proof_level = proof_level
+    end) : Transaction_snark.S )
 
 let genesis_state_body =
   let compile_time_genesis =
@@ -100,19 +102,16 @@ let apply_parties ledger parties =
       (`Ledger ledger) parties
   in
   let open Impl in
-  List.iter (List.rev witnesses)
-    ~f:(fun (witness, spec, statement, snapp_stmt) ->
+  List.iter (List.rev witnesses) ~f:(fun (witness, spec, statement) ->
       run_and_check (fun () ->
           let s =
             exists Statement.With_sok.typ ~compute:(fun () -> statement)
           in
-          let snapp_stmt =
-            Option.value_map ~default:[] snapp_stmt ~f:(fun (i, stmt) ->
-                [ (i, exists Zkapp_statement.typ ~compute:(fun () -> stmt)) ] )
+          let _opt_snapp_stmt =
+            Transaction_snark.Base.Parties_snark.main ~constraint_constants
+              (Parties_segment.Basic.to_single_list spec)
+              s ~witness
           in
-          Transaction_snark.Base.Parties_snark.main ~constraint_constants
-            (Parties_segment.Basic.to_single_list spec)
-            snapp_stmt s ~witness ;
           fun () -> () )
       |> Or_error.ok_exn ) ;
   final_ledger
@@ -123,6 +122,7 @@ let trivial_zkapp =
 
 let check_parties_with_merges_exn ?expected_failure
     ?(state_body = genesis_state_body) ledger partiess =
+  let module T = (val Lazy.force snark_module) in
   (*TODO: merge multiple snapp transactions*)
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
@@ -173,21 +173,20 @@ let check_parties_with_merges_exn ?expected_failure
                         match List.rev witnesses with
                         | [] ->
                             failwith "no witnesses generated"
-                        | (witness, spec, stmt, snapp_statement) :: rest ->
+                        | (witness, spec, stmt) :: rest ->
                             let open Async.Deferred.Or_error.Let_syntax in
                             let%bind p1 =
                               Async.Deferred.Or_error.try_with (fun () ->
                                   T.of_parties_segment_exn ~statement:stmt
-                                    ~witness ~spec ~snapp_statement )
+                                    ~witness ~spec )
                             in
                             Async.Deferred.List.fold ~init:(Ok p1) rest
-                              ~f:(fun acc (witness, spec, stmt, snapp_statement)
-                                 ->
+                              ~f:(fun acc (witness, spec, stmt) ->
                                 let%bind prev = Async.Deferred.return acc in
                                 let%bind curr =
                                   Async.Deferred.Or_error.try_with (fun () ->
                                       T.of_parties_segment_exn ~statement:stmt
-                                        ~witness ~spec ~snapp_statement )
+                                        ~witness ~spec )
                                 in
                                 let sok_digest =
                                   Sok_message.create ~fee:Fee.zero
@@ -241,15 +240,27 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
   { identifier = "dummy"
   ; prevs = [ self; self ]
   ; main =
-      (fun [ _; _ ] _ ->
-        Transaction_snark.dummy_constraints ()
-        |> Snark_params.Tick.Run.run_checked ;
-        (* Unsatisfiable. *)
+      (fun { public_input = _ } ->
         let s =
           Run.exists Field.typ ~compute:(fun () -> Run.Field.Constant.zero)
         in
+        let public_input =
+          Run.exists Zkapp_statement.typ ~compute:(fun () -> assert false)
+        in
+        let proof =
+          Run.exists (Typ.Internal.ref ()) ~compute:(fun () -> assert false)
+        in
+        Impl.run_checked (Transaction_snark.dummy_constraints ()) ;
+        (* Unsatisfiable. *)
         Run.Field.(Assert.equal s (s + one)) ;
-        ([ Boolean.true_; Boolean.true_ ], ()) )
+        { previous_proof_statements =
+            [ { public_input; proof; proof_must_verify = Boolean.true_ }
+            ; { public_input; proof; proof_must_verify = Boolean.true_ }
+            ]
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
+  ; uses_lookup = false
   }
 
 let gen_snapp_ledger =
@@ -270,7 +281,7 @@ let gen_snapp_ledger =
   (test_spec, kp)
 
 let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
-    ~snapp_prover test_spec ~init_ledger ~snapp_pk =
+    ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -280,7 +291,7 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
             ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
           let%bind parties =
-            Transaction_snark.For_tests.update_states ~snapp_prover
+            Transaction_snark.For_tests.update_states ~zkapp_prover
               ~constraint_constants test_spec
           in
           check_parties_with_merges_exn ?expected_failure ?state_body ledger
@@ -339,7 +350,8 @@ module Wallet = struct
     in
     Array.init n ~f:(fun _ -> random_wallet ())
 
-  let user_command ~fee_payer ~source_pk ~receiver_pk amt fee nonce memo =
+  let user_command ~fee_payer ~receiver_pk amt fee nonce memo =
+    let source_pk = Account.public_key fee_payer.account in
     let payload : Signed_command.Payload.t =
       Signed_command.Payload.create ~fee
         ~fee_payer_pk:(Account.public_key fee_payer.account)
@@ -355,12 +367,31 @@ module Wallet = struct
         }
     |> Option.value_exn
 
+  let stake_delegation ~fee_payer ~delegate_pk fee nonce memo =
+    let source_pk = Account.public_key fee_payer.account in
+    let payload : Signed_command.Payload.t =
+      Signed_command.Payload.create ~fee
+        ~fee_payer_pk:(Account.public_key fee_payer.account)
+        ~nonce ~memo ~valid_until:None
+        ~body:
+          (Stake_delegation
+             (Set_delegate { delegator = source_pk; new_delegate = delegate_pk })
+          )
+    in
+    let signature = Signed_command.sign_payload fee_payer.private_key payload in
+    Signed_command.check
+      Signed_command.Poly.Stable.Latest.
+        { payload
+        ; signer = Public_key.of_private_key_exn fee_payer.private_key
+        ; signature
+        }
+    |> Option.value_exn
+
   let user_command_with_wallet wallets ~sender:i ~receiver:j amt fee nonce memo
       =
     let fee_payer = wallets.(i) in
     let receiver = wallets.(j) in
     user_command ~fee_payer
-      ~source_pk:(Account.public_key fee_payer.account)
       ~receiver_pk:(Account.public_key receiver.account)
       amt fee nonce memo
 end
@@ -385,3 +416,145 @@ let check_balance pk balance ledger =
   let loc = Ledger.location_of_account ledger pk |> Option.value_exn in
   let acc = Ledger.get ledger loc |> Option.value_exn in
   [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
+
+(** Test legacy transactions*)
+let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
+  let open Mina_transaction in
+  let to_preunion (t : Transaction.t) =
+    match t with
+    | Command (Signed_command x) ->
+        `Transaction (Transaction.Command x)
+    | Fee_transfer x ->
+        `Transaction (Fee_transfer x)
+    | Coinbase x ->
+        `Transaction (Coinbase x)
+    | Command (Parties x) ->
+        `Parties x
+  in
+  let source = Ledger.merkle_root ledger in
+  let pending_coinbase_stack = Pending_coinbase.Stack.empty in
+  let txn_unchecked = Transaction.forget txn in
+  let state_body, state_body_hash =
+    match txn_global_slot with
+    | None ->
+        (genesis_state_body, genesis_state_body_hash)
+    | Some txn_global_slot ->
+        let state_body =
+          let state =
+            (* NB: The [previous_state_hash] is a dummy, do not use. *)
+            Mina_state.Protocol_state.create
+              ~previous_state_hash:Snark_params.Tick0.Field.zero
+              ~body:genesis_state_body
+          in
+          let consensus_state_at_slot =
+            Consensus.Data.Consensus_state.Value.For_tests
+            .with_global_slot_since_genesis
+              (Mina_state.Protocol_state.consensus_state state)
+              txn_global_slot
+          in
+          Mina_state.Protocol_state.(
+            create_value
+              ~previous_state_hash:(previous_state_hash state)
+              ~genesis_state_hash:(genesis_state_hash state)
+              ~blockchain_state:(blockchain_state state)
+              ~consensus_state:consensus_state_at_slot
+              ~constants:
+                (Protocol_constants_checked.value_of_t
+                   Genesis_constants.compiled.protocol ))
+            .body
+        in
+        let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+        (state_body, state_body_hash)
+  in
+  let txn_state_view : Zkapp_precondition.Protocol_state.View.t =
+    Mina_state.Protocol_state.Body.view state_body
+  in
+  let mentioned_keys, pending_coinbase_stack_target =
+    let pending_coinbase_stack =
+      Pending_coinbase.Stack.push_state state_body_hash pending_coinbase_stack
+    in
+    match txn_unchecked with
+    | Command (Signed_command uc) ->
+        ( Signed_command.accounts_accessed (uc :> Signed_command.t)
+        , pending_coinbase_stack )
+    | Command (Parties _) ->
+        failwith "Parties commands not supported here"
+    | Fee_transfer ft ->
+        (Fee_transfer.receivers ft, pending_coinbase_stack)
+    | Coinbase cb ->
+        ( Coinbase.accounts_accessed cb
+        , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
+  in
+  let sok_signer =
+    match to_preunion txn_unchecked with
+    | `Transaction t ->
+        (Transaction_union.of_transaction t).signer |> Public_key.compress
+    | `Parties c ->
+        Account_id.public_key (Parties.fee_payer c)
+  in
+  let sparse_ledger =
+    Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
+  in
+  let expect_snark_failure, applied_transaction =
+    match
+      Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
+        txn_unchecked
+    with
+    | Ok res ->
+        ( if Option.is_some expected_failure then
+          match Ledger.Transaction_applied.transaction_status res with
+          | Applied ->
+              failwith
+                (sprintf "Expected Ledger.apply_transaction to fail with %s"
+                   (Transaction_status.Failure.describe
+                      (List.hd_exn (Option.value_exn expected_failure)) ) )
+          | Failed f ->
+              assert (
+                List.equal Transaction_status.Failure.equal
+                  (Option.value_exn expected_failure)
+                  (List.concat f) ) ) ;
+        (false, Some res)
+    | Error e ->
+        if Option.is_none expected_failure then
+          failwith
+            (sprintf "Ledger.apply_transaction failed with %s"
+               (Error.to_string_hum e) )
+        else if
+          String.equal (Error.to_string_hum e)
+            (Transaction_status.Failure.describe
+               (List.hd_exn (Option.value_exn expected_failure)) )
+        then ()
+        else
+          failwith
+            (sprintf
+               "Expected Ledger.apply_transaction to fail with %s but failed \
+                with %s"
+               (Transaction_status.Failure.describe
+                  (List.hd_exn (Option.value_exn expected_failure)) )
+               (Error.to_string_hum e) ) ;
+        (true, None)
+  in
+  let target = Ledger.merkle_root ledger in
+  let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sok_signer in
+  let supply_increase =
+    Option.value_map applied_transaction ~default:Amount.Signed.zero
+      ~f:(fun txn ->
+        Ledger.Transaction_applied.supply_increase txn |> Or_error.ok_exn )
+  in
+  match
+    Or_error.try_with (fun () ->
+        Transaction_snark.check_transaction ~constraint_constants ~sok_message
+          ~source ~target ~init_stack:pending_coinbase_stack
+          ~pending_coinbase_stack_state:
+            { Transaction_snark.Pending_coinbase_stack_state.source =
+                pending_coinbase_stack
+            ; target = pending_coinbase_stack_target
+            }
+          ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
+          { transaction = txn; block_data = state_body }
+          (unstage @@ Sparse_ledger.handler sparse_ledger) )
+  with
+  | Error _e ->
+      assert expect_snark_failure
+  | Ok _ ->
+      assert (not expect_snark_failure)

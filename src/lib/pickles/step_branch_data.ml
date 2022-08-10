@@ -9,6 +9,8 @@ type ( 'a_var
      , 'a_value
      , 'ret_var
      , 'ret_value
+     , 'auxiliary_var
+     , 'auxiliary_value
      , 'max_proofs_verified
      , 'branches
      , 'prev_vars
@@ -30,7 +32,9 @@ type ( 'a_var
           , 'a_var
           , 'a_value
           , 'ret_var
-          , 'ret_value )
+          , 'ret_value
+          , 'auxiliary_var
+          , 'auxiliary_value )
           Inductive_rule.t
       ; main :
              step_domains:(Domains.t, 'branches) Vector.t
@@ -46,12 +50,15 @@ type ( 'a_var
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
               and type local_branches = 'local_heights
-              and type return_value = 'ret_value )
+              and type return_value = 'ret_value
+              and type auxiliary_value = 'auxiliary_value )
       }
       -> ( 'a_var
          , 'a_value
          , 'ret_var
          , 'ret_value
+         , 'auxiliary_var
+         , 'auxiliary_value
          , 'max_proofs_verified
          , 'branches
          , 'prev_vars
@@ -65,6 +72,7 @@ let create
     (type branches max_proofs_verified local_signature local_branches var value
     a_var a_value ret_var ret_value prev_vars prev_values ) ~index
     ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
+    ~(step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
@@ -74,7 +82,7 @@ let create
        , a_value
        , ret_var
        , ret_value )
-       Inductive_rule.public_input ) var_to_field_elements
+       Inductive_rule.public_input ) ~auxiliary_typ var_to_field_elements
     value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
@@ -127,8 +135,13 @@ let create
       (Nat.Add.create max_proofs_verified)
       rule
       ~basic:
-        { public_input = typ; proofs_verifieds; wrap_domains; step_domains }
-      ~public_input ~self_branches:branches ~proofs_verified
+        { public_input = typ
+        ; proofs_verifieds
+        ; wrap_domains
+        ; step_domains
+        ; step_uses_lookup
+        }
+      ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights
       ~local_branches_length ~lte ~self
     |> unstage
@@ -142,7 +155,8 @@ let create
     in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Backend.Tock.Rounds.n
+        ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+      (* TODO *)
     in
     Fix_domains.domains
       (module Impls.Step)

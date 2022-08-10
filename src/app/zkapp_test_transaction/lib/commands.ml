@@ -26,7 +26,7 @@ let parse_field_element_or_hash_string s ~f =
   | Error e1 ->
       Error.raise (Error.tag ~tag:"Expected a field element" e1)
 
-let `VK vk, `Prover snapp_prover =
+let `VK vk, `Prover zkapp_prover =
   Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
 let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
@@ -98,18 +98,15 @@ let gen_proof ?(zkapp_account = None) (parties : Parties.t) =
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
+      ~f:(fun _ ((witness, spec, statement) as w) ->
         printf "%s"
           (sprintf
              !"current witness \
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
                Transaction_snark.Parties_segment.Basic.t * \
-               Transaction_snark.Statement.With_sok.t * (int * \
-               Zkapp_statement.t)option) }%!"
+               Transaction_snark.Statement.With_sok.t) }%!"
              w ) ;
-        let%map _ =
-          T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
-        in
+        let%map _ = T.of_parties_segment_exn ~statement ~witness ~spec in
         ((), ()) )
   in
   ()
@@ -193,18 +190,15 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
-      ~f:(fun _ ((witness, spec, statement, snapp_statement) as w) ->
+      ~f:(fun _ ((witness, spec, statement) as w) ->
         printf "%s"
           (sprintf
              !"current witness \
                %{sexp:(Transaction_witness.Parties_segment_witness.t * \
                Transaction_snark.Parties_segment.Basic.t * \
-               Transaction_snark.Statement.With_sok.t * (int * \
-               Zkapp_statement.t)option) }%!"
+               Transaction_snark.Statement.With_sok.t) }%!"
              w ) ;
-        let%map _ =
-          T.of_parties_segment_exn ~snapp_statement ~statement ~witness ~spec
-        in
+        let%map _ = T.of_parties_segment_exn ~statement ~witness ~spec in
         ((), ()) )
   in
   ()
@@ -362,7 +356,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -430,7 +424,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -466,7 +460,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -504,7 +498,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -540,7 +534,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   let%map () =
@@ -577,7 +571,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     }
   in
   let%bind parties =
-    Transaction_snark.For_tests.update_states ~snapp_prover
+    Transaction_snark.For_tests.update_states ~zkapp_prover
       ~constraint_constants spec
   in
   (*Util.print_snapp_transaction parties ;*)
@@ -676,7 +670,7 @@ let%test_module "ZkApps test transaction" =
       go path expected got ; !success
 
     let hit_server (parties : Parties.t) query =
-      let typ = Mina_graphql.Types.Input.send_zkapp in
+      let typ = Mina_graphql.Types.Input.SendZkappInput.arg_typ.arg_typ in
       let query_top_level =
         Graphql_async.Schema.(
           io_field "sendZkapp" ~typ:(non_null string)

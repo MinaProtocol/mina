@@ -81,7 +81,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         | `Deploy ->
             ("deploy", "0")
         | `Update ->
-            ("update", "2")
+            ("update", "1")
       in
       (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
       [%log info] "Running JS script with command $jscommand"
