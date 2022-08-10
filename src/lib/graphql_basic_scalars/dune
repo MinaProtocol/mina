@@ -1,0 +1,14 @@
+(library
+ (name graphql_basic_scalars)
+ (public_name graphql_basic_scalars)
+ (libraries
+   ;; opam libraries
+   async_unix
+   core_kernel
+   integers
+   core
+   graphql-async
+   yojson
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_version)))

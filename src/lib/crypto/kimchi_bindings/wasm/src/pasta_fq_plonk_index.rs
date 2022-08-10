@@ -5,7 +5,12 @@ use crate::srs::fq::WasmFqSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex as DlogIndex;
-use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine, vesta::Vesta as GAffineOther};
+use mina_curves::pasta::{
+    fq::Fq,
+    pallas::{Pallas as GAffine, PallasParameters},
+    vesta::Vesta as GAffineOther,
+};
+use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -32,6 +37,8 @@ pub fn caml_pasta_fq_plonk_index_create(
     prev_challenges: i32,
     srs: &WasmSrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsValue> {
+    console_error_panic_hook::set_once();
+
     // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
     let gates: Vec<_> = gates
         .0
@@ -74,10 +81,12 @@ pub fn caml_pasta_fq_plonk_index_create(
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
+    let mut index = DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
+    // Compute and cache the verifier index digest
+    index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
+
     // create index
-    Ok(WasmPastaFqPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone()),
-    )))
+    Ok(WasmPastaFqPlonkIndex(Box::new(index)))
 }
 
 #[wasm_bindgen]

@@ -73,7 +73,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       previous "wrap" circuit was unable to verify directly, due to its internal field
       being different.
       - `sponge_digest_before_evaluations`: the sponge state: TODO
-      - me_only
+      - `messages_for_next_wrap_proof`
   *)
   ; prev_proof_evals :
       ( Impl.Field.t
