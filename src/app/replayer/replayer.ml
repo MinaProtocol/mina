@@ -635,7 +635,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     let%map (body : Party.Body.Fee_payer.t) =
       Archive_lib.Load_data.get_fee_payer_body ~pool cmd.zkapp_fee_payer_body_id
     in
-    ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
+    ({ body; authorization = Signature Signature.dummy } : Party.Fee_payer.t)
   in
   let%bind (other_parties : Party.Simple.t list) =
     Deferred.List.map (Array.to_list cmd.zkapp_other_parties_ids) ~f:(fun id ->
