@@ -78,7 +78,7 @@ func announceNewRootBlock(ctx context.Context, engine *bitswap.Bitswap, statusSt
 	for h, b := range bs {
 		bitswapLogger.Debugf("Publishing block %s (%d bytes)", codanet.BlockHashToCidSuffix(h), len(b))
 		block, _ := blocks.NewBlockWithCid(b, codanet.BlockHashToCid(h))
-		err = engine.HasBlock(ctx, block)
+		err = engine.NotifyNewBlocks(ctx, block)
 		if err != nil {
 			return err
 		}
