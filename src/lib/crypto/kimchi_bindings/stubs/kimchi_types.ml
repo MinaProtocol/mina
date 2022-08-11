@@ -132,7 +132,7 @@ type nonrec curr_or_next = Curr | Next
 
 type nonrec 'f oracles =
   { o : 'f random_oracles
-  ; p_eval : 'f * 'f
+  ; public_evals : 'f * 'f
   ; opening_prechallenges : 'f array
   ; digest_before_evaluations : 'f
   }

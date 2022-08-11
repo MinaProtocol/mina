@@ -14,7 +14,7 @@ use paste::paste;
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlOracles<F> {
     pub o: CamlRandomOracles<F>,
-    pub p_eval: (F, F),
+    pub public_evals: (F, F),
     pub opening_prechallenges: Vec<F>,
     pub digest_before_evaluations: F,
 }
@@ -54,10 +54,10 @@ macro_rules! impl_oracles {
                 let oracles_result =
                     proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm)?;
 
-                let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
+                let (mut sponge, combined_inner_product, public_evals, digest, oracles) = (
                     oracles_result.fq_sponge,
                     oracles_result.combined_inner_product,
-                    oracles_result.p_eval,
+                    oracles_result.public_evals,
                     oracles_result.digest,
                     oracles_result.oracles,
                 );
@@ -73,7 +73,7 @@ macro_rules! impl_oracles {
 
                 Ok(CamlOracles {
                     o: oracles.into(),
-                    p_eval: (p_eval[0][0].into(), p_eval[1][0].into()),
+                    public_evals: (public_evals[0][0].into(), public_evals[1][0].into()),
                     opening_prechallenges,
                     digest_before_evaluations: digest.into(),
                 })
