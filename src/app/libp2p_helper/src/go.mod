@@ -24,7 +24,8 @@ require (
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/o1-labs/go-bs-lmdb v1.1.0
-	github.com/o1-labs/go-libp2p v0.20.4
+	github.com/o1-labs/go-libp2p v0.20.5
+	github.com/o1-labs/go-mplex v0.7.2
 	github.com/prometheus/client_golang v1.12.2
 	github.com/shirou/gopsutil/v3 v3.22.5
 	github.com/stretchr/testify v1.7.2
@@ -127,7 +128,6 @@ require (
 	github.com/multiformats/go-multistream v0.3.3 // indirect
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/o1-labs/go-mplex v0.7.1 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect

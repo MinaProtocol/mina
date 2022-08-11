@@ -42,6 +42,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	libp2pmplex "github.com/o1-labs/go-libp2p/p2p/muxer/mplex"
+	mplex "github.com/o1-labs/go-mplex"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -781,7 +782,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	var kad *dual.DHT
 
 	// TODO is it fine to have 1 << 20?
-	// mplex.MaxMessageSize = 1 << 30
+	mplex.MaxMessageSize = 1 << 30
 
 	connManager, err := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
 	if err != nil {

@@ -977,10 +977,10 @@ github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+
 github.com/o1-labs/go-bs-lmdb v1.1.0 h1:qfZNYs5tMJ5Ym23avKIbpubfWJBtSJ1REhu51qb9U6M=
 github.com/o1-labs/go-bs-lmdb v1.1.0/go.mod h1:MGOPzEutRw24iN0qrSSbqOIzbgnyFQST/cKlnVSBmnI=
 github.com/o1-labs/go-bs-tests v0.0.6 h1:MytWPo5kOMgxK29UkU6ycWRJrMhuILUSQAtYpn5ek0g=
-github.com/o1-labs/go-libp2p v0.20.4 h1:XZN4q9Q+jQYeRsvaWfA3WpzI5tfKIAaTihSYBQkHcFs=
-github.com/o1-labs/go-libp2p v0.20.4/go.mod h1:zdHGeBE6wRbF1nMo6Ej5Bi96+UXGGcGy0GzL/wft/cQ=
-github.com/o1-labs/go-mplex v0.7.1 h1:ZKXAlgHTSg9Q/rIGfUQONE0XDK2OiHFYaCSoqpGUIyQ=
-github.com/o1-labs/go-mplex v0.7.1/go.mod h1:voDRICYSn6VYZhBGY29rjJHe73BVnv1j9deD38RnGf4=
+github.com/o1-labs/go-libp2p v0.20.5 h1:b1+QT6ZIG9PWi3+yoGLI+SopmJrIPp4l/To3buL6lgM=
+github.com/o1-labs/go-libp2p v0.20.5/go.mod h1:Mb576tXoXdbSTTxxuFQnptRYZMNx/TBLRM5AxgCHrHE=
+github.com/o1-labs/go-mplex v0.7.2 h1:81ZEhpP/lf0WrQvxSIs+Bylld90mlvk304IfsIbw+Ng=
+github.com/o1-labs/go-mplex v0.7.2/go.mod h1:voDRICYSn6VYZhBGY29rjJHe73BVnv1j9deD38RnGf4=
 github.com/oklog/oklog v0.3.2/go.mod h1:FCV+B7mhrz4o+ueLpx+KqkyXRGMWOYEvfiXtdGtbWGs=
 github.com/oklog/run v1.0.0/go.mod h1:dlhp/R75TPv97u0XWUtDeV/lRKWPKSdTuV0TZvrmrQA=
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
