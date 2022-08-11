@@ -313,7 +313,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               { party = fee_payer_party
               ; party_digest =
                   Parties.Call_forest.Digest.Party.create fee_payer_party
-              ; calls = other_parties
+              ; calls =
+                  Parties.Call_forest.map other_parties
+                    ~f:(fun (party : Party.t) ->
+                      { party with
+                        body =
+                          { party.body with
+                            balance_change = Currency.Amount.Signed.zero
+                          }
+                      } )
               }
           in
           prover statement
