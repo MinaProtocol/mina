@@ -201,10 +201,10 @@ macro_rules! impl_oracles {
                 let oracles_result =
                     proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm).map_err(|e| JsValue::from_str(&format!("oracles_create: {}", e)))?;
 
-                let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
+                let (mut sponge, combined_inner_product, public_evals, digest, oracles) = (
                     oracles_result.fq_sponge,
                     oracles_result.combined_inner_product,
-                    oracles_result.p_eval,
+                    oracles_result.public_evals,
                     oracles_result.digest,
                     oracles_result.oracles,
                 );
@@ -220,8 +220,8 @@ macro_rules! impl_oracles {
 
                 Ok([<Wasm $field_name:camel Oracles>] {
                     o: oracles.into(),
-                    p_eval0: p_eval[0][0].into(),
-                    p_eval1: p_eval[1][0].into(),
+                    p_eval0: public_evals[0][0].into(),
+                    p_eval1: public_evals[1][0].into(),
                     opening_prechallenges,
                     digest_before_evaluations: digest.into(),
                 })
