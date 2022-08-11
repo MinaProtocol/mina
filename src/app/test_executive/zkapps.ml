@@ -175,7 +175,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Zkapp update permissions"
       in
       (* Lower fee so that parties_create_accounts gets applied first *)
-      let fee = Currency.Fee.of_int 10_000_000 in
+      let fee = Currency.Fee.of_int 100_000_000 in
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
@@ -194,7 +194,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; fee_payer = None
         ; receivers = []
-        ; amount = Currency.Amount.zero
+        ; amount = Currency.Amount.of_int 10_000_000
         ; zkapp_account_keypairs = zkapp_keypairs
         ; memo
         ; new_zkapp_account = false
