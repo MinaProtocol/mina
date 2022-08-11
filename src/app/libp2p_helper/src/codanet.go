@@ -212,11 +212,15 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	logger.Debugf("%s connected to %s", c.LocalPeer(), c.RemotePeer())
 	cm.OnConnect(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
+	info := cm.GetInfo()
+	logger.Warnf("connected: %d peers with high water %d and low water %d (last trim: %s)", info.ConnCount, info.HighWater, info.LowWater, info.LastTrim.String())
 }
 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
 	cm.OnDisconnect(net, c)
 	cm.p2pManager.Notifee().Disconnected(net, c)
+	info := cm.GetInfo()
+	logger.Warnf("disconnected: %d peers with high water %d and low water %d (last trim: %s)", info.ConnCount, info.HighWater, info.LowWater, info.LastTrim.String())
 }
 
 // proxy remaining p2pconnmgr.BasicConnMgr methods for access
