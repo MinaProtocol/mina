@@ -4,7 +4,7 @@ use crate::gate_vector::fp::WasmGateVector;
 use crate::srs::fp::WasmFpSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
-use kimchi::prover_index::ProverIndex as DlogIndex;
+use kimchi::prover_index::ProverIndex;
 use mina_curves::pasta::{
     fp::Fp,
     pallas::Pallas as GAffineOther,
@@ -24,7 +24,7 @@ use wasm_bindgen::prelude::*;
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[wasm_bindgen]
-pub struct WasmPastaFpPlonkIndex(#[wasm_bindgen(skip)] pub Box<DlogIndex<GAffine>>);
+pub struct WasmPastaFpPlonkIndex(#[wasm_bindgen(skip)] pub Box<ProverIndex<GAffine>>);
 
 //
 // CamlPastaFpPlonkIndex methods
@@ -79,7 +79,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
-    let mut index = DlogIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
+    let mut index = ProverIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
     // Compute and cache the verifier index digest
     index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
 
@@ -133,7 +133,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
+    let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
         .map_err(|err| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", err)))?;
     t.srs = srs.0.clone();
     let (linearization, powers_of_alpha) = expr_linearization(false, false, None);
@@ -159,6 +159,12 @@ pub fn caml_pasta_fp_plonk_index_write(
         .0
         .serialize(&mut rmp_serde::Serializer::new(w))
         .map_err(|e| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", e)))
+}
+
+#[wasm_bindgen]
+pub fn caml_pasta_fp_plonk_index_serialize(index: &WasmPastaFpPlonkIndex) -> String {
+    let serialized = rmp_serde::to_vec(&index.0).unwrap();
+    base64::encode(serialized)
 }
 
 // helpers
