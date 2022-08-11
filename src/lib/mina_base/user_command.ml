@@ -118,7 +118,7 @@ module Verifiable = struct
     | Signed_command x ->
         Signed_command.fee_payer x
     | Parties p ->
-        Party.Fee_payer.account_id p.fee_payer
+        Party.Fee_payer.account_id (fst p.fee_payer)
 end
 
 let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
@@ -136,7 +136,7 @@ let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
       Signed_command c
   | Parties { fee_payer; other_parties; memo } ->
       Parties
-        { fee_payer
+        { fee_payer = (fee_payer, find_vk (Party.Fee_payer.to_party fee_payer))
         ; other_parties =
             other_parties
             |> Parties.Call_forest.map ~f:(fun party -> (party, find_vk party))

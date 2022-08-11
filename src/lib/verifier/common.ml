@@ -40,7 +40,9 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Parties ({ fee_payer; other_parties; memo } as parties_with_vk) ->
+  | Parties
+      ( { fee_payer = fee_payer, _fee_payer_vk; other_parties; memo } as
+      parties_with_vk ) ->
       with_return (fun { return } ->
           let other_parties_hash = Parties.Call_forest.hash other_parties in
           let tx_commitment =

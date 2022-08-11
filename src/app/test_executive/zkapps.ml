@@ -217,6 +217,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred ( zkapp_update_all
                       , parties_update_all
+                      , parties_pay_with_proof
                       , parties_insufficient_replace_fee
                       , parties_insufficient_fee ) =
       let amount = Currency.Amount.zero in
@@ -282,6 +283,45 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           parties_spec
       in
+      let%bind.Deferred parties_pay_with_proof =
+        let fee_payer_body : Party.Body.Fee_payer.t =
+          { public_key =
+              Signature_lib.Public_key.compress
+                (List.nth_exn zkapp_keypairs 2).public_key
+          ; fee = Currency.Fee.of_int 10_000_000
+          ; valid_until = None
+          ; nonce = Account.Nonce.of_int 0
+          }
+        in
+        let { Parties.fee_payer = _; other_parties; memo } =
+          parties_update_all
+        in
+        let%map.Deferred (), (), proof =
+          let _, `Prover prover =
+            Transaction_snark.For_tests.create_trivial_snapp
+              ~constraint_constants ()
+          in
+          let fee_payer_party =
+            { Party.authorization = Signature Signature.dummy
+            ; body = Party.Body.of_fee_payer fee_payer_body
+            }
+          in
+          let statement =
+            Zkapp_statement.of_tree
+              { party = fee_payer_party
+              ; party_digest =
+                  Parties.Call_forest.Digest.Party.create fee_payer_party
+              ; calls = other_parties
+              }
+          in
+          prover statement
+        in
+        { Parties.fee_payer =
+            { body = fee_payer_body; authorization = Proof proof }
+        ; other_parties
+        ; memo
+        }
+      in
       let%bind.Deferred parties_insufficient_replace_fee =
         let spec_insufficient_replace_fee : Transaction_snark.For_tests.Spec.t =
           { parties_spec with fee = Currency.Fee.of_int 5_000_000 }
@@ -298,6 +338,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       ( snapp_update
       , parties_update_all
+      , parties_pay_with_proof
       , parties_insufficient_replace_fee
       , parties_insufficient_fee )
     in
@@ -315,7 +356,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { p with
         fee_payer =
           { body = { p.fee_payer.body with nonce = Account.Nonce.of_int 2 }
-          ; authorization = Signature.dummy
+          ; authorization = Signature Signature.dummy
           }
       }
     in
@@ -681,6 +722,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (send_zkapp ~logger node parties_update_all)
     in
     let%bind () =
+      section_hard "Send a zkApp transaction with fees authorized by a proof"
+        (send_zkapp ~logger node parties_pay_with_proof)
+    in
+    let%bind () =
       section_hard "Send a zkapp with an invalid proof"
         (send_invalid_zkapp ~logger node parties_invalid_proof
            "Verification_failed" )
@@ -695,6 +740,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for zkApp transaction to update all fields to be included in \
          transition frontier"
         (wait_for_zkapp parties_update_all)
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkApp transaction to paying fees with a proof to be included \
+         intransition frontier"
+        (wait_for_zkapp parties_pay_with_proof)
     in
     let%bind () =
       section_hard "Send a zkApp transaction with an invalid nonce"

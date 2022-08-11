@@ -1172,7 +1172,12 @@ module Verifiable = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer : Party.Fee_payer.Stable.V1.t
+        { fee_payer :
+            Party.Fee_payer.Stable.V1.t
+            * ( Side_loaded_verification_key.Stable.V2.t
+              , Zkapp_basic.F.Stable.V1.t )
+              With_hash.Stable.V1.t
+              option
         ; other_parties :
             ( Side_loaded_verification_key.Stable.V2.t
             , Zkapp_basic.F.Stable.V1.t )
@@ -1187,12 +1192,12 @@ module Verifiable = struct
     end
   end]
 
-  let all_parties ({ fee_payer; other_parties; memo = _ } : t) :
+  let all_parties ({ fee_payer = fee_payer, vk; other_parties; memo = _ } : t) :
       'data Call_forest.With_hashes_and_data.t =
     let fee_payer = Party.Fee_payer.to_party fee_payer in
     let fee_payer_digest = Call_forest.Digest.Party.create fee_payer in
     let elt =
-      { Call_forest.Tree.party = (fee_payer, (* TODO *) None)
+      { Call_forest.Tree.party = (fee_payer, vk)
       ; party_digest = fee_payer_digest
       ; calls = other_parties
       }
@@ -1202,7 +1207,7 @@ module Verifiable = struct
 end
 
 let of_verifiable (t : Verifiable.t) : t =
-  { fee_payer = t.fee_payer
+  { fee_payer = fst t.fee_payer
   ; other_parties = Call_forest.map t.other_parties ~f:fst
   ; memo = t.memo
   }
