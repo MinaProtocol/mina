@@ -57,9 +57,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let u (t : t) = t.o.u_chal
 
-  let p_eval_1 (t : t) = fst t.p_eval
+  let p_eval_1 (t : t) = fst t.public_evals
 
-  let p_eval_2 (t : t) = snd t.p_eval
+  let p_eval_2 (t : t) = snd t.public_evals
 
   let opening_prechallenges (t : t) =
     Array.map ~f:scalar_challenge t.opening_prechallenges
