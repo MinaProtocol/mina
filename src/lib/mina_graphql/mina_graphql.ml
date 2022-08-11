@@ -584,7 +584,6 @@ module Types = struct
         ] )
 
   let work_statement =
-    let `Needs_some_work_for_zkapps_on_mainnet = Mina_base.Util.todo_zkapps in
     obj "WorkDescription"
       ~doc:
         "Transition from a source ledger to a target ledger with some fee \
