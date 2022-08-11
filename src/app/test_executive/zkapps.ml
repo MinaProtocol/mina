@@ -245,18 +245,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ({ data; hash } : _ With_hash.t)
       in
       let new_permissions =
-        { Mina_base.Permissions.Poly.edit_state =
-            Permissions.Auth_required.Proof
-        ; send = Permissions.Auth_required.Proof
-        ; receive = Permissions.Auth_required.Proof
-        ; set_delegate = Permissions.Auth_required.Proof
-        ; set_permissions = Permissions.Auth_required.Proof
-        ; set_verification_key = Permissions.Auth_required.Proof
-        ; set_zkapp_uri = Permissions.Auth_required.Proof
-        ; edit_sequence_state = Permissions.Auth_required.Proof
-        ; set_token_symbol = Permissions.Auth_required.Proof
-        ; increment_nonce = Permissions.Auth_required.Proof
-        ; set_voting_for = Permissions.Auth_required.Proof
+        { (Quickcheck.random_value (Permissions.gen ~auth_tag:Proof)) with
+          send = Permissions.Auth_required.Proof
         }
       in
       let new_zkapp_uri = "https://www.minaprotocol.com" in
