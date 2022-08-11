@@ -1200,7 +1200,34 @@ struct
                              Diff_error.Fee_payer_account_not_found ) ;
                         Error `Invalid_command
                     | Some account ->
-                        if not (Account.has_permission ~to_:`Send account) then (
+                        let module Auth_set = Set.Make (Control.Tag) in
+                        let required_permissions =
+                          List.fold cs ~init:Auth_set.empty ~f:(fun set c ->
+                              let auth =
+                                match c with
+                                | Signed_command _ ->
+                                    Control.Tag.Signature
+                                | Parties
+                                    { fee_payer =
+                                        { authorization = Signature _; _ }, _
+                                    ; _
+                                    } ->
+                                    Control.Tag.Signature
+                                | Parties
+                                    { fee_payer =
+                                        { authorization = Proof _; _ }, _
+                                    ; _
+                                    } ->
+                                    Control.Tag.Proof
+                              in
+                              Set.add set auth )
+                        in
+                        if
+                          not
+                            (Set.for_all required_permissions ~f:(fun using ->
+                                 Account.has_permission ~using ~to_:`Send
+                                   account ) )
+                        then (
                           add_failure
                             (Command_failure
                                Diff_error.Fee_payer_not_permitted_to_send ) ;

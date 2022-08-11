@@ -836,17 +836,14 @@ let has_locked_tokens ~global_slot (account : t) =
       in
       Balance.(curr_min_balance > zero)
 
-let has_permission ~to_ (account : t) =
+let has_permission ?(using = Control.Tag.Signature) ~to_ (account : t) =
   match to_ with
   | `Send ->
-      Permissions.Auth_required.check account.permissions.send
-        Control.Tag.Signature
+      Permissions.Auth_required.check account.permissions.send using
   | `Receive ->
-      Permissions.Auth_required.check account.permissions.receive
-        Control.Tag.None_given
+      Permissions.Auth_required.check account.permissions.receive using
   | `Set_delegate ->
-      Permissions.Auth_required.check account.permissions.set_delegate
-        Control.Tag.Signature
+      Permissions.Auth_required.check account.permissions.set_delegate using
 
 let gen =
   let open Quickcheck.Let_syntax in
