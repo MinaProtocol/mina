@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/ledgerwatch/lmdb-go/lmdb"
@@ -25,6 +26,7 @@ type BitswapStorage interface {
 	DeleteStatus(ctx context.Context, key [32]byte) error
 	DeleteBlocks(ctx context.Context, keys [][32]byte) error
 	ViewBlock(ctx context.Context, key [32]byte, callback func([]byte) error) error
+	StoreBlocks(ctx context.Context, blocks []blocks.Block) error
 }
 
 type BitswapStorageLmdb struct {
@@ -66,6 +68,10 @@ func UnmarshalRootBlockStatus(r []byte) (res RootBlockStatus, err error) {
 		err = nil
 	}
 	return
+}
+
+func (bs *BitswapStorageLmdb) StoreBlocks(ctx context.Context, blocks []blocks.Block) error {
+	return bs.blockstore.PutMany(ctx, blocks)
 }
 
 func (bs *BitswapStorageLmdb) ViewBlock(ctx context.Context, key [32]byte, callback func([]byte) error) error {
