@@ -537,14 +537,36 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                    , `Time_received time_received
                    , `Valid_cb valid_cb )
                  ->
-                match%map
+                match%bind
                   initial_validate ~transition_env ~time_received ~valid_cb
                 with
-                | Ok valid_transition ->
+                | Ok ((`Block enveloped_transition, _) as valid_transition) ->
+                    let%map () =
+                      let incoming_transition =
+                        Envelope.Incoming.data enveloped_transition
+                      in
+                      let current_transition = get_current_transition () in
+                      if
+                        Consensus.Hooks.equal_select_status `Take
+                          (Consensus.Hooks.select
+                             ~constants:precomputed_values.consensus_constants
+                             ~existing:
+                               ( Validation.block_with_hash current_transition
+                               |> With_hash.map ~f:Mina_block.consensus_state )
+                             ~candidate:
+                               ( Validation.block_with_hash incoming_transition
+                               |> With_hash.map ~f:Mina_block.consensus_state )
+                             ~logger )
+                      then
+                        (* TODO: do we need to push valid_cb? *)
+                        Broadcast_pipe.Writer.write
+                          most_recent_valid_block_writer incoming_transition
+                      else Deferred.unit
+                    in
                     Pipe_lib.Strict_pipe.Writer.write valid_transition_writer
                       valid_transition
                 | Error () ->
-                    () ) )
+                    Deferred.return () ) )
       in
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
@@ -565,34 +587,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
           ~consensus_local_state ~precomputed_values ~notify_online
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
-      let valid_transition_reader1, valid_transition_reader2 =
-        Strict_pipe.Reader.Fork.two valid_transition_reader
-      in
       don't_wait_for
-      @@ Strict_pipe.Reader.iter valid_transition_reader1
-           ~f:(fun (`Block enveloped_transition, _) ->
-             let incoming_transition =
-               Envelope.Incoming.data enveloped_transition
-             in
-             let current_transition = get_current_transition () in
-             if
-               Consensus.Hooks.equal_select_status `Take
-                 (Consensus.Hooks.select
-                    ~constants:precomputed_values.consensus_constants
-                    ~existing:
-                      ( Validation.block_with_hash current_transition
-                      |> With_hash.map ~f:Mina_block.consensus_state )
-                    ~candidate:
-                      ( Validation.block_with_hash incoming_transition
-                      |> With_hash.map ~f:Mina_block.consensus_state )
-                    ~logger )
-             then
-               (* TODO: do we need to push valid_cb? *)
-               Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                 incoming_transition
-             else Deferred.unit ) ;
-      don't_wait_for
-      @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
+      @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader
            ~f:(fun (`Block enveloped_transition, `Valid_cb vc) ->
              don't_wait_for
              @@ let%map () =
