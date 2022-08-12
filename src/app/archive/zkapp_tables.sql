@@ -42,15 +42,17 @@ CREATE TABLE zkapp_state_data_array
    Postgresql does not allow enforcing that the array elements are
    foreign keys
 
-   Any element of the array may be NULL, meaning Ignore, per the
-   NULL convention
+   Any element of the array may be NULL, per the NULL convention
 */
 CREATE TABLE zkapp_states
 ( id                       serial           PRIMARY KEY
 , element_ids              int[]            NOT NULL
 );
 
-/* like zkapp_states, but for sequences */
+/* like zkapp_states, but for sequence states; width may differ from that table
+
+   Elements are not NULL (not enforced by Postgresql)
+*/
 CREATE TABLE zkapp_sequence_states
 ( id                       serial           PRIMARY KEY
 , element_ids              int[]            NOT NULL
