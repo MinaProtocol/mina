@@ -463,8 +463,8 @@ let wait_till_genesis ~logger ~time_controller
 
 let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     ~time_controller ~consensus_local_state ~persistent_root_location
-    ~persistent_frontier_location
-    ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~network_transition_reader
+    ~persistent_frontier_location ~get_current_frontier
+    ~frontier_broadcast_writer:frontier_w ~network_transition_reader
     ~producer_transition_reader ~get_current_transition
     ~most_recent_valid_block_writer ~precomputed_values ~catchup_mode
     ~notify_online =
@@ -580,7 +580,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                   let incoming_transition =
                     Envelope.Incoming.data enveloped_transition
                   in
-                  match Broadcast_pipe.Reader.peek frontier_r with
+                  match get_current_frontier () with
                   | Some frontier ->
                       if
                         is_transition_for_bootstrap ~logger frontier

@@ -1790,9 +1790,9 @@ let create ?wallets (config : Config.t) =
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root_location:config.persistent_root_location
               ~persistent_frontier_location:config.persistent_frontier_location
-              ~frontier_broadcast_pipe:
-                (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-              ~catchup_mode ~network_transition_reader:block_reader
+              ~get_current_frontier
+              ~frontier_broadcast_writer:frontier_broadcast_pipe_w ~catchup_mode
+              ~network_transition_reader:block_reader
               ~producer_transition_reader ~get_current_transition
               ~most_recent_valid_block_writer
               ~precomputed_values:config.precomputed_values ~notify_online
