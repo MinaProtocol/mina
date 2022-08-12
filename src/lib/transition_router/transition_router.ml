@@ -524,9 +524,28 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
               ~valid_cb ~pipe_name:name ~logger )
           ()
       in
-      Initial_validator.run ~logger ~trust_system ~verifier
-        ~transition_reader:network_transition_reader ~valid_transition_writer
-        ~initialization_finish_signal ~precomputed_values ;
+      let () =
+        let initial_validate =
+          unstage
+            (Initial_validator.validate ~logger ~trust_system ~verifier
+               ~initialization_finish_signal ~precomputed_values )
+        in
+        O1trace.background_thread "initially_validate_blocks" (fun () ->
+            Pipe_lib.Strict_pipe.Reader.iter network_transition_reader
+              ~f:(fun
+                   ( `Transition transition_env
+                   , `Time_received time_received
+                   , `Valid_cb valid_cb )
+                 ->
+                match%map
+                  initial_validate ~transition_env ~time_received ~valid_cb
+                with
+                | Ok valid_transition ->
+                    Pipe_lib.Strict_pipe.Writer.write valid_transition_writer
+                      valid_transition
+                | Error () ->
+                    () ) )
+      in
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location

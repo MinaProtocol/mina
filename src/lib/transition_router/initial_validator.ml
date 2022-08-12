@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Signature_lib
@@ -231,8 +230,8 @@ module Duplicate_block_detector = struct
           [%log error] ~metadata msg )
 end
 
-let validate ~logger ~trust_system ~verifier ~valid_transition_writer
-    ~initialization_finish_signal ~precomputed_values =
+let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
+    ~precomputed_values =
   stage (fun ~transition_env ~time_received ~valid_cb ->
       let genesis_state_hash =
         (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
@@ -286,30 +285,37 @@ let validate ~logger ~trust_system ~verifier ~valid_transition_writer
                 >>= defer validate_protocol_versions)
             with
             | Ok verified_transition ->
-                Writer.write valid_transition_writer
-                  ( `Block
-                      (Envelope.Incoming.wrap ~data:verified_transition ~sender)
-                  , `Valid_cb valid_cb ) ;
                 Mina_metrics.Transition_frontier.update_max_blocklength_observed
                   blockchain_length ;
                 Queue.enqueue Transition_frontier.validated_blocks
                   ( State_hash.With_state_hashes.state_hash transition_with_hash
                   , sender
                   , time_received ) ;
-                return ()
+                return
+                  (Ok
+                     ( `Block
+                         (Envelope.Incoming.wrap ~data:verified_transition
+                            ~sender )
+                     , `Valid_cb valid_cb ) )
             | Error error ->
                 Mina_net2.Validation_callback.fire_if_not_already_fired valid_cb
                   `Reject ;
-                Interruptible.uninterruptible
-                @@ handle_validation_error ~logger ~rejected_blocks_logger
-                     ~time_received ~trust_system ~sender ~transition_with_hash
-                     ~delta:genesis_constants.protocol.delta error
+                let%map () =
+                  Interruptible.uninterruptible
+                  @@ handle_validation_error ~logger ~rejected_blocks_logger
+                       ~time_received ~trust_system ~sender
+                       ~transition_with_hash
+                       ~delta:genesis_constants.protocol.delta error
+                in
+                Error ()
           in
           Interruptible.force computation )
         else Deferred.Result.fail () )
         >>| function
-        | Ok () ->
-            ()
+        | Ok (Ok res) ->
+            Ok res
+        | Ok (Error ()) ->
+            Error ()
         | Error () ->
             let state_hash =
               ( Envelope.Incoming.data transition_env
@@ -327,20 +333,6 @@ let validate ~logger ~trust_system ~verifier ~valid_transition_writer
               ]
             in
             [%log error] ~metadata
-              "Dropping blocks because libp2p validation expired" )
-      else Deferred.unit )
-
-let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer ~initialization_finish_signal ~precomputed_values =
-  let validate =
-    unstage
-      (validate ~logger ~trust_system ~verifier ~valid_transition_writer
-         ~initialization_finish_signal ~precomputed_values )
-  in
-  O1trace.background_thread "initially_validate_blocks" (fun () ->
-      Reader.iter transition_reader
-        ~f:(fun
-             ( `Transition transition_env
-             , `Time_received time_received
-             , `Valid_cb valid_cb )
-           -> validate ~transition_env ~time_received ~valid_cb ) )
+              "Dropping blocks because libp2p validation expired" ;
+            Error () )
+      else Deferred.Result.fail () )
