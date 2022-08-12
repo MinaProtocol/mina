@@ -330,9 +330,9 @@ module type Transition_router_intf = sig
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> most_recent_valid_block:
-         Mina_block.initial_valid_block Broadcast_pipe.Reader.t
-         * Mina_block.initial_valid_block Broadcast_pipe.Writer.t
+    -> get_current_transition:(unit -> Mina_block.initial_valid_block)
+    -> most_recent_valid_block_writer:
+         Mina_block.initial_valid_block Broadcast_pipe.Writer.t
     -> precomputed_values:Precomputed_values.t
     -> catchup_mode:[ `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)

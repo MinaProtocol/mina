@@ -465,10 +465,9 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     ~time_controller ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~network_transition_reader
-    ~producer_transition_reader
-    ~most_recent_valid_block:
-      (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~precomputed_values ~catchup_mode ~notify_online =
+    ~producer_transition_reader ~get_current_transition
+    ~most_recent_valid_block_writer ~precomputed_values ~catchup_mode
+    ~notify_online =
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
@@ -556,9 +555,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
              let incoming_transition =
                Envelope.Incoming.data enveloped_transition
              in
-             let current_transition =
-               Broadcast_pipe.Reader.peek most_recent_valid_block_reader
-             in
+             let current_transition = get_current_transition () in
              if
                Consensus.Hooks.equal_select_status `Take
                  (Consensus.Hooks.select
