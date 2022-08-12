@@ -1399,9 +1399,12 @@ let create ?wallets (config : Config.t) =
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create None
           in
+          let get_current_frontier () =
+            Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+          in
           Exit_handlers.register_async_shutdown_handler ~logger:config.logger
             ~description:"Close transition frontier, if exists" (fun () ->
-              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+              match get_current_frontier () with
               | None ->
                   Deferred.unit
               | Some frontier ->
@@ -1412,9 +1415,7 @@ let create ?wallets (config : Config.t) =
                 Deferred.return
                 @@
                 let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
+                let%bind frontier = get_current_frontier () in
                 f ~frontier input )
           in
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
@@ -1456,9 +1457,7 @@ let create ?wallets (config : Config.t) =
                       let ( protocol_state_hash
                           , best_tip_opt
                           , k_block_hashes_and_timestamps ) =
-                        match
-                          Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                        with
+                        match get_current_frontier () with
                         | None ->
                             ( config.precomputed_values
                                 .protocol_state_with_hashes
@@ -1644,9 +1643,7 @@ let create ?wallets (config : Config.t) =
                         Deferred.return
                         @@
                         let open Option.Let_syntax in
-                        let%bind frontier =
-                          Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                        in
+                        let%bind frontier = get_current_frontier () in
                         let%map ( scan_state
                                 , expected_merkle_root
                                 , pending_coinbases
@@ -1726,10 +1723,7 @@ let create ?wallets (config : Config.t) =
                     O1trace.thread "handle_request_get_transition_knowledge"
                       (fun () ->
                         return
-                          ( match
-                              Broadcast_pipe.Reader.peek
-                                frontier_broadcast_pipe_r
-                            with
+                          ( match get_current_frontier () with
                           | None ->
                               []
                           | Some frontier ->
