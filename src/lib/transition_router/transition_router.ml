@@ -514,10 +514,9 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
     ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~network_transition_reader
-    ~producer_transition_reader
-    ~most_recent_valid_block:
-      (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~get_completed_work ~catchup_mode ~notify_online () =
+    ~producer_transition_reader ~get_most_recent_valid_block
+    ~most_recent_valid_block_writer ~get_completed_work ~catchup_mode
+    ~notify_online () =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -609,9 +608,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
              let incoming_transition =
                Envelope.Incoming.data enveloped_transition
              in
-             let current_transition =
-               Broadcast_pipe.Reader.peek most_recent_valid_block_reader
-             in
+             let current_transition = get_most_recent_valid_block () in
              if
                Consensus.Hooks.equal_select_status `Take
                  (Consensus.Hooks.select

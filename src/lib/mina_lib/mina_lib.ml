@@ -2007,11 +2007,14 @@ let create ~commit_id ?wallets (config : Config.t) =
                           User_command.Zkapp_command zkapp_command )
                     , result_cb ) )
           |> Deferred.don't_wait_for ;
-          let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
+          let most_recent_valid_block_reader, most_recent_valid_block_writer =
             Broadcast_pipe.create
               ( Mina_block.genesis ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
+          in
+          let get_most_recent_valid_block () =
+            Broadcast_pipe.Reader.peek most_recent_valid_block_reader
           in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
@@ -2025,7 +2028,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~frontier_broadcast_pipe:
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~catchup_mode ~network_transition_reader:block_reader
-              ~producer_transition_reader ~most_recent_valid_block
+              ~producer_transition_reader ~get_most_recent_valid_block
+              ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ()
