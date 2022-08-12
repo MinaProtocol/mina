@@ -110,12 +110,13 @@ in {
 
   go-capnproto2 = pkgs.buildGoModule rec {
     pname = "capnpc-go";
-    version = "v3.0.0-alpha.1";
+    # TODO update hashes
+    version = "v3.0.0-alpha.5";
     vendorSha256 = "sha256-jbX/nnlnQoItFXFL/MZZKe4zAjM/EA3q+URJG8I3hok=";
     src = final.fetchFromGitHub {
       owner = "capnproto";
       repo = "go-capnproto2";
-      rev = "v3.0.0-alpha.1";
+      rev = "v3.0.0-alpha.5";
       hash = "sha256-afdLw7of5AksR4ErCMqXqXCOnJ/nHK2Lo4xkC5McBfM";
     };
   };

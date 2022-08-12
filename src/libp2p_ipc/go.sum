@@ -1,5 +1,3 @@
-capnproto.org/go/capnp/v3 v3.0.0-alpha.1 h1:lA/zWC1XgaFez/UdqcWi5Bz1grsqPQDY5Ki4lgYrQ1o=
-capnproto.org/go/capnp/v3 v3.0.0-alpha.1/go.mod h1:izbWjXlvObqHwvhxwDBFLpY9lXSXIxDKRtnuktKHVsU=
 capnproto.org/go/capnp/v3 v3.0.0-alpha.5 h1:vpb0XdrXsIckOxtNWPdAlWDoekgH1YGQkvQYmZcdzCI=
 capnproto.org/go/capnp/v3 v3.0.0-alpha.5/go.mod h1:Dynqh9/LE2Wy7jYd2wIoYgqFwh3hZHCmG7j6/uCWX6c=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
