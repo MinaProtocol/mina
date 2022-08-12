@@ -69,21 +69,26 @@ func NewBitswapCtx(ctx context.Context, outMsgChan chan<- *capnp.Message) *Bitsw
 	}
 }
 
-func announceNewRootBlock(ctx context.Context, engine *bitswap.Bitswap, statusStorage codanet.BitswapStorage, bs map[BitswapBlockLink][]byte, root BitswapBlockLink) error {
-	err := statusStorage.SetStatus(ctx, root, codanet.Partial)
+func announceNewRootBlock(ctx context.Context, engine *bitswap.Bitswap, storage codanet.BitswapStorage, blockMap map[BitswapBlockLink][]byte, root BitswapBlockLink) error {
+	err := storage.SetStatus(ctx, root, codanet.Partial)
 	if err != nil {
 		return err
 	}
-
-	for h, b := range bs {
+	bs := make([]blocks.Block, 0, len(blockMap))
+	for h, b := range blockMap {
 		bitswapLogger.Debugf("Publishing block %s (%d bytes)", codanet.BlockHashToCidSuffix(h), len(b))
 		block, _ := blocks.NewBlockWithCid(b, codanet.BlockHashToCid(h))
-		err = engine.NotifyNewBlocks(ctx, block)
-		if err != nil {
-			return err
-		}
+		bs = append(bs, block)
 	}
-	return statusStorage.SetStatus(ctx, root, codanet.Full)
+	err = storage.StoreBlocks(ctx, bs)
+	if err != nil {
+		return err
+	}
+	err = engine.NotifyNewBlocks(ctx, bs...)
+	if err != nil {
+		return err
+	}
+	return storage.SetStatus(ctx, root, codanet.Full)
 }
 
 func (bs *BitswapCtx) deleteRoot(root BitswapBlockLink) error {
