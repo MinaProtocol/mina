@@ -322,7 +322,7 @@ module Eq_data = struct
           { typ
           ; equal
           ; equal_checked = run Checked.equal
-          ; default = Lazy.force Zkapp_account.Sequence_events.empty_hash
+          ; default = Zkapp_account.Sequence_events.empty_hash
           ; to_input = field
           ; to_input_checked = field
           }
@@ -697,8 +697,7 @@ module Account = struct
       ; receipt_chain_hash
       ; public_key ()
       ; Zkapp_state.typ (Or_ignore.typ Field.typ ~ignore:Field.zero)
-      ; Or_ignore.typ Field.typ
-          ~ignore:(Lazy.force Zkapp_account.Sequence_events.empty_hash)
+      ; Or_ignore.typ Field.typ ~ignore:Zkapp_account.Sequence_events.empty_hash
       ; Or_ignore.typ Boolean.typ ~ignore:false
       ; Or_ignore.typ Boolean.typ ~ignore:false
       ]
