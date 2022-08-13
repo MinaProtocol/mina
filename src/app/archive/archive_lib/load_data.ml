@@ -105,7 +105,8 @@ let update_of_id pool update_id =
   in
   let%bind app_state =
     let%bind field_id_array =
-      query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
+      query_db ~f:(fun db ->
+          Processor.Zkapp_states_nullable.load db app_state_id )
     in
     let field_ids = Array.to_list field_id_array in
     let%map field_strs =
@@ -533,7 +534,8 @@ let get_other_party_body ~pool body_id =
         let%bind delegate = get_pk delegate_id in
         let%bind state =
           let%bind field_ids =
-            query_db ~f:(fun db -> Processor.Zkapp_states.load db state_id)
+            query_db ~f:(fun db ->
+                Processor.Zkapp_states_nullable.load db state_id )
           in
           let%map fields =
             Deferred.List.map (Array.to_list field_ids) ~f:(fun id_opt ->
@@ -739,12 +741,10 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%bind app_state_ints =
           query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
         in
-        (* for app state, all elements are non-NULL *)
-        assert (Array.for_all app_state_ints ~f:Option.is_some) ;
         let%bind app_state =
           let%map field_strs =
             Deferred.List.init (Array.length app_state_ints) ~f:(fun ndx ->
-                let id = Option.value_exn app_state_ints.(ndx) in
+                let id = app_state_ints.(ndx) in
                 query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
@@ -781,7 +781,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%map sequence_state =
           let%map field_strs =
             Deferred.List.init (Array.length sequence_state_ints) ~f:(fun ndx ->
-                let id = Option.value_exn app_state_ints.(ndx) in
+                let id = sequence_state_ints.(ndx) in
                 query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in

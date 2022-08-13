@@ -44,6 +44,13 @@ CREATE TABLE zkapp_state_data_array
 
    Any element of the array may be NULL, per the NULL convention
 */
+CREATE TABLE zkapp_states_nullable
+( id                       serial           PRIMARY KEY
+, element_ids              int[]            NOT NULL
+);
+
+/* like zkapp_states_nullable, but elements are not NULL (not enforced by Postgresql)
+*/
 CREATE TABLE zkapp_states
 ( id                       serial           PRIMARY KEY
 , element_ids              int[]            NOT NULL
@@ -106,7 +113,7 @@ CREATE TABLE zkapp_uris
 /* NULL convention */
 CREATE TABLE zkapp_updates
 ( id                       serial           PRIMARY KEY
-, app_state_id             int              NOT NULL REFERENCES zkapp_states(id)
+, app_state_id             int              NOT NULL REFERENCES zkapp_states_nullable(id)
 , delegate_id              int              REFERENCES public_keys(id)
 , verification_key_id      int              REFERENCES zkapp_verification_keys(id)
 , permissions_id           int              REFERENCES zkapp_permissions(id)
@@ -137,7 +144,7 @@ CREATE TABLE zkapp_precondition_accounts
 , nonce_id                 int                    REFERENCES zkapp_nonce_bounds(id)
 , receipt_chain_hash       text
 , delegate_id              int                    REFERENCES public_keys(id)
-, state_id                 int        NOT NULL    REFERENCES zkapp_states(id)
+, state_id                 int        NOT NULL    REFERENCES zkapp_states_nullable(id)
 , sequence_state_id        int                    REFERENCES zkapp_state_data(id)
 , proved_state             boolean
 , is_new                   boolean

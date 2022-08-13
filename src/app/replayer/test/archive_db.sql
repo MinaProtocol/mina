@@ -1449,6 +1449,40 @@ ALTER SEQUENCE public.zkapp_states_id_seq OWNED BY public.zkapp_states.id;
 
 
 --
+-- Name: zkapp_states; Type: TABLE; Schema: public;
+--
+
+CREATE TABLE public.zkapp_states_nullable (
+    id integer NOT NULL,
+    element_ids integer[] NOT NULL
+);
+
+
+
+
+--
+-- Name: zkapp_states_id_seq; Type: SEQUENCE; Schema: public;
+--
+
+CREATE SEQUENCE public.zkapp_states_nullable_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+
+
+--
+-- Name: zkapp_states_id_seq; Type: SEQUENCE OWNED BY; Schema: public;
+--
+
+ALTER SEQUENCE public.zkapp_states_nullable_id_seq OWNED BY public.zkapp_states_nullable.id;
+
+
+--
 -- Name: zkapp_timestamp_bounds; Type: TABLE; Schema: public;
 --
 
@@ -1898,6 +1932,13 @@ ALTER TABLE ONLY public.zkapp_states ALTER COLUMN id SET DEFAULT nextval('public
 
 
 --
+-- Name: zkapp_states id; Type: DEFAULT; Schema: public;
+--
+
+ALTER TABLE ONLY public.zkapp_states_nullable ALTER COLUMN id SET DEFAULT nextval('public.zkapp_states_nullable_id_seq'::regclass);
+
+
+--
 -- Name: zkapp_timestamp_bounds id; Type: DEFAULT; Schema: public;
 --
 
@@ -2005,27 +2046,27 @@ COPY public.accounts_created (block_id, account_identifier_id, creation_fee) FRO
 --
 
 COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, "timestamp", chain_status) FROM stdin;
-1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	\N	3NLeQxhRU3qHv34vHNUwD2ht9gzW3ioAGqBmVwXjYhsSDHPuBDQn	1	1	1	1	2	77	3100000000000000000	jwNfyVexx2Ry6iTS3915DDuazSYwQDjEADkjpBkwpCrX5hEAnGa	1	0	0	1659993000000	canonical
-2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	3	3	1	1	3	77	3100000000000000000	jxnWoPaQsJ5AWnVtr3Ef6YqUFdTZZx7z2Xwba7VSKXCn1fbf9xd	2	22	22	1659993660000	pending
-3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	3	3	1	1	4	77	3100000000000000000	jwWYvFGUxJtAerCKD75CgJdnfP2tXSEsJH9it5mA4GtY6XoBjC3	3	24	24	1659993720000	pending
-4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	3	3	1	1	5	77	3100000000000000000	jwBHUFH34SYcrimN5a5HCn1WTMkRscVdUrmJcHQ9gweJk7hXhpx	4	26	26	1659993780000	pending
-5	3NKPsYafv3sqCRymAw3hyYbdnpR1rkz5uESW46gA1pme1isBQ8z9	4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3	1	1	6	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	5	28	28	1659993840000	pending
-6	3NLr8y5CxQST5f5QK7LdfL9J1Bnuu5c5iZJ4YPTCfDyWmCKbEX4b	5	3NKPsYafv3sqCRymAw3hyYbdnpR1rkz5uESW46gA1pme1isBQ8z9	3	3	1	1	7	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	6	31	31	1659993930000	pending
-7	3NKvv85heSwz5rwAbT7KFxrHZoGGnmwZHhBW952t5Waq1yM3YtS5	6	3NLr8y5CxQST5f5QK7LdfL9J1Bnuu5c5iZJ4YPTCfDyWmCKbEX4b	3	3	1	1	8	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	7	33	33	1659993990000	pending
-8	3NLAtWGLyAsD9biM2tx6djxKGaUR8FwWm3VCFSmSZNxej2mWu4ck	7	3NKvv85heSwz5rwAbT7KFxrHZoGGnmwZHhBW952t5Waq1yM3YtS5	3	3	1	1	9	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	8	36	36	1659994080000	pending
-9	3NKbHF74kYziUcz9ZWM46NDPjLX2PfcKUfAUArTnrBvXAbCmTtj2	8	3NLAtWGLyAsD9biM2tx6djxKGaUR8FwWm3VCFSmSZNxej2mWu4ck	3	3	1	1	10	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	9	41	41	1659994230000	pending
-10	3NLa1kjXbughbC7wtHwu5v6PTGeog7nFNQfqefvq8FXbP6LjkhBh	9	3NKbHF74kYziUcz9ZWM46NDPjLX2PfcKUfAUArTnrBvXAbCmTtj2	3	3	1	1	11	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	10	42	42	1659994260000	pending
-11	3NKuxCfPPzdyYuJkMNF2F4EbYyfHE5Mfm9mfjcWxwHUBjfmEfAjd	10	3NLa1kjXbughbC7wtHwu5v6PTGeog7nFNQfqefvq8FXbP6LjkhBh	3	3	1	1	12	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	11	44	44	1659994320000	pending
-12	3NLSX5JHft5cMgzBP3qdaf4ejPux3g6RwSNpBdihUndCzk35ZcyL	11	3NKuxCfPPzdyYuJkMNF2F4EbYyfHE5Mfm9mfjcWxwHUBjfmEfAjd	3	3	1	1	13	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	12	46	46	1659994380000	pending
-13	3NKvChb8G72hQBHzr7nn7AHrafGopf4xkzNk3bzZPjd1cDgS1LF6	12	3NLSX5JHft5cMgzBP3qdaf4ejPux3g6RwSNpBdihUndCzk35ZcyL	3	3	1	1	14	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	13	47	47	1659994410000	pending
-14	3NKUXRQ1G7XeZ9itcp766STsZD9EjDcf3mpYT3X7AsMrgArSq4s8	13	3NKvChb8G72hQBHzr7nn7AHrafGopf4xkzNk3bzZPjd1cDgS1LF6	3	3	1	1	15	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	14	48	48	1659994440000	pending
-15	3NLVZy6T83Jn1pfdcwz6GSmirP8SQYSV6Fwv2gCuKpLDcyQP13mH	14	3NKUXRQ1G7XeZ9itcp766STsZD9EjDcf3mpYT3X7AsMrgArSq4s8	3	3	1	1	16	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	15	49	49	1659994470000	pending
-16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	15	3NLVZy6T83Jn1pfdcwz6GSmirP8SQYSV6Fwv2gCuKpLDcyQP13mH	3	3	1	1	17	77	3100000000000000000	jwaUKbLdnzqkgej6UvGvw1uJFke1F9csfWSFtbDm7ddK5nKvax1	16	50	50	1659994500000	pending
-17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	3	3	1	1	18	77	3100000000000000000	jxcVVuLtg3K7KsRVV3a1W2zziBFiTL9fSxPbedohrhtJESg9g61	17	56	56	1659994680000	pending
-18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	3	3	1	1	19	77	3100000000000000000	jxucYv71WRMyExpH4KWaCP34FDmwpVFp1phjShaDi4yhaVCjoBu	18	57	57	1659994710000	pending
-19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	3	3	1	1	20	77	3100000000000000000	jxucYv71WRMyExpH4KWaCP34FDmwpVFp1phjShaDi4yhaVCjoBu	19	60	60	1659994800000	pending
-20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	3	3	1	1	21	77	3100000000000000000	jxFLcRVXPVJa9gMEoPhJzw1QnF6MjUdxUiFFiw18o6n3TerTXSC	20	65	65	1659994950000	pending
-21	3NKKXz5f8zUEb5PyoW1faVfJqsHnBvzrK58XJdxoNGaMenfWcw5w	20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	3	3	1	1	22	77	3100000000000000000	jwGdXLtS2JmCUpEUPEbtYF2CgcViZHx9PVRfE7ttpjmsFWtwfAT	21	68	68	1659995040000	pending
+1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	\N	3NLeQxhRU3qHv34vHNUwD2ht9gzW3ioAGqBmVwXjYhsSDHPuBDQn	1	1	1	1	2	77	3100000000000000000	jxEzgdFtsDh5AFv7YBMERSDvfCDoNfqHMtBamAtS6XgNhhvSsFu	1	0	0	1659993000000	canonical
+2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	1	3NLt1r77r7z7VEX4tACzHc9qC9Rz5GqYSXtufFhpE85tWVoYrx8z	3	3	1	1	3	77	3100000000000000000	jwxp7KiJYwJgXbMnEcrpP96NxFKxw1YvAKPMCvFgEtPJweCvcVp	2	22	22	1659993660000	pending
+3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	2	3NLPC2srDPVxrf4TqpsznL7CTeT6B8pPZYwNCHyizxaSznu6XoUA	3	3	1	1	4	77	3100000000000000000	jwAXJVzttBDUzz7FsmHBQesnDjPZbzpk6KKWgKLrMpVKuYuCxFi	3	24	24	1659993720000	pending
+4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3NLxg96L88SBKKVgWgxcDLpTbCFfftbzCMepbhTBrHxLAcTiv4An	3	3	1	1	5	77	3100000000000000000	jxkPa2ZFgYMXDfADP4qDJ7EzWH2w7UhgbWDZEe7BPJq5e9uikNw	4	26	26	1659993780000	pending
+5	3NKPsYafv3sqCRymAw3hyYbdnpR1rkz5uESW46gA1pme1isBQ8z9	4	3NKAwzwaGhdXYs2iEJPj7cnfgfcRkHmRo9kFfB2DRdUM4NsmNnk8	3	3	1	1	6	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	5	28	28	1659993840000	pending
+6	3NLr8y5CxQST5f5QK7LdfL9J1Bnuu5c5iZJ4YPTCfDyWmCKbEX4b	5	3NKPsYafv3sqCRymAw3hyYbdnpR1rkz5uESW46gA1pme1isBQ8z9	3	3	1	1	7	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	6	31	31	1659993930000	pending
+7	3NKvv85heSwz5rwAbT7KFxrHZoGGnmwZHhBW952t5Waq1yM3YtS5	6	3NLr8y5CxQST5f5QK7LdfL9J1Bnuu5c5iZJ4YPTCfDyWmCKbEX4b	3	3	1	1	8	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	7	33	33	1659993990000	pending
+8	3NLAtWGLyAsD9biM2tx6djxKGaUR8FwWm3VCFSmSZNxej2mWu4ck	7	3NKvv85heSwz5rwAbT7KFxrHZoGGnmwZHhBW952t5Waq1yM3YtS5	3	3	1	1	9	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	8	36	36	1659994080000	pending
+9	3NKbHF74kYziUcz9ZWM46NDPjLX2PfcKUfAUArTnrBvXAbCmTtj2	8	3NLAtWGLyAsD9biM2tx6djxKGaUR8FwWm3VCFSmSZNxej2mWu4ck	3	3	1	1	10	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	9	41	41	1659994230000	pending
+10	3NLa1kjXbughbC7wtHwu5v6PTGeog7nFNQfqefvq8FXbP6LjkhBh	9	3NKbHF74kYziUcz9ZWM46NDPjLX2PfcKUfAUArTnrBvXAbCmTtj2	3	3	1	1	11	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	10	42	42	1659994260000	pending
+11	3NKuxCfPPzdyYuJkMNF2F4EbYyfHE5Mfm9mfjcWxwHUBjfmEfAjd	10	3NLa1kjXbughbC7wtHwu5v6PTGeog7nFNQfqefvq8FXbP6LjkhBh	3	3	1	1	12	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	11	44	44	1659994320000	pending
+12	3NLSX5JHft5cMgzBP3qdaf4ejPux3g6RwSNpBdihUndCzk35ZcyL	11	3NKuxCfPPzdyYuJkMNF2F4EbYyfHE5Mfm9mfjcWxwHUBjfmEfAjd	3	3	1	1	13	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	12	46	46	1659994380000	pending
+13	3NKvChb8G72hQBHzr7nn7AHrafGopf4xkzNk3bzZPjd1cDgS1LF6	12	3NLSX5JHft5cMgzBP3qdaf4ejPux3g6RwSNpBdihUndCzk35ZcyL	3	3	1	1	14	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	13	47	47	1659994410000	pending
+14	3NKUXRQ1G7XeZ9itcp766STsZD9EjDcf3mpYT3X7AsMrgArSq4s8	13	3NKvChb8G72hQBHzr7nn7AHrafGopf4xkzNk3bzZPjd1cDgS1LF6	3	3	1	1	15	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	14	48	48	1659994440000	pending
+15	3NLVZy6T83Jn1pfdcwz6GSmirP8SQYSV6Fwv2gCuKpLDcyQP13mH	14	3NKUXRQ1G7XeZ9itcp766STsZD9EjDcf3mpYT3X7AsMrgArSq4s8	3	3	1	1	16	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	15	49	49	1659994470000	pending
+16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	15	3NLVZy6T83Jn1pfdcwz6GSmirP8SQYSV6Fwv2gCuKpLDcyQP13mH	3	3	1	1	17	77	3100000000000000000	jwWs7Mg1i63LEAYRUnkjzsqJvnUMmtWW9SC88jcM55k3PZ4A7c7	16	50	50	1659994500000	pending
+17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	16	3NLCqsJpwVxSC7gKUVEkCb3PmCvf3CcX52CtSG3xjhcSzopg5NZJ	3	3	1	1	18	77	3100000000000000000	jws8ZUYhrRnJSceZo7Ljk5tRsDXyugG5ur7SW8KZfJb8TT4N9qq	17	56	56	1659994680000	pending
+18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	17	3NLjjx7dm6Bc3D5bc2cNAecuPyhYum9PoX7DYUHGYvS3qc551j1M	3	3	1	1	19	77	3100000000000000000	jwBt8EcxhhNEjok7dsL4U5waPoQHQxRGQa6sucfHTFTpE27HfHH	18	57	57	1659994710000	pending
+19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	18	3NKmDH5RAujPGiX76vwhV6HFsAjN2vvkHjkQcveExvDywyykLeaL	3	3	1	1	20	77	3100000000000000000	jwBt8EcxhhNEjok7dsL4U5waPoQHQxRGQa6sucfHTFTpE27HfHH	19	60	60	1659994800000	pending
+20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	19	3NLJ3QfoaRBs2sMj2dpx1dYAgQoe9tLAFNb19ijBnyzAWafF1KBm	3	3	1	1	21	77	3100000000000000000	jxn5HwzvkP9KFhM19k9D5QSSJr2KgMwTKGBe6WZE9AYPX7u9E9E	20	65	65	1659994950000	pending
+21	3NKKXz5f8zUEb5PyoW1faVfJqsHnBvzrK58XJdxoNGaMenfWcw5w	20	3NL1XVgg2DAjSjVStzXmeQnRunV7Pp1B4cYQ27VtN3Q6esAZ5ufp	3	3	1	1	22	77	3100000000000000000	jwozdsQrYT6i7ausFBqirkYvyu5ybodYFUNRuKeXZXSfhtaQh92	21	68	68	1659995040000	pending
 \.
 
 
@@ -2245,7 +2286,7 @@ COPY public.public_keys (id, value) FROM stdin;
 --
 
 COPY public.snarked_ledger_hashes (id, value) FROM stdin;
-1	jwNfyVexx2Ry6iTS3915DDuazSYwQDjEADkjpBkwpCrX5hEAnGa
+1	jxEzgdFtsDh5AFv7YBMERSDvfCDoNfqHMtBamAtS6XgNhhvSsFu
 \.
 
 
@@ -2598,6 +2639,16 @@ COPY public.zkapp_state_data_array (id, element_ids) FROM stdin;
 --
 
 COPY public.zkapp_states (id, element_ids) FROM stdin;
+2	{1,1,1,1,1,1,1,1}
+3	{3,4,5,6,7,8,9,10}
+\.
+
+
+--
+-- Data for Name: zkapp_states; Type: TABLE DATA; Schema: public;
+--
+
+COPY public.zkapp_states_nullable (id, element_ids) FROM stdin;
 1	{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}
 2	{1,1,1,1,1,1,1,1}
 3	{3,4,5,6,7,8,9,10}
@@ -2886,6 +2937,13 @@ SELECT pg_catalog.setval('public.zkapp_state_data_id_seq', 10, true);
 --
 
 SELECT pg_catalog.setval('public.zkapp_states_id_seq', 3, true);
+
+
+--
+-- Name: zkapp_states_nullable_id_seq; Type: SEQUENCE SET; Schema: public;
+--
+
+SELECT pg_catalog.setval('public.zkapp_states_nullable_id_seq', 3, true);
 
 
 --
@@ -3312,6 +3370,14 @@ ALTER TABLE ONLY public.zkapp_state_data
 
 ALTER TABLE ONLY public.zkapp_states
     ADD CONSTRAINT zkapp_states_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: zkapp_states_nullable zkapp_states_nullable_pkey; Type: CONSTRAINT; Schema: public;
+--
+
+ALTER TABLE ONLY public.zkapp_states_nullable
+    ADD CONSTRAINT zkapp_states_nullable_pkey PRIMARY KEY (id);
 
 
 --
@@ -4043,7 +4109,7 @@ ALTER TABLE ONLY public.zkapp_precondition_accounts
 --
 
 ALTER TABLE ONLY public.zkapp_precondition_accounts
-    ADD CONSTRAINT zkapp_precondition_accounts_state_id_fkey FOREIGN KEY (state_id) REFERENCES public.zkapp_states(id);
+    ADD CONSTRAINT zkapp_precondition_accounts_state_id_fkey FOREIGN KEY (state_id) REFERENCES public.zkapp_states_nullable(id);
 
 
 --
@@ -4051,7 +4117,7 @@ ALTER TABLE ONLY public.zkapp_precondition_accounts
 --
 
 ALTER TABLE ONLY public.zkapp_updates
-    ADD CONSTRAINT zkapp_updates_app_state_id_fkey FOREIGN KEY (app_state_id) REFERENCES public.zkapp_states(id);
+    ADD CONSTRAINT zkapp_updates_app_state_id_fkey FOREIGN KEY (app_state_id) REFERENCES public.zkapp_states_nullable(id);
 
 
 --
