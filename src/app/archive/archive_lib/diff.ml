@@ -15,7 +15,7 @@ module Transition_frontier = struct
   type t =
     | Breadcrumb_added of
         { block :
-            External_transition.Raw.Stable.Latest.t
+            Mina_block.Stable.Latest.t
             State_hash.With_state_hashes.Stable.Latest.t
               (* ledger index, account *)
         ; accounts_accessed : (int * Mina_base.Account.Stable.Latest.t) list
@@ -41,9 +41,7 @@ module Transaction_pool = struct
   [@@deriving bin_io_unversioned]
 end
 
-type t =
-  | Transition_frontier of Transition_frontier.t
-  | Transaction_pool of Transaction_pool.t
+type t = Transition_frontier of Transition_frontier.t
 [@@deriving bin_io_unversioned]
 
 module Builder = struct
@@ -128,13 +126,10 @@ module Builder = struct
                  (Time.diff account_created_time accounts_accessed_time) ) )
         ] ;
     Transition_frontier.Breadcrumb_added
-      { block = With_hash.map ~f:External_transition.compose block_with_hash
+      { block = block_with_hash
       ; accounts_accessed
       ; accounts_created
       ; tokens_used
       ; sender_receipt_chains_from_parent_ledger
       }
-
-  let user_commands user_commands =
-    Transaction_pool { Transaction_pool.added = user_commands; removed = [] }
 end

@@ -13,13 +13,25 @@
    cohttp-async
    graphql-async
    graphql-cohttp
+   graphql
    async_kernel
    result
-   ;; local libraries
+  ;; local libraries
+  (re_export mina_numbers_unix)
    mina_numbers
+  (re_export currency_unix)
    currency
+  (re_export signature_lib_unix)
    signature_lib
+  (re_export mina_base_unix)
+   mina_transaction
    mina_base
+  (re_export block_time_unix)
+  (re_export graphql_basic_scalars)
+   consensus
+  (re_export mina_block_unix)
+  (re_export filtered_external_transition_unix)
+  (re_export mina_transaction_unix)
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))

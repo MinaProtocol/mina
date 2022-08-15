@@ -21,6 +21,7 @@ type nonrec 'caml_f lookup_evaluations =
   { sorted : 'caml_f array array
   ; aggreg : 'caml_f array
   ; table : 'caml_f array
+  ; runtime : 'caml_f array option
   }
 
 type nonrec 'caml_f proof_evaluations =
@@ -50,13 +51,23 @@ type nonrec 'caml_f proof_evaluations =
       * 'caml_f array
   ; generic_selector : 'caml_f array
   ; poseidon_selector : 'caml_f array
+  ; lookup : 'caml_f lookup_evaluations option
   }
 
 type nonrec 'caml_g poly_comm =
   { unshifted : 'caml_g array; shifted : 'caml_g option }
 
+type nonrec ('caml_g, 'caml_f) recursion_challenge =
+  { chals : 'caml_f array; comm : 'caml_g poly_comm }
+
 type nonrec ('g, 'f) opening_proof =
   { lr : ('g * 'g) array; delta : 'g; z1 : 'f; z2 : 'f; sg : 'g }
+
+type nonrec 'caml_g lookup_commitments =
+  { sorted : 'caml_g poly_comm array
+  ; aggreg : 'caml_g poly_comm
+  ; runtime : 'caml_g poly_comm option
+  }
 
 type nonrec 'caml_g prover_commitments =
   { w_comm :
@@ -77,6 +88,7 @@ type nonrec 'caml_g prover_commitments =
       * 'caml_g poly_comm
   ; z_comm : 'caml_g poly_comm
   ; t_comm : 'caml_g poly_comm
+  ; lookup : 'caml_g lookup_commitments option
   }
 
 type nonrec ('caml_g, 'caml_f) prover_proof =
@@ -85,7 +97,7 @@ type nonrec ('caml_g, 'caml_f) prover_proof =
   ; evals : 'caml_f proof_evaluations * 'caml_f proof_evaluations
   ; ft_eval1 : 'caml_f
   ; public : 'caml_f array
-  ; prev_challenges : ('caml_f array * 'caml_g poly_comm) array
+  ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
   }
 
 type nonrec wire = { row : int; col : int }
@@ -107,6 +119,8 @@ type nonrec gate_type =
   | CairoInstruction
   | CairoFlags
   | CairoTransition
+  | RangeCheck0
+  | RangeCheck1
 
 type nonrec 'f circuit_gate =
   { typ : gate_type
@@ -127,12 +141,15 @@ module VerifierIndex = struct
   module Lookup = struct
     type nonrec lookups_used = Single | Joint
 
+    type nonrec 't lookup_selectors = { lookup_gate : 't option }
+
     type nonrec 'poly_comm t =
       { lookup_used : lookups_used
       ; lookup_table : 'poly_comm array
-      ; lookup_selectors : 'poly_comm array
+      ; lookup_selectors : 'poly_comm lookup_selectors
       ; table_ids : 'poly_comm option
       ; max_joint_size : int
+      ; runtime_tables_selector : 'poly_comm option
       }
   end
 
@@ -154,6 +171,8 @@ module VerifierIndex = struct
     { domain : 'fr domain
     ; max_poly_size : int
     ; max_quot_size : int
+    ; public : int
+    ; prev_challenges : int
     ; srs : 'srs
     ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array

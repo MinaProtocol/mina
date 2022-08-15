@@ -1,26 +1,20 @@
-open Core_kernel
-open Async
-open Rosetta_lib
-open Rosetta_models
-
-(* TODO: Also change this to zero when #5361 finishes *)
-let genesis_block_height = Int64.one
-
+module Serializing = Graphql_lib.Serializing
+module Scalars = Graphql_lib.Scalars
 module Get_status =
 [%graphql
 {|
   query {
     genesisBlock {
       stateHash
-    }
+   }
     bestChain(maxLength: 1) {
       stateHash
       protocolState {
         blockchainState {
-          utcDate @bsDecoder(fn: "Int64.of_string")
+          utcDate
         }
         consensusState {
-          blockHeight @bsDecoder(fn: "Graphql.Decoders.int64")
+          blockHeight @ppxCustom(module: "Serializing.Int64")
         }
       }
     }
@@ -32,6 +26,16 @@ module Get_status =
     initialPeers
   }
 |}]
+
+(** Open after GraphQL query, to avoid shadowing functions used by the PPX *)
+open Core_kernel
+open Async
+open Rosetta_lib
+open Rosetta_models
+
+(* TODO: Also change this to zero when .5361 finishes *)
+let genesis_block_height = Int64.one
+
 
 module Sql = struct
   let oldest_block_query =
@@ -93,7 +97,7 @@ module Get_network =
 module Get_network_memoized = struct
   let query =
      Memoize.build @@
-     fun ~graphql_uri () -> Graphql.query (Get_network.make ()) graphql_uri
+     fun ~graphql_uri () -> Graphql.query Get_network.(make @@ makeVariables ()) graphql_uri
 
    module Mock = struct
      let query ~graphql_uri:_ =
@@ -117,7 +121,7 @@ let devnet_chain_id =
 
 let network_tag_of_graphql res =
   let equal_chain_id id =
-    String.equal (res#daemonStatus)#chainId id
+    String.equal res.Get_network.daemonStatus.chainId id
   in
   if equal_chain_id mainnet_chain_id then "mainnet"
   else if equal_chain_id devnet_chain_id then "devnet"
@@ -201,7 +205,7 @@ module Status = struct
         =
      fun ~db ~graphql_uri ->
       let (module Db : Caqti_async.CONNECTION) = db in
-      { gql= (fun () -> Graphql.query (Get_status.make ()) graphql_uri)
+      { gql= (fun () -> Graphql.query Get_status.(make @@ makeVariables ()) graphql_uri)
       ; db_oldest_block=
           (fun () ->
             match !oldest_block_ref with
@@ -229,13 +233,13 @@ module Status = struct
           ~network_identifier:network.network_identifier
       in
       let%bind latest_node_block =
-        match res#bestChain with
+        match res.Get_status.bestChain with
         | None | Some [||] ->
             M.fail (Errors.create `Chain_info_missing)
         | Some chain ->
             M.return (Array.last chain)
       in
-      let genesis_block_state_hash = (res#genesisBlock)#stateHash in
+      let genesis_block_state_hash = (res.genesisBlock).stateHash in
       let%bind (latest_db_block_height,latest_db_block_hash, latest_db_block_timestamp) = env.db_latest_block () in
       let%map (oldest_db_block_height,oldest_db_block_hash) = env.db_oldest_block () in
       { Network_status_response.current_block_identifier=
@@ -251,14 +255,14 @@ module Status = struct
               (Block_identifier.create oldest_db_block_height oldest_db_block_hash)
           )
       ; peers=
-          (let peer_objs = (res#daemonStatus)#peers |> Array.to_list in
-           List.map peer_objs ~f:(fun po -> po#peerId |> Peer.create))
+          (let peer_objs = (res.daemonStatus).peers |> Array.to_list in
+           List.map peer_objs ~f:(fun po -> po.peerId |> Peer.create))
       ; sync_status=
           Some
             { Sync_status.current_index=
-                Some ((latest_node_block#protocolState)#consensusState)#blockHeight
+                Some ((latest_node_block.protocolState).consensusState).blockHeight
             ; target_index= None
-            ; stage= Some (sync_status_to_string res#syncStatus)
+            ; stage= Some (sync_status_to_string res.syncStatus)
             ; synced = None
             } }
   end
@@ -269,46 +273,23 @@ module Status = struct
     ( module struct
       module Mock = Impl (Result)
 
-      let build ~best_chain_missing =
-        object
-          method genesisBlock =
-            object
-              method stateHash = "GENESIS_HASH"
-            end
-
-          method bestChain =
-            if best_chain_missing then None
-            else
-              Some
-                [| object
-                     method stateHash = "STATE_HASH_TIP"
-
-                     method protocolState =
-                       object
-                         method blockchainState =
-                           object
-                             method utcDate = Int64.of_int_exn 1_594_854_566
-                           end
-
-                         method consensusState =
-                           object
-                             method blockHeight = Int64.of_int_exn 4
-                           end
-                       end
-                   end |]
-
-          method daemonStatus =
-            object
-              method chainId = devnet_chain_id
-
-              method peers =
-                [| object
-                     method peerId = "dev.o1test.net"
-                   end |]
-            end
-
-          method syncStatus = `SYNCED
-        end
+      let build ~best_chain_missing = {
+        Get_status.genesisBlock = {stateHash = "GENESIS_HASH"};
+        bestChain = if best_chain_missing then None
+          else Some [|{
+              stateHash = "STATE_HASH_TIP";
+              protocolState = {
+                blockchainState = {utcDate = Int64.to_string @@ Int64.of_int_exn 1_594_854_566};
+                consensusState = {blockHeight = Int64.of_int_exn 4 }
+              }
+            }|];
+        daemonStatus = {
+          chainId = devnet_chain_id;
+          peers = [|{peerId = "dev.o1test.net"}|]
+        };
+        syncStatus = `SYNCED;
+        initialPeers = [||]
+      }
 
       let no_chain_info_env : 'gql Env.Mock.t =
         { gql= (fun () -> Result.return @@ build ~best_chain_missing:true)

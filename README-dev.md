@@ -14,11 +14,16 @@ Mina, this is the right file!
 Building Mina can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
+If you are already a Nix user, or are comfortable installing Nix, it
+can be an easy way to build Mina locally. See
+[nix/README.md](./nix/README.md) for more information and
+instructions.
+
 Currently, Mina builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/MinaProtocol/coda/issues/962).
 
 The short version:
 
-1.  Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
+1.  Start with Ubuntu 18 or run it in a virtual machine
 2.  Set github repos to pull and push over ssh: `git config --global url.ssh://git@github.com/.insteadOf https://github.com/`
     - To push branches to repos in the MinaProtocol or o1-labs organisations, you must complete this step. These repositories do not accept the password authentication used by the https URLs.
 3.  Pull in our submodules: `git submodule update --init --recursive`
@@ -40,10 +45,6 @@ Refer to [/dev](/dev).
 - Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
 
 ### Developer Setup (Linux)
-
-#### Install or have Ubuntu 18
-
-- [VM Images](https://www.osboxes.org/ubuntu/)
 
 #### Building
 

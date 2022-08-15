@@ -15,8 +15,10 @@ end
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
-    type t =
+  [@@@with_versioned_json]
+
+  module V3 : sig
+    type nonrec t =
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t

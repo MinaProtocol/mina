@@ -1,3 +1,4 @@
+open Core_kernel
 open Backend
 open Impls.Step
 open Pickles_types
@@ -13,6 +14,11 @@ type t =
   ( Field.t
   , Field.t Scalar_challenge.t
   , Other_field.t Shifted_value.t
+  , ( ( Field.t Scalar_challenge.t
+      , Other_field.t Shifted_value.t )
+      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+    , Boolean.var )
+    Plonk_types.Opt.t
   , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
     , Tock.Rounds.n )
     Pickles_types.Vector.t
@@ -30,6 +36,10 @@ module Constant = struct
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t
     , Tock.Field.t Shifted_value.t
+    , ( Challenge.Constant.t Scalar_challenge.t
+      , Tock.Field.t Shifted_value.t )
+      Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+      option
     , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
       , Tock.Rounds.n )
       Vector.t
@@ -52,10 +62,11 @@ module Constant = struct
       ; beta = Challenge.Constant.to_tock_field beta
       ; gamma = Challenge.Constant.to_tock_field gamma
       ; zeta = Common.Ipa.Wrap.endo_to_field zeta
+      ; joint_combiner = None
       }
     in
     let evals =
-      Tuple_lib.Double.map Dummy.evals_combined.evals ~f:(fun e -> e.evals)
+      Plonk_types.Evals.to_in_circuit Dummy.evals_combined.evals.evals
     in
     let env =
       Plonk_checks.scalars_env
@@ -72,17 +83,11 @@ module Constant = struct
              ~domain_generator:Tock.Field.domain_generator )
         chals evals
     in
+    let plonk =
+      Plonk_checks.derive_plonk (module Tock.Field) ~env ~shift chals evals
+    in
     { deferred_values =
-        { plonk =
-            { (Plonk_checks.derive_plonk
-                 (module Tock.Field)
-                 ~env ~shift chals evals )
-              with
-              alpha
-            ; beta
-            ; gamma
-            ; zeta
-            }
+        { plonk = { plonk with alpha; beta; gamma; zeta; lookup = None }
         ; combined_inner_product = Shifted_value (tock ())
         ; xi = Scalar_challenge.create one_chal
         ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
@@ -93,11 +98,9 @@ module Constant = struct
     }
 end
 
-let typ ~wrap_rounds : (t, Constant.t) Typ.t =
-  Types.Step.Proof_state.Per_proof.In_circuit.spec wrap_rounds
-  |> Spec.typ (module Impl) (Shifted_value.typ Other_field.typ)
-  |> Typ.transport ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
-       ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data
-  |> Typ.transport_var
-       ~there:Types.Step.Proof_state.Per_proof.In_circuit.to_data
-       ~back:Types.Step.Proof_state.Per_proof.In_circuit.of_data
+let typ ~wrap_rounds ~uses_lookup : (t, Constant.t) Typ.t =
+  Types.Step.Proof_state.Per_proof.typ
+    (module Impl)
+    (Shifted_value.typ Other_field.typ)
+    ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16)
+    ~zero:Common.Lookup_parameters.tick_zero ~uses_lookup

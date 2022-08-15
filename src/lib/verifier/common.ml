@@ -40,7 +40,7 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Parties { fee_payer; other_parties; memo } ->
+  | Parties ({ fee_payer; other_parties; memo } as parties_with_vk) ->
       with_return (fun { return } ->
           let other_parties_hash = Parties.Call_forest.hash other_parties in
           let tx_commitment =
@@ -70,12 +70,13 @@ let check :
           check_signature fee_payer.authorization fee_payer.body.public_key
             full_tx_commitment ;
           let parties_with_hashes_list =
-            Parties.Call_forest.With_hashes.to_parties_with_hashes_list
-              other_parties
+            other_parties |> Zkapp_statement.zkapp_statements_of_forest'
+            |> Parties.Call_forest.With_hashes_and_data
+               .to_parties_with_hashes_list
           in
           let valid_assuming =
             List.filter_map parties_with_hashes_list
-              ~f:(fun ((p, vk_opt), at_party) ->
+              ~f:(fun ((p, (vk_opt, stmt)), _at_party) ->
                 let commitment =
                   if p.body.use_full_commitment then full_tx_commitment
                   else tx_commitment
@@ -92,21 +93,15 @@ let check :
                         return
                           (`Missing_verification_key
                             [ Account_id.public_key @@ Party.account_id p ] )
-                    | Some vk ->
-                        let stmt =
-                          { Zkapp_statement.Poly.transaction = commitment
-                          ; at_party = (at_party :> Snark_params.Tick.Field.t)
-                          }
-                        in
-                        Some (vk, stmt, pi) ) )
+                    | Some (vk : _ With_hash.t) ->
+                        Some (vk.data, stmt, pi) ) )
           in
           let v : User_command.Valid.t =
-            User_command.Poly.Parties
-              { Parties.fee_payer
-              ; other_parties =
-                  Parties.Call_forest.map other_parties ~f:(fun (p, _) -> p)
-              ; memo
-              }
+            (*Verification keys should be present if it reaches here*)
+            let parties =
+              Option.value_exn (Parties.Valid.of_verifiable parties_with_vk)
+            in
+            User_command.Poly.Parties parties
           in
           match valid_assuming with
           | [] ->

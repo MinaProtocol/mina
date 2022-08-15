@@ -108,15 +108,13 @@ module Transaction_applied : sig
   module Signed_command_applied : sig
     module Common : sig
       type t = Transaction_applied.Signed_command_applied.Common.t =
-        { user_command : Signed_command.t With_status.t
-        ; previous_receipt_chain_hash : Receipt.Chain_hash.t
-        }
+        { user_command : Signed_command.t With_status.t }
       [@@deriving sexp]
     end
 
     module Body : sig
       type t = Transaction_applied.Signed_command_applied.Body.t =
-        | Payment of { previous_empty_accounts : Account_id.t list }
+        | Payment of { new_accounts : Account_id.t list }
         | Stake_delegation of
             { previous_delegate : Public_key.Compressed.t option }
         | Failed
@@ -132,7 +130,7 @@ module Transaction_applied : sig
     type t = Transaction_applied.Parties_applied.t =
       { accounts : (Account_id.t * Account.t option) list
       ; command : Parties.t With_status.t
-      ; previous_empty_accounts : Account_id.t list
+      ; new_accounts : Account_id.t list
       }
     [@@deriving sexp]
   end
@@ -146,15 +144,19 @@ module Transaction_applied : sig
 
   module Fee_transfer_applied : sig
     type t = Transaction_applied.Fee_transfer_applied.t =
-      { fee_transfer : Fee_transfer.t
-      ; previous_empty_accounts : Account_id.t list
+      { fee_transfer : Fee_transfer.t With_status.t
+      ; new_accounts : Account_id.t list
+      ; burned_tokens : Currency.Amount.t
       }
     [@@deriving sexp]
   end
 
   module Coinbase_applied : sig
     type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase : Coinbase.t; previous_empty_accounts : Account_id.t list }
+      { coinbase : Coinbase.t With_status.t
+      ; new_accounts : Account_id.t list
+      ; burned_tokens : Currency.Amount.t
+      }
     [@@deriving sexp]
   end
 
@@ -170,9 +172,13 @@ module Transaction_applied : sig
     { previous_hash : Ledger_hash.t; varying : Varying.t }
   [@@deriving sexp]
 
+  val burned_tokens : t -> Currency.Amount.t
+
+  val supply_increase : t -> Currency.Amount.Signed.t Or_error.t
+
   val transaction : t -> Transaction.t With_status.t
 
-  val user_command_status : t -> Transaction_status.t
+  val transaction_status : t -> Transaction_status.t
 end
 
 (** Raises if the ledger is full, or if an account already exists for the given
@@ -220,7 +226,8 @@ val apply_parties_unchecked :
          , Currency.Amount.Signed.t
          , t
          , bool
-         , unit
+         , Parties.Transaction_commitment.t
+         , Mina_numbers.Index.t
          , Transaction_status.Failure.Collection.t )
          Mina_transaction_logic.Parties_logic.Local_state.t
        * Currency.Amount.Signed.t ) )

@@ -1,4 +1,4 @@
-open Pickles_types.Hlist
+open Async_kernel
 open Snark_params.Tick
 open Snark_params.Tick.Run
 open Currency
@@ -22,6 +22,7 @@ module Party_under_construction = struct
             [ Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore; Ignore ]
         ; sequence_state = Ignore
         ; proved_state = Ignore
+        ; is_new = Ignore
         }
       in
       let proved_state =
@@ -91,11 +92,20 @@ module Party_under_construction = struct
           failwith "Incorrect length of app_state"
   end
 
+  module Events = struct
+    type t = { events : Field.Constant.t array list }
+
+    let create () = { events = [] }
+
+    let add_events t events : t = { events = events @ t.events }
+  end
+
   type t =
     { public_key : Public_key.Compressed.t
     ; token_id : Token_id.t
     ; account_condition : Account_condition.t
     ; update : Update.t
+    ; events : Events.t
     }
 
   let create ~public_key ?(token_id = Token_id.default) () =
@@ -103,6 +113,7 @@ module Party_under_construction = struct
     ; token_id
     ; account_condition = Account_condition.create ()
     ; update = Update.create ()
+    ; events = Events.create ()
     }
 
   let to_party (t : t) : Party.Body.t =
@@ -111,39 +122,39 @@ module Party_under_construction = struct
     ; update = Update.to_parties_update t.update
     ; balance_change = { magnitude = Amount.zero; sgn = Pos }
     ; increment_nonce = false
-    ; events = []
+    ; events = t.events.events
     ; sequence_events = []
     ; call_data = Field.Constant.zero
-    ; call_depth = 0
-    ; protocol_state_precondition =
-        { snarked_ledger_hash = Ignore
-        ; timestamp = Ignore
-        ; blockchain_length = Ignore
-        ; min_window_density = Ignore
-        ; last_vrf_output = ()
-        ; total_currency = Ignore
-        ; global_slot_since_hard_fork = Ignore
-        ; global_slot_since_genesis = Ignore
-        ; staking_epoch_data =
-            { ledger =
-                { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-            ; seed = Ignore
-            ; start_checkpoint = Ignore
-            ; lock_checkpoint = Ignore
-            ; epoch_length = Ignore
+    ; preconditions =
+        { Party.Preconditions.network =
+            { snarked_ledger_hash = Ignore
+            ; timestamp = Ignore
+            ; blockchain_length = Ignore
+            ; min_window_density = Ignore
+            ; last_vrf_output = ()
+            ; total_currency = Ignore
+            ; global_slot_since_hard_fork = Ignore
+            ; global_slot_since_genesis = Ignore
+            ; staking_epoch_data =
+                { ledger =
+                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+                ; seed = Ignore
+                ; start_checkpoint = Ignore
+                ; lock_checkpoint = Ignore
+                ; epoch_length = Ignore
+                }
+            ; next_epoch_data =
+                { ledger =
+                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
+                ; seed = Ignore
+                ; start_checkpoint = Ignore
+                ; lock_checkpoint = Ignore
+                ; epoch_length = Ignore
+                }
             }
-        ; next_epoch_data =
-            { ledger =
-                { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-            ; seed = Ignore
-            ; start_checkpoint = Ignore
-            ; lock_checkpoint = Ignore
-            ; epoch_length = Ignore
-            }
+        ; account = Full (Account_condition.to_predicate t.account_condition)
         }
     ; use_full_commitment = false
-    ; account_precondition =
-        Full (Account_condition.to_predicate t.account_condition)
     ; caller = t.token_id
     }
 
@@ -161,6 +172,9 @@ module Party_under_construction = struct
 
   let set_full_state app_state (t : t) =
     { t with update = Update.set_full_state app_state t.update }
+
+  let set_events events (t : t) =
+    { t with events = Events.add_events t.events events }
 
   module In_circuit = struct
     module Account_condition = struct
@@ -199,6 +213,7 @@ module Party_under_construction = struct
                    ]
                ; sequence_state = Ignore
                ; proved_state = Ignore
+               ; is_new = Ignore
                } )
         in
         let proved_state =
@@ -207,7 +222,7 @@ module Party_under_construction = struct
           | None ->
               default.proved_state
           | Some state_proved ->
-              Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.true_
+              Zkapp_basic.Or_ignore.Checked.make_unsafe Boolean.true_
                 state_proved
         in
         { default with proved_state }
@@ -287,11 +302,28 @@ module Party_under_construction = struct
             failwith "Incorrect length of app_state"
     end
 
+    module Events = struct
+      type t = { events : Field.t array list }
+
+      let create () = { events = [] }
+
+      let add_events t events : t = { events = t.events @ events }
+
+      let to_parties_events ({ events } : t) : Zkapp_account.Events.var =
+        let empty_var : Zkapp_account.Events.var =
+          exists ~compute:(fun () -> []) Zkapp_account.Events.typ
+        in
+        (* matches fold_right in Zkapp_account.Events.hash *)
+        Core_kernel.List.fold_right events ~init:empty_var
+          ~f:(Core_kernel.Fn.flip Zkapp_account.Events.push_checked)
+    end
+
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
+      ; events : Events.t
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default)) ()
@@ -300,9 +332,11 @@ module Party_under_construction = struct
       ; token_id
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
+      ; events = Events.create ()
       }
 
-    let to_party (t : t) : Party.Body.Checked.t =
+    let to_party_and_calls (t : t) :
+        Party.Body.Checked.t * Zkapp_call_forest.Checked.t =
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
@@ -312,48 +346,56 @@ module Party_under_construction = struct
         let fields = Array.map Field.Var.constant fields in
         typ.var_of_fields (fields, aux)
       in
-      { public_key = t.public_key
-      ; token_id = t.token_id
-      ; update = Update.to_parties_update t.update
-      ; balance_change =
-          var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
-      ; increment_nonce = Boolean.false_
-      ; events = var_of_t Zkapp_account.Events.typ []
-      ; sequence_events = var_of_t Zkapp_account.Events.typ []
-      ; call_data = Field.zero
-      ; call_depth = As_prover.Ref.create (fun () -> 0)
-      ; protocol_state_precondition =
-          var_of_t Zkapp_precondition.Protocol_state.typ
-            { snarked_ledger_hash = Ignore
-            ; timestamp = Ignore
-            ; blockchain_length = Ignore
-            ; min_window_density = Ignore
-            ; last_vrf_output = ()
-            ; total_currency = Ignore
-            ; global_slot_since_hard_fork = Ignore
-            ; global_slot_since_genesis = Ignore
-            ; staking_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
-            ; next_epoch_data =
-                { ledger =
-                    { Epoch_ledger.Poly.hash = Ignore; total_currency = Ignore }
-                ; seed = Ignore
-                ; start_checkpoint = Ignore
-                ; lock_checkpoint = Ignore
-                ; epoch_length = Ignore
-                }
+      let party : Party.Body.Checked.t =
+        { public_key = t.public_key
+        ; token_id = t.token_id
+        ; update = Update.to_parties_update t.update
+        ; balance_change =
+            var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
+        ; increment_nonce = Boolean.false_
+        ; events = Events.to_parties_events t.events
+        ; sequence_events = var_of_t Zkapp_account.Events.typ []
+        ; call_data = Field.zero
+        ; preconditions =
+            { Party.Preconditions.Checked.network =
+                var_of_t Zkapp_precondition.Protocol_state.typ
+                  { snarked_ledger_hash = Ignore
+                  ; timestamp = Ignore
+                  ; blockchain_length = Ignore
+                  ; min_window_density = Ignore
+                  ; last_vrf_output = ()
+                  ; total_currency = Ignore
+                  ; global_slot_since_hard_fork = Ignore
+                  ; global_slot_since_genesis = Ignore
+                  ; staking_epoch_data =
+                      { ledger =
+                          { Epoch_ledger.Poly.hash = Ignore
+                          ; total_currency = Ignore
+                          }
+                      ; seed = Ignore
+                      ; start_checkpoint = Ignore
+                      ; lock_checkpoint = Ignore
+                      ; epoch_length = Ignore
+                      }
+                  ; next_epoch_data =
+                      { ledger =
+                          { Epoch_ledger.Poly.hash = Ignore
+                          ; total_currency = Ignore
+                          }
+                      ; seed = Ignore
+                      ; start_checkpoint = Ignore
+                      ; lock_checkpoint = Ignore
+                      ; epoch_length = Ignore
+                      }
+                  }
+            ; account = Account_condition.to_predicate t.account_condition
             }
-      ; use_full_commitment = Boolean.false_
-      ; account_precondition =
-          Account_condition.to_predicate t.account_condition
-      ; caller = t.token_id
-      }
+        ; use_full_commitment = Boolean.false_
+        ; caller = t.token_id
+        }
+      in
+      let calls = exists Zkapp_call_forest.typ ~compute:(fun () -> []) in
+      (party, calls)
 
     let assert_state_unproved (t : t) =
       { t with
@@ -369,6 +411,9 @@ module Party_under_construction = struct
 
     let set_full_state app_state (t : t) =
       { t with update = Update.set_full_state app_state t.update }
+
+    let set_events events (t : t) =
+      { t with events = Events.add_events t.events events }
   end
 end
 
@@ -393,22 +438,209 @@ let dummy_constraints () =
         (Kimchi_backend_common.Scalar_challenge.create x)
       : Field.t * Field.t )
 
-(* TODO: Should be able to *return* stmt instead of consuming it.
-         Modify snarky to do this.
-*)
-let party_circuit f ([] : _ H1.T(Id).t)
-    ({ transaction; at_party } : Zkapp_statement.Checked.t) :
-    _ H1.T(E01(Pickles.Inductive_rule.B)).t =
+type return_type =
+  { party : Party.Body.t
+  ; party_digest : Parties.Digest.Party.t
+  ; calls :
+      ( ( Party.t
+        , Parties.Digest.Party.t
+        , Parties.Digest.Forest.t )
+        Parties.Call_forest.Tree.t
+      , Parties.Digest.Forest.t )
+      With_stack_hash.t
+      list
+  }
+
+let to_party party : Zkapp_statement.Checked.t * return_type Prover_value.t =
   dummy_constraints () ;
-  let party = f () in
-  let party = Party_under_construction.In_circuit.to_party party in
-  let returned_transaction = Party.Checked.digest party in
-  let returned_at_party =
-    (* TODO: This should be returned from
-             [Party_under_construction.In_circuit.to_party].
-    *)
-    Field.constant Parties.Call_forest.empty
+  let party, calls =
+    Party_under_construction.In_circuit.to_party_and_calls party
   in
-  Run.Field.Assert.equal returned_transaction transaction ;
-  Run.Field.Assert.equal returned_at_party at_party ;
-  []
+  let party_digest = Parties.Call_forest.Digest.Party.Checked.create party in
+  let public_output : Zkapp_statement.Checked.t =
+    { party = (party_digest :> Field.t)
+    ; calls = (Zkapp_call_forest.Checked.hash calls :> Field.t)
+    }
+  in
+  let auxiliary_output =
+    Prover_value.create (fun () ->
+        let party = As_prover.read (Party.Body.typ ()) party in
+        let party_digest =
+          As_prover.read Parties.Call_forest.Digest.Party.typ party_digest
+        in
+        let calls = Prover_value.get calls.data in
+        { party; calls; party_digest } )
+  in
+  (public_output, auxiliary_output)
+
+open Pickles_types
+open Hlist
+
+let wrap_main f { Pickles.Inductive_rule.public_input = () } =
+  { Pickles.Inductive_rule.previous_proof_statements = []
+  ; public_output = f ()
+  ; auxiliary_output = ()
+  }
+
+let compile :
+    type auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
+       ?self:
+         ( Zkapp_statement.Checked.t
+         , Zkapp_statement.t
+         , max_proofs_verified
+         , branches )
+         Pickles.Tag.t
+    -> ?cache:_
+    -> ?disk_keys:(_, branches) Vector.t * _
+    -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
+    -> branches:(module Nat.Intf with type n = branches)
+    -> max_proofs_verified:
+         (module Nat.Add.Intf with type n = max_proofs_verified)
+    -> name:string
+    -> constraint_constants:_
+    -> choices:
+         (   self:
+               ( Zkapp_statement.Checked.t
+               , Zkapp_statement.t
+               , max_proofs_verified
+               , branches )
+               Pickles.Tag.t
+          -> ( prev_varss
+             , prev_valuess
+             , widthss
+             , heightss
+             , unit
+             , unit
+             , Party_under_construction.In_circuit.t
+             , unit (* TODO: Remove? *)
+             , auxiliary_var
+             , auxiliary_value )
+             H4_6.T(Pickles.Inductive_rule).t )
+    -> unit
+    -> ( Zkapp_statement.Checked.t
+       , Zkapp_statement.t
+       , max_proofs_verified
+       , branches )
+       Pickles.Tag.t
+       * _
+       * (module Pickles.Proof_intf
+            with type t = ( max_proofs_verified
+                          , max_proofs_verified )
+                          Pickles.Proof.t
+             and type statement = Zkapp_statement.t )
+       * ( prev_valuess
+         , widthss
+         , heightss
+         , unit
+         , ( ( Party.t
+             , Parties.Digest.Party.t
+             , Parties.Digest.Forest.t )
+             Parties.Call_forest.Tree.t
+           * auxiliary_value )
+           Deferred.t )
+         H3_2.T(Pickles.Prover).t =
+ fun ?self ?cache ?disk_keys ~auxiliary_typ ~branches ~max_proofs_verified ~name
+     ~constraint_constants ~choices () ->
+  let choices ~self =
+    let rec go :
+        type prev_varss prev_valuess widthss heightss.
+           ( prev_varss
+           , prev_valuess
+           , widthss
+           , heightss
+           , unit
+           , unit
+           , Party_under_construction.In_circuit.t
+           , unit
+           , auxiliary_var
+           , auxiliary_value )
+           H4_6.T(Pickles.Inductive_rule).t
+        -> ( prev_varss
+           , prev_valuess
+           , widthss
+           , heightss
+           , unit
+           , unit
+           , Zkapp_statement.Checked.t
+           , Zkapp_statement.t
+           , return_type Prover_value.t * auxiliary_var
+           , return_type * auxiliary_value )
+           H4_6.T(Pickles.Inductive_rule).t = function
+      | [] ->
+          []
+      | { identifier; prevs; main; uses_lookup } :: choices ->
+          { identifier
+          ; prevs
+          ; uses_lookup
+          ; main =
+              (fun main_input ->
+                let { Pickles.Inductive_rule.previous_proof_statements
+                    ; public_output = party_under_construction
+                    ; auxiliary_output
+                    } =
+                  main main_input
+                in
+                let public_output, party_tree =
+                  to_party party_under_construction
+                in
+                { previous_proof_statements
+                ; public_output
+                ; auxiliary_output = (party_tree, auxiliary_output)
+                } )
+          }
+          :: go choices
+    in
+    go (choices ~self)
+  in
+  let tag, cache_handle, proof, provers =
+    Pickles.compile () ?self ?cache ?disk_keys
+      ~public_input:(Output Zkapp_statement.typ)
+      ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
+      ~branches ~max_proofs_verified ~name ~constraint_constants ~choices
+  in
+  let provers =
+    let rec go :
+        type prev_valuess widthss heightss.
+           ( prev_valuess
+           , widthss
+           , heightss
+           , unit
+           , ( Zkapp_statement.t
+             * (return_type * auxiliary_value)
+             * (max_proofs_verified, max_proofs_verified) Pickles.Proof.t )
+             Deferred.t )
+           H3_2.T(Pickles.Prover).t
+        -> ( prev_valuess
+           , widthss
+           , heightss
+           , unit
+           , ( ( Party.t
+               , Parties.Digest.Party.t
+               , Parties.Digest.Forest.t )
+               Parties.Call_forest.Tree.t
+             * auxiliary_value )
+             Deferred.t )
+           H3_2.T(Pickles.Prover).t = function
+      | [] ->
+          []
+      | prover :: provers ->
+          let prover ?handler () =
+            let open Async_kernel in
+            let%map ( _stmt
+                    , ({ party; party_digest; calls }, auxiliary_value)
+                    , proof ) =
+              prover ?handler ()
+            in
+            let party : Party.t =
+              { body = party
+              ; authorization = Proof (Pickles.Side_loaded.Proof.of_proof proof)
+              }
+            in
+            ( { Parties.Call_forest.Tree.party; party_digest; calls }
+            , auxiliary_value )
+          in
+          prover :: go provers
+    in
+    go provers
+  in
+  (tag, cache_handle, proof, provers)

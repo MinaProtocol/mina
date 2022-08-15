@@ -49,21 +49,27 @@ let plugin_flag = Command.Param.return []
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
+  let receiver_key_warning = Cli_lib.Default.receiver_key_warning in
   let%map_open conf_dir = Cli_lib.Flag.conf_dir
   and block_production_key =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
-        "KEYFILE Private key file for the block producer. You cannot provide \
-         both `block-producer-key` and `block-producer-pubkey`. (default: \
-         don't produce blocks)"
+        (sprintf
+           "KEYFILE Private key file for the block producer. You cannot \
+            provide both `block-producer-key` and `block-producer-pubkey`. \
+            (default: don't produce blocks). %s"
+           receiver_key_warning )
       (optional string)
   and block_production_pubkey =
     flag "--block-producer-pubkey"
       ~aliases:[ "block-producer-pubkey" ]
       ~doc:
-        "PUBLICKEY Public key for the associated private key that is being \
-         tracked by this daemon. You cannot provide both `block-producer-key` \
-         and `block-producer-pubkey`. (default: don't produce blocks)"
+        (sprintf
+           "PUBLICKEY Public key for the associated private key that is being \
+            tracked by this daemon. You cannot provide both \
+            `block-producer-key` and `block-producer-pubkey`. (default: don't \
+            produce blocks). %s"
+           receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
     flag "--block-producer-password"
@@ -83,9 +89,11 @@ let setup_daemon logger =
   and coinbase_receiver_flag =
     flag "--coinbase-receiver" ~aliases:[ "coinbase-receiver" ]
       ~doc:
-        "PUBLICKEY Address to send coinbase rewards to (if this node is \
-         producing blocks). If not provided, coinbase rewards will be sent to \
-         the producer of a block."
+        (sprintf
+           "PUBLICKEY Address to send coinbase rewards to (if this node is \
+            producing blocks). If not provided, coinbase rewards will be sent \
+            to the producer of a block. %s"
+           receiver_key_warning )
       (optional public_key_compressed)
   and genesis_dir =
     flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
@@ -95,14 +103,18 @@ let setup_daemon logger =
       (optional string)
   and run_snark_worker_flag =
     flag "--run-snark-worker" ~aliases:[ "run-snark-worker" ]
-      ~doc:"PUBLICKEY Run the SNARK worker with this public key"
+      ~doc:
+        (sprintf "PUBLICKEY Run the SNARK worker with this public key. %s"
+           receiver_key_warning )
       (optional public_key_compressed)
   and run_snark_coordinator_flag =
     flag "--run-snark-coordinator"
       ~aliases:[ "run-snark-coordinator" ]
       ~doc:
-        "PUBLICKEY Run a SNARK coordinator with this public key (ignored if \
-         the run-snark-worker is set)"
+        (sprintf
+           "PUBLICKEY Run a SNARK coordinator with this public key (ignored if \
+            the run-snark-worker is set). %s"
+           receiver_key_warning )
       (optional public_key_compressed)
   and snark_worker_parallelism_flag =
     flag "--snark-worker-parallelism"
@@ -483,6 +495,12 @@ let setup_daemon logger =
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-rejected-blocks.log"
                ~max_size:rejected_blocks_log_size ~num_rotate:50 ) ;
+        Logger.Consumer_registry.register ~id:Logger.Logger_id.oversized_logs
+          ~processor:(Logger.Processor.raw ())
+          ~transport:
+            (Logger_file_system.dumb_logrotate ~directory:conf_dir
+               ~log_filename:"mina-oversized-logs.log"
+               ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
         let version_metadata =
           [ ("commit", `String Mina_version.commit_id)
           ; ("branch", `String Mina_version.branch)
@@ -1375,6 +1393,48 @@ let replay_blocks logger =
            "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
          Async.never () ) )
 
+let dump_type_shapes =
+  let max_depth_flag =
+    let open Command.Param in
+    flag "--max-depth" ~aliases:[ "-max-depth" ] (optional int)
+      ~doc:"NN Maximum depth of shape S-expressions"
+  in
+  Command.basic ~summary:"Print serialization shapes of versioned types"
+    (Command.Param.map max_depth_flag ~f:(fun max_depth () ->
+         Ppx_version_runtime.Shapes.iteri ~f:(fun ~key:path ~data:shape ->
+             let open Bin_prot.Shape in
+             let canonical = eval shape in
+             let digest = Canonical.to_digest canonical |> Digest.to_hex in
+             let shape_summary =
+               let shape_sexp =
+                 Canonical.to_string_hum canonical |> Sexp.of_string
+               in
+               (* elide the shape below specified depth, so that changes to
+                  contained types aren't considered a change to the containing
+                  type, even though the shape digests differ
+               *)
+               let summary_sexp =
+                 match max_depth with
+                 | None ->
+                     shape_sexp
+                 | Some n ->
+                     let rec go sexp depth =
+                       if depth > n then Sexp.Atom "."
+                       else
+                         match sexp with
+                         | Sexp.Atom _ ->
+                             sexp
+                         | Sexp.List items ->
+                             Sexp.List
+                               (List.map items ~f:(fun item ->
+                                    go item (depth + 1) ) )
+                     in
+                     go shape_sexp 0
+               in
+               Sexp.to_string summary_sexp
+             in
+             Core_kernel.printf "%s, %s, %s\n" path digest shape_summary ) ) )
+
 [%%if force_updates]
 
 let rec ensure_testnet_id_still_good logger =
@@ -1642,6 +1702,7 @@ let internal_commands logger =
           | None ->
               () ) ;
           Deferred.return ()) )
+  ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger)
   ]
 
@@ -1670,23 +1731,9 @@ let mina_commands logger =
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (module Coda_peers_test)
-        ; (module Coda_block_production_test)
-        ; (module Coda_shared_state_test)
+      ( [ (module Coda_shared_state_test)
         ; (module Coda_transitive_peers_test)
-        ; (module Coda_shared_prefix_test)
-        ; (module Coda_shared_prefix_multiproducer_test)
-        ; (module Coda_five_nodes_test)
-        ; (module Coda_restart_node_test)
-        ; (module Coda_restarts_and_txns_holy_grail)
-        ; (module Coda_bootstrap_test)
-        ; (module Coda_long_fork)
-        ; (module Coda_txns_and_restart_non_producers)
-        ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
-        ; (module Full_test)
-        ; (module Transaction_snark_profiler)
-        ; (module Coda_archive_processor_test)
         ]
         : (module Integration_test) list )
   in

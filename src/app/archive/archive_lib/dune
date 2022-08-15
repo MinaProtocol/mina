@@ -64,6 +64,8 @@
    mina_transaction
    protocol_version
    mina_version
+   staged_ledger_diff
+   ppx_version.runtime
  )
  (inline_tests)
  (modes native)

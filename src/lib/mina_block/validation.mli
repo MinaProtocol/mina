@@ -263,6 +263,7 @@ val validate_staged_ledger_diff :
        * [ `Staged_ledger of Staged_ledger.t ]
      , [> `Staged_ledger_application_failed of
           Staged_ledger.Staged_ledger_error.t
+       | `Invalid_body_reference
        | `Invalid_staged_ledger_diff of
          [ `Incorrect_target_staged_ledger_hash
          | `Incorrect_target_snarked_ledger_hash ]

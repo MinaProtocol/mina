@@ -1,5 +1,6 @@
 (library
   (name transaction_snark_tests)
+  (public_name transaction_snark_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -43,6 +44,7 @@
    sexplib0
    test_util
    transaction_witness
+   staged_ledger_diff
    )
   (library_flags -linkall)
   (inline_tests)

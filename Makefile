@@ -2,7 +2,7 @@
 ## Configuration
 
 # Current OCaml version
-OCAML_VERSION = "4.11.2"
+OCAML_VERSION = "4.14.0"
 
 # machine word size
 WORD_SIZE = "64"
@@ -293,7 +293,7 @@ web:
 ## Benchmarks
 
 benchmarks: ocaml_checks
-	dune build src/app/benchmarks/main.exe
+	dune build src/app/benchmarks/benchmarks.exe
 
 ########################################
 # Coverage testing and output

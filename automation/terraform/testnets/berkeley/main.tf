@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name = "berkeley"
-  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-release-2.0.0-ba9a0e0-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-release-2.0.0-ba9a0e0-focal"
+  mina_image = "minaprotocol/mina-daemon:1.3.1beta1-release-2.0.0-c160fce-bullseye-berkeley"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.1beta1-release-2.0.0-c160fce-bullseye"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
 
@@ -92,11 +92,11 @@ module "berkeley" {
   mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
+  use_embedded_runtime_config = true
 
   archive_node_count  = 3
   mina_archive_schema = "create_schema.sql"
   mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"]
-
 
   archive_configs       = [
     {
@@ -129,8 +129,6 @@ module "berkeley" {
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
 
-  use_embedded_runtime_config = true
-
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
 
@@ -149,6 +147,9 @@ module "berkeley" {
     }
   ]
 
+  seed_count            = var.seed_count
+  plain_node_count = 0
+
   whales= [
     for i in range(var.whale_count):{
       duplicates = 1
@@ -163,9 +164,7 @@ module "berkeley" {
 
   # nodes_with_user_agent = ["fish-1-1","fish-2-1"]
   
-  seed_count            = var.seed_count
 
-  plain_node_count = 0
 
   upload_blocks_to_gcloud         = false
   restart_nodes                   = false

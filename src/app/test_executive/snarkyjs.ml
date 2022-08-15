@@ -55,7 +55,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
              ~parties
       in
       [%log info] "zkApp transaction included in transition frontier"
@@ -81,7 +81,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         | `Deploy ->
             ("deploy", "0")
         | `Update ->
-            ("update", "2")
+            ("update", "1")
       in
       (* concurrently make/sign the deploy transaction and wait for the node to be ready *)
       [%log info] "Running JS script with command $jscommand"

@@ -131,8 +131,6 @@ module Runtime = struct
 
   let current_gc = ref (Gc.stat ())
 
-  let current_jemalloc = ref (Jemalloc.get_memory_stats ())
-
   let gc_stat_interval_mins = ref 15.
 
   let gc_allocated_bytes = ref (Gc.allocated_bytes ())
@@ -140,7 +138,6 @@ module Runtime = struct
   let rec gc_stat () =
     let%bind () = after (Time_ns.Span.of_min !gc_stat_interval_mins) in
     current_gc := Gc.stat () ;
-    current_jemalloc := Jemalloc.get_memory_stats () ;
     gc_allocated_bytes := Gc.allocated_bytes () ;
     gc_stat ()
 
@@ -222,28 +219,6 @@ module Runtime = struct
       (fun () -> float_of_int !current_gc.Gc.Stat.stack_size)
       ~help:"Current stack size."
 
-  let jemalloc_active_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
-      (fun () -> float_of_int !current_jemalloc.active)
-      ~help:"active memory in bytes"
-
-  let jemalloc_resident_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
-      (fun () -> float_of_int !current_jemalloc.resident)
-      ~help:
-        "resident memory in bytes (may be zero depending on jemalloc compile \
-         options)"
-
-  let jemalloc_allocated_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
-      (fun () -> float_of_int !current_jemalloc.allocated)
-      ~help:"memory allocated to heap objects in bytes"
-
-  let jemalloc_mapped_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
-      (fun () -> float_of_int !current_jemalloc.mapped)
-      ~help:"memory mapped into process address space in bytes"
-
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
       ~help:"Total user and system CPU time spent in seconds."
@@ -267,10 +242,6 @@ module Runtime = struct
     ; ocaml_gc_largest_free
     ; ocaml_gc_fragments
     ; ocaml_gc_stack_size
-    ; jemalloc_active_bytes
-    ; jemalloc_resident_bytes
-    ; jemalloc_allocated_bytes
-    ; jemalloc_mapped_bytes
     ; process_cpu_seconds_total
     ; process_uptime_ms_total
     ]
@@ -321,6 +292,24 @@ module Bootstrap = struct
   let bootstrap_time_ms =
     let help = "time elapsed while bootstrapping" in
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
+
+  let staking_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync staking epoch ledger in ms" in
+    Counter.v "staking_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let next_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync next epoch ledger in ms" in
+    Counter.v "next_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let root_snarked_ledger_sync_ms =
+    let help = "time elapsed when sync root snarked ledger in ms" in
+    Counter.v "root_snarked_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let num_of_root_snarked_ledger_retargeted =
+    let help =
+      "number of times root_snarked_ledger retargeted during bootstrap"
+    in
+    Gauge.v "num_of_root_snarked_ledger_retargeted" ~help ~namespace ~subsystem
 end
 
 module Transaction_pool = struct
@@ -431,6 +420,36 @@ module Network = struct
             "average time, in ms, for blocks to be validated and rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average time, in ms, for blocks to be accepted after the OCaml \
+             process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for blocks to be rejected after the OCaml \
+             process receives it"
+        end)
+        ()
   end
 
   module Snark_work = struct
@@ -466,6 +485,36 @@ module Network = struct
              rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for snark work to be accepted after the \
+             OCaml process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for snark work to be rejected after the \
+             OCaml process receives it"
+        end)
+        ()
   end
 
   module Transaction = struct
@@ -499,6 +548,36 @@ module Network = struct
           let help =
             "average delay, in ms, for transactions to be validated and \
              rebroadcasted"
+        end)
+        ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for transactions to be accepted after the \
+             OCaml process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for transactions to be rejected after the \
+             OCaml process receives it"
         end)
         ()
   end
@@ -939,6 +1018,10 @@ module Snark_work = struct
        value of the daemon flag work-reassignment-wait"
     in
     Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
+
+  let snark_work_failed_rpc : Counter.t =
+    let help = "# of snark work failures reported by snark workers" in
+    Counter.v "snark_work_failed_rpc" ~help ~namespace ~subsystem
 
   let snark_pool_size : Gauge.t =
     let help = "# of completed snark work bundles in the snark pool" in

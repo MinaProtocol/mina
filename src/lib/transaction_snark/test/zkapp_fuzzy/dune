@@ -36,6 +36,7 @@
    with_hash
    random_oracle
    sexplib0
+   parties_builder
    )
   (link_flags (-linkall))
   (preprocess

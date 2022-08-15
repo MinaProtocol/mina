@@ -45,5 +45,7 @@
    mina_ledger
    unsigned_extended
    sgn
-   )
+   blake2
+   ppx_version.runtime
+ )
 )

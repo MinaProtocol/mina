@@ -84,7 +84,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
@@ -98,7 +97,6 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
@@ -108,7 +106,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Deferred.Or_error.t
 
@@ -117,7 +114,6 @@ module Engine = struct
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
@@ -241,11 +237,11 @@ module Engine = struct
 
     type t
 
-    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Malleable_error.t
 
-    val deploy : t -> Network.t Deferred.t
+    val deploy : t -> Network.t Malleable_error.t
 
-    val destroy : t -> unit Deferred.t
+    val destroy : t -> unit Malleable_error.t
 
     val cleanup : t -> unit Deferred.t
   end
@@ -351,6 +347,17 @@ module Dsl = struct
 
     type t
 
+    type wait_condition_id =
+      | Nodes_to_initialize
+      | Blocks_to_be_produced
+      | Nodes_to_synchronize
+      | Signed_command_to_be_included_in_frontier
+      | Ledger_proofs_emitted_since_genesis
+      | Block_height_growth
+      | Zkapp_to_be_included_in_frontier
+
+    val wait_condition_id : t -> wait_condition_id
+
     val with_timeouts :
          ?soft_timeout:Network_time_span.t
       -> ?hard_timeout:Network_time_span.t
@@ -363,6 +370,8 @@ module Dsl = struct
 
     val blocks_to_be_produced : int -> t
 
+    val block_height_growth : height_growth:int -> t
+
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
     val signed_command_to_be_included_in_frontier :
@@ -372,7 +381,7 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
 
-    val snapp_to_be_included_in_frontier :
+    val zkapp_to_be_included_in_frontier :
       has_failures:bool -> parties:Mina_base.Parties.t -> t
   end
 
@@ -446,6 +455,8 @@ module Dsl = struct
 
     val network_state : t -> Network_state.t
 
+    val event_router : t -> Event_router.t
+
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 
     (* TODO: move this functionality to a more suitable location *)
@@ -465,7 +476,9 @@ module Dsl = struct
       -> log_error_accumulator
 
     val lift_accumulated_log_errors :
-      log_error_accumulator -> Test_error.remote_error Test_error.Set.t
+         ?exit_code:int
+      -> log_error_accumulator
+      -> Test_error.remote_error Test_error.Set.t
   end
 end
 

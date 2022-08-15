@@ -1,5 +1,8 @@
 (env
-  (_ (js_of_ocaml (compilation_mode whole_program))))
+ (_
+  (js_of_ocaml
+   (compilation_mode whole_program))))
+
 (executable
  (name snarky_js_node)
  (modules snarky_js_node)

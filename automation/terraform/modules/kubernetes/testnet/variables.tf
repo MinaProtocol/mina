@@ -144,6 +144,16 @@ variable "log_txn_pool_gossip" {
   default = false
 }
 
+variable "cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
 # Seed Vars
 
 variable "seed_port" {
@@ -208,7 +218,7 @@ variable "seed_configs" {
       libp2p_secret      = string,
       external_port      = number,
       external_ip        = string,
-      private_key_secret = string,
+      # private_key_secret = string,
       enableArchive      = bool,
       archiveAddress     = string
     })
@@ -261,6 +271,16 @@ variable "agent_send_every_mins" {
 variable "gcloud_seeds" {
   type    = list(any)
   default = []
+}
+
+variable "worker_cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "worker_mem_request" {
+  type    = string
+  default = "0Mi"
 }
 
 # Mina network services vars

@@ -114,17 +114,10 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             (sprintf "gcloud auth activate-service-account --key-file=%s" path)
           : int ) ) ;
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
-      Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_ext ->
-          let new_block =
-            Mina_block.External_transition.Validated.lower new_block_ext
-          in
-          let new_block_no_hash =
-            Mina_block.Validated.forget new_block |> With_hash.data
-          in
-          let hash =
-            Mina_block.Validated.forget new_block
-            |> State_hash.With_state_hashes.state_hash
-          in
+      Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_validated ->
+          let new_block = Mina_block.Validated.forget new_block_validated in
+          let new_block_no_hash = With_hash.data new_block in
+          let hash = State_hash.With_state_hashes.state_hash new_block in
           (let path, log = !precomputed_block_writer in
            match Broadcast_pipe.Reader.peek transition_frontier with
            | None ->
@@ -133,8 +126,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                   block"
            | Some tf -> (
                let state_hash =
-                 let block_with_hash, _ = new_block in
-                 (With_hash.hash block_with_hash).state_hash
+                 Mina_block.Validated.state_hash new_block_validated
                in
                match Transition_frontier.find tf state_hash with
                | None ->
@@ -150,12 +142,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                             Transition_frontier.Breadcrumb.staged_ledger
                               breadcrumb
                           in
-                          let block_with_hash =
-                            Mina_block.Validated.forget new_block
-                          in
                           Mina_block.Precomputed.of_block ~logger
                             ~constraint_constants ~staged_ledger ~scheduled_time
-                            block_with_hash
+                            new_block
                         in
                         [%log debug] "Precomputed block generated in $time ms"
                           ~metadata:
@@ -164,7 +153,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                                   Time.(
                                     Span.to_ms
                                       (diff (now ())
-                                         (Block_time.to_time scheduled_time) ))
+                                         (Block_time.to_time_exn scheduled_time) ))
                               )
                             ] ;
                         Mina_block.Precomputed.to_yojson precomputed_block )

@@ -23,6 +23,7 @@
    sgn
    syncable_ledger
    snark_params
+   parties_builder
    pickles
    pickles.backend
    mina_base.import
@@ -47,4 +48,5 @@
    quickcheck_lib
    snarky.backendless
    unsigned_extended
+   ppx_version.runtime
 ))

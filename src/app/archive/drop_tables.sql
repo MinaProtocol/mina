@@ -30,7 +30,7 @@ DROP TABLE user_commands;
 
 DROP TYPE user_command_type;
 
-DROP TYPE user_command_status;
+DROP TYPE transaction_status;
 
 DROP TABLE zkapp_commands;
 
@@ -44,7 +44,7 @@ DROP TYPE call_type_type;
 
 DROP TABLE zkapp_updates;
 
-DROP TABLE zkapp_protocol_state_precondition;
+DROP TABLE zkapp_network_precondition;
 
 DROP TABLE zkapp_account_precondition;
 

@@ -337,27 +337,6 @@ end
 
 let check = Fn.id
 
-[%%if not feature_zkapps]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  match t.zkapp with
-  | None ->
-      t
-  | Some _ ->
-      failwith "Snapp accounts not supported"
-
-[%%endif]
-
-[%%if not feature_tokens]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  if Token_id.equal Token_id.default t.token_id then t
-  else failwith "Token accounts not supported"
-
-[%%endif]
-
 [%%versioned_binable
 module Stable = struct
   module V2 = struct
@@ -504,7 +483,7 @@ type var =
   , Timing.var
   , Permissions.Checked.t
   , Field.Var.t * Zkapp_account.t option As_prover.Ref.t
-  (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
+  (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
   , string Data_as_hash.t )
   Poly.t
 
@@ -685,6 +664,18 @@ module Checked = struct
     in
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
+
+  let has_permission ~to_ (account : var) =
+    match to_ with
+    | `Send ->
+        Permissions.Auth_required.Checked.eval_no_proof account.permissions.send
+          ~signature_verifies:Boolean.true_
+    | `Receive ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.receive ~signature_verifies:Boolean.false_
+    | `Set_delegate ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.set_delegate ~signature_verifies:Boolean.true_
 end
 
 [%%endif]
@@ -844,6 +835,18 @@ let has_locked_tokens ~global_slot (account : t) =
           ~vesting_period ~vesting_increment ~initial_minimum_balance
       in
       Balance.(curr_min_balance > zero)
+
+let has_permission ~to_ (account : t) =
+  match to_ with
+  | `Send ->
+      Permissions.Auth_required.check account.permissions.send
+        Control.Tag.Signature
+  | `Receive ->
+      Permissions.Auth_required.check account.permissions.receive
+        Control.Tag.None_given
+  | `Set_delegate ->
+      Permissions.Auth_required.check account.permissions.set_delegate
+        Control.Tag.Signature
 
 let gen =
   let open Quickcheck.Let_syntax in

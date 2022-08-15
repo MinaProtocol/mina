@@ -113,6 +113,8 @@ module Amount : sig
 
   val add_fee : t -> Fee.t -> t option
 
+  val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
+
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
@@ -123,6 +125,9 @@ module Amount : sig
          and type value := t
 
     val add_signed : var -> Signed.var -> var Checked.t
+
+    val add_signed_flagged :
+      var -> Signed.var -> (var * [ `Overflow of Boolean.var ]) Checked.t
 
     val of_fee : Fee.var -> var
 

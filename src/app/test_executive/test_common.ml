@@ -9,7 +9,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let send_zkapp ~logger node parties =
     [%log info] "Sending zkApp"
-      ~metadata:[ ("parties", Mina_base.Parties.to_yojson parties) ] ;
+      ~metadata:
+        [ ("parties", Mina_base.Parties.to_yojson parties)
+        ; ( "memo"
+          , `String (Mina_base.Signed_command_memo.to_string_hum parties.memo)
+          )
+        ] ;
     match%bind.Deferred Network.Node.send_zkapp ~logger node ~parties with
     | Ok _zkapp_id ->
         [%log info] "ZkApp transaction sent" ;
@@ -42,6 +47,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Malleable_error.hard_error_format
             "ZkApp transaction failed: %s, but expected \"%s\"" err_str
             substring )
+
+  let send_invalid_payment ~logger node ~sender_pub_key ~receiver_pub_key
+      ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature ~expected_failure :
+      unit Malleable_error.t =
+    [%log info] "Sending payment, expected to fail" ;
+    let expected_failure = String.lowercase expected_failure in
+    match%bind.Deferred
+      Network.Node.send_payment_with_raw_sig ~logger node ~sender_pub_key
+        ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
+    with
+    | Ok _ ->
+        [%log error] "Payment succeeded, expected error \"%s\"" expected_failure ;
+        Malleable_error.hard_error_format
+          "Payment transaction succeeded, expected error \"%s\""
+          expected_failure
+    | Error err ->
+        let err_str = Error.to_string_mach err |> String.lowercase in
+        if String.is_substring ~substring:expected_failure err_str then (
+          [%log info] "Payment failed as expected"
+            ~metadata:[ ("error", `String err_str) ] ;
+          Malleable_error.return () )
+        else (
+          [%log error]
+            "Error sending payment, for a reason other than the expected \"%s\""
+            expected_failure
+            ~metadata:[ ("error", `String err_str) ] ;
+          Malleable_error.hard_error_format
+            "Payment failed: %s, but expected \"%s\"" err_str expected_failure )
 
   let get_account_permissions ~logger node account_id =
     [%log info] "Getting permissions for account"

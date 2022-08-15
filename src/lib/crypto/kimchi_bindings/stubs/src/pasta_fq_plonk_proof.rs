@@ -10,14 +10,14 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
 use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof};
+use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
 use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use mina_curves::pasta::{
     fp::Fp,
     fq::Fq,
-    pallas::{Affine as GAffine, PallasParameters},
+    pallas::{Pallas as GAffine, PallasParameters},
 };
 use oracle::{
     constants::PlonkSpongeConstantsKimchi,
@@ -38,29 +38,26 @@ pub fn caml_pasta_fq_plonk_proof_create(
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
-    let prev: Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
-        if prev_challenges.is_empty() {
-            Vec::new()
-        } else {
-            let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
-            prev_sgs
-                .into_iter()
-                .map(Into::<GAffine>::into)
-                .enumerate()
-                .map(|(i, sg)| {
-                    (
-                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
-                            .iter()
-                            .map(Into::<Fq>::into)
-                            .collect(),
-                        PolyComm::<GAffine> {
-                            unshifted: vec![sg],
-                            shifted: None,
-                        },
-                    )
-                })
-                .collect()
-        }
+    let prev = if prev_challenges.is_empty() {
+        Vec::new()
+    } else {
+        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+        prev_sgs
+            .into_iter()
+            .map(Into::<GAffine>::into)
+            .enumerate()
+            .map(|(i, sg)| {
+                let chals = prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                    .iter()
+                    .map(Into::<Fq>::into)
+                    .collect();
+                let comm = PolyComm::<GAffine> {
+                    unshifted: vec![sg],
+                    shifted: None,
+                };
+                RecursionChallenge { chals, comm }
+            })
+            .collect()
     };
 
     let witness: Vec<Vec<_>> = witness.iter().map(|x| (*x.0).clone()).collect();
@@ -80,7 +77,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
         let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, index, prev)
+        >(&group_map, witness, &[], index, prev, None)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok(proof.into())
     })
@@ -135,11 +132,11 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         }
     }
 
-    let prev_challenges = vec![
-        (vec![Fq::one(), Fq::one()], comm()),
-        (vec![Fq::one(), Fq::one()], comm()),
-        (vec![Fq::one(), Fq::one()], comm()),
-    ];
+    let prev = RecursionChallenge {
+        chals: vec![Fq::one(), Fq::one()],
+        comm: comm(),
+    };
+    let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
 
     let g = GAffine::prime_subgroup_generator();
     let proof = OpeningProof {

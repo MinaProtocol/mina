@@ -12,7 +12,7 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'comm t = { transaction : 'comm; at_party : 'comm }
+      type 'comm t = { party : 'comm; calls : 'comm }
       [@@deriving hlist, sexp, yojson]
     end
   end]
@@ -33,6 +33,28 @@ module Stable = struct
 end]
 
 let to_field_elements : t -> _ = Poly.to_field_elements
+
+let of_tree (type party)
+    ({ party = _; party_digest; calls } :
+      ( party
+      , Parties.Digest.Party.t
+      , Parties.Digest.Forest.t )
+      Parties.Call_forest.Tree.t ) : t =
+  { Poly.party = (party_digest :> Parties.Transaction_commitment.t)
+  ; calls = (Parties.Call_forest.hash calls :> Parties.Transaction_commitment.t)
+  }
+
+let zkapp_statements_of_forest' (type data)
+    (forest : data Parties.Call_forest.With_hashes_and_data.t) :
+    (data * t) Parties.Call_forest.With_hashes_and_data.t =
+  Parties.Call_forest.mapi_with_trees forest ~f:(fun _i (party, data) tree ->
+      (party, (data, of_tree tree)) )
+
+let zkapp_statements_of_forest (type party)
+    (forest : (party, _, _) Parties.Call_forest.t) :
+    (party * t, _, _) Parties.Call_forest.t =
+  Parties.Call_forest.mapi_with_trees forest ~f:(fun _i party tree ->
+      (party, of_tree tree) )
 
 [%%ifdef consensus_mechanism]
 

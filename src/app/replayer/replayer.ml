@@ -637,7 +637,7 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
     in
     ({ body; authorization = Signature.dummy } : Party.Fee_payer.t)
   in
-  let%bind (other_parties : Party.Wire.t list) =
+  let%bind (other_parties : Party.Simple.t list) =
     Deferred.List.map (Array.to_list cmd.zkapp_other_parties_ids) ~f:(fun id ->
         let%bind { body_id; authorization_kind } =
           query_db ~f:(fun db -> Processor.Zkapp_other_party.load db id)
@@ -654,10 +654,10 @@ let parties_of_zkapp_command ~pool (cmd : Sql.Zkapp_command.t) :
           | None_given ->
               None_given
         in
-        ({ body; authorization } : Party.Wire.t) )
+        ({ body; authorization } : Party.Simple.t) )
   in
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
-  let parties = Parties.of_wire { fee_payer; other_parties; memo } in
+  let parties = Parties.of_simple { fee_payer; other_parties; memo } in
   return (parties : Parties.t)
 
 let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
@@ -1272,7 +1272,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   ~next_epoch_ledger
             | `Zkapp_command ->
                 let%bind () =
-                  run_checks_on_slot_change uc.global_slot_since_genesis
+                  run_checks_on_slot_change zkc.global_slot_since_genesis
                 in
                 let%bind () = run_zkapp_command ~logger ~pool ~ledger zkc in
                 apply_commands internal_cmds user_cmds zkcs

@@ -113,6 +113,6 @@ module type ROCKS = sig
   val create_snapshot : t -> Snapshot.t
   val release_snapshot : t -> Snapshot.t -> unit
 
-  val checkpoint_create :  t -> ?log_size_for_flush:int -> dir:string -> unit
+  val checkpoint_create :  t -> ?log_size_for_flush:int -> dir:string -> unit -> unit
   val property_value : t -> string -> string option
 end

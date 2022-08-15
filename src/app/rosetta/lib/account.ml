@@ -6,7 +6,7 @@ open Rosetta_lib
 (* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
 module MinaCurrency = Currency
 open Rosetta_models
-module Decoders = Graphql_lib.Decoders
+module Scalars = Graphql_lib.Scalars
 
 module Get_balance =
 [%graphql
@@ -14,10 +14,10 @@ module Get_balance =
     query get_balance($public_key: PublicKey!, $token_id: TokenId) {
       account(publicKey: $public_key, token: $token_id) {
         balance {
-          blockHeight @bsDecoder(fn: "Decoders.uint32")
+          blockHeight @ppxCustom(module: "Scalars.UInt32")
           stateHash
-          liquid @bsDecoder(fn: "Decoders.optional_uint64")
-          total @bsDecoder(fn: "Decoders.uint64")
+          liquid @ppxCustom(module: "Scalars.UInt64")
+          total @ppxCustom(module: "Scalars.UInt64")
         }
         nonce
       }
@@ -544,7 +544,7 @@ AS combo GROUP BY combo.pk_id
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
            * balance from the command *)
           Deferred.Result.return last_relevant_command_balance
-        | None, Some timing_info ->
+        | None, Some _ ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
           failwith "LOOKUP BALANCE, NONCE IN ACCOUNTS_ACCESSED; timing_info isn't just genesis ledger any longer"
           (* WAS:    Deferred.Result.return timing_info.initial_balance *)
@@ -580,7 +580,7 @@ module Balance = struct
       { gql=
           (fun ?token_id ~address () ->
             Graphql.query
-              (Get_balance.make ~public_key:(`String address)
+              Get_balance.(make @@ makeVariables ~public_key:(`String address)
                  ~token_id:
                    (match token_id with Some s -> `String s | None -> `Null)
                  ())

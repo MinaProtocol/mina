@@ -2,7 +2,8 @@
  (name mina_generators)
  (public_name mina_generators)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_let ppx_version))
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_let ppx_version ppx_custom_printf ppx_optcomp))
  (libraries
    ;; opam libraries
    yojson
@@ -12,6 +13,7 @@
    async
    async_unix
    base
+   sexplib0
    ;; local libraries
    sgn
    pickles_types
@@ -20,6 +22,7 @@
    kimchi_backend.pasta
    mina_numbers
    mina_compile_config
+   parties_builder
    signature_lib
    mina_ledger
    mina_base
