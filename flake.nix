@@ -70,7 +70,7 @@
               docker-archive:${self.packages.x86_64-linux.${package}} \
               docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
             '';
-            label = "Upload mina-docker to Google Artifact Registry";
+            label = "Upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             branches = [ "compatible" "develop" ];
