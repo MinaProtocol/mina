@@ -70,7 +70,7 @@
               docker-archive:${self.packages.x86_64-linux.${package}} \
               docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
             '';
-            label = "Upload mina-docker to Google Artifact Registry";
+            label = "Upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             branches = [ "compatible" "develop" ];
@@ -231,13 +231,18 @@
         defaultPackage = ocamlPackages.mina;
         packages.default = ocamlPackages.mina;
 
-        devShell = ocamlPackages.mina-dev;
+        devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          shellHook = ''
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+          '';
+        });
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
             pushd src/app/cli
             dune build @check
