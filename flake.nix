@@ -75,6 +75,16 @@
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             branches = [ "compatible" "develop" ];
           };
+          publishDocs = {
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
+              gsutil -m rsync -rd ${self.defaultPackage.x86_64-linux}/share/doc/html gs://mina-docs
+            '';
+            label = "Publish documentation to Google Storage";
+            depends_on = [ "defaultPackage_x86_64-linux" ];
+            branches = [ "develop" ];
+            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
+          };
         in {
           steps = flakeSteps {
             reproduceRepo = "mina";
@@ -85,6 +95,7 @@
           } self ++ [
             (pushToRegistry "mina-docker")
             (pushToRegistry "mina-daemon-docker")
+            publishDocs
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
