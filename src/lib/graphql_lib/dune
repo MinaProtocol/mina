@@ -1,6 +1,7 @@
 (library
  (name graphql_lib)
  (public_name graphql_lib)
+ (inline_tests)
  (libraries
    ;; opam libraries
    async_unix
@@ -16,6 +17,7 @@
    graphql
    async_kernel
    result
+   ppx_inline_test.config
   ;; local libraries
   (re_export mina_numbers_unix)
    mina_numbers
