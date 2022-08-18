@@ -269,7 +269,7 @@
         };
         packages.mina-daemon-docker = pkgs.dockerTools.buildImage {
           name = "mina-daemon";
-          contents = pkgs.buildEnv {
+          copyToRoot = pkgs.buildEnv {
             name = "mina-daemon-image-root";
             paths = [
               pkgs.dumb-init
