@@ -14,13 +14,6 @@ include Filtered_external_transition_unix.Graphql_scalars
 include Consensus.Graphql_scalars
 include Mina_transaction_unix.Graphql_scalars
 
-(* should we write the test for each module in a single PR?
-   or should we split into 10 seperate PRs *)
-
-(* serialize
-   parse
-   typ? *)
-
 let tester ?(equal = ( = )) input ~left ~right ~f =
   input
   |> List.map (fun (a, b) -> (left a, right b))
