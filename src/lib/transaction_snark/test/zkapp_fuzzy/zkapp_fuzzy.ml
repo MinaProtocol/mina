@@ -104,7 +104,7 @@ let generate_parties_and_apply_them_consecutively () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view ~account_state_tbl
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk () )
+             ~keymap ~ledger ~vk ~max_other_parties:10 () )
           ~f:(fun parties_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -145,7 +145,7 @@ let generate_parties_and_apply_them_freshly () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk () )
+             ~keymap ~ledger ~vk ~max_other_parties:10 () )
           ~f:(fun parties_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
