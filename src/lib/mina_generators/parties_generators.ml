@@ -671,7 +671,7 @@ end
    a nonce for the fee payer, and `Account_precondition.t` for other parties
 *)
 let gen_party_body_components (type a b c d) ?(update = None) ?account_id
-    ?token_id ?account_ids_seen ~account_state_tbl ?vk ?failure
+    ?token_id ?caller ?account_ids_seen ~account_state_tbl ?vk ?failure
     ?(new_account = false) ?(zkapp_account = false) ?(is_fee_payer = false)
     ?available_public_keys ?permissions_auth
     ?(required_balance_change : a option) ?protocol_state_view
@@ -793,7 +793,6 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   in
   let public_key = account.public_key in
   let token_id = account.token_id in
-  let token_account = not (Token_id.equal token_id Token_id.default) in
   let%bind balance_change =
     match required_balance_change with
     | Some bal_change ->
@@ -850,8 +849,11 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
             gen_protocol_state_precondition )
       ~default:(return Zkapp_precondition.Protocol_state.accept)
   and caller =
-    if token_account then return Party.Call_type.Call
-    else Party.Call_type.quickcheck_generator
+    match caller with
+    | None ->
+        Party.Call_type.quickcheck_generator
+    | Some caller ->
+        return caller
   in
   let token_id = f_token_id token_id in
   (* update account state table with all the changes*)
@@ -994,7 +996,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   }
 
 let gen_party_from ?(update = None) ?failure ?(new_account = false)
-    ?(zkapp_account = false) ?account_id ?token_id ?permissions_auth
+    ?(zkapp_account = false) ?account_id ?token_id ?caller ?permissions_auth
     ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
     ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
@@ -1015,7 +1017,7 @@ let gen_party_from ?(update = None) ?failure ?(new_account = false)
   let%bind body_components =
     gen_party_body_components ~update ?failure ~new_account ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
-      ?permissions_auth ?account_id ?token_id ?protocol_state_view ?vk
+      ?permissions_auth ?account_id ?token_id ?caller ?protocol_state_view ?vk
       ~zkapp_account_ids ~account_ids_seen ~available_public_keys
       ?required_balance_change ~account_state_tbl
       ~gen_balance_change:(gen_balance_change ?permissions_auth ~new_account)
@@ -1273,8 +1275,8 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
               gen_party_from ~zkapp_account_ids ~account_ids_seen
                 ~update:(Some Party.Update.dummy) ~authorization
                 ~permissions_auth:Control.Tag.Signature ~available_public_keys
-                ~account_state_tbl ~required_balance_change ?protocol_state_view
-                ?vk ()
+                ~caller:Party.Call_type.Call ~account_state_tbl
+                ~required_balance_change ?protocol_state_view ?vk ()
           | _ ->
               gen_party_from ~zkapp_account_ids ~account_ids_seen ~update
                 ?failure ~authorization ~new_account ~permissions_auth
@@ -1359,9 +1361,10 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
               in
               gen_party_from ~update:(Some Party.Update.dummy) ?failure
                 ~zkapp_account_ids ~account_ids_seen ~new_account:true ~token_id
-                ~authorization ~permissions_auth ~zkapp_account
-                ~available_public_keys ~account_state_tbl ?protocol_state_view
-                ?vk ()
+                ~caller:Party.Call_type.Call
+                ~authorization:(Control.Signature Signature.dummy)
+                ~permissions_auth ~zkapp_account ~available_public_keys
+                ~account_state_tbl ?protocol_state_view ?vk ()
           | _ ->
               (* if we use this account again, it will have a Signature authorization *)
               gen_party_from ~update ?failure ~zkapp_account_ids
@@ -1432,7 +1435,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
           }
         , role ) ) ;
   (* modify the account balance && nonce precondition of the balancing account to reflect the change*)
-  let other_parties =
+  let _other_parties =
     balancing_party
     :: List.map other_parties0 ~f:(fun party ->
            if
@@ -1481,7 +1484,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     gen_parties_with_dynamic_balance ~kind_of_parties:`New_token
       num_new_token_parties
   in
-  let other_parties = other_parties @ new_token_parties in
+  let other_parties = new_token_parties in
   let%map memo = Signed_command_memo.gen in
   let parties_dummy_authorizations : Parties.t =
     Parties.of_simple { fee_payer; other_parties; memo }
