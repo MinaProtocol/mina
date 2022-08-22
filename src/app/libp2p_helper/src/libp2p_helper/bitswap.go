@@ -197,6 +197,9 @@ func (bs *BitswapCtx) DeleteBlocks(keys [][32]byte) error {
 func (bs *BitswapCtx) ViewBlock(key [32]byte, callback func([]byte) error) error {
 	return bs.storage.ViewBlock(bs.ctx, key, callback)
 }
+func (bs *BitswapCtx) StoreBlock(block blocks.Block) error {
+	return bs.storage.StoreBlocks(bs.ctx, []blocks.Block{block})
+}
 
 type BitswapBlockRequester struct {
 	fetcher exchange.Fetcher

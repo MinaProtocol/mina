@@ -702,6 +702,10 @@ func (bs *testBitswapState) ViewBlock(key [32]byte, callback func([]byte) error)
 	}
 	return callback(b)
 }
+func (bs *testBitswapState) StoreBlock(block blocks.Block) error {
+	bs.blocks[block.Cid()] = block.RawData()
+	return nil
+}
 
 func (bg1 *blockGroup) add(bg blockGroup) {
 	if bg1.maxBlockSize != bg.maxBlockSize {
