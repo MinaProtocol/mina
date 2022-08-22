@@ -1245,7 +1245,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
               let%map tag =
                 if new_account then
                   Quickcheck.Generator.of_list
-                    Control.Tag.[ Signature; None_given ]
+                    [ Control.Tag.Signature; None_given ]
                 else Control.Tag.gen
               in
               (tag, None)
