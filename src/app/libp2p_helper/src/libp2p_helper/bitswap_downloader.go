@@ -78,6 +78,7 @@ type BitswapState interface {
 	DeleteStatus(key [32]byte) error
 	DeleteBlocks(keys [][32]byte) error
 	ViewBlock(key [32]byte, callback func([]byte) error) error
+	StoreBlock(block blocks.Block) error
 	NodeDownloadParams() map[cid.Cid]map[root][]NodeIndex
 	RootDownloadStates() map[root]*RootDownloadState
 	MaxBlockSize() int
@@ -250,6 +251,10 @@ func processDownloadedBlockStep(params map[root][]NodeIndex, block blocks.Block,
 func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 	bs.CheckInvariants()
 	id := block.Cid()
+	err := bs.StoreBlock(block)
+	if err != nil {
+		bitswapLogger.Errorf("Failed to store block %s", id)
+	}
 	nodeDownloadParams := bs.NodeDownloadParams()
 	rootDownloadStates := bs.RootDownloadStates()
 	depthIndices := bs.DepthIndices()
