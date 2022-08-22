@@ -60,6 +60,12 @@ type Structured_log_events.t += Added_breadcrumb_user_commands
 type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
   [@@deriving register_event { msg = "Applying diffs: $diffs" }]
 
+type Structured_log_events.t += Persisted_frontier_loaded
+  [@@deriving register_event]
+
+type Structured_log_events.t += Persisted_frontier_failed_to_load
+  [@@deriving register_event]
+
 let genesis_root_data ~precomputed_values =
   let transition =
     Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
@@ -189,6 +195,7 @@ let rec load_with_max_length :
         ~logger
     with
     | Error _ as err ->
+        [%str_log warn] Persisted_frontier_failed_to_load ;
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
@@ -202,8 +209,10 @@ let rec load_with_max_length :
             ~persistent_frontier_instance ignore_consensus_local_state
         with
         | Ok _ as result ->
+            [%str_log trace] Persisted_frontier_loaded ;
             return result
         | Error _ as err ->
+            [%str_log warn] Persisted_frontier_failed_to_load ;
             let%map () =
               Persistent_frontier.Instance.destroy persistent_frontier_instance
             in
@@ -268,6 +277,7 @@ let rec load_with_max_length :
   | Error (`Corrupt err) ->
       [%log error] "Persistent frontier database is corrupt: %s"
         (Persistent_frontier.Database.Error.message err) ;
+      [%str_log warn] Persisted_frontier_failed_to_load ;
       if retry_with_fresh_db then (
         (* should retry be on by default? this could be unnecessarily destructive *)
         [%log info] "destroying old persistent frontier database " ;
