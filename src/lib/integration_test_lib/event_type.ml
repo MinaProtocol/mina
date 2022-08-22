@@ -244,6 +244,12 @@ module Breadcrumb_added = struct
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
 
+module Persisted_frontier = struct
+  module Loaded = struct
+    let name = "persistence_loaded"
+  end
+end
+
 module Gossip = struct
   open Or_error.Let_syntax
 
