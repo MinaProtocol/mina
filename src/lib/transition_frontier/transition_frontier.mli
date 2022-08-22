@@ -18,6 +18,16 @@ module Catchup_tree = Catchup_tree
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 include Frontier_intf.S
 
 type Structured_log_events.t += Added_breadcrumb_user_commands
@@ -37,12 +47,11 @@ val global_max_length : Genesis_constants.t -> int
 
 val load :
      ?retry_with_fresh_db:bool
-  -> logger:Logger.t
+  -> context:(module CONTEXT)
   -> verifier:Verifier.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> precomputed_values:Precomputed_values.t
   -> catchup_mode:[ `Normal | `Super ]
   -> unit
   -> ( t
@@ -91,14 +100,13 @@ module For_tests : sig
   val equal : t -> t -> bool
 
   val load_with_max_length :
-       max_length:int
+       context:(module CONTEXT)
+    -> max_length:int
     -> ?retry_with_fresh_db:bool
-    -> logger:Logger.t
     -> verifier:Verifier.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> precomputed_values:Precomputed_values.t
     -> catchup_mode:[ `Normal | `Super ]
     -> unit
     -> ( t

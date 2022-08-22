@@ -9,6 +9,8 @@
    core_kernel
    async_kernel
    ;; local libraries
+   genesis_constants
+   consensus
    with_hash
    precomputed_values
    proof_carrying_data

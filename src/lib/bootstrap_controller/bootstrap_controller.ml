@@ -9,6 +9,16 @@ open Mina_state
 open Pipe_lib.Strict_pipe
 open Network_peer
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 type Structured_log_events.t += Bootstrap_complete
   [@@deriving register_event { msg = "Bootstrap state: complete." }]
 
@@ -54,13 +64,22 @@ let time_deferred deferred =
   (Time.diff end_time start_time, result)
 
 let worth_getting_root t candidate =
+  let module Context = struct
+    let logger =
+      Logger.extend t.logger
+        [ ( "selection_context"
+          , `String "Bootstrap_controller.worth_getting_root" )
+        ]
+
+    let precomputed_values = t.precomputed_values
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let constraint_constants = precomputed_values.constraint_constants
+  end in
   Consensus.Hooks.equal_select_status `Take
-  @@ Consensus.Hooks.select ~constants:t.consensus_constants
-       ~logger:
-         (Logger.extend t.logger
-            [ ( "selection_context"
-              , `String "Bootstrap_controller.worth_getting_root" )
-            ] )
+  @@ Consensus.Hooks.select
+       ~context:(module Context)
        ~existing:
          ( t.best_seen_transition |> Mina_block.Validation.block_with_hash
          |> With_hash.map ~f:Mina_block.consensus_state )
@@ -126,6 +145,15 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
 
 let on_transition t ~sender ~root_sync_ledger ~genesis_constants
     candidate_transition =
+  let module Context = struct
+    let logger = t.logger
+
+    let precomputed_values = t.precomputed_values
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let constraint_constants = precomputed_values.constraint_constants
+  end in
   let candidate_consensus_state =
     With_hash.map ~f:Mina_block.consensus_state candidate_transition
   in
@@ -145,9 +173,9 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
         Deferred.return `Ignored
     | Ok peer_root_with_proof -> (
         match%bind
-          Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
-            ~consensus_constants:t.consensus_constants ~genesis_constants
-            ~precomputed_values:t.precomputed_values candidate_consensus_state
+          Sync_handler.Root.verify
+            ~context:(module Context)
+            ~verifier:t.verifier ~genesis_constants candidate_consensus_state
             peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
@@ -195,7 +223,7 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
              transition )
       else Deferred.unit )
 
-let external_transition_compare consensus_constants =
+let external_transition_compare ~context:(module Context : CONTEXT) =
   Comparable.lift
     (fun existing candidate ->
       (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
@@ -206,8 +234,7 @@ let external_transition_compare consensus_constants =
       then 0
       else if
         Consensus.Hooks.equal_select_status `Keep
-        @@ Consensus.Hooks.select ~constants:consensus_constants ~existing
-             ~candidate ~logger:(Logger.null ())
+        @@ Consensus.Hooks.select ~context:(module Context) ~existing ~candidate
       then -1
       else 1 )
     ~f:(With_hash.map ~f:Mina_block.consensus_state)
@@ -215,10 +242,11 @@ let external_transition_compare consensus_constants =
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
-let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
-    ~transition_reader ~best_seen_transition ~persistent_root
-    ~persistent_frontier ~initial_root_transition ~precomputed_values
-    ~catchup_mode =
+let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+    ~consensus_local_state ~transition_reader ~best_seen_transition
+    ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
+    =
+  let open Context in
   O1trace.thread "bootstrap" (fun () ->
       let genesis_constants =
         Precomputed_values.genesis_constants precomputed_values
@@ -514,7 +542,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     [%log info] "Synchronizing consensus local state" ;
                     let%map result =
                       Consensus.Hooks.sync_local_state
-                        ~local_state:consensus_local_state ~logger ~trust_system
+                        ~context:(module Context)
+                        ~local_state:consensus_local_state ~trust_system
                         ~random_peers:(fun n ->
                           (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
                           let%map peers =
@@ -528,8 +557,6 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                                   query_peer t.network peer.peer_id
                                     (Rpcs.Consensus_rpc rpc) query) )
                           }
-                        ~ledger_depth:
-                          precomputed_values.constraint_constants.ledger_depth
                         sync_jobs
                     in
                     (true, result) )
@@ -576,9 +603,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                       ( "failed to initialize transition frontier after \
                          bootstrapping: " ^ msg )
                   in
-                  Transition_frontier.load ~retry_with_fresh_db:false ~logger
-                    ~verifier ~consensus_local_state ~persistent_root
-                    ~persistent_frontier ~precomputed_values ~catchup_mode ()
+                  Transition_frontier.load
+                    ~context:(module Context)
+                    ~retry_with_fresh_db:false ~verifier ~consensus_local_state
+                    ~persistent_root ~persistent_frontier ~catchup_mode ()
                   >>| function
                   | Ok frontier ->
                       frontier
@@ -617,12 +645,12 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                         |> Mina_block.Validation.block_with_hash
                       in
                       Consensus.Hooks.equal_select_status `Take
-                      @@ Consensus.Hooks.select ~constants:t.consensus_constants
+                      @@ Consensus.Hooks.select
+                           ~context:(module Context)
                            ~existing:root_consensus_state
                            ~candidate:
                              (With_hash.map ~f:Mina_block.consensus_state
-                                transition )
-                           ~logger )
+                                transition ) )
                 in
                 [%log debug] "Sorting filtered transitions by consensus state"
                   ~metadata:[] ;
@@ -633,7 +661,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                          ~f:
                            (Fn.compose Mina_block.Validation.block_with_hash
                               Envelope.Incoming.data )
-                         (external_transition_compare t.consensus_constants) )
+                         (external_transition_compare ~context:(module Context)) )
                 in
                 let this_cycle =
                   { cycle_result = "success"
@@ -675,6 +703,17 @@ let%test_module "Bootstrap_controller tests" =
     let proof_level = precomputed_values.proof_level
 
     let constraint_constants = precomputed_values.constraint_constants
+
+    module Context = struct
+      let logger = Logger.create ()
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.for_unit_tests
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -791,9 +830,7 @@ let%test_module "Bootstrap_controller tests" =
               type t = Mina_block.t State_hash.With_state_hashes.t
               [@@deriving sexp]
 
-              let compare =
-                external_transition_compare
-                  (Precomputed_values.consensus_constants precomputed_values)
+              let compare = external_transition_compare ~context:(module Context)
             end
 
             include Comparable.Make (T)
@@ -820,11 +857,13 @@ let%test_module "Bootstrap_controller tests" =
       in
       [%log info] "bootstrap begin" ;
       Block_time.Timeout.await_exn time_controller ~timeout_duration
-        (run ~logger ~trust_system ~verifier ~network:my_net.network
+        (run
+           ~context:(module Context)
+           ~trust_system ~verifier ~network:my_net.network
            ~best_seen_transition:None
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Normal ~initial_root_transition ~precomputed_values )
+           ~catchup_mode:`Normal ~initial_root_transition )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :

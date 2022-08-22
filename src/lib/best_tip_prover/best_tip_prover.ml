@@ -4,6 +4,16 @@ open Mina_state
 open Async_kernel
 open Mina_block
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 end
@@ -43,7 +53,8 @@ module Make (Inputs : Inputs_intf) :
         .state_hash
   end)
 
-  let prove ~logger frontier =
+  let prove ~context:(module Context : CONTEXT) frontier =
+    let open Context in
     let open Option.Let_syntax in
     let genesis_constants = Transition_frontier.genesis_constants frontier in
     let root = Transition_frontier.root frontier in
