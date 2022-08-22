@@ -504,20 +504,25 @@ struct
           ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
-        Sequence.fold
-          ( removed_commands |> List.rev |> Sequence.of_list
-          |> Sequence.map ~f:(fun unchecked ->
-                 unchecked.data
-                 |> Transaction_hash.User_command_with_valid_signature.create )
-          )
-          ~init:(t.pool, Sequence.empty)
-          ~f:(fun (pool, dropped_so_far) cmd ->
+        List.fold (List.rev removed_commands) ~init:(t.pool, Sequence.empty)
+          ~f:(fun (pool, dropped_so_far) unhashed_cmd ->
+            let cmd =
+              Transaction_hash.User_command_with_valid_signature.create
+                unhashed_cmd.data
+            in
             ( match
                 Hashtbl.find_and_remove t.locally_generated_committed cmd
               with
             | None ->
                 ()
             | Some time_added ->
+                [%log' info t.logger]
+                  "Locally generated command $cmd committed in a block!"
+                  ~metadata:
+                    [ ( "cmd"
+                      , With_status.to_yojson User_command.Valid.to_yojson
+                          unhashed_cmd )
+                    ] ;
                 Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
                   ~data:time_added ) ;
             let pool', dropped_seq =
@@ -601,7 +606,8 @@ struct
                     "did not expect Indexed_pool.revalidate to call \
                      get_account on account not in accounts_to_check"
         in
-        Indexed_pool.revalidate pool' (`Subset accounts_to_check) get_account
+        Indexed_pool.revalidate pool' ~logger:t.logger
+          (`Subset accounts_to_check) get_account
       in
       let committed_commands, dropped_commit_conflicts =
         let command_hashes =
@@ -694,7 +700,7 @@ struct
                     Indexed_pool.add_from_gossip_exn t.pool (`Checked cmd)
                       acct.nonce
                       ~verify:(fun _ -> assert false)
-                      ( Account.balance_at_slot ~global_slot acct
+                      ( Account.liquid_balance_at_slot ~global_slot acct
                       |> Currency.Balance.to_amount )
                   with
                   | Error e ->
@@ -801,7 +807,8 @@ struct
                    Indexed_pool.global_slot_since_genesis t.pool
                  in
                  let new_pool, dropped =
-                   Indexed_pool.revalidate t.pool `Entire_pool (fun sender ->
+                   Indexed_pool.revalidate t.pool ~logger:t.logger `Entire_pool
+                     (fun sender ->
                        match
                          Base_ledger.location_of_account validation_ledger
                            sender
@@ -817,7 +824,7 @@ struct
                                (Base_ledger.get validation_ledger loc)
                            in
                            ( acc.nonce
-                           , Account.balance_at_slot ~global_slot acc
+                           , Account.liquid_balance_at_slot ~global_slot acc
                              |> Currency.Balance.to_amount ) )
                  in
                  let dropped_locally_generated =
@@ -1265,8 +1272,8 @@ struct
                                           , c ) )
                                         account.nonce
                                         (Currency.Balance.to_amount
-                                           (Account.balance_at_slot ~global_slot
-                                              account ) )
+                                           (Account.liquid_balance_at_slot
+                                              ~global_slot account ) )
                                     with
                                     | Error e -> (
                                         match%bind
@@ -1691,7 +1698,6 @@ let%test_module _ =
           Mina_state.Genesis_protocol_state.t
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
-            ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
             ~constraint_constants ~consensus_constants
             ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         in

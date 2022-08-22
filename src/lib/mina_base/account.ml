@@ -848,7 +848,7 @@ let has_permission ~to_ (account : t) =
       Permissions.Auth_required.check account.permissions.set_delegate
         Control.Tag.Signature
 
-let balance_at_slot ~global_slot (account : t) =
+let liquid_balance_at_slot ~global_slot (account : t) =
   match account.timing with
   | Untimed ->
       account.balance

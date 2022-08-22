@@ -194,7 +194,6 @@ module For_tests = struct
             assert_all_by_hash tx ) ) ;
     Map.iteri all_by_sender
       ~f:(fun ~key:fee_payer ~data:(tx_seq, currency_reserved) ->
-        (*Printf.printf !"asserting invariants on %{Sexp}\n" (Account_id.sexp_of_t fee_payer) ;*)
         assert (F_sequence.length tx_seq > 0) ;
         let check_consistent tx =
           [%test_eq: Account_id.t]
@@ -726,10 +725,11 @@ let drop_until_sufficient_balance :
 *)
 let revalidate :
        t
+    -> logger:Logger.t
     -> [ `Entire_pool | `Subset of Account_id.Set.t ]
     -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
     -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
- fun ({ config = { constraint_constants; _ }; _ } as t) scope f ->
+ fun ({ config = { constraint_constants; _ }; _ } as t) ~logger scope f ->
   let requires_revalidation =
     match scope with
     | `Entire_pool ->
@@ -746,17 +746,16 @@ let revalidate :
       if not (requires_revalidation sender) then acc
       else
         let current_nonce, current_balance = f sender in
-        Printf.printf
-          "revalidating %s; current_nonce = %d, current_balance = %s\n"
-          (Sexp.to_string @@ Account_id.sexp_of_t sender)
-          (Account_nonce.to_int current_nonce)
-          (Currency.Amount.to_formatted_string current_balance) ;
-        Printf.printf "nonces in queue: [%s]\n"
-          ( F_sequence.to_list queue
-          |> List.map ~f:(fun cmd ->
-                 Transaction_hash.User_command_with_valid_signature.command cmd
-                 |> User_command.applicable_at_nonce |> Account_nonce.to_string )
-          |> String.concat ~sep:", " ) ;
+        [%log debug]
+          "Revalidating account $account in transaction pool ($current_nonce, \
+           $current_balance)"
+          ~metadata:
+            [ ( "account"
+              , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
+            ; ("account_nonce", `Int (Account_nonce.to_int current_nonce))
+            ; ( "account_balance"
+              , `String (Currency.Amount.to_formatted_string current_balance) )
+            ] ;
         let first_cmd = F_sequence.head_exn queue in
         let first_nonce =
           first_cmd
@@ -764,7 +763,9 @@ let revalidate :
           |> User_command.applicable_at_nonce
         in
         if Account_nonce.(current_nonce < first_nonce) then (
-          Printf.printf "current nonce precedes first nonce; dropping queue\n" ;
+          [%log debug]
+            "Current account nonce precedes first nonce in queue; dropping \
+             queue" ;
           let dropped, t'' = remove_with_dependents_exn' t first_cmd in
           (t'', Sequence.append dropped_acc dropped) )
         else
@@ -779,9 +780,10 @@ let revalidate :
                 Account_nonce.equal nonce current_nonce )
             |> Option.value ~default:(F_sequence.length queue)
           in
-          Printf.printf
-            "current nonce succeeds first nonce; splitting queue at index %d\n"
-            first_applicable_nonce_index ;
+          [%log debug]
+            "Current account nonce succeeds first nonce in queue; splitting \
+             queue at $index"
+            ~metadata:[ ("index", `Int first_applicable_nonce_index) ] ;
           let drop_queue, keep_queue =
             F_sequence.split_at queue first_applicable_nonce_index
           in
@@ -1855,7 +1857,6 @@ let%test_module _ =
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
             ~constraint_constants ~consensus_constants
-            ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         in
         compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
@@ -1928,7 +1929,7 @@ let%test_module _ =
         |> User_command.accounts_accessed |> Account_id.Set.of_list
       in
       let pool, dropped =
-        revalidate pool (`Subset accounts_to_check) (fun sender ->
+        revalidate pool ~logger (`Subset accounts_to_check) (fun sender ->
             match Mina_ledger.Ledger.location_of_account ledger sender with
             | None ->
                 (Account.Nonce.zero, Currency.Amount.zero)
@@ -1940,7 +1941,7 @@ let%test_module _ =
                     (Mina_ledger.Ledger.get ledger loc)
                 in
                 ( acc.nonce
-                , Account.balance_at_slot
+                , Account.liquid_balance_at_slot
                     ~global_slot:Mina_numbers.Global_slot.zero acc
                   |> Currency.Balance.to_amount ) )
       in

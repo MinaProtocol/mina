@@ -1107,18 +1107,6 @@ let accounts_accessed (t : t) =
 
 let fee_payer_pk (t : t) = t.fee_payer.body.public_key
 
-(*
-type account_mutations =
-  { nonce_increase : int
-  ; balance_delta : Currency.Amount.Signed.t }
-
-let account_mutations (t : t) : (Account_id.t * [`Nonce_increase | `Balance_increase | `Balance_decrease]) Account_id.Map.t =
-  let mutations =
-    let fee_payer_account_id = (t.fee_payer.body.public_key, fee_token t) in
-    Account_id.Map.of_alist_exn [(t.fee_payer.body.public_key, {nonce_increase = 1; balance_delta = Currency.Amount.Signed.zero})]
-  in
-*)
-
 let value_if b ~then_ ~else_ = if b then then_ else else_
 
 module Virtual = struct

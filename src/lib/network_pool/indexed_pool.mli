@@ -173,6 +173,7 @@ val find_by_hash :
 *)
 val revalidate :
      t
+  -> logger:Logger.t
   -> [ `Entire_pool | `Subset of Account_id.Set.t ]
   -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
