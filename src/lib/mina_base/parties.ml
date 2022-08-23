@@ -1057,10 +1057,11 @@ let fee (t : t) : Currency.Fee.t = t.fee_payer.body.fee
 
 let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
-let application_nonce (t : t) : Account.Nonce.t = (fee_payer_party t).body.nonce
+let applicable_at_nonce (t : t) : Account.Nonce.t =
+  (fee_payer_party t).body.nonce
 
-let target_nonce (t : t) : Account.Nonce.t =
-  let base_nonce = Account.Nonce.succ (application_nonce t) in
+let target_nonce_on_success (t : t) : Account.Nonce.t =
+  let base_nonce = Account.Nonce.succ (applicable_at_nonce t) in
   let fee_payer_pubkey = t.fee_payer.body.public_key in
   let fee_payer_party_increments =
     List.count (Call_forest.to_list t.other_parties) ~f:(fun p ->

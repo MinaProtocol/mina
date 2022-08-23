@@ -116,6 +116,8 @@ val get_inferred_nonce_from_transaction_pool_and_ledger :
 
 val active_or_bootstrapping : t -> unit Participating_state.t
 
+val get_node_state : t -> Node_error_service.node_state Deferred.t
+
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
 val best_ledger : t -> Mina_ledger.Ledger.t Participating_state.t

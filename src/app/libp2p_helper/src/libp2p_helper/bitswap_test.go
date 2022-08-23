@@ -15,7 +15,7 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	ipld "github.com/ipfs/go-ipld-format"
 	multihash "github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
@@ -184,12 +184,12 @@ func (at bitswapTestAttempt) awaitPublish(nodes []testNode) (resIds []BitswapBlo
 func confirmBlocksNotInStorage(bs *BitswapCtx, resource []byte) error {
 	blocks, _ := SplitDataToBitswapBlocksLengthPrefixedWithTag(bs.maxBlockSize, resource, BlockBodyTag)
 	for h := range blocks {
-		err := bs.storage.ViewBlock(h, func(actualB []byte) error {
+		err := bs.storage.ViewBlock(bs.ctx, h, func(actualB []byte) error {
 			return nil
 		})
 		if err == nil {
 			return fmt.Errorf("block %s wasn't deleted", codanet.BlockHashToCidSuffix(h))
-		} else if err != blockstore.ErrNotFound {
+		} else if err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(h)}) {
 			return err
 		}
 	}
@@ -203,7 +203,7 @@ func confirmBlocksInStorage(bs *BitswapCtx, resource []byte) error {
 		return fmt.Errorf("unexpected no root block")
 	}
 	for h, b := range blocks {
-		err := bs.storage.ViewBlock(h, func(actualB []byte) error {
+		err := bs.storage.ViewBlock(bs.ctx, h, func(actualB []byte) error {
 			if bytes.Equal(b, actualB) {
 				return nil
 			}
@@ -546,6 +546,10 @@ func TestBitswapMedium(t *testing.T) {
 }
 
 func TestBitswapSmoke(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping TestBitswapSmoke in short mode")
+		return
+	}
 	testBitswap(t, 50, 1, 1, 1<<16, true)
 }
 
