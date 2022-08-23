@@ -88,6 +88,11 @@ let
             installPhase = "touch $out";
           } // extraArgs);
     in {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ];
+      });
+
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
