@@ -2871,36 +2871,23 @@ module Ledger = struct
   let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
     add_account_exn l##.value pk (Js.to_string balance)
 
-  let dummy_state_view : Mina_base.Zkapp_precondition.Protocol_state.View.t =
-    let epoch_data =
-      { Mina_base.Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger =
-          { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
-          ; total_currency = Currency.Amount.zero
-          }
-      ; seed = Field.Constant.zero
-      ; start_checkpoint = Field.Constant.zero
-      ; lock_checkpoint = Field.Constant.zero
-      ; epoch_length = Mina_numbers.Length.zero
-      }
+  let protocol_state_of_json =
+    let deriver =
+      Mina_base.Zkapp_precondition.Protocol_state.View.deriver
+      @@ Fields_derivers_zkapps.o ()
     in
-    { snarked_ledger_hash = Field.Constant.zero
-    ; timestamp = Block_time.zero
-    ; blockchain_length = Mina_numbers.Length.zero
-    ; min_window_density = Mina_numbers.Length.zero
-    ; last_vrf_output = ()
-    ; total_currency = Currency.Amount.zero
-    ; global_slot_since_hard_fork = Mina_numbers.Global_slot.zero
-    ; global_slot_since_genesis = Mina_numbers.Global_slot.zero
-    ; staking_epoch_data = epoch_data
-    ; next_epoch_data = epoch_data
-    }
+    let of_json = Fields_derivers_zkapps.of_json deriver in
+    fun (json : Js.js_string Js.t) :
+        Mina_base.Zkapp_precondition.Protocol_state.View.t ->
+      json |> Js.to_string |> Yojson.Safe.from_string |> of_json
 
   let apply_parties_transaction l (txn : Parties.t)
-      (account_creation_fee : string) =
+      (account_creation_fee : string)
+      (network_state : Mina_base.Zkapp_precondition.Protocol_state.View.t) =
     check_party_signatures txn ;
     let ledger = l##.value in
     let applied_exn =
-      T.apply_parties_unchecked ~state_view:dummy_state_view
+      T.apply_parties_unchecked ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee
@@ -2926,11 +2913,15 @@ module Ledger = struct
     Js.array @@ Array.of_list account_list
 
   let apply_json_transaction l (tx_json : Js.js_string Js.t)
-      (account_creation_fee : Js.js_string Js.t) =
+      (account_creation_fee : Js.js_string Js.t)
+      (network_json : Js.js_string Js.t) =
     let txn =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    apply_parties_transaction l txn (Js.to_string account_creation_fee)
+    let network_state = protocol_state_of_json network_json in
+    apply_parties_transaction l txn
+      (Js.to_string account_creation_fee)
+      network_state
 
   let create_token_account pk token =
     account_id pk token |> Mina_base.Account_id.public_key

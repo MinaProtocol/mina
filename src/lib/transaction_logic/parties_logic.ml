@@ -1305,11 +1305,11 @@ module Make (Inputs : Inputs_intf) = struct
       let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
       (* Shift along if last update wasn't this slot *)
       let is_this_slot = Global_slot.equal txn_global_slot last_sequence_slot in
-      let is_full_and_different_slot = Bool.((not is_empty) &&& is_this_slot) in
-      let s5 = Field.if_ is_full_and_different_slot ~then_:s5' ~else_:s4' in
-      let s4 = Field.if_ is_full_and_different_slot ~then_:s4' ~else_:s3' in
-      let s3 = Field.if_ is_full_and_different_slot ~then_:s3' ~else_:s2' in
-      let s2 = Field.if_ is_full_and_different_slot ~then_:s2' ~else_:s1' in
+      let is_empty_or_this_slot = Bool.(is_empty ||| is_this_slot) in
+      let s5 = Field.if_ is_empty_or_this_slot ~then_:s5' ~else_:s4' in
+      let s4 = Field.if_ is_empty_or_this_slot ~then_:s4' ~else_:s3' in
+      let s3 = Field.if_ is_empty_or_this_slot ~then_:s3' ~else_:s2' in
+      let s2 = Field.if_ is_empty_or_this_slot ~then_:s2' ~else_:s1' in
       let last_sequence_slot =
         Global_slot.if_ is_empty ~then_:last_sequence_slot
           ~else_:txn_global_slot
