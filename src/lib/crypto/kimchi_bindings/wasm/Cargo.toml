@@ -37,20 +37,16 @@ o1-utils = { path = "../../proof-systems/utils" }
 oracle = { path = "../../proof-systems/oracle" }
 kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
 
-rand = { version = "0.8.0" }
+array-init = "2.0.0"
+base64 = "0.13.0"
 getrandom = { version = "0.2", features = ["js"] }
-#num-bigint = { version = "0.2.3" }
-#sprs = { version = "0.7.1" }
-
-#rand = { version = "0.8.0", features = [ "wasm-bindgen" ] }
 num-bigint = { version = "0.4.0" }
 paste = "1.0.5"
-sprs = { version = "0.11.0" }
+rand = { version = "0.8.0" }
 rayon = { version = "1" }
-array-init = "2.0.0"
-
-serde = "1.0.130"
 rmp-serde = "1.0.0"
+sprs = { version = "0.11.0" }
+serde = "1.0.130"
 serde_json = "1.0"
 
 [dev-dependencies]

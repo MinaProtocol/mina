@@ -92,6 +92,7 @@
    data_hash_lib
    transition_handler
    ppx_version.runtime
+   node_error_service
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))
