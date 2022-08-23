@@ -28,7 +28,6 @@
     pipe_lib
     transition_frontier
     logger
-    mina_lib
     node_addrs_and_ports
     mina_version
     participating_state
