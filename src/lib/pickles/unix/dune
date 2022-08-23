@@ -1,11 +1,11 @@
 (library
- (name mina_base_unix)
- (public_name mina_base.unix)
+ (name pickles_unix)
+ (public_name pickles.unix)
  (libraries
    ;; opam libraries
    graphql-async
    yojson
-   result
+   ; result
    core_kernel
    base
    ;; local libraries
