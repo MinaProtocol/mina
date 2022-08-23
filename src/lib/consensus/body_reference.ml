@@ -51,3 +51,5 @@ let typ : (var, t) Typ.t =
          (Fn.compose Fold.bool_t_to_string Fold.of_list) )
 
 let to_hex = Blake2.to_hex
+
+let to_raw_string = Blake2.to_raw_string

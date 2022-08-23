@@ -8,7 +8,7 @@ module At_most_two = struct
 
     module V1 = struct
       type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-      [@@deriving compare, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
     end
   end]
 
@@ -16,7 +16,7 @@ module At_most_two = struct
     | Zero
     | One of 'a option
     | Two of ('a * 'a option) option
-  [@@deriving compare, sexp, yojson]
+  [@@deriving equal, compare, sexp, yojson]
 
   let increase t ws =
     match (t, ws) with
@@ -40,12 +40,13 @@ module At_most_one = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type 'a t = Zero | One of 'a option [@@deriving compare, sexp, yojson]
+      type 'a t = Zero | One of 'a option
+      [@@deriving equal, compare, sexp, yojson]
     end
   end]
 
   type 'a t = 'a Stable.Latest.t = Zero | One of 'a option
-  [@@deriving compare, sexp, yojson]
+  [@@deriving equal, compare, sexp, yojson]
 
   let increase t ws =
     match (t, ws) with
@@ -64,13 +65,13 @@ module Ft = struct
 
     module V1 = struct
       type t = Coinbase.Fee_transfer.Stable.V1.t
-      [@@deriving compare, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
+  type t = Stable.Latest.t [@@deriving equal, compare, sexp, yojson]
 end
 
 module Pre_diff_two = struct
@@ -85,7 +86,7 @@ module Pre_diff_two = struct
         ; coinbase : Ft.Stable.V1.t At_most_two.Stable.V1.t
         ; internal_command_statuses : Transaction_status.Stable.V2.t list
         }
-      [@@deriving compare, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
     end
   end]
 
@@ -95,7 +96,7 @@ module Pre_diff_two = struct
     ; coinbase : Ft.t At_most_two.t
     ; internal_command_statuses : Transaction_status.t list
     }
-  [@@deriving compare, sexp, yojson]
+  [@@deriving equal, compare, sexp, yojson]
 
   let map t ~f1 ~f2 =
     { completed_works = List.map t.completed_works ~f:f1
@@ -117,7 +118,7 @@ module Pre_diff_one = struct
         ; coinbase : Ft.Stable.V1.t At_most_one.Stable.V1.t
         ; internal_command_statuses : Transaction_status.Stable.V2.t list
         }
-      [@@deriving compare, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
     end
   end]
 
@@ -127,7 +128,7 @@ module Pre_diff_one = struct
     ; coinbase : Ft.t At_most_one.t
     ; internal_command_statuses : Transaction_status.t list
     }
-  [@@deriving compare, sexp, yojson]
+  [@@deriving equal, compare, sexp, yojson]
 
   let map t ~f1 ~f2 =
     { completed_works = List.map t.completed_works ~f:f1
@@ -147,13 +148,13 @@ module Pre_diff_with_at_most_two_coinbase = struct
         ( Transaction_snark_work.Stable.V2.t
         , User_command.Stable.V2.t With_status.Stable.V2.t )
         Pre_diff_two.Stable.V2.t
-      [@@deriving compare, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
+  type t = Stable.Latest.t [@@deriving equal, compare, sexp, yojson]
 end
 
 module Pre_diff_with_at_most_one_coinbase = struct
@@ -166,13 +167,13 @@ module Pre_diff_with_at_most_one_coinbase = struct
         ( Transaction_snark_work.Stable.V2.t
         , User_command.Stable.V2.t With_status.Stable.V2.t )
         Pre_diff_one.Stable.V2.t
-      [@@deriving compare, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
+  type t = Stable.Latest.t [@@deriving equal, compare, sexp, yojson]
 end
 
 module Diff = struct
@@ -184,13 +185,13 @@ module Diff = struct
       type t =
         Pre_diff_with_at_most_two_coinbase.Stable.V2.t
         * Pre_diff_with_at_most_one_coinbase.Stable.V2.t option
-      [@@deriving compare, sexp, yojson]
+      [@@deriving equal, compare, sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
+  type t = Stable.Latest.t [@@deriving equal, compare, sexp, yojson]
 end
 
 [%%versioned
@@ -198,14 +199,15 @@ module Stable = struct
   [@@@no_toplevel_latest_type]
 
   module V2 = struct
-    type t = { diff : Diff.Stable.V2.t } [@@deriving compare, sexp, yojson]
+    type t = { diff : Diff.Stable.V2.t }
+    [@@deriving equal, compare, sexp, yojson]
 
     let to_latest = Fn.id
   end
 end]
 
 type t = Stable.Latest.t = { diff : Diff.t }
-[@@deriving compare, sexp, yojson, fields]
+[@@deriving equal, compare, sexp, yojson, fields]
 
 module With_valid_signatures_and_proofs = struct
   type pre_diff_with_at_most_two_coinbase =

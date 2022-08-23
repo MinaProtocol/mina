@@ -264,7 +264,30 @@ let push_message_to_outgoing_message request =
     Builder.Libp2pHelperInterface.Message.(
       builder_op push_message_set_builder request)
 
-let create_push_message ~validation_id ~validation_result =
+let create_add_resource_push_message ~tag ~data =
+  build'
+    (module Builder.Libp2pHelperInterface.PushMessage)
+    Builder.Libp2pHelperInterface.PushMessage.(
+      builder_op header_set_builder (create_push_message_header ())
+      *> reader_op add_resource_set_reader
+           (build
+              (module Builder.Libp2pHelperInterface.AddResource)
+              Builder.Libp2pHelperInterface.AddResource.(
+                op tag_set_exn tag *> op data_set data) ))
+
+let create_validation_push_message ~validation_id ~validation_result =
+  build'
+    (module Builder.Libp2pHelperInterface.PushMessage)
+    Builder.Libp2pHelperInterface.PushMessage.(
+      builder_op header_set_builder (create_push_message_header ())
+      *> reader_op validation_set_reader
+           (build
+              (module Builder.Libp2pHelperInterface.Validation)
+              Builder.Libp2pHelperInterface.Validation.(
+                reader_op validation_id_set_reader validation_id
+                *> op result_set validation_result) ))
+
+let create_validation_push_message ~validation_id ~validation_result =
   build'
     (module Builder.Libp2pHelperInterface.PushMessage)
     Builder.Libp2pHelperInterface.PushMessage.(
