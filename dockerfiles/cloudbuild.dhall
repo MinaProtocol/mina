@@ -233,7 +233,7 @@ let services =
           , "dockerfiles/stages/2-opam-deps"
           , "dockerfiles/stages/3-toolchain"
           ]
-        , timeout = Some "10800s"
+        , timeout = Some "14400s"
         }
       , mina-rosetta = DockerfileDescription::{
         , service = "mina-rosetta"
@@ -243,6 +243,7 @@ let services =
           , "dockerfiles/stages/3-builder"
           , "dockerfiles/stages/4-production"
           ]
+        , timeout = Some "14400s"
         }
       , leaderboard = DockerfileDescription::{
         , service = "leaderboard"
