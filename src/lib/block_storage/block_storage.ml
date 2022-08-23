@@ -1,14 +1,13 @@
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 open Core_kernel
-open Lmdb
 
 type t =
   { (* statuses is a map from 32-byte key to a 1-byte value representing the status of a root bitswap block *)
-    statuses : (Consensus.Body_reference.t, int, [ `Uni ]) Map.t
-  ; blocks : (Blake2.t, Bigstring.t, [ `Uni ]) Map.t
+    statuses : (Consensus.Body_reference.t, int, [ `Uni ]) Lmdb.Map.t
+  ; blocks : (Blake2.t, Bigstring.t, [ `Uni ]) Lmdb.Map.t
   ; logger : Logger.t
-  ; env : Env.t
+  ; env : Lmdb.Env.t
   }
 
 module Root_block_status = struct
@@ -20,8 +19,8 @@ let body_tag = Staged_ledger_diff.Body.Tag.(to_enum Body)
 let full_status = Root_block_status.to_enum Full
 
 let uint8_conv =
-  Conv.make
-    ~flags:Conv.Flags.(integer_key + integer_dup + dup_fixed)
+  Lmdb.Conv.make
+    ~flags:Lmdb.Conv.Flags.(integer_key + integer_dup + dup_fixed)
     ~serialise:(fun alloc x ->
       let a = alloc 1 in
       Bigstring.set_uint8_exn a ~pos:0 x ;
@@ -30,29 +29,29 @@ let uint8_conv =
     ()
 
 let blake2_conv =
-  Conv.make
-    ~serialise:(fun alloc x ->
-      let str = Blake2.to_raw_string x in
-      Conv.serialise Conv.string alloc str )
-    ~deserialise:(fun s ->
-      Conv.deserialise Conv.string s |> Blake2.of_raw_string )
-    ()
+  Lmdb.Conv.(
+    make
+      ~serialise:(fun alloc x ->
+        let str = Blake2.to_raw_string x in
+        serialise string alloc str )
+      ~deserialise:(fun s -> deserialise string s |> Blake2.of_raw_string)
+      ())
 
 let open_ ~logger dir =
-  let env = Env.create ~max_maps:1 Ro dir in
+  let env = Lmdb.Env.create ~max_maps:1 Ro dir in
   (* Env. *)
   let blocks =
-    Map.open_existing ~key:blake2_conv ~value:Conv.bigstring Nodup env
+    Lmdb.Map.open_existing ~key:blake2_conv ~value:Lmdb.Conv.bigstring Nodup env
   in
   let statuses =
-    Map.open_existing ~key:blake2_conv ~value:uint8_conv ~name:"status" Nodup
-      env
+    Lmdb.Map.open_existing ~key:blake2_conv ~value:uint8_conv ~name:"status"
+      Nodup env
   in
   { blocks; statuses; logger; env }
 
 let get_status { statuses; logger; _ } body_ref =
   try
-    let raw_status = Map.get statuses body_ref in
+    let raw_status = Lmdb.Map.get statuses body_ref in
     match Root_block_status.of_enum raw_status with
     | None ->
         [%log error] "Unexpected status $status for $body_reference"
@@ -63,84 +62,73 @@ let get_status { statuses; logger; _ } body_ref =
         None
     | Some x ->
         Some x
-  with Not_found -> None
+  with Lmdb.Not_found -> None
 
-let read_block blocks logger txn key =
-  let%bind.Option raw =
-    try Map.get ~txn blocks key |> Some with Not_found -> None
+let read_body_impl blocks txn root_ref =
+  let find_block ref =
+    try Lmdb.Map.get ~txn blocks ref |> Some with Lmdb.Not_found -> None
   in
-  match Staged_ledger_diff.Bitswap_block.parse_block raw with
-  | Ok a ->
-      Some a
-  | Error e ->
-      [%log error] "Error parsing bitswap block $key: $error"
-        ~metadata:
-          [ ("key", Blake2.to_yojson key)
-          ; ("error", `String (Error.to_string_hum e))
-          ] ;
-      None
-
-let read_body_impl blocks logger txn body_ref =
-  let%bind.Option root_links, root_data =
-    read_block blocks logger txn body_ref
+  let%bind.Or_error raw_root_block =
+    Option.value_map
+      ~f:(fun x -> Ok x)
+      ~default:
+        (Or_error.error_string
+           (sprintf "root block %s not found" @@ Blake2.to_hex root_ref) )
+      (find_block root_ref)
   in
-  let%bind.Option () =
-    if Bigstring.length root_data < 5 then (
-      [%log error]
-        "Couldn't read root block for $body_reference: data section is too \
-         short"
-        ~metadata:
-          [ ("body_reference", Consensus.Body_reference.to_yojson body_ref) ] ;
-      None )
-    else Some ()
+  let%bind.Or_error root_links, root_data =
+    Staged_ledger_diff.Bitswap_block.parse_block ~hash:root_ref raw_root_block
+  in
+  let%bind.Or_error () =
+    if Bigstring.length root_data < 5 then
+      Or_error.error_string
+      @@ sprintf "Couldn't read root block for %s: data section is too short"
+      @@ Consensus.Body_reference.to_hex root_ref
+    else Ok ()
   in
   let len = Bigstring.get_uint32_le root_data ~pos:0 - 1 in
-  let%bind.Option () =
+  let%bind.Or_error () =
     let raw_tag = Bigstring.get_uint8 root_data ~pos:4 in
-    if body_tag = raw_tag then Some ()
-    else (
-      [%log error] "Unexpected tag $tag for $body_reference"
-        ~metadata:
-          [ ("body_reference", Consensus.Body_reference.to_yojson body_ref)
-          ; ("tag", `Int raw_tag)
-          ] ;
-      None )
+    if body_tag = raw_tag then Ok ()
+    else
+      Or_error.error_string
+      @@ sprintf "Unexpected tag %s for block %s" (Int.to_string raw_tag)
+           (Consensus.Body_reference.to_hex root_ref)
   in
   let buf = Bigstring.create len in
   let pos = ref (Bigstring.length root_data - 5) in
   Bigstring.blit ~src:root_data ~src_pos:5 ~dst:buf ~dst_pos:0 ~len:!pos ;
   let q = Queue.create () in
   Queue.enqueue_all q root_links ;
-  let exited_early = ref false in
-  while not (Queue.is_empty q) do
-    match read_block blocks logger txn (Queue.dequeue_exn q) with
-    | None ->
-        Queue.clear q ;
-        exited_early := true
-    | Some (links, data) ->
+  let%map.Or_error () =
+    Staged_ledger_diff.Bitswap_block.iter_links q
+      ~report_chunk:(fun data ->
         Bigstring.blit ~src:data ~src_pos:0 ~dst:buf ~dst_pos:!pos
           ~len:(Bigstring.length data) ;
-        pos := !pos + Bigstring.length data ;
-        Queue.enqueue_all q links
-  done ;
-  let%map.Option () = if !exited_early then None else Some () in
+        pos := !pos + Bigstring.length data )
+      ~find_block
+  in
   Staged_ledger_diff.Body.Stable.Latest.bin_read_t buf ~pos_ref:(ref 0)
 
 let read_body { statuses; logger; blocks; env } body_ref =
   let impl txn =
     try
-      if Map.get ~txn statuses body_ref = full_status then (
-        let res = read_body_impl blocks logger txn body_ref in
-        if Option.is_none res then
-          [%log error] "Couldn't read body for $body_reference with Full status"
-            ~metadata:
-              [ ("body_reference", Consensus.Body_reference.to_yojson body_ref)
-              ] ;
-        res )
+      if Lmdb.Map.get ~txn statuses body_ref = full_status then (
+        match read_body_impl blocks txn body_ref with
+        | Ok r ->
+            Some r
+        | Error e ->
+            [%log error]
+              "Couldn't read body for $body_reference with Full status: $error"
+              ~metadata:
+                [ ("body_reference", Consensus.Body_reference.to_yojson body_ref)
+                ; ("error", `String (Error.to_string_hum e))
+                ] ;
+            None )
       else None
-    with Not_found -> None
+    with Lmdb.Not_found -> None
   in
-  match Txn.go Ro env impl with
+  match Lmdb.Txn.go Ro env impl with
   | None ->
       [%log error]
         "LMDB transaction failed unexpectedly while reading block \
