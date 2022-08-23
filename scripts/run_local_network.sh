@@ -109,6 +109,7 @@ exec-daemon() {
   echo $MINA_EXE daemon \
     -client-port $client_port \
     -rest-port $rest_port \
+    -insecure-rest-server \
     -external-port $external_port \
     -metrics-port $daemon_metrics_port \
     -libp2p-metrics-port $libp2p_metrics_port \
@@ -120,6 +121,7 @@ exec-daemon() {
   exec $MINA_EXE daemon \
     -client-port $client_port \
     -rest-port $rest_port \
+    -insecure-rest-server \
     -external-port $external_port \
     -metrics-port $daemon_metrics_port \
     -libp2p-metrics-port $libp2p_metrics_port \
