@@ -32,7 +32,9 @@ let create_ledger_and_transactions num_transactions :
       let public_key = Public_key.compress k.public_key in
       let account_id = Account_id.create public_key Token_id.default in
       Mina_ledger.Ledger.create_new_account_exn ledger account_id
-        (Account.create account_id (Currency.Balance.of_int 10_000)) ) ;
+        (Account.create account_id
+           (Currency.Balance.of_uint64
+              (Unsigned.UInt64.of_int64 Int64.max_value) ) ) ) ;
   let txn (from_kp : Signature_lib.Keypair.t) (to_kp : Signature_lib.Keypair.t)
       amount fee nonce =
     let to_pk = Public_key.compress to_kp.public_key in
