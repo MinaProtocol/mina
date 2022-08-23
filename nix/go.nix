@@ -2,7 +2,7 @@
 final: prev: {
   vend = final.callPackage ./vend { };
 
-  go-capnproto2 = pkgs.buildGo118Module rec {
+  go-capnproto2 = final.buildGo118Module rec {
     pname = "capnpc-go";
     version = "v3.0.0-alpha.5";
     vendorSha256 = "sha256-oZ6fUUpAsBS5hvl2+eqWsE3i0lwJzXeVaH2OiqWJQyY=";
