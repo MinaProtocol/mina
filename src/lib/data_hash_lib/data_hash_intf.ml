@@ -20,6 +20,8 @@ module type Basic = sig
 
   val to_decimal_string : t -> string
 
+  val of_decimal_string : string -> t
+
   val to_bytes : t -> string
 
   [%%ifdef consensus_mechanism]
