@@ -983,12 +983,17 @@ struct
           Deferred.return
             (Result.ok_if_true cond ~error:(Error.of_string error))
         in
+        let is_sender_local =
+          Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
+        in
         let%bind () =
           (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already *)
           let (`Already_mem already_mem) =
             Lru_cache.add t.recently_seen (Lru_cache.T.hash diff.data)
           in
-          ok_if_true (not already_mem) ~error:"Recently seen"
+          ok_if_true
+            (not (already_mem && not is_sender_local))
+            ~error:"Recently seen"
         in
         let%bind () =
           let cmds_with_insufficient_fees =
