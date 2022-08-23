@@ -1,8 +1,8 @@
 # An overlay defining Go parts&dependencies of Mina
 final: prev: {
-  vend = pkgs.callPackage ./vend { };
+  vend = final.callPackage ./vend { };
 
-  go-capnproto2 = pkgs.buildGo118Module rec {
+  go-capnproto2 = final.buildGo118Module rec {
     pname = "capnpc-go";
     version = "v3.0.0-alpha.5";
     vendorSha256 = "sha256-oZ6fUUpAsBS5hvl2+eqWsE3i0lwJzXeVaH2OiqWJQyY=";
@@ -16,13 +16,13 @@ final: prev: {
     };
   };
 
-  libp2p_ipc_go = pkgs.stdenv.mkDerivation {
+  libp2p_ipc_go = final.stdenv.mkDerivation {
     # todo: buildgomodule?
     name = "libp2p_ipc-go";
-    buildInputs = [ pkgs.capnproto pkgs.go-capnproto2 ];
+    buildInputs = [ final.capnproto final.go-capnproto2 ];
     src = ../src/libp2p_ipc;
     buildPhase = ''
-      capnp compile -ogo -I${pkgs.go-capnproto2.src}/std libp2p_ipc.capnp
+      capnp compile -ogo -I${final.go-capnproto2.src}/std libp2p_ipc.capnp
     '';
     installPhase = ''
       mkdir $out
@@ -31,7 +31,7 @@ final: prev: {
   };
 
   # Jobs/Test/Libp2pUnitTest
-  libp2p_helper = pkgs.buildGo118Module {
+  libp2p_helper = final.buildGo118Module {
     pname = "libp2p_helper";
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
@@ -45,19 +45,19 @@ final: prev: {
       == "27d929c6f62322fb01e84781456ce1fb986cc28d1b9fe7b338e4291f5e909baa" then
         "sha256-WT6SmmtSctJ0Roq4EYKAl7LSzsjsjjS0xqN1RATxpqs="
       else
-        pkgs.lib.warn
+        final.lib.warn
         "Please update the hashes in ${__curPos.file}#${toString __curPos.line}"
-        pkgs.lib.fakeHash;
+        final.lib.fakeHash;
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
       # Yo dawg
       # proxyVendor doesn't work (cannot find package "." in:)
-      # And runVend was removed from nixpkgs
+      # And runVend was removed from nixfinal
       # So we vendor the vend package in yo repo
       # So yo can vendor while u vendor
       postBuild = ''
         rm vendor -rf
-        ${pkgs.vend}/bin/vend
+        ${final.vend}/bin/vend
       '';
       # remove libp2p_ipc from go.mod, inject it back in postconfigure
       postConfigure = ''
@@ -66,7 +66,7 @@ final: prev: {
     };
     postConfigure = ''
       chmod +w vendor
-      cp -r --reflink=auto ${pkgs.libp2p_ipc_go}/ vendor/libp2p_ipc
+      cp -r --reflink=auto ${final.libp2p_ipc_go}/ vendor/libp2p_ipc
       sed -i 's/.*libp2p_ipc.*//' go.mod
     '';
   };
