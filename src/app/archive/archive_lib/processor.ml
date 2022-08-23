@@ -274,79 +274,177 @@ module Zkapp_state_data_array = struct
 end
 
 module Zkapp_states_nullable = struct
+  type t =
+    { element0 : int option
+    ; element1 : int option
+    ; element2 : int option
+    ; element3 : int option
+    ; element4 : int option
+    ; element5 : int option
+    ; element6 : int option
+    ; element7 : int option
+    }
+  [@@deriving fields, hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.
+        [ option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ]
+
   let table_name = "zkapp_states_nullable"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : (Pickles.Backend.Tick.Field.t option, 'n) Vector.vec) =
     let open Deferred.Result.Let_syntax in
-    let%bind (element_ids : int option array) =
+    let%bind (element_ids : int option list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
         ~f:
           ( Mina_caqti.add_if_some
           @@ Zkapp_state_data.add_if_doesn't_exist (module Conn) )
-      >>| Array.of_list
+    in
+    let t =
+      match element_ids with
+      | [ element0
+        ; element1
+        ; element2
+        ; element3
+        ; element4
+        ; element5
+        ; element6
+        ; element7
+        ] ->
+          { element0
+          ; element1
+          ; element2
+          ; element3
+          ; element4
+          ; element5
+          ; element6
+          ; element7
+          }
+      | _ ->
+          failwith "Invalid number of nullable app state elements"
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_nullable_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+      ~table_name ~cols:(Fields.names, typ)
       (module Conn)
-      element_ids
+      t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Mina_caqti.array_nullable_int_typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
 module Zkapp_states = struct
+  type t =
+    { element0 : int
+    ; element1 : int
+    ; element2 : int
+    ; element3 : int
+    ; element4 : int
+    ; element5 : int
+    ; element6 : int
+    ; element7 : int
+    }
+  [@@deriving fields, hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int; int; int; int; int; int ]
+
   let table_name = "zkapp_states"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : (Pickles.Backend.Tick.Field.t, 'n) Vector.vec) =
     let open Deferred.Result.Let_syntax in
-    let%bind (element_ids : int array) =
+    let%bind (element_ids : int list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
         ~f:(Zkapp_state_data.add_if_doesn't_exist (module Conn))
-      >>| Array.of_list
+    in
+    let t =
+      match element_ids with
+      | [ element0
+        ; element1
+        ; element2
+        ; element3
+        ; element4
+        ; element5
+        ; element6
+        ; element7
+        ] ->
+          { element0
+          ; element1
+          ; element2
+          ; element3
+          ; element4
+          ; element5
+          ; element6
+          ; element7
+          }
+      | _ ->
+          failwith "Invalid number of app state elements"
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+      ~table_name ~cols:(Fields.names, typ)
       (module Conn)
-      element_ids
+      t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
 module Zkapp_sequence_states = struct
+  type t =
+    { element0 : int
+    ; element1 : int
+    ; element2 : int
+    ; element3 : int
+    ; element4 : int
+    }
+  [@@deriving fields, hlist]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int; int; int ]
+
   let table_name = "zkapp_sequence_states"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : (Pickles.Backend.Tick.Field.t, 'n) Vector.vec) =
     let open Deferred.Result.Let_syntax in
-    let%bind (element_ids : int array) =
+    let%bind (element_ids : int list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps) ~f:(fun field ->
           Zkapp_state_data.add_if_doesn't_exist (module Conn) field )
-      >>| Array.of_list
+    in
+    let t =
+      match element_ids with
+      | [ element0; element1; element2; element3; element4 ] ->
+          { element0; element1; element2; element3; element4 }
+      | _ ->
+          failwith "Invalid number of sequence state elements"
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
-      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+      ~table_name ~cols:(Fields.names, typ)
       (module Conn)
-      element_ids
+      t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 

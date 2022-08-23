@@ -36,33 +36,41 @@ CREATE TABLE zkapp_state_data_array
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_state_data
 
-   We don't specify the width here, as that may change (and not enforced
-   by Postgresql, in any case)
-
-   Postgresql does not allow enforcing that the array elements are
-   foreign keys
-
    Any element of the array may be NULL, per the NULL convention
 */
 CREATE TABLE zkapp_states_nullable
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL
+, element0                 int              REFERENCES zkapp_state_data(id)
+, element1                 int		    REFERENCES zkapp_state_data(id)
+, element2                 int		    REFERENCES zkapp_state_data(id)
+, element3                 int		    REFERENCES zkapp_state_data(id)
+, element4                 int		    REFERENCES zkapp_state_data(id)
+, element5                 int		    REFERENCES zkapp_state_data(id)
+, element6                 int		    REFERENCES zkapp_state_data(id)
+, element7                 int		    REFERENCES zkapp_state_data(id)
 );
 
-/* like zkapp_states_nullable, but elements are not NULL (not enforced by Postgresql)
-*/
+/* like zkapp_states_nullable, but elements are not NULL */
 CREATE TABLE zkapp_states
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL
+, element0                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element1                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element2                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element3                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element4                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element5                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element6                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element7                 int              NOT NULL REFERENCES zkapp_state_data(id)
 );
 
-/* like zkapp_states, but for sequence states; width may differ from that table
-
-   Elements are not NULL (not enforced by Postgresql)
-*/
+/* like zkapp_states, but for sequence states */
 CREATE TABLE zkapp_sequence_states
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL
+, element0                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element1                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element2                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element3                 int              NOT NULL REFERENCES zkapp_state_data(id)
+, element4                 int              NOT NULL REFERENCES zkapp_state_data(id)
 );
 
 /* the element_ids are non-NULL, and refer to zkapp_state_data_array
