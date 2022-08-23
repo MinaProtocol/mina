@@ -265,7 +265,7 @@ struct
         in
         O.create dlog_vk
           ( Vector.map2
-              (Vector.extend_exn
+              (Vector.extend_front_exn
                  statement.messages_for_next_step_proof
                    .challenge_polynomial_commitments Local_max_proofs_verified.n
                  (Lazy.force Dummy.Ipa.Wrap.sg) )
@@ -352,13 +352,13 @@ struct
             }
         ; prev_proof_evals = t.prev_evals
         ; prev_challenge_polynomial_commitments =
-            Vector.extend_exn
+            Vector.extend_front_exn
               t.statement.messages_for_next_step_proof
                 .challenge_polynomial_commitments Local_max_proofs_verified.n
               (Lazy.force Dummy.Ipa.Wrap.sg)
             (* TODO: This computation is also redone elsewhere. *)
         ; prev_challenges =
-            Vector.extend_exn
+            Vector.extend_front_exn
               (Vector.map
                  t.statement.messages_for_next_step_proof
                    .old_bulletproof_challenges ~f:Ipa.Step.compute_challenges )
