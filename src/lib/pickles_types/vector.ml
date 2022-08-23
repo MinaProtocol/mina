@@ -421,6 +421,15 @@ let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
 let rec trim : type a n m. (a, m) t -> (n, m) Nat.Lte.t -> (a, n) t =
  fun v p -> match (v, p) with _, Z -> [] | x :: xs, S p -> x :: trim xs p
 
+let extend_front_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
+ fun v m dummy ->
+  let v = to_array v in
+  let n = Array.length v in
+  let m' = Nat.to_int m in
+  assert (n <= m') ;
+  let padding = m' - n in
+  init m ~f:(fun i -> if i < padding then dummy else v.(i - padding))
+
 let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
  fun v m default ->
   match (v, m) with
