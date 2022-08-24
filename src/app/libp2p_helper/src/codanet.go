@@ -738,15 +738,12 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	lanPatcher := patcher.NewPatcher()
 	wanPatcher := patcher.NewPatcher()
-	lanPatcher.MaxProtected = 20
-	wanPatcher.MaxProtected = 20
-	lanPatcher.ProtectionRate = .1
-	wanPatcher.ProtectionRate = .1
+	lanPatcher.MaxProtected = minConnections
+	wanPatcher.MaxProtected = minConnections
+	lanPatcher.ProtectionRate = .2
+	wanPatcher.ProtectionRate = .2
 
 	var kad *dual.DHT
-
-	// TODO is it fine to have 1 << 20?
-	// mplex.MaxMessageSize = 1 << 30
 
 	connManager, err := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
 	if err != nil {
