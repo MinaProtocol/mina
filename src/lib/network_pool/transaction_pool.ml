@@ -358,7 +358,7 @@ struct
     let member t x =
       Indexed_pool.member t.pool (Transaction_hash.User_command.of_checked x)
 
-    let transactions t = Indexed_pool.transactions t.pool
+    let transactions t = Indexed_pool.transactions ~logger:t.logger t.pool
 
     let all_from_account { pool; _ } = Indexed_pool.all_from_account pool
 

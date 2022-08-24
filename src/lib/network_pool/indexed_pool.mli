@@ -84,7 +84,9 @@ val size : t -> int
 val min_fee : t -> Currency.Fee_rate.t option
 
 val transactions :
-  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
+     logger:Logger.t
+  -> t
+  -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 (** Remove the command from the pool with the lowest fee per wu,
     along with any others from the same account with higher nonces. *)

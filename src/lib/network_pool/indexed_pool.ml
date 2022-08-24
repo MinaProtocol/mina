@@ -538,7 +538,7 @@ module Update = struct
 end
 
 (* Returns a sequence of commands in the pool in descending fee order *)
-let transactions t =
+let transactions ~logger t =
   let insert_applicable applicable_by_fee txn =
     let fee =
       User_command.fee_per_wu
@@ -574,16 +574,34 @@ let transactions t =
           let head_txn, sender_queue' =
             Option.value_exn (F_sequence.uncons sender_queue)
           in
-          assert (
+          if
             Transaction_hash.equal
               (Transaction_hash.User_command_with_valid_signature.hash txn)
-              (Transaction_hash.User_command_with_valid_signature.hash head_txn) ) ;
-          match F_sequence.uncons sender_queue' with
-          | Some (next_txn, _) ->
-              ( insert_applicable applicable_by_fee' next_txn
-              , Map.set all_by_sender ~key:sender ~data:sender_queue' )
-          | None ->
-              (applicable_by_fee', Map.remove all_by_sender sender)
+              (Transaction_hash.User_command_with_valid_signature.hash head_txn)
+          then
+            match F_sequence.uncons sender_queue' with
+            | Some (next_txn, _) ->
+                ( insert_applicable applicable_by_fee' next_txn
+                , Map.set all_by_sender ~key:sender ~data:sender_queue' )
+            | None ->
+                (applicable_by_fee', Map.remove all_by_sender sender)
+          else (
+            (* the sender's queue is malformed *)
+            [%log error]
+              "Transaction pool \"applicable_by_fee\" index contained \
+               malformed entry for $sender ($head_applicable_by_fee != \
+               $head_sender_queue); skipping transactions from $sender during \
+               iteration"
+              ~metadata:
+                [ ("sender", Account_id.to_yojson sender)
+                ; ( "head_applicable_by_fee"
+                  , Transaction_hash.User_command_with_valid_signature.to_yojson
+                      txn )
+                ; ( "head_sender_queue"
+                  , Transaction_hash.User_command_with_valid_signature.to_yojson
+                      head_txn )
+                ] ;
+            (applicable_by_fee', Map.remove all_by_sender sender) )
         in
         Some (txn, (applicable_by_fee'', all_by_sender')) )
 
