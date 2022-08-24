@@ -272,8 +272,8 @@ let gen_balance_change ?permissions_auth (account : Account.t) ~new_account =
   let%map (magnitude : Currency.Amount.t) =
     if new_account then
       Currency.Amount.gen_incl
-        (Currency.Amount.of_formatted_string "500.0")
-        (Currency.Amount.of_formatted_string "1000.0")
+        (Currency.Amount.of_formatted_string "50.0")
+        (Currency.Amount.of_formatted_string "100.0")
     else
       Currency.Amount.gen_incl Currency.Amount.zero
         (Currency.Balance.to_amount small_balance_change)
@@ -773,7 +773,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
                   | Control.Tag.Proof, `New_account ->
                       false
                   | _, `New_account ->
-                      true
+                      (* `required_balance_change` is only for balancing party. Newly created account
+                         should not be used in balancing party *)
+                      Option.is_none required_balance_change
                   | _, `Ordinary_participant ->
                       true )
               |> Account_id.Table.data
