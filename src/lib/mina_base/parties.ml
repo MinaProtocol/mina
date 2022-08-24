@@ -1429,6 +1429,30 @@ let dummy =
   ; memo = Signed_command_memo.empty
   }
 
+(* Parties transactions are filtered using this predicate
+   - in outgoing gossip
+   - when adding to the transaction pool
+   - in incoming blocks
+
+   Design note: a single predicate means we traverse the other parties only
+   once; the alternative would be to use separate predicates, so we could log
+   what bound is exceeded, at the expense of multiple traversals
+*)
+let valid_size t =
+  let max_other_parties = 6 in
+  let max_events = 12 in
+  let max_sequence_events = 12 in
+  let num_other_parties, num_events, num_sequence_events =
+    Call_forest.fold t.other_parties ~init:(0, 0, 0)
+      ~f:(fun (len, evs, seq_evs) party ->
+        let party_evs = List.length party.body.events in
+        let party_seq_evs = List.length party.body.sequence_events in
+        (len + 1, evs + party_evs, seq_evs + party_seq_evs) )
+  in
+  num_other_parties <= max_other_parties
+  && num_events <= max_events
+  && num_sequence_events <= max_sequence_events
+
 let inner_query =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"

@@ -462,14 +462,57 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 ~fn:(fun (env, vc) ->
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
-                      Sinks.Block_sink.push sink_block
-                        ( `Transition
-                            (Envelope.Incoming.map ~f:(const state) env)
-                        , `Time_received (Block_time.now config.time_controller)
-                        , `Valid_cb vc )
+                      let transactions =
+                        Mina_block.transactions state
+                          ~constraint_constants:
+                            Genesis_constants.Constraint_constants.compiled
+                      in
+                      let _valid_txns, too_big_txns =
+                        List.partition_tf transactions ~f:(fun txn ->
+                            Mina_transaction.Transaction.valid_size txn.data )
+                      in
+                      if not @@ List.is_empty too_big_txns then (
+                        [%log' warn config.logger]
+                          "Not accepting incoming block with %d too-big \
+                           transactions"
+                          (List.length too_big_txns) ;
+                        [%log' debug config.logger]
+                          "Rejected block with too-big transactions"
+                          ~metadata:[ ("block", Mina_block.to_yojson state) ] ;
+                        Deferred.unit )
+                      else
+                        Sinks.Block_sink.push sink_block
+                          ( `Transition
+                              (Envelope.Incoming.map ~f:(const state) env)
+                          , `Time_received
+                              (Block_time.now config.time_controller)
+                          , `Valid_cb vc )
                   | Message.Latest.T.Transaction_pool_diff diff ->
                       Sinks.Tx_sink.push sink_tx
-                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
+                        ( Envelope.Incoming.map
+                            ~f:(fun _ ->
+                              let valid_size_cmds, too_big_cmds =
+                                List.partition_tf diff
+                                  ~f:Mina_base.User_command.valid_size
+                              in
+                              if not @@ List.is_empty too_big_cmds then (
+                                [%log' warn config.logger]
+                                  "Not adding %d too-big user commands to \
+                                   transaction pool"
+                                  (List.length too_big_cmds) ;
+                                [%log' debug config.logger]
+                                  "Too-big user commands not added to \
+                                   transaction pool"
+                                  ~metadata:
+                                    [ ( "user_commands"
+                                      , `List
+                                          (List.map too_big_cmds
+                                             ~f:Mina_base.User_command.to_yojson )
+                                      )
+                                    ] ) ;
+                              valid_size_cmds )
+                            env
+                        , vc )
                   | Message.Latest.T.Snark_pool_diff diff ->
                       Sinks.Snark_sink.push sink_snark_work
                         (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc) )

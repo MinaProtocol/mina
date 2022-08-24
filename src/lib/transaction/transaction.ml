@@ -115,3 +115,10 @@ let fee_payer_pk (t : t) =
       Fee_transfer.fee_payer_pk ft
   | Coinbase cb ->
       Coinbase.fee_payer_pk cb
+
+let valid_size (t : t) =
+  match t with
+  | Command cmd ->
+      User_command.valid_size cmd
+  | Fee_transfer _ | Coinbase _ ->
+      true

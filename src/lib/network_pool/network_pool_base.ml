@@ -180,7 +180,7 @@ end)
         ~trace_label:Resource_pool.label ~logger resource_pool
     in
     log_rate_limiter_occasionally network_pool remote_rl ;
-    (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
+    (*priority: Transition frontier diffs > local diffs > incoming diffs*)
     Deferred.don't_wait_for
       (O1trace.thread Resource_pool.label (fun () ->
            Strict_pipe.Reader.Merge.iter

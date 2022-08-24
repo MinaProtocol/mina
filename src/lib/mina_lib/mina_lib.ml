@@ -71,8 +71,8 @@ type components =
 
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
-  | User_command_inputs of User_command_input.t list
-  | Snapp_command_inputs of Parties.t list
+  | Signed_command_inputs of User_command_input.t list
+  | Parties_command_inputs of Parties.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -944,22 +944,29 @@ let get_current_nonce t aid =
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
-  let cmd_inputs = User_command_inputs uc_inputs in
+  let cmd_inputs = Signed_command_inputs uc_inputs in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
     (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
-let add_full_transactions t user_command =
-  let result_ivar = Ivar.create () in
-  Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
-    (user_command, Ivar.fill result_ivar)
-  |> Deferred.don't_wait_for ;
-  Ivar.read result_ivar
+let add_full_transactions t user_commands =
+  let _, too_big_commands =
+    List.partition_tf user_commands ~f:User_command.valid_size
+  in
+  if not @@ List.is_empty too_big_commands then
+    Deferred.Result.fail
+      (Error.of_string "User commands contain at least one too-big command")
+  else
+    let result_ivar = Ivar.create () in
+    Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
+      (user_commands, Ivar.fill result_ivar)
+    |> Deferred.don't_wait_for ;
+    Ivar.read result_ivar
 
-let add_snapp_transactions t (snapp_txns : Parties.t list) =
+let add_zkapp_transactions t (partiess : Parties.t list) =
   let result_ivar = Ivar.create () in
-  let cmd_inputs = Snapp_command_inputs snapp_txns in
+  let cmd_inputs = Parties_command_inputs partiess in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
     (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
@@ -1802,14 +1809,14 @@ let create ?wallets (config : Config.t) =
           Strict_pipe.Reader.iter user_command_input_reader
             ~f:(fun (inputs, result_cb, get_current_nonce, get_account) ->
               match inputs with
-              | User_command_inputs uc_inputs -> (
+              | Signed_command_inputs uc_inputs -> (
                   match%bind
                     User_command_input.to_user_commands ~get_current_nonce
                       ~get_account ~constraint_constants ~logger:config.logger
                       uc_inputs
                   with
-                  | Ok user_commands ->
-                      if List.is_empty user_commands then (
+                  | Ok signed_commands ->
+                      if List.is_empty signed_commands then (
                         result_cb
                           (Error (Error.of_string "No user commands to send")) ;
                         Deferred.unit )
@@ -1817,7 +1824,7 @@ let create ?wallets (config : Config.t) =
                         (*callback for the result from transaction_pool.apply_diff*)
                         Network_pool.Transaction_pool.Local_sink.push
                           tx_local_sink
-                          ( List.map user_commands ~f:(fun c ->
+                          ( List.map signed_commands ~f:(fun c ->
                                 User_command.Signed_command c )
                           , result_cb )
                   | Error e ->
@@ -1826,13 +1833,30 @@ let create ?wallets (config : Config.t) =
                         ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
                       result_cb (Error e) ;
                       Deferred.unit )
-              | Snapp_command_inputs snapp_txns ->
+              | Parties_command_inputs partiess ->
                   (* TODO: here, submit a Parties.t, which includes a nonce
                      allow the nonce to be omitted, and infer it, as done
                      for user command inputs
                   *)
+                  let valid_size_partiess, too_big_partiess =
+                    List.partition_tf partiess ~f:Parties.valid_size
+                  in
+                  if not @@ List.is_empty too_big_partiess then (
+                    [%log' warn config.logger]
+                      "Not adding %d too-big local Parties transactions to \
+                       transaction pool"
+                      (List.length too_big_partiess) ;
+                    [%log' debug config.logger]
+                      "Too-big local Parties transactions not added to \
+                       transaction pool"
+                      ~metadata:
+                        [ ( "partiess"
+                          , `List
+                              (List.map too_big_partiess ~f:Parties.to_yojson)
+                          )
+                        ] ) ;
                   Network_pool.Transaction_pool.Local_sink.push tx_local_sink
-                    ( List.map snapp_txns ~f:(fun cmd ->
+                    ( List.map valid_size_partiess ~f:(fun cmd ->
                           User_command.Parties cmd )
                     , result_cb ) )
           |> Deferred.don't_wait_for ;
@@ -1875,16 +1899,34 @@ let create ?wallets (config : Config.t) =
               log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
-                ~f:(fun x ->
+                ~f:(fun cmds ->
+                  let valid_size_cmds, too_big_cmds =
+                    List.partition_tf cmds ~f:User_command.valid_size
+                  in
+                  if not @@ List.is_empty too_big_cmds then (
+                    [%log' warn config.logger]
+                      "Filtered %d too-big user commands from transaction pool \
+                       gossip"
+                      (List.length too_big_cmds) ;
+                    [%log' debug config.logger]
+                      "Filtered too-big user commands from transaction pool \
+                       gossip"
+                      ~metadata:
+                        [ ( "user_commands"
+                          , `List
+                              (List.map too_big_cmds ~f:User_command.to_yojson)
+                          )
+                        ] ) ;
                   let%bind () =
                     send_resource_pool_diff_or_wait ~rl
                       ~diff_score:
                         Network_pool.Transaction_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Transaction_pool.Resource_pool.Diff
-                        .max_per_15_seconds x
+                        .max_per_15_seconds valid_size_cmds
                   in
-                  Mina_networking.broadcast_transaction_pool_diff net x ) ) ;
+                  Mina_networking.broadcast_transaction_pool_diff net
+                    valid_size_cmds ) ) ;
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
@@ -1955,8 +1997,7 @@ let create ?wallets (config : Config.t) =
                       in
                       let metadata =
                         [ ("state_hash", State_hash.to_yojson hash)
-                        ; ( "external_transition"
-                          , Mina_block.Validated.to_yojson transition )
+                        ; ("block", Mina_block.Validated.to_yojson transition)
                         ; ("timing", timing_error_json)
                         ]
                       in
