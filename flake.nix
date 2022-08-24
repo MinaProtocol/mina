@@ -71,10 +71,20 @@
               docker-archive:${self.packages.x86_64-linux.${package}} \
               docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
             '';
-            label = "Upload mina-docker to Google Artifact Registry";
+            label = "Upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             branches = [ "compatible" "develop" ];
+          };
+          publishDocs = {
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
+              gsutil -m rsync -rd ${self.defaultPackage.x86_64-linux}/share/doc/html gs://mina-docs
+            '';
+            label = "Publish documentation to Google Storage";
+            depends_on = [ "defaultPackage_x86_64-linux" ];
+            branches = [ "develop" ];
+            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
           };
         in {
           steps = flakeSteps {
@@ -86,6 +96,7 @@
           } self ++ [
             (pushToRegistry "mina-docker")
             (pushToRegistry "mina-daemon-docker")
+            publishDocs
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
@@ -271,13 +282,20 @@
         defaultPackage = ocamlPackages.mina;
         packages.default = ocamlPackages.mina;
 
-        devShell = ocamlPackages.mina-dev;
+        devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+          '';
+        });
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
             pushd src/app/cli
             dune build @check

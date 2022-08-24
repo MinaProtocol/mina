@@ -5,9 +5,9 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"io/ioutil"
+	"os"
 	"testing"
 	"time"
-	"os"
 
 	ipc "libp2p_ipc"
 

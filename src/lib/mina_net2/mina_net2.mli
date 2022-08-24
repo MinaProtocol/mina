@@ -110,6 +110,16 @@ end
 module Validation_callback = Validation_callback
 module Sink = Sink
 
+module For_tests : sig
+  module Helper = Libp2p_helper
+
+  val generate_random_keypair : Helper.t -> Keypair.t Deferred.t
+
+  val multiaddr_to_libp2p_ipc : Multiaddr.t -> Libp2p_ipc.multiaddr
+
+  val empty_libp2p_ipc_gating_config : Libp2p_ipc.gating_config
+end
+
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *
   * The new [net] isn't connected to any network until [configure] is called.

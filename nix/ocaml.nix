@@ -88,6 +88,11 @@ let
             installPhase = "touch $out";
           } // extraArgs);
     in {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ];
+      });
+
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
@@ -123,6 +128,7 @@ let
         nativeBuildInputs = [
           self.dune
           self.ocamlfind
+          self.odoc
           lld_wrapped
           pkgs.capnproto
           pkgs.removeReferencesTo
@@ -161,13 +167,14 @@ let
             src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
             -j$NIX_BUILD_CORES
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
+          dune build @doc || true
         '';
 
         outputs =
           [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" ];
 
         installPhase = ''
-          mkdir -p $out/bin $sample/share/mina $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
+          mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
           mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
           mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
           mv _build/default/src/app/rosetta/rosetta.exe $out/bin/rosetta
@@ -179,6 +186,7 @@ let
           mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           #mv _build/default/src/lib/mina_base/sample_keypairs.json $sample/share/mina
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
+          mv _build/default/_doc/_html $out/share/doc/html
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
         shellHook =

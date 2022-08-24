@@ -55,6 +55,7 @@
    blake2
    mina_metrics
    mina_compile_config
+   node_error_service
    mina_user_error
    file_system
    mina_version

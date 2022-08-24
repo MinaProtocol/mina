@@ -107,6 +107,7 @@ val get_highest_fee :
 val handle_committed_txn :
      t
   -> Transaction_hash.User_command_with_valid_signature.t
+  -> application_status:Transaction_status.t option
   -> fee_payer_balance:Currency.Amount.t
   -> fee_payer_nonce:Mina_base.Account.Nonce.t
   -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
