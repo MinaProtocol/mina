@@ -272,8 +272,8 @@ let gen_balance_change ?permissions_auth (account : Account.t) ~new_account =
   let%map (magnitude : Currency.Amount.t) =
     if new_account then
       Currency.Amount.gen_incl
-        (Currency.Amount.of_formatted_string "20.0")
-        (Currency.Amount.of_formatted_string "100.0")
+        (Currency.Amount.of_formatted_string "2.0")
+        (Currency.Amount.of_formatted_string "10.0")
     else
       Currency.Amount.gen_incl Currency.Amount.zero
         (Currency.Balance.to_amount small_balance_change)
