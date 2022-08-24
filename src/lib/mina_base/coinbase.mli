@@ -1,5 +1,5 @@
-open Core
-open Import
+open Core_kernel
+open Mina_base_import
 module Fee_transfer = Coinbase_fee_transfer
 
 module Stable : sig
@@ -43,7 +43,7 @@ val create :
   -> fee_transfer:Fee_transfer.t option
   -> t Or_error.t
 
-val supply_increase : t -> Currency.Amount.t Or_error.t
+val expected_supply_increase : t -> Currency.Amount.t Or_error.t
 
 val fee_excess : t -> Fee_excess.t Or_error.t
 

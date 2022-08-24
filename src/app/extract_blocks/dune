@@ -7,6 +7,7 @@
    async_unix
    core
    base
+   base64
    integers
    caqti-async
    caqti-driver-postgresql
@@ -17,16 +18,26 @@
    uri
    async.async_command
    ;; local libraries
-   mina_wire_types
+   mina_base
+   mina_base.import
+   kimchi_backend.pasta
+   pasta_bindings
+   pickles
+   pickles_types
+   pickles.backend
    archive_lib
    data_hash_lib
    signature_lib
    logger
+   mina_caqti
    block_time
    mina_numbers
-   mina_base
+   mina_transaction
+   snark_params
    currency
    unsigned_extended
+   sgn
+   with_hash
    error_json
  )
  (preprocessor_deps ../../config.mlh)

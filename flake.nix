@@ -15,6 +15,7 @@
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
+  inputs.nix-npm-buildPackage.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.url = "github:tweag/opam-nix";
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
@@ -62,19 +63,28 @@
       pipeline = with flake-buildkite-pipeline.lib;
         let
           pushToRegistry = package: {
-            command = runInEnv self.devShells.x86_64-linux.operations
-              ''
-                skopeo \
-                copy \
-                --insecure-policy \
-                --dest-registry-token $(gcloud auth application-default print-access-token) \
-                docker-archive:${self.packages.x86_64-linux.${package}} \
-                docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
-              '';
-            label = "Upload mina-docker to Google Artifact Registry";
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              skopeo \
+              copy \
+              --insecure-policy \
+              --dest-registry-token $(gcloud auth application-default print-access-token) \
+              docker-archive:${self.packages.x86_64-linux.${package}} \
+              docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
+            '';
+            label = "Upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             branches = [ "compatible" "develop" ];
+          };
+          publishDocs = {
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
+              gsutil -m rsync -rd ${self.defaultPackage.x86_64-linux}/share/doc/html gs://mina-docs
+            '';
+            label = "Publish documentation to Google Storage";
+            depends_on = [ "defaultPackage_x86_64-linux" ];
+            branches = [ "develop" ];
+            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
           };
         in {
           steps = flakeSteps {
@@ -86,6 +96,7 @@
           } self ++ [
             (pushToRegistry "mina-docker")
             (pushToRegistry "mina-daemon-docker")
+            publishDocs
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
@@ -95,15 +106,15 @@
             (import nixpkgs-mozilla)
             (import ./nix/overlay.nix)
             (final: prev: {
-              ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-                inherit inputs pkgs;
-                static = final.stdenv.hostPlatform.isStatic;
-              });
+              ocamlPackages_mina = requireSubmodules
+                (import ./nix/ocaml.nix { inherit inputs pkgs; });
             })
           ]);
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
-        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage { };
+        nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage {
+          nodejs = pkgs.nodejs-16_x;
+        };
 
         submodules = map builtins.head (builtins.filter lib.isList
           (map (builtins.match "	path = (.*)")
@@ -121,7 +132,6 @@
         checks = import ./nix/checks.nix inputs pkgs;
 
         ocamlPackages = pkgs.ocamlPackages_mina;
-        ocamlPackages_static = pkgs.pkgsStatic.ocamlPackages_mina;
       in {
 
         # Jobs/Lint/Rust.dhall
@@ -183,7 +193,7 @@
             patchelf \
               --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
               --set-rpath "${pkgs.stdenv.cc.cc.lib}/lib" \
-              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux
+              ./node_modules/bs-platform/lib/*.linux ./node_modules/bs-platform/vendor/ninja/snapshot/*.linux ./node_modules/gentype/vendor-linux/gentype.exe
           '';
           yarnBuildMore = ''
             cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
@@ -195,7 +205,44 @@
           '';
         };
 
-        inherit ocamlPackages ocamlPackages_static;
+        # snarkyjs
+        packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
+          src = ./src/lib/snarky_js_bindings/snarkyjs;
+          preBuild = ''
+            BINDINGS_PATH=./dist/server/node_bindings
+            mkdir -p "$BINDINGS_PATH"
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/server/node_bindings
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/server/node_bindings
+            chmod -R 777 "$BINDINGS_PATH"
+
+            # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
+            # better error messages
+            # TODO: find a less hacky way to make adjustments to jsoo compiler output
+            # `s` is the jsoo representation of the error message string, and `s.c` is the actual JS string
+            sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+            sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+            sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
+          '';
+          npmBuild = "npm run build -- --bindings=./dist/server/node_bindings";
+          # TODO: add snarky-run
+          # TODO
+          # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
+        };
+
+        packages.mina-signer = nix-npm-buildPackage.buildNpmPackage {
+          src = ./frontend/mina-signer;
+          preBuild = ''
+            cp ${ocamlPackages.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
+            chmod 0666 src/client_sdk.bc.js
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm{.js,_bg.wasm} src
+            chmod 0666 src/plonk_wasm{.js,_bg.wasm}
+          '';
+          npmBuild = "npm run build";
+          doCheck = true;
+          checkPhase = "npm test";
+        };
+
+        inherit ocamlPackages;
         packages.mina = ocamlPackages.mina;
         packages.mina_tests = ocamlPackages.mina_tests;
         packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
@@ -223,12 +270,10 @@
             cmd = [ "/bin/dumb-init" "/entrypoint.sh" ];
           };
         };
-
-        packages.marlin_plonk_bindings_stubs = pkgs.marlin_plonk_bindings_stubs;
+        # packages.mina_static = ocamlPackages_static.mina;
+        packages.kimchi_bindings_stubs = pkgs.kimchi_bindings_stubs;
         packages.go-capnproto2 = pkgs.go-capnproto2;
         packages.libp2p_helper = pkgs.libp2p_helper;
-        packages.marlin_plonk_bindings_stubs_static =
-          pkgs.pkgsMusl.marlin_plonk_bindings_stubs;
         packages.mina_integration_tests = ocamlPackages.mina_integration_tests;
 
         legacyPackages.musl = pkgs.pkgsMusl;
@@ -237,13 +282,20 @@
         defaultPackage = ocamlPackages.mina;
         packages.default = ocamlPackages.mina;
 
-        devShell = ocamlPackages.mina-dev;
+        devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+          '';
+        });
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
             pushd src/app/cli
             dune build @check
@@ -255,6 +307,20 @@
           pkgs.mkShell { packages = with pkgs; [ skopeo google-cloud-sdk ]; };
 
         devShells.impure = import ./nix/impure-shell.nix pkgs;
+
+        # A shell from which it's possible to build Mina with Rust bits being built incrementally using cargo.
+        # This is "impure" from the nix' perspective since running `cargo build` requires networking in general.
+        # However, this is a useful balance between purity and convenience for Rust development.
+        devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina-rust-shell";
+          nativeBuildInputs = oa.nativeBuildInputs ++ [
+            pkgs.rustup
+            pkgs.libiconv # needed on macOS for one of the rust dep
+          ];
+          MARLIN_PLONK_STUBS = "n";
+          PLONK_WASM_WEB = "n";
+          PLONK_WASM_NODEJS = "n";
+        });
 
         inherit checks;
       });

@@ -24,7 +24,7 @@ open Result.Let_syntax
 (* TODO: implement versions with module versioning. For
  * now, this is just stubbed so we can add db migrations
  * later. (#3736) *)
-let version = 1
+let version = 2
 
 module Schema = struct
   module Keys = struct
@@ -34,6 +34,7 @@ module Schema = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = string * State_hash.Stable.V1.t
 
@@ -45,12 +46,12 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.Stable.V1.t -> External_transition.Raw.Stable.V1.t t
+    | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
-    | Root : Root_data.Minimal.Stable.V1.t t
+    | Root : Root_data.Minimal.Stable.V2.t t
     | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
-        : Mina_state.Protocol_state.Value.Stable.V1.t list t
+        : Mina_state.Protocol_state.Value.Stable.V2.t list t
 
   let to_string : type a. a t -> string = function
     | Db_version ->
@@ -70,7 +71,7 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Raw.Stable.Latest.t]
+        [%bin_type_class: Mina_block.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -87,23 +88,26 @@ module Schema = struct
       -> of_gadt:(a t -> data)
       -> a t Bin_prot.Type_class.t =
    fun (module M) ~to_gadt ~of_gadt ->
-    let ({shape; writer= {size; write}; reader= {read; vtag_read}}
-          : data Bin_prot.Type_class.t) =
+    let ({ shape; writer = { size; write }; reader = { read; vtag_read } }
+          : data Bin_prot.Type_class.t ) =
       [%bin_type_class: M.t]
     in
     { shape
-    ; writer=
-        { size= Fn.compose size of_gadt
-        ; write= (fun buffer ~pos gadt -> write buffer ~pos (of_gadt gadt)) }
-    ; reader=
-        { read= (fun buffer ~pos_ref -> to_gadt (read buffer ~pos_ref))
-        ; vtag_read=
+    ; writer =
+        { size = Fn.compose size of_gadt
+        ; write = (fun buffer ~pos gadt -> write buffer ~pos (of_gadt gadt))
+        }
+    ; reader =
+        { read = (fun buffer ~pos_ref -> to_gadt (read buffer ~pos_ref))
+        ; vtag_read =
             (fun buffer ~pos_ref number ->
-              to_gadt (vtag_read buffer ~pos_ref number) ) } }
+              to_gadt (vtag_read buffer ~pos_ref number) )
+        }
+    }
 
   (* HACK: The OCaml compiler thought the pattern matching in of_gadts was
-   non-exhaustive. However, it should not be since I constrained the
-   polymorphic type *)
+     non-exhaustive. However, it should not be since I constrained the
+     polymorphic type *)
   let[@warning "-8"] binable_key_type (type a) :
       a t -> a t Bin_prot.Type_class.t = function
     | Db_version ->
@@ -153,11 +157,11 @@ module Error = struct
     | `Arcs of State_hash.t
     | `Protocol_states_for_root_scan_state ]
 
-  type not_found = [`Not_found of not_found_member]
+  type not_found = [ `Not_found of not_found_member ]
 
-  type raised = [`Raised of Error.t]
+  type raised = [ `Raised of Error.t ]
 
-  type t = [not_found | raised | `Invalid_version]
+  type t = [ not_found | raised | `Invalid_version ]
 
   let not_found_message (`Not_found member) =
     let member_name, member_id =
@@ -203,12 +207,12 @@ end
 
 module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
 
-type t = {directory: string; logger: Logger.t; db: Rocks.t}
+type t = { directory : string; logger : Logger.t; db : Rocks.t }
 
 let create ~logger ~directory =
-  if not (Result.is_ok (Unix.access directory [`Exists])) then
+  if not (Result.is_ok (Unix.access directory [ `Exists ])) then
     Unix.mkdir ~perm:0o766 directory ;
-  {directory; logger; db= Rocks.create directory}
+  { directory; logger; db = Rocks.create directory }
 
 let close t = Rocks.close t.db
 
@@ -273,23 +277,20 @@ let check t ~genesis_state_hash =
             check_arcs succ_hash )
       in
       let%bind () = check_version () in
-      let%bind root_hash, root_transition = check_base () in
-      let root_block = External_transition.decompose root_transition in
+      let%bind root_hash, root_block = check_base () in
       let root_protocol_state =
-        root_block
-        |> Mina_block.header
-        |> Mina_block.Header.protocol_state
+        root_block |> Mina_block.header |> Mina_block.Header.protocol_state
       in
       let%bind () =
-        let persisted_genesis_state_hash = Mina_state.Protocol_state.genesis_state_hash root_protocol_state in
-        if State_hash.equal persisted_genesis_state_hash genesis_state_hash
-        then Ok ()
+        let persisted_genesis_state_hash =
+          Mina_state.Protocol_state.genesis_state_hash root_protocol_state
+        in
+        if State_hash.equal persisted_genesis_state_hash genesis_state_hash then
+          Ok ()
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
-      root_block
-      |> Mina_block.header
-      |> Header.protocol_state
+      root_block |> Mina_block.header |> Header.protocol_state
       |> Mina_state.Protocol_state.blockchain_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
@@ -298,25 +299,29 @@ let check t ~genesis_state_hash =
 let initialize t ~root_data =
   let open Root_data.Limited in
   let root_state_hash, root_transition =
-    let t = Mina_block.Validated.forget (External_transition.Validated.lower @@ Root_data.Limited.transition root_data) in
-    (State_hash.With_state_hashes.state_hash t, State_hash.With_state_hashes.data t)
+    let t = Mina_block.Validated.forget (transition root_data) in
+    ( State_hash.With_state_hashes.state_hash t
+    , State_hash.With_state_hashes.data t )
   in
   [%log' trace t.logger]
-    ~metadata:[("root_data", Root_data.Limited.to_yojson root_data)]
+    ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
-      Batch.set batch ~key:(Transition root_state_hash) ~data:(External_transition.compose root_transition) ;
+      Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:(protocol_states root_data |> List.map ~f:With_hash.data) )
 
-let add t ~transition:(transition, _validation) =
+let add t ~transition =
+  let transition = Mina_block.Validated.forget transition in
   let hash = State_hash.With_state_hashes.state_hash transition in
-  let raw_transition = External_transition.compose (With_hash.data transition) in
-  let parent_hash = With_hash.data transition |> Mina_block.header |> Header.protocol_state |> Mina_state.Protocol_state.previous_state_hash in
+  let parent_hash =
+    With_hash.data transition |> Mina_block.header |> Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
+  in
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition parent_hash))
@@ -326,7 +331,7 @@ let add t ~transition:(transition, _validation) =
     get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
   in
   Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:(Transition hash) ~data:raw_transition ;
+      Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
       Batch.set batch ~key:(Arcs hash) ~data:[] ;
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
@@ -361,21 +366,22 @@ let get_transition t hash =
     get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
   in
   let block =
-    let data = External_transition.decompose transition in
-    {With_hash.data; hash={State_hash.State_hashes.state_hash = hash; state_body_hash = None}}
+    { With_hash.data = transition
+    ; hash =
+        { State_hash.State_hashes.state_hash = hash; state_body_hash = None }
+    }
   in
   let parent_hash =
-    block
-    |> With_hash.data
-    |> Mina_block.header
+    block |> With_hash.data |> Mina_block.header
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
-  Mina_block.Validated.unsafe_of_trusted_block ~delta_block_chain_proof:(Non_empty_list.singleton parent_hash) (`This_block_is_trusted_to_be_safe block)
+  Mina_block.Validated.unsafe_of_trusted_block
+    ~delta_block_chain_proof:(Non_empty_list.singleton parent_hash)
+    (`This_block_is_trusted_to_be_safe block)
 
-let get_arcs t hash =
-  get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
+let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
 let get_root t = get t.db ~key:Root ~error:(`Not_found `Root)
 

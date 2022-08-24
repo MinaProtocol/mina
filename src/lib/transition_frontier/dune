@@ -24,6 +24,7 @@
    staged_ledger
    mina_state
    signature_lib
+   mina_ledger
    consensus
    genesis_constants
    mina_numbers

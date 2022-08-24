@@ -57,7 +57,11 @@
    graphql_lib
    node_status
    o1trace_webkit_event
+   generated_graphql_queries
+   mina_transaction
+   mina_generators
    mina_user_error
+   mina_ledger
    mina_block
    mina_lib
    mina_base
@@ -71,10 +75,12 @@
    node_error_service
    genesis_ledger_helper
    signature_lib
+   mina_base.import
    mina_numbers
    precomputed_values
    with_hash
    transaction_snark
+   transaction_snark_tests
    transaction_protocol_state
    test_util
    file_system
@@ -93,6 +99,17 @@
    group_map
    snark_work_lib
    mina_compile_config
+   mina_transaction_logic
+   verifier
+   parallel
+   random_oracle
+   kimchi_backend
+   kimchi_backend.pasta
+   pickles_types
+   pickles
+   pickles.backend
+   snark_params
+   parties_builder
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh

@@ -1,7 +1,7 @@
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
-module Serializing = Graphql_lib.Serializing
+module Scalars = Graphql_lib.Scalars
 module Encoders = Mina_graphql.Types.Input
 
 module Get_tracked_accounts =
@@ -9,10 +9,10 @@ module Get_tracked_accounts =
 {|
 query @encoders(module: "Encoders"){
   trackedAccounts {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
     locked
     balance {
-      total @ppxCustom(module: "Serializing.Balance")
+      total
     }
   }
 }
@@ -24,7 +24,7 @@ module Get_tracked_account =
 query ($public_key: PublicKey!, $token: TokenId) @encoders(module: "Encoders"){
   account(publicKey: $public_key, token: $token) {
     balance {
-      total @ppxCustom(module: "Serializing.Balance")
+      total
     }
   }
 }
@@ -35,7 +35,7 @@ module Get_all_accounts =
 {|
 query ($public_key: PublicKey!) @encoders(module: "Encoders"){
   accounts(publicKey: $public_key) {
-    token @ppxCustom(module: "Serializing.Token")
+    token
   }
 }
 |}]
@@ -45,7 +45,7 @@ module Create_account =
 {|
 mutation ($password: String!) @encoders(module: "Encoders"){
   createAccount(input: {password: $password}) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -55,7 +55,7 @@ module Create_hd_account =
 {|
 mutation ($hd_index: UInt32!) @encoders(module: "Encoders"){
   createHDAccount(input: {index: $hd_index}) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -65,7 +65,7 @@ module Unlock_account =
 {|
 mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
   unlockAccount(input: {password: $password, publicKey: $public_key }) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -75,7 +75,7 @@ module Lock_account =
 {|
 mutation ($public_key: PublicKey!) @encoders(module: "Encoders"){
   lockAccount(input: {publicKey: $public_key }) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -91,8 +91,8 @@ module Snark_pool =
 {|
 query snarkPool {
   snarkPool {
-  fee @ppxCustom(module: "Serializing.UInt64")
-  prover @ppxCustom(module: "Serializing.Public_key")
+  fee
+  prover
   work_ids: workIds
 }
 }
@@ -108,9 +108,9 @@ query pendingSnarkWork {
       target_ledger_hash: targetLedgerHash
       fee_excess: feeExcess {
         sign
-        fee_magnitude: feeMagnitude @ppxCustom(module: "Serializing.UInt64")
+        fee_magnitude: feeMagnitude
       }
-      supply_increase: supplyIncrease @ppxCustom(module: "Serializing.UInt64")
+      supply_increase: supplyIncrease
       work_id: workId
       }
     }
@@ -122,8 +122,8 @@ module Set_coinbase_receiver =
 {|
 mutation ($public_key: PublicKey) @encoders(module: "Encoders"){
   setCoinbaseReceiver(input : {publicKey: $public_key}) {
-    lastCoinbaseReceiver @ppxCustom(module: "Serializing.Public_key")
-    currentCoinbaseReceiver @ppxCustom(module: "Serializing.Public_key")
+    lastCoinbaseReceiver
+    currentCoinbaseReceiver
     }
   }
 |}]
@@ -133,7 +133,7 @@ module Set_snark_worker =
 {|
 mutation ($public_key: PublicKey) @encoders(module: "Encoders"){
   setSnarkWorker (input : {publicKey: $public_key}) {
-      lastSnarkWorker @ppxCustom(module: "Serializing.Public_key")
+      lastSnarkWorker
     }
   }
 |}]
@@ -143,7 +143,7 @@ module Set_snark_work_fee =
 {|
 mutation ($fee: UInt64!) @encoders(module: "Encoders"){
   setSnarkWorkFee(input: {fee: $fee}) {
-    lastFee @ppxCustom(module: "Serializing.UInt64")
+    lastFee
     }
 }
 |}]
@@ -177,61 +177,6 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
-module Send_create_token =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $receiver: PublicKey!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) @encoders(module: "Encoders"){
-  createToken(input:
-    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewToken {
-      id
-    }
-  }
-}
-|}]
-
-module Send_create_token_account =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $tokenOwner: PublicKey!,
-          $receiver: PublicKey!,
-          $token: TokenId!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) @encoders(module: "Encoders"){
-  createTokenAccount(input:
-    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewTokenAccount {
-      id
-    }
-  }
-}
-|}]
-
-module Send_mint_tokens =
-[%graphql
-{|
-mutation ($sender: PublicKey!,
-          $receiver: PublicKey,
-          $token: TokenId!,
-          $amount: UInt64!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) @encoders(module: "Encoders"){
-  mintTokens(input:
-    {tokenOwner: $sender, receiver: $receiver, token: $token, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
-    mintTokens {
-      id
-    }
-  }
-}
-|}]
-
 module Export_logs =
 [%graphql
 {|
@@ -241,14 +186,6 @@ mutation ($basename: String) @encoders(module: "Encoders"){
       tarfile
     }
   }
-}
-|}]
-
-module Get_token_owner =
-[%graphql
-{|
-query tokenOwner($token: TokenId!) @encoders(module: "Encoders"){
-  tokenOwner(token: $token)
 }
 |}]
 
@@ -270,22 +207,16 @@ query user_commands($public_key: PublicKey) @encoders(module: "Encoders"){
     id
     isDelegation
     nonce
-    from @ppxCustom(module: "Serializing.Public_key")
-    to_: to @ppxCustom(module: "Serializing.Public_key")
-    amount @ppxCustom(module: "Serializing.Amount")
-    fee @ppxCustom(module: "Serializing.Fee")
-    memo @ppxCustom(module: "Serializing.Memo")
+    from
+    to_: to
+    amount
+    fee
+    memo
   }
 }
 |}]
 
-module Next_available_token =
-[%graphql
-{|
-query next_available_token {
-  nextAvailableToken @ppxCustom(module: "Serializing.Token")
-}
-|}]
+module Pooled_zkapp_commands = Generated_graphql_queries.Pooled_zkapp_commands
 
 module Time_offset = [%graphql {|
 query time_offset {
@@ -354,7 +285,7 @@ module Import_account =
 {|
 mutation ($path: String!, $password: String!) @encoders(module: "Encoders"){
   importAccount (path: $path, password: $password) {
-    public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+    public_key: publicKey
     already_imported: alreadyImported
     success
   }

@@ -3,12 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
-open Crypto_params
-
-[%%endif]
+open Snark_params
 
 module Wire_types = Mina_wire_types.Mina_base.Signed_command_memo
 
@@ -27,8 +22,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Base58_check = Base58_check.Make (struct
         let description = "User command memo"
 
-        let version_byte = Base58_check.Version_bytes.user_command_memo
-      end)
+    let of_base58_check (s : string) : t Or_error.t = Base58_check.decode s
+
+    let of_base58_check_exn (s : string) : t = Base58_check.decode_exn s
 
       let to_base58_check (memo : t) : string = Base58_check.encode memo
 
@@ -49,7 +45,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
   [%%define_locally
   Stable.Latest.(to_yojson, of_yojson, to_base58_check, of_base58_check_exn)]
 
-  exception Too_long_user_memo_input
+[%%define_locally
+Stable.Latest.
+  (to_yojson, of_yojson, to_base58_check, of_base58_check, of_base58_check_exn)]
 
   exception Too_long_digestible_string
 
@@ -168,11 +166,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
     | Bytes str ->
         str
 
-  let of_raw_exn = function
-    | Digest base58_check ->
-        of_base58_check_exn base58_check
-    | Bytes str ->
-        create_from_string_exn str
+let of_raw_exn = function
+  | Digest base58_check ->
+      of_base58_check_exn base58_check
+  | Bytes str ->
+      of_base58_check_exn str
 
   let fold_bits t =
     { Fold_lib.Fold.fold =
@@ -262,12 +260,18 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let memo = create_from_string_exn s in
         is_valid memo && String.equal s (data memo)
 
-      let%test "memo from too-long string" =
-        let s = String.init (max_input_length + 1) ~f:(fun _ -> '\xFF') in
-        try
-          let (_ : t) = create_from_string_exn s in
-          false
-        with Too_long_user_memo_input -> true
+let gen =
+  Quickcheck.Generator.map String.quickcheck_generator
+    ~f:create_by_digesting_string_exn
+
+let hash memo =
+  Random_oracle.hash ~init:Hash_prefix.zkapp_memo
+    (Random_oracle.Legacy.pack_input
+       (Random_oracle_input.Legacy.bitstring (to_bits memo)) )
+
+let to_plaintext (memo : t) : string Or_error.t =
+  if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))
+  else Error (Error.of_string "Memo does not contain text bytes")
 
       [%%ifdef consensus_mechanism]
 
@@ -294,4 +298,75 @@ module Make_str (_ : Wire_types.Concrete) = struct
     end )
 end
 
-include Wire_types.Make (Make_sig) (Make_str)
+let length_in_bits = 8 * memo_length
+
+let typ : (Checked.t, t) Typ.t =
+  Typ.transport
+    (Typ.array ~length:length_in_bits Boolean.typ)
+    ~there:(fun (t : t) -> Blake2.string_to_bits (t :> string))
+    ~back:(fun bs -> (Blake2.bits_to_string bs :> t))
+
+[%%endif]
+
+let deriver obj =
+  Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~js_type:String
+    ~to_string:to_base58_check ~of_string:of_base58_check_exn
+
+let%test_module "user_command_memo" =
+  ( module struct
+    let data memo = String.sub memo ~pos:(length_index + 1) ~len:(length memo)
+
+    let%test "digest string" =
+      let s = "this is a string" in
+      let memo = create_by_digesting_string_exn s in
+      is_valid memo
+
+    let%test "digest too-long string" =
+      let s =
+        String.init (max_digestible_string_length + 1) ~f:(fun _ -> '\xFF')
+      in
+      try
+        let (_ : t) = create_by_digesting_string_exn s in
+        false
+      with Too_long_digestible_string -> true
+
+    let%test "memo from string" =
+      let s = "time and tide wait for no one" in
+      let memo = create_from_string_exn s in
+      is_valid memo && String.equal s (data memo)
+
+    let%test "memo from too-long string" =
+      let s = String.init (max_input_length + 1) ~f:(fun _ -> '\xFF') in
+      try
+        let (_ : t) = create_from_string_exn s in
+        false
+      with Too_long_user_memo_input -> true
+
+    [%%ifdef consensus_mechanism]
+
+    let%test_unit "typ is identity" =
+      let s = "this is a string" in
+      let memo = create_by_digesting_string_exn s in
+      let read_constant = function
+        | Snarky_backendless.Cvar.Constant x ->
+            x
+        | _ ->
+            assert false
+      in
+      let (Typ typ) = typ in
+      let memo_var =
+        memo |> typ.value_to_fields
+        |> (fun (arr, aux) ->
+             ( Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+             , aux ) )
+        |> typ.var_of_fields
+      in
+      let memo_read =
+        memo_var |> typ.var_to_fields
+        |> (fun (arr, aux) -> (Array.map arr ~f:(fun x -> read_constant x), aux))
+        |> typ.value_of_fields
+      in
+      [%test_eq: string] memo memo_read
+
+    [%%endif]
+  end )

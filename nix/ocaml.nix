@@ -1,29 +1,25 @@
-{ inputs, static ? false, ... }@args:
+{ inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
-  pkgs = if static then args.pkgs.pkgsMusl else args.pkgs;
+  inherit (args) pkgs;
 
   inherit (builtins) filterSource path;
 
-  inherit (pkgs.lib) hasPrefix;
+  inherit (pkgs.lib)
+    hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath
+    optionalString;
 
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam ../src/opam.export;
-  external-packages = pkgs.lib.getAttrs [
-    "sodium"
-    "capnp"
-    "rpc_parallel"
-    "async_kernel"
-    "base58"
-  ] (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
+  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
+    (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   difference = a: b:
-    pkgs.lib.filterAttrs (name: _: !builtins.elem name (builtins.attrNames b))
-    a;
+    filterAttrs (name: _: !builtins.elem name (builtins.attrNames b)) a;
 
   export-installed = opam-nix.opamListToQuery export.installed;
 
@@ -53,26 +49,10 @@ let
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
 
   sourceInfo = inputs.self.sourceInfo or { };
-  dds = x: x.overrideAttrs (o: { dontDisableStatic = true; });
 
   external-libs = with pkgs;
-    if static then
-      map dds [
-        (zlib.override { splitStaticOutput = false; })
-        (bzip2.override { linkStatic = true; })
-        (jemalloc)
-        (gmp.override { withStatic = true; })
-        (openssl.override { static = true; })
-        libffi
-      ]
-    else [
-      zlib
-      bzip2
-      jemalloc
-      gmp
-      openssl
-      libffi
-    ];
+    [ zlib bzip2 gmp openssl libffi ]
+    ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
   filtered-src = with inputs.nix-filter.lib;
     filter {
@@ -89,8 +69,7 @@ let
 
   overlay = self: super:
     let
-      ocaml-libs =
-        builtins.attrValues (pkgs.lib.getAttrs installedPackageNames self);
+      ocaml-libs = builtins.attrValues (getAttrs installedPackageNames self);
 
       # This is needed because
       # - lld package is not wrapped to pick up the correct linker flags
@@ -109,6 +88,11 @@ let
             installPhase = "touch $out";
           } // extraArgs);
     in {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ];
+      });
+
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
@@ -135,23 +119,39 @@ let
         MINA_COMMIT_SHA1 = "__commit_sha1___________________________";
         MINA_BRANCH = "<unknown>";
 
+        NIX_LDFLAGS =
+          optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
+          "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
+
         buildInputs = ocaml-libs ++ external-libs;
+
         nativeBuildInputs = [
           self.dune
           self.ocamlfind
+          self.odoc
           lld_wrapped
           pkgs.capnproto
           pkgs.removeReferencesTo
+          pkgs.fd
         ] ++ ocaml-libs;
 
         # todo: slimmed rocksdb
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
-        MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
+        # this is used to retrieve the path of the built static library
+        # and copy it from within a dune rule
+        # (see src/lib/crypto/kimchi_bindings/stubs/dune)
+        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+
+        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+
         configurePhase = ''
           export MINA_ROOT="$PWD"
-          patchShebangs .
+          export -f patchShebangs stopNest isScript
+          fd . --type executable -x bash -c "patchShebangs {}"
+          export -n patchShebangs stopNest isScript
         '';
 
         buildPhase = ''
@@ -164,16 +164,17 @@ let
             src/app/rosetta/rosetta_testnet_signatures.exe \
             src/app/rosetta/rosetta_mainnet_signatures.exe \
             src/app/generate_keypair/generate_keypair.exe \
-            src/lib/mina_base/sample_keypairs.json \
+            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
             -j$NIX_BUILD_CORES
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
+          dune build @doc || true
         '';
 
         outputs =
           [ "out" "generate_keypair" "mainnet" "testnet" "genesis" "sample" ];
 
         installPhase = ''
-          mkdir -p $out/bin $sample/share/mina $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
+          mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda
           mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
           mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
           mv _build/default/src/app/rosetta/rosetta.exe $out/bin/rosetta
@@ -183,22 +184,22 @@ let
           mv _build/default/src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
           mv _build/default/src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
           mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
-          mv _build/default/src/lib/mina_base/sample_keypairs.json $sample/share/mina
+          #mv _build/default/src/lib/mina_base/sample_keypairs.json $sample/share/mina
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
+          mv _build/default/_doc/_html $out/share/doc/html
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
-        shellHook = "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
-      } // pkgs.lib.optionalAttrs static { OCAMLPARAM = "_,ccopt=-static"; }
-        // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
-          OCAMLPARAM = "_,cclib=-lc++";
-        });
+        shellHook =
+          "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
+      } // optionalAttrs pkgs.stdenv.isDarwin {
+        OCAMLPARAM = "_,cclib=-lc++";
+      });
 
       mina = let
         commit_sha1 =
           inputs.self.sourceInfo.rev or "<unknown>                               ";
         commit_date =
           inputs.self.sourceInfo.lastModifiedDate or "<unknown>     ";
-        inherit (pkgs.lib) makeBinPath;
       in pkgs.runCommand "mina-release" {
         buildInputs = [ pkgs.makeWrapper ];
         outputs = self.mina-dev.outputs;
@@ -224,7 +225,9 @@ let
       } ''
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
-        psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
+        pushd src/app/archive
+        psql "$MINA_TEST_POSTGRES" < create_schema.sql
+        popd
         # TODO: investigate failing tests, ideally we should run all tests in src/
         dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
@@ -240,11 +243,14 @@ let
 
         outputs = [ "out" ];
 
-        checkInputs = [ pkgs.nodejs ];
+        checkInputs = [ pkgs.nodejs-16_x ];
 
         buildPhase = ''
-          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$opam__zarith__lib/zarith"
-          dune build --display=short src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
+          dune build --display=short \
+            src/lib/crypto/kimchi_bindings/js/node_js \
+            src/app/client_sdk/client_sdk.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_node.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
         '';
 
         doCheck = true;
@@ -261,8 +267,9 @@ let
         '';
 
         installPhase = ''
-          mkdir -p $out/share/client_sdk
+          mkdir -p $out/share/client_sdk $out/share/snarkyjs_bindings
           mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
+          mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
         '';
       });
 

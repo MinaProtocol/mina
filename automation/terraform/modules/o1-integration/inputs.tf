@@ -68,6 +68,26 @@ variable "log_precomputed_blocks" {
   type = bool
 }
 
+variable "worker_cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "worker_mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
+variable "cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
 variable "archive_configs" {
   description = "individual archive-node deployment configurations"
   default = null
@@ -79,6 +99,11 @@ variable "archive_node_count" {
 
 variable "mina_archive_schema" {
   type = string
+}
+
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
 }
 
 variable "block_producer_configs" {

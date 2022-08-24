@@ -66,6 +66,11 @@ variable "mina_archive_schema" {
   default = ""
 }
 
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
+}
+
 variable "archive_node_count" {
   type    = number
   default = 0
@@ -137,6 +142,16 @@ variable "log_precomputed_blocks" {
 variable "log_txn_pool_gossip" {
   type    = bool
   default = false
+}
+
+variable "cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "mem_request" {
+  type    = string
+  default = "0Mi"
 }
 
 # Seed Vars
@@ -258,6 +273,16 @@ variable "gcloud_seeds" {
   default = []
 }
 
+variable "worker_cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "worker_mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
 # Mina network services vars
 
 variable "restart_nodes" {
@@ -308,6 +333,7 @@ variable "archive_configs" {
       postgresqlPassword      = string
       postgresDB              = string
       remoteSchemaFile        = string
+      remoteSchemaAuxFiles        = list(string)
 
       persistenceEnabled      = bool
       persistenceSize         = string

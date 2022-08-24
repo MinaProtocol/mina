@@ -8,11 +8,22 @@
    async
    bin_prot.shape
    base.caml
+   blake2
+   stdint
+   ppx_inline_test.config
+   splittable_random
+   stdio
+   async_unix
+   async_kernel
    ;; local libraries
    mina_base
    transaction_snark_work
    genesis_constants
    currency
-   )
+   allocation_functor
+   consensus
+   logger
+   ppx_version.runtime
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version ppx_deriving_yojson)))
+ (preprocess (pps ppx_coda ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))

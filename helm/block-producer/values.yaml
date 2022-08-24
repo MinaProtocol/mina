@@ -20,6 +20,8 @@ mina:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  cpuRequest: 6
+  memRequest: "12.0Gi"
 
 userAgent:
   image: ""

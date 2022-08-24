@@ -109,6 +109,7 @@ exec-daemon() {
   echo $MINA_EXE daemon \
     -client-port $client_port \
     -rest-port $rest_port \
+    -insecure-rest-server \
     -external-port $external_port \
     -metrics-port $daemon_metrics_port \
     -libp2p-metrics-port $libp2p_metrics_port \
@@ -120,6 +121,7 @@ exec-daemon() {
   exec $MINA_EXE daemon \
     -client-port $client_port \
     -rest-port $rest_port \
+    -insecure-rest-server \
     -external-port $external_port \
     -metrics-port $daemon_metrics_port \
     -libp2p-metrics-port $libp2p_metrics_port \
@@ -484,8 +486,8 @@ fi
 
 if $transactions; then
   folder=$nodesfolder/fish_1
-  keyfile=$ledgerfolder/online_fish_keys/online_fish_account_1
-  pubkey=$(cat $ledgerfolder/online_fish_keys/online_fish_account_1.pub)
+  keyfile=$ledgerfolder/online_fish_keys/online_fish_account_0
+  pubkey=$(cat $ledgerfolder/online_fish_keys/online_fish_account_0.pub)
   rest_server="http://127.0.0.1:$(($FISH_START_PORT + 1))/graphql"
   printf "\n"
   echo "Waiting for node to be up to start sending transactions..."

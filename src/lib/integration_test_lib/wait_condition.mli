@@ -28,6 +28,8 @@ module Make
     | Nodes_to_synchronize
     | Signed_command_to_be_included_in_frontier
     | Ledger_proofs_emitted_since_genesis
+    | Block_height_growth
+    | Zkapp_to_be_included_in_frontier
 
   type t =
     { id : wait_condition_id

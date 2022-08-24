@@ -1,7 +1,7 @@
-(* memory_stats.ml -- log OCaml, jemalloc memory data *)
+(* memory_stats.ml -- log OCaml memory data *)
 
 open Core_kernel
-open Async
+open Async_kernel
 open Gc.Stat
 
 let ocaml_memory_stats () =
@@ -15,16 +15,6 @@ let ocaml_memory_stats () =
   ; ("fragments", `Int stat.fragments)
   ]
 
-let jemalloc_memory_stats () =
-  let { Jemalloc.active; resident; allocated; mapped } =
-    Jemalloc.get_memory_stats ()
-  in
-  [ ("active", `Int active)
-  ; ("resident", `Int resident)
-  ; ("allocated", `Int allocated)
-  ; ("mapped", `Int mapped)
-  ]
-
 let log_memory_stats logger ~process =
   don't_wait_for
     ((* Curve points are allocated in C++ and deallocated with finalizers.
@@ -36,7 +26,7 @@ let log_memory_stats logger ~process =
              major GC cycle every ten minutes.
      *)
      let gc_method =
-       Option.value ~default:"full" @@ Unix.getenv "MINA_GC_HACK_MODE"
+       Option.value ~default:"full" @@ Stdlib.Sys.getenv_opt "MINA_GC_HACK_MODE"
      in
      (* Doing Gc.major is known to work, but takes quite a bit of time.
              Running a single slice might be sufficient, but I haven't tested it
@@ -54,17 +44,16 @@ let log_memory_stats logger ~process =
              other
      in
      let interval =
-       Time.Span.of_sec
+       Time_ns.Span.of_sec
        @@ Option.(
             value ~default:600.
-              (map ~f:Float.of_string @@ Unix.getenv "MINA_GC_HACK_INTERVAL"))
+              ( map ~f:Float.of_string
+              @@ Stdlib.Sys.getenv_opt "MINA_GC_HACK_INTERVAL" ))
      in
      let log_stats suffix =
        let proc = ("process", `String process) in
        [%log debug] "OCaml memory statistics, %s" suffix
-         ~metadata:(proc :: ocaml_memory_stats ()) ;
-       [%log debug] "Jemalloc memory statistics (in bytes)"
-         ~metadata:(proc :: jemalloc_memory_stats ())
+         ~metadata:(proc :: ocaml_memory_stats ())
      in
      let rec loop () =
        log_stats "before major gc" ;

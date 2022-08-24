@@ -1,15 +1,13 @@
-module Serializing = Graphql_lib.Serializing
-
 module Get_coinbase_and_genesis =
 [%graphql
 {|
   query {
     genesisBlock {
       creatorAccount {
-        publicKey @ppxCustom(module: "Serializing.String")
+        publicKey @ppxCustom(module: "Graphql_lib.Scalars.String_json")
       }
       winnerAccount {
-        publicKey @ppxCustom(module: "Serializing.String")
+        publicKey @ppxCustom(module: "Graphql_lib.Scalars.String_json")
       }
       protocolState {
         blockchainState {
@@ -96,7 +94,7 @@ module Internal_command_info = struct
     ; receiver: [`Pk of string]
     ; receiver_account_creation_fee_paid: Unsigned_extended.UInt64.t option
     ; fee: Unsigned_extended.UInt64.t
-    ; token: Unsigned_extended.UInt64.t
+    ; token: [`Token_id of string]
     ; sequence_no: int
     ; secondary_sequence_no: int
     ; hash: string }
@@ -146,9 +144,9 @@ module Internal_command_info = struct
                 ; related_operations
                 ; status
                 ; account=
-                    Some (account_id t.receiver Amount_of.Token_id.default)
+                    Some (account_id t.receiver (`Token_id Amount_of.Token_id.default))
                 ; _type= Operation_types.name `Coinbase_inc
-                ; amount= Some (Amount_of.token t.token t.fee)
+                ; amount= Some (Amount_of.token (`Token_id Amount_of.Token_id.default) t.fee)
                 ; coin_change= None
                 ; metadata= None }
           | `Fee_receiver_inc ->
@@ -181,7 +179,7 @@ module Internal_command_info = struct
               ; status
               ; account=
                   Some
-                    (account_id coinbase_receiver Amount_of.Token_id.default)
+                    (account_id coinbase_receiver (`Token_id Amount_of.Token_id.default) )
               ; _type= Operation_types.name `Fee_payer_dec
               ; amount= Some Amount_of.(negated (mina t.fee))
               ; coin_change= None
@@ -192,7 +190,7 @@ module Internal_command_info = struct
                 ; related_operations
                 ; status
                 ; account=
-                    Some (account_id t.receiver Amount_of.Token_id.default)
+                    Some (account_id t.receiver (`Token_id Amount_of.Token_id.default))
                 ; _type= Operation_types.name `Account_creation_fee_via_fee_receiver
                 ; amount= Some Amount_of.(negated @@ mina account_creation_fee)
                 ; coin_change= None
@@ -205,7 +203,7 @@ module Internal_command_info = struct
       ; receiver= `Pk "Eve"
       ; receiver_account_creation_fee_paid= None
       ; fee= Unsigned.UInt64.of_int 20_000_000_000
-      ; token= Unsigned.UInt64.of_int 1
+      ; token= (`Token_id Amount_of.Token_id.default)
       ; sequence_no=1
       ; secondary_sequence_no=0
       ; hash= "COINBASE_1" }
@@ -213,13 +211,14 @@ module Internal_command_info = struct
       ; receiver= `Pk "Alice"
       ; receiver_account_creation_fee_paid= None
       ; fee= Unsigned.UInt64.of_int 30_000_000_000
-      ; token= Unsigned.UInt64.of_int 1
+      ; token= (`Token_id Amount_of.Token_id.default)
       ; sequence_no=1
       ; secondary_sequence_no=0
       ; hash= "FEE_TRANSFER" } ]
 end
 
 module Block_info = struct
+  (* TODO: should timestamp be string?; Block_time.t is an unsigned 64-bit int *)
   type t =
     { block_identifier: Block_identifier.t
     ; parent_block_identifier: Block_identifier.t
@@ -420,9 +419,7 @@ WITH RECURSIVE chain AS (
 
       let created_token t = t.created_token
 
-      let typ =
-        let open Archive_lib.Processor.Caqti_type_spec in
-        let spec =
+      let typ = Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
             [ string
             ; string
@@ -432,10 +429,6 @@ WITH RECURSIVE chain AS (
             ; option int64
             ; option int64
             ; option int64 ]
-        in
-        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
-        Caqti_type.custom ~encode ~decode (to_rep spec)
     end
 
     let typ =
@@ -562,11 +555,13 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
+          (* internal commands always use the default token *)
+          let token_id = Mina_base.Token_id.(to_string default) in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
           ; receiver_account_creation_fee_paid= Option.map (Internal_commands.Extras.receiver_account_creation_fee_paid extras) ~f:Unsigned.UInt64.of_int64
-          ; fee= Unsigned.UInt64.of_int64 ic.fee
-          ; token= Unsigned.UInt64.of_int64 ic.token
+          ; fee= Unsigned.UInt64.of_string ic.fee
+          ; token= `Token_id token_id
           ; sequence_no=Internal_commands.Extras.sequence_no extras
           ; secondary_sequence_no=Internal_commands.Extras.secondary_sequence_no extras
           ; hash= ic.hash } )
@@ -580,13 +575,6 @@ WITH RECURSIVE chain AS (
                 M.return `Payment
             | "delegation" ->
                 M.return `Delegation
-            | "create_token" ->
-                M.return `Create_token
-            | "create_account" ->
-                (* N.B.: not create_token_account *)
-                M.return `Create_token_account
-            | "mint_tokens" ->
-                M.return `Mint_tokens
             | other ->
                 M.fail
                   (Errors.create
@@ -597,6 +585,9 @@ WITH RECURSIVE chain AS (
                           other)
                      `Invariant_violation)
           in
+          (* TODO: do we want to mention tokens at all here? *)
+          let fee_token = Mina_base.Token_id.(to_string default) in
+          let token = Mina_base.Token_id.(to_string default) in
           let%map failure_status =
             match User_commands.Extras.failure_reason extras with
             | None -> (
@@ -636,11 +627,11 @@ WITH RECURSIVE chain AS (
           ; fee_payer= User_commands.Extras.fee_payer extras
           ; source= User_commands.Extras.source extras
           ; receiver= User_commands.Extras.receiver extras
-          ; fee_token= Unsigned.UInt64.of_int64 uc.fee_token
-          ; token= Unsigned.UInt64.of_int64 uc.token
-          ; nonce= Unsigned.UInt32.of_int uc.nonce
-          ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
-          ; fee= Unsigned.UInt64.of_int64 uc.fee
+          ; fee_token= `Token_id fee_token
+          ; token= `Token_id token
+          ; nonce= Unsigned.UInt32.of_int64 uc.nonce
+          ; amount= Option.map ~f:Unsigned.UInt64.of_string uc.amount
+          ; fee= Unsigned.UInt64.of_string uc.fee
           ; hash= uc.hash
           ; failure_status= Some failure_status
           ; valid_until= Option.map ~f:Unsigned.UInt32.of_int64 uc.valid_until
@@ -654,7 +645,7 @@ WITH RECURSIVE chain AS (
     ; parent_block_identifier=
         { Block_identifier.index= raw_parent_block.height
         ; hash= raw_parent_block.state_hash }
-    ; timestamp= raw_block.timestamp
+    ; timestamp= Int64.of_string raw_block.timestamp
     ; internal_info= internal_commands
     ; user_commands }
 end

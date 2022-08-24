@@ -24,6 +24,7 @@
    logger
    otp_lib
    consensus
+   mina_ledger
    file_system
    transition_frontier_full_frontier
    transition_frontier_persistent_root
@@ -31,6 +32,7 @@
    block_time
    transition_frontier_extensions
    mina_base
+   mina_transaction_logic
    rocksdb
    mina_block
    mina_state
@@ -39,6 +41,7 @@
    with_hash
    debug_assert
    non_empty_list
-   )
+   ppx_version.runtime
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_bin_prot ppx_deriving_yojson)))

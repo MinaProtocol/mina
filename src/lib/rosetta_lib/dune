@@ -27,6 +27,7 @@
    currency
    mina_compile_config
    unsigned_extended
+   mina_base.import
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
