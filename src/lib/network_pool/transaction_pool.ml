@@ -1121,9 +1121,14 @@ struct
             Indexed_pool.member pool
               (Transaction_hash.User_command.of_checked cmd)
           then Error Diff_error.Duplicate
-          else if not (Map.mem fee_payer_accounts (fee_payer cmd)) then
-            Error Diff_error.Fee_payer_account_not_found
-          else Ok ()
+          else
+            match Map.find fee_payer_accounts (fee_payer cmd) with
+            | None ->
+                Error Diff_error.Fee_payer_account_not_found
+            | Some account ->
+                if not (Account.has_permission ~to_:`Send account) then
+                  Error Diff_error.Fee_payer_not_permitted_to_send
+                else Ok ()
         in
         let pool, add_results =
           List.fold_map (Envelope.Incoming.data diff) ~init:t.pool

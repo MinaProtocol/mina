@@ -767,8 +767,8 @@ let revalidate :
       else
         let current_nonce, current_balance = f sender in
         [%log debug]
-          "Revalidating account $account in transaction pool ($current_nonce, \
-           $current_balance)"
+          "Revalidating account $account in transaction pool ($account_nonce, \
+           $account_balance)"
           ~metadata:
             [ ( "account"
               , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
@@ -1078,20 +1078,17 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           (* this command goes on the end *)
           let%bind reserved_currency' =
             M.of_result
-              Result.Let_syntax.(
-                let%bind reserved_currency' =
-                  Currency.Amount.(consumed + reserved_currency)
-                  |> Result.of_option ~error:Overflow
-                  (* C4 *)
-                in
-                let%map () =
-                  Result.ok_if_true
-                    Currency.Amount.(balance >= reserved_currency')
-                    ~error:
-                      (Insufficient_funds (`Balance balance, reserved_currency'))
-                  (* C2 *)
-                in
-                reserved_currency')
+              ( Currency.Amount.(consumed + reserved_currency)
+              |> Result.of_option ~error:Overflow )
+            (* C4 *)
+          in
+          let%bind () =
+            M.of_result
+              (Result.ok_if_true
+                 Currency.Amount.(reserved_currency' <= balance)
+                 ~error:
+                   (Insufficient_funds (`Balance balance, reserved_currency')) )
+            (* C2 *)
           in
           let new_state =
             (F_sequence.snoc queued_cmds cmd, reserved_currency')
