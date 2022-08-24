@@ -62,20 +62,30 @@ will only happen once. After it's done, you will be dropped in your favourite ed
 
 ### "Pure" build
 
-You can use Nix to fetch all the dependencies, and then only use
-`dune` as a build system to build Mina itself.
+You can use Nix to fetch all the dependencies, and then only use `dune` as a
+build system to build Mina itself.
 
-This way, you can build the entirety of Mina inside the Nix sandbox
-fully automatically: run `nix-build` (or `nix build mina` if you're
-using flakes).
+This way, you can build the entirety of Mina inside the Nix sandbox fully
+automatically: run `nix-build` (or `nix build mina` if you're using flakes). You
+can find the resulting executable at `result/bin/mina`.
 
-If you wish to build Mina yourself, or work on some changes
-incrementally, run `nix-shell default.nix` (or `nix develop mina` if
-you're using flakes). This will drop you in a shell with all
-dependencies, including OCaml, Rust and Go ones available, so the only
-thing you have to do is run `dune build src/app/cli/src/mina.exe`. You
-can also just run `eval "$buildPhase"` to run the same command as
-would be run inside the nix sandbox. Note that `opam` will **not** be available in that shell, since Nix takes over the job of computing and installing dependencies. If you need to modify the opam switch, use the impure build (next section).
+If you wish to build Mina yourself, or work on some changes incrementally, run
+`nix-shell default.nix` (or `nix develop mina` if you're using flakes). This
+will drop you in a shell with all dependencies, including OCaml, Rust and Go
+ones available, so the only thing you have to do is run `dune build
+src/app/cli/src/mina.exe`. You can also just run `eval "$buildPhase"` to run the
+same command as would be run inside the nix sandbox. The produced executable can
+be found in `_build/default/src/app/cli/src/mina.exe`. You most likely want to
+run it from the same shell you've built it in, since the executable looks for
+certain dependencies at runtime via environment variables, meaning you either
+have to set those variables yourself or rely on the ones set by the `devShell`.
+The executable produced by `nix build mina` doesn't suffer from this limitation,
+since it is wrapped with all the necessary environment variables.
+
+
+Note that `opam` will **not** be available in that shell, since Nix takes over
+the job of computing and installing dependencies. If you need to modify the opam
+switch, use the impure build (next section).
 
 ### "Impure" build
 
@@ -95,6 +105,26 @@ you're using flakes). You will get a `result` symlink in the current
 directory, which links to a tarball containing the docker image. You
 can load the image using `docker load -i result`, then note the tag it
 outputs. You can then run Mina from this docker image with `docker run mina:<tag> mina.exe <args>`.
+
+### Demo nixos-container
+
+If you're running NixOS, you can use `nixos-container` to run a demo of mina daemon from your local checkout. To do so, try
+
+```
+sudo nixos-container create mina --flake mina
+sudo nixos-container start mina
+sudo nixos-container root-login mina
+```
+
+From there, you can poke the mina daemon, e.g. with `systemctl status mina`.
+
+If you want to update the container to reflect the latest checkout, try
+
+```
+sudo nixos-container stop mina
+sudo nixos-container update mina --flake mina
+sudo nixos-container start mina
+```
 
 ### direnv
 

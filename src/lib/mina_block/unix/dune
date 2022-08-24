@@ -1,0 +1,15 @@
+(library
+ (name mina_block_unix)
+ (public_name mina_block.unix)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   yojson
+   ;; local libraries
+   graphql_basic_scalars
+   mina_block
+ )
+ (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Utils that depends on the unix library"))
