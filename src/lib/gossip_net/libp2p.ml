@@ -467,17 +467,18 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                           ~constraint_constants:
                             Genesis_constants.Constraint_constants.compiled
                       in
-                      let _valid_txns, too_big_txns =
-                        List.partition_tf transactions ~f:(fun txn ->
-                            Mina_transaction.Transaction.valid_size txn.data )
+                      let too_big_txns =
+                        List.filter transactions ~f:(fun txn ->
+                            not
+                            @@ Mina_transaction.Transaction.valid_size txn.data )
                       in
                       if not @@ List.is_empty too_big_txns then (
                         [%log' warn config.logger]
-                          "Not accepting incoming block with %d too-big \
+                          "Rejecting incoming block with %d too-big \
                            transactions"
                           (List.length too_big_txns) ;
                         [%log' debug config.logger]
-                          "Rejected block with too-big transactions"
+                          "Rejected incoming block with too-big transactions"
                           ~metadata:[ ("block", Mina_block.to_yojson state) ] ;
                         Deferred.unit )
                       else
