@@ -183,20 +183,22 @@ let fee_payer (t : t) =
       Parties.fee_payer p
 
 (** The application nonce is the nonce of the fee payer at which a user command can be applied. *)
-let application_nonce (t : t) =
+let applicable_at_nonce (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.nonce x
   | Parties p ->
-      Parties.application_nonce p
+      Parties.applicable_at_nonce p
 
-(** The target nonce is what the nonce of the fee payer will be after a user command is applied. *)
-let target_nonce (t : t) =
+let expected_target_nonce t = Account.Nonce.succ (applicable_at_nonce t)
+
+(** The target nonce is what the nonce of the fee payer will be after a user command is successfully applied. *)
+let target_nonce_on_success (t : t) =
   match t with
   | Signed_command x ->
       Account.Nonce.succ (Signed_command.nonce x)
   | Parties p ->
-      Parties.target_nonce p
+      Parties.target_nonce_on_success p
 
 let fee_token (t : t) =
   match t with

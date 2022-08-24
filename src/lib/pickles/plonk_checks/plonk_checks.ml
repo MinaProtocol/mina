@@ -3,6 +3,7 @@ open Pickles_types
 open Pickles_base
 module Scalars = Scalars
 module Domain = Domain
+module Opt = Plonk_types.Opt
 
 type 'field vanishing_polynomial_domain =
   < vanishing_polynomial : 'field -> 'field >
@@ -77,7 +78,7 @@ let actual_evaluation (type f) (module Field : Field_intf with type t = f)
   | e :: es ->
       List.fold ~init:e es ~f:(fun acc fx -> Field.(fx + (pt_n * acc)))
   | [] ->
-      failwith "empty list"
+      Field.of_int 0
 
 let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
     =
@@ -86,9 +87,9 @@ let evals_of_split_evals field ~zeta ~zetaw (es : _ Plonk_types.Evals.t) ~rounds
 
 open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
-let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
+let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
     ~field_of_hex ~domain ~srs_length_log2
-    ({ alpha; beta = _; gamma = _; zeta } : (c, _) Minimal.t)
+    ({ alpha; beta; gamma; zeta; joint_combiner } : (t, _) Minimal.t)
     (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) =
   let ww = Vector.to_array e.w in
   let w0 = Array.map ww ~f:fst in
@@ -115,6 +116,18 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
         failwithf
           !"Coefficient index %d\n%! should have been linearized away"
           i ()
+    | LookupTable ->
+        get_eval (Opt.value_exn e.lookup).table
+    | LookupSorted i ->
+        get_eval (Opt.value_exn e.lookup).sorted.(i)
+    | LookupAggreg ->
+        get_eval (Opt.value_exn e.lookup).aggreg
+    | LookupRuntimeTable ->
+        get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
+    | LookupKindIndex LookupGate ->
+        failwith "Lookup kind index should have been linearized away"
+    | LookupRuntimeSelector ->
+        failwith "Lookup runtime selector should have been linearized away"
   in
   let open F in
   let square x = x * x in
@@ -133,14 +146,15 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
     done ;
     arr
   in
-  let w3, w2, w1 =
+  let w4, w3, w2, w1 =
     (* generator^{n - 3} *)
     let gen = domain#generator in
     (* gen_inv = gen^{n - 1} = gen^{-1} *)
-    let gen_inv = one / gen in
-    let w3 = square gen_inv * gen_inv in
-    let w2 = gen * w3 in
-    (w3, w2, gen * w2)
+    let w1 = one / gen in
+    let w2 = square w1 in
+    let w3 = w2 * w1 in
+    let w4 = lazy (w3 * w1) in
+    (w4, w3, w2, w1)
   in
   let zk_polynomial =
     (* Vanishing polynomial of [w1, w2, w3]
@@ -148,6 +162,7 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
     *)
     (zeta - w1) * (zeta - w2) * (zeta - w3)
   in
+  let zeta_to_n_minus_1 = lazy (domain#vanishing_polynomial zeta) in
   { Scalars.Env.add = ( + )
   ; sub = ( - )
   ; mul = ( * )
@@ -164,6 +179,36 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
   ; srs_length_log2
+  ; vanishes_on_last_4_rows =
+      ( match joint_combiner with
+      | None ->
+          (* No need to compute anything when not using lookups *)
+          F.one
+      | Some _ ->
+          zk_polynomial * (zeta - Lazy.force w4) )
+  ; joint_combiner = Option.value joint_combiner ~default:F.one
+  ; beta
+  ; gamma
+  ; unnormalized_lagrange_basis =
+      (fun i ->
+        let w_to_i =
+          match i with
+          | 0 ->
+              one
+          | 1 ->
+              domain#generator
+          | -1 ->
+              w1
+          | -2 ->
+              w2
+          | -3 ->
+              w3
+          | -4 ->
+              Lazy.force w4
+          | _ ->
+              failwith "TODO"
+        in
+        Lazy.force zeta_to_n_minus_1 / (zeta - w_to_i) )
   }
 
 (* TODO: not true anymore if lookup is used *)
@@ -172,13 +217,123 @@ let scalars_env (type c t) (module F : Field_intf with type t = t) ~endo ~mds
 (see https://github.com/o1-labs/proof-systems/blob/516b16fc9b0fdcab5c608cd1aea07c0c66b6675d/kimchi/src/index.rs#L190) *)
 let perm_alpha0 : int = 21
 
+let tick_lookup_constant_term_part (type a)
+    ({ add = ( + )
+     ; sub = ( - )
+     ; mul = ( * )
+     ; square = _
+     ; mds = _
+     ; endo_coefficient = _
+     ; pow
+     ; var
+     ; field
+     ; cell
+     ; alpha_pow
+     ; double = _
+     ; zk_polynomial = _
+     ; omega_to_minus_3 = _
+     ; zeta_to_n_minus_1 = _
+     ; srs_length_log2 = _
+     ; vanishes_on_last_4_rows
+     ; joint_combiner
+     ; beta
+     ; gamma
+     ; unnormalized_lagrange_basis
+     } :
+      a Scalars.Env.t ) =
+  alpha_pow 24
+  * ( vanishes_on_last_4_rows
+    * ( cell (var (LookupAggreg, Next))
+        * ( ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupSorted 0, Curr))
+            + (beta * cell (var (LookupSorted 0, Next))) )
+          * ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupSorted 1, Next))
+            + (beta * cell (var (LookupSorted 1, Curr))) )
+          * ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupSorted 2, Curr))
+            + (beta * cell (var (LookupSorted 2, Next))) )
+          * ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupSorted 3, Next))
+            + (beta * cell (var (LookupSorted 3, Curr))) ) )
+      - cell (var (LookupAggreg, Curr))
+        * ( ( gamma
+            + pow (joint_combiner, 2)
+              * field
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+          * ( gamma
+            + pow (joint_combiner, 2)
+              * field
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+          * ( gamma
+            + pow (joint_combiner, 2)
+              * field
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+          * pow
+              ( field
+                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                + beta
+              , 3 )
+          * ( gamma
+              * ( beta
+                + field
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            + cell (var (LookupTable, Curr))
+            + (beta * cell (var (LookupTable, Next))) ) ) ) )
+  + alpha_pow 25
+    * ( unnormalized_lagrange_basis 0
+      * ( cell (var (LookupAggreg, Curr))
+        - field
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+        ) )
+  + alpha_pow 26
+    * ( unnormalized_lagrange_basis (-4)
+      * ( cell (var (LookupAggreg, Curr))
+        - field
+            "0x0000000000000000000000000000000000000000000000000000000000000001"
+        ) )
+  + alpha_pow 27
+    * ( unnormalized_lagrange_basis (-4)
+      * (cell (var (LookupSorted 0, Curr)) - cell (var (LookupSorted 1, Curr)))
+      )
+  + alpha_pow 28
+    * ( unnormalized_lagrange_basis 0
+      * (cell (var (LookupSorted 1, Curr)) - cell (var (LookupSorted 2, Curr)))
+      )
+  + alpha_pow 29
+    * ( unnormalized_lagrange_basis (-4)
+      * (cell (var (LookupSorted 2, Curr)) - cell (var (LookupSorted 3, Curr)))
+      )
+
 module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta. 
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
   let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
-      ~(env : t Scalars.Env.t) ({ alpha = _; beta; gamma; zeta } : _ Minimal.t)
-      (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
+      ~(env : t Scalars.Env.t)
+      ({ alpha = _; beta; gamma; zeta; joint_combiner = _ } : _ Minimal.t)
+      (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0
+      ~(lookup_constant_term_part : (F.t Scalars.Env.t -> F.t) option) =
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in
     let e1 field = snd (field e) in
@@ -214,7 +369,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     in
     let denominator = (zeta - env.omega_to_minus_3) * (zeta - one) in
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
-    let constant_term = Sc.constant_term env in
+    let constant_term =
+      let c = Sc.constant_term env in
+      Option.value_map lookup_constant_term_part ~default:c ~f:(fun x ->
+          c + x env )
+    in
     ft_eval0 - constant_term
 
   (** Computes the list of scalars used in the linearization. *)
@@ -222,7 +381,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift =
     let _ = with_label in
     let open F in
-    fun ({ alpha; beta; gamma; zeta } : _ Minimal.t)
+    fun ({ alpha; beta; gamma; zeta; joint_combiner } : _ Minimal.t)
         (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
           (*((e0, e1) : _ Plonk_types.Evals.In_circuit.t Double.t) *) ->
       let open Plonk_types.Evals.In_circuit in
@@ -264,6 +423,18 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             Lazy.force (Hashtbl.find_exn index_terms (Index EndoMulScalar))
         ; perm
         ; generic
+        ; lookup =
+            ( match joint_combiner with
+            | None ->
+                Plonk_types.Opt.None
+            | Some joint_combiner ->
+                Some
+                  { joint_combiner
+                  ; lookup_gate =
+                      Lazy.force
+                        (Hashtbl.find_exn index_terms
+                           (LookupKindIndex LookupGate) )
+                  } )
         }
 
   (** Check that computed proof scalars match the expected ones,
@@ -276,7 +447,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   *)
   let checked (type t)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env (plonk : _ In_circuit.t) evals =
+      ~shift ~env (plonk : (_, _, _, _ Opt.t) In_circuit.t) evals =
     let actual =
       derive_plonk ~with_label:Impl.with_label
         (module Impl.Field)
@@ -285,20 +456,42 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; beta = plonk.beta
         ; gamma = plonk.gamma
         ; zeta = plonk.zeta
+        ; joint_combiner =
+            ( match plonk.lookup with
+            | Plonk_types.Opt.None ->
+                None
+            | Some l | Maybe (_, l) ->
+                Some l.In_circuit.Lookup.joint_combiner )
         }
         evals
     in
     let open Impl in
     let open In_circuit in
     with_label __LOC__ (fun () ->
-        Vector.to_list
-          (with_label __LOC__ (fun () ->
-               Vector.map2 plonk.generic actual.generic
-                 ~f:(Shifted_value.equal Field.equal) ) )
+        ( Vector.to_list
+            (with_label __LOC__ (fun () ->
+                 Vector.map2 plonk.generic actual.generic
+                   ~f:(Shifted_value.equal Field.equal) ) )
         @ with_label __LOC__ (fun () ->
               List.map
                 ~f:(fun f ->
                   Shifted_value.equal Field.equal (f plonk) (f actual) )
                 [ poseidon_selector; vbmul; complete_add; endomul; perm ] )
+        @
+        match (plonk.lookup, actual.lookup) with
+        | None, None ->
+            []
+        | Some plonk, Some actual ->
+            [ Shifted_value.equal Field.equal plonk.lookup_gate
+                actual.lookup_gate
+            ]
+        | Maybe (is_some, plonk), (Some actual | Maybe (_, actual)) ->
+            [ Boolean.( ||| ) (Boolean.not is_some)
+                (Shifted_value.equal Field.equal plonk.lookup_gate
+                   actual.lookup_gate )
+            ]
+        | Some _, Maybe _ | None, (Some _ | Maybe _) | (Some _ | Maybe _), None
+          ->
+            assert false )
         |> Boolean.all )
 end

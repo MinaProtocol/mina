@@ -15,6 +15,8 @@ module Subscriptions = Mina_subscriptions
 module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
 
+let daemon_start_time = Time_ns.now ()
+
 type Structured_log_events.t += Connecting
   [@@deriving register_event { msg = "Mina daemon is connecting" }]
 
@@ -376,6 +378,63 @@ let active_or_bootstrapping =
         (Broadcast_pipe.Reader.peek t.components.transition_frontier)
         ~f:(Fn.const (Some ())) )
 
+let get_node_state t =
+  let chain_id = t.config.chain_id in
+  let addrs_and_ports = t.config.gossip_net_params.addrs_and_ports in
+  let peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id in
+  let ip_address =
+    Node_addrs_and_ports.external_ip addrs_and_ports
+    |> Core.Unix.Inet_addr.to_string
+  in
+  let public_key =
+    let key_list =
+      block_production_pubkeys t |> Public_key.Compressed.Set.to_list
+    in
+    if List.is_empty key_list then None else Some (List.hd_exn key_list)
+  in
+  let catchup_job_states =
+    match Broadcast_pipe.Reader.peek @@ transition_frontier t with
+    | None ->
+        None
+    | Some tf -> (
+        match Transition_frontier.catchup_tree tf with
+        | Full catchup_tree ->
+            Some
+              (Transition_frontier.Full_catchup_tree.to_node_status_report
+                 catchup_tree )
+        | _ ->
+            None )
+  in
+  let block_height_at_best_tip =
+    best_tip t
+    |> Participating_state.map ~f:(fun b ->
+           Transition_frontier.Breadcrumb.consensus_state b
+           |> Consensus.Data.Consensus_state.blockchain_length
+           |> Mina_numbers.Length.to_uint32 )
+    |> Participating_state.map ~f:Unsigned.UInt32.to_int
+    |> Participating_state.active
+  in
+  let sync_status =
+    sync_status t |> Mina_incremental.Status.Observer.value_exn
+  in
+  let uptime_of_node =
+    Time.(
+      Span.to_string_hum
+      @@ Time.diff (now ())
+           (Time_ns.to_time_float_round_nearest_microsecond daemon_start_time))
+  in
+  let%map hardware_info = Conf_dir.get_hw_info () in
+  { Node_error_service.peer_id
+  ; ip_address
+  ; chain_id
+  ; public_key
+  ; catchup_job_states
+  ; block_height_at_best_tip
+  ; sync_status
+  ; hardware_info
+  ; uptime_of_node
+  }
+
 (* This is a hack put in place to deal with nodes getting stuck
    in Offline states, that is, not receiving blocks for an extended period.
 
@@ -664,7 +723,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
     List.last pooled_transactions
     |> Option.map
          ~f:
-           (Fn.compose User_command.target_nonce
+           (Fn.compose User_command.expected_target_nonce
               Transaction_hash.User_command_with_valid_signature.command )
   in
   match txn_pool_nonce with
@@ -1040,8 +1099,6 @@ let perform_compaction t =
       in
       perform interval_configured
 
-let daemon_start_time = Time_ns.now ()
-
 let check_and_stop_daemon t ~wait =
   let uptime_mins =
     Time_ns.(diff (now ()) daemon_start_time |> Span.to_min |> Int.of_float)
@@ -1060,7 +1117,7 @@ let check_and_stop_daemon t ~wait =
         | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again tm
         | Produce { time = tm; _ }
         | Produce_now { time = tm; _ } ->
-            let tm = Block_time.to_time tm in
+            let tm = Block_time.to_time_exn tm in
             (*Assuming it takes at most 1hr to bootstrap and catchup*)
             let next_block =
               Time.add tm

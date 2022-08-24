@@ -612,6 +612,13 @@ macro_rules! impl_proof {
                 pub fn set_prev_challenges_comms(&mut self, prev_challenges_comms: WasmVector<$WasmPolyComm>) {
                     self.prev_challenges_comms = prev_challenges_comms
                 }
+
+                #[wasm_bindgen]
+                pub fn serialize(&self) -> String {
+                    let proof = ProverProof::from(self);
+                    let serialized = rmp_serde::to_vec(&proof).unwrap();
+                    base64::encode(serialized)
+                }
             }
 
             #[wasm_bindgen]
@@ -621,6 +628,7 @@ macro_rules! impl_proof {
                 prev_challenges: WasmFlatVector<$WasmF>,
                 prev_sgs: WasmVector<$WasmG>,
             ) -> WasmProverProof {
+                console_error_panic_hook::set_once();
                 {
                     let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
@@ -809,7 +817,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
+    use mina_curves::pasta::{fp::Fp, vesta::Vesta as GAffine};
 
     impl_proof!(
         caml_pasta_fp_plonk_proof,
@@ -834,7 +842,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
+    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine};
 
     impl_proof!(
         caml_pasta_fq_plonk_proof,
@@ -851,137 +859,4 @@ pub mod fq {
         WasmPlonkVerifierIndex,
         Fq
     );
-}
-
-#[cfg(test)]
-pub mod to_test {
-    use super::*;
-    use ark_ff::Zero as _;
-    use ark_poly::{univariate::DensePolynomial, UVPolynomial};
-    use commitment_dlog::{
-        commitment::{b_poly_coefficients, ceil_log2},
-        srs::{endos, SRS},
-    };
-    use kimchi::circuits::{
-        constraints::ConstraintSystem, gate::CircuitGate, gates::poseidon::round_to_cols,
-        wires::Wire,
-    };
-    use mina_curves::pasta::{fp::Fp, pallas::Affine as Other, vesta::Affine};
-    use oracle::poseidon::{ArithmeticSponge, Sponge, SpongeConstants};
-    use rand::SeedableRng;
-    use wasm_bindgen_test::*;
-
-    #[wasm_bindgen_test]
-    pub fn test_thing() {
-        let gates = {
-            let mut gates = vec![];
-
-            // poseidon
-            let first_row = Wire::new(1);
-            let last_row = Wire::new(12);
-            let rc = oracle::pasta::fp_kimchi::params().round_constants;
-            let (poseidon, _row) =
-                CircuitGate::<Fp>::create_poseidon_gadget(0, [first_row, last_row], &rc);
-            gates.extend(poseidon);
-
-            gates
-        };
-
-        let public = 0;
-
-        // set up
-        let rng = &mut rand::rngs::StdRng::from_seed([0u8; 32]);
-        let group_map = <Affine as CommitmentCurve>::Map::setup();
-
-        // create the index
-        let fp_sponge_params = oracle::pasta::fp_kimchi::params();
-        let cs = ConstraintSystem::<Fp>::create(gates, vec![], fp_sponge_params.clone(), public)
-            .unwrap();
-        let n = cs.domain.d1.size as usize;
-        let fq_sponge_params = oracle::pasta::fq_kimchi::params();
-        let (endo_q, _endo_r) = endos::<Other>();
-        let mut srs = SRS::create(n);
-        srs.add_lagrange_basis(cs.domain.d1);
-        let srs = std::sync::Arc::new(srs);
-        let index = ProverIndex::<Affine>::create(cs, fq_sponge_params, endo_q, srs);
-
-        // witness
-        let witness = {
-            let mut sponge =
-                ArithmeticSponge::<Fp, PlonkSpongeConstantsKimchi>::new(fp_sponge_params);
-
-            let POS_ROWS_PER_HASH = 11;
-            let ROUNDS_PER_ROW = 5;
-            let SPONGE_WIDTH = 3;
-            // witness for Poseidon permutation custom constraints
-            let mut witness_cols: [Vec<Fp>; COLUMNS] =
-                array_init(|_| vec![Fp::zero(); POS_ROWS_PER_HASH + 1 /* last output row */]);
-
-            // creates a random initial state
-            let init = vec![Fp::zero(), Fp::zero(), Fp::zero()];
-
-            // index
-            let first_row = 0;
-
-            // initialize the sponge in the circuit with our random state
-            let first_state_cols = &mut witness_cols[round_to_cols(0)];
-            for state_idx in 0..SPONGE_WIDTH {
-                first_state_cols[state_idx][first_row] = init[state_idx];
-            }
-
-            // set the sponge state
-            sponge.state = init.clone();
-
-            // for the poseidon rows
-            for row_idx in 0..POS_ROWS_PER_HASH {
-                let row = row_idx + first_row;
-                for round in 0..ROUNDS_PER_ROW {
-                    // the last round makes use of the next row
-                    let maybe_next_row = if round == ROUNDS_PER_ROW - 1 {
-                        row + 1
-                    } else {
-                        row
-                    };
-
-                    //
-                    let abs_round = round + row_idx * ROUNDS_PER_ROW;
-
-                    // apply the sponge and record the result in the witness
-                    // (this won't work if the circuit has an INITIAL_ARK)
-                    assert!(!PlonkSpongeConstantsKimchi::INITIAL_ARK);
-                    sponge.full_round(abs_round);
-
-                    // apply the sponge and record the result in the witness
-                    let cols_to_update = round_to_cols((round + 1) % ROUNDS_PER_ROW);
-                    witness_cols[cols_to_update]
-                        .iter_mut()
-                        .zip(sponge.state.iter())
-                        // update the state (last update is on the next row)
-                        .for_each(|(w, s)| w[maybe_next_row] = *s);
-                }
-            }
-
-            witness_cols
-        };
-
-        //
-        let prev = {
-            let k = ceil_log2(index.srs.g.len());
-            let chals: Vec<_> = (0..k).map(|_| Fp::zero()).collect();
-            let comm = {
-                let coeffs = b_poly_coefficients(&chals);
-                let b = DensePolynomial::from_coefficients_vec(coeffs);
-                index.srs.commit_non_hiding(&b, None)
-            };
-
-            (chals, comm)
-        };
-
-        // proof
-        ProverProof::create_recursive::<
-            DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
-            DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, &[], &index, vec![prev])
-        .unwrap();
-    }
 }

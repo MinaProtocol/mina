@@ -343,6 +343,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fp_srs_commit_evaluations => "commit_evaluations");
                 decl_func!(w, env, caml_fp_srs_b_poly_commitment => "b_poly_commitment");
                 decl_func!(w, env, caml_fp_srs_batch_accumulator_check => "batch_accumulator_check");
+                decl_func!(w, env, caml_fp_srs_batch_accumulator_generate => "batch_accumulator_generate");
                 decl_func!(w, env, caml_fp_srs_h => "urs_h");
             });
 
@@ -357,6 +358,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fq_srs_commit_evaluations => "commit_evaluations");
                 decl_func!(w, env, caml_fq_srs_b_poly_commitment => "b_poly_commitment");
                 decl_func!(w, env, caml_fq_srs_batch_accumulator_check => "batch_accumulator_check");
+                decl_func!(w, env, caml_fq_srs_batch_accumulator_generate => "batch_accumulator_generate");
                 decl_func!(w, env, caml_fq_srs_h => "urs_h");
             });
         });
@@ -434,6 +436,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_module!(w, env, "Proof", {
             decl_module!(w, env, "Fp", {
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_create => "create");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_lookup => "example_with_lookup");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_verify => "verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_dummy => "dummy");

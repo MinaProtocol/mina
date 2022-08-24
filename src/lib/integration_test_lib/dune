@@ -46,4 +46,5 @@
    data_hash_lib
    integers
    transition_handler
+   snark_worker
 ))

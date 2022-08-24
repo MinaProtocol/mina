@@ -2,7 +2,12 @@ use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
-use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
+use mina_curves::pasta::{
+    fq::Fq,
+    pallas::{Pallas as GAffine, PallasParameters},
+    vesta::Vesta as GAffineOther,
+};
+use oracle::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -79,9 +84,11 @@ pub fn caml_pasta_fq_plonk_index_create(
     }
 
     // create index
-    Ok(CamlPastaFqPlonkIndex(Box::new(
-        ProverIndex::<GAffine>::create(cs, endo_q, srs.clone()),
-    )))
+    let mut index = ProverIndex::<GAffine>::create(cs, endo_q, srs.clone());
+    // Compute and cache the verifier index digest
+    index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
+
+    Ok(CamlPastaFqPlonkIndex(Box::new(index)))
 }
 
 #[ocaml_gen::func]

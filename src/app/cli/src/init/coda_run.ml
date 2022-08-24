@@ -437,6 +437,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
           Deferred.return @@ Mina_lib.add_work coda work )
+    ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+        (fun
+          ()
+          ((_work_spec, _prover_pk) :
+            Snark_worker.Work.Spec.t * Signature_lib.Public_key.Compressed.t )
+        ->
+          [%str_log error] Snark_worker.Generating_snark_work_failed ;
+          Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
+          Deferred.unit )
     ]
   in
   let create_graphql_server ~bind_to_address ~schema ~server_description port =
@@ -649,7 +658,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
   Core.print_string message
 
 let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
-    ~node_error_url ~contact_info coda_ref =
+    coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
@@ -699,12 +708,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
            | _exn ->
                let error = Error.of_exn ~backtrace:`Get exn in
                let%bind () =
-                 match node_error_url with
-                 | Some node_error_url ->
-                     Node_error_service.send_report ~logger:top_logger
-                       ~node_error_url ~mina_ref:coda_ref ~error ~contact_info
-                 | None ->
-                     Deferred.unit
+                 Node_error_service.send_report ~logger:top_logger ~error
                in
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref

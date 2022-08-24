@@ -17,7 +17,7 @@ let with_versioned_json = "with_versioned_json"
 let no_toplevel_latest_type_str = "no_toplevel_latest_type"
 
 (* option to `deriving version' *)
-type version_option = No_version_option | Binable [@@deriving equal]
+type version_option = No_version_option | Binable | Rpc [@@deriving equal]
 
 let create_attr ~loc attr_name attr_payload =
   { attr_name; attr_payload; attr_loc = loc }
@@ -36,6 +36,8 @@ let rec add_deriving ~loc ~version_option attributes : attributes =
         [%expr version]
     | Binable ->
         [%expr version { binable }]
+    | Rpc ->
+        [%expr version { rpc }]
   in
   match attributes with
   | [] ->
@@ -46,6 +48,8 @@ let rec add_deriving ~loc ~version_option attributes : attributes =
             payload [ [%expr bin_io]; version_expr ]
         | Binable ->
             payload [ version_expr ]
+        | Rpc ->
+            payload [ [%expr bin_io]; version_expr ]
       in
       [ create_attr ~loc attr_name attr_payload ]
   | attr :: attributes -> (
@@ -77,6 +81,8 @@ let rec add_deriving ~loc ~version_option attributes : attributes =
                 true
             | Binable ->
                 false
+            | Rpc ->
+                true
           in
           let extra_payload_args =
             match (has_version, needs_bin_io) with
@@ -619,27 +625,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
                   Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
                     [%e estring ptype_name.txt]
                 in
-                match Ppx_version_runtime.Shapes.register path bin_shape_t with
-                | `Ok ->
-                    ()
-                | `Duplicate -> (
-                    (* versioned types inside functors that are called more than
-                       once will yield duplicates; OK if the shapes are the same
-                    *)
-                    match Ppx_version_runtime.Shapes.find path with
-                    | Some bin_shape_t' ->
-                        if
-                          not
-                            (Ppx_version_runtime.Shapes.equal_shapes bin_shape_t
-                               bin_shape_t' )
-                        then
-                          Core_kernel.failwithf
-                            "Different type shapes at path %s" path ()
-                        else ()
-                    | None ->
-                        Core_kernel.failwithf
-                          "Expected to find registered shape at path %s" path ()
-                    )]
+                Ppx_version_runtime.Shapes.register path bin_shape_t]
           else []
       | _ ->
           failwith "Expected single type declaration in structure item"
@@ -1112,6 +1098,136 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
     Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
     raise exn
 
+let convert_rpc_version (stri : structure_item) =
+  let register_shapes =
+    let (module Ast_builder) = Ast_builder.make stri.pstr_loc in
+    let open Ast_builder in
+    [%str
+      let (_ : _) =
+        let query_path =
+          Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
+            [%e estring "query"]
+        in
+        Ppx_version_runtime.Shapes.register query_path bin_shape_query ;
+        let response_path =
+          Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
+            [%e estring "response"]
+        in
+        Ppx_version_runtime.Shapes.register response_path bin_shape_response]
+  in
+  let add_derivers_to_types = function
+    | { pstr_desc = Pstr_type (rec_flag, [ ty_decl ]); pstr_loc }
+      when List.mem [ "query"; "response" ] ty_decl.ptype_name.txt
+             ~equal:String.equal ->
+        let ty_decl_with_attrs =
+          { ty_decl with
+            ptype_attributes =
+              add_deriving ~loc:ty_decl.ptype_loc ~version_option:Rpc
+                ty_decl.ptype_attributes
+          }
+        in
+        { pstr_desc = Pstr_type (rec_flag, [ ty_decl_with_attrs ]); pstr_loc }
+    | item ->
+        item
+  in
+  match stri.pstr_desc with
+  | Pstr_module ({ pmb_name; pmb_expr; _ } as mod_binding)
+    when Option.is_some pmb_name.txt
+         && Versioned_util.is_version_module (Option.value_exn pmb_name.txt)
+    -> (
+      match pmb_expr with
+      | { pmod_desc =
+            Pmod_structure
+              (( { pstr_desc =
+                     Pstr_module
+                       ( { pmb_name = { txt = Some "T"; _ }
+                         ; pmb_expr =
+                             { pmod_desc = Pmod_structure str_items; _ } as
+                             inner_mod_expr
+                         ; _
+                         } as inner_mod_binding )
+                 ; _
+                 } as inner_str_item )
+              :: other_mods )
+        ; _
+        } as mod_expr ->
+          (* query, response types in module T contained in Vn module *)
+          let str_items_with_derivers =
+            List.map str_items ~f:add_derivers_to_types
+          in
+          let pmb_expr_with_derivers =
+            { mod_expr with
+              pmod_desc =
+                Pmod_structure
+                  ( { inner_str_item with
+                      pstr_desc =
+                        Pstr_module
+                          { inner_mod_binding with
+                            pmb_expr =
+                              { inner_mod_expr with
+                                pmod_desc =
+                                  Pmod_structure
+                                    (str_items_with_derivers @ register_shapes)
+                              }
+                          }
+                    }
+                  :: other_mods )
+            }
+          in
+          { stri with
+            pstr_desc =
+              Pstr_module { mod_binding with pmb_expr = pmb_expr_with_derivers }
+          }
+      | _ ->
+          failwith "Expected structure in RPC version module" )
+  | _ ->
+      stri
+
+let check_rpc_versioned_module_numbers stris =
+  ignore
+    ( List.fold stris ~init:None ~f:(fun last_vn stri ->
+          match stri.pstr_desc with
+          | Pstr_module { pmb_name; _ }
+            when Option.is_some pmb_name.txt
+                 && Versioned_util.is_version_module
+                      (Option.value_exn pmb_name.txt) -> (
+              let current_vn =
+                Versioned_util.version_of_versioned_module_name
+                  (Option.value_exn pmb_name.txt)
+              in
+              match last_vn with
+              | None ->
+                  Some current_vn
+              | Some vn ->
+                  if current_vn = vn then
+                    Location.raise_errorf ~loc:stri.pstr_loc
+                      "Duplicate versions in versioned RPC modules" ;
+                  if current_vn > vn then
+                    Location.raise_errorf ~loc:stri.pstr_loc
+                      "Versioned RPC modules must be listed in decreasing order" ;
+                  Some current_vn )
+          | _ ->
+              last_vn )
+      : int option )
+
+let version_rpc_module ~loc ~path:_ rpc_name (rpc_body : structure_item list loc)
+    =
+  Printexc.record_backtrace true ;
+  try
+    check_rpc_versioned_module_numbers rpc_body.txt ;
+    let rpc_body_txt = List.map rpc_body.txt ~f:convert_rpc_version in
+    let open Ast_helper in
+    Str.include_ ~loc
+      (Incl.mk ~loc
+         (Ast_helper.Mod.structure ~loc
+            [ Str.module_ ~loc
+                (Mb.mk ~loc:rpc_body.loc (some_loc rpc_name)
+                   (Mod.structure ~loc:rpc_body.loc rpc_body_txt) )
+            ] ) )
+  with exn ->
+    Format.(fprintf err_formatter "%s@." (Printexc.get_backtrace ())) ;
+    raise exn
+
 (* code for module declarations in signatures
 
    - add deriving bin_io, version to list of deriving items for the type "t" in versioned modules
@@ -1416,6 +1532,11 @@ let () =
       declare "versioned_binable" Context.structure_item module_ast_pattern
         (version_module ~version_option:Binable))
   in
+  let module_extension_rpc =
+    Extension.(
+      declare "versioned_rpc" Context.structure_item module_ast_pattern
+        version_rpc_module)
+  in
   let module_decl_ast_pattern =
     Ast_pattern.(
       psig
@@ -1432,8 +1553,11 @@ let () =
   let module_rule_binable =
     Context_free.Rule.extension module_extension_binable
   in
+  let module_rule_rpc = Context_free.Rule.extension module_extension_rpc in
   let module_decl_rule = Context_free.Rule.extension module_decl_extension in
-  let rules = [ module_rule; module_rule_binable; module_decl_rule ] in
+  let rules =
+    [ module_rule; module_rule_binable; module_rule_rpc; module_decl_rule ]
+  in
   Driver.register_transformation "ppx_version/versioned_module" ~rules ;
   Ppxlib.Driver.add_arg "--no-toplevel-latest-type"
     (Caml.Arg.Unit (fun () -> no_toplevel_latest_type := true))

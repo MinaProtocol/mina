@@ -81,6 +81,7 @@ module Diff_versioned = struct
           | Expired
           | Overloaded
           | Fee_payer_account_not_found
+          | Fee_payer_not_permitted_to_send
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -104,6 +105,7 @@ module Diff_versioned = struct
       | Expired
       | Overloaded
       | Fee_payer_account_not_found
+      | Fee_payer_not_permitted_to_send
     [@@deriving sexp, yojson]
 
     let to_string_name = function
@@ -133,6 +135,8 @@ module Diff_versioned = struct
           "overloaded"
       | Fee_payer_account_not_found ->
           "fee_payer_account_not_found"
+      | Fee_payer_not_permitted_to_send ->
+          "fee_payer_not_permitted_to_send"
 
     let to_string_hum = function
       | Insufficient_replace_fee ->
@@ -166,6 +170,8 @@ module Diff_versioned = struct
           "The diff containing this transaction was too large"
       | Fee_payer_account_not_found ->
           "Fee payer account was not found in the best tip ledger"
+      | Fee_payer_not_permitted_to_send ->
+          "Fee payer account permissions don't allow sending funds"
   end
 
   module Rejected = struct
@@ -358,16 +364,16 @@ struct
           match Indexed_pool.get_highest_fee pool with
           | Some cmd -> (
               match
-                Indexed_pool.handle_committed_txn pool
-                  cmd
-                  (* we have the invariant that the transactions currently
-                     in the pool are always valid against the best tip, so
-                     no need to check balances here *)
+                Indexed_pool.handle_committed_txn pool cmd
+                  ~application_status:None
+                    (* we have the invariant that the transactions currently
+                       in the pool are always valid against the best tip, so
+                       no need to check balances here *)
                   ~fee_payer_balance:Currency.Amount.max_int
                   ~fee_payer_nonce:
                     ( Transaction_hash.User_command_with_valid_signature.command
                         cmd
-                    |> User_command.application_nonce )
+                    |> User_command.applicable_at_nonce )
               with
               | Ok (t, _) ->
                   Some (cmd, t)
@@ -642,7 +648,8 @@ struct
                   ~data:time_added ) ;
             let p', dropped =
               match
-                Indexed_pool.handle_committed_txn p cmd' ~fee_payer_balance
+                Indexed_pool.handle_committed_txn p cmd'
+                  ~application_status:(Some cmd.status) ~fee_payer_balance
                   ~fee_payer_nonce
               with
               | Ok res ->
@@ -940,6 +947,7 @@ struct
           | Expired
           | Overloaded
           | Fee_payer_account_not_found
+          | Fee_payer_not_permitted_to_send
         [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
@@ -1193,164 +1201,179 @@ struct
                              Diff_error.Fee_payer_account_not_found ) ;
                         Error `Invalid_command
                     | Some account ->
-                        let signer_lock =
-                          Hashtbl.find_or_add t.sender_mutex signer
-                            ~default:Mutex.create
-                        in
-                        (*This lock is released in apply function unless
-                          there's an error that causes all the transactions from
-                          this signer to be discarded*)
-                        let%bind () = Mutex.acquire signer_lock in
-                        let rec go sender_local_state u_acc acc
-                            (rejected : Rejected.t) = function
-                          | [] ->
-                              (* We keep the signer lock until this verified diff is applied. *)
-                              return
-                                (Ok
-                                   ( List.rev acc
-                                   , List.rev rejected
-                                   , sender_local_state
-                                   , u_acc ) )
-                          | c :: cs ->
-                              let uc = User_command.of_verifiable c in
-                              if Result.is_error !failures then (
-                                Mutex.release signer_lock ;
-                                return (Error `Other_command_failed) )
-                              else
-                                let tx' =
-                                  Transaction_hash.User_command.create uc
-                                in
-                                if Indexed_pool.member t.pool tx' then
-                                  if is_sender_local then (
-                                    [%log' info t.logger]
-                                      "Received local $cmd already present in \
-                                       the pool"
-                                      ~metadata:
-                                        [ ("cmd", User_command.to_yojson uc) ] ;
-                                    match
-                                      Indexed_pool.find_by_hash t.pool
-                                        (Transaction_hash.User_command.hash tx')
-                                    with
-                                    | Some validated_uc ->
-                                        go sender_local_state
-                                          Indexed_pool.Update.empty
-                                          ((validated_uc, []) :: acc)
-                                          rejected cs
-                                    | None ->
-                                        (*We just checked for membership, fail?*)
-                                        go sender_local_state u_acc acc
-                                          ( ( uc
-                                            , Diff_versioned.Diff_error
-                                              .Duplicate )
-                                          :: rejected )
-                                          cs )
-                                  else
-                                    let%bind _ =
-                                      trust_record
-                                        ( Trust_system.Actions.Sent_old_gossip
-                                        , None )
-                                    in
-                                    go sender_local_state u_acc acc
-                                      ( (uc, Diff_versioned.Diff_error.Duplicate)
-                                      :: rejected )
-                                      cs
-                                else if
-                                  has_sufficient_fee t.pool ~pool_max_size uc
-                                then
-                                  match%bind
-                                    Indexed_pool.add_from_gossip_exn_async
-                                      ~config ~sender_local_state
-                                      ~verify:(fun c ->
-                                        match%map
-                                          Batcher.verify t.batcher
-                                            { diffs with data = [ c ] }
-                                        with
-                                        | Error e ->
-                                            [%log' error t.logger]
-                                              "Transaction verification error: \
-                                               $error"
-                                              ~metadata:
-                                                [ ( "error"
-                                                  , `String
-                                                      (Error.to_string_hum e) )
-                                                ] ;
-                                            None
-                                        | Ok (Error invalid) ->
-                                            [%log' error t.logger]
-                                              "Batch verification failed when \
-                                               adding from gossip"
-                                              ~metadata:
-                                                [ ( "error"
-                                                  , `String
-                                                      (Verifier
-                                                       .invalid_to_string
-                                                         invalid ) )
-                                                ] ;
-                                            add_failure (Invalid_failure invalid) ;
-                                            None
-                                        | Ok (Ok [ c ]) ->
-                                            Some c
-                                        | Ok (Ok _) ->
-                                            assert false )
-                                      (`Unchecked
-                                        ( Transaction_hash.User_command.create uc
-                                        , c ) )
-                                      account.nonce
-                                      (Currency.Balance.to_amount
-                                         (balance_of_account ~global_slot
-                                            account ) )
-                                  with
-                                  | Error e -> (
-                                      match%bind
-                                        handle_command_error t ~trust_record
-                                          ~is_sender_local uc e
+                        if not (Account.has_permission ~to_:`Send account) then (
+                          add_failure
+                            (Command_failure
+                               Diff_error.Fee_payer_not_permitted_to_send ) ;
+                          return (Error `Invalid_command) )
+                        else
+                          let signer_lock =
+                            Hashtbl.find_or_add t.sender_mutex signer
+                              ~default:Mutex.create
+                          in
+                          (*This lock is released in apply function unless
+                            there's an error that causes all the transactions from
+                            this signer to be discarded*)
+                          let%bind () = Mutex.acquire signer_lock in
+                          let rec go sender_local_state u_acc acc
+                              (rejected : Rejected.t) = function
+                            | [] ->
+                                (* We keep the signer lock until this verified diff is applied. *)
+                                return
+                                  (Ok
+                                     ( List.rev acc
+                                     , List.rev rejected
+                                     , sender_local_state
+                                     , u_acc ) )
+                            | c :: cs ->
+                                let uc = User_command.of_verifiable c in
+                                if Result.is_error !failures then (
+                                  Mutex.release signer_lock ;
+                                  return (Error `Other_command_failed) )
+                                else
+                                  let tx' =
+                                    Transaction_hash.User_command.create uc
+                                  in
+                                  if Indexed_pool.member t.pool tx' then
+                                    if is_sender_local then (
+                                      [%log' info t.logger]
+                                        "Received local $cmd already present \
+                                         in the pool"
+                                        ~metadata:
+                                          [ ("cmd", User_command.to_yojson uc) ] ;
+                                      match
+                                        Indexed_pool.find_by_hash t.pool
+                                          (Transaction_hash.User_command.hash
+                                             tx' )
                                       with
-                                      | `Reject ->
-                                          add_failure
-                                            (Command_failure
-                                               (diff_error_of_indexed_pool_error
-                                                  e ) ) ;
-                                          Mutex.release signer_lock ;
-                                          return (Error `Invalid_command)
-                                      | `Ignore ->
+                                      | Some validated_uc ->
+                                          go sender_local_state
+                                            Indexed_pool.Update.empty
+                                            ((validated_uc, []) :: acc)
+                                            rejected cs
+                                      | None ->
+                                          (*We just checked for membership, fail?*)
                                           go sender_local_state u_acc acc
                                             ( ( uc
-                                              , diff_error_of_indexed_pool_error
-                                                  e )
+                                              , Diff_versioned.Diff_error
+                                                .Duplicate )
                                             :: rejected )
                                             cs )
-                                  | Ok (res, sender_local_state, u) ->
+                                    else
                                       let%bind _ =
                                         trust_record
-                                          ( Trust_system.Actions
-                                            .Sent_useful_gossip
-                                          , Some
-                                              ( "$cmd"
-                                              , [ ( "cmd"
-                                                  , User_command.to_yojson uc )
-                                                ] ) )
+                                          ( Trust_system.Actions.Sent_old_gossip
+                                          , None )
                                       in
-                                      go sender_local_state
-                                        (Indexed_pool.Update.merge u_acc u)
-                                        (res :: acc) rejected cs
-                                else
-                                  let%bind () =
-                                    trust_record
-                                      ( Trust_system.Actions.Sent_useless_gossip
-                                      , Some
-                                          ( sprintf
-                                              "rejecting command $cmd due to \
-                                               insufficient fee."
-                                          , [ ("cmd", User_command.to_yojson uc)
-                                            ] ) )
-                                  in
-                                  go sender_local_state u_acc acc
-                                    ((uc, Insufficient_fee) :: rejected)
-                                    cs
-                        in
-                        go
-                          (Indexed_pool.get_sender_local_state t.pool signer)
-                          Indexed_pool.Update.empty [] [] cs )
+                                      go sender_local_state u_acc acc
+                                        ( ( uc
+                                          , Diff_versioned.Diff_error.Duplicate
+                                          )
+                                        :: rejected )
+                                        cs
+                                  else if
+                                    has_sufficient_fee t.pool ~pool_max_size uc
+                                  then
+                                    match%bind
+                                      Indexed_pool.add_from_gossip_exn_async
+                                        ~config ~sender_local_state
+                                        ~verify:(fun c ->
+                                          match%map
+                                            Batcher.verify t.batcher
+                                              { diffs with data = [ c ] }
+                                          with
+                                          | Error e ->
+                                              [%log' error t.logger]
+                                                "Transaction verification \
+                                                 error: $error"
+                                                ~metadata:
+                                                  [ ( "error"
+                                                    , `String
+                                                        (Error.to_string_hum e)
+                                                    )
+                                                  ] ;
+                                              None
+                                          | Ok (Error invalid) ->
+                                              [%log' error t.logger]
+                                                "Batch verification failed \
+                                                 when adding from gossip"
+                                                ~metadata:
+                                                  [ ( "error"
+                                                    , `String
+                                                        (Verifier
+                                                         .invalid_to_string
+                                                           invalid ) )
+                                                  ] ;
+                                              add_failure
+                                                (Invalid_failure invalid) ;
+                                              None
+                                          | Ok (Ok [ c ]) ->
+                                              Some c
+                                          | Ok (Ok _) ->
+                                              assert false )
+                                        (`Unchecked
+                                          ( Transaction_hash.User_command.create
+                                              uc
+                                          , c ) )
+                                        account.nonce
+                                        (Currency.Balance.to_amount
+                                           (balance_of_account ~global_slot
+                                              account ) )
+                                    with
+                                    | Error e -> (
+                                        match%bind
+                                          handle_command_error t ~trust_record
+                                            ~is_sender_local uc e
+                                        with
+                                        | `Reject ->
+                                            add_failure
+                                              (Command_failure
+                                                 (diff_error_of_indexed_pool_error
+                                                    e ) ) ;
+                                            Mutex.release signer_lock ;
+                                            return (Error `Invalid_command)
+                                        | `Ignore ->
+                                            go sender_local_state u_acc acc
+                                              ( ( uc
+                                                , diff_error_of_indexed_pool_error
+                                                    e )
+                                              :: rejected )
+                                              cs )
+                                    | Ok (res, sender_local_state, u) ->
+                                        let%bind _ =
+                                          trust_record
+                                            ( Trust_system.Actions
+                                              .Sent_useful_gossip
+                                            , Some
+                                                ( "$cmd"
+                                                , [ ( "cmd"
+                                                    , User_command.to_yojson uc
+                                                    )
+                                                  ] ) )
+                                        in
+                                        go sender_local_state
+                                          (Indexed_pool.Update.merge u_acc u)
+                                          (res :: acc) rejected cs
+                                  else
+                                    let%bind () =
+                                      trust_record
+                                        ( Trust_system.Actions
+                                          .Sent_useless_gossip
+                                        , Some
+                                            ( sprintf
+                                                "rejecting command $cmd due to \
+                                                 insufficient fee."
+                                            , [ ( "cmd"
+                                                , User_command.to_yojson uc )
+                                              ] ) )
+                                    in
+                                    go sender_local_state u_acc acc
+                                      ((uc, Insufficient_fee) :: rejected)
+                                      cs
+                          in
+                          go
+                            (Indexed_pool.get_sender_local_state t.pool signer)
+                            Indexed_pool.Update.empty [] [] cs )
               in
               match !failures with
               | Error errs when not allow_failures_for_tests ->
@@ -1608,7 +1631,7 @@ struct
                in
                let get_nonce txn =
                  Transaction_hash.User_command_with_valid_signature.command txn
-                 |> User_command.application_nonce
+                 |> User_command.applicable_at_nonce
                in
                if cmp <> 0 then cmp
                else
@@ -1832,8 +1855,8 @@ let%test_module _ =
             (User_command.fee_payer cmd2)
         then
           Account.Nonce.compare
-            (User_command.application_nonce cmd1)
-            (User_command.application_nonce cmd2)
+            (User_command.applicable_at_nonce cmd1)
+            (User_command.applicable_at_nonce cmd2)
         else
           let get_fee_wu cmd = User_command.fee_per_wu cmd in
           (* descending order of fee/weight *)
@@ -2342,7 +2365,7 @@ let%test_module _ =
             of_time_exn ~constants:consensus_constants current_time
             |> end_time ~constants:consensus_constants)
         in
-        at (Block_time.to_time slot_end)
+        at (Block_time.to_time_exn slot_end)
       in
       let curr_slot = current_global_slot () in
       let slot_padding = Mina_numbers.Global_slot.of_int padding in

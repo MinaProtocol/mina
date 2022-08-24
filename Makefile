@@ -301,7 +301,7 @@ web:
 ## Benchmarks
 
 benchmarks: ocaml_checks
-	dune build src/app/benchmarks/main.exe
+	dune build src/app/benchmarks/benchmarks.exe
 
 ########################################
 # Coverage testing and output

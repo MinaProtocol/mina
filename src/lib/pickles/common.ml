@@ -30,11 +30,12 @@ let wrap_domains ~proofs_verified =
   in
   { Domains.h = Pow_2_roots_of_unity h }
 
-let hash_step_me_only ~app_state (t : _ Types.Step.Proof_state.Me_only.t) =
+let hash_messages_for_next_step_proof ~app_state
+    (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
   let g (x, y) = [ x; y ] in
   let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
-    (Types.Step.Proof_state.Me_only.to_field_elements t ~g
+    (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
        ~app_state )
 
@@ -85,6 +86,37 @@ module Shifts = struct
 
   let tick2 : Tick.Field.t Shifted_value.Type2.Shift.t =
     Shifted_value.Type2.Shift.create (module Tick.Field)
+end
+
+module Lookup_parameters = struct
+  let tick_zero : _ Composition_types.Zero_values.t =
+    { value =
+        { challenge = Challenge.Constant.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+        }
+    ; var =
+        { challenge = Impls.Step.Field.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value
+              (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
+        }
+    }
+
+  let tock_zero : _ Composition_types.Zero_values.t =
+    { value =
+        { challenge = Challenge.Constant.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+        }
+    ; var =
+        { challenge = Impls.Wrap.Field.zero
+        ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
+        }
+    }
+
+  let tick ~lookup:flag : _ Composition_types.Wrap.Lookup_parameters.t =
+    { use = No; zero = tick_zero }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
@@ -178,12 +210,12 @@ let tock_unpadded_public_input_of_statement prev_statement =
 
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_proofs_verified
+let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n
+        ~wrap_rounds:Tock.Rounds.n ~uses_lookup
     in
     Impls.Step.generate_public_input [ input ] prev_statement
   in

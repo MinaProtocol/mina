@@ -14,6 +14,13 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
+type mina_initialization =
+  { mina : Mina_lib.t
+  ; client_trustlist : Unix.Cidr.t list option
+  ; rest_server_port : int
+  ; limited_graphql_port : int option
+  }
+
 let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
@@ -49,21 +56,27 @@ let plugin_flag = Command.Param.return []
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
+  let receiver_key_warning = Cli_lib.Default.receiver_key_warning in
   let%map_open conf_dir = Cli_lib.Flag.conf_dir
   and block_production_key =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
-        "KEYFILE Private key file for the block producer. You cannot provide \
-         both `block-producer-key` and `block-producer-pubkey`. (default: \
-         don't produce blocks)"
+        (sprintf
+           "KEYFILE Private key file for the block producer. You cannot \
+            provide both `block-producer-key` and `block-producer-pubkey`. \
+            (default: don't produce blocks). %s"
+           receiver_key_warning )
       (optional string)
   and block_production_pubkey =
     flag "--block-producer-pubkey"
       ~aliases:[ "block-producer-pubkey" ]
       ~doc:
-        "PUBLICKEY Public key for the associated private key that is being \
-         tracked by this daemon. You cannot provide both `block-producer-key` \
-         and `block-producer-pubkey`. (default: don't produce blocks)"
+        (sprintf
+           "PUBLICKEY Public key for the associated private key that is being \
+            tracked by this daemon. You cannot provide both \
+            `block-producer-key` and `block-producer-pubkey`. (default: don't \
+            produce blocks). %s"
+           receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
     flag "--block-producer-password"
@@ -83,9 +96,11 @@ let setup_daemon logger =
   and coinbase_receiver_flag =
     flag "--coinbase-receiver" ~aliases:[ "coinbase-receiver" ]
       ~doc:
-        "PUBLICKEY Address to send coinbase rewards to (if this node is \
-         producing blocks). If not provided, coinbase rewards will be sent to \
-         the producer of a block."
+        (sprintf
+           "PUBLICKEY Address to send coinbase rewards to (if this node is \
+            producing blocks). If not provided, coinbase rewards will be sent \
+            to the producer of a block. %s"
+           receiver_key_warning )
       (optional public_key_compressed)
   and genesis_dir =
     flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
@@ -95,14 +110,18 @@ let setup_daemon logger =
       (optional string)
   and run_snark_worker_flag =
     flag "--run-snark-worker" ~aliases:[ "run-snark-worker" ]
-      ~doc:"PUBLICKEY Run the SNARK worker with this public key"
+      ~doc:
+        (sprintf "PUBLICKEY Run the SNARK worker with this public key. %s"
+           receiver_key_warning )
       (optional public_key_compressed)
   and run_snark_coordinator_flag =
     flag "--run-snark-coordinator"
       ~aliases:[ "run-snark-coordinator" ]
       ~doc:
-        "PUBLICKEY Run a SNARK coordinator with this public key (ignored if \
-         the run-snark-worker is set)"
+        (sprintf
+           "PUBLICKEY Run a SNARK coordinator with this public key (ignored if \
+            the run-snark-worker is set). %s"
+           receiver_key_warning )
       (optional public_key_compressed)
   and snark_worker_parallelism_flag =
     flag "--snark-worker-parallelism"
@@ -594,19 +613,11 @@ let setup_daemon logger =
         Memory_stats.log_memory_stats logger ~process:"daemon" ;
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
-        let module Coda_initialization = struct
-          type ('a, 'b, 'c) t =
-            { coda : 'a
-            ; client_trustlist : 'b
-            ; rest_server_port : 'c
-            ; limited_graphql_port : 'c option
-            }
-        end in
         let time_controller =
           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
         in
         let pids = Child_processes.Termination.create_pid_table () in
-        let coda_initialization_deferred () =
+        let mina_initialization_deferred () =
           let config_file_installed =
             (* Search for config files installed as part of a deb/brew package.
                These files are commit-dependent, to ensure that we don't clobber
@@ -1245,7 +1256,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    submitter keyfile"
           in
           let start_time = Time.now () in
-          let%map coda =
+          let%map mina =
             Mina_lib.create ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
@@ -1276,35 +1287,41 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~stop_time ~node_status_url () )
           in
-          { Coda_initialization.coda
-          ; client_trustlist
-          ; rest_server_port
-          ; limited_graphql_port
-          }
+          { mina; client_trustlist; rest_server_port; limited_graphql_port }
         in
         (* Breaks a dependency cycle with monitor initilization and coda *)
-        let coda_ref : Mina_lib.t option ref = ref None in
+        let mina_ref : Mina_lib.t option ref = ref None in
+        Option.iter node_error_url ~f:(fun url ->
+            let get_node_state () =
+              match !mina_ref with
+              | None ->
+                  Deferred.return None
+              | Some mina ->
+                  let%map node_state = Mina_lib.get_node_state mina in
+                  Some node_state
+            in
+            Node_error_service.set_config ~get_node_state
+              ~node_error_url:(Uri.of_string url) ~contact_info ) ;
         Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-          ~child_pids:pids ~top_logger:logger ~node_error_url ~contact_info
-          coda_ref ;
+          ~child_pids:pids ~top_logger:logger mina_ref ;
         Async.Scheduler.within' ~monitor
         @@ fun () ->
-        let%bind { Coda_initialization.coda
+        let%bind { mina
                  ; client_trustlist
                  ; rest_server_port
                  ; limited_graphql_port
                  } =
-          coda_initialization_deferred ()
+          mina_initialization_deferred ()
         in
-        coda_ref := Some coda ;
+        mina_ref := Some mina ;
         (*This pipe is consumed only by integration tests*)
         don't_wait_for
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
-             (Mina_lib.validated_transitions coda)
+             (Mina_lib.validated_transitions mina)
              ~f:ignore ) ;
         Coda_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
-          coda ;
+          mina ;
         let%bind () =
           Option.map metrics_server_port ~f:(fun port ->
               let forward_uri =
@@ -1318,8 +1335,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
           |> Option.value ~default:Deferred.unit
         in
-        let () = Mina_plugins.init_plugins ~logger coda plugins in
-        return coda )
+        let () = Mina_plugins.init_plugins ~logger mina plugins in
+        return mina )
 
 let daemon logger =
   Command.async ~summary:"Mina daemon"
