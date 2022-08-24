@@ -272,8 +272,8 @@ let gen_balance_change ?permissions_auth (account : Account.t) ~new_account =
   let%map (magnitude : Currency.Amount.t) =
     if new_account then
       Currency.Amount.gen_incl
-        (Currency.Amount.of_formatted_string "2.0")
-        (Currency.Amount.of_formatted_string "10.0")
+        (Currency.Amount.of_formatted_string "20.0")
+        (Currency.Amount.of_formatted_string "100.0")
     else
       Currency.Amount.gen_incl Currency.Amount.zero
         (Currency.Balance.to_amount small_balance_change)
@@ -767,10 +767,14 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
             let accts =
               Account_id.Table.filteri account_state_tbl
                 ~f:(fun ~key:_ ~data:(_, role) ->
-                  match role with
-                  | `Fee_payer | `New_account ->
+                  match (authorization_tag, role) with
+                  | _, `Fee_payer ->
                       false
-                  | `Ordinary_participant ->
+                  | Control.Tag.Proof, `New_account ->
+                      false
+                  | _, `New_account ->
+                      true
+                  | _, `Ordinary_participant ->
                       true )
               |> Account_id.Table.data
             in
@@ -1142,14 +1146,6 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     |> Account_id.Table.keys
   in
   Hash_set.add account_ids_seen fee_payer_acct_id ;
-  let%bind balancing_party =
-    let authorization = Control.Signature Signature.dummy in
-    gen_party_from ?failure ~permissions_auth:Control.Tag.Signature
-      ~zkapp_account_ids ~account_ids_seen ~authorization ~new_account:false
-      ~available_public_keys
-      ~required_balance_change:Currency.Amount.Signed.zero ~account_state_tbl
-      ?protocol_state_view ?vk ()
-  in
   let gen_parties_with_dynamic_balance ~new_parties num_parties =
     let rec go acc n =
       let open Zkapp_basic in
@@ -1375,66 +1371,14 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
      is sensitive to the order of party generation.
   *)
   let balance_change = Currency.Amount.Signed.negate balance_change_sum in
-  let balancing_party =
-    { balancing_party with body = { balancing_party.body with balance_change } }
+  let%bind balancing_party =
+    let authorization = Control.Signature Signature.dummy in
+    gen_party_from ?failure ~permissions_auth:Control.Tag.Signature
+      ~zkapp_account_ids ~account_ids_seen ~authorization ~new_account:false
+      ~available_public_keys ~account_state_tbl
+      ~required_balance_change:balance_change ?protocol_state_view ?vk ()
   in
-  Account_id.Table.update account_state_tbl
-    (Account_id.create balancing_party.body.public_key Token_id.default)
-    ~f:(function
-    | None ->
-        failwith "account of balancing party is missing"
-    | Some (account, role) ->
-        ( { account with
-            balance =
-              Currency.Balance.add_signed_amount_flagged account.balance
-                balance_change
-              |> fst
-          }
-        , role ) ) ;
-  (* modify the account balance && nonce precondition of the balancing account to reflect the change*)
-  let other_parties =
-    balancing_party
-    :: List.map other_parties0 ~f:(fun party ->
-           if
-             Signature_lib.Public_key.Compressed.equal party.body.public_key
-               balancing_party.body.public_key
-           then
-             { party with
-               body =
-                 { party.body with
-                   preconditions =
-                     { party.body.preconditions with
-                       account =
-                         ( match party.body.preconditions.account with
-                         | Full precond ->
-                             Full
-                               { precond with
-                                 balance =
-                                   ( match precond.balance with
-                                   | Check interval ->
-                                       Check
-                                         Zkapp_precondition.Closed_interval.
-                                           { lower =
-                                               Currency.Balance
-                                               .add_signed_amount_flagged
-                                                 interval.lower balance_change
-                                               |> fst
-                                           ; upper =
-                                               Currency.Balance
-                                               .add_signed_amount_flagged
-                                                 interval.upper balance_change
-                                               |> fst
-                                           }
-                                   | _ ->
-                                       precond.balance )
-                               }
-                         | _ ->
-                             party.body.preconditions.account )
-                     }
-                 }
-             }
-           else party )
-  in
+  let other_parties = other_parties0 @ [ balancing_party ] in
   let%map memo = Signed_command_memo.gen in
   let parties_dummy_authorizations : Parties.t =
     Parties.of_simple { fee_payer; other_parties; memo }
