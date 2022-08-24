@@ -221,7 +221,8 @@ func (br *BitswapBlockRequester) RequestBlocks(ids []cid.Cid) error {
 }
 
 // BitswapLoop: Bitswap processing loop
-//  Do not launch more than one instance of it
+//
+//	Do not launch more than one instance of it
 func (bs *BitswapCtx) Loop() {
 	configuredCheck := func() {
 		if bs.engine == nil || bs.storage == nil {
