@@ -107,15 +107,10 @@ func createMessage(size uint64) []byte {
 }
 
 func TestPeerExchange(t *testing.T) {
-	codanet.NoDHT = true
-	defer func() {
-		codanet.NoDHT = false
-	}()
-
 	// only allow peer count of 2 for node A
 	maxCount := 2
 	appAPort := nextPort()
-	appA := newTestAppWithMaxConns(t, nil, true, maxCount, maxCount, appAPort)
+	appA := newTestAppWithMaxConnsAndCtxAndGrace(t, newTestKey(t), nil, true, maxCount, maxCount, true, appAPort, context.Background(), time.Second)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 
@@ -137,20 +132,30 @@ func TestPeerExchange(t *testing.T) {
 	t.Logf("c=%s", appC.P2p.Host.ID())
 	t.Logf("d=%s", appD.P2p.Host.ID())
 
-	withTimeout(t, func() {
+	ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
+	go func() {
 		for {
 			// check if appC is connected to appB
 			for _, peer := range appD.P2p.Host.Network().Peers() {
 				if peer == appB.P2p.Host.ID() || peer == appC.P2p.Host.ID() {
+					cancelF()
 					return
 				}
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
-	}, "D did not connect to B or C via A")
+	}()
 
+	<-ctx.Done()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		t.Fatal("D did not connect to B or C via A")
+	}
+	time.Sleep(time.Second * 2)
+	appA.P2p.TrimOpenConns(context.Background())
 	time.Sleep(time.Second)
-	require.Equal(t, maxCount, len(appA.P2p.Host.Network().Peers()))
+
+	require.LessOrEqual(t, len(appA.P2p.Host.Network().Peers()), maxCount)
 }
 
 func sendStreamMessage(t *testing.T, from *app, to *app, msg []byte) {

@@ -49,6 +49,9 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 	return newTestAppWithMaxConnsAndCtx(t, newTestKey(t), seeds, noUpcalls, minConns, maxConns, true, port, context.Background())
 }
 func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, minaPeerExchange bool, port uint16, ctx context.Context) *app {
+	return newTestAppWithMaxConnsAndCtxAndGrace(t, privkey, seeds, noUpcalls, minConns, maxConns, minaPeerExchange, port, ctx, 10*time.Second)
+}
+func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, seeds []peer.AddrInfo, noUpcalls bool, minConns, maxConns int, minaPeerExchange bool, port uint16, ctx context.Context, gracePeriod time.Duration) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
@@ -66,7 +69,7 @@ func newTestAppWithMaxConnsAndCtx(t *testing.T, privkey crypto.PrivKey, seeds []
 		minConns,
 		maxConns,
 		minaPeerExchange,
-		10*time.Second,
+		gracePeriod,
 		nil,
 	)
 	require.NoError(t, err)

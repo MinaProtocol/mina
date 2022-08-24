@@ -681,7 +681,7 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 	logger.Debugf("wrote node status to stream %s", s.Protocol())
 }
 
-func (h Helper) pxConnectionWorker() {
+func (h *Helper) pxConnectionWorker() {
 	for peer := range h.pxDiscoveries {
 		connInfo := h.ConnectionManager.GetInfo()
 		if connInfo.ConnCount < connInfo.LowWater {
@@ -696,6 +696,10 @@ func (h Helper) pxConnectionWorker() {
 			h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
 		}
 	}
+}
+
+func (h *Helper) TrimOpenConns(ctx context.Context) {
+	h.ConnectionManager.TrimOpenConns(ctx)
 }
 
 // MakeHelper does all the initialization to run one host
