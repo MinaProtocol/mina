@@ -21,7 +21,7 @@ module Legacy_token_id : sig
 end
 
 module Body : sig
-  type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V1.t =
+  type t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
   [@@deriving equal, sexp, hash, yojson]
@@ -109,11 +109,7 @@ module Poly : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type ('common, 'body) t =
-            ( 'common
-            , 'body )
-            Mina_wire_types.Mina_base.Signed_command_payload.Poly.V1.t =
-        { common : 'common; body : 'body }
+      type ('common, 'body) t = { common : 'common; body : 'body }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
 
       val of_latest :

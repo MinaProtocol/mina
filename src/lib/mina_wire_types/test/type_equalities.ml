@@ -11,6 +11,7 @@ module Assert_equal0 (O : S0) (W : S0 with type t = O.t) = struct end
 
 module Assert_equal0V1 (O : V1S0) (W : V1S0 with type V1.t = O.V1.t) = struct end
 
+(*
 module Currency = struct
   module O = Currency
   module W = WT.Currency
@@ -36,6 +37,7 @@ module Public_key = struct
   include Assert_equal0V1 (O.Compressed.Stable) (W.Compressed)
   include Assert_equal0V1 (O.Stable) (W)
 end
+*)
 
 module Mina_numbers = struct
   module O = Mina_numbers
@@ -44,6 +46,7 @@ module Mina_numbers = struct
   include Assert_equal0V1 (O.Global_slot.Stable) (W.Global_slot)
 end
 
+(*
 module Mina_base = struct
   module O = Mina_base
   module W = WT.Mina_base
@@ -67,3 +70,4 @@ module Mina_base = struct
   include Assert_equal0V1 (O.Minting_payload.Stable) (W.Minting_payload)
   include Assert_equal0V1 (O.Signature.Stable) (W.Signature)
 end
+*)

@@ -25,8 +25,8 @@
    snark_bits
    pickles
    mina_wire_types
-   marlin_plonk_bindings
-   marlin_plonk_bindings.pasta_fp
+   ;marlin_plonk_bindings
+   ;marlin_plonk_bindings.pasta_fp
    crypto_params
    snarky_field_extensions
    snarky.intf

@@ -13,6 +13,8 @@ open Let_syntax
 [%%endif]
 
 open Intf
+module Signed_poly = Signed_poly
+module Wire_types = Mina_wire_types.Currency
 
 type uint64 = Unsigned.uint64
 
@@ -30,11 +32,13 @@ end
 module Make (Unsigned : sig
   include Unsigned_extended.S
 
-module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
-  module Signed_poly = Signed_poly
+  val to_uint64 : t -> uint64
 
-  module Make (Unsigned : sig
-    include Unsigned_extended.S
+  val of_uint64 : uint64 -> t
+end) (M : sig
+  val length : int
+end) : sig
+  [%%ifdef consensus_mechanism]
 
   include
     S
@@ -44,111 +48,109 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
        and type Signed.signed_fee = (Unsigned.t, Sgn.t) Signed_poly.t
        and type Signed.Checked.signed_fee_var = Field.Var.t Signed_var.t
 
-    val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var
+  val pack_var : var -> Field.Var.t
 
-    val unpack_var : Field.Var.t -> (var, _) Tick.Checked.t
+  [%%else]
 
   include
     S
       with type t = Unsigned.t
        and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
 
-    [%%else]
+  [%%endif]
 
-    include S with type t = Unsigned.t
+  val scale : t -> int -> t option
+end = struct
+  let max_int = Unsigned.max_int
 
-    [%%endif]
+  let length_in_bits = M.length
 
-    val scale : t -> int -> t option
-  end = struct
-    let max_int = Unsigned.max_int
+  type t = Unsigned.t [@@deriving sexp, compare, hash]
 
-    let length_in_bits = M.length
+  (* can't be automatically derived *)
+  let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
-    type t = Unsigned.t [@@deriving sexp, compare, hash]
+  [%%define_locally
+  Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
-    (* can't be automatically derived *)
-    let dhall_type = Ppx_dhall_type.Dhall_type.Text
+  let precision = 9
 
-    [%%define_locally
-    Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
+  let precision_exp = Unsigned.of_int @@ Int.pow 10 precision
 
-    let precision = 9
+  let to_formatted_string amount =
+    let rec go num_stripped_zeros num =
+      let open Int in
+      if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
+      else (num_stripped_zeros, num)
+    in
+    let whole = Unsigned.div amount precision_exp in
+    let remainder = Unsigned.to_int (Unsigned.rem amount precision_exp) in
+    if Int.(remainder = 0) then to_string whole
+    else
+      let num_stripped_zeros, num = go 0 remainder in
+      Printf.sprintf "%s.%0*d" (to_string whole)
+        Int.(precision - num_stripped_zeros)
+        num
 
-    let precision_exp = Unsigned.of_int @@ Int.pow 10 precision
+  let of_formatted_string input =
+    let parts = String.split ~on:'.' input in
+    match parts with
+    | [ whole ] ->
+        of_string (whole ^ String.make precision '0')
+    | [ whole; decimal ] ->
+        let decimal_length = String.length decimal in
+        if Int.(decimal_length > precision) then
+          of_string (whole ^ String.sub decimal ~pos:0 ~len:precision)
+        else
+          of_string
+            (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
+    | _ ->
+        failwith "Currency.of_formatted_string: Invalid currency input"
 
-    let to_formatted_string amount =
-      let rec go num_stripped_zeros num =
-        let open Int in
-        if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
-        else (num_stripped_zeros, num)
-      in
-      let whole = Unsigned.div amount precision_exp in
-      let remainder = Unsigned.to_int (Unsigned.rem amount precision_exp) in
-      if Int.(remainder = 0) then to_string whole
-      else
-        let num_stripped_zeros, num = go 0 remainder in
-        Printf.sprintf "%s.%0*d" (to_string whole)
-          Int.(precision - num_stripped_zeros)
-          num
+  module Arg = struct
+    type typ = t [@@deriving sexp, hash, compare]
 
-    let of_formatted_string input =
-      let parts = String.split ~on:'.' input in
-      match parts with
-      | [ whole ] ->
-          of_string (whole ^ String.make precision '0')
-      | [ whole; decimal ] ->
-          let decimal_length = String.length decimal in
-          if Int.(decimal_length > precision) then
-            of_string (whole ^ String.sub decimal ~pos:0 ~len:precision)
-          else
-            of_string
-              ( whole ^ decimal
-              ^ String.make Int.(precision - decimal_length) '0' )
-      | _ ->
-          failwith "Currency.of_formatted_string: Invalid currency input"
+    type t = typ [@@deriving sexp, hash, compare]
 
-    module Arg = struct
-      type typ = t [@@deriving sexp, hash, compare]
+    let to_string = to_formatted_string
 
-      type t = typ [@@deriving sexp, hash, compare]
+    let of_string = of_formatted_string
+  end
 
-      let to_string = to_formatted_string
+  include Codable.Make_of_string (Arg)
+  include Hashable.Make (Arg)
+  include Comparable.Make (Arg)
 
-      let of_string = of_formatted_string
-    end
+  let gen_incl a b : t Quickcheck.Generator.t =
+    let a = Bignum_bigint.of_string Unsigned.(to_string a) in
+    let b = Bignum_bigint.of_string Unsigned.(to_string b) in
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl a b)
+      ~f:(fun n -> of_string (Bignum_bigint.to_string n))
 
-    include Codable.Make_of_string (Arg)
-    include Hashable.Make (Arg)
-    include Comparable.Make (Arg)
+  let gen : t Quickcheck.Generator.t =
+    let m = Bignum_bigint.of_string Unsigned.(to_string max_int) in
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl zero m)
+      ~f:(fun n -> of_string (Bignum_bigint.to_string n))
 
-    let gen_incl a b : t Quickcheck.Generator.t =
-      let a = Bignum_bigint.of_string Unsigned.(to_string a) in
-      let b = Bignum_bigint.of_string Unsigned.(to_string b) in
-      Quickcheck.Generator.map
-        Bignum_bigint.(gen_incl a b)
-        ~f:(fun n -> of_string (Bignum_bigint.to_string n))
+  module Vector = struct
+    include M
+    include Unsigned
 
-    let gen : t Quickcheck.Generator.t =
-      let m = Bignum_bigint.of_string Unsigned.(to_string max_int) in
-      Quickcheck.Generator.map
-        Bignum_bigint.(gen_incl zero m)
-        ~f:(fun n -> of_string (Bignum_bigint.to_string n))
+    let empty = zero
 
-    module Vector = struct
-      include M
-      include Unsigned
+    let get t i = Infix.((t lsr i) land one = one)
 
-      let empty = zero
+    let set v i b =
+      if b then Infix.(v lor (one lsl i)) else Infix.(v land lognot (one lsl i))
+  end
 
-      let get t i = Infix.((t lsr i) land one = one)
+  module B = Bits.Vector.Make (Vector)
 
-      let set v i b =
-        if b then Infix.(v lor (one lsl i))
-        else Infix.(v land lognot (one lsl i))
-    end
+  include (B : Bits_intf.Convertible_bits with type t := t)
 
-    module B = Bits.Vector.Make (Vector)
+  [%%ifdef consensus_mechanism]
 
   type var = Field.Var.t
 
@@ -641,21 +643,14 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
     [%%endif]
   end
 
-  let currency_length = 64
+  [%%ifdef consensus_mechanism]
 
-  module Fee = struct
-    module T =
-      Make
-        (Unsigned_extended.UInt64)
-        (struct
-          let length = currency_length
-        end)
+  module Checked = struct
+    module N = Mina_numbers.Nat.Make_checked (Unsigned) (B)
 
-    include T
+    type t = var
 
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
+    let if_ = if_
 
     (* Unpacking protects against underflow *)
     let sub (x : var) (y : var) =
@@ -956,15 +951,17 @@ module Amount = struct
           val of_field : Field.Var.t -> t
         end
       end
-    end]
 
       [%%endif]
 
       val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
     end
   end
+  [@@warning "-32"]
 
-  module Amount = struct
+  module Make_str (A : sig
+    type t = Unsigned_extended.UInt64.Stable.V1.t
+  end) : Make_sig(A).S = struct
     module T =
       Make
         (Unsigned_extended.UInt64)
@@ -1024,33 +1021,37 @@ module Amount = struct
     [%%endif]
   end
 
-  module Balance = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = Amount.Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
+  include Make_str(struct
+    type t = Unsigned_extended.UInt64.Stable.V1.t
+  end)
+  (*include Wire_types.Make.Amount (Make_sig) (Make_str)*)
+end
 
-        let to_latest = Fn.id
+module Balance = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Amount.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
 
-        (* can't be automatically derived *)
-        let dhall_type = Ppx_dhall_type.Dhall_type.Text
-      end
-    end]
+      let to_latest = Fn.id
 
-    [%%ifdef consensus_mechanism]
+      (* can't be automatically derived *)
+      let dhall_type = Ppx_dhall_type.Dhall_type.Text
+    end
+  end]
 
-    include (Amount : Basic with type t := t with type var = Amount.var)
+  [%%ifdef consensus_mechanism]
 
-    [%%else]
+  include (Amount : Basic with type t := t with type var = Amount.var)
 
-    include (Amount : Basic with type t := t)
+  [%%else]
 
-    [%%endif]
+  include (Amount : Basic with type t := t)
 
-    let to_amount = Fn.id
+  [%%endif]
 
-    let add_amount = Amount.add
+  let to_amount = Fn.id
 
   let add_amount = Amount.add
 
@@ -1092,6 +1093,7 @@ module Amount = struct
     let ( + ) = add_amount
 
     let ( - ) = sub_amount
+  end
 
   [%%endif]
 end
@@ -1183,25 +1185,25 @@ let%test_module "sub_flagged module" =
   ( module struct
     [%%ifdef consensus_mechanism]
 
-    module Checked = struct
-      include Amount.Checked
+    open Tick
 
-      let add_signed_amount = add_signed
+    module type Sub_flagged_S = sig
+      type t
 
-      let add_amount = add
+      type magnitude = t [@@deriving sexp, compare]
 
       type var
 
       (* TODO =
          field Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list *)
 
-      let add_amount_flagged = add_flagged
+      val zero : t
 
-      let add_signed_amount_flagged = add_signed_flagged
+      val ( - ) : t -> t -> t option
 
-      let sub_amount_flagged = sub_flagged
+      val typ : (var, t) Typ.t
 
-      let ( + ) = add_amount
+      val gen : t Quickcheck.Generator.t
 
       module Checked : sig
         val sub_flagged :
@@ -1209,67 +1211,31 @@ let%test_module "sub_flagged module" =
       end
     end
 
+    let run_test (module M : Sub_flagged_S) =
+      let open M in
+      let sub_flagged_unchecked (x, y) =
+        if compare_magnitude x y < 0 then (zero, true)
+        else (Option.value_exn (x - y), false)
+      in
+      let sub_flagged_checked =
+        let f (x, y) =
+          Snarky_backendless.Checked.map (M.Checked.sub_flagged x y)
+            ~f:(fun (r, `Underflow u) -> (r, u))
+        in
+        Test_util.checked_to_unchecked (Typ.tuple2 typ typ)
+          (Typ.tuple2 typ Boolean.typ)
+          f
+      in
+      Quickcheck.test ~trials:100 (Quickcheck.Generator.tuple2 gen gen)
+        ~f:(fun p ->
+          let m, u = sub_flagged_unchecked p in
+          let m_checked, u_checked = sub_flagged_checked p in
+          assert (Bool.equal u u_checked) ;
+          if not u then [%test_eq: M.magnitude] m m_checked )
+
+    let%test_unit "fee sub_flagged" = run_test (module Fee)
+
+    let%test_unit "amount sub_flagged" = run_test (module Amount)
+
     [%%endif]
-  end
-
-  let%test_module "sub_flagged module" =
-    ( module struct
-      [%%ifdef consensus_mechanism]
-
-      open Tick
-
-      module type Sub_flagged_S = sig
-        type t
-
-        type magnitude = t [@@deriving sexp, compare]
-
-        type var =
-          field Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list
-
-        val zero : t
-
-        val ( - ) : t -> t -> t option
-
-        val typ : (var, t) Typ.t
-
-        val gen : t Quickcheck.Generator.t
-
-        module Checked : sig
-          val sub_flagged :
-               var
-            -> var
-            -> (var * [ `Underflow of Boolean.var ], 'a) Tick.Checked.t
-        end
-      end
-
-      let run_test (module M : Sub_flagged_S) =
-        let open M in
-        let sub_flagged_unchecked (x, y) =
-          if compare_magnitude x y < 0 then (zero, true)
-          else (Option.value_exn (x - y), false)
-        in
-        let sub_flagged_checked =
-          let f (x, y) =
-            Snarky_backendless.Checked.map (M.Checked.sub_flagged x y)
-              ~f:(fun (r, `Underflow u) -> (r, u))
-          in
-          Test_util.checked_to_unchecked (Typ.tuple2 typ typ)
-            (Typ.tuple2 typ Boolean.typ)
-            f
-        in
-        Quickcheck.test ~trials:100 (Quickcheck.Generator.tuple2 gen gen)
-          ~f:(fun p ->
-            let m, u = sub_flagged_unchecked p in
-            let m_checked, u_checked = sub_flagged_checked p in
-            assert (Bool.equal u u_checked) ;
-            if not u then [%test_eq: M.magnitude] m m_checked )
-
-      let%test_unit "fee sub_flagged" = run_test (module Fee)
-
-      let%test_unit "amount sub_flagged" = run_test (module Amount)
-
-      [%%endif]
-    end )
-end
-
-include Mina_wire_types.Currency.Make (Make_sig) (Make_str)
+  end )
