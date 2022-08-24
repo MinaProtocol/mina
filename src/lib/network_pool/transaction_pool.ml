@@ -1388,18 +1388,7 @@ struct
                   in
                   Or_error.errorf "Diff failed with verification failure(s): %s"
                     errs_string
-              | Error errs ->
-                  let errs_string =
-                    List.map errs ~f:(fun err ->
-                        match err with
-                        | Command_failure cmd_err ->
-                            Yojson.Safe.to_string (Diff_error.to_yojson cmd_err)
-                        | Invalid_failure invalid ->
-                            Verifier.invalid_to_string invalid )
-                    |> String.concat ~sep:", "
-                  in
-                  failwith errs_string
-              | Ok () ->
+              | Error _ | Ok () ->
                   let data =
                     List.filter_map diffs' ~f:(function
                       | Error (`Invalid_command | `Other_command_failed) ->
@@ -1734,7 +1723,7 @@ let%test_module _ =
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()) )
 
-    let `VK vk, `Prover _ =
+    let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
     module Mock_transition_frontier = struct
@@ -1793,12 +1782,6 @@ let%test_module _ =
     let () =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true
-
-    (** Assert the invariants of the locally generated command tracking system.
-    *)
-
-    let `VK _, `Prover prover =
-      Lazy.force Transaction_snark_tests.Util.trivial_zkapp
 
     let replace_parties_authorizations ~keymap cmds =
       Deferred.List.map
