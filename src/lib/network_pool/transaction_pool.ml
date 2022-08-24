@@ -561,7 +561,6 @@ struct
               @@ Currency.Balance.to_uint64 account.balance )
           in
           let empty_state = (Account.Nonce.zero, Currency.Amount.zero) in
-          (* TODO: it occurs to me that this batch logic is duplicated during the staged ledger apply... we should try and share data *)
           let existing_account_states_by_id =
             preload_accounts best_tip_ledger accounts_to_check
           in
@@ -939,7 +938,7 @@ struct
         [%log' error t.logger] ~metadata
           "Error verifying transaction pool diff from $sender: $error" ;
         if punish && not is_local then
-          (* TODO: Make this error more specific (could also be a bad signature. *)
+          (* TODO: Make this error more specific (could also be a bad signature). *)
           trust_record
             ( Trust_system.Actions.Sent_invalid_proof
             , Some ("Error verifying transaction pool diff: $error", metadata)
@@ -987,7 +986,7 @@ struct
           Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
         in
         let%bind () =
-          (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already *)
+          (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already (#11704) *)
           let (`Already_mem already_mem) =
             Lru_cache.add t.recently_seen (Lru_cache.T.hash diff.data)
           in
@@ -1013,7 +1012,7 @@ struct
             (List.is_empty cmds_with_insufficient_fees)
             ~error:"Some commands have insufficient fee"
         in
-        (* TODO: batch `to_verifiable` *)
+        (* TODO: batch `to_verifiable` (#11705) *)
         let%bind ledger =
           match t.best_tip_ledger with
           | Some ledger ->
@@ -1056,7 +1055,7 @@ struct
             in
             Error Error.(tag (of_string msg) ~tag:"Verification_failed")
         | Ok (Ok commands) ->
-            (* TODO: we don't hash this anywhere prior to this? *)
+            (* TODO: avoid duplicate hashing (#11706) *)
             O1trace.sync_thread "hashing_transactions_after_verification"
               (fun () ->
                 Deferred.return
@@ -1109,7 +1108,6 @@ struct
               |> User_command.fee_payer )
           |> Account_id.Set.of_list
         in
-        (* TODO: do we need to load all of these? or just the ones that aren't already in the Indexed_pool? I think we can compute some of this info from the pool *)
         let fee_payer_accounts =
           preload_accounts ledger fee_payer_account_ids
         in
@@ -1132,7 +1130,6 @@ struct
             ~f:(fun pool cmd ->
               let result =
                 let%bind.Result () = check_command pool cmd in
-                (* TODO: compute from pool (when possible) *)
                 let account = Map.find_exn fee_payer_accounts (fee_payer cmd) in
                 let balance =
                   Currency.Amount.of_uint64
