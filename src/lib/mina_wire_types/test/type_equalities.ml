@@ -10,8 +10,8 @@ open WT.Utils
 module Assert_equal0 (O : S0) (W : S0 with type t = O.t) = struct end
 
 module Assert_equal0V1 (O : V1S0) (W : V1S0 with type V1.t = O.V1.t) = struct end
+module Assert_equal0V2 (O : V2S0) (W : V2S0 with type V2.t = O.V2.t) = struct end
 
-(*
 module Currency = struct
   module O = Currency
   module W = WT.Currency
@@ -20,6 +20,7 @@ module Currency = struct
   include Assert_equal0V1 (O.Balance.Stable) (W.Balance)
 end
 
+(*
 module Snark_params = struct
   module O = Snark_params
   module W = WT.Snark_params
