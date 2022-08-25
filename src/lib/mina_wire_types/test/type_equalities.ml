@@ -53,23 +53,23 @@ module Mina_base = struct
   module O = Mina_base
   module W = WT.Mina_base
   include Assert_equal0V1 (O.Signature.Stable) (W.Signature)
+  include Assert_equal0V1 (O.Signed_command_memo.Stable) (W.Signed_command_memo)
+  include
+    Assert_equal0V2
+      (O.Signed_command_payload.Common.Stable)
+      (W.Signed_command_payload.Common)
+  include Assert_equal0V2 (O.Payment_payload.Stable) (W.Payment_payload)
+  include Assert_equal0V1 (O.Stake_delegation.Stable) (W.Stake_delegation)
+  include
+    Assert_equal0V2
+      (O.Signed_command_payload.Body.Stable)
+      (W.Signed_command_payload.Body)
+  include
+    Assert_equal0V2 (O.Signed_command_payload.Stable) (W.Signed_command_payload)
   (* To port from V1 to V2
 
-     include
-       Assert_equal0V1
-         (O.Signed_command_payload.Common.Stable)
-         (W.Signed_command_payload.Common)
-     include
-       Assert_equal0V1
-         (O.Signed_command_payload.Body.Stable)
-         (W.Signed_command_payload.Body)
-     include
-       Assert_equal0V1 (O.Signed_command_payload.Stable) (W.Signed_command_payload)
-     include Assert_equal0V1 (O.Signed_command_memo.Stable) (W.Signed_command_memo)
      include Assert_equal0V1 (O.Signed_command.Stable) (W.Signed_command)
      include Assert_equal0V1 (O.Token_id.Stable) (W.Token_id)
-     include Assert_equal0V1 (O.Payment_payload.Stable) (W.Payment_payload)
-     include Assert_equal0V1 (O.Stake_delegation.Stable) (W.Stake_delegation)
      include Assert_equal0V1 (O.New_token_payload.Stable) (W.New_token_payload)
      include Assert_equal0V1 (O.New_account_payload.Stable) (W.New_account_payload)
      include Assert_equal0V1 (O.Minting_payload.Stable) (W.Minting_payload)

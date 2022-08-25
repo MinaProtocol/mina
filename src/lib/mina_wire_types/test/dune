@@ -8,6 +8,7 @@
     snark_params
     signature_lib
     mina_base
+    mina_base.import
     mina_numbers
     ; Necessary for the type equality
     kimchi_backend.pasta

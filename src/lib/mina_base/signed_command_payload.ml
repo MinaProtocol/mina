@@ -38,6 +38,12 @@ module Common = struct
     module Stable = struct
       module V2 = struct
         type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
+              ( 'fee
+              , 'public_key
+              , 'nonce
+              , 'global_slot
+              , 'memo )
+              Mina_wire_types.Mina_base.Signed_command_payload.Common.Poly.V2.t =
           { fee : 'fee
           ; fee_payer_pk : 'public_key
           ; nonce : 'nonce
@@ -168,7 +174,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
-        type t =
+        type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
           | Payment of Payment_payload.Stable.V2.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
         [@@deriving sexp]
