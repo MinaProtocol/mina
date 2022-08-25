@@ -951,8 +951,8 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
   Ivar.read result_ivar
 
 let add_full_transactions t user_commands =
-  let _, too_big_commands =
-    List.partition_tf user_commands ~f:User_command.valid_size
+  let too_big_commands =
+    List.filter user_commands ~f:(fun cmd -> not @@ User_command.valid_size cmd)
   in
   if not @@ List.is_empty too_big_commands then
     Deferred.Result.fail
@@ -965,12 +965,20 @@ let add_full_transactions t user_commands =
     Ivar.read result_ivar
 
 let add_zkapp_transactions t (partiess : Parties.t list) =
-  let result_ivar = Ivar.create () in
-  let cmd_inputs = Parties_command_inputs partiess in
-  Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
-  |> Deferred.don't_wait_for ;
-  Ivar.read result_ivar
+  let too_big_partiess =
+    List.filter partiess ~f:(fun parties -> not @@ Parties.valid_size parties)
+  in
+  if not @@ List.is_empty too_big_partiess then
+    Deferred.Result.fail
+      (Error.of_string
+         "List of zkApps transactions contains at least one too-big zkApp" )
+  else
+    let result_ivar = Ivar.create () in
+    let cmd_inputs = Parties_command_inputs partiess in
+    Strict_pipe.Writer.write t.pipes.user_command_input_writer
+      (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
+    |> Deferred.don't_wait_for ;
+    Ivar.read result_ivar
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -1838,26 +1846,10 @@ let create ?wallets (config : Config.t) =
                      allow the nonce to be omitted, and infer it, as done
                      for user command inputs
                   *)
-                  let valid_size_partiess, too_big_partiess =
-                    List.partition_tf partiess ~f:Parties.valid_size
-                  in
-                  if not @@ List.is_empty too_big_partiess then (
-                    [%log' warn config.logger]
-                      "Not adding %d too-big local Parties transactions to \
-                       transaction pool"
-                      (List.length too_big_partiess) ;
-                    [%log' debug config.logger]
-                      "Too-big local Parties transactions not added to \
-                       transaction pool"
-                      ~metadata:
-                        [ ( "partiess"
-                          , `List
-                              (List.map too_big_partiess ~f:Parties.to_yojson)
-                          )
-                        ] ) ;
+                  (* too-big Parties.t's were filtered when writing to the user command pipe *)
                   Network_pool.Transaction_pool.Local_sink.push tx_local_sink
-                    ( List.map valid_size_partiess ~f:(fun cmd ->
-                          User_command.Parties cmd )
+                    ( List.map partiess ~f:(fun parties ->
+                          User_command.Parties parties )
                     , result_cb ) )
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
