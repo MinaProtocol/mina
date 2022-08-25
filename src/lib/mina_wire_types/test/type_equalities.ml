@@ -7,8 +7,11 @@ module WT = Mina_wire_types
 open WT.Utils
 
 (* Given two modules containing one type, check the types are equal *)
+(* For types with arity 0 *)
 module Assert_equal0 (O : S0) (W : S0 with type t = O.t) = struct end
 
+(* Assert_equalXVY checks the equality of two versioned
+   types of arity X with version Y *)
 module Assert_equal0V1 (O : V1S0) (W : V1S0 with type V1.t = O.V1.t) = struct end
 module Assert_equal0V2 (O : V2S0) (W : V2S0 with type V2.t = O.V2.t) = struct end
 
@@ -45,10 +48,12 @@ module Mina_numbers = struct
   include Assert_equal0V1 (O.Global_slot.Stable) (W.Global_slot)
 end
 
-(*
 module Mina_base = struct
   module O = Mina_base
   module W = WT.Mina_base
+  include Assert_equal0V1 (O.Signature.Stable) (W.Signature)
+  (* To port from V1 to V2
+   
   include
     Assert_equal0V1
       (O.Signed_command_payload.Common.Stable)
@@ -67,6 +72,6 @@ module Mina_base = struct
   include Assert_equal0V1 (O.New_token_payload.Stable) (W.New_token_payload)
   include Assert_equal0V1 (O.New_account_payload.Stable) (W.New_account_payload)
   include Assert_equal0V1 (O.Minting_payload.Stable) (W.Minting_payload)
-  include Assert_equal0V1 (O.Signature.Stable) (W.Signature)
+
+  *)
 end
-*)
