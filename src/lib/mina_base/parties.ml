@@ -1440,21 +1440,23 @@ let dummy =
 *)
 let valid_size t =
   let max_other_parties = 6 in
-  let max_events = 12 in
-  let max_sequence_events = 12 in
+  let max_events_size = 12 in
+  let max_sequence_events_size = 12 in
   let events_size events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let num_other_parties, num_events, num_sequence_events =
+  let num_other_parties, num_events_size, num_sequence_events_size =
     Call_forest.fold t.other_parties ~init:(0, 0, 0)
-      ~f:(fun (len, evs, seq_evs) party ->
-        let party_evs = events_size party.body.events in
-        let party_seq_evs = events_size party.body.sequence_events in
-        (len + 1, evs + party_evs, seq_evs + party_seq_evs) )
+      ~f:(fun (num_parties, evs_size, seq_evs_size) party ->
+        let party_evs_size = events_size party.body.events in
+        let party_seq_evs_size = events_size party.body.sequence_events in
+        ( num_parties + 1
+        , evs_size + party_evs_size
+        , seq_evs_size + party_seq_evs_size ) )
   in
   num_other_parties <= max_other_parties
-  && num_events <= max_events
-  && num_sequence_events <= max_sequence_events
+  && num_events_size <= max_events_size
+  && num_sequence_events_size <= max_sequence_events_size
 
 let inner_query =
   lazy
