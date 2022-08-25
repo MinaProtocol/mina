@@ -66,9 +66,9 @@ module Mina_base = struct
       (W.Signed_command_payload.Body)
   include
     Assert_equal0V2 (O.Signed_command_payload.Stable) (W.Signed_command_payload)
+  include Assert_equal0V2 (O.Signed_command.Stable) (W.Signed_command)
   (* To port from V1 to V2
 
-     include Assert_equal0V1 (O.Signed_command.Stable) (W.Signed_command)
      include Assert_equal0V1 (O.Token_id.Stable) (W.Token_id)
      include Assert_equal0V1 (O.New_token_payload.Stable) (W.New_token_payload)
      include Assert_equal0V1 (O.New_account_payload.Stable) (W.New_account_payload)

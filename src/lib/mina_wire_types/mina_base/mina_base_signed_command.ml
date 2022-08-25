@@ -12,3 +12,11 @@ module V1 = struct
     , Mina_base_signature.V1.t )
     Poly.V1.t
 end
+
+module V2 = struct
+  type t =
+    ( Mina_base_signed_command_payload.V2.t
+    , Public_key.V1.t
+    , Mina_base_signature.V1.t )
+    Poly.V1.t
+end
