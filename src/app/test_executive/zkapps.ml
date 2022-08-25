@@ -463,7 +463,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           mk_forest
             [ mk_node
                 (mk_party_body Call token_owner Token_id.default
-                   (-2 * account_creation_fee_int) )
+                   (-account_creation_fee_int) )
                 [ mk_node
                     (mk_party_body Call token_accounts.(0) custom_token_id (-30))
                     []
@@ -491,7 +491,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           mk_forest
             [ mk_node
                 (mk_party_body Call token_owner Token_id.default
-                   (-2 * account_creation_fee_int) )
+                   (-account_creation_fee_int) )
                 [ mk_node
                     (mk_party_body Call token_accounts.(1) custom_token_id (-5))
                     []
