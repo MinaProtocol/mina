@@ -39,4 +39,8 @@ module Stable : sig
   end
 end]
 
-include Signed_command_intf.S with type t = Stable.Latest.t
+include
+  Signed_command_intf.S
+    with type t = Stable.Latest.t
+     and type With_valid_signature.Stable.V2.t =
+      Mina_wire_types.Mina_base.Signed_command.With_valid_signature.Stable.V2.t

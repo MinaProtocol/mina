@@ -74,6 +74,27 @@ module type Gen_intf = sig
   end
 end
 
+module type With_valid_signature_intf = sig
+  type tt
+
+  module Stable : sig
+    module V2 : sig
+      type nonrec t = private tt
+      [@@deriving sexp, equal, bin_io, yojson, version, compare, hash]
+
+      include Gen_intf with type t := t
+    end
+
+    module Latest = V2
+  end
+
+  type t = Stable.V2.t [@@deriving sexp, yojson, compare, hash]
+
+  include Gen_intf with type t := t
+
+  include Comparable.S with type t := t
+end
+
 module type S = sig
   type t [@@deriving sexp, yojson, hash]
 
@@ -129,24 +150,7 @@ module type S = sig
 
   include Gen_intf with type t := t
 
-  module With_valid_signature : sig
-    module Stable : sig
-      module Latest : sig
-        type nonrec t = private t
-        [@@deriving sexp, equal, bin_io, yojson, version, compare, hash]
-
-        include Gen_intf with type t := t
-      end
-
-      module V2 = Latest
-    end
-
-    type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]
-
-    include Gen_intf with type t := t
-
-    include Comparable.S with type t := t
-  end
+  module With_valid_signature : With_valid_signature_intf with type tt := t
 
   val sign_payload :
        ?signature_kind:Mina_signature_kind.t

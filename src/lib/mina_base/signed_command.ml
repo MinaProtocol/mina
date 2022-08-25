@@ -304,7 +304,18 @@ module Gen = struct
           return @@ sign' sender_pk payload )
 end
 
-module With_valid_signature = struct
+module With_valid_signature_make_sig
+    (T : Mina_wire_types.Mina_base.Signed_command.With_valid_signature.Types.S) =
+struct
+  module type S =
+    Signed_command_intf.With_valid_signature_intf
+      with type tt := t
+      with type Stable.V2.t = T.Stable.V2.t
+end
+
+module With_valid_signature_make_str
+    (T : Mina_wire_types.Mina_base.Signed_command.With_valid_signature.Concrete) :
+  With_valid_signature_make_sig(T).S = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -323,6 +334,11 @@ module With_valid_signature = struct
   module Gen = Stable.Latest.Gen
   include Comparable.Make (Stable.Latest)
 end
+
+module With_valid_signature =
+  Mina_wire_types.Mina_base.Signed_command.With_valid_signature.Make
+    (With_valid_signature_make_sig)
+    (With_valid_signature_make_str)
 
 let to_valid_unsafe t =
   `If_this_is_used_it_should_have_a_comment_justifying_it t
