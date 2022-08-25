@@ -104,7 +104,7 @@ let create_ledger_and_transactions num_transactions :
       in
       (ledger, [ Command (Signed_command a); Command (Signed_command b) ])
 
-let create_ledger_and_zkapps num_transactions :
+let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties :
     Mina_ledger.Ledger.t * Parties.t list =
   let length =
     match num_transactions with
@@ -113,28 +113,234 @@ let create_ledger_and_zkapps num_transactions :
     | `Two_from_same ->
         failwith "Must provide a count when profiling with snapps"
   in
-  let max_other_parties =
-    let min_max = Mina_generators.Parties_generators.max_other_parties in
-    Quickcheck.random_value (Int.gen_incl min_max 20)
+  let `VK verification_key, `Prover prover =
+    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
   in
+  let num_keypairs = num_parties + 10 in
+  let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
+  let num_keypairs_in_ledger = num_parties + 1 in
+  let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
+  let account_ids =
+    List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
+        Account_id.create (Public_key.compress public_key) Token_id.default )
+  in
+  let balances =
+    let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
+    let min_balance =
+      Currency.Fee.to_int min_cmd_fee
+      |> Int.( + ) 1_000_000_000_000_000
+      |> Currency.Balance.of_int
+    in
+    (* max balance to avoid overflow when adding deltas *)
+    let max_balance =
+      let max_bal = Currency.Balance.of_formatted_string "10000000.0" in
+      match
+        Currency.Balance.add_amount min_balance
+          (Currency.Balance.to_amount max_bal)
+      with
+      | None ->
+          failwith "parties_with_ledger: overflow for max_balance"
+      | Some _ ->
+          max_bal
+    in
+    Quickcheck.random_value
+      (Quickcheck.Generator.list_with_length num_keypairs_in_ledger
+         (Currency.Balance.gen_incl min_balance max_balance) )
+  in
+  let account_ids_and_balances = List.zip_exn account_ids balances in
+  let snappify_account (account : Account.t) : Account.t =
+    (* TODO: use real keys *)
+    let permissions =
+      { Permissions.user_default with
+        edit_state = Permissions.Auth_required.Either
+      ; send = Either
+      ; set_delegate = Either
+      ; set_permissions = Either
+      ; set_verification_key = Either
+      ; set_zkapp_uri = Either
+      ; edit_sequence_state = Either
+      ; set_token_symbol = Either
+      ; increment_nonce = Either
+      ; set_voting_for = Either
+      }
+    in
+    let verification_key = Some verification_key in
+    let zkapp = Some { Zkapp_account.default with verification_key } in
+    { account with permissions; zkapp }
+  in
+  (* half zkApp accounts, half non-zkApp accounts *)
+  let accounts =
+    List.map account_ids_and_balances ~f:(fun (account_id, balance) ->
+        let account = Account.create account_id balance in
+        snappify_account account )
+  in
+  let fee_payer_keypair = List.hd_exn keypairs in
+  let fee_payer_pk = Public_key.compress fee_payer_keypair.public_key in
+  let ledger =
+    Mina_ledger.Ledger.create ~depth:constraint_constants.ledger_depth ()
+  in
+  List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
+      match Mina_ledger.Ledger.get_or_create_account ledger acct_id acct with
+      | Error err ->
+          failwithf
+            "parties: error adding account for account id: %s, error: %s@."
+            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
+            (Error.to_string_hum err) ()
+      | Ok (`Existed, _) ->
+          failwithf "parties: account for account id already exists: %s@."
+            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
+            ()
+      | Ok (`Added, _) ->
+          () ) ;
+  let field_array_list_gen ~array_len ~list_len =
+    let open Quickcheck.Generator.Let_syntax in
+    let array_gen =
+      let%map fields =
+        Quickcheck.Generator.list_with_length array_len
+          Snark_params.Tick.Field.gen
+      in
+      Array.of_list fields
+    in
+    Quickcheck.Generator.list_with_length list_len array_gen
+  in
+  let fee = Currency.Fee.of_int 1_000_000 in
+  let sequence_events =
+    Quickcheck.random_value (field_array_list_gen ~array_len:1 ~list_len:2)
+  in
+  let snapp_update =
+    { Party.Update.dummy with
+      app_state =
+        Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
+            Zkapp_basic.Set_or_keep.Set (Snark_params.Tick.Field.of_int i) )
+    }
+  in
+  let amount = Currency.Amount.of_int 1_000_000_000 in
+  let receiver_count = num_parties - num_proof_parties in
+  let test_spec nonce : Transaction_snark.For_tests.Spec.t =
+    { sender = (fee_payer_keypair, nonce)
+    ; fee
+    ; fee_payer = None
+    ; receivers =
+        List.map (List.take keypairs_in_ledger receiver_count) ~f:(fun kp ->
+            (Signature_lib.Public_key.compress kp.public_key, amount) )
+    ; amount =
+        ( if receiver_count > 0 then
+          Currency.Amount.scale amount receiver_count |> Option.value_exn
+        else Currency.Amount.zero )
+    ; zkapp_account_keypairs = List.take keypairs_in_ledger num_proof_parties
+    ; memo = Signed_command_memo.create_from_string_exn "blah"
+    ; new_zkapp_account = false
+    ; snapp_update
+    ; current_auth = Permissions.Auth_required.Proof
+    ; call_data = Snark_params.Tick.Field.zero
+    ; events = []
+    ; sequence_events
+    ; preconditions = None
+    }
+  in
+  let rec generate_zkapp n acc nonce =
+    if n <= 0 then List.rev acc
+    else
+      let start = Time.now () in
+      let parties =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Transaction_snark.For_tests.update_states ~zkapp_prover:prover
+              ~constraint_constants (test_spec nonce) )
+      in
+      let other_parties = Parties.other_parties_list parties in
+      let proof_count, signature_count, no_auths, next_nonce =
+        List.fold ~init:(0, 0, 0, nonce)
+          (Party.of_fee_payer parties.fee_payer :: other_parties)
+          ~f:(fun (pc, sc, na, nonce) (p : Party.t) ->
+            let nonce =
+              if
+                Public_key.Compressed.equal p.body.public_key fee_payer_pk
+                && p.body.increment_nonce
+              then Mina_base.Account.Nonce.succ nonce
+              else nonce
+            in
+            match p.authorization with
+            | Proof _ ->
+                (pc + 1, sc, na, nonce)
+            | Signature _ ->
+                (pc, sc + 1, na, nonce)
+            | _ ->
+                (pc, sc, na + 1, nonce) )
+      in
+      printf
+        !"Generated zkapp with %d parties of which %d signatures, %d proofs \
+          and %d none in %f secs\n\
+          %!"
+        (List.length other_parties + 1)
+        signature_count proof_count no_auths
+        Time.(Span.to_sec (diff (now ()) start)) ;
+      generate_zkapp (n - 1) (parties :: acc) next_nonce
+  in
+  (ledger, generate_zkapp length [] Mina_base.Account.Nonce.zero)
+
+let _create_ledger_and_zkapps_from_generator num_transactions :
+    Mina_ledger.Ledger.t * Parties.t list =
+  let length =
+    match num_transactions with
+    | `Count length ->
+        length
+    | `Two_from_same ->
+        failwith "Must provide a count when profiling with snapps"
+  in
+  let max_other_parties = 6 in
+  let num_proof_parties = 6 in
+  printf
+    !"Generating zkApp transactions with %d parties and %d proof parties\n%!"
+    max_other_parties num_proof_parties ;
+  let start = Time.now () in
+  (*let `VK vk, `Prover prover, `Proof proof =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Transaction_snark.For_tests.create_dummy_but_valid_zkapp_proof
+            ~constraint_constants () )
+    in*)
   let `VK vk, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
   in
   let cmd_infos, ledger =
     Quickcheck.random_value
       (Mina_generators.User_command_generators.sequence_parties_with_ledger
-         ~max_other_parties ~length ~vk () )
+         ~max_other_parties ~num_proof_parties ~length ~vk () )
   in
   let zkapps =
     List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->
         match user_cmd with
         | User_command.Parties parties_valid ->
+            let parties = Parties.Valid.forget parties_valid in
+            let other_parties = Parties.other_parties_list parties in
+            let proof_count, signature_count, no_auths =
+              List.fold ~init:(0, 0, 0)
+                (Party.of_fee_payer parties.fee_payer :: other_parties)
+                ~f:(fun (pc, sc, na) (p : Party.t) ->
+                  match p.authorization with
+                  | Proof _ ->
+                      (pc + 1, sc, na)
+                  | Signature _ ->
+                      (pc, sc + 1, na)
+                  | _ ->
+                      (pc, sc, na + 1) )
+            in
+            printf
+              !"Generated zkapp with %d parties of which %d signatures, %d \
+                proofs and %d none\n\
+                %!"
+              (List.length other_parties + 1)
+              signature_count proof_count no_auths ;
             Async.Thread_safe.block_on_async_exn (fun () ->
-                Parties_builder.replace_authorizations ~prover ~keymap
+                Parties_builder.replace_authorizations
+                  ~prover (*~dummy_proof:proof*)
+                  ~keymap
                   (Parties.Valid.forget parties_valid) )
         | User_command.Signed_command _ ->
             failwith "Expected Parties user command" )
   in
+  printf
+    !"Time to generate zkapps: %f secs\n%!"
+    Time.(Span.to_sec (diff (now ()) start)) ;
   (ledger, zkapps)
 
 let time thunk =
@@ -269,9 +475,11 @@ let profile_zkapps ~verifier ledger partiess =
   let%map () =
     let num_partiess = List.length partiess in
     Async.Deferred.List.iteri partiess ~f:(fun ndx parties ->
+        let other_parties = Parties.other_parties_list parties in
         printf "Processing zkApp %d of %d, other_parties length: %d\n" (ndx + 1)
           num_partiess
-          (List.length @@ Parties.other_parties_list parties) ;
+          (List.length other_parties) ;
+        let v_start_time = Time.now () in
         let%bind res =
           Verifier.verify_commands verifier
             [ User_command.to_verifiable ~ledger ~get:Mina_ledger.Ledger.get
@@ -279,6 +487,22 @@ let profile_zkapps ~verifier ledger partiess =
                 (Parties parties)
             ]
         in
+        let proof_count, signature_count =
+          List.fold ~init:(0, 0)
+            (Party.of_fee_payer parties.fee_payer :: other_parties)
+            ~f:(fun (pc, sc) (p : Party.t) ->
+              match p.authorization with
+              | Proof _ ->
+                  (pc + 1, sc)
+              | Signature _ ->
+                  (pc, sc + 1)
+              | _ ->
+                  (pc, sc) )
+        in
+        printf
+          !"Verifying zkapp with %d signatures and %d proofs took %f secs\n%!"
+          signature_count proof_count
+          Time.(Span.to_sec (diff (now ()) v_start_time)) ;
         let _a = Or_error.ok_exn res in
         let tm_zkapp0 = Core.Unix.gettimeofday () in
         (*verify*)
@@ -398,12 +622,14 @@ let generate_base_snarks_witness sparse_ledger0
       : Sparse_ledger.t ) ;
   Async.Deferred.return "Base constraint system satisfied"
 
-let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
-    use_zkapps : unit =
+let run ~user_command_profiler ~zkapp_profiler num_transactions ~num_parties
+    ~num_proof_parties repeats preeval use_zkapps : unit =
   let logger = Logger.null () in
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
-    let ledger, transactions = create_ledger_and_zkapps num_transactions in
+    let ledger, transactions =
+      create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties
+    in
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -445,7 +671,8 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions repeats preeval
     in
     go repeats
 
-let main num_transactions repeats preeval use_zkapps () =
+let main ~num_parties ~num_proof_parties num_transactions repeats preeval
+    use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
         let constraint_constants =
@@ -455,24 +682,28 @@ let main num_transactions repeats preeval use_zkapps () =
       end) in
       run
         ~user_command_profiler:(profile_user_command (module T))
-        ~zkapp_profiler:profile_zkapps num_transactions repeats preeval
-        use_zkapps )
+        ~zkapp_profiler:profile_zkapps num_transactions ~num_parties
+        ~num_proof_parties repeats preeval use_zkapps )
 
-let dry num_transactions repeats preeval use_zkapps () =
+let dry ~num_parties ~num_proof_parties num_transactions repeats preeval
+    use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't check base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
       run ~user_command_profiler:check_base_snarks ~zkapp_profiler
-        num_transactions repeats preeval use_zkapps )
+        num_transactions ~num_parties ~num_proof_parties repeats preeval
+        use_zkapps )
 
-let witness num_transactions repeats preeval use_zkapps () =
+let witness ~num_parties ~num_proof_parties num_transactions repeats preeval
+    use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't generate witnesses for base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
       run ~user_command_profiler:generate_base_snarks_witness ~zkapp_profiler
-        num_transactions repeats preeval use_zkapps )
+        num_transactions ~num_parties ~num_proof_parties repeats preeval
+        use_zkapps )
 
 let command =
   let open Command.Let_syntax in
@@ -504,10 +735,26 @@ let command =
      and use_zkapps =
        flag "--zkapps" ~aliases:[ "-zkapps" ]
          ~doc:"Use zkApp transactions instead of payments" no_arg
+     and num_updates =
+       flag "--num-updates" ~aliases:[ "-num-updates" ]
+         ~doc:
+           "Number of account updates per transaction (excluding the fee \
+            payer). Default:6"
+         (optional int)
+     and num_proof_updates =
+       flag "--num-proof-updates" ~aliases:[ "-num-proof-updates" ]
+         ~doc:
+           "Number of updates out of total updates that are to be authorized \
+            by a proof. Default:6"
+         (optional int)
      in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
        |> Option.value ~default:`Two_from_same
+     in
+     let num_parties = Option.value num_updates ~default:6 in
+     let num_proof_parties =
+       Option.value num_proof_updates ~default:num_parties
      in
      if use_zkapps then (
        let incompatible_flags = ref [] in
@@ -526,6 +773,12 @@ let command =
            (String.concat !incompatible_flags ~sep:", ") ;
          exit 1 ) ) ;
      let repeats = Option.value repeats ~default:1 in
-     if witness_only then witness num_transactions repeats preeval use_zkapps
-     else if check_only then dry num_transactions repeats preeval use_zkapps
-     else main num_transactions repeats preeval use_zkapps )
+     if witness_only then
+       witness ~num_parties ~num_proof_parties num_transactions repeats preeval
+         use_zkapps
+     else if check_only then
+       dry ~num_parties ~num_proof_parties num_transactions repeats preeval
+         use_zkapps
+     else
+       main ~num_parties ~num_proof_parties num_transactions repeats preeval
+         use_zkapps )
