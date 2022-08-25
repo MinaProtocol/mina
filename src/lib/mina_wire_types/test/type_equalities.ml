@@ -10,11 +10,20 @@ open WT.Utils
 (* For types with arity 0 *)
 module Assert_equal0 (O : S0) (W : S0 with type t = O.t) = struct end
 
+(* For types with arity 1 *)
+module Assert_equal1 (O : S1) (W : S1 with type 'a t = 'a O.t) = struct end
+
 (* Assert_equalXVY checks the equality of two versioned
    types of arity X with version Y *)
 module Assert_equal0V1 (O : V1S0) (W : V1S0 with type V1.t = O.V1.t) = struct end
 
 module Assert_equal0V2 (O : V2S0) (W : V2S0 with type V2.t = O.V2.t) = struct end
+
+module Assert_equal1V1 (O : V1S1) (W : V1S1 with type 'a V1.t = 'a O.V1.t) =
+struct end
+
+module Assert_equal1V2 (O : V2S1) (W : V2S1 with type 'a V2.t = 'a O.V2.t) =
+struct end
 
 module Currency = struct
   module O = Currency
@@ -49,6 +58,21 @@ module Mina_numbers = struct
   include Assert_equal0V1 (O.Global_slot.Stable) (W.Global_slot)
 end
 
+module Pickles_base = struct
+  module O = Pickles_base
+  module W = WT.Pickles_base
+  include Assert_equal0V1 (O.Proofs_verified.Stable) (W.Proofs_verified)
+end
+
+module Pickles = struct
+  module O = Pickles
+  module W = WT.Pickles
+  include
+    Assert_equal0V2
+      (O.Side_loaded.Verification_key.Stable)
+      (W.Side_loaded.Verification_key)
+end
+
 module Mina_base = struct
   module O = Mina_base
   module W = WT.Mina_base
@@ -76,6 +100,20 @@ module Mina_base = struct
   include Assert_equal0V1 (O.Party.Fee_payer.Stable) (W.Party.Fee_payer)
   include Assert_equal0V1 (O.Account_id.Digest.Stable) (W.Account_id.Digest)
   include Assert_equal0V1 (O.Token_id.Stable) (W.Token_id)
+  include Assert_equal1V1 (O.Zkapp_state.V.Stable) (W.Zkapp_state.V)
+  include
+    Assert_equal1V1
+      (O.Zkapp_basic.Set_or_keep.Stable)
+      (W.Zkapp_basic.Set_or_keep)
+  include Assert_equal0V2 (O.Permissions.Stable) (W.Permissions)
+  include
+    Assert_equal0V1 (O.Account.Token_symbol.Stable) (W.Account.Token_symbol)
+  include
+    Assert_equal0V1
+      (O.Party.Update.Timing_info.Stable)
+      (W.Party.Update.Timing_info)
+  include Assert_equal0V1 (O.Party.Update.Stable) (W.Party.Update)
+  include Assert_equal0V1 (O.Party.Body.Events'.Stable) (W.Party.Body.Events')
   (* To port from V1 to V2
 
      include Assert_equal0V1 (O.New_token_payload.Stable) (W.New_token_payload)

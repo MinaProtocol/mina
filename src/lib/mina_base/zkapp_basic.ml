@@ -97,7 +97,9 @@ module Set_or_keep = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = Set of 'a | Keep
+      type 'a t = 'a Mina_wire_types.Mina_base.Zkapp_basic.Set_or_keep.V1.t =
+        | Set of 'a
+        | Keep
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]

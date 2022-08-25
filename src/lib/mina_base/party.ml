@@ -61,7 +61,7 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
+        type t = Mina_wire_types.Mina_base.Party.Update.Timing_info.V1.t =
           { initial_minimum_balance : Balance.Stable.V1.t
           ; cliff_time : Global_slot.Stable.V1.t
           ; cliff_amount : Amount.Stable.V1.t
@@ -216,7 +216,7 @@ module Update = struct
   module Stable = struct
     module V1 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Update.V1.t =
         { app_state :
             F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
