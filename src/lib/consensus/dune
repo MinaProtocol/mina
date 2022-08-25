@@ -37,13 +37,13 @@
    pickles.backend
    random_oracle
    bignum_bigint
-   graphql_lib
    vrf_lib
    snark_params
    with_hash
    consensus.vrf
    snarky_taylor
    mina_base
+   mina_base_unix
    block_time
    perf_histograms
    test_util
@@ -51,12 +51,14 @@
    non_zero_curve_point
    mina_metrics
    mina_numbers
+   mina_numbers_unix
    signature_lib
    snarky.backendless
    blake2
    crypto_params
    data_hash_lib
    currency
+   currency_unix
    file_system
    coda_genesis_ledger
    interruptible
@@ -68,6 +70,7 @@
    snarky_integer
    bitstring_lib
    pasta
+   graphql_basic_scalars
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess

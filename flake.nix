@@ -39,11 +39,28 @@
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
     }:
     {
-      overlay = import ./nix/overlay.nix;
+      overlays = {
+        misc = import ./nix/misc.nix;
+        rust = import ./nix/rust.nix;
+        go = import ./nix/go.nix;
+      };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
       nixosConfigurations.container = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [
+        modules = let
+          PK = "B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p";
+          wallet = {
+            box_primitive = "xsalsa20poly1305";
+            ciphertext =
+              "Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt";
+            nonce = "6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia";
+            pw_primitive = "argon2i";
+            pwdiff = [ 134217728 6 ];
+            pwsalt = "ASoBkV3NsY7ZRuxztyPJdmJCiz3R";
+          };
+          wallet-file = builtins.toFile "mina-wallet" (builtins.toJSON wallet);
+          wallet-file-pub = builtins.toFile "mina-wallet-pub" PK;
+        in [
           self.nixosModules.mina
           {
             boot.isContainer = true;
@@ -52,10 +69,46 @@
 
             services.mina = {
               enable = true;
+              config = {
+                "ledger" = {
+                  "name" = "mina-demo";
+                  "accounts" = [{
+                    "pk" = PK;
+                    "balance" = "66000";
+                    "sk" = null;
+                    "delegate" = null;
+                  }];
+                };
+              };
               waitForRpc = false;
               external-ip = "0.0.0.0";
-              extraArgs = [ "--seed" ];
+              generate-genesis-proof = true;
+              seed = true;
+              block-producer-key = "/var/lib/mina/wallets/store/${PK}";
+              extraArgs = [
+                "--demo-mode"
+                "--proof-level"
+                "none"
+                "--run-snark-worker"
+                "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
+                "-insecure-rest-server"
+              ];
             };
+
+            systemd.services.mina = {
+              preStart = ''
+                printf '{"genesis":{"genesis_state_timestamp":"%s"}}' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > /var/lib/mina/daemon.json
+              '';
+              environment = {
+                MINA_TIME_OFFSET = "0";
+                MINA_PRIVKEY_PASS = "";
+              };
+            };
+
+            systemd.tmpfiles.rules = [
+              "C /var/lib/mina/wallets/store/${PK}.pub 700 mina mina - ${wallet-file-pub}"
+              "C /var/lib/mina/wallets/store/${PK}     700 mina mina - ${wallet-file}"
+            ];
           }
         ];
       };
@@ -70,10 +123,20 @@
               docker-archive:${self.packages.x86_64-linux.${package}} \
               docker://us-west2-docker.pkg.dev/o1labs-192920/nix-containers/${package}:$BUILDKITE_BRANCH
             '';
-            label = "Upload mina-docker to Google Artifact Registry";
+            label = "Upload ${package} to Google Artifact Registry";
             depends_on = [ "packages_x86_64-linux_${package}" ];
             plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
             branches = [ "compatible" "develop" ];
+          };
+          publishDocs = {
+            command = runInEnv self.devShells.x86_64-linux.operations ''
+              gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
+              gsutil -m rsync -rd ${self.defaultPackage.x86_64-linux}/share/doc/html gs://mina-docs
+            '';
+            label = "Publish documentation to Google Storage";
+            depends_on = [ "defaultPackage_x86_64-linux" ];
+            branches = [ "develop" ];
+            plugins = [{ "thedyrt/skip-checkout#v0.1.1" = null; }];
           };
         in {
           steps = flakeSteps {
@@ -85,19 +148,19 @@
           } self ++ [
             (pushToRegistry "mina-docker")
             (pushToRegistry "mina-daemon-docker")
+            publishDocs
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
-          (nixpkgs.lib.composeManyExtensions [
+          (nixpkgs.lib.composeManyExtensions ([
             (import nixpkgs-mozilla)
-            (import ./nix/overlay.nix)
             (final: prev: {
               ocamlPackages_mina = requireSubmodules
                 (import ./nix/ocaml.nix { inherit inputs pkgs; });
             })
-          ]);
+          ] ++ builtins.attrValues self.overlays));
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
         nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage { };
@@ -231,13 +294,20 @@
         defaultPackage = ocamlPackages.mina;
         packages.default = ocamlPackages.mina;
 
-        devShell = ocamlPackages.mina-dev;
+        devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+          '';
+        });
         devShells.default = self.devShell.${system};
 
         devShells.with-lsp = ocamlPackages.mina-dev.overrideAttrs (oa: {
           nativeBuildInputs = oa.nativeBuildInputs
             ++ [ ocamlPackages.ocaml-lsp-server ];
           shellHook = ''
+            ${oa.shellHook}
+            unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
             pushd src/app/cli
             dune build @check

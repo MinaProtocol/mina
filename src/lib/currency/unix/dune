@@ -1,0 +1,14 @@
+(library
+ (name currency_unix)
+ (public_name currency.unix)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   yojson
+   ;; local libraries
+   graphql_basic_scalars
+   currency
+ )
+ (preprocess (pps ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Unix specific utils for currency types"))

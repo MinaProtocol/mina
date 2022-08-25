@@ -45,9 +45,8 @@
    mina_numbers
    zexe_backend.pasta
    logproc_lib
-
  )
- (preprocessor_deps ../../../config.mlh ../../../graphql-ppx-config.inc)
+ (preprocessor_deps ../../../config.mlh ../../../graphql-ppx-config.inc ../../../../graphql_schema.json)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_coda
