@@ -27,7 +27,7 @@ module With_valid_signature : sig
   module M : sig
     module Stable : sig
       module V2 : sig
-        type t = Stable.V2.t
+        type t = private Stable.V2.t
       end
     end
   end
