@@ -130,13 +130,7 @@ let mkArgs
     = λ(tag : Text) →
       λ(desc : DockerfileDescription.Type) →
       λ(serviceDesc : ServiceDescription.Type) →
-          [ "build"
-          , "-t"
-          , tag
-          , "--cache-from"
-          , "gcr.io/\${PROJECT_ID}/${desc.service}"
-          ]
-        # optionalBuildArg "image" (debInfo_ serviceDesc.debCodename).image
+          optionalBuildArg "image" (debInfo_ serviceDesc.debCodename).image
         # optionalBuildArg "MINA_REPO" serviceDesc.repo
         # optionalBuildArg "network" serviceDesc.network
         # optionalBuildArg "MINA_BRANCH" serviceDesc.branch
@@ -145,14 +139,6 @@ let mkArgs
             (debInfo_ serviceDesc.debCodename).debCodename
         # optionalBuildArg "deb_release" serviceDesc.debRelease
         # optionalBuildArg "deb_version" serviceDesc.debVersion
-        # serviceDesc.extraArgs
-        # merge
-            { Some =
-                λ(ctx : Text) →
-                  dockerfilePathsArgs desc.dockerfilePaths # [ ctx ]
-            , None = [ "-" ]
-            }
-            desc.dockerContext
 
 let mkScript
     : Text → DockerfileDescription.Type → ServiceDescription.Type → Text
@@ -172,7 +158,23 @@ let mkScript
                   Text
                   Text
                   escapeShellArg
-                  ([ "docker" ] # mkArgs tag desc serviceDesc)
+                  (   [ "docker"
+                      , "build"
+                      , "-t"
+                      , tag
+                      , "--cache-from"
+                      , "gcr.io/\${PROJECT_ID}/${desc.service}"
+                      ]
+                    # mkArgs tag desc serviceDesc
+                    # serviceDesc.extraArgs
+                    # merge
+                        { Some =
+                            λ(ctx : Text) →
+                              dockerfilePathsArgs desc.dockerfilePaths # [ ctx ]
+                        , None = [ "-" ]
+                        }
+                        desc.dockerContext
+                  )
               )
 
 let cloudBuild
@@ -197,6 +199,81 @@ let cloudBuild
             , images = Some [ tag ]
             , timeout = desc.timeout
             , logsBucket = serviceDesc.logsBucket
+            }
+
+let kanikoBuild
+    : DockerfileDescription.Type →
+      ServiceDescription.Type →
+        Schema.Cloudbuild.Type
+    = λ(desc : DockerfileDescription.Type) →
+      λ(serviceDesc : ServiceDescription.Type) →
+        let tag = "gcr.io/\${PROJECT_ID}/${desc.service}:${serviceDesc.version}"
+
+        let context =
+              merge
+                { Some = λ(a : Text) → "/workspace/" ++ a, None = "/workspace" }
+                desc.dockerContext
+
+        let dockerfilePathsText =
+              List/fold
+                Text
+                desc.dockerfilePaths
+                Text
+                (λ(a : Text) → λ(b : Text) → a ++ " " ++ b)
+                ("" : Text)
+
+        let dockerfileStep =
+              Schema.Step::{
+              , name = "bash"
+              , args =
+                  let script =
+                        ''
+                        cat ${dockerfilePathsText} > ${context}/Dockerfile
+                        ''
+
+                  in  Some [ "-eEuo", "pipefail", "-c", script ]
+              }
+
+        let buildStep =
+              Schema.Step::{
+              , name = "gcr.io/kaniko-project/executor:latest"
+              , args = Some
+                  (   [ "--dockerfile=Dockerfile"
+                      , "--context=dir://${context}"
+                      , "--destination=${tag}"
+                      , "--cache=true"
+                      , "--cache-ttl=24h"
+                      ]
+                    # mkArgs tag desc serviceDesc
+                  )
+              , timeout = desc.timeout
+              }
+
+        let pool
+            : Schema.PoolObject
+            = { name =
+                  "projects/o1labs-192920/locations/europe-west1/workerPools/cloudbuild-test"
+              }
+
+        let options
+            : Schema.Options.Type
+            = { env = None (List Text)
+              , secretEnv = None Text
+              , volumes = None (List Schema.Volume)
+              , sourceProvenanceHash = None Text
+              , machineType = None Text
+              , diskSizeGb = None Text
+              , dynamicSubstitutions = None Bool
+              , logStreamingOption = None Text
+              , logging = None Text
+              , pool = Some pool
+              }
+
+        in  Schema.Cloudbuild::{
+            , steps = [ dockerfileStep, buildStep ]
+            , timeout = desc.timeout
+            , logsBucket = serviceDesc.logsBucket
+            , options = Some options
             }
 
 let dockerBuild
@@ -264,4 +341,5 @@ let services =
         }
       }
 
-in  { cloudBuild, dockerBuild, ServiceDescription, DebCodename } ⫽ services
+in    { cloudBuild, kanikoBuild, dockerBuild, ServiceDescription, DebCodename }
+    ⫽ services

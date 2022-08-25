@@ -855,8 +855,8 @@ let all_pod_ids t = Map.keys t.nodes_by_pod_id
 
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
-  let poll_interval = Time.Span.of_sec 15.0 in
-  let max_polls = 40 (* 10 mins *) in
+  let poll_interval = Time.Span.of_sec 30.0 in
+  let max_polls = 60 (* poll_interval * max_polls = 30 mins *) in
   let all_pods_set =
     all_pods network
     |> List.map ~f:(fun { pod_id; _ } -> pod_id)

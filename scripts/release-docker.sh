@@ -73,7 +73,7 @@ function usage() {
   exit 1
 }
 
-FUNCTION=cloudBuild
+FUNCTION=kanikoBuild
 LOGS_BUCKET=",logsBucket = Some \"gs://mina-cloudbuild-logs\""
 
 extraArgs=()
@@ -129,6 +129,9 @@ if [[ $FUNCTION == cloudBuild ]]; then
     gcloud builds submit
 elif [[ $FUNCTION == dockerBuild ]]; then
     eval eval "$(dhall-to-bash <<< "$dhall")"
+elif [[ $FUNCTION == kanikoBuild ]]; then
+    dhall-to-yaml <<< "$dhall" | tee /dev/stderr > cloudbuild.yaml
+    gcloud builds submit --config=./cloudbuild.yaml
 else
     echo "Unknown function: $FUNCTION" > /dev/stderr
     exit 1

@@ -5,6 +5,10 @@ let Volume
     : Type
     = { name : Text, path : Text }
 
+let PoolObject
+    : Type
+    = { name : Text }
+
 let Artifacts
     : Type
     = { objects : { location : Text, paths : List Text } }
@@ -46,6 +50,7 @@ let Options =
           , dynamicSubstitutions : Optional Bool
           , logStreamingOption : Optional Text
           , logging : Optional Text
+          , pool : Optional PoolObject
           }
       , default =
         { env = None (List Text)
@@ -57,6 +62,7 @@ let Options =
         , dynamicSubstitutions = None Bool
         , logStreamingOption = None Text
         , logging = None Text
+        , pool = None PoolObject
         }
       }
 
@@ -86,4 +92,4 @@ let Cloudbuild =
         }
       }
 
-in  { Volume, Artifacts, Step, Options, Cloudbuild }
+in  { Volume, Artifacts, PoolObject, Step, Options, Cloudbuild }
