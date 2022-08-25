@@ -960,7 +960,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
+        type t = Mina_wire_types.Mina_base.Party.Body.Fee_payer.V1.t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; fee : Fee.Stable.V1.t
           ; valid_until : Global_slot.Stable.V1.t option [@name "validUntil"]
@@ -1351,7 +1351,7 @@ module Fee_payer = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Fee_payer.V1.t =
         { body : Body.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }

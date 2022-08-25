@@ -8,3 +8,5 @@ module Minting_payload = Mina_base_minting_payload
 module Signature = Mina_base_signature
 module Signed_command_memo = Mina_base_signed_command_memo
 module Token_id = Mina_base_token_id
+module Party = Mina_base_party
+module Account_id = Mina_base_account_id

@@ -1,10 +1,12 @@
 open Utils
 
 module Types : sig
-  module type S = V1S0
+  module type S = sig
+    module Digest : V1S0
+  end
 end
 
-module type Concrete = Types.S with type V1.t = Unsigned.UInt64.t
+module type Concrete = Types.S with type Digest.V1.t = Snark_params.Tick.Field.t
 
 module M : Types.S
 
@@ -14,4 +16,4 @@ module Make
     (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
   Signature(M).S
 
-include Types.S with module V1 = M.V1
+include Types.S with module Digest = M.Digest
