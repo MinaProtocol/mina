@@ -165,7 +165,7 @@ val configure :
   -> flooding:bool
   -> direct_peers:Multiaddr.t list
   -> peer_exchange:bool
-  -> mina_peer_exchange:bool
+  -> peer_protection_ratio:float
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
   -> min_connections:int

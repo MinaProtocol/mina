@@ -136,7 +136,7 @@ let create_peer_id peer_id =
 
 let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
-    ~seed_peers ~known_private_ip_nets ~peer_exchange ~mina_peer_exchange
+    ~seed_peers ~known_private_ip_nets ~peer_exchange ~peer_protection_ratio
     ~min_connections ~max_connections ~validation_queue_size ~gating_config
     ~topic_config =
   build
@@ -154,7 +154,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
       *> list_op seed_peers_set_list seed_peers
       *> list_op known_private_ip_nets_set_list known_private_ip_nets
       *> op peer_exchange_set peer_exchange
-      *> op mina_peer_exchange_set mina_peer_exchange
+      *> op peer_protection_ratio_set peer_protection_ratio
       *> op min_connections_set_int_exn min_connections
       *> op max_connections_set_int_exn max_connections
       *> op validation_queue_size_set_int_exn validation_queue_size

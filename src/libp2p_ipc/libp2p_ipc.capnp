@@ -80,7 +80,7 @@ struct Libp2pConfig {
   gatingConfig @11 :GatingConfig;
   maxConnections @12 :UInt32;
   validationQueueSize @13 :UInt32;
-  minaPeerExchange @14 :Bool;
+  peerProtectionRatio @14 :Float32;
   minConnections @15 :UInt32;
   knownPrivateIpNets @16 :List(Text);
   topicConfig @17 :List(TopicLevel);

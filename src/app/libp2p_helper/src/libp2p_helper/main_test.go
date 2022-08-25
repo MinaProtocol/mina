@@ -110,7 +110,7 @@ func TestPeerExchange(t *testing.T) {
 	// only allow peer count of 2 for node A
 	maxCount := 2
 	appAPort := nextPort()
-	appA := newTestAppWithMaxConnsAndCtxAndGrace(t, newTestKey(t), nil, true, maxCount, maxCount, true, appAPort, context.Background(), time.Second)
+	appA := newTestAppWithMaxConnsAndCtxAndGrace(t, newTestKey(t), nil, true, maxCount, maxCount, .2, appAPort, context.Background(), time.Second)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 

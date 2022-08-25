@@ -432,7 +432,7 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		gatingConfig,
 		int(m.MinConnections()),
 		int(m.MaxConnections()),
-		m.MinaPeerExchange(),
+		m.PeerProtectionRatio(),
 		time.Second*15,
 		knownPrivateIpNets,
 	)

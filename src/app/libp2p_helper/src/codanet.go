@@ -3,11 +3,8 @@ package codanet
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math"
-	"math/rand"
 	gonet "net"
 	"path"
 	"sync"
@@ -26,7 +23,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -57,10 +53,6 @@ func parseCIDR(cidr string) gonet.IPNet {
 	return *ipnet
 }
 
-type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
-
-const numPxConnectionWorkers int = 8
-
 var (
 	logger      = logging.Logger("codanet.Helper")
 	NoDHT       bool // option for testing to completely disable the DHT
@@ -75,7 +67,6 @@ var (
 		"169.254.0.0/16",
 	}
 
-	pxProtocolID         = protocol.ID("/mina/peer-exchange")
 	NodeStatusProtocolID = protocol.ID("/mina/node-status")
 	BitSwapExchange      = protocol.ID("/mina/bitswap-exchange")
 
@@ -98,15 +89,9 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 }
 
 type CodaConnectionManager struct {
-	ctx        context.Context
-	host       host.Host
-	p2pManager *p2pconnmgr.BasicConnMgr
-	// minaPeerExchange controls whether to send random peers to the other ndoe before trimming its
-	// recently opened connection
-	minaPeerExchange bool
-	getRandomPeers   getRandomPeersFunc
-	OnConnect        func(network.Network, network.Conn)
-	OnDisconnect     func(network.Network, network.Conn)
+	p2pManager   *p2pconnmgr.BasicConnMgr
+	OnConnect    func(network.Network, network.Conn)
+	OnDisconnect func(network.Network, network.Conn)
 	// protectedMirror is a map of protected peer ids/tags, mirroring the structure in
 	// BasicConnMgr which is not accessible from CodaConnectionManager
 	protectedMirror     map[peer.ID]map[string]interface{}
@@ -129,18 +114,17 @@ func (cm *CodaConnectionManager) AddOnDisconnectHandler(f func(network.Network, 
 	}
 }
 
-func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) (*CodaConnectionManager, error) {
+func newCodaConnectionManager(minConnections, maxConnections int, grace time.Duration) (*CodaConnectionManager, error) {
 	noop := func(net network.Network, c network.Conn) {}
 	connmgr, err := p2pconnmgr.NewConnManager(minConnections, maxConnections, p2pconnmgr.WithGracePeriod(grace))
 	if err != nil {
 		return nil, err
 	}
 	return &CodaConnectionManager{
-		p2pManager:       connmgr,
-		OnConnect:        noop,
-		OnDisconnect:     noop,
-		minaPeerExchange: minaPeerExchange,
-		protectedMirror:  make(map[peer.ID]map[string]interface{}),
+		p2pManager:      connmgr,
+		OnConnect:       noop,
+		OnDisconnect:    noop,
+		protectedMirror: make(map[peer.ID]map[string]interface{}),
 	}, nil
 }
 
@@ -242,7 +226,6 @@ type Helper struct {
 	MsgStats          *MessageStats
 	Seeds             []peer.AddrInfo
 	NodeStatus        []byte
-	pxDiscoveries     chan peer.AddrInfo
 	// TODO: use this function to notify helper
 	// about the peers that provided useful data
 	HeartbeatPeer func(peer.ID)
@@ -569,35 +552,6 @@ func (gs *CodaGatingState) InterceptUpgraded(network.Conn) (allow bool, reason c
 	return
 }
 
-func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
-	peers := h.Host.Peerstore().Peers()
-	if len(peers)-2 < num {
-		num = len(peers) - 2 // -2 because excluding ourself and the peer we are sending this to
-	}
-
-	ret := make([]peer.AddrInfo, num)
-	rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
-	idx := 0
-
-	for i := 0; i < num; i++ {
-		for {
-			if idx >= len(peers) {
-				return ret
-			} else if peers[idx] != h.Host.ID() && peers[idx] != from && len(h.Host.Peerstore().PeerInfo(peers[idx]).Addrs) != 0 {
-				break
-			} else {
-				idx += 1
-			}
-		}
-
-		ret[i] = h.Host.Peerstore().PeerInfo(peers[idx])
-		idx += 1
-	}
-
-	logger.Debugf("node=%s sending random peers", h.Host.ID(), ret)
-	return ret
-}
-
 type customValidator struct {
 	Base record.Validator
 }
@@ -610,46 +564,6 @@ func (cv customValidator) Validate(key string, value []byte) error {
 func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 	logger.Debugf("DHT Selecting Among: %s = %s", key, bytes.Join(values, []byte("; ")))
 	return cv.Base.Select(key, values)
-}
-
-func (h *Helper) handlePxStreams(s network.Stream) {
-	defer func() {
-		_ = s.Close()
-	}()
-
-	stat := s.Conn().Stat()
-	if stat.Direction != network.DirOutbound {
-		return
-	}
-
-	connInfo := h.ConnectionManager.GetInfo()
-	if connInfo.ConnCount >= connInfo.LowWater {
-		return
-	}
-
-	buf := make([]byte, 8192)
-	_, err := s.Read(buf)
-	if err != nil && err != io.EOF {
-		logger.Debugf("failed to decode list of peers err=%s", err)
-		return
-	}
-
-	r := bytes.NewReader(buf)
-	peers := []peer.AddrInfo{}
-	dec := json.NewDecoder(r)
-	err = dec.Decode(&peers)
-	if err != nil {
-		logger.Debugf("failed to decode list of peers err=%s", err)
-		return
-	}
-
-	for _, p := range peers {
-		select {
-		case h.pxDiscoveries <- p:
-		default:
-			logger.Debugf("peer discoveries channel full; dropping peer %v", p)
-		}
-	}
 }
 
 func (h *Helper) handleNodeStatusStreams(s network.Stream) {
@@ -681,29 +595,12 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 	logger.Debugf("wrote node status to stream %s", s.Protocol())
 }
 
-func (h *Helper) pxConnectionWorker() {
-	for peer := range h.pxDiscoveries {
-		connInfo := h.ConnectionManager.GetInfo()
-		if connInfo.ConnCount < connInfo.LowWater {
-			err := h.Host.Connect(h.Ctx, peer)
-			if err != nil {
-				logger.Debugf("failed to connect to peer %v err=%s", peer, err)
-			} else {
-				logger.Debugf("connected to peer! %v", peer)
-			}
-		} else {
-			logger.Debugf("discovered peer (%v) via peer exchange, but already have too many connections; adding to peerstore, but refusing to connect", peer)
-			h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
-		}
-	}
-}
-
 func (h *Helper) TrimOpenConns(ctx context.Context) {
 	h.ConnectionManager.TrimOpenConns(ctx)
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingConfig *CodaGatingConfig, minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration, knownPrivateIpNets []gonet.IPNet) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingConfig *CodaGatingConfig, minConnections, maxConnections int, peerProtectionRatio float32, grace time.Duration, knownPrivateIpNets []gonet.IPNet) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -740,12 +637,12 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	wanPatcher := patcher.NewPatcher()
 	lanPatcher.MaxProtected = minConnections
 	wanPatcher.MaxProtected = minConnections
-	lanPatcher.ProtectionRate = .2
-	wanPatcher.ProtectionRate = .2
+	lanPatcher.ProtectionRate = peerProtectionRatio
+	wanPatcher.ProtectionRate = peerProtectionRatio
 
 	var kad *dual.DHT
 
-	connManager, err := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
+	connManager, err := newCodaConnectionManager(minConnections, maxConnections, grace)
 	if err != nil {
 		return nil, err
 	}
@@ -825,26 +722,12 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		BandwidthCounter:  bandwidthCounter,
 		MsgStats:          &MessageStats{min: math.MaxUint64},
 		Seeds:             seeds,
-		pxDiscoveries:     nil,
 		HeartbeatPeer: func(p peer.ID) {
 			lanPatcher.Heartbeat(p)
 			wanPatcher.Heartbeat(p)
 		},
 	}
 
-	if !minaPeerExchange {
-		return h, nil
-	}
-
-	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections*3)
-	for w := 0; w < numPxConnectionWorkers; w++ {
-		go h.pxConnectionWorker()
-	}
-
-	connManager.getRandomPeers = h.getRandomPeers
-	connManager.ctx = ctx
-	connManager.host = host
-	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
 	h.Host.SetStreamHandler(NodeStatusProtocolID, h.handleNodeStatusStreams)
 	return h, nil
 }
