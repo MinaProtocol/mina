@@ -513,7 +513,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
           |> mk_parties_transaction ~memo:"zkapp for tokens transfer 2"
                ~fee:10_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 4)
+               ~fee_payer_nonce:(Account.Nonce.of_int 5)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
