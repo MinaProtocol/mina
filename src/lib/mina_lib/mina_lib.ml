@@ -955,8 +955,11 @@ let add_full_transactions t user_commands =
     List.filter user_commands ~f:(fun cmd -> not @@ User_command.valid_size cmd)
   in
   if not @@ List.is_empty too_big_commands then
-    Deferred.Result.fail
-      (Error.of_string "User commands contain at least one too-big command")
+    let err_str =
+      if List.length user_commands = 1 then "Transaction is too big"
+      else "List of transactions contain at least one too-big transaction"
+    in
+    Deferred.Result.fail (Error.of_string err_str)
   else
     let result_ivar = Ivar.create () in
     Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
@@ -969,9 +972,11 @@ let add_zkapp_transactions t (partiess : Parties.t list) =
     List.filter partiess ~f:(fun parties -> not @@ Parties.valid_size parties)
   in
   if not @@ List.is_empty too_big_partiess then
-    Deferred.Result.fail
-      (Error.of_string
-         "List of zkApps transactions contains at least one too-big zkApp" )
+    let err_str =
+      if List.length partiess = 1 then "zkApp transaction is too big"
+      else "List of zkApps contains at least one too-big zkApp"
+    in
+    Deferred.Result.fail (Error.of_string err_str)
   else
     let result_ivar = Ivar.create () in
     let cmd_inputs = Parties_command_inputs partiess in
