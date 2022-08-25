@@ -20,11 +20,10 @@ module Currency = struct
   include Assert_equal0V1 (O.Balance.Stable) (W.Balance)
 end
 
-(*
 module Snark_params = struct
   module O = Snark_params
   module W = WT.Snark_params
-  include Assert_equal0 (O.Tick.Field) (W.Tick.Field)
+  include Assert_equal0 (O.Tick.Field)(W.Tick.Field)
   include Assert_equal0 (O.Tock.Field) (W.Tock.Field)
   include Assert_equal0 (O.Tick.Inner_curve) (W.Tick.Inner_curve)
   include Assert_equal0 (O.Tock.Inner_curve) (W.Tock.Inner_curve)
@@ -35,10 +34,9 @@ end
 module Public_key = struct
   module O = Signature_lib.Public_key
   module W = WT.Public_key
-  include Assert_equal0V1 (O.Compressed.Stable) (W.Compressed)
   include Assert_equal0V1 (O.Stable) (W)
+  include Assert_equal0V1 (O.Compressed.Stable) (W.Compressed)
 end
-*)
 
 module Mina_numbers = struct
   module O = Mina_numbers

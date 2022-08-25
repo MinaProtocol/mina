@@ -10,10 +10,9 @@
     mina_base
     mina_numbers
     ; Necessary for the type equality
-    ;marlin_plonk_bindings
+    kimchi_backend.pasta
     pickles
     pickles.backend
-    ;zexe_backend.pasta
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))

@@ -6,10 +6,7 @@
   (libraries
     ; Keep these dependencies to an absolute minimum
     integers
-    ;marlin_plonk_bindings.pasta_fp
-    ;marlin_plonk_bindings.pasta_fq
-    ;marlin_plonk_bindings.pasta_pallas
-    ;marlin_plonk_bindings.pasta_vesta
+    pasta_bindings
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))
