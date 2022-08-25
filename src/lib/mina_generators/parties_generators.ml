@@ -1428,6 +1428,10 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
 let gen_list_of_parties_from ?failure ?max_other_parties
     ~(fee_payer_keypairs : Signature_lib.Keypair.t list) ~keymap
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?length () =
+  (* Since when generating multiple parties the fee payer's nonce should only
+     be incremented as the `Fee_payer` role, this is why we pre-computed the
+     `account_state_tbl` here.
+  *)
   let account_state_tbl =
     match account_state_tbl with
     | None ->
