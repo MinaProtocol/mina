@@ -12,3 +12,4 @@ module Party = Mina_base_party
 module Account_id = Mina_base_account_id
 module Zkapp_basic = Mina_base_zkapp_basic
 module Zkapp_state = Mina_base_zkapp_state
+module Verification_key_wire = Mina_base_verification_key_wire
