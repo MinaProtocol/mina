@@ -272,7 +272,7 @@ let gen_balance_change ?permissions_auth (account : Account.t) ~new_account =
   let%map (magnitude : Currency.Amount.t) =
     if new_account then
       Currency.Amount.gen_incl
-        (Currency.Amount.of_formatted_string "20.0")
+        (Currency.Amount.of_formatted_string "50.0")
         (Currency.Amount.of_formatted_string "100.0")
     else
       Currency.Amount.gen_incl Currency.Amount.zero
@@ -780,7 +780,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
                   | Control.Tag.Proof, `New_account ->
                       false
                   | _, `New_account ->
-                      true
+                      (* `required_balance_change` is only for balancing party. Newly created account
+                         should not be used in balancing party *)
+                      Option.is_none required_balance_change
                   | _, `Ordinary_participant ->
                       true )
               |> Account_id.Table.data
@@ -1499,6 +1501,10 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
 let gen_list_of_parties_from ?failure ?max_other_parties
     ~(fee_payer_keypairs : Signature_lib.Keypair.t list) ~keymap
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?length () =
+  (* Since when generating multiple parties the fee payer's nonce should only
+     be incremented as the `Fee_payer` role, this is why we pre-computed the
+     `account_state_tbl` here.
+  *)
   let account_state_tbl =
     match account_state_tbl with
     | None ->
