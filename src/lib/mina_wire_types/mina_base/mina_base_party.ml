@@ -9,6 +9,12 @@ module Body = struct
         }
     end
   end
+
+  module Events' = struct
+    module V1 = struct
+      type t = Snark_params.Tick.Field.t array list
+    end
+  end
 end
 
 module Fee_payer = struct
