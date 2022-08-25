@@ -370,3 +370,5 @@ val connection_gating_config : t -> connection_gating
 
 (** List of currently banned IPs. *)
 val banned_ips : t -> Unix.Inet_addr.t list
+
+val send_heartbeat : t -> Peer.Id.t -> unit

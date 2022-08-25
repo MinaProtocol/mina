@@ -335,6 +335,10 @@ struct Libp2pHelperInterface {
     ids @0 :List(RootBlockId);
   }
 
+  struct HeartbeatPeer {
+    id @0 :PeerId;
+  }
+
   struct DownloadResource {
     tag @0 :UInt8;
     ids @1 :List(RootBlockId);
@@ -417,6 +421,7 @@ struct Libp2pHelperInterface {
       addResource @2 :Libp2pHelperInterface.AddResource;
       deleteResource @3 :Libp2pHelperInterface.DeleteResource;
       downloadResource @4 :Libp2pHelperInterface.DownloadResource;
+      heartbeatPeer @5 :Libp2pHelperInterface.HeartbeatPeer;
     }
   }
 

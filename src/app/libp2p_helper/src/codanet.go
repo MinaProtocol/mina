@@ -226,8 +226,6 @@ type Helper struct {
 	MsgStats          *MessageStats
 	Seeds             []peer.AddrInfo
 	NodeStatus        []byte
-	// TODO: use this function to notify helper
-	// about the peers that provided useful data
 	HeartbeatPeer func(peer.ID)
 }
 

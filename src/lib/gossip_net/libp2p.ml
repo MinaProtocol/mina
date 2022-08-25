@@ -617,6 +617,11 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let ban_configuration =
         ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
       in
+      let send_heartbeat peer =
+        O1trace.thread "execute_heartbeat" (fun () ->
+            let%map net2 = !net2_ref in
+            Mina_net2.send_heartbeat net2 peer.Network_peer.Peer.peer_id )
+      in
       let do_ban (banned_peer, expiration) =
         O1trace.thread "execute_gossip_net_bans" (fun () ->
             don't_wait_for
@@ -649,12 +654,19 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           | _ ->
               Deferred.unit )
       in
+      let handle_trust_system_upcall upcall =
+        match upcall with
+        | `Ban u ->
+            do_ban u
+        | `Heartbeat peer ->
+            send_heartbeat peer
+      in
       let ban_reader, ban_writer = Linear_pipe.create () in
       don't_wait_for
         (let%map () =
            Strict_pipe.Reader.iter
-             (Trust_system.ban_pipe config.trust_system)
-             ~f:do_ban
+             (Trust_system.upcall_pipe config.trust_system)
+             ~f:handle_trust_system_upcall
          in
          Linear_pipe.close ban_writer ) ;
       let t =

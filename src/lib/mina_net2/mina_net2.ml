@@ -601,3 +601,5 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
                       , `List (List.map ~f:Peer_without_id.to_yojson batch) )
                     ] ) ) ) ) ;
   Deferred.Or_error.return t
+
+let send_heartbeat t peer_id = Libp2p_helper.send_heartbeat ~peer_id t.helper

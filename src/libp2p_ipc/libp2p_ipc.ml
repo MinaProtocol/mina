@@ -275,17 +275,21 @@ let create_add_resource_push_message ~tag ~data =
               Builder.Libp2pHelperInterface.AddResource.(
                 op tag_set_exn tag *> op data_set data) ))
 
-let create_validation_push_message ~validation_id ~validation_result =
+let create_heartbeat_peer_push_message ~peer_id =
+  let id =
+    build'
+      (module Builder.PeerId)
+      Builder.PeerId.(op id_set (Peer.Id.to_string peer_id))
+  in
   build'
     (module Builder.Libp2pHelperInterface.PushMessage)
     Builder.Libp2pHelperInterface.PushMessage.(
       builder_op header_set_builder (create_push_message_header ())
-      *> reader_op validation_set_reader
+      *> reader_op heartbeat_peer_set_reader
            (build
-              (module Builder.Libp2pHelperInterface.Validation)
-              Builder.Libp2pHelperInterface.Validation.(
-                reader_op validation_id_set_reader validation_id
-                *> op result_set validation_result) ))
+              (module Builder.Libp2pHelperInterface.HeartbeatPeer)
+              Builder.Libp2pHelperInterface.HeartbeatPeer.(
+                builder_op id_set_builder id) ))
 
 let create_validation_push_message ~validation_id ~validation_result =
   build'
