@@ -956,8 +956,11 @@ let add_full_transactions t user_commands =
   in
   if not @@ List.is_empty too_big_commands then
     let err_str =
-      if List.length user_commands = 1 then "Transaction is too big"
-      else "List of transactions contain at least one too-big transaction"
+      match user_commands with
+      | [ _ ] ->
+          "Transaction is too big"
+      | _ ->
+          "List of transactions contain at least one too-big transaction"
     in
     Deferred.Result.fail (Error.of_string err_str)
   else
@@ -973,8 +976,11 @@ let add_zkapp_transactions t (partiess : Parties.t list) =
   in
   if not @@ List.is_empty too_big_partiess then
     let err_str =
-      if List.length partiess = 1 then "zkApp transaction is too big"
-      else "List of zkApps contains at least one too-big zkApp"
+      match partiess with
+      | [ _ ] ->
+          "zkApp transaction is too big"
+      | _ ->
+          "List of zkApps contains at least one too-big zkApp"
     in
     Deferred.Result.fail (Error.of_string err_str)
   else
