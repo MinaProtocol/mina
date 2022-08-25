@@ -58,6 +58,21 @@ module Mina_numbers = struct
   include Assert_equal0V1 (O.Global_slot.Stable) (W.Global_slot)
 end
 
+module Pickles_base = struct
+  module O = Pickles_base
+  module W = WT.Pickles_base
+  include Assert_equal0V1 (O.Proofs_verified.Stable) (W.Proofs_verified)
+end
+
+module Pickles = struct
+  module O = Pickles
+  module W = WT.Pickles
+  include
+    Assert_equal0V2
+      (O.Side_loaded.Verification_key.Stable)
+      (W.Side_loaded.Verification_key)
+end
+
 module Mina_base = struct
   module O = Mina_base
   module W = WT.Mina_base

@@ -8,6 +8,8 @@
     integers
     pasta_bindings
     pickles_types
+    kimchi_types
+    kimchi_bindings
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))
