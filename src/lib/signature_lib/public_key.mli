@@ -37,8 +37,8 @@ module Compressed : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('field, 'boolean) t = 
-          ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.V1.t =
+        type ('field, 'boolean) t =
+              ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.V1.t =
           { x : 'field; is_odd : 'boolean }
       end
     end]

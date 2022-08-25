@@ -26,35 +26,37 @@ end
 
 module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
   module Signed_poly = Signed_poly
+
   [%%ifdef consensus_mechanism]
 
   module Signed_var = struct
     type 'mag repr = ('mag, Sgn.var) Signed_poly.t
 
     (* Invariant: At least one of these is Some *)
-    type nonrec 'mag t = { repr : 'mag repr; mutable value : Field.Var.t option }
+    type nonrec 'mag t =
+      { repr : 'mag repr; mutable value : Field.Var.t option }
   end
 
   [%%endif]
 
   module Make (Unsigned : sig
-      include Unsigned_extended.S
+    include Unsigned_extended.S
 
-      val to_uint64 : t -> uint64
+    val to_uint64 : t -> uint64
 
-      val of_uint64 : uint64 -> t
-    end) (M : sig
-            val length : int
-          end) : sig
+    val of_uint64 : uint64 -> t
+  end) (M : sig
+    val length : int
+  end) : sig
     [%%ifdef consensus_mechanism]
 
     include
       S
-      with type t = Unsigned.t
-       and type var = Field.Var.t
-       and type Signed.var = Field.Var.t Signed_var.t
-       and type Signed.signed_fee = (Unsigned.t, Sgn.t) Signed_poly.t
-       and type Signed.Checked.signed_fee_var = Field.Var.t Signed_var.t
+        with type t = Unsigned.t
+         and type var = Field.Var.t
+         and type Signed.var = Field.Var.t Signed_var.t
+         and type Signed.signed_fee = (Unsigned.t, Sgn.t) Signed_poly.t
+         and type Signed.Checked.signed_fee_var = Field.Var.t Signed_var.t
 
     val pack_var : var -> Field.Var.t
 
@@ -62,8 +64,8 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
 
     include
       S
-      with type t = Unsigned.t
-       and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
+        with type t = Unsigned.t
+         and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
 
     [%%endif]
 
@@ -79,7 +81,7 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
     let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
     [%%define_locally
-      Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
+    Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
     let precision = 9
 
@@ -104,16 +106,17 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       let parts = String.split ~on:'.' input in
       match parts with
       | [ whole ] ->
-        of_string (whole ^ String.make precision '0')
+          of_string (whole ^ String.make precision '0')
       | [ whole; decimal ] ->
-        let decimal_length = String.length decimal in
-        if Int.(decimal_length > precision) then
-          of_string (whole ^ String.sub decimal ~pos:0 ~len:precision)
-        else
-          of_string
-            (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
+          let decimal_length = String.length decimal in
+          if Int.(decimal_length > precision) then
+            of_string (whole ^ String.sub decimal ~pos:0 ~len:precision)
+          else
+            of_string
+              ( whole ^ decimal
+              ^ String.make Int.(precision - decimal_length) '0' )
       | _ ->
-        failwith "Currency.of_formatted_string: Invalid currency input"
+          failwith "Currency.of_formatted_string: Invalid currency input"
 
     module Arg = struct
       type typ = t [@@deriving sexp, hash, compare]
@@ -151,7 +154,8 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       let get t i = Infix.((t lsr i) land one = one)
 
       let set v i b =
-        if b then Infix.(v lor (one lsl i)) else Infix.(v land lognot (one lsl i))
+        if b then Infix.(v lor (one lsl i))
+        else Infix.(v land lognot (one lsl i))
     end
 
     module B = Bits.Vector.Make (Vector)
@@ -199,7 +203,8 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
     let image_from_bits_unsafe (t : var) =
       make_checked (fun () ->
           let _, _, actual_packed =
-            Pickles.Scalar_challenge.to_field_checked' ~num_bits:length_in_bits m
+            Pickles.Scalar_challenge.to_field_checked' ~num_bits:length_in_bits
+              m
               (Kimchi_backend_common.Scalar_challenge.create t)
           in
           actual_packed )
@@ -248,64 +253,66 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
               let%map t = read Field.typ t in
               match kind with
               | `Add ->
-                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
-                  (* Within range. *)
-                  Field.zero
-                else
-                  (* Overflowed. We compensate by subtracting [modulus_as_field]. *)
-                  Field.(negate one)
+                  if Int.(Field.compare t (Lazy.force modulus_as_field) < 0)
+                  then (* Within range. *)
+                    Field.zero
+                  else
+                    (* Overflowed. We compensate by subtracting [modulus_as_field]. *)
+                    Field.(negate one)
               | `Sub ->
-                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
-                  (* Within range. *)
-                  Field.zero
-                else
-                  (* Underflowed, but appears as an overflow because of wrapping in
-                     the field (that is, -1 is the largest field element, -2 is the
-                     second largest, etc.). Compensate by adding [modulus_as_field].
-                  *)
-                  Field.one
+                  if Int.(Field.compare t (Lazy.force modulus_as_field) < 0)
+                  then (* Within range. *)
+                    Field.zero
+                  else
+                    (* Underflowed, but appears as an overflow because of wrapping in
+                       the field (that is, -1 is the largest field element, -2 is the
+                       second largest, etc.). Compensate by adding [modulus_as_field].
+                    *)
+                    Field.one
               | `Add_or_sub ->
-                (* This case is a little more nuanced: -modulus_as_field < t <
-                   2*modulus_as_field, and we need to detect which 'side of 0' we
-                   are. Thus, we have 3 cases:
-                *)
-                if Int.(Field.compare t (Lazy.force modulus_as_field) < 0) then
-                  (* 1. we are already in the desired range, no adjustment; *)
-                  Field.zero
-                else if
-                  Int.(Field.compare t (Lazy.force double_modulus_as_field) < 0)
-                then
-                  (* 2. we are in the range
-                        [modulus_as_field <= t < 2 * modulus_as_field],
-                        so this was an addition that overflowed, and we should
-                        compensate by subtracting [modulus_as_field];
+                  (* This case is a little more nuanced: -modulus_as_field < t <
+                     2*modulus_as_field, and we need to detect which 'side of 0' we
+                     are. Thus, we have 3 cases:
                   *)
-                  Field.(negate one)
-                else
-                  (* 3. we are outside of either range, so this must be the
-                        underflow of a subtraction, and we should compensate by
-                        adding [modulus_as_field].
-                  *)
-                  Field.one)
+                  if Int.(Field.compare t (Lazy.force modulus_as_field) < 0)
+                  then
+                    (* 1. we are already in the desired range, no adjustment; *)
+                    Field.zero
+                  else if
+                    Int.(
+                      Field.compare t (Lazy.force double_modulus_as_field) < 0)
+                  then
+                    (* 2. we are in the range
+                          [modulus_as_field <= t < 2 * modulus_as_field],
+                          so this was an addition that overflowed, and we should
+                          compensate by subtracting [modulus_as_field];
+                    *)
+                    Field.(negate one)
+                  else
+                    (* 3. we are outside of either range, so this must be the
+                          underflow of a subtraction, and we should compensate by
+                          adding [modulus_as_field].
+                    *)
+                    Field.one)
       in
       let%bind out_of_range =
         match kind with
         | `Add ->
-          (* 0 or -1 => 0 or 1 *)
-          Boolean.of_field (Field.Var.negate adjustment_factor)
+            (* 0 or -1 => 0 or 1 *)
+            Boolean.of_field (Field.Var.negate adjustment_factor)
         | `Sub ->
-          (* Already 0 or 1 *)
-          Boolean.of_field adjustment_factor
+            (* Already 0 or 1 *)
+            Boolean.of_field adjustment_factor
         | `Add_or_sub ->
-          (* The return flag [out_of_range] is a boolean represented by either 0
-             when [t] is in range or 1 when [t] is out-of-range.
-             Notice that [out_of_range = adjustment_factor^2] gives us exactly
-             the desired values, and moreover we can ensure that
-             [adjustment_factor] is exactly one of -1, 0 or 1 by checking that
-             [out_of_range] is boolean.
-          *)
-          Field.Checked.mul adjustment_factor adjustment_factor
-          >>= Boolean.of_field
+            (* The return flag [out_of_range] is a boolean represented by either 0
+               when [t] is in range or 1 when [t] is out-of-range.
+               Notice that [out_of_range = adjustment_factor^2] gives us exactly
+               the desired values, and moreover we can ensure that
+               [adjustment_factor] is exactly one of -1, 0 or 1 by checking that
+               [out_of_range] is boolean.
+            *)
+            Field.Checked.mul adjustment_factor adjustment_factor
+            >>= Boolean.of_field
       in
       (* [t_adjusted = t + adjustment_factor * modulus_as_field] *)
       let t_adjusted =
@@ -350,11 +357,11 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
     let add_signed_flagged x y =
       match y.Signed_poly.sgn with
       | Sgn.Pos ->
-        let z, `Overflow b = add_flagged x y.Signed_poly.magnitude in
-        (z, `Overflow b)
+          let z, `Overflow b = add_flagged x y.Signed_poly.magnitude in
+          (z, `Overflow b)
       | Sgn.Neg ->
-        let z, `Underflow b = sub_flagged x y.Signed_poly.magnitude in
-        (z, `Overflow b)
+          let z, `Underflow b = sub_flagged x y.Signed_poly.magnitude in
+          (z, `Overflow b)
 
     let scale u64 i =
       let i = Unsigned.of_int i in
@@ -383,7 +390,8 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       let compare : t -> t -> int =
         let cmp = [%compare: (Unsigned.t, Sgn.t) Signed_poly.t] in
         fun t1 t2 ->
-          if Unsigned.(equal t1.magnitude zero && equal t2.magnitude zero) then 0
+          if Unsigned.(equal t1.magnitude zero && equal t2.magnitude zero) then
+            0
           else cmp t1 t2
 
       let equal : t -> t -> bool =
@@ -398,16 +406,16 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       let is_positive (t : t) : bool =
         match t.sgn with
         | Pos ->
-          not Unsigned.(equal zero t.magnitude)
+            not Unsigned.(equal zero t.magnitude)
         | Neg ->
-          false
+            false
 
       let is_negative (t : t) : bool =
         match t.sgn with
         | Neg ->
-          not Unsigned.(equal zero t.magnitude)
+            not Unsigned.(equal zero t.magnitude)
         | Pos ->
-          false
+            false
 
       type magnitude = Unsigned.t [@@deriving sexp, compare]
 
@@ -426,7 +434,8 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
 
       let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
-      let to_bits ({ sgn; magnitude } : t) = sgn_to_bool sgn :: to_bits magnitude
+      let to_bits ({ sgn; magnitude } : t) =
+        sgn_to_bool sgn :: to_bits magnitude
 
       let to_input { sgn; magnitude } =
         Random_oracle.Input.Chunked.(
@@ -438,13 +447,13 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       let add (x : t) (y : t) : t option =
         match (x.sgn, y.sgn) with
         | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
-          let open Option.Let_syntax in
-          let%map magnitude = add x.magnitude y.magnitude in
-          create ~sgn ~magnitude
+            let open Option.Let_syntax in
+            let%map magnitude = add x.magnitude y.magnitude in
+            create ~sgn ~magnitude
         | Pos, Neg | Neg, Pos ->
-          let c = compare_magnitude x.magnitude y.magnitude in
-          Some
-            ( if Int.( < ) c 0 then
+            let c = compare_magnitude x.magnitude y.magnitude in
+            Some
+              ( if Int.( < ) c 0 then
                 create ~sgn:y.sgn
                   ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
               else if Int.( > ) c 0 then
@@ -455,18 +464,18 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       let add_flagged (x : t) (y : t) : t * [ `Overflow of bool ] =
         match (x.sgn, y.sgn) with
         | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
-          let magnitude, `Overflow b = add_flagged x.magnitude y.magnitude in
-          (create ~sgn ~magnitude, `Overflow b)
+            let magnitude, `Overflow b = add_flagged x.magnitude y.magnitude in
+            (create ~sgn ~magnitude, `Overflow b)
         | Pos, Neg | Neg, Pos ->
-          let c = compare_magnitude x.magnitude y.magnitude in
-          ( ( if Int.( < ) c 0 then
+            let c = compare_magnitude x.magnitude y.magnitude in
+            ( ( if Int.( < ) c 0 then
                 create ~sgn:y.sgn
                   ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
               else if Int.( > ) c 0 then
                 create ~sgn:x.sgn
                   ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
               else zero )
-          , `Overflow false )
+            , `Overflow false )
 
       let negate t =
         if Unsigned.(equal zero t.magnitude) then zero
@@ -516,12 +525,14 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
         let value (t : var) =
           match t.value with
           | Some x ->
-            Checked.return x
+              Checked.return x
           | None ->
-            let r = t.repr in
-            let%map x = Field.Checked.mul (r.sgn :> Field.Var.t) r.magnitude in
-            t.value <- Some x ;
-            x
+              let r = t.repr in
+              let%map x =
+                Field.Checked.mul (r.sgn :> Field.Var.t) r.magnitude
+              in
+              t.value <- Some x ;
+              x
 
         let to_field_var = value
 
@@ -545,7 +556,9 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
           }
 
         let of_unsigned magnitude : var =
-          { repr = { magnitude; sgn = Sgn.Checked.pos }; value = Some magnitude }
+          { repr = { magnitude; sgn = Sgn.Checked.pos }
+          ; value = Some magnitude
+          }
 
         let negate (t : var) : var =
           { value = Option.map t.value ~f:Field.Var.negate
@@ -566,9 +579,9 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
           let%map value =
             match (then_.value, else_.value) with
             | Some v1, Some v2 ->
-              Field.Checked.if_ cond ~then_:v1 ~else_:v2 >>| Option.return
+                Field.Checked.if_ cond ~then_:v1 ~else_:v2 >>| Option.return
             | _ ->
-              return None
+                return None
           in
           { Signed_var.value; repr }
 
@@ -586,20 +599,20 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
             exists Sgn.typ
               ~compute:
                 (let open As_prover in
-                 let%map x = read typ x and y = read typ y in
-                 match add x y with
-                 | Some r ->
-                   r.sgn
-                 | None -> (
-                     match (x.sgn, y.sgn) with
-                     | Sgn.Neg, Sgn.Neg ->
-                       (* Ensure that we provide a value in the range
-                          [-modulus_as_field < magnitude < 2*modulus_as_field]
-                          for [range_check_flagged].
-                       *)
-                       Sgn.Neg
-                     | _ ->
-                       Sgn.Pos ))
+                let%map x = read typ x and y = read typ y in
+                match add x y with
+                | Some r ->
+                    r.sgn
+                | None -> (
+                    match (x.sgn, y.sgn) with
+                    | Sgn.Neg, Sgn.Neg ->
+                        (* Ensure that we provide a value in the range
+                           [-modulus_as_field < magnitude < 2*modulus_as_field]
+                           for [range_check_flagged].
+                        *)
+                        Sgn.Neg
+                    | _ ->
+                        Sgn.Pos ))
           in
           let value = Field.Var.add xv yv in
           let%bind magnitude =
@@ -611,7 +624,9 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
           (* Recompute the result from [res_magnitude], since it may have been
              adjusted.
           *)
-          let%map res_value = Field.Checked.mul (sgn :> Field.Var.t) magnitude in
+          let%map res_value =
+            Field.Checked.mul (sgn :> Field.Var.t) magnitude
+          in
           ( { Signed_var.repr = { magnitude = res_magnitude; sgn }
             ; value = Some res_value
             }
@@ -623,8 +638,8 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
             exists Sgn.typ
               ~compute:
                 (let open As_prover in
-                 let%map x = read typ x and y = read typ y in
-                 Option.value_map (add x y) ~default:Sgn.Pos ~f:(fun r -> r.sgn))
+                let%map x = read typ x and y = read typ y in
+                Option.value_map (add x y) ~default:Sgn.Pos ~f:(fun r -> r.sgn))
           in
           let%bind res_value = seal (Field.Var.add xv yv) in
           let%bind magnitude =
@@ -731,14 +746,15 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
 
       let%test_module "currency_test" =
         ( module struct
-          let expect_failure err c = if Or_error.is_ok (check c) then failwith err
+          let expect_failure err c =
+            if Or_error.is_ok (check c) then failwith err
 
           let expect_success err c =
             match check c with
             | Ok () ->
-              ()
+                ()
             | Error e ->
-              Error.(raise (tag ~tag:err e))
+                Error.(raise (tag ~tag:err e))
 
           let to_bigint x = Bignum_bigint.of_string (Unsigned.to_string x)
 
@@ -814,22 +830,22 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
             qc_test_fast generator ~shrinker ~f:(fun num ->
                 match of_formatted_string (to_formatted_string num) with
                 | after_format ->
-                  if Unsigned.equal after_format num then ()
-                  else
+                    if Unsigned.equal after_format num then ()
+                    else
+                      Error.(
+                        raise
+                          (of_string
+                             (sprintf
+                                !"formatting: num=%{Unsigned} middle=%{String} \
+                                  after=%{Unsigned}"
+                                num (to_formatted_string num) after_format ) ))
+                | exception e ->
+                    let err = Error.of_exn e in
                     Error.(
                       raise
-                        (of_string
-                           (sprintf
-                              !"formatting: num=%{Unsigned} middle=%{String} \
-                                after=%{Unsigned}"
-                              num (to_formatted_string num) after_format ) ))
-                | exception e ->
-                  let err = Error.of_exn e in
-                  Error.(
-                    raise
-                      (tag
-                         ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
-                         err )) )
+                        (tag
+                           ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
+                           err )) )
 
           let%test_unit "formatting_trailing_zeros" =
             let generator = gen_incl Unsigned.zero Unsigned.max_int in
@@ -863,18 +879,18 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
     include T
 
     [%%versioned
-      module Stable = struct
-        [@@@no_toplevel_latest_type]
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
 
-        module V1 = struct
-          type t = Unsigned_extended.UInt64.Stable.V1.t
-          [@@deriving sexp, compare, hash, equal]
+      module V1 = struct
+        type t = Unsigned_extended.UInt64.Stable.V1.t
+        [@@deriving sexp, compare, hash, equal]
 
-          [%%define_from_scope to_yojson, of_yojson, dhall_type]
+        [%%define_from_scope to_yojson, of_yojson, dhall_type]
 
-          let to_latest = Fn.id
-        end
-      end]
+        let to_latest = Fn.id
+      end
+    end]
 
     type _unused = unit constraint Signed.t = (t, Sgn.t) Signed_poly.t
   end
@@ -882,29 +898,29 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
   module Amount = struct
     (* See documentation for {!module:Mina_wire_types} *)
     module Make_sig (A : sig
-        type t
-      end) =
+      type t
+    end) =
     struct
       module type S = sig
         [%%versioned:
-          module Stable : sig
-            module V1 : sig
-              type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
+        module Stable : sig
+          module V1 : sig
+            type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
 
-              (* not automatically derived *)
-              val dhall_type : Ppx_dhall_type.Dhall_type.t
-            end
-          end]
+            (* not automatically derived *)
+            val dhall_type : Ppx_dhall_type.Dhall_type.t
+          end
+        end]
 
         [%%ifdef consensus_mechanism]
 
         (* Give a definition to var, it will be hidden at the interface level *)
         include
           Basic
-          with type t := Stable.Latest.t
-           and type var =
-                 Pickles.Impls.Step.Impl.Internal_Basic.field
-                   Snarky_backendless.Cvar.t
+            with type t := Stable.Latest.t
+             and type var =
+              Pickles.Impls.Step.Impl.Internal_Basic.field
+              Snarky_backendless.Cvar.t
 
         [%%else]
 
@@ -920,15 +936,17 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
 
         module Signed :
           Signed_intf
-          with type magnitude := t
-           and type magnitude_var := var
-           and type signed_fee := Fee.Signed.t
-           and type Checked.signed_fee_var := Fee.Signed.Checked.t
+            with type magnitude := t
+             and type magnitude_var := var
+             and type signed_fee := Fee.Signed.t
+             and type Checked.signed_fee_var := Fee.Signed.Checked.t
 
         [%%else]
 
         module Signed :
-          Signed_intf with type magnitude := t and type signed_fee := Fee.Signed.t
+          Signed_intf
+            with type magnitude := t
+             and type signed_fee := Fee.Signed.t
 
         [%%endif]
 
@@ -945,9 +963,9 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
         module Checked : sig
           include
             Checked_arithmetic_intf
-            with type var := var
-             and type signed_var := Signed.var
-             and type value := t
+              with type var := var
+               and type signed_var := Signed.var
+               and type value := t
 
           val add_signed : var -> Signed.var -> var Checked.t
 
@@ -968,8 +986,8 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
     [@@warning "-32"]
 
     module Make_str (A : sig
-        type t = Unsigned_extended.UInt64.Stable.V1.t
-      end) : Make_sig(A).S = struct
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+    end) : Make_sig(A).S = struct
       module T =
         Make
           (Unsigned_extended.UInt64)
@@ -982,9 +1000,9 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       include (
         T :
           module type of T
-        with type var = T.var
-         and module Signed = T.Signed
-         and module Checked := T.Checked )
+            with type var = T.var
+             and module Signed = T.Signed
+             and module Checked := T.Checked )
 
       [%%else]
 
@@ -993,18 +1011,18 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       [%%endif]
 
       [%%versioned
-        module Stable = struct
-          [@@@no_toplevel_latest_type]
+      module Stable = struct
+        [@@@no_toplevel_latest_type]
 
-          module V1 = struct
-            type t = Unsigned_extended.UInt64.Stable.V1.t
-            [@@deriving sexp, compare, hash, equal, yojson]
+        module V1 = struct
+          type t = Unsigned_extended.UInt64.Stable.V1.t
+          [@@deriving sexp, compare, hash, equal, yojson]
 
-            [%%define_from_scope to_yojson, of_yojson, dhall_type]
+          [%%define_from_scope to_yojson, of_yojson, dhall_type]
 
-            let to_latest = Fn.id
-          end
-        end]
+          let to_latest = Fn.id
+        end
+      end]
 
       let of_fee (fee : Fee.t) : t = fee
 
@@ -1029,25 +1047,25 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       [%%endif]
     end
 
-    include Make_str(struct
-        type t = Unsigned_extended.UInt64.Stable.V1.t
-      end)
-      (*include Wire_types.Make.Amount (Make_sig) (Make_str)*)
+    include Make_str (struct
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+    end)
+    (*include Wire_types.Make.Amount (Make_sig) (Make_str)*)
   end
 
   module Balance = struct
     [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t = Amount.Stable.V1.t
-          [@@deriving sexp, compare, equal, hash, yojson]
+    module Stable = struct
+      module V1 = struct
+        type t = Amount.Stable.V1.t
+        [@@deriving sexp, compare, equal, hash, yojson]
 
-          let to_latest = Fn.id
+        let to_latest = Fn.id
 
-          (* can't be automatically derived *)
-          let dhall_type = Ppx_dhall_type.Dhall_type.Text
-        end
-      end]
+        (* can't be automatically derived *)
+        let dhall_type = Ppx_dhall_type.Dhall_type.Text
+      end
+    end]
 
     [%%ifdef consensus_mechanism]
 
@@ -1179,14 +1197,14 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
       sexp_of_pair sexp_of_fee sexp_of_weight (fee, weight)
 
     include Comparable.Make (struct
-        type nonrec t = t
+      type nonrec t = t
 
-        let compare = compare
+      let compare = compare
 
-        let t_of_sexp = t_of_sexp
+      let t_of_sexp = t_of_sexp
 
-        let sexp_of_t = sexp_of_t
-      end)
+      let sexp_of_t = sexp_of_t
+    end)
   end
 
   let%test_module "sub_flagged module" =
@@ -1236,10 +1254,10 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
         in
         Quickcheck.test ~trials:100 (Quickcheck.Generator.tuple2 gen gen)
           ~f:(fun p ->
-              let m, u = sub_flagged_unchecked p in
-              let m_checked, u_checked = sub_flagged_checked p in
-              assert (Bool.equal u u_checked) ;
-              if not u then [%test_eq: M.magnitude] m m_checked )
+            let m, u = sub_flagged_unchecked p in
+            let m_checked, u_checked = sub_flagged_checked p in
+            assert (Bool.equal u u_checked) ;
+            if not u then [%test_eq: M.magnitude] m m_checked )
 
       let%test_unit "fee sub_flagged" = run_test (module Fee)
 

@@ -13,6 +13,7 @@ module Assert_equal0 (O : S0) (W : S0 with type t = O.t) = struct end
 (* Assert_equalXVY checks the equality of two versioned
    types of arity X with version Y *)
 module Assert_equal0V1 (O : V1S0) (W : V1S0 with type V1.t = O.V1.t) = struct end
+
 module Assert_equal0V2 (O : V2S0) (W : V2S0 with type V2.t = O.V2.t) = struct end
 
 module Currency = struct
@@ -26,7 +27,7 @@ end
 module Snark_params = struct
   module O = Snark_params
   module W = WT.Snark_params
-  include Assert_equal0 (O.Tick.Field)(W.Tick.Field)
+  include Assert_equal0 (O.Tick.Field) (W.Tick.Field)
   include Assert_equal0 (O.Tock.Field) (W.Tock.Field)
   include Assert_equal0 (O.Tick.Inner_curve) (W.Tick.Inner_curve)
   include Assert_equal0 (O.Tock.Inner_curve) (W.Tock.Inner_curve)
@@ -53,25 +54,24 @@ module Mina_base = struct
   module W = WT.Mina_base
   include Assert_equal0V1 (O.Signature.Stable) (W.Signature)
   (* To port from V1 to V2
-   
-  include
-    Assert_equal0V1
-      (O.Signed_command_payload.Common.Stable)
-      (W.Signed_command_payload.Common)
-  include
-    Assert_equal0V1
-      (O.Signed_command_payload.Body.Stable)
-      (W.Signed_command_payload.Body)
-  include
-    Assert_equal0V1 (O.Signed_command_payload.Stable) (W.Signed_command_payload)
-  include Assert_equal0V1 (O.Signed_command_memo.Stable) (W.Signed_command_memo)
-  include Assert_equal0V1 (O.Signed_command.Stable) (W.Signed_command)
-  include Assert_equal0V1 (O.Token_id.Stable) (W.Token_id)
-  include Assert_equal0V1 (O.Payment_payload.Stable) (W.Payment_payload)
-  include Assert_equal0V1 (O.Stake_delegation.Stable) (W.Stake_delegation)
-  include Assert_equal0V1 (O.New_token_payload.Stable) (W.New_token_payload)
-  include Assert_equal0V1 (O.New_account_payload.Stable) (W.New_account_payload)
-  include Assert_equal0V1 (O.Minting_payload.Stable) (W.Minting_payload)
 
+     include
+       Assert_equal0V1
+         (O.Signed_command_payload.Common.Stable)
+         (W.Signed_command_payload.Common)
+     include
+       Assert_equal0V1
+         (O.Signed_command_payload.Body.Stable)
+         (W.Signed_command_payload.Body)
+     include
+       Assert_equal0V1 (O.Signed_command_payload.Stable) (W.Signed_command_payload)
+     include Assert_equal0V1 (O.Signed_command_memo.Stable) (W.Signed_command_memo)
+     include Assert_equal0V1 (O.Signed_command.Stable) (W.Signed_command)
+     include Assert_equal0V1 (O.Token_id.Stable) (W.Token_id)
+     include Assert_equal0V1 (O.Payment_payload.Stable) (W.Payment_payload)
+     include Assert_equal0V1 (O.Stake_delegation.Stable) (W.Stake_delegation)
+     include Assert_equal0V1 (O.New_token_payload.Stable) (W.New_token_payload)
+     include Assert_equal0V1 (O.New_account_payload.Stable) (W.New_account_payload)
+     include Assert_equal0V1 (O.Minting_payload.Stable) (W.Minting_payload)
   *)
 end

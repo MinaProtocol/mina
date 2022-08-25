@@ -277,7 +277,8 @@ module type Full = sig
     type 'mag repr = ('mag, Sgn.var) Signed_poly.t
 
     (* Invariant: At least one of these is Some *)
-    type nonrec 'mag t = { repr : 'mag repr; mutable value : Field.Var.t option }
+    type nonrec 'mag t =
+      { repr : 'mag repr; mutable value : Field.Var.t option }
   end
 
   [%%endif]
@@ -286,14 +287,14 @@ module type Full = sig
 
   module Fee : sig
     [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type t [@@deriving sexp, compare, hash, yojson, equal]
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving sexp, compare, hash, yojson, equal]
 
-          (* not automatically derived *)
-          val dhall_type : Ppx_dhall_type.Dhall_type.t
-        end
-      end]
+        (* not automatically derived *)
+        val dhall_type : Ppx_dhall_type.Dhall_type.t
+      end
+    end]
 
     include Basic with type t := Stable.Latest.t
 
@@ -306,17 +307,17 @@ module type Full = sig
 
     module Signed :
       Signed_intf
-      with type magnitude := t
-       and type magnitude_var := var
-       and type signed_fee := (t, Sgn.t) Signed_poly.t
-       and type Checked.signed_fee_var := Field.Var.t Signed_var.t
+        with type magnitude := t
+         and type magnitude_var := var
+         and type signed_fee := (t, Sgn.t) Signed_poly.t
+         and type Checked.signed_fee_var := Field.Var.t Signed_var.t
 
     [%%else]
 
     module Signed :
       Signed_intf
-      with type magnitude := t
-       and type signed_fee := (t, Sgn.t) Signed_poly.t
+        with type magnitude := t
+         and type signed_fee := (t, Sgn.t) Signed_poly.t
 
     [%%endif]
 
@@ -325,9 +326,9 @@ module type Full = sig
     module Checked : sig
       include
         Checked_arithmetic_intf
-        with type var := var
-         and type signed_var := Signed.var
-         and type value := t
+          with type var := var
+           and type signed_var := Signed.var
+           and type value := t
 
       val add_signed : var -> Signed.var -> var Checked.t
     end
@@ -338,14 +339,14 @@ module type Full = sig
 
   module Amount : sig
     [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type t [@@deriving sexp, compare, hash, equal, yojson]
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving sexp, compare, hash, equal, yojson]
 
-          (* not automatically derived *)
-          val dhall_type : Ppx_dhall_type.Dhall_type.t
-        end
-      end]
+        (* not automatically derived *)
+        val dhall_type : Ppx_dhall_type.Dhall_type.t
+      end
+    end]
 
     include Basic with type t := Stable.Latest.t
 
@@ -357,10 +358,10 @@ module type Full = sig
 
     module Signed :
       Signed_intf
-      with type magnitude := t
-       and type magnitude_var := var
-       and type signed_fee := Fee.Signed.t
-       and type Checked.signed_fee_var := Fee.Signed.Checked.t
+        with type magnitude := t
+         and type magnitude_var := var
+         and type signed_fee := Fee.Signed.t
+         and type Checked.signed_fee_var := Fee.Signed.Checked.t
 
     [%%else]
 
@@ -384,9 +385,9 @@ module type Full = sig
     module Checked : sig
       include
         Checked_arithmetic_intf
-        with type var := var
-         and type signed_var := Signed.var
-         and type value := t
+          with type var := var
+           and type signed_var := Signed.var
+           and type value := t
 
       val add_signed : var -> Signed.var -> var Checked.t
 
@@ -408,14 +409,14 @@ module type Full = sig
 
   module Balance : sig
     [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type t [@@deriving sexp, compare, hash, yojson, equal]
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving sexp, compare, hash, yojson, equal]
 
-          (* not automatically derived *)
-          val dhall_type : Ppx_dhall_type.Dhall_type.t
-        end
-      end]
+        (* not automatically derived *)
+        val dhall_type : Ppx_dhall_type.Dhall_type.t
+      end
+    end]
 
     include Basic with type t := Stable.Latest.t
 
@@ -456,7 +457,9 @@ module type Full = sig
         var -> Amount.var -> (var * [ `Overflow of Boolean.var ]) Checked.t
 
       val add_signed_amount_flagged :
-        var -> Amount.Signed.var -> (var * [ `Overflow of Boolean.var ]) Checked.t
+           var
+        -> Amount.Signed.var
+        -> (var * [ `Overflow of Boolean.var ]) Checked.t
 
       val sub_or_zero : var -> var -> var Checked.t
 
