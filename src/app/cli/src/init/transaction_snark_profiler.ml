@@ -288,10 +288,7 @@ let _create_ledger_and_zkapps_from_generator num_transactions :
         failwith "Must provide a count when profiling with snapps"
   in
   let max_other_parties = 6 in
-  let num_proof_parties = 6 in
-  printf
-    !"Generating zkApp transactions with %d parties and %d proof parties\n%!"
-    max_other_parties num_proof_parties ;
+  printf !"Generating zkApp transactions with %d parties\n%!" max_other_parties ;
   let start = Time.now () in
   (*let `VK vk, `Prover prover, `Proof proof =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -304,7 +301,7 @@ let _create_ledger_and_zkapps_from_generator num_transactions :
   let cmd_infos, ledger =
     Quickcheck.random_value
       (Mina_generators.User_command_generators.sequence_parties_with_ledger
-         ~max_other_parties ~num_proof_parties ~length ~vk () )
+         ~max_other_parties ~length ~vk () )
   in
   let zkapps =
     List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->
