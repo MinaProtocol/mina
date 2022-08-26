@@ -9,6 +9,7 @@
    async_unix
    base.base_internalhash_types
    base
+   stdio
    async_kernel
    core_kernel
    core
@@ -18,6 +19,8 @@
    bin_prot.shape
    ppx_inline_test.config
    ;; local libraries
+   mina_compile_config
+   mina_generators
    sgn
    transition_frontier_base
    staged_ledger
@@ -30,6 +33,7 @@
    transaction_snark_work
    genesis_constants
    mina_numbers
+   mina_transaction_logic
    transition_frontier
    ledger_proof
    verifier
@@ -37,7 +41,9 @@
    one_or_two
    quickcheck_lib
    mina_base
+   mina_transaction
    transaction_snark
+   transaction_snark_tests
    consensus
    network_peer
    currency
@@ -47,11 +53,21 @@
    signature_lib
    inline_test_quiet_logs
    pickles
+   pickles_types
+   kimchi_backend.pasta
+   pickles.backend
+   random_oracle
    error_json
    mina_metrics
    interruptible
    merkle_ledger
    data_hash_lib
+   with_hash
+   mina_ledger
+   mina_base.import
+   snark_params
+   parties_builder
+   ppx_version.runtime
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

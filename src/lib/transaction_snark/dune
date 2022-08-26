@@ -13,13 +13,17 @@
    sexplib0
    bignum
    core
-   ppx_version.runtime
    core_kernel
    base.md5
    base.caml
    async_unix
    ;; local libraries
+   mina_base.import
+   mina_transaction
+   mina_transaction_logic
    hash_prefix_states
+   kimchi_backend.common
+   kimchi_backend
    with_hash
    bitstring_lib
    one_or_two
@@ -49,10 +53,12 @@
    quickcheck_lib
    test_util
    transaction_witness
+   mina_ledger
+   kimchi_backend.pasta
    merkle_ledger
-   zexe_backend
-   pasta
-   )
+   mina_base.util
+   ppx_version.runtime
+ )
  (preprocess
   (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (instrumentation (backend bisect_ppx))

@@ -26,6 +26,7 @@
    integers
    re2
    ;; local libraries
+   key_gen
    integration_test_lib
    graphql_lib
    coda_runtime_config
@@ -33,18 +34,21 @@
    genesis_constants
    genesis_ledger_helper
    logger
+   mina_base_import
    signature_lib
    currency
    mina_version
    timeout_lib
    mina_numbers
+   mina_transaction
    file_system
    pickles
    pickles_types
    backend
+   kimchi_pasta
    with_hash
    data_hash_lib
-   unsigned_extended
+   generated_graphql_queries
    mina_graphql
    )
 )

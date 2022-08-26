@@ -16,9 +16,8 @@ let
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam ../src/opam.export;
-  external-packages =
-    getAttrs [ "sodium" "capnp" "rpc_parallel" "async_kernel" "base58" ]
-    (builtins.mapAttrs (_: last) (opam-nix.listRepo external-repo));
+  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
+    (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   difference = a: b:
     filterAttrs (name: _: !builtins.elem name (builtins.attrNames b)) a;
@@ -90,6 +89,11 @@ let
             installPhase = "touch $out";
           } // extraArgs);
     in {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs (oa: {
+        buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ];
+      });
+
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
@@ -121,6 +125,7 @@ let
           "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
 
         buildInputs = ocaml-libs ++ external-libs;
+
         nativeBuildInputs = [
           self.dune
           self.ocamlfind
@@ -128,16 +133,26 @@ let
           lld_wrapped
           pkgs.capnproto
           pkgs.removeReferencesTo
+          pkgs.fd
         ] ++ ocaml-libs;
 
         # todo: slimmed rocksdb
         MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
-        MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
+        # this is used to retrieve the path of the built static library
+        # and copy it from within a dune rule
+        # (see src/lib/crypto/kimchi_bindings/stubs/dune)
+        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+
+        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+
         configurePhase = ''
           export MINA_ROOT="$PWD"
-          patchShebangs .
+          export -f patchShebangs stopNest isScript
+          fd . --type executable -x bash -c "patchShebangs {}"
+          export -n patchShebangs stopNest isScript
         '';
 
         buildPhase = ''
@@ -150,7 +165,7 @@ let
             src/app/rosetta/rosetta_testnet_signatures.exe \
             src/app/rosetta/rosetta_mainnet_signatures.exe \
             src/app/generate_keypair/generate_keypair.exe \
-            src/lib/mina_base/sample_keypairs.json \
+            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
             -j$NIX_BUILD_CORES
           dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
           dune build @doc || true
@@ -170,7 +185,7 @@ let
           mv _build/default/src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
           mv _build/default/src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
           mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
-          mv _build/default/src/lib/mina_base/sample_keypairs.json $sample/share/mina
+          #mv _build/default/src/lib/mina_base/sample_keypairs.json $sample/share/mina
           mv _build/default/src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           mv _build/default/_doc/_html $out/share/doc/html
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
@@ -211,7 +226,9 @@ let
       } ''
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
-        psql "$MINA_TEST_POSTGRES" < src/app/archive/create_schema.sql
+        pushd src/app/archive
+        psql "$MINA_TEST_POSTGRES" < create_schema.sql
+        popd
         # TODO: investigate failing tests, ideally we should run all tests in src/
         dune runtest src/app/archive src/lib/command_line_tests --display=short
       '';
@@ -227,11 +244,14 @@ let
 
         outputs = [ "out" ];
 
-        checkInputs = [ pkgs.nodejs ];
+        checkInputs = [ pkgs.nodejs-16_x ];
 
         buildPhase = ''
-          export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$opam__zarith__lib/zarith"
-          dune build --display=short src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
+          dune build --display=short \
+            src/lib/crypto/kimchi_bindings/js/node_js \
+            src/app/client_sdk/client_sdk.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_node.bc.js \
+            src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
         '';
 
         doCheck = true;
@@ -248,8 +268,9 @@ let
         '';
 
         installPhase = ''
-          mkdir -p $out/share/client_sdk
+          mkdir -p $out/share/client_sdk $out/share/snarkyjs_bindings
           mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
+          mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
         '';
       });
 

@@ -2,6 +2,7 @@ open Core
 open Async
 open Pipe_lib
 open Mina_base
+open Mina_transaction
 open Mina_state
 open Mina_block
 
@@ -108,6 +109,47 @@ end = struct
     t.timeout <- Some timeout
 end
 
+(** Sends an error to the reporting service containing as many failed transactions as we can fit. *)
+let report_transaction_inclusion_failures ~logger failed_txns =
+  let num_failures = List.length failed_txns in
+  let count_size = Fn.compose String.length Yojson.Safe.to_string in
+  let wrap_error failed_txns_json =
+    `Assoc
+      [ ( "message"
+        , `String
+            "Some transactions failed to apply to the ledger when creating the \
+             staged ledger diff" )
+      ; ("num_failures", `Int num_failures)
+      ; ("sampled_failures", failed_txns_json)
+      ]
+  in
+  let rec generate_errors failures available_bytes =
+    if available_bytes <= 0 then []
+    else
+      match failures with
+      | [] ->
+          []
+      | (txn, error) :: remaining_failures ->
+          let element =
+            `Assoc
+              [ ("transaction", User_command.Valid.to_yojson txn)
+              ; ("error", Error_json.error_to_yojson error)
+              ]
+          in
+          let element_size = count_size element in
+          (* subtract an additional byte for each element here to account for commas *)
+          element
+          :: generate_errors remaining_failures
+               (available_bytes - element_size - 1)
+  in
+  Node_error_service.send_dynamic_report ~logger
+    ~generate_error:(fun available_bytes ->
+      (* subtract 2 bytes to account for empty string *)
+      let base_error_size = count_size (wrap_error (`String "")) - 2 in
+      (* subtract 2 bytes to account for list brackets that wrap failed_txns *)
+      let leftover_bytes = available_bytes - base_error_size - 2 in
+      wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
+
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
@@ -142,24 +184,31 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
 
       let diff =
         O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
-            let diff =
+            (* TODO: handle transaction inclusion failures here *)
+            let diff_result =
               Staged_ledger.create_diff ~constraint_constants staged_ledger
                 ~coinbase_receiver ~logger
                 ~current_state_view:previous_state_view
                 ~transactions_by_fee:transactions ~get_completed_work
                 ~log_block_creation ~supercharge_coinbase
+              |> Result.map ~f:(fun (diff, failed_txns) ->
+                     if not (List.is_empty failed_txns) then
+                       don't_wait_for
+                         (report_transaction_inclusion_failures ~logger
+                            failed_txns ) ;
+                     diff )
               |> Result.map_error ~f:(fun err ->
                      Staged_ledger.Staged_ledger_error.Pre_diff err )
             in
-            match (diff, block_reward_threshold) with
-            | Ok d, Some threshold ->
+            match (diff_result, block_reward_threshold) with
+            | Ok diff, Some threshold ->
                 let net_return =
                   Option.value ~default:Currency.Amount.zero
                     (Staged_ledger_diff.net_return ~constraint_constants
                        ~supercharge_coinbase
-                       (Staged_ledger_diff.forget d) )
+                       (Staged_ledger_diff.forget diff) )
                 in
-                if Currency.Amount.(net_return >= threshold) then diff
+                if Currency.Amount.(net_return >= threshold) then diff_result
                 else (
                   [%log info]
                     "Block reward $reward is less than the min-block-reward \
@@ -172,7 +221,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                     Staged_ledger_diff.With_valid_signatures_and_proofs
                     .empty_diff )
             | _ ->
-                diff )
+                diff_result )
       in
       match%map
         let%bind.Deferred.Result diff = return diff in
@@ -190,7 +239,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
-          @@ Ledger.unregister_mask_exn ~loc:__LOC__
+          @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
             ( (match diff with Ok diff -> diff | Error _ -> assert false)
@@ -237,20 +286,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               previous_protocol_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash
             in
-            let next_ledger_hash =
-              Option.value_map ledger_proof_opt
-                ~f:(fun (proof, _) ->
-                  Ledger_proof.statement proof |> Ledger_proof.statement_target
-                  )
-                ~default:previous_ledger_hash
-            in
-            let snarked_next_available_token =
+            let next_registers =
               match ledger_proof_opt with
               | Some (proof, _) ->
-                  (Ledger_proof.statement proof).next_available_token_after
+                  { ( Ledger_proof.statement proof
+                    |> Ledger_proof.statement_target )
+                    with
+                    pending_coinbase_stack = ()
+                  }
               | None ->
                   previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.snarked_next_available_token
+                  |> Blockchain_state.registers
             in
             let genesis_ledger_hash =
               previous_protocol_state |> Protocol_state.blockchain_state
@@ -260,7 +306,11 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Option.value_map ledger_proof_opt
                 ~f:(fun (proof, _) ->
                   (Ledger_proof.statement proof).supply_increase )
-                ~default:Currency.Amount.zero
+                ~default:Currency.Amount.Signed.zero
+            in
+            let body_reference =
+              Staged_ledger_diff.Body.compute_reference
+                (Body.create @@ Staged_ledger_diff.forget diff)
             in
             let blockchain_state =
               (* We use the time of the beginning of the slot because if things
@@ -272,9 +322,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                  has a different slot from the [scheduled_time]
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
-                ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
-                ~snarked_next_available_token
-                ~staged_ledger_hash:next_staged_ledger_hash
+                ~registers:next_registers ~genesis_ledger_hash
+                ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
             in
             let current_time =
               Block_time.now time_controller
@@ -321,6 +370,9 @@ module Precomputed = struct
     ; staged_ledger_diff : Staged_ledger_diff.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+    ; accounts_accessed : (int * Account.t) list
+    ; accounts_created : (Account_id.t * Currency.Fee.t) list
+    ; tokens_used : (Token_id.t * Account_id.t option) list
     }
 
   let sexp_of_t = Precomputed.sexp_of_t
@@ -473,10 +525,11 @@ module Vrf_evaluation_state = struct
     }
 
   let poll_vrf_evaluator ~logger vrf_evaluator =
-    O1trace.thread "query_vrf_evaluator" (fun () ->
-        retry ~logger
-          ~error_message:"Error fetching slots from the VRF evaluator"
-          (fun () -> Vrf_evaluator.slots_won_so_far vrf_evaluator) )
+    let f () =
+      O1trace.thread "query_vrf_evaluator" (fun () ->
+          Vrf_evaluator.slots_won_so_far vrf_evaluator )
+    in
+    retry ~logger ~error_message:"Error fetching slots from the VRF evaluator" f
 
   let create () = { queue = Core.Queue.create (); vrf_evaluator_status = Start }
 
@@ -521,14 +574,13 @@ module Vrf_evaluation_state = struct
 
   let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf t =
     let set_epoch_data () =
-      O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
-          retry ~logger
-            ~error_message:"Error setting epoch state of the VRF evaluator"
-            (fun () ->
-              Vrf_evaluator.set_new_epoch_state vrf_evaluator
-                ~epoch_data_for_vrf ) )
+      let f () =
+        O1trace.thread "set_vrf_evaluator_epoch_state" (fun () ->
+            Vrf_evaluator.set_new_epoch_state vrf_evaluator ~epoch_data_for_vrf )
+      in
+      retry ~logger
+        ~error_message:"Error setting epoch state of the VRF evaluator" f
     in
-
     [%log info] "Sending data for VRF evaluations for epoch $epoch"
       ~metadata:
         [ ("epoch", Mina_numbers.Length.to_yojson epoch_data_for_vrf.epoch) ] ;
@@ -585,7 +637,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (scheduled_time, block_data, winner_pk) =
+      let produce ivar (scheduled_time, block_data, winner_pubkey) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -667,7 +719,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
-                ~winner_pk ~block_reward_threshold
+                ~winner_pk:winner_pubkey ~block_reward_threshold
             in
             match next_state_opt with
             | None ->
@@ -748,10 +800,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                             (let body = Body.create staged_ledger_diff in
                              Mina_block.create ~body
                                ~header:
-                                 (Header.create
-                                    ~body_reference:
-                                      (Body_reference.of_body body)
-                                    ~protocol_state ~protocol_state_proof
+                                 (Header.create ~protocol_state
+                                    ~protocol_state_proof
                                     ~delta_block_chain_proof () ) )
                         }
                       |> Validation.skip_time_received_validation
@@ -813,7 +863,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                         Time.(
                           Span.to_ms
                           @@ diff (now ())
-                          @@ Block_time.to_time scheduled_time)) ;
+                          @@ Block_time.to_time_exn scheduled_time)) ;
                     let%bind.Async.Deferred () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
@@ -1163,12 +1213,19 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
   in
   let start = Block_time.now time_controller in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
+  (* accounts_accessed, accounts_created, tokens_used are unused here
+     those fields are in precomputed blocks to add to the
+     archive db, they're not needed for replaying blocks
+  *)
   let produce
       { Precomputed.scheduled_time
       ; protocol_state
       ; protocol_state_proof
       ; staged_ledger_diff
       ; delta_transition_chain_proof = delta_block_chain_proof
+      ; accounts_accessed = _
+      ; accounts_created = _
+      ; tokens_used = _
       } =
     let protocol_state_hashes = Protocol_state.hashes protocol_state in
     let consensus_state_with_hashes =
@@ -1231,9 +1288,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   (let body = Body.create staged_ledger_diff in
                    Mina_block.create ~body
                      ~header:
-                       (Header.create
-                          ~body_reference:(Body_reference.of_body body)
-                          ~protocol_state ~protocol_state_proof
+                       (Header.create ~protocol_state ~protocol_state_proof
                           ~delta_block_chain_proof () ) )
               }
             |> Validation.skip_time_received_validation
@@ -1290,7 +1345,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           Mina_metrics.Block_producer.(
             Block_production_delay_histogram.observe block_production_delay
               Time.(
-                Span.to_ms @@ diff (now ()) @@ Block_time.to_time scheduled_time)) ;
+                Span.to_ms
+                @@ diff (now ())
+                @@ Block_time.to_time_exn scheduled_time)) ;
           let%bind.Async.Deferred () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in
@@ -1345,7 +1402,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         | Some (precomputed_block, precomputed_blocks) ->
             let new_time_offset =
               Time.diff (Time.now ())
-                (Block_time.to_time precomputed_block.Precomputed.scheduled_time)
+                (Block_time.to_time_exn
+                   precomputed_block.Precomputed.scheduled_time )
             in
             [%log info]
               "Changing time offset from $old_time_offset to $new_time_offset"

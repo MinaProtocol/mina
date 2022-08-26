@@ -21,7 +21,9 @@
    async_unix
    stdio
    extlib
+   sexp_diff_kernel
    ;; local libraries
+   key_gen
    visualization
    timeout_lib
    pipe_lib
@@ -38,9 +40,11 @@
    secrets
    network_pool
    currency
+   mina_base.import
    mina_numbers
-   integers
-   unsigned_extended
-   transition_handler
+   mina_transaction
    data_hash_lib
+   integers
+   transition_handler
+   snark_worker
 ))

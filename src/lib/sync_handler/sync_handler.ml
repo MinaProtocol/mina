@@ -1,7 +1,8 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_block
+module Ledger = Mina_ledger.Ledger
+module Sync_ledger = Mina_ledger.Sync_ledger
 open Frontier_base
 open Network_peer
 
@@ -155,8 +156,7 @@ module Make (Inputs : Inputs_intf) :
           Transition_frontier.(
             find frontier hash >>| Breadcrumb.validated_transition)
           ( find_in_root_history frontier hash
-          >>| Fn.compose External_transition.Validated.lower
-                Root_data.Historical.transition )
+          >>| Root_data.Historical.transition )
           ~f:Fn.const
       in
       With_hash.data @@ Mina_block.Validated.forget validated_transition
@@ -305,7 +305,7 @@ let%test_module "Sync_handler" =
 
     let to_external_transition breadcrumb =
       Transition_frontier.Breadcrumb.validated_transition breadcrumb
-      |> External_transition.Validation.forget_validation
+      |> Mina_block.Validated.forget
 
     let%test "a node should be able to give a valid proof of their root" =
       heartbeat_flag := true ;
@@ -330,7 +330,7 @@ let%test_module "Sync_handler" =
               |> Breadcrumb.validated_transition)
           in
           let observed_state =
-            External_transition.Validated.protocol_state seen_transition
+            Mina_block.Validated.protocol_state seen_transition
             |> Protocol_state.consensus_state
           in
           let root_with_proof =
@@ -345,7 +345,7 @@ let%test_module "Sync_handler" =
             verify observed_state root_with_proof |> Deferred.Or_error.ok_exn
           in
           heartbeat_flag := false ;
-          External_transition.(
+          Mina_block.(
             equal
               (With_hash.data root_transition)
               (to_external_transition (Transition_frontier.root frontier))

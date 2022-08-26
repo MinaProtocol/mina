@@ -28,6 +28,7 @@
    transaction_snark_work
    staged_ledger_diff
    o1trace
+   mina_base.import
    genesis_constants
    file_system
    mina_commands
@@ -46,6 +47,7 @@
    mina_state
    mina_graphql
    mina_base
+   mina_ledger
    mina_lib
    mina_net2
    parallel
@@ -67,6 +69,7 @@
    work_selector
    mina_compile_config
    unsigned_extended
+   ppx_version.runtime
  )
 
  (preprocessor_deps ../../../../config.mlh)

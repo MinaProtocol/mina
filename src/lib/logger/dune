@@ -11,13 +11,9 @@
    bin_prot.shape
    base.caml
    base.base_internalhash_types
-   core
-   ppx_inline_test.config
-   async
-   async_unix
    ;; local libraries
    interpolator_lib
-   logproc_lib
+   ppx_version.runtime
  )
  (preprocess
   (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson))

@@ -22,6 +22,7 @@
    non_empty_list
    pipe_lib
    state_or_error
+   ppx_version.runtime
  )
  (preprocess
   (pps ppx_jane ppx_coda ppx_version ppx_compare lens.ppx_deriving))

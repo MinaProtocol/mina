@@ -10,11 +10,11 @@
    cmdliner
    base.caml
    async_unix
-   integers
-   unsigned_extended
    ;; local libraries
    with_hash
    data_hash_lib
+   kimchi_backend
+   kimchi_backend.pasta
    pickles
    pickles_types
    random_oracle_input
@@ -23,11 +23,13 @@
    integration_test_lib
    signature_lib
    mina_base
+   mina_transaction
    file_system
    currency
    coda_runtime_config
    secrets
    integration_test_cloud_engine
+   mina_generators
    logger
    random_oracle
    mina_numbers
@@ -35,8 +37,14 @@
    snark_params
    pickles.backend
    pipe_lib
+   mina_base.import
+   key_gen
+   integers
    user_command_input
    participating_state
+   sgn
+   parties_builder
+   network_pool
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_coda ppx_version)))

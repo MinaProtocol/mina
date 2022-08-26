@@ -28,7 +28,8 @@
    key_value_database
    non_empty_list
    visualization
-   )
+   ppx_version.runtime
+ )
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

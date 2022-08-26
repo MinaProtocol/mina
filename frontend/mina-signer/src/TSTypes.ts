@@ -18,6 +18,7 @@ export type Message = {
 export type Signature = {
   readonly field: string;
   readonly scalar: string;
+  readonly signer?: string;
 };
 
 export type StakeDelegation = {
@@ -39,7 +40,25 @@ export type Payment = {
   readonly validUntil?: UInt32;
 };
 
-export type SignableData = Message | StakeDelegation | Payment;
+export type OtherParties = {
+  body: any;
+  authorization: any;
+}[];
+
+export type Party = {
+  readonly parties: {
+    otherParties: OtherParties;
+  };
+
+  readonly feePayer: {
+    readonly feePayer: PublicKey;
+    readonly fee: UInt64;
+    readonly nonce: UInt32;
+    readonly memo?: string;
+  };
+};
+
+export type SignableData = Message | StakeDelegation | Payment | Party;
 
 export type Signed<SignableData> = {
   readonly signature: Signature;

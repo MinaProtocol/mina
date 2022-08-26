@@ -2,7 +2,6 @@ open Core
 open Async
 open Async_unix
 open Network_peer
-module Bitswap_block = Bitswap_block
 module Keypair = Keypair
 module Libp2p_stream = Libp2p_stream
 module Multiaddr = Multiaddr
@@ -59,6 +58,18 @@ let gating_config_to_helper_format (config : connection_gating) =
   in
   Libp2p_ipc.create_gating_config ~banned_ips ~banned_peers ~trusted_ips
     ~trusted_peers ~isolate:config.isolate
+
+module For_tests = struct
+  module Helper = Libp2p_helper
+
+  let generate_random_keypair = Keypair.generate_random
+
+  let multiaddr_to_libp2p_ipc = Multiaddr.to_libp2p_ipc
+
+  let empty_libp2p_ipc_gating_config =
+    gating_config_to_helper_format
+      { banned_peers = []; trusted_peers = []; isolate = false }
+end
 
 type protocol_handler =
   { protocol_name : string

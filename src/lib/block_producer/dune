@@ -29,7 +29,10 @@
    prover
    mina_state
    mina_intf
+   mina_ledger
    mina_base
+   mina_transaction
+   mina_transaction_logic
    mina_block
    consensus
    interruptible
@@ -51,6 +54,8 @@
    unsigned_extended
    genesis_constants
    data_hash_lib
+   sgn
+   node_error_service
  )
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_register_event))

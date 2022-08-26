@@ -21,7 +21,7 @@ module type S = sig
     -> t Deferred.t
 end
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Intf
   open Rpc_intf
@@ -33,7 +33,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
              Peer.Id.t
           -> ('q, 'r) rpc
           -> 'q
-          -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+          -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
       }
 
     type network_interface = { sinks : Message.sinks; rpc_hook : rpc_hook }
@@ -105,7 +105,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         -> responder_id:Peer.Id.t
         -> (q, r) rpc
         -> q
-        -> r Mina_base.Rpc_intf.rpc_response Deferred.t =
+        -> r Network_peer.Rpc_intf.rpc_response Deferred.t =
      fun t peer_table ~sender_id ~responder_id rpc query ->
       let responder =
         Option.value_exn
@@ -117,7 +117,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       | Ok intf ->
           intf.rpc_hook.hook sender_id rpc query
       | Error e ->
-          Deferred.return (Mina_base.Rpc_intf.Failed_to_connect e)
+          Deferred.return (Network_peer.Rpc_intf.Failed_to_connect e)
   end
 
   module Instance = struct
@@ -139,7 +139,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
              Peer.Id.t
           -> (q, r) rpc
           -> q
-          -> r Mina_base.Rpc_intf.rpc_response Deferred.t =
+          -> r Network_peer.Rpc_intf.rpc_response Deferred.t =
        fun peer rpc query ->
         let (module Impl) = implementation_of_rpc rpc in
         let latest_version =
@@ -160,7 +160,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             failwith "fake gossip net error: rpc not implemented"
         | Some deferred ->
             let%map response = deferred in
-            Mina_base.Rpc_intf.Connected
+            Network_peer.Rpc_intf.Connected
               (Envelope.Incoming.wrap_peer ~data:(Ok response) ~sender)
       in
       Network.{ hook }
@@ -249,7 +249,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               | Connected x ->
                   x.data
               | Failed_to_connect e ->
-                  return (Mina_base.Rpc_intf.Failed_to_connect e) )
+                  return (Network_peer.Rpc_intf.Failed_to_connect e) )
             |> Or_error.all
           in
           let sender =

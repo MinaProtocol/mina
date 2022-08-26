@@ -7,14 +7,15 @@
    core_kernel
    ppx_inline_test.config
    ;; local libraries
+   kimchi_backend
    pickles.backend
+   kimchi_backend.pasta
    random_oracle_input
    signature_lib
    snark_params
    random_oracle
    pickles
    mina_signature_kind
-   pasta
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
