@@ -111,7 +111,13 @@ end
 module Span_gen = struct
   include Time.Span
 
-  let gen = quickcheck_generator
+  let gen =
+    let open Core_kernel_private.Span_float in
+    let millenium = of_day (Float.round_up (365.2425 *. 1000.)) in
+    Quickcheck.Generator.filter quickcheck_generator ~f:(fun t ->
+        neg millenium <= t && t <= millenium )
+
+  let compare x y = Core_kernel.Time.Span.robustly_compare x y
 end
 
 module Slot_gen = struct
