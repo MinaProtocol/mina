@@ -15,10 +15,13 @@
    graphql-async
    graphql-cohttp
    graphql
+   graphql_parser
    async_kernel
    result
    ppx_inline_test.config
+   sexplib0
   ;; local libraries
+  graphql_wrapper
   (re_export mina_numbers_unix)
    mina_numbers
   (re_export currency_unix)
@@ -29,10 +32,13 @@
    mina_transaction
    mina_base
   (re_export block_time_unix)
+   block_time
   (re_export graphql_basic_scalars)
    consensus
   (re_export mina_block_unix)
+   mina_block
   (re_export filtered_external_transition_unix)
+   filtered_external_transition
   (re_export mina_transaction_unix)
  )
  (instrumentation (backend bisect_ppx))
