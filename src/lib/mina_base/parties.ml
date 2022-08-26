@@ -1440,35 +1440,30 @@ let dummy =
 *)
 let valid_size t =
   let max_proof_parties = 4 in
-  let max_nonproof_parties = 8 in
+  let max_parties = 8 in
   let max_events_size = 12 in
   let max_sequence_events_size = 12 in
   let events_size events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let ( num_proof_parties
-      , num_nonproof_parties
-      , num_events_size
-      , num_sequence_events_size ) =
+  let num_proof_parties, num_parties, num_events_size, num_sequence_events_size
+      =
     Call_forest.fold t.other_parties ~init:(0, 0, 0, 0)
-      ~f:(fun
-           (num_proof_parties, num_nonproof_parties, evs_size, seq_evs_size)
-           party
-         ->
-        let num_proof_parties', num_nonproof_parties' =
+      ~f:(fun (num_proof_parties, num_parties, evs_size, seq_evs_size) party ->
+        let num_proof_parties' =
           if Control.(Tag.equal (tag party.authorization) Tag.Proof) then
-            (num_proof_parties + 1, num_nonproof_parties)
-          else (num_proof_parties, num_nonproof_parties + 1)
+            num_proof_parties + 1
+          else num_proof_parties
         in
         let party_evs_size = events_size party.body.events in
         let party_seq_evs_size = events_size party.body.sequence_events in
         ( num_proof_parties'
-        , num_nonproof_parties'
+        , num_parties + 1
         , evs_size + party_evs_size
         , seq_evs_size + party_seq_evs_size ) )
   in
   num_proof_parties <= max_proof_parties
-  && num_nonproof_parties <= max_nonproof_parties
+  && num_parties <= max_parties
   && num_events_size <= max_events_size
   && num_sequence_events_size <= max_sequence_events_size
 
