@@ -207,7 +207,7 @@ let%test_module "Sequence events test" =
       List.iter seq_state_elts0 ~f:(fun elt ->
           assert (
             Impl.Field.Constant.equal elt
-              Zkapp_account.Sequence_events.empty_hash ) ) ;
+              Zkapp_account.Sequence_events.empty_state_element ) ) ;
       (* last seq slot is 0 *)
       assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot0) ;
       let parties1, account1 =
@@ -232,11 +232,11 @@ let%test_module "Sequence events test" =
             assert (
               not
               @@ Impl.Field.Constant.equal elt
-                   Zkapp_account.Sequence_events.empty_hash )
+                   Zkapp_account.Sequence_events.empty_state_element )
           else
             assert (
               Impl.Field.Constant.equal elt
-                Zkapp_account.Sequence_events.empty_hash ) ) ;
+                Zkapp_account.Sequence_events.empty_state_element ) ) ;
       (* last seq slot still 0 *)
       assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot1)
 
@@ -274,11 +274,11 @@ let%test_module "Sequence events test" =
             assert (
               not
               @@ Impl.Field.Constant.equal elt
-                   Zkapp_account.Sequence_events.empty_hash )
+                   Zkapp_account.Sequence_events.empty_state_element )
           else
             assert (
               Impl.Field.Constant.equal elt
-                Zkapp_account.Sequence_events.empty_hash ) ) ;
+                Zkapp_account.Sequence_events.empty_state_element ) ) ;
       (* seq slot is 1 *)
       assert (Mina_numbers.Global_slot.equal slot1 last_seq_slot0) ;
       let slot2 = Mina_numbers.Global_slot.of_int 2 in
@@ -300,11 +300,11 @@ let%test_module "Sequence events test" =
             assert (
               not
               @@ Impl.Field.Constant.equal elt
-                   Zkapp_account.Sequence_events.empty_hash )
+                   Zkapp_account.Sequence_events.empty_state_element )
           else
             assert (
               Impl.Field.Constant.equal elt
-                Zkapp_account.Sequence_events.empty_hash ) ) ;
+                Zkapp_account.Sequence_events.empty_state_element ) ) ;
       (* check the shifted elements *)
       for i = 1 to 4 do
         let last_elt = List.nth_exn seq_state_elts0 (i - 1) in
@@ -332,11 +332,11 @@ let%test_module "Sequence events test" =
             assert (
               not
               @@ Impl.Field.Constant.equal elt
-                   Zkapp_account.Sequence_events.empty_hash )
+                   Zkapp_account.Sequence_events.empty_state_element )
           else
             assert (
               Impl.Field.Constant.equal elt
-                Zkapp_account.Sequence_events.empty_hash ) ) ;
+                Zkapp_account.Sequence_events.empty_state_element ) ) ;
       (* check the shifted elements *)
       for i = 1 to 4 do
         let last_elt = List.nth_exn seq_state_elts1 (i - 1) in

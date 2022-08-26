@@ -47,10 +47,6 @@ struct
 
   let typ = Data_as_hash.typ ~hash
 
-  let is_empty_var (e : var) =
-    Snark_params.Tick.Field.(
-      Checked.equal (Data_as_hash.hash e) (Var.constant empty_hash))
-
   let var_to_input (x : var) = Data_as_hash.to_input x
 
   let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
@@ -164,6 +160,14 @@ module Sequence_events = struct
 
     let deriver_name = "SequenceEvents"
   end)
+
+  let is_empty_var (e : var) =
+    Snark_params.Tick.Field.(
+      Checked.equal (Data_as_hash.hash e) (Var.constant empty_hash))
+
+  let empty_state_element =
+    let salt_phrase = "MinaZkappSequenceStateEmptyElt" in
+    Random_oracle.(salt salt_phrase |> digest)
 
   let push_events (acc : Field.t) (events : t) : Field.t =
     push_hash acc (hash events)
@@ -338,7 +342,7 @@ let default : _ Poly.t =
   ; verification_key = None
   ; zkapp_version = Mina_numbers.Zkapp_version.zero
   ; sequence_state =
-      (let empty = Sequence_events.empty_hash in
+      (let empty = Sequence_events.empty_state_element in
        [ empty; empty; empty; empty; empty ] )
   ; last_sequence_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false

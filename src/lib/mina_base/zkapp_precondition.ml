@@ -322,7 +322,7 @@ module Eq_data = struct
           { typ
           ; equal
           ; equal_checked = run Checked.equal
-          ; default = Zkapp_account.Sequence_events.empty_hash
+          ; default = Zkapp_account.Sequence_events.empty_state_element
           ; to_input = field
           ; to_input_checked = field
           }
@@ -689,7 +689,7 @@ module Account = struct
           (pack_input (to_input t)))
   end
 
-  let typ () : (Checked.t, Stable.Latest.t) Typ.t =
+  let typ () : (Checked.t, t) Typ.t =
     let open Leaf_typs in
     Typ.of_hlistable
       [ balance
@@ -697,7 +697,8 @@ module Account = struct
       ; receipt_chain_hash
       ; public_key ()
       ; Zkapp_state.typ (Or_ignore.typ Field.typ ~ignore:Field.zero)
-      ; Or_ignore.typ Field.typ ~ignore:Zkapp_account.Sequence_events.empty_hash
+      ; Or_ignore.typ Field.typ
+          ~ignore:Zkapp_account.Sequence_events.empty_state_element
       ; Or_ignore.typ Boolean.typ ~ignore:false
       ; Or_ignore.typ Boolean.typ ~ignore:false
       ]

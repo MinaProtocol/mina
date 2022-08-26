@@ -14,6 +14,13 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
+type mina_initialization =
+  { mina : Mina_lib.t
+  ; client_trustlist : Unix.Cidr.t list option
+  ; rest_server_port : int
+  ; limited_graphql_port : int option
+  }
+
 let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
@@ -606,19 +613,11 @@ let setup_daemon logger =
         Memory_stats.log_memory_stats logger ~process:"daemon" ;
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
-        let module Coda_initialization = struct
-          type ('a, 'b, 'c) t =
-            { coda : 'a
-            ; client_trustlist : 'b
-            ; rest_server_port : 'c
-            ; limited_graphql_port : 'c option
-            }
-        end in
         let time_controller =
           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
         in
         let pids = Child_processes.Termination.create_pid_table () in
-        let coda_initialization_deferred () =
+        let mina_initialization_deferred () =
           let config_file_installed =
             (* Search for config files installed as part of a deb/brew package.
                These files are commit-dependent, to ensure that we don't clobber
@@ -1257,7 +1256,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    submitter keyfile"
           in
           let start_time = Time.now () in
-          let%map coda =
+          let%map mina =
             Mina_lib.create ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
@@ -1288,35 +1287,41 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~stop_time ~node_status_url () )
           in
-          { Coda_initialization.coda
-          ; client_trustlist
-          ; rest_server_port
-          ; limited_graphql_port
-          }
+          { mina; client_trustlist; rest_server_port; limited_graphql_port }
         in
         (* Breaks a dependency cycle with monitor initilization and coda *)
-        let coda_ref : Mina_lib.t option ref = ref None in
+        let mina_ref : Mina_lib.t option ref = ref None in
+        Option.iter node_error_url ~f:(fun url ->
+            let get_node_state () =
+              match !mina_ref with
+              | None ->
+                  Deferred.return None
+              | Some mina ->
+                  let%map node_state = Mina_lib.get_node_state mina in
+                  Some node_state
+            in
+            Node_error_service.set_config ~get_node_state
+              ~node_error_url:(Uri.of_string url) ~contact_info ) ;
         Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-          ~child_pids:pids ~top_logger:logger ~node_error_url ~contact_info
-          coda_ref ;
+          ~child_pids:pids ~top_logger:logger mina_ref ;
         Async.Scheduler.within' ~monitor
         @@ fun () ->
-        let%bind { Coda_initialization.coda
+        let%bind { mina
                  ; client_trustlist
                  ; rest_server_port
                  ; limited_graphql_port
                  } =
-          coda_initialization_deferred ()
+          mina_initialization_deferred ()
         in
-        coda_ref := Some coda ;
+        mina_ref := Some mina ;
         (*This pipe is consumed only by integration tests*)
         don't_wait_for
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
-             (Mina_lib.validated_transitions coda)
+             (Mina_lib.validated_transitions mina)
              ~f:ignore ) ;
         Coda_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
-          coda ;
+          mina ;
         let%bind () =
           Option.map metrics_server_port ~f:(fun port ->
               let forward_uri =
@@ -1330,8 +1335,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
           |> Option.value ~default:Deferred.unit
         in
-        let () = Mina_plugins.init_plugins ~logger coda plugins in
-        return coda )
+        let () = Mina_plugins.init_plugins ~logger mina plugins in
+        return mina )
 
 let daemon logger =
   Command.async ~summary:"Mina daemon"
