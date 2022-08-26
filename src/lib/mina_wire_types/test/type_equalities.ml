@@ -122,3 +122,5 @@ module Mina_base = struct
      include Assert_equal0V1 (O.Minting_payload.Stable) (W.Minting_payload)
   *)
 end
+
+include Assert_equal0V1 (Block_time.Stable) (WT.Block_time)

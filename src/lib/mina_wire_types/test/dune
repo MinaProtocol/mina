@@ -10,6 +10,7 @@
     mina_base
     mina_base.import
     mina_numbers
+    block_time
     ; Necessary for the type equality
     kimchi_backend.pasta
     pickles
