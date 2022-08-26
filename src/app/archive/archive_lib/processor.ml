@@ -273,8 +273,8 @@ module Zkapp_state_data_array = struct
       id
 end
 
-module Zkapp_states = struct
-  let table_name = "zkapp_states"
+module Zkapp_states_nullable = struct
+  let table_name = "zkapp_states_nullable"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : (Pickles.Backend.Tick.Field.t option, 'n) Vector.vec) =
@@ -296,6 +296,31 @@ module Zkapp_states = struct
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int Mina_caqti.array_nullable_int_typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
+      id
+end
+
+module Zkapp_states = struct
+  let table_name = "zkapp_states"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (fps : (Pickles.Backend.Tick.Field.t, 'n) Vector.vec) =
+    let open Deferred.Result.Let_syntax in
+    let%bind (element_ids : int array) =
+      Mina_caqti.deferred_result_list_map (Vector.to_list fps)
+        ~f:(Zkapp_state_data.add_if_doesn't_exist (module Conn))
+      >>| Array.of_list
+    in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "element_ids" ], Mina_caqti.array_int_typ)
+      ~tannot:(function "element_ids" -> Some "int[]" | _ -> None)
+      (module Conn)
+      element_ids
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
       id
 end
@@ -552,7 +577,7 @@ module Zkapp_updates = struct
     let open Deferred.Result.Let_syntax in
     let%bind app_state_id =
       Vector.map ~f:Zkapp_basic.Set_or_keep.to_option update.app_state
-      |> Zkapp_states.add_if_doesn't_exist (module Conn)
+      |> Zkapp_states_nullable.add_if_doesn't_exist (module Conn)
     in
     let%bind delegate_id =
       Mina_caqti.add_if_zkapp_set
@@ -717,7 +742,7 @@ module Zkapp_precondition_account = struct
     in
     let%bind state_id =
       Vector.map ~f:Zkapp_basic.Or_ignore.to_option acct.state
-      |> Zkapp_states.add_if_doesn't_exist (module Conn)
+      |> Zkapp_states_nullable.add_if_doesn't_exist (module Conn)
     in
     let%bind sequence_state_id =
       Mina_caqti.add_if_zkapp_check
@@ -2315,7 +2340,6 @@ module Zkapp_account = struct
           : Mina_base.Zkapp_account.t ) =
       zkapp_account
     in
-    let app_state = Vector.map app_state ~f:(fun field -> Some field) in
     let%bind app_state_id =
       Zkapp_states.add_if_doesn't_exist (module Conn) app_state
     in
