@@ -90,11 +90,11 @@ module Mina_base = struct
       (W.Signed_command_payload.Body)
   include
     Assert_equal0V2 (O.Signed_command_payload.Stable) (W.Signed_command_payload)
-  include Assert_equal0V2 (O.Signed_command.Stable) (W.Signed_command.Stable)
+  include Assert_equal0V2 (O.Signed_command.Stable) (W.Signed_command)
   include
     Assert_equal0V2
       (O.Signed_command.With_valid_signature.Stable)
-      (W.Signed_command.With_valid_signature.M.Stable)
+      (W.Signed_command.With_valid_signature)
   include
     Assert_equal0V1 (O.Party.Body.Fee_payer.Stable) (W.Party.Body.Fee_payer)
   include Assert_equal0V1 (O.Party.Fee_payer.Stable) (W.Party.Fee_payer)
