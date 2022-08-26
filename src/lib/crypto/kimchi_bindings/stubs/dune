@@ -24,6 +24,22 @@
 
 (rule
  (enabled_if
+  (<> %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
+ (targets rustflags.sexp)
+ (action
+  (with-stdout-to rustflags.sexp
+   (echo "-C target-feature=+bmi2,+adx"))))
+
+(rule
+ (enabled_if
+  (= %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
+ (targets rustflags.sexp)
+ (action
+  (with-stdout-to rustflags.sexp
+   (echo "-C target-feature=-bmi2,-adx"))))
+
+(rule
+ (enabled_if
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (targets libwires_15_stubs.a)
  (deps
@@ -40,7 +56,7 @@
     "%{read:dune-build-root}/cargo_kimchi_stubs"
     (setenv
      RUSTFLAGS
-     "-C target-feature=+bmi2,+adx"
+     %{read:rustflags.sexp}
      (run cargo build --release)))
    (run
     cp
