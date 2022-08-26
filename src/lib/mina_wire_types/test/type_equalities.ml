@@ -56,6 +56,7 @@ module Mina_numbers = struct
   module W = WT.Mina_numbers
   include Assert_equal0V1 (O.Account_nonce.Stable) (W.Account_nonce)
   include Assert_equal0V1 (O.Global_slot.Stable) (W.Global_slot)
+  include Assert_equal0V1 (O.Length.Stable) (W.Length)
 end
 
 module Pickles_base = struct
