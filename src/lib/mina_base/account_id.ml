@@ -4,7 +4,10 @@ open Core_kernel
 open Mina_base_import
 
 module Make_sig (T : Mina_wire_types.Mina_base.Account_id.Types.S) = struct
-  module type S = Account_id_intf.S with type Digest.Stable.V1.t = T.Digest.V1.t
+  module type S =
+    Account_id_intf.S
+      with type Digest.Stable.V1.t = T.Digest.V1.t
+       and type Stable.V2.t = T.V2.t
 end
 
 module Make_str (T : Mina_wire_types.Mina_base.Account_id.Concrete) = struct
