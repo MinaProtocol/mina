@@ -106,6 +106,26 @@ directory, which links to a tarball containing the docker image. You
 can load the image using `docker load -i result`, then note the tag it
 outputs. You can then run Mina from this docker image with `docker run mina:<tag> mina.exe <args>`.
 
+### Demo nixos-container
+
+If you're running NixOS, you can use `nixos-container` to run a demo of mina daemon from your local checkout. To do so, try
+
+```
+sudo nixos-container create mina --flake mina
+sudo nixos-container start mina
+sudo nixos-container root-login mina
+```
+
+From there, you can poke the mina daemon, e.g. with `systemctl status mina`.
+
+If you want to update the container to reflect the latest checkout, try
+
+```
+sudo nixos-container stop mina
+sudo nixos-container update mina --flake mina
+sudo nixos-container start mina
+```
+
 ### direnv
 
 It is considered as a good practice to automatically enter the Nix shell instead of keeping in mind that you need to execute the `nix develop mina` command every time you enter the Mina repo directory.  
