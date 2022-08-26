@@ -12,6 +12,7 @@
     mina_numbers
     block_time
     ; Necessary for the type equality
+    data_hash_lib
     kimchi_backend.pasta
     pickles
     pickles.backend

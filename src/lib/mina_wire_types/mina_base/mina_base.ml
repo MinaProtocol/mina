@@ -18,3 +18,5 @@ module Verification_key_wire = Mina_base_verification_key_wire
 module Permissions = Mina_base_permissions
 module Account = Mina_base_account
 module Ledger_hash = Mina_base_ledger_hash
+module Epoch_data = Mina_base_epoch_data
+module Epoch_ledger = Mina_base_epoch_ledger

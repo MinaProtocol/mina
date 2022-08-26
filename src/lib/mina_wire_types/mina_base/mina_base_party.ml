@@ -54,7 +54,8 @@ module Update = struct
           Mina_base_account.Token_symbol.V1.t
           Mina_base_zkapp_basic.Set_or_keep.V1.t
       ; timing : Timing_info.V1.t Mina_base_zkapp_basic.Set_or_keep.V1.t
-      ; voting_for : State_hash.V1.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+      ; voting_for :
+          Data_hash_lib.State_hash.V1.t Mina_base_zkapp_basic.Set_or_keep.V1.t
       }
   end
 end

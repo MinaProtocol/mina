@@ -123,12 +123,15 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Parties.Valid.Verification_key_hash.Stable)
       (W.Parties.Valid.Verification_key_hash)
-  (* To port from V1 to V2
-
-     include Assert_equal0V1 (O.New_token_payload.Stable) (W.New_token_payload)
-     include Assert_equal0V1 (O.New_account_payload.Stable) (W.New_account_payload)
-     include Assert_equal0V1 (O.Minting_payload.Stable) (W.Minting_payload)
-  *)
+  include Assert_equal0V1 (O.Ledger_hash.Stable) (W.Ledger_hash)
+  include
+    Assert_equal0V1
+      (O.Zkapp_precondition.Protocol_state.Epoch_data.Stable)
+      (W.Zkapp_precondition.Protocol_state.Epoch_data)
 end
 
 include Assert_equal0V1 (Block_time.Stable) (WT.Block_time)
+include
+  Assert_equal0V1
+    (Data_hash_lib.State_hash.Stable)
+    (WT.Data_hash_lib.State_hash)
