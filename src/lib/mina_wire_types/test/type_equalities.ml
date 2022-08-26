@@ -72,6 +72,7 @@ module Pickles = struct
     Assert_equal0V2
       (O.Side_loaded.Verification_key.Stable)
       (W.Side_loaded.Verification_key)
+  include Assert_equal0V1 (O.Backend.Tick.Field.Stable) (W.Backend.Tick.Field)
 end
 
 module Mina_base = struct
