@@ -177,21 +177,6 @@ module Output = struct
         root_node :: acc_trees )
 end
 
-module type Graph_node_intf = sig
-  type t
-
-  type display [@@deriving yojson]
-
-  val display : t -> display
-
-  val equal : t -> t -> bool
-
-  val hash : t -> int
-
-  val compare : t -> t -> int
-
-  val name : t -> string
-end
 
 module Display = struct
   type state =
