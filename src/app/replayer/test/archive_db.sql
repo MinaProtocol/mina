@@ -1318,7 +1318,11 @@ ALTER SEQUENCE public.zkapp_precondition_accounts_id_seq OWNED BY public.zkapp_p
 
 CREATE TABLE public.zkapp_sequence_states (
     id integer NOT NULL,
-    element_ids integer[] NOT NULL
+    element0 integer NOT NULL,
+    element1 integer NOT NULL,
+    element2 integer NOT NULL,
+    element3 integer NOT NULL,
+    element4 integer NOT NULL
 );
 
 
@@ -1413,14 +1417,20 @@ CREATE SEQUENCE public.zkapp_state_data_id_seq
 
 ALTER SEQUENCE public.zkapp_state_data_id_seq OWNED BY public.zkapp_state_data.id;
 
-
 --
 -- Name: zkapp_states; Type: TABLE; Schema: public;
 --
 
 CREATE TABLE public.zkapp_states (
     id integer NOT NULL,
-    element_ids integer[] NOT NULL
+    element0 integer NOT NULL,
+    element1 integer NOT NULL,
+    element2 integer NOT NULL,
+    element3 integer NOT NULL,
+    element4 integer NOT NULL,
+    element5 integer NOT NULL,
+    element6 integer NOT NULL,
+    element7 integer NOT NULL
 );
 
 
@@ -1454,7 +1464,14 @@ ALTER SEQUENCE public.zkapp_states_id_seq OWNED BY public.zkapp_states.id;
 
 CREATE TABLE public.zkapp_states_nullable (
     id integer NOT NULL,
-    element_ids integer[] NOT NULL
+    element0 integer,
+    element1 integer,
+    element2 integer,
+    element3 integer,
+    element4 integer,
+    element5 integer,
+    element6 integer,
+    element7 integer
 );
 
 
@@ -2603,8 +2620,8 @@ COPY public.zkapp_precondition_accounts (id, balance_id, nonce_id, receipt_chain
 -- Data for Name: zkapp_sequence_states; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_sequence_states (id, element_ids) FROM stdin;
-1	{2,2,2,2,2}
+COPY public.zkapp_sequence_states (id, element0, element1, element2, element3, element4) FROM stdin;
+1	2	2	2	2	2
 \.
 
 
@@ -2638,9 +2655,9 @@ COPY public.zkapp_state_data_array (id, element_ids) FROM stdin;
 -- Data for Name: zkapp_states; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_states (id, element_ids) FROM stdin;
-2	{1,1,1,1,1,1,1,1}
-3	{3,4,5,6,7,8,9,10}
+COPY public.zkapp_states (id, element0, element1, element2, element3, element4, element5, element6, element7) FROM stdin;
+2	1	1	1	1	1	1	1	1
+3	3	4	5	6	7	8	9	10
 \.
 
 
@@ -2648,10 +2665,10 @@ COPY public.zkapp_states (id, element_ids) FROM stdin;
 -- Data for Name: zkapp_states; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_states_nullable (id, element_ids) FROM stdin;
-1	{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}
-2	{1,1,1,1,1,1,1,1}
-3	{3,4,5,6,7,8,9,10}
+COPY public.zkapp_states_nullable (id, element0, element1, element2, element3, element4, element5, element6, element7) FROM stdin;
+1	\N	\N	\N	\N	\N	\N	\N	\N
+2	1	1	1	1	1	1	1	1
+3	3	4	5	6	7	8	9	10
 \.
 
 
