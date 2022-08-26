@@ -7,7 +7,8 @@ module Fee_transfer_type = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Fee_transfer | Fee_transfer_via_coinbase [@@deriving quickcheck, compare, sexp]
+      type t = Fee_transfer | Fee_transfer_via_coinbase
+      [@@deriving quickcheck, compare, sexp]
 
       let to_latest = Fn.id
     end
