@@ -114,6 +114,7 @@ module Mina_base = struct
       (W.Party.Update.Timing_info)
   include Assert_equal0V1 (O.Party.Update.Stable) (W.Party.Update)
   include Assert_equal0V1 (O.Party.Body.Events'.Stable) (W.Party.Body.Events')
+  include Assert_equal0V1 (O.Ledger_hash.Stable) (W.Ledger_hash)
   (* To port from V1 to V2
 
      include Assert_equal0V1 (O.New_token_payload.Stable) (W.New_token_payload)
