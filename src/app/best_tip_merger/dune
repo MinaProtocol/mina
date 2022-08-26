@@ -5,6 +5,7 @@
   (modes native)
   (libraries
    ;; opam libraries
+   async.async_command
    async_kernel
    stdio
    base.caml
