@@ -1376,6 +1376,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     go [] num_parties
   in
   (* at least 1 party *)
+  (*
   let%bind num_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind num_new_accounts = Int.gen_uniform_incl 0 num_parties in
   let num_old_parties = num_parties - num_new_accounts in
@@ -1422,6 +1423,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
       ~required_balance_change:balance_change ?protocol_state_view ?vk ()
   in
   let _other_parties = other_parties0 @ [ balancing_party ] in
+     *)
   let%bind num_token_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind num_new_token_parties = Int.gen_uniform_incl 1 num_token_parties in
   let%bind new_token_parties =
