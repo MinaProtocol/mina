@@ -1,7 +1,7 @@
 {
   "name": "mina-signer-experimental",
   "description": "Node/Browser API for signing transactions on various networks for Mina Protocol",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "scripts": {
     "build": "tsc && cp src/client_sdk.min.js dist/src/client_sdk.bc.js",
     "clean": "rm -rf dist",
