@@ -1400,13 +1400,11 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
                   num_new_accounts
               |> Option.value_exn )) )
       ~f:(fun acc party ->
-        if Token_id.equal Token_id.default party.body.token_id then
-          match Currency.Amount.Signed.add acc party.body.balance_change with
-          | Some sum ->
-              sum
-          | None ->
-              failwith "Overflow adding other parties balances"
-        else acc )
+        match Currency.Amount.Signed.add acc party.body.balance_change with
+        | Some sum ->
+            sum
+        | None ->
+            failwith "Overflow adding other parties balances" )
   in
 
   (* modify the balancing party with balance change to yield a zero sum
@@ -1432,7 +1430,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
   in
   let other_parties = new_token_parties in
   let%map memo = Signed_command_memo.gen in
-  let _parties_dummy_authorizations : Parties.t =
+  let parties_dummy_authorizations : Parties.t =
     let open Parties_builder in
     let other_parties =
       mk_forest
@@ -1454,9 +1452,6 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
         |> Parties.Call_forest.accumulate_hashes_predicated
     ; memo
     }
-  in
-  let parties_dummy_authorizations : Parties.t =
-    Parties.of_simple { fee_payer; other_parties; memo }
   in
   (* update receipt chain hashes in accounts table *)
   let receipt_elt =
