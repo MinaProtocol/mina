@@ -9,6 +9,7 @@ module Signature = Mina_base_signature
 module Signed_command_memo = Mina_base_signed_command_memo
 module Token_id = Mina_base_token_id
 module Party = Mina_base_party
+module Parties = Mina_base_parties
 module Account_id = Mina_base_account_id
 module Zkapp_basic = Mina_base_zkapp_basic
 module Zkapp_state = Mina_base_zkapp_state
