@@ -1097,7 +1097,6 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ?account_state_tbl ~ledger ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
-  let _max = max_other_parties in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
@@ -1130,17 +1129,25 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
   (* table of public keys not in the ledger, to be used for new parties
      we have the corresponding private keys, so we can create signatures for those new parties
   *)
-  let ledger_account_set =
+  let ledger_account_list =
     Account_id.Set.union_list
       [ Ledger.accounts ledger
       ; Account_id.Set.of_hashtbl_keys account_state_tbl
       ]
+    |> Account_id.Set.to_list
+  in
+  let ledger_pk_list =
+    List.map ledger_account_list ~f:(fun account_id ->
+        Account_id.public_key account_id )
+  in
+  let ledger_pk_set =
+    Signature_lib.Public_key.Compressed.Set.of_list ledger_pk_list
   in
   let available_public_keys =
     let tbl = Signature_lib.Public_key.Compressed.Table.create () in
     Signature_lib.Public_key.Compressed.Map.iter_keys keymap ~f:(fun pk ->
-        let account_id = Account_id.create pk Token_id.default in
-        if not (Account_id.Set.mem ledger_account_set account_id) then
+        if not (Signature_lib.Public_key.Compressed.Set.mem ledger_pk_set pk)
+        then
           Signature_lib.Public_key.Compressed.Table.add_exn tbl ~key:pk ~data:() ) ;
     tbl
   in
@@ -1376,6 +1383,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     in
     go [] num_parties
   in
+
   (* at least 1 party *)
   (*
   let%bind num_parties = Int.gen_uniform_incl 1 max_other_parties in
@@ -1425,7 +1433,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
   in
   let _other_parties = other_parties0 @ [ balancing_party ] in
      *)
-  let%bind num_new_token_parties = return 1 in
+  let%bind num_new_token_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind new_token_parties =
     gen_parties_with_dynamic_balance ~kind_of_parties:`New_token
       num_new_token_parties
