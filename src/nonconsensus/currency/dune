@@ -27,6 +27,10 @@
    unsigned_extended_nonconsensus
    sgn_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_annot ppx_coda ppx_version ppx_let ppx_assert ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_custom_printf ppx_deriving.std ppx_deriving_yojson h_list.ppx ppx_inline_test ppx_fields_conv))

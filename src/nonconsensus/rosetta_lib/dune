@@ -27,6 +27,10 @@
    snark_params_nonconsensus
    unsigned_extended_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_optcomp ppx_assert ppx_let ppx_sexp_conv

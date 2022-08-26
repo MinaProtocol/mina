@@ -27,6 +27,10 @@
    hash_prefix_states_nonconsensus
    non_zero_curve_point_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_optcomp ppx_sexp_conv
