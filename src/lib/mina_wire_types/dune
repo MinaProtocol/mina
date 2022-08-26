@@ -11,7 +11,7 @@
     kimchi_types
     kimchi_bindings
     )
-  (preprocess (pps ppx_version))
+  (preprocess (pps ppx_version ppx_optcomp))
   (instrumentation (backend bisect_ppx))
   (flags -w -22) ; Allow using versioned types outside of ppx
   )

@@ -5,6 +5,12 @@ module Types : sig
     module Side_loaded : sig
       module Verification_key : V2S0
     end
+
+    module Backend : sig
+      module Tick : sig
+        module Field : V1S0
+      end
+    end
   end
 end
 
@@ -32,12 +38,23 @@ module M : sig
       end
     end
   end
+
+  module Backend : sig
+    module Tick : sig
+      module Field : sig
+        module V1 : sig
+          type t = Pasta_bindings.Fp.t
+        end
+      end
+    end
+  end
 end
 
 module type Concrete =
   Types.S
     with type Side_loaded.Verification_key.V2.t =
       M.Side_loaded.Verification_key.V2.t
+     and type Backend.Tick.Field.V1.t = Pasta_bindings.Fp.t
 
 module type Local_sig = Signature(Types).S
 
@@ -45,4 +62,5 @@ module Make
     (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
   Signature(M).S
 
-include Types.S with module Side_loaded = M.Side_loaded
+include
+  Types.S with module Side_loaded = M.Side_loaded and module Backend = M.Backend
