@@ -20,7 +20,9 @@ module Closed_interval = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = { lower : 'a; upper : 'a }
+      type 'a t =
+            'a Mina_wire_types.Mina_base.Zkapp_precondition.Closed_interval.V1.t =
+        { lower : 'a; upper : 'a }
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
