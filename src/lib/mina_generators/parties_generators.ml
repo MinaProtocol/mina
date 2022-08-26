@@ -1097,6 +1097,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
     ?account_state_tbl ~ledger ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
+  let _max = max_other_parties in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
@@ -1424,8 +1425,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
   in
   let _other_parties = other_parties0 @ [ balancing_party ] in
      *)
-  let%bind num_token_parties = Int.gen_uniform_incl 1 max_other_parties in
-  let%bind num_new_token_parties = Int.gen_uniform_incl 1 num_token_parties in
+  let%bind num_new_token_parties = return 1 in
   let%bind new_token_parties =
     gen_parties_with_dynamic_balance ~kind_of_parties:`New_token
       num_new_token_parties
