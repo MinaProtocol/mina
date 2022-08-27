@@ -29,6 +29,7 @@
    kimchi_backend.pasta
    mina_base.import
    sgn
+   sgn_type
    pickles_types
    blake2
    pickles

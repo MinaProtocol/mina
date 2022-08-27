@@ -507,7 +507,7 @@ module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Account_precondition.V1.t =
         | Full of Zkapp_precondition.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
@@ -650,7 +650,7 @@ module Preconditions = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Preconditions.V1.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account : Account_precondition.Stable.V1.t
         }
@@ -866,7 +866,7 @@ module Body = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Body.V1.t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V1.t
         ; update : Update.Stable.V1.t

@@ -1,3 +1,5 @@
-module V1 = struct
-  type t = Pos | Neg
+module Sgn = struct
+  module V1 = struct
+    type t = Pos | Neg
+  end
 end

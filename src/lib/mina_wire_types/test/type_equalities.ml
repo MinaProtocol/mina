@@ -25,6 +25,15 @@ struct end
 module Assert_equal1V2 (O : V2S1) (W : V2S1 with type 'a V2.t = 'a O.V2.t) =
 struct end
 
+module Misc_tests = struct
+  include Assert_equal0V1 (Block_time.Stable) (WT.Block_time)
+  include
+    Assert_equal0V1
+      (Data_hash_lib.State_hash.Stable)
+      (WT.Data_hash_lib.State_hash)
+  include Assert_equal0V1 (Sgn_type.Sgn.Stable) (WT.Sgn_type.Sgn)
+end
+
 module Currency = struct
   module O = Currency
   module W = WT.Currency
@@ -128,10 +137,18 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Zkapp_precondition.Protocol_state.Epoch_data.Stable)
       (W.Zkapp_precondition.Protocol_state.Epoch_data)
+  include
+    Assert_equal0V1
+      (O.Zkapp_precondition.Protocol_state.Stable)
+      (W.Zkapp_precondition.Protocol_state)
+  include
+    Assert_equal0V2
+      (O.Zkapp_precondition.Account.Stable)
+      (W.Zkapp_precondition.Account)
+  include
+    Assert_equal0V1
+      (O.Party.Account_precondition.Stable)
+      (W.Party.Account_precondition)
+  include Assert_equal0V1 (O.Party.Preconditions.Stable) (W.Party.Preconditions)
+  include Assert_equal0V1 (O.Party.Body.Stable) (W.Party.Body)
 end
-
-include Assert_equal0V1 (Block_time.Stable) (WT.Block_time)
-include
-  Assert_equal0V1
-    (Data_hash_lib.State_hash.Stable)
-    (WT.Data_hash_lib.State_hash)

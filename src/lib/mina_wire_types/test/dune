@@ -12,6 +12,8 @@
     mina_numbers
     block_time
     ; Necessary for the type equality
+    sgn
+    sgn_type
     data_hash_lib
     kimchi_backend.pasta
     pickles
