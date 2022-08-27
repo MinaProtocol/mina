@@ -57,6 +57,7 @@ automation/src/*.js
 automation/node_modules/
 automation/terraform/testnets/**/keys
 
+
 automation/scripts/offline_fish_keys
 automation/scripts/offline_whale_keys
 automation/scripts/online_fish_keys
@@ -86,7 +87,6 @@ _opam
 
 target
 release
-Cargo.lock
 .vscode
 
 ### IntelliJ IDEA ###
@@ -99,3 +99,8 @@ Cargo.lock
 .env
 .envrc
 .direnv/
+
+# pipenv
+Pipfile
+Pipfile.lock
+
