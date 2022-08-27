@@ -57,7 +57,6 @@ automation/src/*.js
 automation/node_modules/
 automation/terraform/testnets/**/keys
 
-
 automation/scripts/offline_fish_keys
 automation/scripts/offline_whale_keys
 automation/scripts/online_fish_keys
@@ -103,4 +102,3 @@ release
 # pipenv
 Pipfile
 Pipfile.lock
-
