@@ -23,11 +23,9 @@ type Structured_log_events.t += Bootstrap_complete
   [@@deriving register_event { msg = "Bootstrap state: complete." }]
 
 type t =
-  { logger : Logger.t
+  { context : (module CONTEXT)
   ; trust_system : Trust_system.t
-  ; consensus_constants : Consensus.Constants.t
   ; verifier : Verifier.t
-  ; precomputed_values : Precomputed_values.t
   ; mutable best_seen_transition : Mina_block.initial_valid_block
   ; mutable current_root : Mina_block.initial_valid_block
   ; network : Mina_networking.t
@@ -63,19 +61,15 @@ let time_deferred deferred =
   let end_time = Time.now () in
   (Time.diff end_time start_time, result)
 
-let worth_getting_root t candidate =
+let worth_getting_root ({ context = (module Context); _ } as t) candidate =
   let module Context = struct
+    include Context
+
     let logger =
-      Logger.extend t.logger
+      Logger.extend logger
         [ ( "selection_context"
           , `String "Bootstrap_controller.worth_getting_root" )
         ]
-
-    let precomputed_values = t.precomputed_values
-
-    let consensus_constants = precomputed_values.consensus_constants
-
-    let constraint_constants = precomputed_values.constraint_constants
   end in
   Consensus.Hooks.equal_select_status `Take
   @@ Consensus.Hooks.select
@@ -85,9 +79,10 @@ let worth_getting_root t candidate =
          |> With_hash.map ~f:Mina_block.consensus_state )
        ~candidate
 
-let received_bad_proof t host e =
+let received_bad_proof ({ context = (module Context); _ } as t) host e =
+  let open Context in
   Trust_system.(
-    record t.trust_system t.logger host
+    record t.trust_system logger host
       Actions.
         ( Violated_protocol
         , Some
@@ -101,11 +96,12 @@ let should_sync ~root_sync_ledger t candidate_state =
   (not @@ done_syncing_root root_sync_ledger)
   && worth_getting_root t candidate_state
 
-let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
-    =
+let start_sync_job_with_peer ~sender ~root_sync_ledger
+    ({ context = (module Context); _ } as t) peer_best_tip peer_root =
+  let open Context in
   let%bind () =
     Trust_system.(
-      record t.trust_system t.logger sender
+      record t.trust_system logger sender
         Actions.
           ( Fulfilled_request
           , Some ("Received verified peer root and best tip", []) ))
@@ -143,17 +139,9 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip peer_root
   | `Repeat ->
       `Ignored
 
-let on_transition t ~sender ~root_sync_ledger ~genesis_constants
-    candidate_transition =
-  let module Context = struct
-    let logger = t.logger
-
-    let precomputed_values = t.precomputed_values
-
-    let consensus_constants = precomputed_values.consensus_constants
-
-    let constraint_constants = precomputed_values.constraint_constants
-  end in
+let on_transition ({ context = (module Context); _ } as t) ~sender
+    ~root_sync_ledger ~genesis_constants candidate_transition =
+  let open Context in
   let candidate_consensus_state =
     With_hash.map ~f:Mina_block.consensus_state candidate_transition
   in
@@ -166,7 +154,7 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
            ~f:State_hash.State_hashes.state_hash )
     with
     | Error e ->
-        [%log' error t.logger]
+        [%log error]
           ~metadata:[ ("error", Error_json.error_to_yojson e) ]
           !"Could not get the proof of the root transition from the network: \
             $error" ;
@@ -185,8 +173,9 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
-let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
-    ~sync_ledger_reader ~genesis_constants =
+let sync_ledger ({ context = (module Context); _ } as t) ~preferred
+    ~root_sync_ledger ~transition_graph ~sync_ledger_reader ~genesis_constants =
+  let open Context in
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
@@ -208,8 +197,7 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
         worth_getting_root t
           (With_hash.map ~f:Mina_block.consensus_state transition)
       then (
-        [%log' trace t.logger]
-          "Added the transition from sync_ledger_reader into cache"
+        [%log trace] "Added the transition from sync_ledger_reader into cache"
           ~metadata:
             [ ( "state_hash"
               , State_hash.to_yojson
@@ -284,12 +272,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         in
         let t =
           { network
-          ; consensus_constants =
-              Precomputed_values.consensus_constants precomputed_values
-          ; logger
+          ; context = (module Context)
           ; trust_system
           ; verifier
-          ; precomputed_values
           ; best_seen_transition = initial_root_transition
           ; current_root = initial_root_transition
           ; num_of_root_snarked_ledger_retargeted = 0
@@ -307,8 +292,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
           time_deferred
             (let root_sync_ledger =
-               Sync_ledger.Db.create temp_snarked_ledger ~logger:t.logger
-                 ~trust_system
+               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
              in
              don't_wait_for
                (sync_ledger t
@@ -474,7 +458,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         | Error e ->
             let%bind () =
               Trust_system.(
-                record t.trust_system t.logger sender
+                record t.trust_system logger sender
                   Actions.
                     ( Outgoing_connection_error
                     , Some
@@ -506,7 +490,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
             let%bind () =
               Trust_system.(
-                record t.trust_system t.logger sender
+                record t.trust_system logger sender
                   Actions.
                     ( Fulfilled_request
                     , Some ("Received valid scan state from peer", []) ))
@@ -742,12 +726,9 @@ let%test_module "Bootstrap_controller tests" =
         |> Mina_block.Validation.reset_frontier_dependencies_validation
         |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
-      { logger
-      ; consensus_constants =
-          Precomputed_values.consensus_constants precomputed_values
+      { context = (module Context)
       ; trust_system
       ; verifier
-      ; precomputed_values
       ; best_seen_transition = transition
       ; current_root = transition
       ; network
