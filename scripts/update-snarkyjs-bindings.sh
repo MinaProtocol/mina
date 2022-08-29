@@ -19,14 +19,6 @@ sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invali
 sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$SNARKY_JS_PATH"/src/node_bindings/snarky_js_node.bc.cjs
 sed -i 's/function raise(t){throw caml_call1(to_exn$0,t)}/function raise(t){throw Error(t?.[1]?.c ?? "some error")}/' "$SNARKY_JS_PATH"/src/node_bindings/snarky_js_node.bc.cjs
 
-# optimize wasm / minify JS (we don't do this with jsoo to not break the error message fix above)
-# pushd "$SNARKY_JS_PATH"/src/node_bindings
-#   wasm-opt --detect-features --enable-mutable-globals -O4 plonk_wasm_bg.wasm -o plonk_wasm_bg.wasm.opt
-#   mv plonk_wasm_bg.wasm.opt plonk_wasm_bg.wasm
-#   npx esbuild --minify --log-level=error snarky_js_node.bc.js > snarky_js_node.bc.min.js
-#   mv snarky_js_node.bc.min.js snarky_js_node.bc.js
-# popd
-
 npm run build --prefix="$SNARKY_JS_PATH"
 
 # 2. web build
@@ -40,7 +32,7 @@ cp _build/default/src/lib/snarky_js_bindings/snarky_js_chrome*.js "$SNARKY_JS_PA
 sed -i 's/function failwith(s){throw \[0,Failure,s\]/function failwith(s){throw joo_global_object.Error(s.c)/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
 sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
 sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
-sed -i 's/function raise(t){throw caml_call1(to_exn$0,t)}/function raise(t){throw Error(t?.[1]?.c ?? "some error")}/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
+sed -i 's/function raise(t){throw caml_call1(to_exn$0,t)}/function raise(t){throw Error(t?.[1]?.c ?? "Unknown error thrown by raise")}/' "$SNARKY_JS_PATH"/src/chrome_bindings/snarky_js_chrome.bc.js
 
 # optimize wasm / minify JS (we don't do this with jsoo to not break the error message fix above)
 pushd "$SNARKY_JS_PATH"/src/chrome_bindings
