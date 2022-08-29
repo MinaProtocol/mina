@@ -314,8 +314,8 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
       Deferred.any
         [ ( exit_or_signal
           >>| function
-          | Ok _ ->
-              `Unexpected_termination
+          | Ok termination ->
+              `Unexpected_termination termination
           | Error err ->
               `Wait_threw_an_exception err )
         ]
@@ -333,9 +333,14 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
            Ivar.fill_if_empty create_worker_trigger () ) ;
         let () =
           match e with
-          | `Unexpected_termination ->
-              [%log error] "verifier terminated unexpectedly"
-                ~metadata:[ ("verifier_pid", `Int (Pid.to_int pid)) ] ;
+          | `Unexpected_termination termination ->
+              [%log error] "verifier terminated unexpectedly with $termination"
+                ~metadata:
+                  [ ("verifier_pid", `Int (Pid.to_int pid))
+                  ; ( "termination"
+                    , `String
+                        (Core.Unix.Exit_or_signal.to_string_hum termination) )
+                  ] ;
               Ivar.fill_if_empty create_worker_trigger ()
           | `Wait_threw_an_exception _ -> (
               ( match e with
