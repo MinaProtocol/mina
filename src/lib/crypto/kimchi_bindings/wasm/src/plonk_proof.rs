@@ -612,6 +612,13 @@ macro_rules! impl_proof {
                 pub fn set_prev_challenges_comms(&mut self, prev_challenges_comms: WasmVector<$WasmPolyComm>) {
                     self.prev_challenges_comms = prev_challenges_comms
                 }
+
+                #[wasm_bindgen]
+                pub fn serialize(&self) -> String {
+                    let proof = ProverProof::from(self);
+                    let serialized = rmp_serde::to_vec(&proof).unwrap();
+                    base64::encode(serialized)
+                }
             }
 
             #[wasm_bindgen]
@@ -621,6 +628,7 @@ macro_rules! impl_proof {
                 prev_challenges: WasmFlatVector<$WasmF>,
                 prev_sgs: WasmVector<$WasmG>,
             ) -> WasmProverProof {
+                console_error_panic_hook::set_once();
                 {
                     let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };

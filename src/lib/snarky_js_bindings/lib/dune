@@ -23,6 +23,7 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
+   base58_check
    block_time
    currency
    data_hash_lib

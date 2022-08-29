@@ -222,16 +222,16 @@ module For_tests = struct
                 Transaction_hash.User_command_with_valid_signature.command tx
               in
               [%test_eq: Account_nonce.t]
-                (User_command.application_nonce unchecked)
+                (User_command.applicable_at_nonce unchecked)
                 curr_nonce ;
               check_consistent tx ;
-              ( User_command.target_nonce unchecked
+              ( User_command.expected_target_nonce unchecked
               , Option.value_exn
                   Currency.Amount.(
                     Option.value_exn
                       (currency_consumed ~constraint_constants tx)
                     + currency_acc) ) )
-            ( User_command.target_nonce applicable_unchecked
+            ( User_command.expected_target_nonce applicable_unchecked
             , Option.value_exn
                 (currency_consumed ~constraint_constants applicable) )
             inapplicables
@@ -257,12 +257,12 @@ module For_tests = struct
           applicable ) ;
       let tx' =
         F_sequence.find sender_txs ~f:(fun cmd ->
-            let application_nonce =
+            let applicable_at_nonce =
               cmd |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.application_nonce
+              |> User_command.applicable_at_nonce
             in
-            Account_nonce.equal application_nonce
-            @@ User_command.application_nonce unchecked )
+            Account_nonce.equal applicable_at_nonce
+            @@ User_command.applicable_at_nonce unchecked )
         |> Option.value_exn
       in
       [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx tx'
@@ -570,13 +570,13 @@ let remove_with_dependents_exn :
   assert (not @@ F_sequence.is_empty sender_queue) ;
   let cmd_nonce =
     Transaction_hash.User_command_with_valid_signature.command cmd
-    |> User_command.application_nonce
+    |> User_command.applicable_at_nonce
   in
   let cmd_index =
     F_sequence.findi sender_queue ~f:(fun cmd' ->
         let nonce =
           Transaction_hash.User_command_with_valid_signature.command cmd'
-          |> User_command.application_nonce
+          |> User_command.applicable_at_nonce
         in
         (* we just compare nonce equality since the command we are looking for already exists in the sequence *)
         Account_nonce.equal nonce cmd_nonce )
@@ -687,7 +687,7 @@ let revalidate :
       let first_cmd = F_sequence.head_exn queue in
       let first_nonce =
         first_cmd |> Transaction_hash.User_command_with_valid_signature.command
-        |> User_command.application_nonce
+        |> User_command.applicable_at_nonce
       in
       if Account_nonce.(current_nonce < first_nonce) then
         let dropped, t'' = remove_with_dependents_exn' t first_cmd in
@@ -698,7 +698,7 @@ let revalidate :
           F_sequence.findi queue ~f:(fun cmd' ->
               let nonce =
                 Transaction_hash.User_command_with_valid_signature.command cmd'
-                |> User_command.application_nonce
+                |> User_command.applicable_at_nonce
               in
               Account_nonce.equal nonce current_nonce )
           |> Option.value ~default:(F_sequence.length queue)
@@ -799,9 +799,21 @@ let remove_expired t :
         (Sequence.append dropped_acc removed, t')
       else acc )
 
+let actual_target_nonce cmd ~application_status =
+  match cmd with
+  | User_command.Signed_command x ->
+      Account.Nonce.succ (Signed_command.nonce x)
+  | Parties p -> (
+      match application_status with
+      | None | Some (Transaction_status.Failed _) ->
+          User_command.expected_target_nonce cmd
+      | _ ->
+          Parties.target_nonce_on_success p )
+
 let handle_committed_txn :
        t
     -> Transaction_hash.User_command_with_valid_signature.t
+    -> application_status:Transaction_status.t option
     -> fee_payer_balance:Currency.Amount.t
     -> fee_payer_nonce:Mina_base.Account.Nonce.t
     -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
@@ -811,7 +823,7 @@ let handle_committed_txn :
        )
        Result.t =
  fun ({ config = { constraint_constants; _ }; _ } as t) committed
-     ~fee_payer_balance ~fee_payer_nonce ->
+     ~application_status ~fee_payer_balance ~fee_payer_nonce ->
   let committed' =
     Transaction_hash.User_command_with_valid_signature.command committed
   in
@@ -824,10 +836,13 @@ let handle_committed_txn :
       let first_cmd' =
         Transaction_hash.User_command_with_valid_signature.command first_cmd
       in
+      let actual_target_nonce =
+        actual_target_nonce committed' ~application_status
+      in
       if
         Account_nonce.(
-          User_command.application_nonce committed'
-          <> User_command.application_nonce first_cmd')
+          User_command.applicable_at_nonce committed'
+          <> User_command.applicable_at_nonce first_cmd')
       then
         Error
           (`Queued_txns_by_sender
@@ -836,9 +851,9 @@ let handle_committed_txn :
             , F_sequence.to_seq cmds ) )
       else if
         Account_nonce.(
-          User_command.target_nonce committed'
-          <> User_command.target_nonce first_cmd')
+          actual_target_nonce <> User_command.expected_target_nonce first_cmd')
       then
+        (*The committed transaction invalidates the rest of sequence*)
         let dropped_cmds = F_sequence.to_seq cmds in
         let t = remove_applicable_exn t first_cmd in
         let t =
@@ -867,9 +882,7 @@ let handle_committed_txn :
         in
         let new_queued_cmds, currency_reserved'', dropped_cmds =
           (*removed the first cmd, check if there are anymore committed transactions from the fee payer*)
-          if
-            Mina_base.Account.Nonce.(
-              equal (User_command.target_nonce first_cmd') fee_payer_nonce)
+          if Mina_base.Account.Nonce.(equal actual_target_nonce fee_payer_nonce)
           then
             (* remove user_commands that consume more currency than what the latest fee_payer_balance is*)
             drop_until_sufficient_balance ~constraint_constants
@@ -1017,7 +1030,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
     let unchecked = Transaction_hash.User_command.data unchecked_cmd in
     let fee = User_command.fee unchecked in
     let fee_per_wu = User_command.fee_per_wu unchecked in
-    let cmd_application_nonce = User_command.application_nonce unchecked in
+    let cmd_applicable_at_nonce = User_command.applicable_at_nonce unchecked in
     (* Result errors indicate problems with the command, while assert failures
        indicate bugs in Mina. *)
     let%bind consumed =
@@ -1054,10 +1067,10 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
               (* nothing queued for this sender *)
               let%bind () =
                 Result.ok_if_true
-                  (Account_nonce.equal current_nonce cmd_application_nonce)
+                  (Account_nonce.equal current_nonce cmd_applicable_at_nonce)
                   ~error:
                     (Invalid_nonce
-                       (`Expected current_nonce, cmd_application_nonce) )
+                       (`Expected current_nonce, cmd_applicable_at_nonce) )
                 (* C1/1a *)
               in
               let%map () =
@@ -1080,17 +1093,17 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
     | Some (queued_cmds, reserved_currency) ->
         assert (not @@ F_sequence.is_empty queued_cmds) ;
         (* C1/C1b *)
-        let queue_application_nonce =
+        let queue_applicable_at_nonce =
           F_sequence.head_exn queued_cmds
           |> Transaction_hash.User_command_with_valid_signature.command
-          |> User_command.application_nonce
+          |> User_command.applicable_at_nonce
         in
         let queue_target_nonce =
           F_sequence.last_exn queued_cmds
           |> Transaction_hash.User_command_with_valid_signature.command
-          |> User_command.target_nonce
+          |> User_command.expected_target_nonce
         in
-        if Account_nonce.equal queue_target_nonce cmd_application_nonce then (
+        if Account_nonce.equal queue_target_nonce cmd_applicable_at_nonce then (
           (* this command goes on the end *)
           let%bind reserved_currency' =
             M.of_result
@@ -1121,28 +1134,28 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           in
           by_sender := { !by_sender with data = Some new_state } ;
           (cmd, Sequence.empty) )
-        else if Account_nonce.equal queue_application_nonce current_nonce then (
+        else if Account_nonce.equal queue_applicable_at_nonce current_nonce then (
           (* we're replacing a command *)
           let%bind () =
             Result.ok_if_true
-              (Account_nonce.between ~low:queue_application_nonce
-                 ~high:queue_target_nonce cmd_application_nonce )
+              (Account_nonce.between ~low:queue_applicable_at_nonce
+                 ~high:queue_target_nonce cmd_applicable_at_nonce )
               ~error:
                 (Invalid_nonce
-                   ( `Between (queue_application_nonce, queue_target_nonce)
-                   , cmd_application_nonce ) )
+                   ( `Between (queue_applicable_at_nonce, queue_target_nonce)
+                   , cmd_applicable_at_nonce ) )
             |> M.of_result
             (* C1/C1b *)
           in
           let replacement_index =
             F_sequence.findi queued_cmds ~f:(fun cmd' ->
-                let cmd_application_nonce' =
+                let cmd_applicable_at_nonce' =
                   Transaction_hash.User_command_with_valid_signature.command
                     cmd'
-                  |> User_command.application_nonce
+                  |> User_command.applicable_at_nonce
                 in
-                Account_nonce.compare cmd_application_nonce
-                  cmd_application_nonce'
+                Account_nonce.compare cmd_applicable_at_nonce
+                  cmd_applicable_at_nonce'
                 <= 0 )
             |> Option.value_exn
           in
@@ -1154,8 +1167,8 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             |> Transaction_hash.User_command_with_valid_signature.command
           in
           assert (
-            Account_nonce.compare cmd_application_nonce
-              (User_command.application_nonce to_drop)
+            Account_nonce.compare cmd_applicable_at_nonce
+              (User_command.applicable_at_nonce to_drop)
             <= 0 ) ;
           (* We check the fee increase twice because we need to be sure the
              subtraction is safe. *)
@@ -1252,7 +1265,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           M.of_result
             (Error
                (Invalid_nonce
-                  (`Expected queue_target_nonce, cmd_application_nonce) ) )
+                  (`Expected queue_target_nonce, cmd_applicable_at_nonce) ) )
 end
 
 module Add_from_gossip_exn0 = Add_from_gossip_exn (Writer_result)
@@ -1299,6 +1312,7 @@ let add_from_gossip_exn_async ~config
   Deferred.Result.map (Writer_result.Deferred.run x) ~f:(fun ((c, cs), us) ->
       ((c, Sequence.to_list cs), !r, us) )
 
+(** Add back the commands that were removed due to a reorg*)
 let add_from_backtrack :
        t
     -> Transaction_hash.User_command_with_valid_signature.t
@@ -1346,10 +1360,10 @@ let add_from_backtrack :
       if
         not
           (Account_nonce.equal
-             (unchecked |> User_command.target_nonce)
+             (unchecked |> User_command.expected_target_nonce)
              ( first_queued
              |> Transaction_hash.User_command_with_valid_signature.command
-             |> User_command.application_nonce ) )
+             |> User_command.applicable_at_nonce ) )
       then
         failwith
         @@ sprintf
@@ -1727,13 +1741,13 @@ let%test_module _ =
             let replace_nonce =
               replace_cmd
               |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.application_nonce
+              |> User_command.applicable_at_nonce
             in
             List.findi setup_cmds ~f:(fun _i cmd ->
                 let cmd_nonce =
                   cmd
                   |> Transaction_hash.User_command_with_valid_signature.command
-                  |> User_command.application_nonce
+                  |> User_command.applicable_at_nonce
                 in
                 Account_nonce.compare replace_nonce cmd_nonce <= 0 )
             |> Option.value_exn
@@ -1742,11 +1756,11 @@ let%test_module _ =
             Account_nonce.to_int
               ( replace_cmd
               |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.application_nonce )
+              |> User_command.applicable_at_nonce )
             - Account_nonce.to_int
                 ( List.hd_exn setup_cmds
                 |> Transaction_hash.User_command_with_valid_signature.command
-                |> User_command.application_nonce )
+                |> User_command.applicable_at_nonce )
           in
           Printf.printf
             !"replacement indices: new=%d, old=%d\n%!"
@@ -1897,13 +1911,16 @@ let%test_module _ =
         assert_invariants pool' ;
         pool'
       in
-      let commit_to_pool cmd fee_payer_balance expected_drops pool =
+      let commit_to_pool cmd ~application_status ~fee_payer_balance
+          ~expected_drops pool =
         let fee_payer_nonce =
-          User_command.target_nonce
+          User_command.expected_target_nonce
           @@ Transaction_hash.User_command_with_valid_signature.command cmd
         in
         let pool, dropped =
-          handle_committed_txn pool cmd ~fee_payer_balance ~fee_payer_nonce
+          handle_committed_txn pool cmd
+            ~application_status:(Some application_status) ~fee_payer_balance
+            ~fee_payer_nonce
           |> Result.map_error ~f:(fun (`Queued_txns_by_sender (error, _)) ->
                  error )
           |> Result.ok_or_failwith
@@ -1940,19 +1957,44 @@ let%test_module _ =
              ; (kp2, 0L)
             |]
             ledger ;
-          let cmd1 = make_cmd ~double_increment:true 0 in
-          let cmd2 = make_cmd ~double_increment:false 2 in
-          let cmd3 = make_cmd ~double_increment:true 3 in
-          let cmd4 = make_cmd ~double_increment:true 5 in
+          let cmd1 = make_cmd ~double_increment:false 0 in
+          let cmd2 = make_cmd ~double_increment:false 1 in
+          let cmd3 = make_cmd ~double_increment:false 2 in
+          let cmd4 = make_cmd ~double_increment:false 3 in
+          let cmd5 = make_cmd ~double_increment:false 4 in
+          let cmd6 = make_cmd ~double_increment:false 5 in
+          let cmd7 = make_cmd ~double_increment:false 6 in
           (* used to break the sequence *)
-          let cmd3' = make_cmd ~double_increment:false 3 in
+          (* same as cmd3. should not drop anything*)
+          let cmd3' = make_cmd ~double_increment:false 2 in
+          (*command with multiple fee payer increments but failed. Equivalent to one fee payer increment, drops cmd4 because it is a different command but keeps the rest*)
+          let cmd4_failed = make_cmd ~double_increment:true 3 in
+          (*command with multiple fee payer increments but applied. drops cmd5 because it is different and invalidates the rest of the queue*)
+          let cmd5' = make_cmd ~double_increment:true 4 in
           ignore
             ( empty |> add_to_pool cmd1 |> add_to_pool cmd2 |> add_to_pool cmd3
-              |> add_to_pool cmd4
-              |> commit_to_pool cmd1 (balance_after_cmd 1) Sequence.empty
-              |> commit_to_pool cmd2 (balance_after_cmd 2) Sequence.empty
-              |> commit_to_pool cmd3' (balance_after_cmd 3)
-                   (Sequence.of_list [ cmd3; cmd4 ])
+              |> add_to_pool cmd4 |> add_to_pool cmd5 |> add_to_pool cmd6
+              |> add_to_pool cmd7
+              |> commit_to_pool cmd1 ~application_status:Applied
+                   ~fee_payer_balance:(balance_after_cmd 1)
+                   ~expected_drops:Sequence.empty
+              |> commit_to_pool cmd2 ~application_status:Applied
+                   ~fee_payer_balance:(balance_after_cmd 2)
+                   ~expected_drops:Sequence.empty
+              |> commit_to_pool cmd3' ~application_status:Applied
+                   ~fee_payer_balance:(balance_after_cmd 3)
+                   ~expected_drops:Sequence.empty
+              |> commit_to_pool cmd4_failed
+                   ~application_status:
+                     (Failed
+                        Transaction_status.Failure.(
+                          Collection.of_single_failure
+                            Update_not_permitted_balance) )
+                   ~fee_payer_balance:(balance_after_cmd 4)
+                   ~expected_drops:(Sequence.singleton cmd4)
+              |> commit_to_pool cmd5' ~application_status:Applied
+                   ~fee_payer_balance:(balance_after_cmd 5)
+                   ~expected_drops:(Sequence.of_list [ cmd5; cmd6; cmd7 ])
               : t )
           (*
           |> apply_to_pool (balance_after_cmd 0) cmd1

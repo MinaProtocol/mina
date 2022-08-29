@@ -173,6 +173,7 @@ val create_diff :
         -> Transaction_snark_work.Checked.t option )
   -> supercharge_coinbase:bool
   -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
+       * (User_command.Valid.t * Error.t) list
      , Pre_diff_info.Error.t )
      Result.t
 
