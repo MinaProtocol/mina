@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val verifier : Verifier.t
 
   val trust_system : Trust_system.t
+
+  val network : Mina_networking.t
 end
 
 module Catchup_jobs : sig
@@ -25,7 +27,6 @@ end
 
 val run :
      context:(module CONTEXT)
-  -> network:Mina_networking.t
   -> frontier:Transition_frontier.t
   -> catchup_job_reader:
        ( State_hash.t

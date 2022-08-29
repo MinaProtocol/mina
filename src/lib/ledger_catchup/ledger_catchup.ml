@@ -13,19 +13,20 @@ module type CONTEXT = sig
   val verifier : Verifier.t
 
   val trust_system : Trust_system.t
+
+  val network : Mina_networking.t
 end
 
-let run ~context:(module Context : CONTEXT) ~network ~frontier
-    ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
+let run ~context:(module Context : CONTEXT) ~frontier ~catchup_job_reader
+    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache : unit =
   match Transition_frontier.catchup_tree frontier with
   | Hash _ ->
       Normal_catchup.run
         ~context:(module Context)
-        ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+        ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
         ~unprocessed_transition_cache
   | Full _ ->
       Super_catchup.run
         ~context:(module Context)
-        ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+        ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
         ~unprocessed_transition_cache

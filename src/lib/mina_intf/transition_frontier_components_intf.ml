@@ -305,15 +305,17 @@ module type Transition_chain_prover_intf = sig
 end
 
 module type Bootstrap_controller_intf = sig
+  type network
+
   module type CONTEXT = sig
     val logger : Logger.t
 
     val verifier : Verifier.t
 
     val trust_system : Trust_system.t
-  end
 
-  type network
+    val network : network
+  end
 
   type transition_frontier
 
@@ -323,7 +325,6 @@ module type Bootstrap_controller_intf = sig
 
   val run :
        context:(module CONTEXT)
-    -> network:network
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> transition_reader:
          Mina_block.initial_valid_block Envelope.Incoming.t Strict_pipe.Reader.t
@@ -339,23 +340,24 @@ module type Bootstrap_controller_intf = sig
 end
 
 module type Transition_frontier_controller_intf = sig
+  type network
+
   module type CONTEXT = sig
     val logger : Logger.t
 
     val verifier : Verifier.t
 
     val trust_system : Trust_system.t
+
+    val network : network
   end
 
   type transition_frontier
 
   type breadcrumb
 
-  type network
-
   val run :
        context:(module CONTEXT)
-    -> network:network
     -> time_controller:Block_time.Controller.t
     -> collected_transitions:
          Mina_block.initial_valid_block Envelope.Incoming.t list
@@ -368,6 +370,8 @@ module type Transition_frontier_controller_intf = sig
 end
 
 module type Transition_router_intf = sig
+  type network
+
   module type CONTEXT = sig
     val logger : Logger.t
 
@@ -380,6 +384,8 @@ module type Transition_router_intf = sig
     val verifier : Verifier.t
 
     val trust_system : Trust_system.t
+
+    val network : network
   end
 
   type transition_frontier
@@ -390,11 +396,8 @@ module type Transition_router_intf = sig
 
   type breadcrumb
 
-  type network
-
   val run :
        context:(module CONTEXT)
-    -> network:network
     -> is_seed:bool
     -> is_demo_mode:bool
     -> time_controller:Block_time.Controller.t

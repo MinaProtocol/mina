@@ -15,9 +15,11 @@ module type CONTEXT = sig
   val verifier : Verifier.t
 
   val trust_system : Trust_system.t
+
+  val network : Mina_networking.t
 end
 
-let run ~context:(module Context : CONTEXT) ~network ~time_controller
+let run ~context:(module Context : CONTEXT) ~time_controller
     ~collected_transitions ~frontier ~network_transition_reader
     ~producer_transition_reader ~clear_reader =
   let open Context in
@@ -129,7 +131,7 @@ let run ~context:(module Context : CONTEXT) ~network ~time_controller
     ~processed_transition_writer ;
   Ledger_catchup.run
     ~context:(module Context)
-    ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in

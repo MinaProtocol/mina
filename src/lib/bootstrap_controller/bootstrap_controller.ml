@@ -21,6 +21,8 @@ module type CONTEXT = sig
   val verifier : Verifier.t
 
   val trust_system : Trust_system.t
+
+  val network : Mina_networking.t
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -30,7 +32,6 @@ type t =
   { context : (module CONTEXT)
   ; mutable best_seen_transition : Mina_block.initial_valid_block
   ; mutable current_root : Mina_block.initial_valid_block
-  ; network : Mina_networking.t
   ; mutable num_of_root_snarked_ledger_retargeted : int
   }
 
@@ -151,7 +152,7 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
     Deferred.return `Ignored
   else
     match%bind
-      Mina_networking.get_ancestry t.network sender.Peer.peer_id
+      Mina_networking.get_ancestry network sender.Peer.peer_id
         (With_hash.map_hash candidate_consensus_state
            ~f:State_hash.State_hashes.state_hash )
     with
@@ -180,7 +181,7 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
   let open Context in
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
-  Mina_networking.glue_sync_ledger ~preferred t.network query_reader
+  Mina_networking.glue_sync_ledger ~preferred network query_reader
     response_writer ;
   Reader.iter sync_ledger_reader ~f:(fun (`Block incoming_transition, _) ->
       let (transition, _) : Mina_block.initial_valid_block =
@@ -213,7 +214,7 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
              transition )
       else Deferred.unit )
 
-let external_transition_compare ~context:(module Context : CONTEXT) =
+let external_transition_compare ~context =
   Comparable.lift
     (fun existing candidate ->
       (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
@@ -224,7 +225,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
       then 0
       else if
         Consensus.Hooks.equal_select_status `Keep
-        @@ Consensus.Hooks.select ~context:(module Context) ~existing ~candidate
+        @@ Consensus.Hooks.select ~context ~existing ~candidate
       then -1
       else 1 )
     ~f:(With_hash.map ~f:Mina_block.consensus_state)
@@ -232,7 +233,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
-let run ~context:(module Context : CONTEXT) ~network ~consensus_local_state
+let run ~context:(module Context : CONTEXT) ~consensus_local_state
     ~transition_reader ~best_seen_transition ~persistent_root
     ~persistent_frontier ~initial_root_transition ~catchup_mode =
   let open Context in
@@ -272,8 +273,7 @@ let run ~context:(module Context : CONTEXT) ~network ~consensus_local_state
           |> Mina_block.Validation.reset_staged_ledger_diff_validation
         in
         let t =
-          { network
-          ; context = (module Context)
+          { context = (module Context)
           ; best_seen_transition = initial_root_transition
           ; current_root = initial_root_transition
           ; num_of_root_snarked_ledger_retargeted = 0
@@ -325,7 +325,7 @@ let run ~context:(module Context : CONTEXT) ~network ~consensus_local_state
                    , staged_ledger_data_download_result ) =
             time_deferred
               (Mina_networking
-               .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
+               .get_staged_ledger_aux_and_pending_coinbases_at_hash network
                  sender.peer_id hash )
           in
           match staged_ledger_data_download_result with
@@ -530,14 +530,14 @@ let run ~context:(module Context : CONTEXT) ~network ~consensus_local_state
                         ~random_peers:(fun n ->
                           (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
                           let%map peers =
-                            Mina_networking.random_peers t.network n
+                            Mina_networking.random_peers network n
                           in
                           sender :: peers )
                         ~query_peer:
                           { Consensus.Hooks.Rpcs.query =
                               (fun peer rpc query ->
                                 Mina_networking.(
-                                  query_peer t.network peer.peer_id
+                                  query_peer network peer.peer_id
                                     (Rpcs.Consensus_rpc rpc) query) )
                           }
                         sync_jobs
@@ -729,10 +729,14 @@ let%test_module "Bootstrap_controller tests" =
         |> Mina_block.Validation.reset_frontier_dependencies_validation
         |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
+      let module Context = struct
+        include Context
+
+        let network = network
+      end in
       { context = (module Context)
       ; best_seen_transition = transition
       ; current_root = transition
-      ; network
       ; num_of_root_snarked_ledger_retargeted = 0
       }
 
@@ -838,10 +842,15 @@ let%test_module "Bootstrap_controller tests" =
         Transition_frontier.close ~loc:__LOC__ my_net.state.frontier
       in
       [%log info] "bootstrap begin" ;
+      let module Context = struct
+        include Context
+
+        let network = my_net.network
+      end in
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run
            ~context:(module Context)
-           ~network:my_net.network ~best_seen_transition:None
+           ~best_seen_transition:None
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
            ~catchup_mode:`Normal ~initial_root_transition )

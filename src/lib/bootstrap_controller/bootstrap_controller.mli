@@ -14,13 +14,14 @@ module type CONTEXT = sig
   val verifier : Verifier.t
 
   val trust_system : Trust_system.t
+
+  val network : Mina_networking.t
 end
 
 type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
 
 val run :
      context:(module CONTEXT)
-  -> network:Mina_networking.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> transition_reader:
        ( [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t ]

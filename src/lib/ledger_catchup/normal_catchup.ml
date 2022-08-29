@@ -19,6 +19,8 @@ module type CONTEXT = sig
   val verifier : Verifier.t
 
   val trust_system : Trust_system.t
+
+  val network : Mina_networking.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -633,9 +635,8 @@ let garbage_collect_subtrees ~logger ~subtrees =
           ignore @@ Cached.invalidate_with_failure node ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
-let run ~context:(module Context : CONTEXT) ~network ~frontier
-    ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
+let run ~context:(module Context : CONTEXT) ~frontier ~catchup_job_reader
+    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache : unit =
   let open Context in
   let hash_tree =
     match Transition_frontier.catchup_tree frontier with
@@ -944,9 +945,14 @@ let%test_module "Ledger_catchup tests" =
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
+      let module Context = struct
+        include Context
+
+        let network = network
+      end in
       run
         ~context:(module Context)
-        ~network ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
+        ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer

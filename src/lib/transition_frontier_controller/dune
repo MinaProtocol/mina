@@ -30,4 +30,5 @@
    consensus
    verifier
    trust_system
+   mina_networking
 ))

@@ -21,6 +21,8 @@ module type CONTEXT = sig
   val verifier : Verifier.t
 
   val trust_system : Trust_system.t
+
+  val network : Mina_networking.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -1001,8 +1003,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t
   run_node
 
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
-let run_catchup ~context:(module Context : CONTEXT) ~network ~frontier
-    ~build_func
+let run_catchup ~context:(module Context : CONTEXT) ~frontier ~build_func
     ~(catchup_job_reader :
        ( State_hash.t
        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -1322,13 +1323,12 @@ let run_catchup ~context:(module Context : CONTEXT) ~network ~frontier
                           (h, l) )
                       : State_hash.t * Length.t ) ) ) )
 
-let run ~context:(module Context : CONTEXT) ~network ~frontier
-    ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache : unit =
+let run ~context:(module Context : CONTEXT) ~frontier ~catchup_job_reader
+    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache : unit =
   O1trace.background_thread "perform_super_catchup" (fun () ->
       run_catchup
         ~context:(module Context)
-        ~network ~frontier ~catchup_job_reader ~unprocessed_transition_cache
+        ~frontier ~catchup_job_reader ~unprocessed_transition_cache
         ~catchup_breadcrumbs_writer
         ~build_func:Transition_frontier.Breadcrumb.build )
 
@@ -1436,9 +1436,14 @@ let%test_module "Ledger_catchup tests" =
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
+      let module Context = struct
+        include Context
+
+        let network = network
+      end in
       run
         ~context:(module Context)
-        ~network ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
+        ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer

@@ -1766,6 +1766,12 @@ let create ?wallets (config : Config.t) =
                           | Some frontier ->
                               Sync_handler.best_tip_path ~frontier ) ) ) )
           in
+          (* Expand the context with the network handle. *)
+          let module Context = struct
+            include Context
+
+            let network = net
+          end in
           (* tie the first knot *)
           net_ref := Some net ;
           let user_command_input_reader, user_command_input_writer =
@@ -1819,8 +1825,7 @@ let create ?wallets (config : Config.t) =
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
-              ~network:net ~is_seed:config.is_seed
-              ~is_demo_mode:config.demo_mode
+              ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root_location:config.persistent_root_location

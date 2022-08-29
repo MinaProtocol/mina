@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val verifier : Verifier.t
 
   val trust_system : Trust_system.t
+
+  val network : Mina_networking.t
 end
 
 type Structured_log_events.t += Starting_transition_frontier_controller
@@ -74,7 +76,7 @@ let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
-    ~network ~time_controller ~producer_transition_reader_ref
+    ~time_controller ~producer_transition_reader_ref
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~collected_transitions ~transition_reader_ref ~transition_writer_ref
     ~frontier_w frontier =
@@ -106,7 +108,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   let new_verified_transition_reader =
     Transition_frontier_controller.run
       ~context:(module Context)
-      ~network ~time_controller ~collected_transitions ~frontier
+      ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader:!transition_reader_ref
       ~producer_transition_reader ~clear_reader
   in
@@ -116,7 +118,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
          (Strict_pipe.Writer.write verified_transition_writer) )
   |> don't_wait_for
 
-let start_bootstrap_controller ~context:(module Context : CONTEXT) ~network
+let start_bootstrap_controller ~context:(module Context : CONTEXT)
     ~time_controller ~producer_transition_reader_ref
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~transition_reader_ref ~transition_writer_ref ~consensus_local_state
@@ -152,20 +154,20 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~network
   upon
     (Bootstrap_controller.run
        ~context:(module Context)
-       ~network ~consensus_local_state ~transition_reader:!transition_reader_ref
+       ~consensus_local_state ~transition_reader:!transition_reader_ref
        ~persistent_frontier ~persistent_root ~initial_root_transition
        ~best_seen_transition ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
       Strict_pipe.Writer.kill !transition_writer_ref ;
       start_transition_frontier_controller
         ~context:(module Context)
-        ~network ~time_controller ~producer_transition_reader_ref
+        ~time_controller ~producer_transition_reader_ref
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~transition_reader_ref
         ~transition_writer_ref ~frontier_w new_frontier )
 
 let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
-    ~network ~most_recent_valid_block_writer ~genesis_constants =
+    ~most_recent_valid_block_writer ~genesis_constants =
   let open Context in
   let num_peers = 16 in
   let%bind peers = Mina_networking.random_peers network num_peers in
@@ -329,8 +331,8 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting to too many peers" )
     ]
 
-let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
-    ~is_demo_mode ~time_controller ~frontier_w ~producer_transition_reader_ref
+let initialize ~context:(module Context : CONTEXT) ~is_seed ~is_demo_mode
+    ~time_controller ~frontier_w ~producer_transition_reader_ref
     ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
     ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
@@ -347,8 +349,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
     Deferred.both
       (download_best_tip
          ~context:(module Context)
-         ~notify_online ~network ~most_recent_valid_block_writer
-         ~genesis_constants )
+         ~notify_online ~most_recent_valid_block_writer ~genesis_constants )
       (load_frontier
          ~context:(module Context)
          ~persistent_frontier ~persistent_root ~consensus_local_state
@@ -363,7 +364,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
       in
       start_bootstrap_controller
         ~context:(module Context)
-        ~network ~time_controller ~producer_transition_reader_ref
+        ~time_controller ~producer_transition_reader_ref
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~transition_reader_ref ~consensus_local_state
         ~transition_writer_ref ~frontier_w ~persistent_root ~persistent_frontier
@@ -392,7 +393,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
           let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
           start_bootstrap_controller
             ~context:(module Context)
-            ~network ~time_controller ~producer_transition_reader_ref
+            ~time_controller ~producer_transition_reader_ref
             ~producer_transition_writer_ref ~verified_transition_writer
             ~clear_reader ~transition_reader_ref ~consensus_local_state
             ~transition_writer_ref ~frontier_w ~persistent_root
@@ -451,7 +452,7 @@ let initialize ~context:(module Context : CONTEXT) ~network ~is_seed
           let collected_transitions = Option.to_list best_tip in
           start_transition_frontier_controller
             ~context:(module Context)
-            ~network ~time_controller ~producer_transition_reader_ref
+            ~time_controller ~producer_transition_reader_ref
             ~producer_transition_writer_ref ~verified_transition_writer
             ~clear_reader ~collected_transitions ~transition_reader_ref
             ~transition_writer_ref ~frontier_w frontier )
@@ -495,7 +496,7 @@ let wait_till_genesis ~logger ~time_controller
       (logger_loop ())
     |> Deferred.ignore_m
 
-let run ~context:(module Context : CONTEXT) ~network ~is_seed ~is_demo_mode
+let run ~context:(module Context : CONTEXT) ~is_seed ~is_demo_mode
     ~time_controller ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~network_transition_reader
@@ -575,7 +576,7 @@ let run ~context:(module Context : CONTEXT) ~network ~is_seed ~is_demo_mode
       let%map () =
         initialize
           ~context:(module Context)
-          ~network ~is_seed ~is_demo_mode ~persistent_frontier ~persistent_root
+          ~is_seed ~is_demo_mode ~persistent_frontier ~persistent_root
           ~time_controller ~frontier_w ~producer_transition_reader_ref
           ~catchup_mode ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~transition_reader_ref
@@ -639,8 +640,7 @@ let run ~context:(module Context : CONTEXT) ~network ~is_seed ~is_demo_mode
                         in
                         start_bootstrap_controller
                           ~context:(module Context)
-                          ~network ~time_controller
-                          ~producer_transition_reader_ref
+                          ~time_controller ~producer_transition_reader_ref
                           ~producer_transition_writer_ref
                           ~verified_transition_writer ~clear_reader
                           ~transition_reader_ref ~transition_writer_ref
