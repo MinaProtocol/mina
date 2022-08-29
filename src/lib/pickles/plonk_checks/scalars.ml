@@ -527,19 +527,16 @@ module Tick : S = struct
              let x_7 =
                cell (var (Witness 8, Curr)) + cell (var (Witness 5, Curr))
              in
-             (cell (var (Witness 11, Curr)) * cell (var (Witness 11, Curr)))
+             square (cell (var (Witness 11, Curr)))
              - cell (var (Witness 11, Curr))
              + alpha_pow 1
-               * ( cell (var (Witness 12, Curr))
-                   * cell (var (Witness 12, Curr))
+               * ( square (cell (var (Witness 12, Curr)))
                  - cell (var (Witness 12, Curr)) )
              + alpha_pow 2
-               * ( cell (var (Witness 13, Curr))
-                   * cell (var (Witness 13, Curr))
+               * ( square (cell (var (Witness 13, Curr)))
                  - cell (var (Witness 13, Curr)) )
              + alpha_pow 3
-               * ( cell (var (Witness 14, Curr))
-                   * cell (var (Witness 14, Curr))
+               * ( square (cell (var (Witness 14, Curr)))
                  - cell (var (Witness 14, Curr)) )
              + alpha_pow 4
                * ( (x_0 - cell (var (Witness 4, Curr)))
