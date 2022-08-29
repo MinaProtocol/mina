@@ -107,7 +107,7 @@ module Time_gen = struct
 
   let compare x y = Core_kernel.Time.robustly_compare x y
 end
-let g = Time.Span.of_ns
+
 module Span_gen = struct
   include Time.Span
 
