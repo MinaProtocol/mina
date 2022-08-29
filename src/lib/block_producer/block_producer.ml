@@ -294,6 +294,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                     with
                     pending_coinbase_stack = ()
                   }
+                  |> Registers.Blockchain.of_full
               | None ->
                   previous_protocol_state |> Protocol_state.blockchain_state
                   |> Blockchain_state.registers

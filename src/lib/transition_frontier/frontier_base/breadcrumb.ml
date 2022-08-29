@@ -384,9 +384,10 @@ module For_tests = struct
       let next_registers =
         Option.value_map ledger_proof_opt
           ~f:(fun (proof, _) ->
-            { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
-              pending_coinbase_stack = ()
-            } )
+            Registers.Blockchain.of_full
+              { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
+                pending_coinbase_stack = ()
+              } )
           ~default:previous_registers
       in
       let genesis_ledger_hash =

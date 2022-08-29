@@ -40,6 +40,7 @@
    data_hash_lib
    staged_ledger_diff
    ppx_version.runtime
+   mina_transaction_logic
  )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))

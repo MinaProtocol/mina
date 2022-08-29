@@ -6,16 +6,11 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ( 'staged_ledger_hash
-           , 'snarked_ledger_hash
-           , 'local_state
-           , 'time
-           , 'body_reference )
-           t =
+      type ('staged_ledger_hash, 'snarked_ledger_hash, 'time, 'body_reference) t =
         { staged_ledger_hash : 'staged_ledger_hash
         ; genesis_ledger_hash : 'snarked_ledger_hash
         ; registers :
-            ('snarked_ledger_hash, unit, 'local_state) Registers.Stable.V1.t
+            ('snarked_ledger_hash, unit) Registers.Blockchain.Stable.V1.t
         ; timestamp : 'time
         ; body_reference : 'body_reference
         }
@@ -43,7 +38,6 @@ module Value = struct
       type t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
-        , Local_state.Stable.V1.t
         , Block_time.Stable.V1.t
         , Consensus.Body_reference.Stable.V1.t )
         Poly.Stable.V2.t
@@ -57,7 +51,6 @@ end
 type var =
   ( Staged_ledger_hash.var
   , Frozen_ledger_hash.var
-  , Local_state.Checked.t
   , Block_time.Checked.t
   , Consensus.Body_reference.var )
   Poly.t
@@ -75,7 +68,7 @@ let data_spec =
   let open Data_spec in
   [ Staged_ledger_hash.typ
   ; Frozen_ledger_hash.typ
-  ; Registers.typ [ Frozen_ledger_hash.typ; Typ.unit; Local_state.typ ]
+  ; Registers.Blockchain.typ [ Frozen_ledger_hash.typ; Typ.unit ]
   ; Block_time.Checked.typ
   ; Consensus.Body_reference.typ
   ]
@@ -100,11 +93,8 @@ let var_to_input
        then we could more efficiently deal with the transaction SNARK input
        (as we could reuse the hash)
     *)
-    let { ledger; pending_coinbase_stack = (); local_state } = registers in
-    Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.var_to_input ledger
-       ; Local_state.Checked.to_input local_state
-      |]
+    let { ledger; pending_coinbase_stack = () } = registers in
+    Array.reduce_exn ~f:append [| Frozen_ledger_hash.var_to_input ledger |]
   in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.var_to_input staged_ledger_hash
@@ -128,9 +118,8 @@ let to_input
        then we could more efficiently deal with the transaction SNARK input
        (as we could reuse the hash)
     *)
-    let { ledger; pending_coinbase_stack = (); local_state } = registers in
-    Array.reduce_exn ~f:append
-      [| Frozen_ledger_hash.to_input ledger; Local_state.to_input local_state |]
+    let { ledger; pending_coinbase_stack = () } = registers in
+    Array.reduce_exn ~f:append [| Frozen_ledger_hash.to_input ledger |]
   in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
@@ -149,11 +138,7 @@ let negative_one
   { staged_ledger_hash =
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
   ; genesis_ledger_hash
-  ; registers =
-      { ledger = genesis_ledger_hash
-      ; pending_coinbase_stack = ()
-      ; local_state = Local_state.dummy ()
-      }
+  ; registers = { ledger = genesis_ledger_hash; pending_coinbase_stack = () }
   ; timestamp = consensus_constants.genesis_state_timestamp
   ; body_reference = genesis_body_reference
   }
@@ -161,13 +146,12 @@ let negative_one
 (* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one
 
-type display = (string, string, Local_state.display, string, string) Poly.t
-[@@deriving yojson]
+type display = (string, string, string, string) Poly.t [@@deriving yojson]
 
 let display
     ({ staged_ledger_hash
      ; genesis_ledger_hash
-     ; registers = { ledger; pending_coinbase_stack = (); local_state }
+     ; registers = { ledger; pending_coinbase_stack = () }
      ; timestamp
      ; body_reference
      } :
@@ -183,7 +167,6 @@ let display
           Visualization.display_prefix_of_string
           @@ Frozen_ledger_hash.to_base58_check ledger
       ; pending_coinbase_stack = ()
-      ; local_state = Local_state.display local_state
       }
   ; timestamp =
       Time.to_string_trimmed ~zone:Time.Zone.utc

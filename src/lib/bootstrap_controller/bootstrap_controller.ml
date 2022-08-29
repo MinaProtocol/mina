@@ -402,14 +402,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     let%map result =
                       Staged_ledger
                       .of_scan_state_pending_coinbases_and_snarked_ledger
-                        ~logger
-                        ~snarked_local_state:
-                          Mina_block.(
-                            t.current_root |> Validation.block |> header
-                            |> Header.protocol_state
-                            |> Protocol_state.blockchain_state
-                            |> Blockchain_state.registers
-                            |> Registers.local_state)
+                        ~logger ~snarked_local_state:(Local_state.empty ())
                         ~verifier ~constraint_constants ~scan_state
                         ~snarked_ledger:temp_mask ~expected_merkle_root
                         ~pending_coinbases ~get_state
@@ -910,12 +903,7 @@ let%test_module "Bootstrap_controller tests" =
                 Transition_frontier.root_snarked_ledger frontier
                 |> Ledger.of_database
               in
-              let snarked_local_state =
-                Transition_frontier.root frontier
-                |> Transition_frontier.Breadcrumb.protocol_state
-                |> Protocol_state.blockchain_state |> Blockchain_state.registers
-                |> Registers.local_state
-              in
+              let snarked_local_state = Local_state.empty () in
               let scan_state = Staged_ledger.scan_state staged_ledger in
               let get_state hash =
                 match Transition_frontier.find_protocol_state frontier hash with

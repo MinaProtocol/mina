@@ -41,9 +41,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
         Ok protocol_state
   in
   let mask = Mina_ledger.Ledger.of_database root_ledger in
-  let local_state =
-    Blockchain_state.registers blockchain_state |> Registers.local_state
-  in
+  let local_state = Local_state.empty () in
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
   in

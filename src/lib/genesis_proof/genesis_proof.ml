@@ -161,9 +161,10 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   let curr = t.protocol_state_with_hashes.data in
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
     let reg (t : Blockchain_state.Value.t) =
-      { t.registers with
-        pending_coinbase_stack = Mina_base.Pending_coinbase.Stack.empty
-      }
+      Registers.Blockchain.Value.to_full
+        { t.registers with
+          pending_coinbase_stack = Mina_base.Pending_coinbase.Stack.empty
+        }
     in
     { sok_digest = Mina_base.Sok_message.Digest.default
     ; source = reg (Protocol_state.blockchain_state prev_state)

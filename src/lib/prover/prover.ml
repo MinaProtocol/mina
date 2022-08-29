@@ -72,9 +72,10 @@ module Worker_state = struct
     | None ->
         let bs = Protocol_state.blockchain_state in
         let reg x =
-          { (bs x).Blockchain_state.Poly.registers with
-            pending_coinbase_stack = Pending_coinbase.Stack.empty
-          }
+          Registers.Blockchain.Value.to_full
+            { (bs x).Blockchain_state.Poly.registers with
+              pending_coinbase_stack = Pending_coinbase.Stack.empty
+            }
         in
         let chain_state = Blockchain_snark.Blockchain.state chain in
         ( { source = reg chain_state

@@ -188,7 +188,8 @@ let%snarkydef step ~(logger : Logger.t)
   let%bind txn_snark_should_verify, success =
     let%bind non_pc_registers_didn't_change =
       non_pc_registers_equal_var
-        (previous_state |> Protocol_state.blockchain_state).registers
+        ( (previous_state |> Protocol_state.blockchain_state).registers
+        |> Registers.Blockchain.Checked.to_full )
         { txn_snark.target with pending_coinbase_stack = () }
     and supply_increase_is_zero =
       Currency.Amount.(
@@ -225,6 +226,7 @@ let%snarkydef step ~(logger : Logger.t)
     let%bind txn_snark_input_correct =
       let registers (t : Protocol_state.var) =
         (Protocol_state.blockchain_state t).registers
+        |> Registers.Blockchain.Checked.to_full
       in
       let open Checked in
       let%bind () =
