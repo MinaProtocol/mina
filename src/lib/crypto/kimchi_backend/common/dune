@@ -8,7 +8,7 @@
  (preprocess
   (pps
    ppx_version
-   ppx_coda
+   ppx_mina
    ppx_jane
    ppx_deriving_yojson
    ppx_deriving.std

@@ -17,7 +17,7 @@
   ppx_version.runtime
   test_util)
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson
+  (pps ppx_mina ppx_version ppx_jane ppx_hash ppx_compare ppx_deriving_yojson
        ppx_bitstring))
  (instrumentation (backend bisect_ppx))
  (synopsis "Address for merkle database representations"))

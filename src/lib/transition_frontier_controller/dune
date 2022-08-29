@@ -2,7 +2,7 @@
  (name transition_frontier_controller)
  (public_name transition_frontier_controller)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_coda))
+ (preprocess (pps ppx_version ppx_mina))
  (libraries
    ;; opam libraries
    base

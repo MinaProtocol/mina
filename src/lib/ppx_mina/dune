@@ -1,6 +1,6 @@
 (library
- (name ppx_coda)
- (public_name ppx_coda)
+ (name ppx_mina)
+ (public_name ppx_mina)
  (kind ppx_deriver)
  (libraries
    ;; opam libraries

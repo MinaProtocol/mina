@@ -114,7 +114,7 @@
  (preprocessor_deps ../../../../config.mlh
                     ../../../../../graphql_schema.json
                     ../../../../graphql-ppx-config.inc)
- (preprocess (pps ppx_deriving_yojson ppx_coda ppx_version
+ (preprocess (pps ppx_deriving_yojson ppx_mina ppx_version
                   ; ppx_jane except ppx_optcomp
                   ppx_base ppx_assert ppx_bench ppx_bin_prot ppx_custom_printf
                   ppx_fields_conv ppx_fixed_literal ppx_here ppx_inline_test ppx_let
