@@ -92,6 +92,7 @@
    data_hash_lib
    transition_handler
    ppx_version.runtime
+   mina_intf
    node_error_service
  )
  (instrumentation (backend bisect_ppx))

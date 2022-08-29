@@ -17,6 +17,7 @@
    async_kernel
    base.base_internalhash_types
    ;; local libraries
+   precomputed_values
    merkle_ledger
    downloader
    protocol_version

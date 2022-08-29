@@ -26,4 +26,6 @@
    precomputed_values
    logger
    with_hash
+   genesis_constants
+   consensus
 ))
