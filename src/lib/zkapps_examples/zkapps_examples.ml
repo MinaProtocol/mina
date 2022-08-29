@@ -53,7 +53,7 @@ module Party_under_construction = struct
           | None ->
               default.proved_state
           | Some state_proved ->
-              Zkapp_basic.Or_ignore.Checked.make_unsafe_explicit Boolean.true_
+              Zkapp_basic.Or_ignore.Checked.make_unsafe Boolean.true_
                 state_proved
         in
         { default with proved_state }
@@ -140,6 +140,42 @@ module Party_under_construction = struct
         }
     end
 
+    module Events = struct
+      type t = { events : Field.t array list }
+
+      let create () = { events = [] }
+
+      let add_events t events : t = { events = t.events @ events }
+
+      let to_parties_events ({ events } : t) : Zkapp_account.Events.var =
+        let open Core_kernel in
+        let empty_var : Zkapp_account.Events.var =
+          exists ~compute:(fun () -> []) Zkapp_account.Events.typ
+        in
+        (* matches fold_right in Zkapp_account.Events.hash *)
+        List.fold_right events ~init:empty_var
+          ~f:(Fn.flip Zkapp_account.Events.push_to_data_as_hash)
+    end
+
+    module Sequence_events = struct
+      type t = { sequence_events : Field.t array list }
+
+      let create () = { sequence_events = [] }
+
+      let add_sequence_events t sequence_events : t =
+        { sequence_events = t.sequence_events @ sequence_events }
+
+      let to_parties_sequence_events ({ sequence_events } : t) :
+          Zkapp_account.Sequence_events.var =
+        let open Core_kernel in
+        let empty_var : Zkapp_account.Events.var =
+          exists ~compute:(fun () -> []) Zkapp_account.Sequence_events.typ
+        in
+        (* matches fold_right in Zkapp_account.Sequence_events.hash *)
+        List.fold_right sequence_events ~init:empty_var
+          ~f:(Fn.flip Zkapp_account.Sequence_events.push_to_data_as_hash)
+    end
+
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
@@ -148,6 +184,8 @@ module Party_under_construction = struct
       ; rev_calls :
           (Zkapp_call_forest.Checked.party * Zkapp_call_forest.Checked.t) list
       ; call_data : Field.t option
+      ; events : Events.t
+      ; sequence_events : Sequence_events.t
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default)) ()
@@ -158,6 +196,8 @@ module Party_under_construction = struct
       ; update = Update.create ()
       ; rev_calls = []
       ; call_data = None
+      ; events = Events.create ()
+      ; sequence_events = Sequence_events.create ()
       }
 
     let to_party_and_calls (t : t) :
@@ -178,9 +218,10 @@ module Party_under_construction = struct
         ; balance_change =
             var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
         ; increment_nonce = Boolean.false_
-        ; events = var_of_t Zkapp_account.Events.typ []
-        ; sequence_events = var_of_t Zkapp_account.Events.typ []
         ; call_data = Option.value ~default:Field.zero t.call_data
+        ; events = Events.to_parties_events t.events
+        ; sequence_events =
+            Sequence_events.to_parties_sequence_events t.sequence_events
         ; preconditions =
             { Party.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
@@ -248,6 +289,15 @@ module Party_under_construction = struct
       { t with rev_calls = (party, calls) :: t.rev_calls }
 
     let set_call_data call_data (t : t) = { t with call_data = Some call_data }
+
+    let add_events events (t : t) =
+      { t with events = Events.add_events t.events events }
+
+    let add_sequence_events sequence_events (t : t) =
+      { t with
+        sequence_events =
+          Sequence_events.add_sequence_events t.sequence_events sequence_events
+      }
   end
 end
 
@@ -275,6 +325,14 @@ class party ~public_key ?token_id =
     method register_call called_party sub_calls =
       party <-
         Party_under_construction.In_circuit.register_call called_party sub_calls
+          party
+
+    method add_events events =
+      party <- Party_under_construction.In_circuit.add_events events party
+
+    method add_sequence_events sequence_events =
+      party <-
+        Party_under_construction.In_circuit.add_sequence_events sequence_events
           party
 
     method party_under_construction = party

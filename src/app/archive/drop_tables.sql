@@ -60,6 +60,8 @@ DROP TABLE zkapp_permissions;
 
 DROP TABLE zkapp_state_data_array;
 
+DROP TABLE zkapp_states_nullable;
+
 DROP TABLE zkapp_states;
 
 DROP TABLE zkapp_state_data;
