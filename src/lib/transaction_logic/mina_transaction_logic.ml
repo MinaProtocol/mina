@@ -1141,8 +1141,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = value_if
     end
 
-    module Events = struct
-      type t = Field.t array list
+    module Sequence_events = struct
+      type t = Zkapp_account.Sequence_events.t
 
       let is_empty = List.is_empty
 

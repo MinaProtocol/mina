@@ -53,6 +53,10 @@
    signature_lib
    inline_test_quiet_logs
    pickles
+   pickles_types
+   kimchi_backend.pasta
+   pickles.backend
+   random_oracle
    error_json
    mina_metrics
    interruptible

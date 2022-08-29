@@ -63,6 +63,7 @@
    block_time
    coda_runtime_config
    trust_system
+   protocol_version
    coda_genesis_proof
    with_hash
    block_producer

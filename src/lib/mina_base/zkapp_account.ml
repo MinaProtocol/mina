@@ -4,53 +4,72 @@ open Core_kernel
 open Snark_params.Tick
 open Zkapp_basic
 
-module Events = struct
-  module Event = struct
-    (* Arbitrary hash input, encoding determined by the zkApp's developer. *)
-    type t = Field.t array [@@deriving equal]
+module Event = struct
+  (* Arbitrary hash input, encoding determined by the zkApp's developer. *)
+  type t = Field.t array [@@deriving equal]
 
-    let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
+  let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
 
-    [%%ifdef consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
-    type var = Field.Var.t array
+  type var = Field.Var.t array
 
-    let hash_var (x : Field.Var.t array) =
-      Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_event x
+  let hash_var (x : Field.Var.t array) =
+    Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_event x
 
-    [%%endif]
-  end
+  [%%endif]
+end
 
+module Make_events (Inputs : sig
+  val salt_phrase : string
+
+  val hash_prefix : field Random_oracle.State.t
+
+  val deriver_name : string
+end) =
+struct
   type t = Event.t list [@@deriving equal]
 
-  let empty_hash = lazy Random_oracle.(salt "MinaSnappEventsEmpty" |> digest)
+  let empty_hash = Random_oracle.(salt Inputs.salt_phrase |> digest)
 
   let push_hash acc hash =
-    Random_oracle.hash ~init:Hash_prefix_states.zkapp_events [| acc; hash |]
+    Random_oracle.hash ~init:Inputs.hash_prefix [| acc; hash |]
 
   let push_event acc event = push_hash acc (Event.hash event)
 
   let hash (x : t) =
     (* fold_right so the empty hash is used at the end of the events *)
-    List.fold_right ~init:(Lazy.force empty_hash) ~f:(Fn.flip push_event) x
-
-  let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
+    List.fold_right ~init:empty_hash ~f:(Fn.flip push_event) x
 
   [%%ifdef consensus_mechanism]
 
   type var = t Data_as_hash.t
 
-  let var_to_input (x : var) = Data_as_hash.to_input x
-
   let typ = Data_as_hash.typ ~hash
 
-  let is_empty_var (e : var) =
-    Snark_params.Tick.Field.(
-      Checked.equal (Data_as_hash.hash e) (Var.constant (Lazy.force empty_hash)))
+  let var_to_input (x : var) = Data_as_hash.to_input x
+
+  let to_input (x : t) = Random_oracle_input.Chunked.field (hash x)
+
+  let push_to_data_as_hash (events : var) (e : Event.var) : var =
+    let open Run in
+    let res =
+      exists typ ~compute:(fun () ->
+          let tl = As_prover.read typ events in
+          let hd =
+            As_prover.read (Typ.array ~length:(Array.length e) Field.typ) e
+          in
+          hd :: tl )
+    in
+    Field.Assert.equal
+      (Random_oracle.Checked.hash ~init:Inputs.hash_prefix
+         [| Data_as_hash.hash events; Event.hash_var e |] )
+      (Data_as_hash.hash res) ;
+    res
 
   let empty_stack_msg = "Attempted to pop an empty stack"
 
-  let pop_checked (events : var) : Event.t Data_as_hash.t * var =
+  let pop_from_data_as_hash (events : var) : Event.t Data_as_hash.t * var =
     let open Run in
     let hd, tl =
       exists
@@ -68,35 +87,33 @@ module Events = struct
       (Data_as_hash.hash events) ;
     (hd, tl)
 
-  let push_checked (events : var) (e : Event.var) : var =
-    let open Run in
-    let res =
-      exists typ ~compute:(fun () ->
-          let tl = As_prover.read typ events in
-          let hd =
-            As_prover.read (Typ.array ~length:(Array.length e) Field.typ) e
-          in
-          hd :: tl )
-    in
-    Field.Assert.equal
-      (Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_events
-         [| Data_as_hash.hash events; Event.hash_var e |] )
-      (Data_as_hash.hash res) ;
-    res
+  [%%endif]
 
   let deriver obj =
     let open Fields_derivers_zkapps in
     let events = list @@ array field (o ()) in
     with_checked
       ~checked:(Data_as_hash.deriver events)
-      ~name:"Events" events obj
+      ~name:Inputs.deriver_name events obj
+end
+
+module Events = struct
+  include Make_events (struct
+    let salt_phrase = "MinaZkappEventsEmpty"
+
+    let hash_prefix = Hash_prefix_states.zkapp_events
+
+    let deriver_name = "Events"
+  end)
 
   let%test_unit "checked push/pop inverse" =
     let open Quickcheck in
+    let num_events = 11 in
+    let event_len = 7 in
     let events =
       random_value
-        (Generator.list_with_length 11
-           (Generator.list_with_length 7 Field.gen) )
+        (Generator.list_with_length num_events
+           (Generator.list_with_length event_len Field.gen) )
       |> List.map ~f:Array.of_list
     in
     let events_vars = List.map events ~f:(Array.map ~f:Field.Var.constant) in
@@ -105,12 +122,12 @@ module Events = struct
           let empty_var = Run.exists typ ~compute:(fun _ -> []) in
           let pushed =
             List.fold_right events_vars ~init:empty_var
-              ~f:(Fn.flip push_checked)
+              ~f:(Fn.flip push_to_data_as_hash)
           in
           let popped =
             let rec go acc var =
               try
-                let event_with_hash, tl_var = pop_checked var in
+                let event_with_hash, tl_var = pop_from_data_as_hash var in
                 let event =
                   Run.As_prover.read
                     (Data_as_hash.typ ~hash:Event.hash)
@@ -133,22 +150,31 @@ module Events = struct
         ()
     | Error err ->
         failwithf "Error from run_and_check: %s" (Error.to_string_hum err) ()
-
-  [%%endif]
 end
 
 module Sequence_events = struct
-  let empty_hash = lazy Random_oracle.(salt "MinaSnappSequenceEmpty" |> digest)
+  include Make_events (struct
+    let salt_phrase = "MinaZkappSequenceEmpty"
 
-  let push_hash acc hash =
-    Random_oracle.hash ~init:Hash_prefix_states.zkapp_sequence_events
-      [| acc; hash |]
+    let hash_prefix = Hash_prefix_states.zkapp_sequence_events
 
-  let push_events acc events = push_hash acc (Events.hash events)
+    let deriver_name = "SequenceEvents"
+  end)
+
+  let is_empty_var (e : var) =
+    Snark_params.Tick.Field.(
+      Checked.equal (Data_as_hash.hash e) (Var.constant empty_hash))
+
+  let empty_state_element =
+    let salt_phrase = "MinaZkappSequenceStateEmptyElt" in
+    Random_oracle.(salt salt_phrase |> digest)
+
+  let push_events (acc : Field.t) (events : t) : Field.t =
+    push_hash acc (hash events)
 
   [%%ifdef consensus_mechanism]
 
-  let push_events_checked x (e : Events.var) =
+  let push_events_checked (x : Field.Var.t) (e : var) : Field.Var.t =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_sequence_events
       [| x; Data_as_hash.hash e |]
 
@@ -167,12 +193,6 @@ module Poly = struct
         ; last_sequence_slot : 'slot
         ; proved_state : 'bool
         }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
-    end
-
-    module V1 = struct
-      type ('app_state, 'vk) t =
-        { app_state : 'app_state; verification_key : 'vk }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
@@ -322,7 +342,7 @@ let default : _ Poly.t =
   ; verification_key = None
   ; zkapp_version = Mina_numbers.Zkapp_version.zero
   ; sequence_state =
-      (let empty = Lazy.force Sequence_events.empty_hash in
+      (let empty = Sequence_events.empty_state_element in
        [ empty; empty; empty; empty; empty ] )
   ; last_sequence_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false
