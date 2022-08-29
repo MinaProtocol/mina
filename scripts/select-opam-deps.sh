@@ -8,7 +8,7 @@ set -eou pipefail
 
 RES=()
 for lib in $@; do
-  RES+=($(cat src/opam.export | grep '"'"$lib"'\.' | awk -F'"' '{ print $2 }'))
+  RES+=($(cat opam.export | grep '"'"$lib"'\.' | awk -F'"' '{ print $2 }'))
 done
 
 echo "${RES[@]}"
