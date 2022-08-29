@@ -37,7 +37,18 @@ module Call_data = struct
   module Output = struct
     module Constant = struct
       type t =
-        { blinding_value : Field.Constant.t; new_state : Field.Constant.t }
+        { blinding_value : Field.Constant.t
+              (** A random value, mixed into the hash with the returned value.
+
+                  This is used to hide the contents of the inter-app call's
+                  arguments and return values from the protocol, so that one
+                  zkApp can make assertions about private data on behalf on
+                  another zkApp, or otherwise keep data secret.
+                  When chosen at random, the probability of an adversary
+                  finding the correct value is negligible (1 in ~2^254).
+              *)
+        ; new_state : Field.Constant.t
+        }
       [@@deriving hlist]
 
       let to_random_oracle_input { blinding_value; new_state } =
