@@ -8,13 +8,19 @@ module Types : sig
 
     module Backend : sig
       module Tick : sig
-        module Field : V1S0
+        module Field : sig
+          module V1 : sig
+            type t = Pasta_bindings.Fp.t
+          end
+        end
       end
     end
+
+    module Proof : sig end
   end
 end
 
-module M : sig
+module Concrete_ : sig
   module Side_loaded : sig
     module Verification_key : sig
       module Vk : sig
@@ -48,12 +54,16 @@ module M : sig
       end
     end
   end
+
+  module Proof : sig end
 end
+
+module M : Types.S
 
 module type Concrete =
   Types.S
     with type Side_loaded.Verification_key.V2.t =
-      M.Side_loaded.Verification_key.V2.t
+      Concrete_.Side_loaded.Verification_key.V2.t
      and type Backend.Tick.Field.V1.t = Pasta_bindings.Fp.t
 
 module type Local_sig = Signature(Types).S

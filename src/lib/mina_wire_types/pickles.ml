@@ -34,6 +34,8 @@ module M = struct
       end
     end
   end
+
+  module Proof = struct end
 end
 
 module Types = struct
@@ -44,11 +46,19 @@ module Types = struct
 
     module Backend : sig
       module Tick : sig
-        module Field : V1S0
+        module Field : sig
+          module V1 : sig
+            type t = Pasta_bindings.Fp.t
+          end
+        end
       end
     end
+
+    module Proof : sig end
   end
 end
+
+module Concrete_ = M
 
 module type Concrete =
   Types.S
