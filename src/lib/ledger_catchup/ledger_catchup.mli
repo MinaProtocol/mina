@@ -13,6 +13,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
 module Catchup_jobs : sig
@@ -22,7 +24,6 @@ end
 val run :
      context:(module CONTEXT)
   -> trust_system:Trust_system.t
-  -> verifier:Verifier.t
   -> network:Mina_networking.t
   -> frontier:Transition_frontier.t
   -> catchup_job_reader:

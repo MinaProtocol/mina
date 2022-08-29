@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -707,7 +709,7 @@ let forest_pick forest =
       List.iter forest ~f:(Rose_tree.iter ~f:return) ;
       assert false )
 
-let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
+let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t
     ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
     ~catchup_breadcrumbs_writer
     ~(build_func :
@@ -997,8 +999,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   run_node
 
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
-let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
-    ~network ~frontier ~build_func
+let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~network
+    ~frontier ~build_func
     ~(catchup_job_reader :
        ( State_hash.t
        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -1109,7 +1111,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
         "Catchup states $states") ;
   *)
   let run_state_machine =
-    setup_state_machine_runner ~t ~verifier ~downloader
+    setup_state_machine_runner ~t ~downloader
       ~context:(module Context)
       ~trust_system ~frontier ~unprocessed_transition_cache
       ~catchup_breadcrumbs_writer ~build_func
@@ -1318,13 +1320,13 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           (h, l) )
                       : State_hash.t * Length.t ) ) ) )
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+let run ~context:(module Context : CONTEXT) ~trust_system ~network ~frontier
+    ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   O1trace.background_thread "perform_super_catchup" (fun () ->
       run_catchup
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+        ~trust_system ~network ~frontier ~catchup_job_reader
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:Transition_frontier.Breadcrumb.build )
 
@@ -1374,6 +1376,8 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let verifier = verifier
     end
 
     (* let mock_verifier =
@@ -1430,7 +1434,7 @@ let%test_module "Ledger_catchup tests" =
       in
       run
         ~context:(module Context)
-        ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
+        ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
         ~catchup_job_reader ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer

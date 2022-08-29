@@ -26,6 +26,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
 include Frontier_intf.S
@@ -48,7 +50,6 @@ val global_max_length : Genesis_constants.t -> int
 val load :
      ?retry_with_fresh_db:bool
   -> context:(module CONTEXT)
-  -> verifier:Verifier.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
@@ -103,7 +104,6 @@ module For_tests : sig
        context:(module CONTEXT)
     -> max_length:int
     -> ?retry_with_fresh_db:bool
-    -> verifier:Verifier.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t

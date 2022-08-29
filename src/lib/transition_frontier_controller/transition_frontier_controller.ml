@@ -11,9 +11,11 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+let run ~context:(module Context : CONTEXT) ~trust_system ~network
     ~time_controller ~collected_transitions ~frontier ~network_transition_reader
     ~producer_transition_reader ~clear_reader =
   let open Context in
@@ -120,13 +122,13 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let clean_up_catchup_scheduler = Ivar.create () in
   Transition_handler.Processor.run
     ~context:(module Context)
-    ~time_controller ~trust_system ~verifier ~frontier
-    ~primary_transition_reader ~producer_transition_reader
-    ~clean_up_catchup_scheduler ~catchup_job_writer ~catchup_breadcrumbs_reader
-    ~catchup_breadcrumbs_writer ~processed_transition_writer ;
+    ~time_controller ~trust_system ~frontier ~primary_transition_reader
+    ~producer_transition_reader ~clean_up_catchup_scheduler ~catchup_job_writer
+    ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
+    ~processed_transition_writer ;
   Ledger_catchup.run
     ~context:(module Context)
-    ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+    ~trust_system ~network ~frontier ~catchup_job_reader
     ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in

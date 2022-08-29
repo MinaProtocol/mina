@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -164,7 +166,6 @@ module Generator = struct
 
   type peer_config =
        context:(module CONTEXT)
-    -> verifier:Verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool
     -> peer_state Generator.t
@@ -224,7 +225,8 @@ module Generator = struct
               let ledger_hash, _ = Envelope.Incoming.data query_env in
               Sync_handler.answer_query ~frontier ledger_hash
                 (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                ~logger:(Logger.create ()) ~trust_system:(Trust_system.null ())
+                ~context:(module Context)
+                ~trust_system:(Trust_system.null ())
               |> Deferred.map
                  (* begin error string prefix so we can pattern-match *)
                    ~f:
@@ -292,7 +294,7 @@ module Generator = struct
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
       ?get_best_tip ?get_node_status ?get_transition_knowledge
       ?get_transition_chain_proof ?get_transition_chain
-      ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
+      ~context:(module Context : CONTEXT) ~max_frontier_length
       ~use_super_catchup =
     let open Context in
     let epoch_ledger_location =
@@ -321,8 +323,8 @@ module Generator = struct
       ?get_best_tip ?get_node_status ?get_transition_knowledge
       ?get_transition_chain_proof ?get_transition_chain
 
-  let fresh_peer ~context:(module Context : CONTEXT) ~verifier
-      ~max_frontier_length ~use_super_catchup =
+  let fresh_peer ~context:(module Context : CONTEXT) ~max_frontier_length
+      ~use_super_catchup =
     fresh_peer_custom_rpc
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
@@ -330,14 +332,14 @@ module Generator = struct
       ?get_transition_knowledge:None ?get_transition_chain_proof:None
       ?get_transition_chain:None
       ~context:(module Context)
-      ~verifier ~max_frontier_length ~use_super_catchup
+      ~max_frontier_length ~use_super_catchup
 
   let peer_with_branch_custom_rpc ~frontier_branch_size
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?get_some_initial_peers ?answer_sync_ledger_query ?get_ancestry
       ?get_best_tip ?get_node_status ?get_transition_knowledge
       ?get_transition_chain_proof ?get_transition_chain
-      ~context:(module Context : CONTEXT) ~verifier ~max_frontier_length
+      ~context:(module Context : CONTEXT) ~max_frontier_length
       ~use_super_catchup =
     let open Context in
     let epoch_ledger_location =
@@ -372,7 +374,7 @@ module Generator = struct
       ?get_transition_chain_proof ?get_transition_chain
 
   let peer_with_branch ~frontier_branch_size ~context:(module Context : CONTEXT)
-      ~verifier ~max_frontier_length ~use_super_catchup =
+      ~max_frontier_length ~use_super_catchup =
     peer_with_branch_custom_rpc ~frontier_branch_size
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
@@ -380,7 +382,7 @@ module Generator = struct
       ?get_transition_knowledge:None ?get_transition_chain_proof:None
       ?get_transition_chain:None
       ~context:(module Context)
-      ~verifier ~max_frontier_length ~use_super_catchup
+      ~max_frontier_length ~use_super_catchup
 
   let gen ?(logger = Logger.null ()) ~precomputed_values ~verifier
       ~max_frontier_length ~use_super_catchup
@@ -396,13 +398,15 @@ module Generator = struct
 
       let consensus_constants =
         precomputed_values.Precomputed_values.consensus_constants
+
+      let verifier = verifier
     end in
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun (config : peer_config) ->
           config
             ~context:(module Context)
-            ~verifier ~max_frontier_length ~use_super_catchup )
+            ~max_frontier_length ~use_super_catchup )
     in
     setup ~context:(module Context) states
 end

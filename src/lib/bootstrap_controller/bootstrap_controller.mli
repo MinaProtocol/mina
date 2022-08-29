@@ -10,6 +10,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
 type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
@@ -17,7 +19,6 @@ type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
 val run :
      context:(module CONTEXT)
   -> trust_system:Trust_system.t
-  -> verifier:Verifier.t
   -> network:Mina_networking.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> transition_reader:

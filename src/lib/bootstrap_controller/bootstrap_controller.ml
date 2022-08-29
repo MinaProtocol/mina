@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -25,7 +27,6 @@ type Structured_log_events.t += Bootstrap_complete
 type t =
   { context : (module CONTEXT)
   ; trust_system : Trust_system.t
-  ; verifier : Verifier.t
   ; mutable best_seen_transition : Mina_block.initial_valid_block
   ; mutable current_root : Mina_block.initial_valid_block
   ; network : Mina_networking.t
@@ -163,7 +164,7 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
         match%bind
           Sync_handler.Root.verify
             ~context:(module Context)
-            ~verifier:t.verifier ~genesis_constants candidate_consensus_state
+            ~genesis_constants candidate_consensus_state
             peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
@@ -230,7 +231,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+let run ~context:(module Context : CONTEXT) ~trust_system ~network
     ~consensus_local_state ~transition_reader ~best_seen_transition
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
     =
@@ -274,7 +275,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           { network
           ; context = (module Context)
           ; trust_system
-          ; verifier
           ; best_seen_transition = initial_root_transition
           ; current_root = initial_root_transition
           ; num_of_root_snarked_ledger_retargeted = 0
@@ -589,7 +589,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   in
                   Transition_frontier.load
                     ~context:(module Context)
-                    ~retry_with_fresh_db:false ~verifier ~consensus_local_state
+                    ~retry_with_fresh_db:false ~consensus_local_state
                     ~persistent_root ~persistent_frontier ~catchup_mode ()
                   >>| function
                   | Ok frontier ->
@@ -688,6 +688,12 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.create ~logger ~proof_level ~constraint_constants
+            ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
+
     module Context = struct
       let logger = Logger.create ()
 
@@ -697,13 +703,9 @@ let%test_module "Bootstrap_controller tests" =
         Genesis_constants.Constraint_constants.for_unit_tests
 
       let consensus_constants = precomputed_values.consensus_constants
-    end
 
-    let verifier =
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+      let verifier = verifier
+    end
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
@@ -728,7 +730,6 @@ let%test_module "Bootstrap_controller tests" =
       in
       { context = (module Context)
       ; trust_system
-      ; verifier
       ; best_seen_transition = transition
       ; current_root = transition
       ; network
@@ -840,8 +841,7 @@ let%test_module "Bootstrap_controller tests" =
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run
            ~context:(module Context)
-           ~trust_system ~verifier ~network:my_net.network
-           ~best_seen_transition:None
+           ~trust_system ~network:my_net.network ~best_seen_transition:None
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
            ~catchup_mode:`Normal ~initial_root_transition )

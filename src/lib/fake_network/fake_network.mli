@@ -13,6 +13,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -88,7 +90,6 @@ module Generator : sig
 
   type peer_config =
        context:(module CONTEXT)
-    -> verifier:Verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool
     -> peer_state Generator.t

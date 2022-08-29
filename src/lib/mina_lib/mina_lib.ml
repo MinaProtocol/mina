@@ -1381,6 +1381,12 @@ let create ?wallets (config : Config.t) =
                     }
                   , config.snark_work_fee ) )
           in
+          (* Expand the context with the verifier handle. *)
+          let module Context = struct
+            include Context
+
+            let verifier = verifier
+          end in
           let%bind uptime_snark_worker_opt =
             (* if uptime URL provided, run uptime service SNARK worker *)
             Option.value_map config.uptime_url ~default:(return None)
@@ -1703,7 +1709,7 @@ let create ?wallets (config : Config.t) =
                         in
                         Sync_handler.answer_query ~frontier ledger_hash
                           (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                          ~logger:config.logger
+                          ~context:(module Context)
                           ~trust_system:config.trust_system
                         |> Deferred.map
                            (* begin error string prefix so we can pattern-match *)
@@ -1812,7 +1818,7 @@ let create ?wallets (config : Config.t) =
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
-              ~trust_system:config.trust_system ~verifier ~network:net
+              ~trust_system:config.trust_system ~network:net
               ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state

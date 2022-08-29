@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val verifier : Verifier.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -475,7 +477,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
       go [] )
 
 let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
-    ~trust_system ~verifier ~frontier ~unprocessed_transition_cache ~transitions
+    ~trust_system ~frontier ~unprocessed_transition_cache ~transitions
     ~target_hash ~subtrees =
   let open Context in
   let open Deferred.Or_error.Let_syntax in
@@ -629,8 +631,8 @@ let garbage_collect_subtrees ~logger ~subtrees =
           ignore @@ Cached.invalidate_with_failure node ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+let run ~context:(module Context : CONTEXT) ~trust_system ~network ~frontier
+    ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   let open Context in
   let hash_tree =
@@ -799,7 +801,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                  "Download transitions complete" ;
                verify_transitions_and_build_breadcrumbs
                  ~context:(module Context)
-                 ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
+                 ~trust_system ~frontier ~unprocessed_transition_cache
                  ~transitions ~target_hash ~subtrees
              with
              | Ok trees_of_breadcrumbs ->
@@ -887,6 +889,8 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let verifier = verifier
     end
 
     let downcast_transition transition =
@@ -938,7 +942,7 @@ let%test_module "Ledger_catchup tests" =
       in
       run
         ~context:(module Context)
-        ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
+        ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
         ~catchup_job_reader ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer

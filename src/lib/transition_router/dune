@@ -47,4 +47,5 @@
    proof_carrying_data
    ledger_catchup
    data_hash_lib
+   verifier
 ))

@@ -6,16 +6,6 @@ module Sync_ledger = Mina_ledger.Sync_ledger
 open Frontier_base
 open Network_peer
 
-module type CONTEXT = sig
-  val logger : Logger.t
-
-  val precomputed_values : Precomputed_values.t
-
-  val constraint_constants : Genesis_constants.Constraint_constants.t
-
-  val consensus_constants : Consensus.Constants.t
-end
-
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 
@@ -28,6 +18,16 @@ module Make (Inputs : Inputs_intf) :
   Mina_intf.Sync_handler_intf
     with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
+
+  module type CONTEXT = sig
+    val logger : Logger.t
+
+    val precomputed_values : Precomputed_values.t
+
+    val constraint_constants : Genesis_constants.Constraint_constants.t
+
+    val consensus_constants : Consensus.Constants.t
+  end
 
   let find_in_root_history frontier state_hash =
     let open Transition_frontier.Extensions in
@@ -85,13 +85,14 @@ module Make (Inputs : Inputs_intf) :
     else None
 
   let answer_query :
-         frontier:Inputs.Transition_frontier.t
+         context:(module CONTEXT)
+      -> frontier:Inputs.Transition_frontier.t
       -> Ledger_hash.t
       -> Sync_ledger.Query.t Envelope.Incoming.t
-      -> logger:Logger.t
       -> trust_system:Trust_system.t
       -> Sync_ledger.Answer.t Option.t Deferred.t =
-   fun ~frontier hash query ~logger ~trust_system ->
+   fun ~context:(module Context) ~frontier hash query ~trust_system ->
+    let open Context in
     match get_ledger_by_hash ~frontier hash with
     | None ->
         return None
@@ -191,6 +192,18 @@ module Make (Inputs : Inputs_intf) :
     go [] (Transition_frontier.best_tip frontier)
 
   module Root = struct
+    module type CONTEXT = sig
+      val logger : Logger.t
+
+      val precomputed_values : Precomputed_values.t
+
+      val constraint_constants : Genesis_constants.Constraint_constants.t
+
+      val consensus_constants : Consensus.Constants.t
+
+      val verifier : Verifier.t
+    end
+
     let prove ~context:(module Context : CONTEXT) ~frontier seen_consensus_state
         =
       let module Context = struct
@@ -218,7 +231,7 @@ module Make (Inputs : Inputs_intf) :
         data = With_hash.data best_tip_with_witness.data
       }
 
-    let verify ~context:(module Context : CONTEXT) ~verifier ~genesis_constants
+    let verify ~context:(module Context : CONTEXT) ~genesis_constants
         observed_state peer_root =
       let module Context = struct
         include Context

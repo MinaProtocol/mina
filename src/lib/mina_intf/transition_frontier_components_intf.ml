@@ -5,23 +5,17 @@ open Cache_lib
 open Mina_base
 open Network_peer
 
-module type CONTEXT = sig
-  val logger : Logger.t
-
-  val precomputed_values : Precomputed_values.t
-
-  val constraint_constants : Genesis_constants.Constraint_constants.t
-
-  val consensus_constants : Consensus.Constants.t
-end
-
 module type Transition_handler_validator_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+  end
+
   type unprocessed_transition_cache
 
   type transition_frontier
 
   val run :
-       logger:Logger.t
+       context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
@@ -38,7 +32,7 @@ module type Transition_handler_validator_intf = sig
     -> unit
 
   val validate_transition :
-       logger:Logger.t
+       context:(module CONTEXT)
     -> frontier:transition_frontier
     -> unprocessed_transition_cache:unprocessed_transition_cache
     -> Mina_block.initial_valid_block Envelope.Incoming.t
@@ -52,13 +46,24 @@ module type Transition_handler_validator_intf = sig
 end
 
 module type Breadcrumb_builder_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+
+    val precomputed_values : Precomputed_values.t
+
+    val constraint_constants : Genesis_constants.Constraint_constants.t
+
+    val consensus_constants : Consensus.Constants.t
+
+    val verifier : Verifier.t
+  end
+
   type transition_frontier
 
   type transition_frontier_breadcrumb
 
   val build_subtrees_of_breadcrumbs :
-       logger:Logger.t
-    -> verifier:Verifier.t
+       context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> frontier:transition_frontier
     -> initial_hash:State_hash.t
@@ -73,13 +78,24 @@ module type Breadcrumb_builder_intf = sig
 end
 
 module type Transition_handler_processor_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+
+    val precomputed_values : Precomputed_values.t
+
+    val constraint_constants : Genesis_constants.Constraint_constants.t
+
+    val consensus_constants : Consensus.Constants.t
+
+    val verifier : Verifier.t
+  end
+
   type transition_frontier
 
   type transition_frontier_breadcrumb
 
   val run :
-       logger:Logger.t
-    -> verifier:Verifier.t
+       context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
@@ -123,9 +139,13 @@ module type Transition_handler_processor_intf = sig
 end
 
 module type Unprocessed_transition_cache_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+  end
+
   type t
 
-  val create : logger:Logger.t -> t
+  val create : context:(module CONTEXT) -> t
 
   val register_exn :
        t
@@ -191,6 +211,18 @@ end
     transition_frontier based off of a condition on the consensus_state from
     the requesting node *)
 module type Consensus_best_tip_prover_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+
+    val precomputed_values : Precomputed_values.t
+
+    val constraint_constants : Genesis_constants.Constraint_constants.t
+
+    val consensus_constants : Consensus.Constants.t
+
+    val verifier : Verifier.t
+  end
+
   type transition_frontier
 
   val prove :
@@ -204,7 +236,6 @@ module type Consensus_best_tip_prover_intf = sig
 
   val verify :
        context:(module CONTEXT)
-    -> verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
     -> ( Mina_block.t
@@ -216,13 +247,23 @@ module type Consensus_best_tip_prover_intf = sig
 end
 
 module type Sync_handler_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+
+    val precomputed_values : Precomputed_values.t
+
+    val constraint_constants : Genesis_constants.Constraint_constants.t
+
+    val consensus_constants : Consensus.Constants.t
+  end
+
   type transition_frontier
 
   val answer_query :
-       frontier:transition_frontier
+       context:(module CONTEXT)
+    -> frontier:transition_frontier
     -> Ledger_hash.t
     -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
-    -> logger:Logger.t
     -> trust_system:Trust_system.t
     -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
 
@@ -260,6 +301,12 @@ module type Transition_chain_prover_intf = sig
 end
 
 module type Bootstrap_controller_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+
+    val verifier : Verifier.t
+  end
+
   type network
 
   type transition_frontier
@@ -269,9 +316,8 @@ module type Bootstrap_controller_intf = sig
   type persistent_frontier
 
   val run :
-       logger:Logger.t
+       context:(module CONTEXT)
     -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
     -> network:network
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> transition_reader:
@@ -288,6 +334,12 @@ module type Bootstrap_controller_intf = sig
 end
 
 module type Transition_frontier_controller_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+
+    val verifier : Verifier.t
+  end
+
   type transition_frontier
 
   type breadcrumb
@@ -295,9 +347,8 @@ module type Transition_frontier_controller_intf = sig
   type network
 
   val run :
-       logger:Logger.t
+       context:(module CONTEXT)
     -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
     -> network:network
     -> time_controller:Block_time.Controller.t
     -> collected_transitions:
@@ -311,6 +362,18 @@ module type Transition_frontier_controller_intf = sig
 end
 
 module type Transition_router_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+
+    val precomputed_values : Precomputed_values.t
+
+    val constraint_constants : Genesis_constants.Constraint_constants.t
+
+    val consensus_constants : Consensus.Constants.t
+
+    val verifier : Verifier.t
+  end
+
   type transition_frontier
 
   type transition_frontier_persistent_root
@@ -324,7 +387,6 @@ module type Transition_router_intf = sig
   val run :
        context:(module CONTEXT)
     -> trust_system:Trust_system.t
-    -> verifier:Verifier.t
     -> network:network
     -> is_seed:bool
     -> is_demo_mode:bool
