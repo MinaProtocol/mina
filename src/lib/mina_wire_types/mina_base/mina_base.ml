@@ -20,3 +20,4 @@ module Account = Mina_base_account
 module Ledger_hash = Mina_base_ledger_hash
 module Epoch_data = Mina_base_epoch_data
 module Epoch_ledger = Mina_base_epoch_ledger
+module Fee_transfer = Mina_base_fee_transfer

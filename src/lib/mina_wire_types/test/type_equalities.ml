@@ -151,4 +151,5 @@ module Mina_base = struct
       (W.Party.Account_precondition)
   include Assert_equal0V1 (O.Party.Preconditions.Stable) (W.Party.Preconditions)
   include Assert_equal0V1 (O.Party.Body.Stable) (W.Party.Body)
+  include Assert_equal0V2 (O.Fee_transfer.Single.Stable) (W.Fee_transfer.Single)
 end
