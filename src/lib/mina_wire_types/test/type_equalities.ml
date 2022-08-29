@@ -153,6 +153,8 @@ module Mina_base = struct
   include Assert_equal0V1 (O.Party.Body.Stable) (W.Party.Body)
   include Assert_equal0V2 (O.Fee_transfer.Single.Stable) (W.Fee_transfer.Single)
   include Assert_equal0V2 (O.Fee_transfer.Stable) (W.Fee_transfer)
+  include
+    Assert_equal0V1 (O.Coinbase_fee_transfer.Stable) (W.Coinbase_fee_transfer)
 end
 
 module One_or_two = struct
