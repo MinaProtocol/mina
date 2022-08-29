@@ -39,7 +39,11 @@
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
     }:
     {
-      overlay = import ./nix/overlay.nix;
+      overlays = {
+        misc = import ./nix/misc.nix;
+        rust = import ./nix/rust.nix;
+        go = import ./nix/go.nix;
+      };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
       nixosConfigurations.container = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
@@ -150,14 +154,13 @@
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
-          (nixpkgs.lib.composeManyExtensions [
+          (nixpkgs.lib.composeManyExtensions ([
             (import nixpkgs-mozilla)
-            (import ./nix/overlay.nix)
             (final: prev: {
               ocamlPackages_mina = requireSubmodules
                 (import ./nix/ocaml.nix { inherit inputs pkgs; });
             })
-          ]);
+          ] ++ builtins.attrValues self.overlays));
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
         nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage { };

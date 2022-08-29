@@ -1,3 +1,4 @@
+# A set defining OCaml parts&dependencies of Mina
 { inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
