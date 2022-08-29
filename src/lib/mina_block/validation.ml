@@ -12,6 +12,14 @@ open Mina_state
 open Consensus.Data
 include Validation_types
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 let validation (_, v) = v
 
 let block_with_hash (b, _) = b
@@ -379,8 +387,17 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
   , Unsafe.set_valid_delta_block_chain validation
       (Non_empty_list.singleton previous_protocol_state_hash) )
 
-let validate_frontier_dependencies ~logger ~consensus_constants ~root_block
-    ~get_block_by_hash (t, validation) =
+let validate_frontier_dependencies ~context:(module Context : CONTEXT)
+    ~root_block ~get_block_by_hash (t, validation) =
+  let module Context = struct
+    include Context
+
+    let logger =
+      Logger.extend logger
+        [ ( "selection_context"
+          , `String "Mina_block.Validation.validate_frontier_dependencies" )
+        ]
+  end in
   let open Result.Let_syntax in
   let hash = State_hash.With_state_hashes.state_hash t in
   let protocol_state = Fn.compose Header.protocol_state Block.header in
@@ -400,13 +417,8 @@ let validate_frontier_dependencies ~logger ~consensus_constants ~root_block
     let ( = ) = Stdlib.( = ) in
     Result.ok_if_true
       ( `Take
-      = Consensus.Hooks.select ~constants:consensus_constants
-          ~logger:
-            (Logger.extend logger
-               [ ( "selection_context"
-                 , `String
-                     "Mina_block.Validation.validate_frontier_dependencies" )
-               ] )
+      = Consensus.Hooks.select
+          ~context:(module Context)
           ~existing:(With_hash.map ~f:consensus_state root_block)
           ~candidate:(With_hash.map ~f:consensus_state t) )
       ~error:`Not_selected_over_frontier_root

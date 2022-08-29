@@ -1000,6 +1000,7 @@ module Config = struct
     ; consensus_local_state : Consensus.Data.Local_state.t
     ; genesis_ledger_hash : Ledger_hash.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; precomputed_values : Precomputed_values.t
     ; creatable_gossip_net : Gossip_net.Any.creatable
     ; is_seed : bool
     ; log_gossip_heard : log_gossip_heard
@@ -1066,7 +1067,14 @@ let create (config : Config.t) ~sinks
     ~(get_transition_knowledge :
           Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
        -> Rpcs.Get_transition_knowledge.response Deferred.t ) =
-  let logger = config.logger in
+  let module Context = struct
+    let logger = config.logger
+
+    let consensus_constants = config.precomputed_values.consensus_constants
+
+    let constraint_constants = config.constraint_constants
+  end in
+  let open Context in
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
     let sender = Envelope.Incoming.sender data_in_envelope in
@@ -1384,7 +1392,8 @@ let create (config : Config.t) ~sinks
     ]
     @ Consensus.Hooks.Rpcs.(
         List.map
-          (rpc_handlers ~logger:config.logger
+          (rpc_handlers
+             ~context:(module Context)
              ~local_state:config.consensus_local_state
              ~genesis_ledger_hash:
                (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash) )

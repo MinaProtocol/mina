@@ -21,7 +21,8 @@ type mina_initialization =
   ; limited_graphql_port : int option
   }
 
-let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
+let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
+    ~protocol_major_version =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -29,9 +30,13 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants =
     List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
     |> String.concat ~sep:""
   in
+  let protocol_version_digest =
+    Int.to_string protocol_major_version |> Md5.digest_string |> Md5.to_hex
+  in
   let b2 =
     Blake2.digest_string
-      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
+      ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
+      ^ protocol_version_digest )
   in
   Blake2.to_hex b2
 
@@ -1034,8 +1039,18 @@ let setup_daemon logger =
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
+          let module Context = struct
+            let logger = logger
+
+            let precomputed_values = precomputed_values
+
+            let constraint_constants = precomputed_values.constraint_constants
+
+            let consensus_constants = precomputed_values.consensus_constants
+          end in
           let consensus_local_state =
             Consensus.Data.Local_state.create
+              ~context:(module Context)
               ~genesis_ledger:
                 (Precomputed_values.genesis_ledger precomputed_values)
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
@@ -1044,7 +1059,6 @@ let setup_daemon logger =
                     let open Keypair in
                     Public_key.compress keypair.public_key )
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
-              ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
@@ -1135,10 +1149,16 @@ let setup_daemon logger =
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let chain_id =
+            let protocol_major_version =
+              Protocol_version.of_string_exn
+                compile_time_current_protocol_version
+              |> Protocol_version.major
+            in
             chain_id ~genesis_state_hash
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_system_digests:
                 (Lazy.force precomputed_values.constraint_system_digests)
+              ~protocol_major_version
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -1184,6 +1204,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create ~pids gossip_net_params))
+            ; precomputed_values
             }
           in
           let coinbase_receiver : Consensus.Coinbase_receiver.t =
