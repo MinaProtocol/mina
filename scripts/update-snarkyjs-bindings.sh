@@ -5,7 +5,7 @@ SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 dune b src/lib/crypto/kimchi_bindings/js/node_js \
 && dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js || exit 1
 
-mkdir -p "$SNARKY_JS_PATH"/dist/server/node_bindings
+mkdir -p "$SNARKY_JS_PATH"/dist/node/node_bindings
 cp _build/default/src/lib/crypto/kimchi_bindings/js/node_js/plonk_wasm* "$SNARKY_JS_PATH"/src/node_bindings/
 mv -f "$SNARKY_JS_PATH"/src/node_bindings/plonk_wasm.js "$SNARKY_JS_PATH"/src/node_bindings/plonk_wasm.cjs
 cp _build/default/src/lib/snarky_js_bindings/snarky_js_node.bc.js "$SNARKY_JS_PATH"/src/node_bindings/snarky_js_node.bc.cjs

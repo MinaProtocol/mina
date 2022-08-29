@@ -11,7 +11,7 @@ dune b src/lib/crypto/kimchi_bindings/js/node_js \
 && dune b src/lib/snarky_js_bindings/snarky_js_node.bc.js \
 && dune b src/lib/snarky_js_bindings/snarkyjs/src/snarky/gen/js-layout.ts || exit 1
 
-BINDINGS_PATH="$SNARKY_JS_PATH"/dist/server/_node_bindings/
+BINDINGS_PATH="$SNARKY_JS_PATH"/dist/node/_node_bindings/
 mkdir -p "$BINDINGS_PATH"
 cp _build/default/src/lib/crypto/kimchi_bindings/js/node_js/plonk_wasm* "$BINDINGS_PATH"
 mv $BINDINGS_PATH/plonk_wasm.js $BINDINGS_PATH/plonk_wasm.cjs
