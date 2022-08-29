@@ -104,10 +104,29 @@ let update_of_id pool update_id =
     query_db ~f:(fun db -> Processor.Zkapp_updates.load db update_id)
   in
   let%bind app_state =
-    let%bind field_id_array =
-      query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
+    let%bind { element0
+             ; element1
+             ; element2
+             ; element3
+             ; element4
+             ; element5
+             ; element6
+             ; element7
+             } =
+      query_db ~f:(fun db ->
+          Processor.Zkapp_states_nullable.load db app_state_id )
     in
-    let field_ids = Array.to_list field_id_array in
+    let field_ids =
+      [ element0
+      ; element1
+      ; element2
+      ; element3
+      ; element4
+      ; element5
+      ; element6
+      ; element7
+      ]
+    in
     let%map field_strs =
       Deferred.List.map field_ids ~f:(fun id_opt ->
           Option.value_map id_opt ~default:(return None) ~f:(fun id ->
@@ -532,11 +551,31 @@ let get_other_party_body ~pool body_id =
         in
         let%bind delegate = get_pk delegate_id in
         let%bind state =
-          let%bind field_ids =
-            query_db ~f:(fun db -> Processor.Zkapp_states.load db state_id)
+          let%bind { element0
+                   ; element1
+                   ; element2
+                   ; element3
+                   ; element4
+                   ; element5
+                   ; element6
+                   ; element7
+                   } =
+            query_db ~f:(fun db ->
+                Processor.Zkapp_states_nullable.load db state_id )
+          in
+          let elements =
+            [ element0
+            ; element1
+            ; element2
+            ; element3
+            ; element4
+            ; element5
+            ; element6
+            ; element7
+            ]
           in
           let%map fields =
-            Deferred.List.map (Array.to_list field_ids) ~f:(fun id_opt ->
+            Deferred.List.map elements ~f:(fun id_opt ->
                 Option.value_map id_opt ~default:(return None) ~f:(fun id ->
                     let%map field_str =
                       query_db ~f:(fun db ->
@@ -736,15 +775,31 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
            ; zkapp_uri_id = _
            }
          ->
-        let%bind app_state_ints =
+        let%bind { element0
+                 ; element1
+                 ; element2
+                 ; element3
+                 ; element4
+                 ; element5
+                 ; element6
+                 ; element7
+                 } =
           query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
         in
-        (* for app state, all elements are non-NULL *)
-        assert (Array.for_all app_state_ints ~f:Option.is_some) ;
+        let elements =
+          [ element0
+          ; element1
+          ; element2
+          ; element3
+          ; element4
+          ; element5
+          ; element6
+          ; element7
+          ]
+        in
         let%bind app_state =
           let%map field_strs =
-            Deferred.List.init (Array.length app_state_ints) ~f:(fun ndx ->
-                let id = Option.value_exn app_state_ints.(ndx) in
+            Deferred.List.map elements ~f:(fun id ->
                 query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
@@ -774,14 +829,14 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           zkapp_version |> Unsigned.UInt32.of_int64
           |> Mina_numbers.Zkapp_version.of_uint32
         in
-        let%bind sequence_state_ints =
+        let%bind { element0; element1; element2; element3; element4 } =
           query_db ~f:(fun db ->
               Processor.Zkapp_sequence_states.load db sequence_state_id )
         in
+        let elements = [ element0; element1; element2; element3; element4 ] in
         let%map sequence_state =
           let%map field_strs =
-            Deferred.List.init (Array.length sequence_state_ints) ~f:(fun ndx ->
-                let id = Option.value_exn app_state_ints.(ndx) in
+            Deferred.List.map elements ~f:(fun id ->
                 query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in

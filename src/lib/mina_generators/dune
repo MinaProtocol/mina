@@ -15,6 +15,7 @@
    base
    sexplib0
    ;; local libraries
+   genesis_constants
    sgn
    pickles_types
    pickles

@@ -18,6 +18,7 @@
    async_unix
    ;; local libraries
    mina_wire_types
+   genesis_constants
    mina_base.import
    pickles.backend
    one_or_two

@@ -36,11 +36,11 @@ WORKDIR $HOME/$MINA_DIR
 ENV OPAMYES 1
 
 # --- Import Opam Switch
-# TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
-RUN opam switch import src/opam.export
+# TODO: handle this opam work without cloning the full repository (directly pull opam.export)
+RUN opam switch import opam.export
 
 # --- Pin external packages / submodules
-# TODO: Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
+# TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
 RUN eval $(opam config env) \
   && scripts/pin-external-packages.sh \
   && opam clean --logs -cs

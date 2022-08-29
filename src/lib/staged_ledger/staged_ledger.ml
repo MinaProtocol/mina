@@ -2055,6 +2055,10 @@ let%test_module "staged ledger tests" =
   ( module struct
     module Sl = T
 
+    let () =
+      Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true
+
     let self_pk =
       Quickcheck.random_value ~seed:(`Deterministic "self_pk")
         Public_key.Compressed.gen
