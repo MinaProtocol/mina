@@ -17,10 +17,13 @@
   (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
 
 ;;
-;; rules to build the static library for kimchi
+;; Rules to set the optimisation flags for the rust compiler.
 ;;
-
-;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
+;; By default, we compile with optimisations enabled. The instructions that
+;; these generate may not be available on all CPU architectures; to build a
+;; slower version that does not use these instructions, set the environment
+;; variable `RUST_TARGET_FEATURE_OPTIMISATIONS=n`.
+;;
 
 (rule
  (enabled_if
@@ -37,6 +40,12 @@
  (action
   (with-stdout-to rustflags.sexp
    (echo "-C target-feature=-bmi2,-adx"))))
+
+;;
+;; rules to build the static library for kimchi
+;;
+
+;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
 
 (rule
  (enabled_if
