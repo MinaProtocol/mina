@@ -19,6 +19,12 @@ module type CONTEXT = sig
   val consensus_constants : Constants.t
 end
 
+module type CONTEXT_WITH_TRUST = sig
+  include CONTEXT
+
+  val trust_system : Trust_system.t
+end
+
 let make_checked t = Snark_params.Tick.Run.make_checked t
 
 let name = "proof_of_stake"
@@ -2819,7 +2825,7 @@ module Hooks = struct
                  { next = next.expected_root; staking = staking.expected_root }
               ) )
 
-  let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
+  let sync_local_state ~context:(module Context : CONTEXT_WITH_TRUST)
       ~local_state ~random_peers ~(query_peer : Rpcs.query) requested_syncs =
     let open Context in
     let open Local_state in

@@ -27,6 +27,8 @@ module Make (Inputs : Inputs_intf) :
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val consensus_constants : Consensus.Constants.t
+
+    val trust_system : Trust_system.t
   end
 
   let find_in_root_history frontier state_hash =
@@ -89,9 +91,8 @@ module Make (Inputs : Inputs_intf) :
       -> frontier:Inputs.Transition_frontier.t
       -> Ledger_hash.t
       -> Sync_ledger.Query.t Envelope.Incoming.t
-      -> trust_system:Trust_system.t
       -> Sync_ledger.Answer.t Option.t Deferred.t =
-   fun ~context:(module Context) ~frontier hash query ~trust_system ->
+   fun ~context:(module Context) ~frontier hash query ->
     let open Context in
     match get_ledger_by_hash ~frontier hash with
     | None ->

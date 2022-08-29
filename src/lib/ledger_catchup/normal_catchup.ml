@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val verifier : Verifier.t
+
+  val trust_system : Trust_system.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -57,8 +59,8 @@ end
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
-let verify_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~frontier ~unprocessed_transition_cache enveloped_transition =
+let verify_transition ~context:(module Context : CONTEXT) ~frontier
+    ~unprocessed_transition_cache enveloped_transition =
   let open Context in
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
@@ -477,8 +479,8 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
       go [] )
 
 let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
-    ~trust_system ~frontier ~unprocessed_transition_cache ~transitions
-    ~target_hash ~subtrees =
+    ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
+    =
   let open Context in
   let open Deferred.Or_error.Let_syntax in
   let verification_start_time = Core.Time.now () in
@@ -531,7 +533,7 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
         match%bind
           verify_transition
             ~context:(module Context)
-            ~trust_system ~frontier ~unprocessed_transition_cache transition
+            ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
             List.iter acc ~f:(fun (node, vc) ->
@@ -631,7 +633,7 @@ let garbage_collect_subtrees ~logger ~subtrees =
           ignore @@ Cached.invalidate_with_failure node ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~network ~frontier
+let run ~context:(module Context : CONTEXT) ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   let open Context in
@@ -801,8 +803,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~network ~frontier
                  "Download transitions complete" ;
                verify_transitions_and_build_breadcrumbs
                  ~context:(module Context)
-                 ~trust_system ~frontier ~unprocessed_transition_cache
-                 ~transitions ~target_hash ~subtrees
+                 ~frontier ~unprocessed_transition_cache ~transitions
+                 ~target_hash ~subtrees
              with
              | Ok trees_of_breadcrumbs ->
                  [%log trace]
@@ -891,6 +893,8 @@ let%test_module "Ledger_catchup tests" =
       let consensus_constants = precomputed_values.consensus_constants
 
       let verifier = verifier
+
+      let trust_system = trust_system
     end
 
     let downcast_transition transition =
@@ -942,8 +946,8 @@ let%test_module "Ledger_catchup tests" =
       in
       run
         ~context:(module Context)
-        ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
-        ~catchup_job_reader ~unprocessed_transition_cache ;
+        ~network ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
+        ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader

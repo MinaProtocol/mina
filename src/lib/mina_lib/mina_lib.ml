@@ -1140,6 +1140,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val trust_system : Trust_system.t
 end
 
 let context (config : Config.t) : (module CONTEXT) =
@@ -1151,6 +1153,8 @@ let context (config : Config.t) : (module CONTEXT) =
     let consensus_constants = precomputed_values.consensus_constants
 
     let constraint_constants = precomputed_values.constraint_constants
+
+    let trust_system = config.trust_system
   end )
 
 let start t =
@@ -1219,7 +1223,6 @@ let start t =
     Block_producer.run ~context:(context t.config)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
-      ~trust_system:t.config.trust_system
       ~transaction_resource_pool:
         (Network_pool.Transaction_pool.resource_pool
            t.components.transaction_pool )
@@ -1264,8 +1267,7 @@ let start t =
 let start_with_precomputed_blocks t blocks =
   let%bind () =
     Block_producer.run_precomputed ~context:(context t.config)
-      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
-      ~time_controller:t.config.time_controller
+      ~verifier:t.processes.verifier ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
       ~precomputed_blocks:blocks
@@ -1710,7 +1712,6 @@ let create ?wallets (config : Config.t) =
                         Sync_handler.answer_query ~frontier ledger_hash
                           (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
                           ~context:(module Context)
-                          ~trust_system:config.trust_system
                         |> Deferred.map
                            (* begin error string prefix so we can pattern-match *)
                              ~f:
@@ -1818,8 +1819,8 @@ let create ?wallets (config : Config.t) =
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
-              ~trust_system:config.trust_system ~network:net
-              ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
+              ~network:net ~is_seed:config.is_seed
+              ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root_location:config.persistent_root_location

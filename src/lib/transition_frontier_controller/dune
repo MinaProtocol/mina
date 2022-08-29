@@ -29,4 +29,5 @@
    genesis_constants
    consensus
    verifier
+   trust_system
 ))

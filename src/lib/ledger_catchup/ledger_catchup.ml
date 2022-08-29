@@ -11,19 +11,21 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val verifier : Verifier.t
+
+  val trust_system : Trust_system.t
 end
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~network ~frontier
+let run ~context:(module Context : CONTEXT) ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   match Transition_frontier.catchup_tree frontier with
   | Hash _ ->
       Normal_catchup.run
         ~context:(module Context)
-        ~trust_system ~network ~frontier ~catchup_job_reader
-        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+        ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+        ~unprocessed_transition_cache
   | Full _ ->
       Super_catchup.run
         ~context:(module Context)
-        ~trust_system ~network ~frontier ~catchup_job_reader
-        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache
+        ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+        ~unprocessed_transition_cache

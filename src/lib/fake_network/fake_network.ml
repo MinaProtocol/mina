@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val verifier : Verifier.t
+
+  val trust_system : Trust_system.t
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -88,7 +90,6 @@ module Constants = struct
 end
 
 let setup (type n) ~context:(module Context : CONTEXT)
-    ?(trust_system = Trust_system.null ())
     ?(time_controller = Block_time.Controller.basic ~logger:Context.logger)
     (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
   let open Context in
@@ -226,7 +227,6 @@ module Generator = struct
               Sync_handler.answer_query ~frontier ledger_hash
                 (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
                 ~context:(module Context)
-                ~trust_system:(Trust_system.null ())
               |> Deferred.map
                  (* begin error string prefix so we can pattern-match *)
                    ~f:
@@ -400,6 +400,8 @@ module Generator = struct
         precomputed_values.Precomputed_values.consensus_constants
 
       let verifier = verifier
+
+      let trust_system = Trust_system.null ()
     end in
     let open Quickcheck.Generator.Let_syntax in
     let%map states =

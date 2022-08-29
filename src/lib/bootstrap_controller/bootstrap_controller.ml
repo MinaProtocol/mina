@@ -19,6 +19,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val verifier : Verifier.t
+
+  val trust_system : Trust_system.t
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -26,7 +28,6 @@ type Structured_log_events.t += Bootstrap_complete
 
 type t =
   { context : (module CONTEXT)
-  ; trust_system : Trust_system.t
   ; mutable best_seen_transition : Mina_block.initial_valid_block
   ; mutable current_root : Mina_block.initial_valid_block
   ; network : Mina_networking.t
@@ -80,10 +81,10 @@ let worth_getting_root ({ context = (module Context); _ } as t) candidate =
          |> With_hash.map ~f:Mina_block.consensus_state )
        ~candidate
 
-let received_bad_proof ({ context = (module Context); _ } as t) host e =
+let received_bad_proof { context = (module Context); _ } host e =
   let open Context in
   Trust_system.(
-    record t.trust_system logger host
+    record trust_system logger host
       Actions.
         ( Violated_protocol
         , Some
@@ -102,7 +103,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
   let open Context in
   let%bind () =
     Trust_system.(
-      record t.trust_system logger sender
+      record trust_system logger sender
         Actions.
           ( Fulfilled_request
           , Some ("Received verified peer root and best tip", []) ))
@@ -231,10 +232,9 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
-let run ~context:(module Context : CONTEXT) ~trust_system ~network
-    ~consensus_local_state ~transition_reader ~best_seen_transition
-    ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    =
+let run ~context:(module Context : CONTEXT) ~network ~consensus_local_state
+    ~transition_reader ~best_seen_transition ~persistent_root
+    ~persistent_frontier ~initial_root_transition ~catchup_mode =
   let open Context in
   O1trace.thread "bootstrap" (fun () ->
       let genesis_constants =
@@ -274,7 +274,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~network
         let t =
           { network
           ; context = (module Context)
-          ; trust_system
           ; best_seen_transition = initial_root_transition
           ; current_root = initial_root_transition
           ; num_of_root_snarked_ledger_retargeted = 0
@@ -458,7 +457,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~network
         | Error e ->
             let%bind () =
               Trust_system.(
-                record t.trust_system logger sender
+                record trust_system logger sender
                   Actions.
                     ( Outgoing_connection_error
                     , Some
@@ -490,7 +489,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~network
         | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
             let%bind () =
               Trust_system.(
-                record t.trust_system logger sender
+                record trust_system logger sender
                   Actions.
                     ( Fulfilled_request
                     , Some ("Received valid scan state from peer", []) ))
@@ -527,7 +526,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~network
                     let%map result =
                       Consensus.Hooks.sync_local_state
                         ~context:(module Context)
-                        ~local_state:consensus_local_state ~trust_system
+                        ~local_state:consensus_local_state
                         ~random_peers:(fun n ->
                           (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
                           let%map peers =
@@ -705,6 +704,8 @@ let%test_module "Bootstrap_controller tests" =
       let consensus_constants = precomputed_values.consensus_constants
 
       let verifier = verifier
+
+      let trust_system = trust_system
     end
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
@@ -729,7 +730,6 @@ let%test_module "Bootstrap_controller tests" =
         |> Mina_block.Validation.reset_staged_ledger_diff_validation
       in
       { context = (module Context)
-      ; trust_system
       ; best_seen_transition = transition
       ; current_root = transition
       ; network
@@ -841,7 +841,7 @@ let%test_module "Bootstrap_controller tests" =
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run
            ~context:(module Context)
-           ~trust_system ~network:my_net.network ~best_seen_transition:None
+           ~network:my_net.network ~best_seen_transition:None
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
            ~catchup_mode:`Normal ~initial_root_transition )

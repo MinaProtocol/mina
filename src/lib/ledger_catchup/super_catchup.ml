@@ -19,6 +19,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val verifier : Verifier.t
+
+  val trust_system : Trust_system.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -131,8 +133,8 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
-let verify_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~frontier ~unprocessed_transition_cache enveloped_transition =
+let verify_transition ~context:(module Context : CONTEXT) ~frontier
+    ~unprocessed_transition_cache enveloped_transition =
   let open Context in
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
@@ -570,7 +572,7 @@ module Verify_work_batcher = struct
   let verify (t : _ t) = verify t
 end
 
-let initial_validate ~context:(module Context : CONTEXT) ~trust_system
+let initial_validate ~context:(module Context : CONTEXT)
     ~(batcher : _ Initial_validate_batcher.t) ~frontier
     ~unprocessed_transition_cache transition =
   let open Context in
@@ -626,7 +628,7 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
     "initial_validate: verification of proofs complete" ;
   verify_transition
     ~context:(module Context)
-    ~trust_system ~frontier ~unprocessed_transition_cache tv
+    ~frontier ~unprocessed_transition_cache tv
   |> Deferred.map ~f:(Result.map_error ~f:(fun e -> `Error e))
 
 open Frontier_base
@@ -710,7 +712,7 @@ let forest_pick forest =
       assert false )
 
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t
-    ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
+    ~downloader ~frontier ~unprocessed_transition_cache
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
@@ -818,7 +820,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t
           step
             ( initial_validate
                 ~context:(module Context)
-                ~trust_system ~batcher:initial_validation_batcher ~frontier
+                ~batcher:initial_validation_batcher ~frontier
                 ~unprocessed_transition_cache
                 { external_block with
                   data =
@@ -999,8 +1001,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t
   run_node
 
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
-let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~network
-    ~frontier ~build_func
+let run_catchup ~context:(module Context : CONTEXT) ~network ~frontier
+    ~build_func
     ~(catchup_job_reader :
        ( State_hash.t
        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -1113,8 +1115,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~network
   let run_state_machine =
     setup_state_machine_runner ~t ~downloader
       ~context:(module Context)
-      ~trust_system ~frontier ~unprocessed_transition_cache
-      ~catchup_breadcrumbs_writer ~build_func
+      ~frontier ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
+      ~build_func
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
   (* TODO: Print out the hashes you're adding *)
@@ -1320,14 +1322,14 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~network
                           (h, l) )
                       : State_hash.t * Length.t ) ) ) )
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~network ~frontier
+let run ~context:(module Context : CONTEXT) ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   O1trace.background_thread "perform_super_catchup" (fun () ->
       run_catchup
         ~context:(module Context)
-        ~trust_system ~network ~frontier ~catchup_job_reader
-        ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
+        ~network ~frontier ~catchup_job_reader ~unprocessed_transition_cache
+        ~catchup_breadcrumbs_writer
         ~build_func:Transition_frontier.Breadcrumb.build )
 
 (* Unit tests *)
@@ -1378,6 +1380,8 @@ let%test_module "Ledger_catchup tests" =
       let consensus_constants = precomputed_values.consensus_constants
 
       let verifier = verifier
+
+      let trust_system = trust_system
     end
 
     (* let mock_verifier =
@@ -1434,8 +1438,8 @@ let%test_module "Ledger_catchup tests" =
       in
       run
         ~context:(module Context)
-        ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
-        ~catchup_job_reader ~unprocessed_transition_cache ;
+        ~network ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
+        ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader

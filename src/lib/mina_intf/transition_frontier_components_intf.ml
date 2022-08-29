@@ -8,6 +8,8 @@ open Network_peer
 module type Transition_handler_validator_intf = sig
   module type CONTEXT = sig
     val logger : Logger.t
+
+    val trust_system : Trust_system.t
   end
 
   type unprocessed_transition_cache
@@ -16,7 +18,6 @@ module type Transition_handler_validator_intf = sig
 
   val run :
        context:(module CONTEXT)
-    -> trust_system:Trust_system.t
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
     -> transition_reader:
@@ -56,6 +57,8 @@ module type Breadcrumb_builder_intf = sig
     val consensus_constants : Consensus.Constants.t
 
     val verifier : Verifier.t
+
+    val trust_system : Trust_system.t
   end
 
   type transition_frontier
@@ -64,7 +67,6 @@ module type Breadcrumb_builder_intf = sig
 
   val build_subtrees_of_breadcrumbs :
        context:(module CONTEXT)
-    -> trust_system:Trust_system.t
     -> frontier:transition_frontier
     -> initial_hash:State_hash.t
     -> ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -88,6 +90,8 @@ module type Transition_handler_processor_intf = sig
     val consensus_constants : Consensus.Constants.t
 
     val verifier : Verifier.t
+
+    val trust_system : Trust_system.t
   end
 
   type transition_frontier
@@ -96,7 +100,6 @@ module type Transition_handler_processor_intf = sig
 
   val run :
        context:(module CONTEXT)
-    -> trust_system:Trust_system.t
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
     -> primary_transition_reader:
@@ -255,6 +258,8 @@ module type Sync_handler_intf = sig
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val consensus_constants : Consensus.Constants.t
+
+    val trust_system : Trust_system.t
   end
 
   type transition_frontier
@@ -264,7 +269,6 @@ module type Sync_handler_intf = sig
     -> frontier:transition_frontier
     -> Ledger_hash.t
     -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
-    -> trust_system:Trust_system.t
     -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
@@ -305,6 +309,8 @@ module type Bootstrap_controller_intf = sig
     val logger : Logger.t
 
     val verifier : Verifier.t
+
+    val trust_system : Trust_system.t
   end
 
   type network
@@ -317,7 +323,6 @@ module type Bootstrap_controller_intf = sig
 
   val run :
        context:(module CONTEXT)
-    -> trust_system:Trust_system.t
     -> network:network
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> transition_reader:
@@ -338,6 +343,8 @@ module type Transition_frontier_controller_intf = sig
     val logger : Logger.t
 
     val verifier : Verifier.t
+
+    val trust_system : Trust_system.t
   end
 
   type transition_frontier
@@ -348,7 +355,6 @@ module type Transition_frontier_controller_intf = sig
 
   val run :
        context:(module CONTEXT)
-    -> trust_system:Trust_system.t
     -> network:network
     -> time_controller:Block_time.Controller.t
     -> collected_transitions:
@@ -372,6 +378,8 @@ module type Transition_router_intf = sig
     val consensus_constants : Consensus.Constants.t
 
     val verifier : Verifier.t
+
+    val trust_system : Trust_system.t
   end
 
   type transition_frontier
@@ -386,7 +394,6 @@ module type Transition_router_intf = sig
 
   val run :
        context:(module CONTEXT)
-    -> trust_system:Trust_system.t
     -> network:network
     -> is_seed:bool
     -> is_demo_mode:bool

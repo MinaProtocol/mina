@@ -13,6 +13,12 @@ module type CONTEXT = sig
   val consensus_constants : Constants.t
 end
 
+module type CONTEXT_WITH_TRUST = sig
+  include CONTEXT
+
+  val trust_system : Trust_system.t
+end
+
 module type Constants = sig
   [%%versioned:
   module Stable : sig
@@ -730,8 +736,7 @@ module type S = sig
      * Synchronize local state over the network.
      *)
     val sync_local_state :
-         context:(module CONTEXT)
-      -> trust_system:Trust_system.t
+         context:(module CONTEXT_WITH_TRUST)
       -> local_state:Local_state.t
       -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Rpcs.query

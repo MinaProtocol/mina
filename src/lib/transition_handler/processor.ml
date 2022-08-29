@@ -27,6 +27,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val verifier : Verifier.t
+
+  val trust_system : Trust_system.t
 end
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -98,8 +100,8 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(Mina_block.Validated.state_hash transition)
 
-let process_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~frontier ~catchup_scheduler ~processed_transition_writer ~time_controller
+let process_transition ~context:(module Context : CONTEXT) ~frontier
+    ~catchup_scheduler ~processed_transition_writer ~time_controller
     ~transition:cached_initially_validated_transition ~valid_cb =
   let open Context in
   let enveloped_initially_validated_transition =
@@ -219,8 +221,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
          ~processed_transition_writer ~only_if_present:false ~time_controller
          ~source:`Gossip breadcrumb ~precomputed_values ~valid_cb ))
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
-    ~frontier
+let run ~context:(module Context : CONTEXT) ~time_controller ~frontier
     ~(primary_transition_reader :
        ( [ `Block of
            ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -259,8 +260,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
   let process_transition =
     process_transition
       ~context:(module Context)
-      ~trust_system ~frontier ~catchup_scheduler ~processed_transition_writer
-      ~time_controller
+      ~frontier ~catchup_scheduler ~processed_transition_writer ~time_controller
   in
   O1trace.background_thread "process_blocks" (fun () ->
       Reader.Merge.iter
@@ -398,6 +398,8 @@ let%test_module "Transition_handler.Processor tests" =
       let consensus_constants = precomputed_values.consensus_constants
 
       let verifier = verifier
+
+      let trust_system = trust_system
     end
 
     let downcast_breadcrumb breadcrumb =
@@ -444,8 +446,8 @@ let%test_module "Transition_handler.Processor tests" =
                 let cache = Unprocessed_transition_cache.create ~logger in
                 run
                   ~context:(module Context)
-                  ~time_controller ~trust_system ~clean_up_catchup_scheduler
-                  ~frontier ~primary_transition_reader:valid_transition_reader
+                  ~time_controller ~clean_up_catchup_scheduler ~frontier
+                  ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
                   ~processed_transition_writer ;

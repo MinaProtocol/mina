@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val trust_system : Trust_system.t
 end
 
 let validate_transition ~context:(module Context : CONTEXT) ~frontier
@@ -61,8 +63,8 @@ let validate_transition ~context:(module Context : CONTEXT) ~frontier
   Unprocessed_transition_cache.register_exn unprocessed_transition_cache
     enveloped_transition
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
-    ~frontier ~transition_reader
+let run ~context:(module Context : CONTEXT) ~time_controller ~frontier
+    ~transition_reader
     ~(valid_transition_writer :
        ( [ `Block of
            ( Mina_block.initial_valid_block Envelope.Incoming.t

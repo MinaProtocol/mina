@@ -55,6 +55,7 @@
    genesis_constants
    data_hash_lib
    sgn
+   trust_system
  )
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_register_event))

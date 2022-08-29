@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val verifier : Verifier.t
+
+  val trust_system : Trust_system.t
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -80,7 +82,6 @@ type nonrec 'n t =
 
 val setup :
      context:(module CONTEXT)
-  -> ?trust_system:Trust_system.t
   -> ?time_controller:Block_time.Controller.t
   -> (peer_state, 'n num_peers) Vect.t
   -> 'n num_peers t

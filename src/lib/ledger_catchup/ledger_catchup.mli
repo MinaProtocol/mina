@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val verifier : Verifier.t
+
+  val trust_system : Trust_system.t
 end
 
 module Catchup_jobs : sig
@@ -23,7 +25,6 @@ end
 
 val run :
      context:(module CONTEXT)
-  -> trust_system:Trust_system.t
   -> network:Mina_networking.t
   -> frontier:Transition_frontier.t
   -> catchup_job_reader:
