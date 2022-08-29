@@ -4281,8 +4281,7 @@ module For_tests = struct
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
       ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-      ; receivers :
-          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; receivers : (Signature_lib.Keypair.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
       ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
@@ -4370,9 +4369,26 @@ module For_tests = struct
     ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
     , `Prover trivial_prover )
 
-  let create_parties
+  let rec interleave left right dir acc =
+    if List.length left = 0 && List.length right = 0 then List.rev acc
+    else
+      match dir with
+      | `Left -> (
+          match left with
+          | [] ->
+              interleave [] right `Right acc
+          | l :: ls ->
+              interleave ls right `Right (l :: acc) )
+      | `Right -> (
+          match right with
+          | [] ->
+              interleave left [] `Left acc
+          | r :: rs ->
+              interleave left rs `Left (r :: acc) )
+
+  let create_parties ?receiver_auth
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
-      ~update =
+      ~update ~receiver_update =
     let { Spec.fee
         ; sender = sender, sender_nonce
         ; fee_payer = fee_payer_opt
@@ -4513,10 +4529,24 @@ module For_tests = struct
             : Party.Simple.t ) )
     in
     let other_receivers =
-      List.map receivers ~f:(fun (receiver, amt) : Party.Simple.t ->
+      List.map receivers ~f:(fun (receiver_kp, amt) : Party.Simple.t ->
+          let receiver =
+            Signature_lib.Public_key.compress receiver_kp.public_key
+          in
+          let receiver_auth, use_full_commitment =
+            match receiver_auth with
+            | Some Control.Tag.Signature ->
+                (Control.Signature Signature.dummy, true)
+            | Some Proof ->
+                failwith
+                  "Not implemented. Pickles_types.Nat.N2.n \
+                   Pickles_types.Nat.N2.n ~domain_log2:15)"
+            | Some None_given | None ->
+                (None_given, false)
+          in
           { body =
               { public_key = receiver
-              ; update
+              ; update = receiver_update
               ; token_id = Token_id.default
               ; balance_change = Amount.Signed.of_unsigned amt
               ; increment_nonce = false
@@ -4525,15 +4555,17 @@ module For_tests = struct
               ; call_data = Field.zero
               ; call_depth = 0
               ; preconditions = { preconditions' with account = Accept }
-              ; use_full_commitment = false
+              ; use_full_commitment
               ; caller = Call
               }
-          ; authorization = Control.None_given
+          ; authorization = receiver_auth
           } )
     in
     let other_parties_data =
-      Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
-      @ snapp_parties @ other_receivers
+      interleave snapp_parties
+        ( Option.value_map ~default:[] sender_party ~f:(fun p -> [ p ])
+        @ other_receivers )
+        `Left []
     in
     let ps =
       Parties.Call_forest.With_hashes.of_parties_simple_list other_parties_data
@@ -4570,6 +4602,26 @@ module For_tests = struct
               (Random_oracle.Input.Chunked.field commitment)
           in
           { body = s.body; authorization = Signature sender_signature_auth } )
+    in
+    let other_receivers =
+      List.map2_exn other_receivers receivers ~f:(fun s receiver_kp ->
+          match s.authorization with
+          | Control.Signature _ ->
+              let commitment =
+                if s.body.use_full_commitment then full_commitment
+                else commitment
+              in
+              let receiver_signature_auth =
+                Signature_lib.Schnorr.Chunked.sign (fst receiver_kp).private_key
+                  (Random_oracle.Input.Chunked.field commitment)
+              in
+              { Party.Simple.body = s.body
+              ; authorization = Signature receiver_signature_auth
+              }
+          | Control.Proof _ ->
+              failwith ""
+          | Control.None_given ->
+              s )
     in
     ( `Parties
         (Parties.of_simple { fee_payer; other_parties = other_receivers; memo })
@@ -4608,6 +4660,7 @@ module For_tests = struct
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties ~constraint_constants spec ~update:update_vk
+        ~receiver_update:Party.Update.noop
     in
     assert (List.is_empty other_parties) ;
     (* invariant: same number of keypairs, snapp_parties *)
@@ -4637,17 +4690,18 @@ module For_tests = struct
     in
     parties
 
-  let update_states ?zkapp_prover ~constraint_constants (spec : Spec.t) =
-    let ( `Parties { Parties.fee_payer; other_parties; memo }
+  let update_states ?receiver_auth ?zkapp_prover ~constraint_constants
+      (spec : Spec.t) =
+    let ( `Parties ({ Parties.fee_payer; memo; _ } as p)
         , `Sender_party sender_party
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties ~constraint_constants spec ~update:spec.snapp_update
+        ~receiver_update:Party.Update.noop ?receiver_auth
     in
-    assert (List.is_empty other_parties) ;
-    assert (Option.is_none sender_party) ;
     assert (not @@ List.is_empty snapp_parties) ;
+    let receivers = (Parties.to_simple p).other_parties in
     let snapp_parties =
       snapp_parties
       |> List.map ~f:(fun p -> (p, p))
@@ -4707,7 +4761,12 @@ module For_tests = struct
               failwith
                 "Current authorization not Proof or Signature or None_given" )
     in
-    let other_parties = snapp_parties in
+    let other_parties =
+      interleave snapp_parties
+        ( Option.value_map ~default:[] ~f:(fun p -> [ p ]) sender_party
+        @ receivers )
+        `Left []
+    in
     let parties : Parties.t =
       Parties.of_simple { fee_payer; other_parties; memo }
     in
@@ -4721,7 +4780,7 @@ module For_tests = struct
         , `Full_txn_commitment _full_commitment ) =
       create_parties
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-        spec ~update:spec.snapp_update
+        spec ~update:spec.snapp_update ~receiver_update:spec.snapp_update
     in
     assert (Option.is_some sender_party) ;
     assert (List.is_empty snapp_parties) ;

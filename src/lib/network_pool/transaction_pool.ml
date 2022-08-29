@@ -2217,7 +2217,7 @@ let%test_module _ =
       let sender = (sender_kp, sender_nonce) in
       let amount = Currency.Amount.of_int amount in
       let receiver_kp = test_keys.(receiver_idx) in
-      let receiver =
+      let _receiver =
         receiver_kp.public_key |> Signature_lib.Public_key.compress
       in
       let fee_payer =
@@ -2241,7 +2241,7 @@ let%test_module _ =
         { sender
         ; fee_payer
         ; fee
-        ; receivers = [ (receiver, amount) ]
+        ; receivers = [ (receiver_kp, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
         ; memo = Signed_command_memo.create_from_string_exn "expiry tests"

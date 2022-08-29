@@ -215,14 +215,19 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties :
     }
   in
   let amount = Currency.Amount.of_int 1_000_000_000 in
-  let receiver_count = num_parties - num_proof_parties in
+  let sender_parties = 1 in
+  let receiver_count =
+    if num_parties - num_proof_parties = 1 then 1
+      (*You need a sender for a single receiver*)
+    else max 0 (num_parties - num_proof_parties - sender_parties)
+  in
   let test_spec nonce : Transaction_snark.For_tests.Spec.t =
     { sender = (fee_payer_keypair, nonce)
     ; fee
     ; fee_payer = None
     ; receivers =
         List.map (List.take keypairs_in_ledger receiver_count) ~f:(fun kp ->
-            (Signature_lib.Public_key.compress kp.public_key, amount) )
+            (kp, amount) )
     ; amount =
         ( if receiver_count > 0 then
           Currency.Amount.scale amount receiver_count |> Option.value_exn
@@ -245,7 +250,8 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties :
       let parties =
         Async.Thread_safe.block_on_async_exn (fun () ->
             Transaction_snark.For_tests.update_states ~zkapp_prover:prover
-              ~constraint_constants (test_spec nonce) )
+              ~constraint_constants (test_spec nonce)
+              ~receiver_auth:Control.Tag.Signature )
       in
       let other_parties = Parties.other_parties_list parties in
       let proof_count, signature_count, no_auths, next_nonce =

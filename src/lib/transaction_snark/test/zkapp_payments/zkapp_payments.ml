@@ -181,7 +181,7 @@ let%test_module "Zkapp payments tests" =
                     ; fee
                     ; fee_payer = None
                     ; receivers =
-                        (new_receiver, new_receiver_amount)
+                        (new_kp, new_receiver_amount)
                         :: ( List.take specs (receiver_count - 1)
                            |> List.map ~f:(fun s -> (s.receiver, amount)) )
                     ; amount = total_amount
@@ -248,7 +248,7 @@ let%test_module "Zkapp payments tests" =
                     ; fee
                     ; fee_payer = None
                     ; receivers =
-                        (new_receiver, amount)
+                        (new_kp, amount)
                         :: ( List.take specs (receiver_count - 1)
                            |> List.map ~f:(fun s -> (s.receiver, amount)) )
                     ; amount = total_amount

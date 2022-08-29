@@ -194,7 +194,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { sender = (sender_keypair, nonce)
         ; fee
         ; fee_payer = None
-        ; receivers = [ (receiver_key, amount) ]
+        ; receivers = [ (keypair, amount) ]
         ; amount
         ; zkapp_account_keypairs = []
         ; memo

@@ -502,8 +502,7 @@ module For_tests : sig
       { fee : Currency.Fee.t
       ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
       ; fee_payer : (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-      ; receivers :
-          (Signature_lib.Public_key.Compressed.t * Currency.Amount.t) list
+      ; receivers : (Signature_lib.Keypair.t * Currency.Amount.t) list
       ; amount : Currency.Amount.t
       ; zkapp_account_keypairs : Signature_lib.Keypair.t list
       ; memo : Signed_command_memo.t
@@ -525,7 +524,8 @@ module For_tests : sig
     -> Parties.t
 
   val update_states :
-       ?zkapp_prover:
+       ?receiver_auth:Control.Tag.t
+    -> ?zkapp_prover:
          ( unit
          , unit
          , unit
