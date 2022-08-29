@@ -121,6 +121,47 @@ end = struct
     t.timeout <- Some timeout
 end
 
+(** Sends an error to the reporting service containing as many failed transactions as we can fit. *)
+let report_transaction_inclusion_failures ~logger failed_txns =
+  let num_failures = List.length failed_txns in
+  let count_size = Fn.compose String.length Yojson.Safe.to_string in
+  let wrap_error failed_txns_json =
+    `Assoc
+      [ ( "message"
+        , `String
+            "Some transactions failed to apply to the ledger when creating the \
+             staged ledger diff" )
+      ; ("num_failures", `Int num_failures)
+      ; ("sampled_failures", failed_txns_json)
+      ]
+  in
+  let rec generate_errors failures available_bytes =
+    if available_bytes <= 0 then []
+    else
+      match failures with
+      | [] ->
+          []
+      | (txn, error) :: remaining_failures ->
+          let element =
+            `Assoc
+              [ ("transaction", User_command.Valid.to_yojson txn)
+              ; ("error", Error_json.error_to_yojson error)
+              ]
+          in
+          let element_size = count_size element in
+          (* subtract an additional byte for each element here to account for commas *)
+          element
+          :: generate_errors remaining_failures
+               (available_bytes - element_size - 1)
+  in
+  Node_error_service.send_dynamic_report ~logger
+    ~generate_error:(fun available_bytes ->
+      (* subtract 2 bytes to account for empty string *)
+      let base_error_size = count_size (wrap_error (`String "")) - 2 in
+      (* subtract 2 bytes to account for list brackets that wrap failed_txns *)
+      let leftover_bytes = available_bytes - base_error_size - 2 in
+      wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
+
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
@@ -155,24 +196,31 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
 
       let diff =
         O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
-            let diff =
+            (* TODO: handle transaction inclusion failures here *)
+            let diff_result =
               Staged_ledger.create_diff ~constraint_constants staged_ledger
                 ~coinbase_receiver ~logger
                 ~current_state_view:previous_state_view
                 ~transactions_by_fee:transactions ~get_completed_work
                 ~log_block_creation ~supercharge_coinbase
+              |> Result.map ~f:(fun (diff, failed_txns) ->
+                     if not (List.is_empty failed_txns) then
+                       don't_wait_for
+                         (report_transaction_inclusion_failures ~logger
+                            failed_txns ) ;
+                     diff )
               |> Result.map_error ~f:(fun err ->
                      Staged_ledger.Staged_ledger_error.Pre_diff err )
             in
-            match (diff, block_reward_threshold) with
-            | Ok d, Some threshold ->
+            match (diff_result, block_reward_threshold) with
+            | Ok diff, Some threshold ->
                 let net_return =
                   Option.value ~default:Currency.Amount.zero
                     (Staged_ledger_diff.net_return ~constraint_constants
                        ~supercharge_coinbase
-                       (Staged_ledger_diff.forget d) )
+                       (Staged_ledger_diff.forget diff) )
                 in
-                if Currency.Amount.(net_return >= threshold) then diff
+                if Currency.Amount.(net_return >= threshold) then diff_result
                 else (
                   [%log info]
                     "Block reward $reward is less than the min-block-reward \
@@ -185,7 +233,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                     Staged_ledger_diff.With_valid_signatures_and_proofs
                     .empty_diff )
             | _ ->
-                diff )
+                diff_result )
       in
       match%map
         let%bind.Deferred.Result diff = return diff in

@@ -1,5 +1,3 @@
-open Core
-
 module Block_data = struct
   [%%versioned
   module Stable = struct
@@ -7,7 +5,7 @@ module Block_data = struct
       type t = Mina_state.Protocol_state.Body.Value.Stable.V2.t
       [@@deriving sexp]
 
-      let to_latest = Fn.id
+      let to_latest = Core_kernel.Fn.id
     end
   end]
 

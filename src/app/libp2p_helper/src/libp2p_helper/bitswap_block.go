@@ -107,18 +107,19 @@ func MkDepthIndices(linksPerBlock, maxTotalBlocks int) DepthIndices {
 }
 
 // `n` is the total number of bitswap blocks
-//   formula for `n` is derived as follows
-//   (for s_i the data part of bitswap block i,
-//   l_i the number of links in the block i):
-//      1. 2 + LINK_SIZE * l_i + s_i <= maxBlockDataSize
-//      2. sum_i{1..n} ( 2 + LINK_SIZE * l_i + s_i ) <= n * maxBlockDataSize
-//      3. sum_i{1..n} l_i = n - 1 (as each block is referenced by
-//         a single link and root block is referenced by none)
-//      4. sum_i{1..n} s_i = len(data) (sum of all data parts is
-//         equal to the size of the data blob)
-//      5. 2 * n + LINK_SIZE * (n - 1) + len(data) <= n * maxBlockDataSize
-//         (following from 2., 3. and 4.)
-//      6. n >= (len(data) - LINK_SIZE) / (maxBlockDataSize - LINK_SIZE - 2)
+//
+//	formula for `n` is derived as follows
+//	(for s_i the data part of bitswap block i,
+//	l_i the number of links in the block i):
+//	   1. 2 + LINK_SIZE * l_i + s_i <= maxBlockDataSize
+//	   2. sum_i{1..n} ( 2 + LINK_SIZE * l_i + s_i ) <= n * maxBlockDataSize
+//	   3. sum_i{1..n} l_i = n - 1 (as each block is referenced by
+//	      a single link and root block is referenced by none)
+//	   4. sum_i{1..n} s_i = len(data) (sum of all data parts is
+//	      equal to the size of the data blob)
+//	   5. 2 * n + LINK_SIZE * (n - 1) + len(data) <= n * maxBlockDataSize
+//	      (following from 2., 3. and 4.)
+//	   6. n >= (len(data) - LINK_SIZE) / (maxBlockDataSize - LINK_SIZE - 2)
 func requiredBitswapBlockCount(maxBlockDataSize int, dataLength int) int {
 	if dataLength <= maxBlockDataSize-2 {
 		return 1
@@ -192,18 +193,19 @@ func (schema *BitswapBlockSchema) LinkCount(id NodeIndex) int {
 // blocks. Each resulting block follows
 // the byte format:
 //
-//  * [2 bytes] number of links n
-//  * [n * LINK_SIZE bytes] links (each link is a 256-bit hash)
-//  * [up to (maxBlockDataSize - 2 - LINK_SIZE * n) bytes] data
+//   - [2 bytes] number of links n
+//   - [n * LINK_SIZE bytes] links (each link is a 256-bit hash)
+//   - [up to (maxBlockDataSize - 2 - LINK_SIZE * n) bytes] data
 //
 // Resulting bitswap block tree is balanced. Tree is
 // optimized for breadth-first search (BFS), in particular:
 //
-//  * Data blobs should be concatenated in BFS order
-//  * There exist such `M >= 0` such that for any result of the function
-//    first `M` blocks contain exactly `min(maxBlockDataSize / LINK_SIZE, 65535)` links
-//    per block, and all blocks from `M + 2` (in the BFS order)
-//    contain only data (no links)
+//   - Data blobs should be concatenated in BFS order
+//   - There exist such `M >= 0` such that for any result of the function
+//     first `M` blocks contain exactly `min(maxBlockDataSize / LINK_SIZE, 65535)` links
+//     per block, and all blocks from `M + 2` (in the BFS order)
+//     contain only data (no links)
+//
 // All blocks except for last one (in BFS order) are exactly of `maxBlockDataSize` size.
 //
 // Returns a map of bitswap blocks, indexed by

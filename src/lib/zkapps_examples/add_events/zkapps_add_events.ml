@@ -39,7 +39,7 @@ let update_events public_key =
           (Typ.list ~length:num_events
              (Typ.array ~length:event_length Field.typ) )
       in
-      Party_under_construction.In_circuit.set_events events party )
+      Party_under_construction.In_circuit.add_events events party )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize zkApp"
