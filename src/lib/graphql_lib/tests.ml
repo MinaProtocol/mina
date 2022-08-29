@@ -107,7 +107,7 @@ module Time_gen = struct
 
   let compare x y = Core_kernel.Time.robustly_compare x y
 end
-
+let g = Time.Span.of_ns
 module Span_gen = struct
   include Time.Span
 
@@ -117,7 +117,14 @@ module Span_gen = struct
     Quickcheck.Generator.filter quickcheck_generator ~f:(fun t ->
         neg millenium <= t && t <= millenium )
 
-  let compare x y = Core_kernel.Time.Span.robustly_compare x y
+  let compare x y =
+    (* Core_kernel.Time.Span.robustly_compare x y *)
+    (* https://github.com/janestreet/core_kernel/blob/v0.14.1/src/float.ml#L61 *)
+    let tolerance = 1E-3 in
+    let diff = x - y in
+    if diff < of_sec ~-.tolerance then -1
+    else if diff > of_sec tolerance then 1
+    else 0
 end
 
 module Slot_gen = struct
