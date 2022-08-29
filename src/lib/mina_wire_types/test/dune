@@ -11,6 +11,7 @@
     mina_base.import
     mina_numbers
     block_time
+    one_or_two
     ; Necessary for the type equality
     sgn
     sgn_type

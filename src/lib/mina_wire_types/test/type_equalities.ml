@@ -152,4 +152,11 @@ module Mina_base = struct
   include Assert_equal0V1 (O.Party.Preconditions.Stable) (W.Party.Preconditions)
   include Assert_equal0V1 (O.Party.Body.Stable) (W.Party.Body)
   include Assert_equal0V2 (O.Fee_transfer.Single.Stable) (W.Fee_transfer.Single)
+  include Assert_equal0V2 (O.Fee_transfer.Stable) (W.Fee_transfer)
+end
+
+module One_or_two = struct
+  module O = One_or_two
+  module W = WT.One_or_two
+  include Assert_equal1V1 (O.Stable) (W)
 end

@@ -11,6 +11,10 @@ module Types : sig
           }
       end
     end
+
+    module V2 : sig
+      type t = private Single.V2.t One_or_two.V1.t
+    end
   end
 end
 
@@ -24,6 +28,10 @@ module M : sig
         }
     end
   end
+
+  module V2 : sig
+    type t = private Single.V2.t One_or_two.V1.t
+  end
 end
 
 module type Concrete = sig
@@ -36,6 +44,10 @@ module type Concrete = sig
         }
     end
   end
+
+  module V2 : sig
+    type t = Single.V2.t One_or_two.V1.t
+  end
 end
 
 module type Local_sig = Signature(Types).S
@@ -44,4 +56,4 @@ module Make
     (Signature : Local_sig) (F : functor (A : Concrete) -> Signature(A).S) :
   Signature(M).S
 
-include Types.S with module Single = M.Single
+include Types.S with module Single = M.Single and module V2 = M.V2

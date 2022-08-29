@@ -11,6 +11,10 @@ module Types = struct
           }
       end
     end
+
+    module V2 : sig
+      type t = private Single.V2.t One_or_two.V1.t
+    end
   end
 end
 
@@ -24,6 +28,10 @@ module M = struct
         }
     end
   end
+
+  module V2 = struct
+    type t = Single.V2.t One_or_two.V1.t
+  end
 end
 
 module type Concrete = sig
@@ -35,6 +43,10 @@ module type Concrete = sig
         ; fee_token : Mina_base_token_id.V1.t
         }
     end
+  end
+
+  module V2 : sig
+    type t = Single.V2.t One_or_two.V1.t
   end
 end
 

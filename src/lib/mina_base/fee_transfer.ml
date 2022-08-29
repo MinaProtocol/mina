@@ -3,7 +3,9 @@ open Mina_base_import
 
 module Make_sig (T : Mina_wire_types.Mina_base.Fee_transfer.Types.S) = struct
   module type S =
-    Fee_transfer_intf.Full with type Single.Stable.V2.t = T.Single.V2.t
+    Fee_transfer_intf.Full
+      with type Single.Stable.V2.t = T.Single.V2.t
+       and type Stable.V2.t = T.V2.t
 end
 
 module Make_str (T : Mina_wire_types.Mina_base.Fee_transfer.Concrete) :
