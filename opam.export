@@ -7,6 +7,7 @@ roots: [
   "bitstring.4.1.0"
   "camlp4.4.14+1"
   "capnp.3.4.0"
+  "check_opam_switch.~dev"
   "cohttp-async.5.0.0"
   "core_extended.v0.14.0"
   "extlib.1.7.8"
@@ -68,6 +69,7 @@ installed: [
   "caqti-async.1.3.0"
   "caqti-driver-postgresql.1.5.1"
   "charInfo_width.1.1.0"
+  "check_opam_switch.~dev"
   "cmdliner.1.0.3"
   "cohttp.5.0.0"
   "cohttp-async.5.0.0"
@@ -142,6 +144,7 @@ installed: [
   "merlin-extend.0.6.1"
   "mew.0.1.0"
   "mew_vi.0.5.0"
+  "minicli.5.0.2"
   "mmap.1.1.0"
   "num.1.1"
   "ocaml.4.14.0"
@@ -163,7 +166,10 @@ installed: [
   "octavius.1.2.2"
   "odoc.2.1.0"
   "odoc-parser.1.0.0"
+  "opam-core.2.1.2"
   "opam-depext.1.2.1"
+  "opam-file-format.2.1.4"
+  "opam-format.2.1.2"
   "parsexp.v0.14.2"
   "postgresql.5.0.0"
   "ppx_assert.v0.14.0"
@@ -243,11 +249,46 @@ installed: [
   "zed.3.1.0"
 ]
 pinned: [
+  "check_opam_switch.~dev"
   "graphql_ppx.1.2.2"
   "capnp.3.4.0"
   "rpc_parallel.v0.14.0"
   "async_kernel.v0.14.0"
 ]
+package "check_opam_switch" {
+  opam-version: "2.0"
+  version: "~dev"
+  synopsis:
+    "A tool to check that the current opam environment is up to date with an opam.export file"
+  description:
+    "A tool to check that the current opam environment is up to date with an opam.export file"
+  maintainer: "yves.stan.lecornec@tweag.io"
+  depends: [
+    "dune" {>= "3.3"}
+    "opam-core" {>= "2.0.0"}
+    "opam-format" {>= "2.0.0"}
+    "minicli" {>= "5.0.0"}
+    "odoc" {with-doc}
+  ]
+  build: [
+    ["dune" "subst"] {dev}
+    [
+      "dune"
+      "build"
+      "-p"
+      name
+      "-j"
+      jobs
+      "@install"
+      "@runtest" {with-test}
+      "@doc" {with-doc}
+    ]
+  ]
+  url {
+    src: "https://github.com/tweag/check_opam_switch/archive/d0aa49884e0f9fd4bbb2cd1a32b798a12f84b603.tar.gz"
+    checksum: "sha256=24ab29ea4aff9da9d649f0b577c5d4e27ce2bef51058e139965cc9be25494a46"
+  }
+}
 package "graphql_ppx" {
   opam-version: "2.0"
   version: "1.2.2"
@@ -278,6 +319,7 @@ package "graphql_ppx" {
          checksum: "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
   }
 }
+
 package "capnp" {
   opam-version: "2.0"
   version: "3.4.0"

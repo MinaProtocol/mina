@@ -5,6 +5,14 @@ open Currency
 open Signature_lib
 open Mina_base
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Constants.t
+end
+
 module type Constants = sig
   [%%versioned:
   module Stable : sig
@@ -291,10 +299,10 @@ module type S = sig
 
       val create :
            Signature_lib.Public_key.Compressed.Set.t
+        -> context:(module CONTEXT)
         -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> epoch_ledger_location:string
-        -> ledger_depth:int
         -> genesis_state_hash:State_hash.t
         -> t
 
@@ -328,13 +336,12 @@ module type S = sig
 
     module Vrf : sig
       val check :
-           constraint_constants:Genesis_constants.Constraint_constants.t
+           context:(module CONTEXT)
         -> global_slot:Mina_numbers.Global_slot.t
         -> seed:Mina_base.Epoch_seed.t
         -> producer_private_key:Signature_lib.Private_key.t
         -> producer_public_key:Signature_lib.Public_key.Compressed.t
         -> total_stake:Amount.t
-        -> logger:Logger.t
         -> get_delegators:
              (   Public_key.Compressed.t
               -> Mina_base.Account.t Mina_base.Account.Index.Table.t option )
@@ -612,7 +619,7 @@ module type S = sig
       include Network_peer.Rpc_intf.Rpc_interface_intf
 
       val rpc_handlers :
-           logger:Logger.t
+           context:(module CONTEXT)
         -> local_state:Local_state.t
         -> genesis_ledger_hash:Frozen_ledger_hash.t
         -> rpc_handler list
@@ -647,12 +654,11 @@ module type S = sig
      * kept, or `\`Take` if the second tip should be taken instead.
     *)
     val select :
-         constants:Constants.t
+         context:(module CONTEXT)
       -> existing:
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> candidate:
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
-      -> logger:Logger.t
       -> select_status
 
     (*Data required to evaluate VRFs for an epoch*)
@@ -685,12 +691,11 @@ module type S = sig
      * Indicator of when we should bootstrap
      *)
     val should_bootstrap :
-         constants:Constants.t
+         context:(module CONTEXT)
       -> existing:
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> candidate:
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
-      -> logger:Logger.t
       -> bool
 
     val get_epoch_ledger :
@@ -718,12 +723,11 @@ module type S = sig
      * Synchronize local state over the network.
      *)
     val sync_local_state :
-         logger:Logger.t
+         context:(module CONTEXT)
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
       -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Rpcs.query
-      -> ledger_depth:int
       -> local_state_sync
       -> unit Deferred.Or_error.t
 

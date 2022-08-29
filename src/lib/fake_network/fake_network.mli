@@ -5,6 +5,16 @@ open Network_peer
 open Mina_base
 module Sync_ledger = Mina_ledger.Sync_ledger
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 (* There must be at least 2 peers to create a network *)
 type 'n num_peers = 'n Peano.gt_1
 
@@ -67,10 +77,9 @@ type nonrec 'n t =
   constraint 'n = _ num_peers
 
 val setup :
-     logger:Logger.t
+     context:(module CONTEXT)
   -> ?trust_system:Trust_system.t
   -> ?time_controller:Block_time.Controller.t
-  -> precomputed_values:Precomputed_values.t
   -> (peer_state, 'n num_peers) Vect.t
   -> 'n num_peers t
 
@@ -78,8 +87,7 @@ module Generator : sig
   open Quickcheck
 
   type peer_config =
-       logger:Logger.t
-    -> precomputed_values:Precomputed_values.t
+       context:(module CONTEXT)
     -> verifier:Verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool

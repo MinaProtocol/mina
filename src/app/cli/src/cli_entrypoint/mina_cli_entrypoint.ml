@@ -1039,8 +1039,18 @@ let setup_daemon logger =
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
+          let module Context = struct
+            let logger = logger
+
+            let precomputed_values = precomputed_values
+
+            let constraint_constants = precomputed_values.constraint_constants
+
+            let consensus_constants = precomputed_values.consensus_constants
+          end in
           let consensus_local_state =
             Consensus.Data.Local_state.create
+              ~context:(module Context)
               ~genesis_ledger:
                 (Precomputed_values.genesis_ledger precomputed_values)
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
@@ -1049,7 +1059,6 @@ let setup_daemon logger =
                     let open Keypair in
                     Public_key.compress keypair.public_key )
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
-              ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
@@ -1195,6 +1204,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create ~pids gossip_net_params))
+            ; precomputed_values
             }
           in
           let coinbase_receiver : Consensus.Coinbase_receiver.t =
