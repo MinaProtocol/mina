@@ -1098,10 +1098,10 @@ module Base = struct
           Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
       end
 
-      module Events = struct
-        type t = Zkapp_account.Events.var
+      module Sequence_events = struct
+        type t = Zkapp_account.Sequence_events.var
 
-        let is_empty x = run_checked (Party.Events.is_empty_var x)
+        let is_empty x = run_checked (Party.Sequence_events.is_empty_var x)
 
         let push_events = Party.Sequence_events.push_events_checked
       end

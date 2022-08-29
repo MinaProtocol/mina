@@ -55,6 +55,7 @@
    blake2
    mina_metrics
    mina_compile_config
+   node_error_service
    mina_user_error
    file_system
    mina_version
@@ -62,6 +63,7 @@
    block_time
    coda_runtime_config
    trust_system
+   protocol_version
    coda_genesis_proof
    with_hash
    block_producer
@@ -73,4 +75,4 @@
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_here ppx_let ppx_sexp_conv ppx_optcomp ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv ppx_optcomp ppx_deriving_yojson)))

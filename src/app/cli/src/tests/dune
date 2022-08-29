@@ -76,7 +76,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_assert
-               ppx_coda
+               ppx_mina
                ppx_compare
                ppx_version
                ppx_here

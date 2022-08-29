@@ -27,6 +27,6 @@
    ppx_version.runtime
  )
  (preprocess
-  (pps ppx_coda ppx_version ppx_deriving_yojson))
+  (pps ppx_mina ppx_version ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Filtering operations for external transitions"))
