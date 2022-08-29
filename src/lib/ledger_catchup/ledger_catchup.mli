@@ -5,13 +5,22 @@ open Mina_base
 open Network_peer
 module Best_tip_lru = Best_tip_lru
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 module Catchup_jobs : sig
   val reader : int Broadcast_pipe.Reader.t
 end
 
 val run :
-     logger:Logger.t
-  -> precomputed_values:Precomputed_values.t
+     context:(module CONTEXT)
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Mina_networking.t
