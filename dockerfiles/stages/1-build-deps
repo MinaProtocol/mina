@@ -14,10 +14,10 @@ ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
-ARG GO_VERSION=1.16.5
+ARG GO_VERSION=1.18.2
 
 # Go Capnp Version (for capnpc dependency)
-ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
+ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
 ARG RUST_VERSION=1.58.1
@@ -39,6 +39,8 @@ RUN apt-get update \
     libgmp-dev \
     libgmp3-dev \
     libjemalloc-dev \
+    liblmdb-dev \
+    liblmdb0 \
     libpq-dev \
     libprocps-dev \
     libsodium-dev \

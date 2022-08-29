@@ -55,6 +55,7 @@
    blake2
    mina_metrics
    mina_compile_config
+   node_error_service
    mina_user_error
    file_system
    mina_version
@@ -62,6 +63,7 @@
    block_time
    coda_runtime_config
    trust_system
+   protocol_version
    coda_genesis_proof
    with_hash
    block_producer

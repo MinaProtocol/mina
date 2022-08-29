@@ -411,10 +411,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   time_deferred
                     (let open Deferred.Let_syntax in
                     let temp_mask = Ledger.of_database temp_snarked_ledger in
-                    (*TODO: is "snarked_local_state" passed here really snarked?*)
-                    let `Needs_some_work_for_zkapps_on_mainnet =
-                      Mina_base.Util.todo_zkapps
-                    in
                     let%map result =
                       Staged_ledger
                       .of_scan_state_pending_coinbases_and_snarked_ledger

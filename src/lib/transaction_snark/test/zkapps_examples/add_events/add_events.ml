@@ -165,12 +165,12 @@ let%test_module "Add events test" =
           (parties, Ledger.get ledger loc) )
 
     module Events_verifier = Merkle_list_verifier.Make (struct
-      type proof_elem = Mina_base.Zkapp_account.Events.Event.t
+      type proof_elem = Mina_base.Zkapp_account.Event.t
 
       type hash = Snark_params.Tick.Field.t [@@deriving equal]
 
       let hash (parent_hash : hash) (proof_elem : proof_elem) =
-        let elem_hash = Mina_base.Zkapp_account.Events.Event.hash proof_elem in
+        let elem_hash = Mina_base.Zkapp_account.Event.hash proof_elem in
         Mina_base.Zkapp_account.Events.push_hash parent_hash elem_hash
     end)
 
@@ -226,8 +226,7 @@ let%test_module "Add events test" =
          to match that
       *)
       match
-        Events_verifier.verify_right
-          ~init:(Lazy.force Mina_base.Zkapp_account.Events.empty_hash)
+        Events_verifier.verify_right ~init:Zkapp_account.Events.empty_hash
           all_events all_events_hash
       with
       | None ->

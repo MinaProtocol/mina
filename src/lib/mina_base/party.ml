@@ -816,7 +816,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
         ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
         ~increment_nonce:!.bool ~events:!.Events.deriver
-        ~sequence_events:!.Events.deriver ~call_data:!.field
+        ~sequence_events:!.Sequence_events.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
         ~caller:!.Token_id.deriver ~call_depth:!.int
       |> finish "PartyBody" ~t_toplevel_annots
@@ -1087,7 +1087,7 @@ module Body = struct
       ; balance_change : Amount.Signed.var
       ; increment_nonce : Boolean.var
       ; events : Events.var
-      ; sequence_events : Events.var
+      ; sequence_events : Sequence_events.var
       ; call_data : Field.Var.t
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
@@ -1118,7 +1118,7 @@ module Body = struct
         ; Random_oracle_input.Chunked.packed
             ((increment_nonce :> Field.Var.t), 1)
         ; Events.var_to_input events
-        ; Events.var_to_input sequence_events
+        ; Sequence_events.var_to_input sequence_events
         ; Random_oracle_input.Chunked.field call_data
         ; Preconditions.Checked.to_input preconditions
         ; Random_oracle_input.Chunked.packed
@@ -1139,7 +1139,7 @@ module Body = struct
       ; Amount.Signed.typ
       ; Boolean.typ
       ; Events.typ
-      ; Events.typ
+      ; Sequence_events.typ
       ; Field.typ
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
@@ -1190,7 +1190,7 @@ module Body = struct
       ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events
-      ; Events.to_input sequence_events
+      ; Sequence_events.to_input sequence_events
       ; Random_oracle_input.Chunked.field call_data
       ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
