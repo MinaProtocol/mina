@@ -161,6 +161,10 @@ end
 (** Interface that allows a peer to prove their best_tip in the
     transition_frontier *)
 module type Best_tip_prover_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+  end
+
   type transition_frontier
 
   val prove :
