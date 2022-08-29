@@ -1441,8 +1441,8 @@ let dummy =
 let valid_size t =
   let max_proof_parties = 4 in
   let max_parties = 8 in
-  let max_events_size = 12 in
-  let max_sequence_events_size = 12 in
+  let max_events_size = 16 in
+  let max_sequence_events_size = 16 in
   let events_size events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
