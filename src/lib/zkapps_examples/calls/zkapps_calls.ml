@@ -14,14 +14,14 @@ module Call_data = struct
     module Constant = struct
       type t = { old_state : Field.Constant.t } [@@deriving hlist]
 
-      let to_ro_input { old_state } =
+      let to_random_oracle_input { old_state } =
         Random_oracle_input.Chunked.field_elements [| old_state |]
     end
 
     module Circuit = struct
       type t = { old_state : Field.t } [@@deriving hlist]
 
-      let to_ro_input { old_state } =
+      let to_random_oracle_input { old_state } =
         Random_oracle_input.Chunked.field_elements [| old_state |]
     end
 
@@ -40,7 +40,7 @@ module Call_data = struct
         { blinding_value : Field.Constant.t; new_state : Field.Constant.t }
       [@@deriving hlist]
 
-      let to_ro_input { blinding_value; new_state } =
+      let to_random_oracle_input { blinding_value; new_state } =
         Random_oracle_input.Chunked.field_elements
           [| blinding_value; new_state |]
     end
@@ -49,7 +49,7 @@ module Call_data = struct
       type t = { blinding_value : Field.t; new_state : Field.t }
       [@@deriving hlist]
 
-      let to_ro_input { blinding_value; new_state } =
+      let to_random_oracle_input { blinding_value; new_state } =
         Random_oracle_input.Chunked.field_elements
           [| blinding_value; new_state |]
     end
@@ -64,28 +64,32 @@ module Call_data = struct
     type t = { input : Input.Constant.t; output : Output.Constant.t }
     [@@deriving hlist]
 
-    let to_ro_input { input; output } =
+    let to_random_oracle_input { input; output } =
       Random_oracle_input.Chunked.append
-        (Input.Constant.to_ro_input input)
-        (Output.Constant.to_ro_input output)
+        (Input.Constant.to_random_oracle_input input)
+        (Output.Constant.to_random_oracle_input output)
 
     let digest (t : t) =
       let open Random_oracle in
-      to_ro_input t |> pack_input |> update ~state:initial_state |> digest
+      to_random_oracle_input t |> pack_input
+      |> update ~state:initial_state
+      |> digest
   end
 
   module Circuit = struct
     type t = { input : Input.Circuit.t; output : Output.Circuit.t }
     [@@deriving hlist]
 
-    let to_ro_input { input; output } =
+    let to_random_oracle_input { input; output } =
       Random_oracle_input.Chunked.append
-        (Input.Circuit.to_ro_input input)
-        (Output.Circuit.to_ro_input output)
+        (Input.Circuit.to_random_oracle_input input)
+        (Output.Circuit.to_random_oracle_input output)
 
     let digest (t : t) =
       let open Random_oracle.Checked in
-      to_ro_input t |> pack_input |> update ~state:initial_state |> digest
+      to_random_oracle_input t |> pack_input
+      |> update ~state:initial_state
+      |> digest
   end
 
   let typ =
