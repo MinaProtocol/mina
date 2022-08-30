@@ -2,6 +2,9 @@ open Utils
 
 module Types : sig
   module type S = sig
+    module Reduced_messages_for_next_proof_over_same_field :
+        module type of Pickles_reduced_messages_for_next_proof_over_same_field
+
     module Side_loaded : sig
       module Verification_key : V2S0
     end
@@ -21,6 +24,9 @@ module Types : sig
 end
 
 module Concrete_ : sig
+  module Reduced_messages_for_next_proof_over_same_field :
+      module type of Pickles_reduced_messages_for_next_proof_over_same_field
+
   module Side_loaded : sig
     module Verification_key : sig
       module Vk : sig

@@ -14,6 +14,14 @@ module Step = struct
   module Stable = struct
     module V1 = struct
       type ('s, 'challenge_polynomial_commitments, 'bpcs) t =
+            ( 's
+            , 'challenge_polynomial_commitments
+            , 'bpcs )
+            Mina_wire_types.Pickles
+            .Reduced_messages_for_next_proof_over_same_field
+            .Step
+            .V1
+            .t =
         { app_state : 's
         ; challenge_polynomial_commitments : 'challenge_polynomial_commitments
         ; old_bulletproof_challenges : 'bpcs
