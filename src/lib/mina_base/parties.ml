@@ -1439,15 +1439,13 @@ let dummy =
    what bound is exceeded, at the expense of multiple traversals
 *)
 let valid_size t =
-  let max_proof_parties = 4 in
-  let max_parties = 8 in
-  let max_events_size = 16 in
-  let max_sequence_events_size = 16 in
-  let events_size events =
+  let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let num_proof_parties, num_parties, num_events_size, num_sequence_events_size
-      =
+  let ( num_proof_parties
+      , num_parties
+      , num_event_elements
+      , num_sequence_event_elements ) =
     Call_forest.fold t.other_parties ~init:(0, 0, 0, 0)
       ~f:(fun (num_proof_parties, num_parties, evs_size, seq_evs_size) party ->
         let num_proof_parties' =
@@ -1455,17 +1453,20 @@ let valid_size t =
             num_proof_parties + 1
           else num_proof_parties
         in
-        let party_evs_size = events_size party.body.events in
-        let party_seq_evs_size = events_size party.body.sequence_events in
+        let party_evs_elements = events_elements party.body.events in
+        let party_seq_evs_elements =
+          events_elements party.body.sequence_events
+        in
         ( num_proof_parties'
         , num_parties + 1
-        , evs_size + party_evs_size
-        , seq_evs_size + party_seq_evs_size ) )
+        , evs_size + party_evs_elements
+        , seq_evs_size + party_seq_evs_elements ) )
   in
-  num_proof_parties <= max_proof_parties
-  && num_parties <= max_parties
-  && num_events_size <= max_events_size
-  && num_sequence_events_size <= max_sequence_events_size
+  num_proof_parties <= Mina_compile_config.max_proof_parties
+  && num_parties <= Mina_compile_config.max_parties
+  && num_event_elements <= Mina_compile_config.max_event_elements
+  && num_sequence_event_elements
+     <= Mina_compile_config.max_sequence_event_elements
 
 let inner_query =
   lazy

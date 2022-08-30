@@ -950,6 +950,13 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
+let zkapps_limits_str =
+  let open Mina_compile_config in
+  sprintf
+    "limits are %d proof parties, %d parties, %d event elements, and %d \
+     sequence event elements"
+    max_proof_parties max_parties max_event_elements max_sequence_event_elements
+
 let add_full_transactions t user_commands =
   let too_big_commands =
     List.filter user_commands ~f:(fun cmd -> not @@ User_command.valid_size cmd)
@@ -958,9 +965,11 @@ let add_full_transactions t user_commands =
     let err_str =
       match user_commands with
       | [ _ ] ->
-          "Transaction is too big"
+          sprintf "Transaction is too big; %s" zkapps_limits_str
       | _ ->
-          "List of transactions contain at least one too-big transaction"
+          sprintf
+            "List of transactions contain at least one too-big transaction; %s"
+            zkapps_limits_str
     in
     Deferred.Result.fail (Error.of_string err_str)
   else
@@ -978,9 +987,10 @@ let add_zkapp_transactions t (partiess : Parties.t list) =
     let err_str =
       match partiess with
       | [ _ ] ->
-          "zkApp transaction is too big"
+          sprintf "zkApp transaction is too big; %s" zkapps_limits_str
       | _ ->
-          "List of zkApps contains at least one too-big zkApp"
+          sprintf "List of zkApps contains at least one too-big zkApp; %s"
+            zkapps_limits_str
     in
     Deferred.Result.fail (Error.of_string err_str)
   else
