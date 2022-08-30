@@ -12,6 +12,7 @@
     mina_numbers
     block_time
     one_or_two
+    mina_transaction
     ; Necessary for the type equality
     sgn
     sgn_type

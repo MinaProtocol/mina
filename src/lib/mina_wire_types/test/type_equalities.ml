@@ -163,3 +163,9 @@ module One_or_two = struct
   module W = WT.One_or_two
   include Assert_equal1V1 (O.Stable) (W)
 end
+
+module Mina_transaction = struct
+  module O = Mina_transaction.Transaction
+  module W = WT.Mina_transaction
+  include Assert_equal1V2 (O.Poly.Stable) (W.Poly)
+end
