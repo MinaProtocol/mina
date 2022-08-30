@@ -35,7 +35,12 @@ module M = struct
     end
   end
 
-  module Proof = struct end
+  module Proof = struct
+    type challenge_constant =
+      Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N4).t
+
+    type 'a step_bp_vec = 'a Pickles_types.Vector.Vector_16.t
+  end
 end
 
 module Types = struct
