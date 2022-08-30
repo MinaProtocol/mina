@@ -1,13 +1,5 @@
 open Utils
 
-module Valid : sig
-  module Verification_key_hash : sig
-    module V1 : sig
-      type t = Mina_base_zkapp_basic.F.V1.t
-    end
-  end
-end
-
 module Digest_types : sig
   module type S = sig
     module Party : sig
@@ -97,4 +89,20 @@ module V1 : sig
         Call_forest.V1.t
     ; memo : Mina_base_signed_command_memo.V1.t
     }
+end
+
+module Valid : sig
+  module Verification_key_hash : sig
+    module V1 : sig
+      type t = Mina_base_zkapp_basic.F.V1.t
+    end
+  end
+
+  module V1 : sig
+    type t =
+      { parties : V1.t
+      ; verification_keys :
+          (Mina_base_account_id.V2.t * Verification_key_hash.V1.t) list
+      }
+  end
 end

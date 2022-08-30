@@ -1311,7 +1311,10 @@ module type Valid_intf = sig
   val forget : t -> T.t
 end
 
-module Valid : Valid_intf = struct
+module Valid :
+  Valid_intf
+    with type Stable.V1.t = Mina_wire_types.Mina_base.Parties.Valid.V1.t =
+struct
   module S = Stable
 
   module Verification_key_hash = struct
@@ -1329,7 +1332,7 @@ module Valid : Valid_intf = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Parties.Valid.V1.t =
         { parties : S.V1.t
         ; verification_keys :
             (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list

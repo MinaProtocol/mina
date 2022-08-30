@@ -10,3 +10,9 @@ end
 module V2 = struct
   type t = Mina_base.User_command.V2.t Poly.V2.t
 end
+
+module Valid = struct
+  module V2 = struct
+    type t = Mina_base.User_command.Valid.V2.t Poly.V2.t
+  end
+end
