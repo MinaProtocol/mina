@@ -148,7 +148,7 @@ module Call_forest = struct
 
   type ('a, 'b, 'c) tree = ('a, 'b, 'c) Tree.t
 
-  module Digest : sig
+  module type Digest_intf = sig
     module Party : sig
       include Digest_intf.S
 
@@ -193,7 +193,18 @@ module Call_forest = struct
 
       val create : (_, Party.t, Forest.t) tree -> Tree.t
     end
-  end = struct
+  end
+
+  module Make_digest_sig (T : Mina_wire_types.Mina_base.Parties.Digest_types.S) =
+  struct
+    module type S =
+      Digest_intf
+        with type Party.Stable.V1.t = T.Party.V1.t
+         and type Forest.Stable.V1.t = T.Forest.V1.t
+  end
+
+  module Make_digest_str (T : Mina_wire_types.Mina_base.Parties.Digest_concrete) :
+    Make_digest_sig(T).S = struct
     module M = struct
       open Pickles.Impls.Step.Field
       module Checked = Pickles.Impls.Step.Field
@@ -281,6 +292,11 @@ module Call_forest = struct
           [| party_digest; stack_hash |]
     end
   end
+
+  module Digest =
+    Mina_wire_types.Mina_base.Parties.Digest_make
+      (Make_digest_sig)
+      (Make_digest_str)
 
   let fold = Tree.fold_forest
 
@@ -1447,3 +1463,7 @@ let%test_module "Test" =
       Run_in_thread.block_on_async_exn
       @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
   end )
+
+(* end *)
+
+(* include Mina_wire_types.Mina_base.Parties.Make (Make_sig) (Make_str) *)

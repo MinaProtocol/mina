@@ -21,6 +21,7 @@
     pickles
     pickles.backend
     pickles_base
+    pasta_bindings
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))

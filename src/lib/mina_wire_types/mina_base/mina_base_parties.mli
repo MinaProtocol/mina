@@ -1,14 +1,14 @@
 open Utils
 
-module Valid = struct
-  module Verification_key_hash = struct
-    module V1 = struct
+module Valid : sig
+  module Verification_key_hash : sig
+    module V1 : sig
       type t = Mina_base_zkapp_basic.F.V1.t
     end
   end
 end
 
-module Digest_types = struct
+module Digest_types : sig
   module type S = sig
     module Party : sig
       module V1 : sig
@@ -24,16 +24,16 @@ module Digest_types = struct
   end
 end
 
-module Digest_M = struct
-  module Party = struct
-    module V1 = struct
-      type t = Pasta_bindings.Fp.t
+module Digest_M : sig
+  module Party : sig
+    module V1 : sig
+      type t = private Pasta_bindings.Fp.t
     end
   end
 
-  module Forest = struct
-    module V1 = struct
-      type t = Pasta_bindings.Fp.t
+  module Forest : sig
+    module V1 : sig
+      type t = private Pasta_bindings.Fp.t
     end
   end
 end
@@ -56,17 +56,11 @@ module type Digest_local_sig = Signature(Digest_types).S
 
 module Digest_make
     (Signature : Digest_local_sig) (F : functor (A : Digest_concrete) ->
-      Signature(A).S) =
-  F (Digest_M)
+      Signature(A).S) : Signature(Digest_M).S
 
-module Call_forest = struct
-  module Digest = Digest_M
-
-  (* module V1 = struct *)
-  (*   type ('party, 'party_digest, 'digest) t = *)
-  (*     ( ('party, 'party_digest, 'digest) Tree.Stable.V1.t *)
-  (*     , 'digest ) *)
-  (*       Mina_base_with_stack_hash.V1.t *)
-  (*       list *)
-  (* end *)
+module Call_forest : sig
+  module Digest :
+    Digest_types.S
+      with module Party = Digest_M.Party
+       and module Forest = Digest_M.Forest
 end

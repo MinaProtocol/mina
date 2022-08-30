@@ -132,6 +132,14 @@ module Mina_base = struct
     Assert_equal0V1
       (O.Parties.Valid.Verification_key_hash.Stable)
       (W.Parties.Valid.Verification_key_hash)
+  include
+    Assert_equal0V1
+      (O.Parties.Call_forest.Digest.Party.Stable)
+      (W.Parties.Call_forest.Digest.Party)
+  include
+    Assert_equal0V1
+      (O.Parties.Call_forest.Digest.Forest.Stable)
+      (W.Parties.Call_forest.Digest.Forest)
   include Assert_equal0V1 (O.Ledger_hash.Stable) (W.Ledger_hash)
   include
     Assert_equal0V1
