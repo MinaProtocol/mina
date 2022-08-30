@@ -178,8 +178,9 @@ let rec load_with_max_length :
     -> catchup_mode:[ `Normal | `Super ]
     -> unit
     -> ( t
-       , [> `Bootstrap_required
+       , [ `Bootstrap_required
          | `Persistent_frontier_malformed
+         | `Snarked_ledger_mismatch
          | `Failure of string ] )
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
@@ -190,12 +191,19 @@ let rec load_with_max_length :
   (* TODO: #3053 *)
   let continue persistent_frontier_instance ~ignore_consensus_local_state
       ~snarked_ledger_hash =
+    let snarked_ledger_hash_json =
+      Frozen_ledger_hash.to_yojson snarked_ledger_hash
+    in
     match
       Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
         ~logger
     with
     | Error _ as err ->
-        [%str_log warn] Persisted_frontier_failed_to_load ;
+        [%str_log warn] Persisted_frontier_failed_to_load
+          ~metadata:
+            [ ("error", `String "SNARKed ledger mismatch on load from disk")
+            ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
+            ] ;
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
@@ -209,15 +217,31 @@ let rec load_with_max_length :
             ~persistent_frontier_instance ignore_consensus_local_state
         with
         | Ok _ as result ->
-            [%str_log trace] Persisted_frontier_loaded ;
+            [%str_log trace] Persisted_frontier_loaded
+              ~metadata:[ ("snarked_ledger_hash", snarked_ledger_hash_json) ] ;
             return result
-        | Error _ as err ->
-            [%str_log warn] Persisted_frontier_failed_to_load ;
+        | Error err as err_result ->
+            let err_str =
+              match err with
+              | `Failure msg ->
+                  sprintf "Failure: %s" msg
+              | `Bootstrap_required ->
+                  "Bootstrap required"
+              (* next two cases aren't reachable, needed for types to work out *)
+              | `Snarked_ledger_mismatch | `Persistent_frontier_malformed ->
+                  failwith "Unexpected failure on loading transition frontier"
+            in
+            [%str_log warn] Persisted_frontier_failed_to_load
+              ~metadata:
+                [ ("error", `String err_str)
+                ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
+                ] ;
+
             let%map () =
               Persistent_frontier.Instance.destroy persistent_frontier_instance
             in
             Persistent_root.Instance.close persistent_root_instance ;
-            err )
+            err_result )
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
