@@ -1,9 +1,6 @@
 open Utils
 
 module M = struct
-  module Reduced_messages_for_next_proof_over_same_field =
-    Pickles_reduced_messages_for_next_proof_over_same_field
-
   module Side_loaded = struct
     module Verification_key = struct
       module Vk = struct
@@ -43,9 +40,6 @@ end
 
 module Types = struct
   module type S = sig
-    module Reduced_messages_for_next_proof_over_same_field :
-        module type of Pickles_reduced_messages_for_next_proof_over_same_field
-
     module Side_loaded : sig
       module Verification_key : V2S0
     end

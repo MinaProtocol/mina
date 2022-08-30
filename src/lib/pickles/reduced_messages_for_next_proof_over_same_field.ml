@@ -17,8 +17,8 @@ module Step = struct
             ( 's
             , 'challenge_polynomial_commitments
             , 'bpcs )
-            Mina_wire_types.Pickles
-            .Reduced_messages_for_next_proof_over_same_field
+            Mina_wire_types
+            .Pickles_reduced_messages_for_next_proof_over_same_field
             .Step
             .V1
             .t =
