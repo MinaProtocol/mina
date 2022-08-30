@@ -41,6 +41,15 @@ end
 
 module Wrap = struct
   module Proof_state = struct
+    module Messages_for_next_wrap_proof = struct
+      module V1 = struct
+        type ('g1, 'bulletproof_challenges) t =
+          { challenge_polynomial_commitment : 'g1
+          ; old_bulletproof_challenges : 'bulletproof_challenges
+          }
+      end
+    end
+
     module Deferred_values = struct
       module Plonk = struct
         module Minimal = struct

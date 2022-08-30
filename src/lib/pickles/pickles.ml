@@ -3,6 +3,7 @@ module Make_sig (T : Mina_wire_types.Pickles.Types.S) = struct
     Pickles_intf.S
       with type Side_loaded.Verification_key.Stable.V2.t =
         T.Side_loaded.Verification_key.V2.t
+       and type ('a, 'b) Proof.t = ('a, 'b) T.Proof.t
 end
 
 module Make_str (T : Mina_wire_types.Pickles.Concrete) = struct

@@ -13,6 +13,10 @@ module Assert_equal0 (O : S0) (W : S0 with type t = O.t) = struct end
 (* For types with arity 1 *)
 module Assert_equal1 (O : S1) (W : S1 with type 'a t = 'a O.t) = struct end
 
+(* For types with arity 2 *)
+module Assert_equal2 (O : S2) (W : S2 with type ('a, 'b) t = ('a, 'b) O.t) =
+struct end
+
 (* Assert_equalXVY checks the equality of two versioned
    types of arity X with version Y *)
 module Assert_equal0V1 (O : V1S0) (W : V1S0 with type V1.t = O.V1.t) = struct end
@@ -102,6 +106,7 @@ module Pickles = struct
       (O.Side_loaded.Verification_key.Stable)
       (W.Side_loaded.Verification_key)
   include Assert_equal0V1 (O.Backend.Tick.Field.Stable) (W.Backend.Tick.Field)
+  include Assert_equal2 (O.Proof) (W.Proof)
 end
 
 module Mina_base = struct

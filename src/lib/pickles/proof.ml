@@ -97,7 +97,8 @@ module Base = struct
   end
 end
 
-type ('s, 'mlmb, _) with_data =
+type ('s, 'mlmb, 'c) with_data =
+      ('s, 'mlmb, 'c) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
   | T :
       ( 'mlmb Base.Messages_for_next_proof_over_same_field.Wrap.t
       , ( 's

@@ -29,6 +29,15 @@ end
 
 module Wrap : sig
   module Proof_state : sig
+    module Messages_for_next_wrap_proof : sig
+      module V1 : sig
+        type ('g1, 'bulletproof_challenges) t =
+          { challenge_polynomial_commitment : 'g1
+          ; old_bulletproof_challenges : 'bulletproof_challenges
+          }
+      end
+    end
+
     module Deferred_values : sig
       module Plonk : sig
         module Minimal : sig

@@ -16,7 +16,7 @@ module Types : sig
       end
     end
 
-    module Proof : sig end
+    module Proof : S2
   end
 end
 
@@ -56,19 +56,18 @@ module Concrete_ : sig
   end
 
   module Proof : sig
+    type challenge_constant =
+      Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N2).t
+
+    type tock_affine = Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
+
+    type 'a step_bp_vec = 'a Kimchi_pasta.Basic.Rounds.Step_vector.Stable.V1.t
+
     module Base : sig
       module Wrap : sig
         module V2 : sig
-          type challenge_constant =
-            Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N2).t
-
           type digest_constant =
             Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N4).t
-
-          type 'a step_bp_vec =
-            'a Kimchi_pasta.Basic.Rounds.Step_vector.Stable.V1.t
-
-          type tock_affine = Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
 
           type tock_proof =
             ( tock_affine
@@ -98,6 +97,23 @@ module Concrete_ : sig
         end
       end
     end
+
+    type ('s, 'mlmb, _) with_data =
+      | T :
+          ( 'mlmb Pickles_reduced_messages_for_next_proof_over_same_field.Wrap.t
+          , ( 's
+            , (tock_affine, 'most_recent_width) Pickles_types.Vector.t
+            , ( challenge_constant Kimchi_types.scalar_challenge
+                Pickles_bulletproof_challenge.V1.t
+                step_bp_vec
+              , 'most_recent_width )
+              Pickles_types.Vector.t )
+            Pickles_reduced_messages_for_next_proof_over_same_field.Step.V1.t
+          )
+          Base.Wrap.V2.t
+          -> ('s, 'mlmb, _) with_data
+
+    type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
   end
 end
 
@@ -108,6 +124,7 @@ module type Concrete =
     with type Side_loaded.Verification_key.V2.t =
       Concrete_.Side_loaded.Verification_key.V2.t
      and type Backend.Tick.Field.V1.t = Pasta_bindings.Fp.t
+     and type ('a, 'b) Proof.t = ('a, 'b) Concrete_.Proof.t
 
 module type Local_sig = Signature(Types).S
 
@@ -116,4 +133,7 @@ module Make
   Signature(M).S
 
 include
-  Types.S with module Side_loaded = M.Side_loaded and module Backend = M.Backend
+  Types.S
+    with module Side_loaded = M.Side_loaded
+     and module Backend = M.Backend
+     and module Proof = M.Proof
