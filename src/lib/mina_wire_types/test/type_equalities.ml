@@ -35,6 +35,16 @@ module Assert_equal2V2
     (W : V2S2 with type ('a, 'b) V2.t = ('a, 'b) O.V2.t) =
 struct end
 
+module Assert_equal3V1
+    (O : V1S3)
+    (W : V1S3 with type ('a, 'b, 'c) V1.t = ('a, 'b, 'c) O.V1.t) =
+struct end
+
+module Assert_equal3V2
+    (O : V2S3)
+    (W : V2S3 with type ('a, 'b, 'c) V2.t = ('a, 'b, 'c) O.V2.t) =
+struct end
+
 module Misc_tests = struct
   include Assert_equal0V1 (Block_time.Stable) (WT.Block_time)
   include
