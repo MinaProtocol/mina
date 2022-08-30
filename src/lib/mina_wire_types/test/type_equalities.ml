@@ -198,6 +198,7 @@ module Mina_base = struct
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
   include Assert_equal0V1 (O.Party.Stable) (W.Party)
   include Assert_equal0V1 (O.Parties.Stable) (W.Parties)
+  include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
 end
 
 module One_or_two = struct
@@ -210,4 +211,5 @@ module Mina_transaction = struct
   module O = Mina_transaction.Transaction
   module W = WT.Mina_transaction
   include Assert_equal1V2 (O.Poly.Stable) (W.Poly)
+  include Assert_equal0V2 (O.Stable) (W)
 end
