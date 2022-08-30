@@ -1135,14 +1135,14 @@ struct
             ~f:(fun pool cmd ->
               let result =
                 let%bind.Result () = check_command pool cmd in
-                let account = Map.find_exn fee_payer_accounts (fee_payer cmd) in
-                let balance =
-                  Currency.Amount.of_uint64
-                  @@ Currency.Balance.to_uint64 account.balance
+                let global_slot =
+                  Indexed_pool.global_slot_since_genesis t.pool
                 in
+                let account = Map.find_exn fee_payer_accounts (fee_payer cmd) in
                 match
                   Indexed_pool.add_from_gossip_exn pool cmd account.nonce
-                    balance
+                    ( Account.liquid_balance_at_slot ~global_slot account
+                    |> Currency.Balance.to_amount )
                 with
                 | Ok x ->
                     Ok x
