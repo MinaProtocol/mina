@@ -1305,7 +1305,8 @@ module T = struct
   module Stable = struct
     module V1 = struct
       (** A party to a zkApp transaction *)
-      type t = { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
+      type t = Mina_wire_types.Mina_base.Party.V1.t =
+        { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id

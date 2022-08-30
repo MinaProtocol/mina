@@ -94,3 +94,7 @@ module Fee_payer = struct
       { body : Body.Fee_payer.V1.t; authorization : Mina_base_signature.V1.t }
   end
 end
+
+module V1 = struct
+  type t = { body : Body.V1.t; authorization : Mina_base_control.V2.t }
+end
