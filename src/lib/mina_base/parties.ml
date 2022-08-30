@@ -1467,7 +1467,3 @@ let%test_module "Test" =
       Run_in_thread.block_on_async_exn
       @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full dummy
   end )
-
-(* end *)
-
-(* include Mina_wire_types.Mina_base.Parties.Make (Make_sig) (Make_str) *)
