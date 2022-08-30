@@ -7,6 +7,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -23,6 +25,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "1000"; timing = Untimed }
         ; { balance = "1000"; timing = Untimed }
         ; { balance = "0"; timing = Untimed }
+        ]
+    ; extra_genesis_accounts =
+        [ { balance = "3000"; timing = Untimed }
+        ; { balance = "3000"; timing = Untimed }
         ]
     ; num_snark_workers = 0
     }
@@ -49,10 +55,76 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "network can't be paritioned if 2 nodes are hypothetically taken \
+        "network can't be partitioned if 2 nodes are hypothetically taken \
          offline"
         (Util.assert_peers_cant_be_partitioned ~max_disconnections:2
            initial_connectivity_data )
+    in
+    (* a couple of transactions, so the persisted transition frontier is not trivial *)
+    let%bind () =
+      section_hard "send a payment"
+        (let get_pubkey node =
+           let network_keypair = Option.value_exn (Node.network_keypair node) in
+           network_keypair.keypair.public_key
+           |> Signature_lib.Public_key.compress
+         in
+         let sender_pub_key = get_pubkey node_a in
+         let receiver_pub_key = get_pubkey node_b in
+         let%bind { hash = txn_hash; _ } =
+           Node.must_send_payment ~logger node_c ~sender_pub_key
+             ~receiver_pub_key
+             ~amount:(Currency.Amount.of_int 1_000_000)
+             ~fee:(Currency.Fee.of_int 1_000)
+         in
+         wait_for t
+           (Wait_condition.signed_command_to_be_included_in_frontier ~txn_hash
+              ~node_included_in:(`Node node_c) ) )
+    in
+    let%bind () =
+      let open Mina_base in
+      let wait_for_zkapp parties =
+        let%map () =
+          wait_for t
+          @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
+               ~parties
+        in
+        [%log info] "ZkApp transaction included in transition frontier"
+      in
+      section_hard "send a zkApp to create an account"
+        (let%bind parties_create_accounts =
+           let amount = Currency.Amount.of_int 10_000_000_000 in
+           let nonce = Account.Nonce.zero in
+           let memo =
+             Signed_command_memo.create_from_string_exn "Zkapp create account"
+           in
+           let fee = Currency.Fee.of_int 20_000_000 in
+           let sender_kp =
+             List.hd_exn @@ Network.extra_genesis_keypairs network
+           in
+           let (parties_spec : Transaction_snark.For_tests.Spec.t) =
+             { sender = (sender_kp, nonce)
+             ; fee
+             ; fee_payer = None
+             ; receivers = []
+             ; amount
+             ; zkapp_account_keypairs = [ Signature_lib.Keypair.create () ]
+             ; memo
+             ; new_zkapp_account = true
+             ; snapp_update = Party.Update.dummy
+             ; current_auth = Permissions.Auth_required.Signature
+             ; call_data = Snark_params.Tick.Field.zero
+             ; events = []
+             ; sequence_events = []
+             ; preconditions = None
+             }
+           in
+           return
+           @@ Transaction_snark.For_tests.deploy_snapp
+                ~constraint_constants:(Network.constraint_constants network)
+                parties_spec
+         in
+         let%bind () = send_zkapp ~logger node_c parties_create_accounts in
+         wait_for_zkapp parties_create_accounts )
     in
     let%bind () =
       section "blocks are produced"
