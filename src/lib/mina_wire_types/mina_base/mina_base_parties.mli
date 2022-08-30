@@ -86,3 +86,15 @@ module Call_forest : sig
       list
   end
 end
+
+module V1 : sig
+  type t =
+    { fee_payer : Mina_base_party.Fee_payer.V1.t
+    ; other_parties :
+        ( Mina_base_party.V1.t
+        , Call_forest.Digest.Party.V1.t
+        , Call_forest.Digest.Forest.V1.t )
+        Call_forest.V1.t
+    ; memo : Mina_base_signed_command_memo.V1.t
+    }
+end

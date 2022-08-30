@@ -851,7 +851,7 @@ module T = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Parties.V1.t =
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
             ( Party.Stable.V1.t

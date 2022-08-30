@@ -197,6 +197,7 @@ module Mina_base = struct
   include Assert_equal3V1 (O.Parties.Call_forest.Stable) (W.Parties.Call_forest)
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
   include Assert_equal0V1 (O.Party.Stable) (W.Party)
+  include Assert_equal0V1 (O.Parties.Stable) (W.Parties)
 end
 
 module One_or_two = struct
