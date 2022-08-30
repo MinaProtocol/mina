@@ -22,15 +22,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
-        ; { balance = "0"; timing = Untimed }
+        [ { balance = "100_000"; timing = Untimed }
+        ; { balance = "100_000"; timing = Untimed }
+        ; { balance = "100_000"; timing = Untimed }
         ]
-    ; extra_genesis_accounts =
-        [ { balance = "3000"; timing = Untimed }
-        ; { balance = "3000"; timing = Untimed }
-        ]
-    ; num_snark_workers = 0
+    ; extra_genesis_accounts = [ { balance = "9000"; timing = Untimed } ]
+    ; num_snark_workers = 2
+    ; snark_worker_fee = "0.0001"
     }
 
   let run network t =
@@ -61,20 +59,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            initial_connectivity_data )
     in
     (* a couple of transactions, so the persisted transition frontier is not trivial *)
-    let[@warning "-8"] [ fish1; fish2 ] =
-      Network.extra_genesis_keypairs network
-    in
+    let fish = List.hd_exn @@ Network.extra_genesis_keypairs network in
     let%bind () =
       section_hard "send a payment"
-        (let get_pubkey node =
-           let network_keypair = Option.value_exn (Node.network_keypair node) in
-           network_keypair.keypair.public_key
-           |> Signature_lib.Public_key.compress
-         in
-         let sender_pub_key =
-           fish1.public_key |> Signature_lib.Public_key.compress
-         in
-         let receiver_pub_key = get_pubkey node_a in
+        (let%bind sender_pub_key = Util.pub_key_of_node node_a in
+         let%bind receiver_pub_key = Util.pub_key_of_node node_b in
          let%bind { hash = txn_hash; _ } =
            Node.must_send_payment ~logger node_c ~sender_pub_key
              ~receiver_pub_key
@@ -103,7 +92,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              Signed_command_memo.create_from_string_exn "Zkapp create account"
            in
            let fee = Currency.Fee.of_int 20_000_000 in
-           let sender_kp = fish2 in
+           let sender_kp = fish in
            let (parties_spec : Transaction_snark.For_tests.Spec.t) =
              { sender = (sender_kp, nonce)
              ; fee
