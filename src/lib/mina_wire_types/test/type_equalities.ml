@@ -25,6 +25,16 @@ struct end
 module Assert_equal1V2 (O : V2S1) (W : V2S1 with type 'a V2.t = 'a O.V2.t) =
 struct end
 
+module Assert_equal2V1
+    (O : V1S2)
+    (W : V1S2 with type ('a, 'b) V1.t = ('a, 'b) O.V1.t) =
+struct end
+
+module Assert_equal2V2
+    (O : V2S2)
+    (W : V2S2 with type ('a, 'b) V2.t = ('a, 'b) O.V2.t) =
+struct end
+
 module Misc_tests = struct
   include Assert_equal0V1 (Block_time.Stable) (WT.Block_time)
   include
