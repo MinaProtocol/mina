@@ -10,6 +10,7 @@
     pickles_types
     kimchi_types
     kimchi_bindings
+    kimchi_backend.pasta
     )
   (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_version ppx_optcomp))

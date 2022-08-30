@@ -45,6 +45,9 @@ module Base = struct
 
       module V2 = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
+              ( 'messages_for_next_wrap_proof
+              , 'messages_for_next_step_proof )
+              Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
