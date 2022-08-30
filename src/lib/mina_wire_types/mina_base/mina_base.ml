@@ -24,3 +24,4 @@ module Fee_transfer = Mina_base_fee_transfer
 module Coinbase_fee_transfer = Mina_base_coinbase_fee_transfer
 module Coinbase = Mina_base_coinbase
 module With_stack_hash = Mina_base_with_stack_hash
+module Control = Mina_base_control

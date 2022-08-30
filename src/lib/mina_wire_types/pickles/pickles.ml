@@ -1,30 +1,6 @@
 open Utils
 
 module M = struct
-  module Side_loaded = struct
-    module Verification_key = struct
-      module Vk = struct
-        type t =
-          ( Pasta_bindings.Fq.t
-          , Kimchi_bindings.Protocol.SRS.Fq.t
-          , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
-          )
-          Kimchi_types.VerifierIndex.verifier_index
-      end
-
-      type tock_curve_affine =
-        Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
-
-      module V2 = struct
-        type t =
-          ( tock_curve_affine
-          , Pickles_base.Proofs_verified.V1.t
-          , Vk.t )
-          Pickles_base.Side_loaded_verification_key.Poly.V2.t
-      end
-    end
-  end
-
   module Backend = struct
     module Tick = struct
       module Field = struct
@@ -95,12 +71,60 @@ module M = struct
 
     type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
   end
+
+  module Side_loaded = struct
+    module Verification_key = struct
+      module Vk = struct
+        type t =
+          ( Pasta_bindings.Fq.t
+          , Kimchi_bindings.Protocol.SRS.Fq.t
+          , Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
+          )
+          Kimchi_types.VerifierIndex.verifier_index
+      end
+
+      type tock_curve_affine =
+        Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
+
+      module V2 = struct
+        type t =
+          ( tock_curve_affine
+          , Pickles_base.Proofs_verified.V1.t
+          , Vk.t )
+          Pickles_base.Side_loaded_verification_key.Poly.V2.t
+      end
+
+      module Max_width = Pickles_types.Nat.N2
+    end
+
+    module Proof = struct
+      module V2 = struct
+        type t =
+          (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
+      end
+    end
+  end
 end
 
 module Types = struct
   module type S = sig
+    module Proof : S2
+
     module Side_loaded : sig
-      module Verification_key : V2S0
+      module Verification_key : sig
+        module Max_width : module type of Pickles_types.Nat.N2
+
+        module V2 : sig
+          type t
+        end
+      end
+
+      module Proof : sig
+        module V2 : sig
+          type t =
+            (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
+        end
+      end
     end
 
     module Backend : sig
@@ -112,8 +136,6 @@ module Types = struct
         end
       end
     end
-
-    module Proof : S2
   end
 end
 
