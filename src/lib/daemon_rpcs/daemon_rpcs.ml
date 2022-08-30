@@ -116,7 +116,8 @@ end
 module Chain_id_inputs = struct
   type query = unit [@@deriving bin_io_unversioned]
 
-  type response = State_hash.Stable.Latest.t * Genesis_constants.t * string list
+  type response =
+    State_hash.Stable.Latest.t * Genesis_constants.t * string list * int
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =

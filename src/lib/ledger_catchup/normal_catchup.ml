@@ -7,6 +7,16 @@ open Pipe_lib
 open Mina_base
 open Network_peer
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
     from its peer. It receives the state_hash to catchup from
@@ -45,8 +55,9 @@ open Network_peer
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
-let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
-    ~unprocessed_transition_cache enveloped_transition =
+let verify_transition ~context:(module Context : CONTEXT) ~trust_system
+    ~frontier ~unprocessed_transition_cache enveloped_transition =
+  let open Context in
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
@@ -65,8 +76,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       Envelope.Incoming.map enveloped_transition
         ~f:(Fn.const initially_validated_transition)
     in
-    Transition_handler.Validator.validate_transition ~logger ~frontier
-      ~consensus_constants ~unprocessed_transition_cache
+    Transition_handler.Validator.validate_transition
+      ~context:(module Context)
+      ~frontier ~unprocessed_transition_cache
       enveloped_initially_validated_transition
   in
   let open Deferred.Let_syntax in
@@ -462,10 +474,10 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
       in
       go [] )
 
-let verify_transitions_and_build_breadcrumbs ~logger
-    ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
-    ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
-    =
+let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
+    ~trust_system ~verifier ~frontier ~unprocessed_transition_cache ~transitions
+    ~target_hash ~subtrees =
+  let open Context in
   let open Deferred.Or_error.Let_syntax in
   let verification_start_time = Core.Time.now () in
   let%bind transitions_with_initial_validation, initial_hash =
@@ -515,8 +527,8 @@ let verify_transitions_and_build_breadcrumbs ~logger
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in
         match%bind
-          verify_transition ~logger
-            ~consensus_constants:precomputed_values.consensus_constants
+          verify_transition
+            ~context:(module Context)
             ~trust_system ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
@@ -617,9 +629,10 @@ let garbage_collect_subtrees ~logger ~subtrees =
           ignore @@ Cached.invalidate_with_failure node ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
-let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
-    ~catchup_job_reader ~catchup_breadcrumbs_writer
+let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
+  let open Context in
   let hash_tree =
     match Transition_frontier.catchup_tree frontier with
     | Hash t ->
@@ -784,10 +797,10 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                [%log debug]
                  ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
                  "Download transitions complete" ;
-               verify_transitions_and_build_breadcrumbs ~logger
-                 ~precomputed_values ~trust_system ~verifier ~frontier
-                 ~unprocessed_transition_cache ~transitions ~target_hash
-                 ~subtrees
+               verify_transitions_and_build_breadcrumbs
+                 ~context:(module Context)
+                 ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
+                 ~transitions ~target_hash ~subtrees
              with
              | Ok trees_of_breadcrumbs ->
                  [%log trace]
@@ -866,6 +879,16 @@ let%test_module "Ledger_catchup tests" =
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()) )
 
+    module Context = struct
+      let logger = logger
+
+      let precomputed_values = precomputed_values
+
+      let constraint_constants = constraint_constants
+
+      let consensus_constants = precomputed_values.consensus_constants
+    end
+
     let downcast_transition transition =
       let transition =
         transition
@@ -913,9 +936,10 @@ let%test_module "Ledger_catchup tests" =
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
-      run ~logger ~precomputed_values ~verifier ~trust_system ~network ~frontier
-        ~catchup_breadcrumbs_writer ~catchup_job_reader
-        ~unprocessed_transition_cache ;
+      run
+        ~context:(module Context)
+        ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
+        ~catchup_job_reader ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
       ; breadcrumbs_reader = catchup_breadcrumbs_reader

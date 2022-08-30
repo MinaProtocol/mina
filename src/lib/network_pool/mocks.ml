@@ -1,37 +1,11 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Mina_base
 
 let trust_system = Trust_system.null ()
 
 module Transaction_snark_work = Transaction_snark_work
-
-module Base_ledger = struct
-  (* using a Table allows us to add accounts created
-     in the Snapp Quickcheck generators
-  *)
-  type t = Account.t Account_id.Table.t [@@deriving sexp]
-
-  module Location = struct
-    type t = Account_id.t
-  end
-
-  let location_of_account _t k = Some k
-
-  let location_of_account_batch _t ks = List.map ks ~f:(fun k -> (k, Some k))
-
-  let get t l = Account_id.Table.find t l
-
-  let add t ~account_id ~account =
-    Account_id.Table.add t ~key:account_id ~data:account
-
-  let accounts t = Account_id.Table.keys t |> Account_id.Set.of_list
-
-  let get_batch t ls = List.map ls ~f:(fun l -> (l, get t l))
-
-  let detached_signal _ = Deferred.never ()
-end
+module Base_ledger = Mina_ledger.Ledger
 
 module Staged_ledger = struct
   type t = Base_ledger.t [@@deriving sexp]
@@ -83,7 +57,7 @@ module Transition_frontier = struct
     in
     { refcount_table
     ; best_tip_table
-    ; ledger = Account_id.Table.create ()
+    ; ledger = Mina_ledger.Ledger.create_ephemeral ~depth:10 ()
     ; diff_writer
     ; diff_reader
     }

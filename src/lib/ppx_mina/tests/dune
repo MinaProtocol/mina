@@ -7,21 +7,21 @@
 (library
  (name unexpired)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
  (modules unexpired))
 
 ;; define locally
 (library
  (name define_locally_good)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
  (modules define_locally_good))
 
 ;; define from scope
 (library
  (name define_from_scope_good)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
  (modules define_from_scope_good))
 
 ;;; should fail
@@ -30,23 +30,23 @@
 (library
  (name expired)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
  (modules expired))
 
 (library
  (name expiry_in_module)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
  (modules expiry_in_module))
 
 (library
  (name expiry_invalid_date)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
  (modules expiry_invalid_date))
 
 (library
  (name expiry_invalid_format)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_mina))
  (modules expiry_invalid_format))
