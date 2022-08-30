@@ -1,19 +1,10 @@
-# nix-shell -p python3 python3Packages.requests python3Packages.pip python3Packages.readchar python3Packages.jinja2 python3Packages.click python3Packages.natsort python3Packages.docker python3Packages.inflect
-#
-import docker
-import inflect
 import os
-import subprocess
 from pathlib import Path
 import click
 import glob
 import json
 import csv
-import natsort
-client = docker.from_env()
-p = inflect.engine()
 
-MINA_DAEMON_IMAGE = "minaprotocol/mina-daemon:1.3.0alpha1-fix-token-length-rm-staking-set-ffe7fcd-buster-mainnet"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 
 # Default output folders for various kinds of keys
@@ -29,8 +20,9 @@ DEFAULT_STAKER_CSV_FILE = SCRIPT_DIR / "staker_public_keys.csv"
 # A list of services to add and the percentage of total stake they should be allocated
 DEFAULT_SERVICES = {"faucet": 100000 * (10**9), "echo": 100 * (10**9)}
 
-def encode_nanocodas(nanocodas):
-    s = str(nanocodas)
+
+def encode_nanominas(nanominas):
+    s = str(nanominas)
     if len(s) > 9:
         return s[:-9] + '.' + s[-9:]
     else:
@@ -46,8 +38,7 @@ def encode_nanocodas(nanocodas):
 @click.option(
     '--generate-remainder',
     default=False,
-    help=
-    'Indicates that keys should be generated if there are not a sufficient number of keys present.'
+    help='Indicates that keys should be generated if there are not a sufficient number of keys present.'
 )
 # Service Account Params
 @click.option('--service-accounts-directory',
@@ -78,8 +69,7 @@ def encode_nanocodas(nanocodas):
 # Community Staker Account Params
 @click.option(
     '--staker-csv-file',
-    help=
-    'Location of a CSV file detailing Discord Username and Public Key for Stakers.'
+    help='Location of a CSV file detailing Discord Username and Public Key for Stakers.'
 )
 def generate_ledger(generate_remainder, service_accounts_directory,
                     num_whale_accounts, online_whale_accounts_directory,
@@ -185,9 +175,10 @@ def generate_ledger(generate_remainder, service_accounts_directory,
         with open(Path(staker_csv_file).absolute(), newline='') as csvfile:
             reader = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in itertools.islice(reader, num_fish_accounts):
+                # FIXME: Not sure why we start referencing CSV with index 1, perhaps format specific?
                 discord_username = row[1]
                 public_key = row[2]
-                ## TODO: Check the key format better here
+                # TODO: Check the key format better here
                 if public_key.startswith("4vsRC"):
                     ledger_public_keys["online_staker_keys"].append(public_key)
                     ledger_public_keys["stakers"].append({
@@ -247,14 +238,14 @@ def generate_ledger(generate_remainder, service_accounts_directory,
         ledger.append({
             "pk": service["public_key"],
             "sk": None,
-            "balance": encode_nanocodas(service["balance"]),
+            "balance": encode_nanominas(service["balance"]),
             "delegate": None
         })
 
         annotated_ledger.append({
             "pk": service["public_key"],
             "sk": None,
-            "balance": encode_nanocodas(service["balance"]),
+            "balance": encode_nanominas(service["balance"]),
             "delegate": None,
             "nickname": service["service"]
         })
@@ -267,8 +258,8 @@ def generate_ledger(generate_remainder, service_accounts_directory,
             .format(num_fish_accounts,
                     len(ledger_public_keys["online_staker_keys"])))
 
-    fish_offline_balance = encode_nanocodas(65500 * (10**9))
-    fish_online_balance = encode_nanocodas(500 * (10**9))
+    fish_offline_balance = encode_nanominas(65500 * (10**9))
+    fish_online_balance = encode_nanominas(500 * (10**9))
 
     # Fish Accounts
     for index, fish in enumerate(ledger_public_keys["offline_fish_keys"]):
@@ -345,14 +336,14 @@ def generate_ledger(generate_remainder, service_accounts_directory,
                 "sk":
                 None,
                 "balance":
-                encode_nanocodas(whale_offline_balance),
+                encode_nanominas(whale_offline_balance),
                 "delegate":
                 ledger_public_keys["online_whale_keys"][index]
             })
             ledger.append({
                 "pk": ledger_public_keys["online_whale_keys"][index],
                 "sk": None,
-                "balance": encode_nanocodas(0),
+                "balance": encode_nanominas(0),
                 "delegate": None
             })
 
@@ -362,7 +353,7 @@ def generate_ledger(generate_remainder, service_accounts_directory,
                 "sk":
                 None,
                 "balance":
-                encode_nanocodas(whale_offline_balance),
+                encode_nanominas(whale_offline_balance),
                 "delegate":
                 ledger_public_keys["online_whale_keys"][index],
                 "delegate_discord_username":
@@ -374,7 +365,7 @@ def generate_ledger(generate_remainder, service_accounts_directory,
                 "sk":
                 None,
                 "balance":
-                encode_nanocodas(0),
+                encode_nanominas(0),
                 "delegate":
                 None,
                 "discord_username":
@@ -405,7 +396,9 @@ def generate_ledger(generate_remainder, service_accounts_directory,
             "accounts": ledger
         }
         json.dump(annotated_ledger_wrapper, outfile, indent=1)
-        print("Annotated Ledger Path: " + str(SCRIPT_DIR / 'annotated_ledger.json'))
+        print("Annotated Ledger Path: " +
+              str(SCRIPT_DIR / 'annotated_ledger.json'))
+
 
 if __name__ == '__main__':
     generate_ledger()

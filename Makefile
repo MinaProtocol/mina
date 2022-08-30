@@ -69,7 +69,15 @@ ocaml_version:
 ocaml_word_size:
 	@if ! ocamlopt -config | grep "word_size:" | grep $(WORD_SIZE); then echo "invalid machine word size, expected $(WORD_SIZE)" ; exit 1; fi
 
-ocaml_checks: ocaml_version ocaml_word_size
+
+# Checks that the current opam switch contains the packages from opam.export at the same version.
+# This check is disabled in the pure nix environment (that does not use opam).
+check_opam_switch:
+ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
+	check_opam_switch opam.export
+endif
+
+ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
 	make -C src/app/libp2p_helper

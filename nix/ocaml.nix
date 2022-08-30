@@ -1,3 +1,4 @@
+# A set defining OCaml parts&dependencies of Mina
 { inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
@@ -14,7 +15,7 @@ let
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
-  export = opam-nix.importOpam ../src/opam.export;
+  export = opam-nix.importOpam ../opam.export;
   external-packages =
     getAttrs [ "sodium" "capnp" "rpc_parallel" "async_kernel" "base58" ]
     (builtins.mapAttrs (_: last) (opam-nix.listRepo external-repo));
@@ -134,6 +135,7 @@ let
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         MARLIN_PLONK_STUBS = "${pkgs.marlin_plonk_bindings_stubs}/lib";
+        DISABLE_CHECK_OPAM_SWITCH = "true";
         configurePhase = ''
           export MINA_ROOT="$PWD"
           patchShebangs .
