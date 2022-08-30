@@ -37,6 +37,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ ("peers", `List (List.map all_nodes ~f:(fun n -> `String (Node.id n))))
         ] ;
     let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
+    [%log info] "Do we get an event on initial load?" ;
+    let%bind () = wait_for t @@ Wait_condition.persisted_frontier_loaded () in
     let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
