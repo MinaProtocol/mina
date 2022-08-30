@@ -60,6 +60,9 @@ type Structured_log_events.t += Added_breadcrumb_user_commands
 type Structured_log_events.t += Applying_diffs of { diffs : Yojson.Safe.t list }
   [@@deriving register_event { msg = "Applying diffs: $diffs" }]
 
+type Structured_log_events.t += Persisted_frontier_loaded
+  [@@deriving register_event]
+
 let genesis_root_data ~precomputed_values =
   let transition =
     Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
@@ -174,6 +177,7 @@ let rec load_with_max_length :
     -> ( t
        , [> `Bootstrap_required
          | `Persistent_frontier_malformed
+         | `Snarked_ledger_mismatch
          | `Failure of string ] )
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
@@ -184,15 +188,24 @@ let rec load_with_max_length :
   (* TODO: #3053 *)
   let continue persistent_frontier_instance ~ignore_consensus_local_state
       ~snarked_ledger_hash =
+    let snarked_ledger_hash_json =
+      Frozen_ledger_hash.to_yojson snarked_ledger_hash
+    in
     match
       Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
         ~logger
     with
-    | Error _ as err ->
+    | Error _err as err_result ->
+        (* _err has type [> `Snarked_ledger_mismatch ] *)
+        [%log warn] "Persisted frontier failed to load"
+          ~metadata:
+            [ ("error", `String "SNARKed ledger mismatch on load from disk")
+            ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
+            ] ;
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
-        err
+        err_result
     | Ok persistent_root_instance -> (
         match%bind
           load_from_persistence_and_start
@@ -202,13 +215,31 @@ let rec load_with_max_length :
             ~persistent_frontier_instance ignore_consensus_local_state
         with
         | Ok _ as result ->
+            [%str_log trace] Persisted_frontier_loaded
+              ~metadata:[ ("snarked_ledger_hash", snarked_ledger_hash_json) ] ;
             return result
-        | Error _ as err ->
+        | Error err as err_result ->
+            let err_str =
+              match err with
+              | `Failure msg ->
+                  sprintf "Failure: %s" msg
+              | `Bootstrap_required ->
+                  "Bootstrap required"
+              (* next two cases aren't reachable, needed for types to work out *)
+              | `Snarked_ledger_mismatch | `Persistent_frontier_malformed ->
+                  failwith "Unexpected failure on loading transition frontier"
+            in
+            [%log warn] "Persisted frontier failed to load"
+              ~metadata:
+                [ ("error", `String err_str)
+                ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
+                ] ;
+
             let%map () =
               Persistent_frontier.Instance.destroy persistent_frontier_instance
             in
             Persistent_root.Instance.close persistent_root_instance ;
-            err )
+            err_result )
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier

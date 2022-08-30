@@ -355,6 +355,7 @@ module Dsl = struct
       | Ledger_proofs_emitted_since_genesis
       | Block_height_growth
       | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -383,6 +384,8 @@ module Dsl = struct
 
     val zkapp_to_be_included_in_frontier :
       has_failures:bool -> parties:Mina_base.Parties.t -> t
+
+    val persisted_frontier_loaded : unit -> t
   end
 
   module type Util_intf = sig

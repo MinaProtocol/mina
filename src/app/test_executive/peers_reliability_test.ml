@@ -75,7 +75,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          [%log info]
            "%s started again, will now wait for this node to initialize"
            (Node.id node_c) ;
-         let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
+         let%bind () = wait_for t @@ Wait_condition.node_to_initialize node_c in
+         let%bind () =
+           wait_for t @@ Wait_condition.persisted_frontier_loaded ()
+         in
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts

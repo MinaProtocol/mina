@@ -39,6 +39,7 @@ struct
     | Ledger_proofs_emitted_since_genesis
     | Block_height_growth
     | Zkapp_to_be_included_in_frontier
+    | Persisted_frontier_loaded
 
   type t =
     { id : wait_condition_id
@@ -185,7 +186,7 @@ struct
     let soft_timeout_in_slots = 8 in
     { id = Signed_command_to_be_included_in_frontier
     ; description =
-        Printf.sprintf "signed command with hash %s"
+        sprintf "signed command with hash %s"
           (Transaction_hash.to_base58_check txn_hash)
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
@@ -199,8 +200,7 @@ struct
       else Predicate_continuation ()
     in
     let description =
-      Printf.sprintf "[%d] snarked_ledgers to be generated since genesis"
-        num_proofs
+      sprintf "[%d] snarked_ledgers to be generated since genesis" num_proofs
     in
     { id = Ledger_proofs_emitted_since_genesis
     ; description
@@ -262,6 +262,21 @@ struct
                else acc ^ ", " ^ str ) )
           (Signed_command_memo.to_string_hum parties.memo)
     ; predicate = Event_predicate (Event_type.Breadcrumb_added, (), check)
+    ; soft_timeout = Slots soft_timeout_in_slots
+    ; hard_timeout = Slots (soft_timeout_in_slots * 2)
+    }
+
+  let persisted_frontier_loaded () =
+    let check () _node
+        (_frontier_loaded : Event_type.Persisted_frontier_loaded.t) =
+      (* the fact of loading is sufficient, nothing else to check *)
+      Predicate_passed
+    in
+    let soft_timeout_in_slots = 8 in
+    { id = Persisted_frontier_loaded
+    ; description = "persisted transition frontier to load"
+    ; predicate =
+        Event_predicate (Event_type.Persisted_frontier_loaded, (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
