@@ -61,6 +61,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            initial_connectivity_data )
     in
     (* a couple of transactions, so the persisted transition frontier is not trivial *)
+    let[@warning "-8"] [ fish1; fish2 ] =
+      Network.extra_genesis_keypairs network
+    in
     let%bind () =
       section_hard "send a payment"
         (let get_pubkey node =
@@ -68,8 +71,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            network_keypair.keypair.public_key
            |> Signature_lib.Public_key.compress
          in
-         let sender_pub_key = get_pubkey node_a in
-         let receiver_pub_key = get_pubkey node_b in
+         let sender_pub_key =
+           fish1.public_key |> Signature_lib.Public_key.compress
+         in
+         let receiver_pub_key = get_pubkey node_a in
          let%bind { hash = txn_hash; _ } =
            Node.must_send_payment ~logger node_c ~sender_pub_key
              ~receiver_pub_key
@@ -98,9 +103,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              Signed_command_memo.create_from_string_exn "Zkapp create account"
            in
            let fee = Currency.Fee.of_int 20_000_000 in
-           let sender_kp =
-             List.hd_exn @@ Network.extra_genesis_keypairs network
-           in
+           let sender_kp = fish2 in
            let (parties_spec : Transaction_snark.For_tests.Spec.t) =
              { sender = (sender_kp, nonce)
              ; fee
