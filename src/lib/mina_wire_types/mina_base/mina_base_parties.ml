@@ -62,11 +62,25 @@ module Digest_make
 module Call_forest = struct
   module Digest = Digest_M
 
-  (* module V1 = struct *)
-  (*   type ('party, 'party_digest, 'digest) t = *)
-  (*     ( ('party, 'party_digest, 'digest) Tree.Stable.V1.t *)
-  (*     , 'digest ) *)
-  (*       Mina_base_with_stack_hash.V1.t *)
-  (*       list *)
-  (* end *)
+  module Tree = struct
+    module V1 = struct
+      type ('party, 'party_digest, 'digest) t =
+        { party : 'party
+        ; party_digest : 'party_digest
+        ; calls :
+            ( ('party, 'party_digest, 'digest) t
+            , 'digest )
+            Mina_base_with_stack_hash.V1.t
+            list
+        }
+    end
+  end
+
+  module V1 = struct
+    type ('party, 'party_digest, 'digest) t =
+      ( ('party, 'party_digest, 'digest) Tree.V1.t
+      , 'digest )
+      Mina_base_with_stack_hash.V1.t
+      list
+  end
 end

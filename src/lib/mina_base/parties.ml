@@ -42,6 +42,10 @@ module Call_forest = struct
     module Stable = struct
       module V1 = struct
         type ('party, 'party_digest, 'digest) t =
+              ( 'party
+              , 'party_digest
+              , 'digest )
+              Mina_wire_types.Mina_base.Parties.Call_forest.Tree.V1.t =
           { party : 'party
           ; party_digest : 'party_digest
           ; calls :

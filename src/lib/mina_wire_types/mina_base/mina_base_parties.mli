@@ -63,4 +63,26 @@ module Call_forest : sig
     Digest_types.S
       with module Party = Digest_M.Party
        and module Forest = Digest_M.Forest
+
+  module Tree : sig
+    module V1 : sig
+      type ('party, 'party_digest, 'digest) t =
+        { party : 'party
+        ; party_digest : 'party_digest
+        ; calls :
+            ( ('party, 'party_digest, 'digest) t
+            , 'digest )
+            Mina_base_with_stack_hash.V1.t
+            list
+        }
+    end
+  end
+
+  module V1 : sig
+    type ('party, 'party_digest, 'digest) t =
+      ( ('party, 'party_digest, 'digest) Tree.V1.t
+      , 'digest )
+      Mina_base_with_stack_hash.V1.t
+      list
+  end
 end
