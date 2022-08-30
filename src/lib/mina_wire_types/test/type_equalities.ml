@@ -174,6 +174,7 @@ module Mina_base = struct
   include
     Assert_equal0V1 (O.Coinbase_fee_transfer.Stable) (W.Coinbase_fee_transfer)
   include Assert_equal0V1 (O.Coinbase.Stable) (W.Coinbase)
+  include Assert_equal2V1 (O.With_stack_hash.Stable) (W.With_stack_hash)
 end
 
 module One_or_two = struct
