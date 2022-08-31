@@ -1,18 +1,20 @@
 open Core_kernel
 open Mina_base_import
 
-module Make_sig (T : Mina_wire_types.Mina_base.Coinbase.Types.S) = struct
-  module type S = Coinbase_intf.Full with type Stable.V1.t = T.V1.t
+(** See documentation of the {!Mina_wire_types} library *)
+module Wire_types = Mina_wire_types.Mina_base.Coinbase
+
+module Make_sig (A : Wire_types.Types.S) = struct
+  module type S = Coinbase_intf.Full with type Stable.V1.t = A.V1.t
 end
 
-module Make_str (T : Mina_wire_types.Mina_base.Coinbase.Concrete) :
-  Make_sig(T).S = struct
+module Make_str (A : Wire_types.Concrete) = struct
   module Fee_transfer = Coinbase_fee_transfer
 
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = T.V1.t =
+      type t = A.V1.t =
         { receiver : Public_key.Compressed.Stable.V1.t
         ; amount : Currency.Amount.Stable.V1.t
         ; fee_transfer : Fee_transfer.Stable.V1.t option
@@ -153,4 +155,4 @@ module Make_str (T : Mina_wire_types.Mina_base.Coinbase.Concrete) :
   end
 end
 
-include Mina_wire_types.Mina_base.Coinbase.Make (Make_sig) (Make_str)
+include Wire_types.Make (Make_sig) (Make_str)

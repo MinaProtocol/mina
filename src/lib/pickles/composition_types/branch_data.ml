@@ -1,5 +1,7 @@
 open Core_kernel
 open Pickles_types
+
+(** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Pickles_composition_types.Branch_data
 
 module Make_sig (A : Wire_types.Types.S) = struct

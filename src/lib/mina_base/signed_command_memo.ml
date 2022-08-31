@@ -4,6 +4,8 @@
 
 open Core_kernel
 open Snark_params
+
+(** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Mina_base.Signed_command_memo
 
 module Make_sig (A : Wire_types.Types.S) = struct

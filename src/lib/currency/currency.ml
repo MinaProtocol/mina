@@ -16,15 +16,27 @@ open Intf
 
 type uint64 = Unsigned.uint64
 
-module Make_sig (T : Mina_wire_types.Currency.Types.S) = struct
+(** See documentation of the {!Mina_wire_types} library *)
+module Wire_types = Mina_wire_types.Currency
+
+(** Define the expected full signature of the module, based on the types defined
+    in {!Mina_wire_types} *)
+module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Intf.Full
-      with type Fee.Stable.V1.t = T.Fee.V1.t
-       and type Amount.Stable.V1.t = T.Amount.V1.t
-       and type Balance.Stable.V1.t = T.Balance.V1.t
+    (* full interface defined in a separate file, as it would appear
+       in the MLI *)
+      with type Fee.Stable.V1.t = A.Fee.V1.t
+      (* with added type equalities *)
+       and type Amount.Stable.V1.t = A.Amount.V1.t
+       and type Balance.Stable.V1.t = A.Balance.V1.t
 end
 
-module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
+(** Then we make the real module, which has to have a signature of type
+    {!Make_sig(A)}. Here, since all types are simple type aliases, we don't need
+    to use [A] in the implementation. Otherwise, we would need to add type
+    equalities to the corresponding type in [A] in each type definition. *)
+module Make_str (A : Wire_types.Concrete) = struct
   module Signed_poly = Signed_poly
 
   [%%ifdef consensus_mechanism]
@@ -1267,4 +1279,6 @@ module Make_str (T : Mina_wire_types.Currency.Concrete) = struct
     end )
 end
 
-include Mina_wire_types.Currency.Make (Make_sig) (Make_str)
+(** Finally, we use [Make] to create the full module where the types defined
+    here and in {!Mina_wire_types} are fully unified. *)
+include Wire_types.Make (Make_sig) (Make_str)

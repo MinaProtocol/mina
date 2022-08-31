@@ -1,5 +1,6 @@
 module T = Nat.Make32 ()
 
+(** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Mina_numbers.Length
 
 module Make_sig (A : Wire_types.Types.S) = struct

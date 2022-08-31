@@ -1,20 +1,22 @@
 open Core_kernel
 open Mina_base_import
 
-module Make_sig (T : Mina_wire_types.Mina_base.Fee_transfer.Types.S) = struct
+(** See documentation of the {!Mina_wire_types} library *)
+module Wire_types = Mina_wire_types.Mina_base.Fee_transfer
+
+module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Fee_transfer_intf.Full
-      with type Single.Stable.V2.t = T.Single.V2.t
-       and type Stable.V2.t = T.V2.t
+      with type Single.Stable.V2.t = A.Single.V2.t
+       and type Stable.V2.t = A.V2.t
 end
 
-module Make_str (T : Mina_wire_types.Mina_base.Fee_transfer.Concrete) :
-  Make_sig(T).S = struct
+module Make_str (A : Wire_types.Concrete) = struct
   module Single = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
-        type t = T.Single.V2.t =
+        type t = A.Single.V2.t =
           { receiver_pk : Public_key.Compressed.Stable.V1.t
           ; fee : Currency.Fee.Stable.V1.t
           ; fee_token : Token_id.Stable.V1.t
@@ -138,4 +140,4 @@ module Make_str (T : Mina_wire_types.Mina_base.Fee_transfer.Concrete) :
   let to_numbered_list = One_or_two.to_numbered_list
 end
 
-include Mina_wire_types.Mina_base.Fee_transfer.Make (Make_sig) (Make_str)
+include Wire_types.Make (Make_sig) (Make_str)

@@ -4,15 +4,17 @@ open Core_kernel
 open Mina_base_import
 open Mina_numbers
 
-module Make_sig (T : Mina_wire_types.Mina_base.Signed_command.Types.S) = struct
+(** See documentation of the {!Mina_wire_types} library *)
+module Wire_types = Mina_wire_types.Mina_base.Signed_command
+
+module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Signed_command_intf.Full
       with type With_valid_signature.Stable.Latest.t =
-        T.With_valid_signature.V2.t
+        A.With_valid_signature.V2.t
 end
 
-module Make_str (T : Mina_wire_types.Mina_base.Signed_command.Concrete) :
-  Make_sig(T).S = struct
+module Make_str (_ : Wire_types.Concrete) = struct
   module Fee = Currency.Fee
   module Payload = Signed_command_payload
 
@@ -406,4 +408,4 @@ module Make_str (T : Mina_wire_types.Mina_base.Signed_command.Concrete) :
                Account_id.public_key ) )
 end
 
-include Mina_wire_types.Mina_base.Signed_command.Make (Make_sig) (Make_str)
+include Wire_types.Make (Make_sig) (Make_str)

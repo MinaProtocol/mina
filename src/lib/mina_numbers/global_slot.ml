@@ -1,3 +1,6 @@
+(** Global slot implementation *)
+
+(** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Mina_numbers.Global_slot
 
 module Make_sig (A : Wire_types.Types.S) = struct

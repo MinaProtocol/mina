@@ -69,7 +69,7 @@ For example, the types in {!Currency} can be implemented by using
 The result is the full implementation module with the correct, compatible type,
 which can then be included.
 
-To get started with a practical example, see the implementation of {!Currency} in
+{b To get started} with a practical example, see the implementation of {!Currency} in
 {i lib/currency/currency.ml(i)}, which follows this pattern. See also the
 corresponding {i currency.ml(i)} definitions in this library, which fully
 document the pattern used everywhere in this library.

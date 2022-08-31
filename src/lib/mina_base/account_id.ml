@@ -3,14 +3,17 @@
 open Core_kernel
 open Mina_base_import
 
-module Make_sig (T : Mina_wire_types.Mina_base.Account_id.Types.S) = struct
+(** See documentation of the {!Mina_wire_types} library *)
+module Wire_types = Mina_wire_types.Mina_base.Account_id
+
+module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Account_id_intf.S
-      with type Digest.Stable.V1.t = T.Digest.V1.t
-       and type Stable.V2.t = T.V2.t
+      with type Digest.Stable.V1.t = A.Digest.V1.t
+       and type Stable.V2.t = A.V2.t
 end
 
-module Make_str (T : Mina_wire_types.Mina_base.Account_id.Concrete) = struct
+module Make_str (_ : Wire_types.Concrete) = struct
   let invalid = (Public_key.Compressed.empty, Pickles.Backend.Tick.Field.zero)
 
   module Digest = struct
@@ -225,4 +228,4 @@ module Make_str (T : Mina_wire_types.Mina_base.Account_id.Concrete) = struct
   [%%endif]
 end
 
-include Mina_wire_types.Mina_base.Account_id.Make (Make_sig) (Make_str)
+include Wire_types.Make (Make_sig) (Make_str)

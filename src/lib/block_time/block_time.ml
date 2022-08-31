@@ -5,10 +5,12 @@ open Snark_params
 open Tick
 open Unsigned_extended
 open Snark_bits
+
+(** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Block_time
 
-module Make_sig (T : Wire_types.Types.S) = struct
-  module type S = Intf.S with type Time.t = T.V1.t
+module Make_sig (A : Wire_types.Types.S) = struct
+  module type S = Intf.S with type Time.t = A.V1.t
 end
 
 module Make_str (_ : Wire_types.Concrete) = struct

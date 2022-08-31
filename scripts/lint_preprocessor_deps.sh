@@ -15,6 +15,8 @@ set -u
 
 tmp=$(mktemp ${MKTEMP_FLAGS}ppx_optcomp_dune_files.XXXX)
 
+# Some directories do not have a dune files: we want to find their closest
+# parent dune file instead of reporting an error
 find-dune-in-parents() {
   local dir="$1"
 

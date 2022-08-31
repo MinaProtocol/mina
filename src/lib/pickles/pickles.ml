@@ -1,12 +1,17 @@
-module Make_sig (T : Mina_wire_types.Pickles.Types.S) = struct
+(** Pickles implementation *)
+
+(** See documentation of the {!Mina_wire_types} library *)
+module Wire_types = Mina_wire_types.Pickles
+
+module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Pickles_intf.S
       with type Side_loaded.Verification_key.Stable.V2.t =
-        T.Side_loaded.Verification_key.V2.t
-       and type ('a, 'b) Proof.t = ('a, 'b) T.Proof.t
+        A.Side_loaded.Verification_key.V2.t
+       and type ('a, 'b) Proof.t = ('a, 'b) A.Proof.t
 end
 
-module Make_str (T : Mina_wire_types.Pickles.Concrete) = struct
+module Make_str (_ : Wire_types.Concrete) = struct
   module Endo = Endo
   module P = Proof
 
@@ -4012,4 +4017,4 @@ module Make_str (T : Mina_wire_types.Pickles.Concrete) = struct
     end )
 end
 
-include Mina_wire_types.Pickles.Make (Make_sig) (Make_str)
+include Wire_types.Make (Make_sig) (Make_str)
