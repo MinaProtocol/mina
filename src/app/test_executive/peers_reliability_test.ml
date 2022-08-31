@@ -82,7 +82,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "send a zkApp to create an account"
         (let%bind parties_create_accounts =
            let amount = Currency.Amount.of_int 10_000_000_000 in
-           let nonce = Mina_base.Account.Nonce.zero in
+           let nonce = Mina_base.Account.Nonce.(succ zero) in
            let memo =
              Mina_base.Signed_command_memo.create_from_string_exn
                "Zkapp create account"
