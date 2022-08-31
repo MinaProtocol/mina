@@ -58,7 +58,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* a couple of transactions, so the persisted transition frontier is not trivial *)
     let%bind () =
       section_hard "send a payment"
-        (let%bind sender_pub_key = Util.pub_key_of_node node_a in
+        (let%bind sender_pub_key = Util.pub_key_of_node node_c in
          let%bind receiver_pub_key = Util.pub_key_of_node node_b in
          let%bind { hash = txn_hash; _ } =
            Node.must_send_payment ~logger node_c ~sender_pub_key
@@ -89,7 +89,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            in
            let fee = Currency.Fee.of_int 20_000_000 in
            let sender_kp =
-             (Option.value_exn (Node.network_keypair node_a)).keypair
+             (Option.value_exn (Node.network_keypair node_c)).keypair
            in
            let (parties_spec : Transaction_snark.For_tests.Spec.t) =
              { sender = (sender_kp, nonce)
