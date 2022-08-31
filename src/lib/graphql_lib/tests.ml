@@ -203,6 +203,7 @@ let%test_module "Slot" = (module Make_test (Scalars.Slot) (Slot_gen))
 let%test_module "FeeTransferType" =
   (module Make_test (Scalars.FeeTransferType) (FeeTransferType_gen))
 
+(* TODO: add tests for the following graphql scalars *)
 (* let%test_module "PrecomputedBlockProof" =
    (module Make_test (Scalars.PrecomputedBlockProof) (Mina_block.Precomputed.Proof) ) *)
 
