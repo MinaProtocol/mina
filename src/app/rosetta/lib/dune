@@ -51,7 +51,7 @@
  (preprocessor_deps ../../../config.mlh ../../../graphql-ppx-config.inc ../../../../graphql_schema.json)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
-               ppx_coda
+               ppx_mina
                ppx_compare
                ppx_deriving.show
                ppx_deriving_yojson

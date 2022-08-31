@@ -83,6 +83,11 @@ val size : t -> int
 (* The least fee per weight unit of all transactions in the transaction pool *)
 val min_fee : t -> Currency.Fee_rate.t option
 
+val transactions :
+     logger:Logger.t
+  -> t
+  -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
+
 (** Remove the command from the pool with the lowest fee per wu,
     along with any others from the same account with higher nonces. *)
 val remove_lowest_fee :
@@ -95,26 +100,6 @@ val remove_expired :
 (** Get the applicable command in the pool with the highest fee per wu *)
 val get_highest_fee :
   t -> Transaction_hash.User_command_with_valid_signature.t option
-
-(** Call this when a transaction is added to the best tip or when generating a
-    sequence of transactions to apply. This will drop any transactions at that
-    nonce from the pool. May also drop queued commands for that sender if there
-    was a different queued transaction from that sender at that nonce, and the
-    committed one consumes more currency than the queued one. In that case it'll
-    return the dropped ones in the sequence, including the one with the same
-    nonce as the committed one if it's different.
-*)
-val handle_committed_txn :
-     t
-  -> Transaction_hash.User_command_with_valid_signature.t
-  -> application_status:Transaction_status.t option
-  -> fee_payer_balance:Currency.Amount.t
-  -> fee_payer_nonce:Mina_base.Account.Nonce.t
-  -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
-     , [ `Queued_txns_by_sender of
-         string
-         * Transaction_hash.User_command_with_valid_signature.t Sequence.t ] )
-     Result.t
 
 (** Add a command to the pool. Pass the current nonce for the account and
     its current balance. Throws if the contents of the pool before adding the
@@ -190,6 +175,8 @@ val find_by_hash :
 *)
 val revalidate :
      t
+  -> logger:Logger.t
+  -> [ `Entire_pool | `Subset of Account_id.Set.t ]
   -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t

@@ -40,11 +40,28 @@
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline, ...
     }:
     {
-      overlay = import ./nix/overlay.nix;
+      overlays = {
+        misc = import ./nix/misc.nix;
+        rust = import ./nix/rust.nix;
+        go = import ./nix/go.nix;
+      };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
       nixosConfigurations.container = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [
+        modules = let
+          PK = "B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p";
+          wallet = {
+            box_primitive = "xsalsa20poly1305";
+            ciphertext =
+              "Dmq1Qd8uNbZRT1NT7zVbn3eubpn9Myx9Je9ZQGTKDxUv4BoPNmZAGox18qVfbbEUSuhT4ZGDt";
+            nonce = "6pcvpWSLkMi393dT5VSLR6ft56AWKkCYRqJoYia";
+            pw_primitive = "argon2i";
+            pwdiff = [ 134217728 6 ];
+            pwsalt = "ASoBkV3NsY7ZRuxztyPJdmJCiz3R";
+          };
+          wallet-file = builtins.toFile "mina-wallet" (builtins.toJSON wallet);
+          wallet-file-pub = builtins.toFile "mina-wallet-pub" PK;
+        in [
           self.nixosModules.mina
           {
             boot.isContainer = true;
@@ -53,10 +70,46 @@
 
             services.mina = {
               enable = true;
+              config = {
+                "ledger" = {
+                  "name" = "mina-demo";
+                  "accounts" = [{
+                    "pk" = PK;
+                    "balance" = "66000";
+                    "sk" = null;
+                    "delegate" = null;
+                  }];
+                };
+              };
               waitForRpc = false;
               external-ip = "0.0.0.0";
-              extraArgs = [ "--seed" ];
+              generate-genesis-proof = true;
+              seed = true;
+              block-producer-key = "/var/lib/mina/wallets/store/${PK}";
+              extraArgs = [
+                "--demo-mode"
+                "--proof-level"
+                "none"
+                "--run-snark-worker"
+                "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
+                "-insecure-rest-server"
+              ];
             };
+
+            systemd.services.mina = {
+              preStart = ''
+                printf '{"genesis":{"genesis_state_timestamp":"%s"}}' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > /var/lib/mina/daemon.json
+              '';
+              environment = {
+                MINA_TIME_OFFSET = "0";
+                MINA_PRIVKEY_PASS = "";
+              };
+            };
+
+            systemd.tmpfiles.rules = [
+              "C /var/lib/mina/wallets/store/${PK}.pub 700 mina mina - ${wallet-file-pub}"
+              "C /var/lib/mina/wallets/store/${PK}     700 mina mina - ${wallet-file}"
+            ];
           }
         ];
       };
@@ -102,14 +155,13 @@
     } // utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend
-          (nixpkgs.lib.composeManyExtensions [
+          (nixpkgs.lib.composeManyExtensions ([
             (import nixpkgs-mozilla)
-            (import ./nix/overlay.nix)
             (final: prev: {
               ocamlPackages_mina = requireSubmodules
                 (import ./nix/ocaml.nix { inherit inputs pkgs; });
             })
-          ]);
+          ] ++ builtins.attrValues self.overlays));
         inherit (pkgs) lib;
         mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
         nix-npm-buildPackage = pkgs.callPackage inputs.nix-npm-buildPackage {
@@ -209,10 +261,10 @@
         packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
           src = ./src/lib/snarky_js_bindings/snarkyjs;
           preBuild = ''
-            BINDINGS_PATH=./dist/server/node_bindings
+            BINDINGS_PATH=./dist/node/node_bindings
             mkdir -p "$BINDINGS_PATH"
-            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/server/node_bindings
-            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/server/node_bindings
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/node/node_bindings
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/node/node_bindings
             chmod -R 777 "$BINDINGS_PATH"
 
             # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
@@ -223,7 +275,7 @@
             sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
             sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
           '';
-          npmBuild = "npm run build -- --bindings=./dist/server/node_bindings";
+          npmBuild = "npm run build -- --bindings=./dist/node/node_bindings";
           # TODO: add snarky-run
           # TODO
           # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"

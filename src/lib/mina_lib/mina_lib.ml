@@ -1189,6 +1189,27 @@ let online_broadcaster ~constraint_constants time_controller =
   in
   (online_reader, notify_online)
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
+let context (config : Config.t) : (module CONTEXT) =
+  ( module struct
+    let logger = config.logger
+
+    let precomputed_values = config.precomputed_values
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let constraint_constants = precomputed_values.constraint_constants
+  end )
+
 let start t =
   let set_next_producer_timing timing consensus_state =
     let block_production_status, next_producer_timing =
@@ -1252,7 +1273,7 @@ let start t =
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
-    Block_producer.run ~logger:t.config.logger
+    Block_producer.run ~context:(context t.config)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
       ~trust_system:t.config.trust_system
@@ -1267,7 +1288,6 @@ let start t =
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
       ~log_block_creation:t.config.log_block_creation
-      ~precomputed_values:t.config.precomputed_values
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
@@ -1300,12 +1320,12 @@ let start t =
 
 let start_with_precomputed_blocks t blocks =
   let%bind () =
-    Block_producer.run_precomputed ~logger:t.config.logger
+    Block_producer.run_precomputed ~context:(context t.config)
       ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
-      ~precomputed_values:t.config.precomputed_values ~precomputed_blocks:blocks
+      ~precomputed_blocks:blocks
   in
   start t
 
@@ -1347,6 +1367,7 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   able_to_send_or_wait ()
 
 let create ?wallets (config : Config.t) =
+  let module Context = (val context config) in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
@@ -1759,14 +1780,17 @@ let create ?wallets (config : Config.t) =
                                 { State_hash.State_hashes.state_hash
                                 ; state_body_hash = None
                                 } )
-                         |> Sync_handler.Root.prove ~consensus_constants
-                              ~logger:config.logger ~frontier ) )
+                         |> Sync_handler.Root.prove
+                              ~context:(module Context)
+                              ~frontier ) )
                   ~get_best_tip:
                     (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                          let open Option.Let_syntax in
                          let open Proof_carrying_data in
                          let%map proof_with_data =
-                           Best_tip_prover.prove ~logger:config.logger frontier
+                           Best_tip_prover.prove
+                             ~context:(module Context)
+                             frontier
                          in
                          { proof_with_data with
                            data = With_hash.data proof_with_data.data
@@ -1843,7 +1867,8 @@ let create ?wallets (config : Config.t) =
               |> Validation.reset_staged_ledger_diff_validation )
           in
           let valid_transitions, initialization_finish_signal =
-            Transition_router.run ~logger:config.logger
+            Transition_router.run
+              ~context:(module Context)
               ~trust_system:config.trust_system ~verifier ~network:net
               ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller
@@ -1854,7 +1879,7 @@ let create ?wallets (config : Config.t) =
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
-              ~precomputed_values:config.precomputed_values ~notify_online
+              ~notify_online
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

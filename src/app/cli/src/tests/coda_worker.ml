@@ -361,6 +361,15 @@ module T = struct
         >>| Or_error.ok_exn
       in
       let constraint_constants = precomputed_values.constraint_constants in
+      let module Context = struct
+        let logger = logger
+
+        let precomputed_values = precomputed_values
+
+        let constraint_constants = precomputed_values.constraint_constants
+
+        let consensus_constants = precomputed_values.consensus_constants
+      end in
       let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
@@ -400,11 +409,11 @@ module T = struct
           in
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
           let consensus_local_state =
-            Consensus.Data.Local_state.create block_production_pubkeys
-              ~genesis_ledger:Genesis_ledger.t
+            Consensus.Data.Local_state.create
+              ~context:(module Context)
+              block_production_pubkeys ~genesis_ledger:Genesis_ledger.t
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
-              ~ledger_depth:constraint_constants.ledger_depth
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
           in
@@ -456,6 +465,7 @@ module T = struct
                 Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create gossip_net_params ~pids))
+            ; precomputed_values
             }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in

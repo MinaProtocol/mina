@@ -13,6 +13,16 @@ open Mina_base
 open Frontier_base
 open Mina_state
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 include Frontier_intf.S
 
 module Protocol_states_for_root_scan_state : sig
@@ -26,12 +36,11 @@ module Protocol_states_for_root_scan_state : sig
 end
 
 val create :
-     logger:Logger.t
+     context:(module CONTEXT)
   -> root_data:Root_data.t
   -> root_ledger:Mina_ledger.Ledger.Any_ledger.witness
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
-  -> precomputed_values:Precomputed_values.t
   -> persistent_root_instance:Persistent_root.Instance.t
   -> time_controller:Block_time.Controller.t
   -> t
