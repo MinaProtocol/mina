@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eou pipefail
 
@@ -15,12 +15,26 @@ set -u
 
 tmp=$(mktemp ${MKTEMP_FLAGS}ppx_optcomp_dune_files.XXXX)
 
-find src/lib src/app -name '*.ml' -or -name '*.mli' \
+find-dune-in-parents() {
+  local dir="$1"
+
+  test -e "$dir/dune" && echo "$dir/dune" && return 0
+  [ '/' = "$dir" ] && echo "could not find dune file in parents of $dir" && return 1
+
+  find-dune-in-parents "$(dirname "$dir")"
+}
+
+
+# Export the find-dune-in-parents function to be able to call it via xargs.
+# See https://stackoverflow.com/questions/11003418/calling-shell-functions-with-xargs
+export -f find-dune-in-parents
+
+find "$(pwd)/src/lib" "$(pwd)/src/app" -name '*.ml' -or -name '*.mli' \
   | xargs grep '\[%%import' \
   | cut -d: -f1 \
   | xargs -n 1 dirname \
   | uniq \
-  | xargs -I{} echo '{}/dune' \
+  | xargs -I{} bash -c 'find-dune-in-parents "$@"' _ {}\
   | sort \
   > $tmp
 
