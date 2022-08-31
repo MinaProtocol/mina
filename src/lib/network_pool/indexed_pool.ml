@@ -94,7 +94,6 @@ module Command_error = struct
         | `Timestamp_predicate of string ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Token_id.t
-    | Verification_failed
   [@@deriving sexp, to_yojson]
 
   let grounds_for_diff_rejection : t -> bool = function
@@ -103,7 +102,7 @@ module Command_error = struct
     | Insufficient_funds _
     | Insufficient_replace_fee _ ->
         false
-    | Overflow | Bad_token | Unwanted_fee_token _ | Verification_failed ->
+    | Overflow | Bad_token | Unwanted_fee_token _ ->
         true
 end
 
@@ -312,6 +311,9 @@ let member : t -> Transaction_hash.User_command.t -> bool =
  fun t cmd ->
   Option.is_some
     (Map.find t.all_by_hash (Transaction_hash.User_command.hash cmd))
+
+let has_commands_for_fee_payer : t -> Account_id.t -> bool =
+ fun t account_id -> Map.mem t.all_by_sender account_id
 
 let all_from_account :
        t
@@ -765,8 +767,8 @@ let revalidate :
       else
         let current_nonce, current_balance = f sender in
         [%log debug]
-          "Revalidating account $account in transaction pool ($current_nonce, \
-           $current_balance)"
+          "Revalidating account $account in transaction pool ($account_nonce, \
+           $account_balance)"
           ~metadata:
             [ ( "account"
               , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
@@ -983,10 +985,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
 
   let rec add_from_gossip_exn :
          config:Config.t
-      -> verify:(User_command.Verifiable.t -> (User_command.Valid.t, _, _) M.t)
-      -> [ `Unchecked of
-           Transaction_hash.User_command.t * User_command.Verifiable.t
-         | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
+      -> Transaction_hash.User_command_with_valid_signature.t
       -> Account_nonce.t
       -> Currency.Amount.t
       -> Sender_local_state.t ref
@@ -995,27 +994,11 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
          , Update.single
          , Command_error.t )
          M.t =
-   fun ~config:({ constraint_constants; expiry_ns; _ } as config) ~verify cmd0
+   fun ~config:({ constraint_constants; expiry_ns; _ } as config) cmd
        current_nonce balance by_sender ->
     let open Command_error in
-    let unchecked_cmd =
-      match cmd0 with
-      | `Unchecked (x, _) ->
-          x
-      | `Checked x ->
-          Transaction_hash.User_command.of_checked x
-    in
+    let unchecked_cmd = Transaction_hash.User_command.of_checked cmd in
     let open M.Let_syntax in
-    let verified () =
-      match cmd0 with
-      | `Checked x ->
-          return x
-      | `Unchecked (_, unchecked) ->
-          let%map x = verify unchecked in
-          Transaction_hash.(
-            User_command_with_valid_signature.make x
-              (User_command.hash unchecked_cmd))
-    in
     let unchecked = Transaction_hash.User_command.data unchecked_cmd in
     let fee = User_command.fee unchecked in
     let fee_per_wu = User_command.fee_per_wu unchecked in
@@ -1070,7 +1053,6 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
               in
               ())
         in
-        let%bind cmd = verified () in
         let%map () =
           M.write
             (Update.Add
@@ -1096,22 +1078,18 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           (* this command goes on the end *)
           let%bind reserved_currency' =
             M.of_result
-              Result.Let_syntax.(
-                let%bind reserved_currency' =
-                  Currency.Amount.(consumed + reserved_currency)
-                  |> Result.of_option ~error:Overflow
-                  (* C4 *)
-                in
-                let%map () =
-                  Result.ok_if_true
-                    Currency.Amount.(balance >= reserved_currency')
-                    ~error:
-                      (Insufficient_funds (`Balance balance, reserved_currency'))
-                  (* C2 *)
-                in
-                reserved_currency')
+              ( Currency.Amount.(consumed + reserved_currency)
+              |> Result.of_option ~error:Overflow )
+            (* C4 *)
           in
-          let%bind cmd = verified () in
+          let%bind () =
+            M.of_result
+              (Result.ok_if_true
+                 Currency.Amount.(reserved_currency' <= balance)
+                 ~error:
+                   (Insufficient_funds (`Balance balance, reserved_currency')) )
+            (* C2 *)
+          in
           let new_state =
             (F_sequence.snoc queued_cmds cmd, reserved_currency')
           in
@@ -1180,12 +1158,10 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             Transaction_hash.User_command_with_valid_signature.t Sequence.t]
             dropped
             (F_sequence.to_seq drop_queue) ;
-          let%bind cmd = verified () in
           (* Add the new transaction *)
           let%bind cmd, _ =
             let%map v, dropped' =
-              add_from_gossip_exn ~config ~verify (`Checked cmd) current_nonce
-                balance by_sender
+              add_from_gossip_exn ~config cmd current_nonce balance by_sender
             in
             (* We've already removed them, so this should always be empty. *)
             assert (Sequence.is_empty dropped') ;
@@ -1224,19 +1200,18 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
                   let current_nonce = Account_nonce.succ current_nonce in
                   let by_sender_pre = !by_sender in
                   M.catch
-                    (add_from_gossip_exn ~config ~verify (`Checked cmd)
-                       current_nonce balance by_sender )
-                    ~f:(function
-                      | Ok ((_v, dropped_), ups) ->
-                          assert (Sequence.is_empty dropped_) ;
-                          let%bind () = M.write_all ups in
-                          go increment dropped' None current_nonce
-                      | Error _err ->
-                          by_sender := by_sender_pre ;
-                          (* Re-evaluate with the same [dropped] to calculate the new
-                             fee increment.
-                          *)
-                          go increment dropped (Some dropped') current_nonce )
+                    (add_from_gossip_exn ~config cmd current_nonce balance
+                       by_sender ) ~f:(function
+                    | Ok ((_v, dropped_), ups) ->
+                        assert (Sequence.is_empty dropped_) ;
+                        let%bind () = M.write_all ups in
+                        go increment dropped' None current_nonce
+                    | Error _err ->
+                        by_sender := by_sender_pre ;
+                        (* Re-evaluate with the same [dropped] to calculate the new
+                           fee increment.
+                        *)
+                        go increment dropped (Some dropped') current_nonce )
             in
             go increment drop_tail None current_nonce
           in
@@ -1259,47 +1234,14 @@ end
 
 module Add_from_gossip_exn0 = Add_from_gossip_exn (Writer_result)
 
-let add_from_gossip_exn t ~verify cmd0 nonce balance :
-    ( Transaction_hash.User_command_with_valid_signature.t
-      * t
-      * Transaction_hash.User_command_with_valid_signature.t Sequence.t
-    , Command_error.t )
-    Result.t =
-  let x =
-    Add_from_gossip_exn0.add_from_gossip_exn ~config:t.config
-      ~verify:(fun c ->
-        Result.of_option (verify c) ~error:Command_error.Verification_failed
-        |> Writer_result.of_result )
-      cmd0 nonce balance
+let add_from_gossip_exn t cmd nonce balance =
+  let open Result.Let_syntax in
+  let%map (c, cs), t =
+    run' t cmd
+      (Add_from_gossip_exn0.add_from_gossip_exn ~config:t.config cmd nonce
+         balance )
   in
-  Result.map
-    ~f:(fun ((c, cs), t) -> (c, t, cs))
-    ( match cmd0 with
-    | `Checked cmd ->
-        run' t cmd x
-    | `Unchecked (cmd, _) ->
-        run t
-          ~sender:
-            (User_command.fee_payer (Transaction_hash.User_command.command cmd))
-          x )
-
-module Add_from_gossip_exn_async = Add_from_gossip_exn (Writer_result.Deferred)
-
-let add_from_gossip_exn_async ~config
-    ~(sender_local_state : Sender_local_state.t) ~verify cmd0 nonce balance =
-  let open Async in
-  let r = ref sender_local_state in
-  let x =
-    Add_from_gossip_exn_async.add_from_gossip_exn ~config
-      ~verify:(fun c ->
-        Writer_result.Deferred.Deferred
-          (Deferred.map (verify c) ~f:(fun r ->
-               Result.of_option r ~error:Command_error.Verification_failed
-               |> Writer_result.of_result ) ) )
-      cmd0 nonce balance r
-  in
-  Deferred.Result.map (Writer_result.Deferred.run x) ~f:(fun ((c, cs), us) ->
-      ((c, Sequence.to_list cs), !r, us) )
+  (c, t, cs)
 
 (** Add back the commands that were removed due to a reorg*)
 let add_from_backtrack :
@@ -1426,14 +1368,11 @@ let%test_module _ =
 
     let%test_unit "empty invariants" = assert_invariants empty
 
-    let don't_verify _ = None
-
     let%test_unit "singleton properties" =
       Quickcheck.test (gen_cmd ()) ~f:(fun cmd ->
           let pool = empty in
           let add_res =
-            add_from_gossip_exn pool (`Checked cmd) Account_nonce.zero
-              ~verify:don't_verify
+            add_from_gossip_exn pool cmd Account_nonce.zero
               (Currency.Amount.of_int 500)
           in
           if
@@ -1474,8 +1413,7 @@ let%test_module _ =
               config = { empty.config with expiry_ns = Time_ns.Span.of_sec 5.0 }
             }
           in
-          add_from_gossip_exn pool (`Checked cmd) Account_nonce.zero
-            ~verify:don't_verify
+          add_from_gossip_exn pool cmd Account_nonce.zero
             (Currency.Amount.of_int 3000_000_000_000_000)
           |> function
           | Ok (_, pool', dropped) ->
@@ -1533,7 +1471,7 @@ let%test_module _ =
                 let account_id = User_command.fee_payer unchecked in
                 let pk = Account_id.public_key account_id in
                 let add_res =
-                  add_from_gossip_exn !pool (`Checked cmd) ~verify:don't_verify
+                  add_from_gossip_exn !pool cmd
                     (Hashtbl.find_exn nonces pk)
                     (Hashtbl.find_exn balances pk)
                 in
@@ -1571,9 +1509,6 @@ let%test_module _ =
                     failwith "Overflow."
                 | Error Bad_token ->
                     failwith "Token is incompatible with the command."
-                | Error Verification_failed ->
-                    failwith
-                      "Transaction had invalid proof/signature or was malformed"
                 | Error (Unwanted_fee_token fee_token) ->
                     failwithf
                       !"Bad fee token. The fees are paid in token %{sexp: \
@@ -1709,10 +1644,7 @@ let%test_module _ =
         ~f:(fun (init_nonce, init_balance, setup_cmds, replace_cmd) ->
           let t =
             List.fold_left setup_cmds ~init:empty ~f:(fun t cmd ->
-                match
-                  add_from_gossip_exn t (`Checked cmd) init_nonce init_balance
-                    ~verify:don't_verify
-                with
+                match add_from_gossip_exn t cmd init_nonce init_balance with
                 | Ok (_, t', removed) ->
                     [%test_eq:
                       Transaction_hash.User_command_with_valid_signature.t
@@ -1771,8 +1703,7 @@ let%test_module _ =
               Currency.Amount.(a + replacer_currency_consumed))
           in
           let add_res =
-            add_from_gossip_exn t (`Checked replace_cmd) init_nonce init_balance
-              ~verify:don't_verify
+            add_from_gossip_exn t replace_cmd init_nonce init_balance
           in
           if Currency.Amount.(currency_consumed_post_replace <= init_balance)
           then
@@ -1806,8 +1737,7 @@ let%test_module _ =
         , List.tl_exn cmds_sorted_by_fee_per_wu )
       in
       let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
+        add_from_gossip_exn pool cmd Account_nonce.zero
           (Currency.Amount.of_int (500 * 10_000_000))
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
@@ -1848,8 +1778,7 @@ let%test_module _ =
       in
       let max_by_fee_per_wu = List.max_elt ~compare cmds |> Option.value_exn in
       let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
+        add_from_gossip_exn pool cmd Account_nonce.zero
           (Currency.Amount.of_int (500 * 10_000_000))
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
@@ -1884,8 +1813,7 @@ let%test_module _ =
 
     let add_to_pool ~nonce ~balance pool cmd =
       let _, pool', dropped =
-        add_from_gossip_exn pool (`Checked cmd) ~verify:don't_verify nonce
-          balance
+        add_from_gossip_exn pool cmd nonce balance
         |> Result.map_error
              ~f:(Fn.compose Sexp.to_string Command_error.sexp_of_t)
         |> Result.ok_or_failwith

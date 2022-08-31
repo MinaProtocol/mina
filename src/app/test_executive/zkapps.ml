@@ -217,6 +217,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred ( zkapp_update_all
                       , parties_update_all
+                      , parties_invalid_nonce
+                      , parties_insufficient_funds
                       , parties_insufficient_replace_fee
                       , parties_insufficient_fee ) =
       let amount = Currency.Amount.zero in
@@ -282,6 +284,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           parties_spec
       in
+      let%bind.Deferred parties_invalid_nonce =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          { parties_spec with sender = (fish2_kp, Account.Nonce.max_value) }
+      in
+      let%bind.Deferred parties_insufficient_funds =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          { parties_spec with fee = Currency.Fee.max_int }
+      in
       let%bind.Deferred parties_insufficient_replace_fee =
         let spec_insufficient_replace_fee : Transaction_snark.For_tests.Spec.t =
           { parties_spec with fee = Currency.Fee.of_int 5_000_000 }
@@ -298,17 +308,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       ( snapp_update
       , parties_update_all
+      , parties_invalid_nonce
+      , parties_insufficient_funds
       , parties_insufficient_replace_fee
       , parties_insufficient_fee )
-    in
-    let parties_invalid_nonce =
-      let p = parties_update_all in
-      { p with
-        fee_payer =
-          { p.fee_payer with
-            body = { p.fee_payer.body with nonce = Account.Nonce.max_value }
-          }
-      }
     in
     let parties_invalid_signature =
       let p = parties_update_all in
@@ -334,20 +337,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 | _ ->
                     other_p )
         }
-    in
-    let parties_insufficient_funds =
-      let p = parties_update_all in
-      { p with
-        fee_payer =
-          { p.fee_payer with
-            body =
-              { p.fee_payer.body with
-                (* maximum possible fee *)
-                fee = Currency.Fee.max_int
-              ; nonce = Account.Nonce.of_int 2
-              }
-          }
-      }
     in
     let%bind.Deferred parties_nonexistent_fee_payer =
       let new_kp = Signature_lib.Keypair.create () in
@@ -673,7 +662,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
         (send_invalid_zkapp ~logger node parties_insufficient_fee
-           "at least one user command had an insufficient fee" )
+           "Some commands have insufficient fee" )
     in
     (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
@@ -689,12 +678,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkapp with an insufficient replace fee"
         (send_invalid_zkapp ~logger node parties_insufficient_replace_fee
            "Insufficient_replace_fee" )
-    in
-    let%bind () =
-      section_hard
-        "Wait for zkApp transaction to update all fields to be included in \
-         transition frontier"
-        (wait_for_zkapp parties_update_all)
     in
     let%bind () =
       section_hard "Send a zkApp transaction with an invalid nonce"
@@ -715,6 +698,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkApp transaction with a nonexistent fee payer"
         (send_invalid_zkapp ~logger node parties_nonexistent_fee_payer
            "Fee_payer_account_not_found" )
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkApp transaction to update all fields to be included in \
+         transition frontier"
+        (wait_for_zkapp parties_update_all)
     in
     let%bind () =
       section_hard "Send a zkApp transaction to mint token"

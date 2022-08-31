@@ -149,7 +149,10 @@ module Make
         in
         match has_lower_fee pool work ~fee:fee.fee ~sender with
         | Ok () ->
-            Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+            let%map.Deferred.Result accepted, rejected =
+              Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+            in
+            (`Accept, accepted, rejected)
         | Error e ->
             Deferred.return
               ( if is_local then Error (`Locally_generated (diff, ()))

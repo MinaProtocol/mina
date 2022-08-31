@@ -90,10 +90,9 @@ module type Resource_pool_diff_intf = sig
   val unsafe_apply :
        pool
     -> verified Envelope.Incoming.t
-    -> ( t * rejected
+    -> ( [ `Accept | `Reject ] * t * rejected
        , [ `Locally_generated of t * rejected | `Other of Error.t ] )
-       Result.t
-       Deferred.t
+       Deferred.Result.t
 
   val is_empty : t -> bool
 
@@ -129,7 +128,12 @@ module type Broadcast_callback = sig
   type rejected_diff
 
   type t =
-    | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    | Local of
+        (   ( [ `Broadcasted | `Not_broadcasted ]
+            * resource_pool_diff
+            * rejected_diff )
+            Or_error.t
+         -> unit )
     | External of Mina_net2.Validation_callback.t
 
   val drop : resource_pool_diff -> rejected_diff -> t -> unit Deferred.t
@@ -164,7 +168,11 @@ module type Network_pool_base_intf = sig
     Mina_net2.Sink.S_with_void
       with type msg :=
         resource_pool_diff
-        * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+        * (   ( [ `Broadcasted | `Not_broadcasted ]
+              * resource_pool_diff
+              * rejected_diff )
+              Or_error.t
+           -> unit )
 
   module Remote_sink :
     Mina_net2.Sink.S_with_void
@@ -300,12 +308,9 @@ module type Transaction_pool_diff_intf = sig
   module Diff_error : sig
     type t =
       | Insufficient_replace_fee
-      | Verification_failed
       | Duplicate
-      | Sender_account_does_not_exist
       | Invalid_nonce
       | Insufficient_funds
-      | Insufficient_fee
       | Overflow
       | Bad_token
       | Unwanted_fee_token
