@@ -1169,7 +1169,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     |> Account_id.Table.keys
   in
   Hash_set.add account_ids_seen fee_payer_acct_id ;
-  let gen_parties_with_dynamic_balance ~kind_of_parties num_parties =
+  let _gen_parties_with_dynamic_balance ~kind_of_parties num_parties =
     let new_account = match kind_of_parties with `New -> true | _ -> false in
     let rec go acc n =
       let open Zkapp_basic in
@@ -1433,25 +1433,51 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
   in
   let _other_parties = other_parties0 @ [ balancing_party ] in
      *)
+  let gen_parties_with_token_accounts ~num_parties =
+    let authorization = Control.Signature Signature.dummy in
+    let permissions_auth = Control.Tag.Signature in
+    let caller = Party.Call_type.Call in
+    let rec go acc n =
+      let open Parties_builder in
+      if n <= 0 then return (List.rev acc)
+      else
+        let%bind party0 =
+          let required_balance_change =
+            Currency.Amount.(
+              Signed.negate
+                (Signed.of_unsigned
+                   (of_fee
+                      Genesis_constants.Constraint_constants.compiled
+                        .account_creation_fee ) ))
+          in
+          gen_party_from ~zkapp_account_ids ~account_ids_seen ~authorization
+            ~permissions_auth ~available_public_keys ~caller ~account_state_tbl
+            ~required_balance_change ?protocol_state_view ?vk ()
+        in
+        let%bind party =
+          let token_id =
+            Account_id.derive_token_id
+              ~owner:
+                (Account_id.create party0.body.public_key party0.body.token_id)
+          in
+          gen_party_from ~zkapp_account_ids ~account_ids_seen ~new_account:true
+            ~token_id ~caller ~authorization ~permissions_auth
+            ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
+            ()
+        in
+        go (mk_node party0.body [ mk_node party.body [] ] :: acc) (n - 1)
+    in
+    go [] num_parties
+  in
   let%bind num_new_token_parties = Int.gen_uniform_incl 1 max_other_parties in
   let%bind new_token_parties =
-    gen_parties_with_dynamic_balance ~kind_of_parties:`New_token
-      num_new_token_parties
+    gen_parties_with_token_accounts ~num_parties:num_new_token_parties
   in
   let other_parties = new_token_parties in
   let%map memo = Signed_command_memo.gen in
   let parties_dummy_authorizations : Parties.t =
     let open Parties_builder in
-    let other_parties =
-      mk_forest
-        ( List.mapi other_parties ~f:(fun i p ->
-              if i mod 2 = 0 then
-                [ mk_node p.body
-                    [ mk_node (List.nth_exn other_parties (i + 1)).body [] ]
-                ]
-              else [] )
-        |> List.concat )
-    in
+    let other_parties = mk_forest other_parties in
     { fee_payer
     ; other_parties =
         other_parties
