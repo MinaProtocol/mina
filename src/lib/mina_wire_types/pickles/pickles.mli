@@ -33,6 +33,13 @@ module Types : sig
   end
 end
 
+(** This module contains types that are normally hidden from the {!Pickles}
+    interface, but that we need to expose in order for the {!Pickles}
+    implementation to add type equalities to them, since they are later used to
+    construct other types that are public.
+
+    There should be {b no} reference to {!Concrete_} outside of the {!Pickles}
+    implementation. *)
 module Concrete_ : sig
   module Backend : sig
     module Tick : sig
@@ -45,6 +52,7 @@ module Concrete_ : sig
   end
 
   module Proof : sig
+    (* We define some type aliases directly *)
     type challenge_constant =
       Pickles_limb_vector.Constant.Make(Pickles_types.Nat.N2).t
 

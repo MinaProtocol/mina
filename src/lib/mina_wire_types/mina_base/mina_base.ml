@@ -1,3 +1,5 @@
+(** Make {!Mina_base} submodules available through the normal path *)
+
 module Signed_command_payload = Mina_base_signed_command_payload
 module Signed_command = Mina_base_signed_command
 module Payment_payload = Mina_base_payment_payload

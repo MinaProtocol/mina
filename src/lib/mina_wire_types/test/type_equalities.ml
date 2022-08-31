@@ -6,19 +6,25 @@
 module WT = Mina_wire_types
 open WT.Utils
 
-(* Given two modules containing one type, check the types are equal *)
-(* For types with arity 0 *)
+(** {2 Useful functors for testing} *)
+
+(** {3 Given two modules containing one type, check the types are equal} *)
+
+(** For types with arity 0 *)
 module Assert_equal0 (O : S0) (W : S0 with type t = O.t) = struct end
 
-(* For types with arity 1 *)
+(** For types with arity 1 *)
 module Assert_equal1 (O : S1) (W : S1 with type 'a t = 'a O.t) = struct end
 
-(* For types with arity 2 *)
+(** For types with arity 2 *)
 module Assert_equal2 (O : S2) (W : S2 with type ('a, 'b) t = ('a, 'b) O.t) =
 struct end
 
-(* Assert_equalXVY checks the equality of two versioned
+(** {3 Check equality between versioned types of different arities}
+
+   [Assert_equalXVY] checks the equality of two versioned
    types of arity X with version Y *)
+
 module Assert_equal0V1 (O : V1S0) (W : V1S0 with type V1.t = O.V1.t) = struct end
 
 module Assert_equal0V2 (O : V2S0) (W : V2S0 with type V2.t = O.V2.t) = struct end
@@ -49,6 +55,12 @@ module Assert_equal3V2
     (W : V2S3 with type ('a, 'b, 'c) V2.t = ('a, 'b, 'c) O.V2.t) =
 struct end
 
+(** {2 Actual tests}
+
+    Remember than in this library, the [Stable] layer is omitted in versioned
+    types, so we have to compare [WT.X.V1.t] and [X.Stable.V1.t] *)
+
+(** Tests for small modules *)
 module Misc_tests = struct
   include Assert_equal0V1 (Block_time.Stable) (WT.Block_time)
   include

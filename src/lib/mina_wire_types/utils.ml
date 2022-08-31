@@ -1,12 +1,16 @@
-(** Signature maker provided by implentation module *)
+(** Various useful module types and functors *)
 
+(** The signature of a module *)
 module type Single_sig = sig
   module type S
 end
 
+(** Signature maker provided by implementation module *)
 module Signature (Types : Single_sig) = struct
   module type S = functor (_ : Types.S) -> Single_sig
 end
+
+(** {2 Types of modules with a single type [t] of different arities} *)
 
 module type S0 = sig
   type t
@@ -23,6 +27,8 @@ end
 module type S3 = sig
   type ('a, 'b, 'c) t
 end
+
+(** {2 Same, for versioned types} *)
 
 module type V1S0 = sig
   module V1 : S0
