@@ -1,6 +1,5 @@
 open Core
 open Async
-open Mina_base
 
 type Structured_log_events.t +=
   | Merge_snark_generated of
@@ -40,11 +39,7 @@ module Make (Inputs : Intf.Inputs_intf) :
 
     module Single = struct
       module Spec = struct
-        type t =
-          ( Transaction.t
-          , Transaction_witness.t
-          , Ledger_proof.t )
-          Work.Single.Spec.t
+        type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
         [@@deriving sexp, to_yojson]
 
         let statement = Work.Single.Spec.statement
@@ -213,6 +208,18 @@ module Make (Inputs : Intf.Inputs_intf) :
           (* Pause to wait for stdout to flush *)
           match%bind perform state public_key work with
           | Error e ->
+              let%bind () =
+                match%map
+                  dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+                    shutdown_on_disconnect (work, public_key) daemon_address
+                with
+                | Error e ->
+                    [%log error]
+                      "Couldn't inform the daemon about the snark work failure"
+                      ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                | Ok () ->
+                    ()
+              in
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics logger ;
@@ -258,11 +265,20 @@ module Make (Inputs : Intf.Inputs_intf) :
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
-      in
+      and conf_dir = Cli_lib.Flag.conf_dir in
       fun () ->
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
+        Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
+            let logrotate_max_size = 1024 * 10 in
+            let logrotate_num_rotate = 1 in
+            Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
+              ~processor:(Logger.Processor.raw ())
+              ~transport:
+                (Logger_file_system.dumb_logrotate ~directory:conf_dir
+                   ~log_filename:"mina-snark-worker.log"
+                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ) ;
         Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;

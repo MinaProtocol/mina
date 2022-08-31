@@ -9,13 +9,17 @@ let rec absorb :
     -> absorb_scalar:(scalar -> unit)
     -> g1_to_field_elements:(g1 -> f list)
     -> mask_g1_opt:(g1_opt -> g1)
-    -> (a, < scalar : scalar ; g1 : g1 ; g1_opt : g1_opt >) Type.t
+    -> ( a
+       , < scalar : scalar ; g1 : g1 ; g1_opt : g1_opt ; base_field : f > )
+       Type.t
     -> a
     -> unit =
  fun ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt ty t ->
   match ty with
   | PC ->
       List.iter ~f:absorb_field (g1_to_field_elements t)
+  | Field ->
+      absorb_field t
   | Scalar ->
       absorb_scalar t
   | Without_degree_bound ->
@@ -74,7 +78,6 @@ let boolean_constrain (type f)
   let open Impl in
   assert_all (List.map xs ~f:(fun x -> Constraint.boolean (x :> Field.t)))
 
-(* Should seal constants too *)
 let seal (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
     (x : Impl.Field.t) : Impl.Field.t =
@@ -82,9 +85,36 @@ let seal (type f)
   match Field.to_constant_and_terms x with
   | None, [ (x, i) ] when Field.Constant.(equal x one) ->
       Snarky_backendless.Cvar.Var (Impl.Var.index i)
+  | Some c, [] ->
+      Field.constant c
   | _ ->
       let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
       Field.Assert.equal x y ; y
+
+let lowest_128_bits (type f) ~constrain_low_bits ~assert_128_bits
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x =
+  let open Impl in
+  let pow2 =
+    (* 2 ^ n *)
+    let rec pow2 x i =
+      if i = 0 then x else pow2 Field.Constant.(x + x) (i - 1)
+    in
+    fun n -> pow2 Field.Constant.one n
+  in
+  let lo, hi =
+    exists
+      Typ.(field * field)
+      ~compute:(fun () ->
+        let lo, hi =
+          Field.Constant.unpack (As_prover.read_var x)
+          |> Fn.flip List.split_n 128
+        in
+        (Field.Constant.project lo, Field.Constant.project hi) )
+  in
+  assert_128_bits hi ;
+  if constrain_low_bits then assert_128_bits lo ;
+  Field.Assert.equal x Field.(lo + scale hi (pow2 128)) ;
+  lo
 
 let unsafe_unpack_with_partial_sum (type f)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x ~n =

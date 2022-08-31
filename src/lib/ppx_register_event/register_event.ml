@@ -11,7 +11,7 @@ let checked_interpolations_statically ~loc msg label_names =
       (* check that every interpolation point $foo in msg has a matching label;
          OK to have extra labels not mentioned in message
       *)
-      match Logproc_lib.Interpolator.parse s with
+      match Interpolator_lib.Interpolator.parse s with
       | Error err ->
           Location.raise_errorf ~loc
             "Encountered an error while parsing the msg: %s" err
@@ -168,11 +168,12 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                       ~f:(fun { pld_name = { txt = name; _ }; pld_type; _ } acc ->
                         Ppx_deriving_yojson.wrap_runtime
                         @@ [%expr
+                             let module Result = Core_kernel.Result in
                              match
                                Core_kernel.Map.find args_list [%e estring name]
                              with
                              | Some [%p pvar name] ->
-                                 Core_kernel.Result.bind
+                                 Result.bind
                                    ([%e
                                       of_yojson
                                         ~path:(split_path @ [ ctor; name ])
@@ -180,7 +181,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                                       [%e evar name] )
                                    ~f:(fun [%p pvar name] -> [%e acc])
                              | None ->
-                                 Core_kernel.Result.fail
+                                 Result.fail
                                    [%e
                                      estring
                                        (sprintf "%s, parse: missing argument %s"

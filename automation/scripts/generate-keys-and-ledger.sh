@@ -12,7 +12,7 @@ FISH_COUNT_TOTAL=1
 SEED_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-MINA_DAEMON_IMAGE="codaprotocol/mina-daemon:1.1.6alpha4-feature-mina-passwd-envvars-devnet-4a86bc8"
+MINA_DAEMON_IMAGE="minaprotocol/mina-daemon:1.3.0beta1-develop-7af1312-buster-devnet"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
@@ -89,7 +89,7 @@ rm -rf ./keys/genesis && mkdir ./keys/genesis
 set -eo pipefail
 set -e
 
-privkey_pass="naughty blue worm"
+privkey_pass="naughty red vampire"
 
 function generate_key_files {
 

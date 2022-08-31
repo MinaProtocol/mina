@@ -12,3 +12,4 @@ include Signature_lib_unix.Graphql_scalars
 include Block_time_unix.Graphql_scalars
 include Filtered_external_transition_unix.Graphql_scalars
 include Consensus.Graphql_scalars
+include Mina_transaction_unix.Graphql_scalars

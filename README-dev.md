@@ -26,7 +26,7 @@ The short version:
 1.  Start with Ubuntu 18 or run it in a virtual machine
 2.  Set github repos to pull and push over ssh: `git config --global url.ssh://git@github.com/.insteadOf https://github.com/`
     - To push branches to repos in the MinaProtocol or o1-labs organisations, you must complete this step. These repositories do not accept the password authentication used by the https URLs.
-3.  Pull in our submodules: `git submodule update --init`
+3.  Pull in our submodules: `git submodule update --init --recursive`
     - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
       you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 4.  Run `git config --local --add submodule.recurse true`
@@ -40,7 +40,7 @@ Refer to [/dev](/dev).
 
 - Invoke `make macos-setup`
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Invoke `rustup toolchain install 1.52.1`
+- Invoke `rustup toolchain install 1.58.1`
 - Invoke `make build`
 - Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
 

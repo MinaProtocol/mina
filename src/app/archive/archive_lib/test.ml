@@ -1,6 +1,7 @@
 open Async
 open Core
 open Mina_base
+open Mina_transaction
 open Pipe_lib
 open Signature_lib
 
@@ -49,9 +50,69 @@ let%test_module "Archive node unit tests" =
 
     let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
-    let user_command_gen =
-      User_command.Gen.payment_with_random_participants ~keys ~max_amount:1000
-        ~fee_range:10 ()
+    let user_command_signed_gen =
+      Mina_generators.User_command_generators.payment_with_random_participants
+        ~keys ~max_amount:1000 ~fee_range:10 ()
+
+    let genesis_state_view =
+      let genesis_state_body =
+        precomputed_values.protocol_state_with_hashes.data.body
+      in
+      Mina_state.Protocol_state.Body.view genesis_state_body
+
+    let user_command_zkapp_gen :
+        ('a, Parties.t) User_command.t_ Base_quickcheck.Generator.t =
+      let open Base_quickcheck.Generator.Let_syntax in
+      let%bind initial_balance =
+        Base_quickcheck.Generator.int64_uniform_inclusive 200_000_000_000_000L
+          400_000_000_000_000L
+        >>| Unsigned.UInt64.of_int64 >>| Currency.Balance.of_uint64
+      and fee_payer_key_index =
+        Base_quickcheck.Generator.int_inclusive 0 @@ (Array.length keys - 1)
+      in
+      let test_keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
+      let extra_keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
+      let keys = Array.append test_keys extra_keys in
+      let fee_payer_keypair = keys.(fee_payer_key_index) in
+      let keymap =
+        Array.map keys ~f:(fun { public_key; private_key } ->
+            (Public_key.compress public_key, private_key) )
+        |> Array.to_list |> Public_key.Compressed.Map.of_alist_exn
+      in
+      let ledger = Mina_ledger.Ledger.create ~depth:10 () in
+      let public_keys =
+        Array.map test_keys ~f:(fun key -> Public_key.compress key.public_key)
+      in
+      let account_ids =
+        Array.map public_keys ~f:(fun pk ->
+            Account_id.create pk Token_id.default )
+      in
+      let zkappify_account (account : Account.t) : Account.t =
+        let verification_key =
+          Some
+            With_hash.
+              { data = Side_loaded_verification_key.dummy
+              ; hash = Zkapp_account.dummy_vk_hash ()
+              }
+        in
+        let zkapp = Some { Zkapp_account.default with verification_key } in
+        { account with zkapp }
+      in
+      let accounts =
+        Array.mapi account_ids ~f:(fun ndx account_id ->
+            let account = Account.create account_id initial_balance in
+            if ndx mod 2 = 0 then (account_id, account)
+            else (account_id, zkappify_account account) )
+      in
+      Array.map accounts ~f:(fun (account_id, account) ->
+          Mina_ledger.Ledger.get_or_create_account ledger account_id account
+          |> Or_error.ok_exn )
+      |> fun _ ->
+      let%map (parties : Parties.t) =
+        Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
+          ~keymap ~ledger ~protocol_state_view:genesis_state_view ()
+      in
+      User_command.Parties parties
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~keys ~min_fee:0 ~max_fee:10
@@ -63,12 +124,12 @@ let%test_module "Archive node unit tests" =
           (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
              ~min_fee:Currency.Fee.zero )
 
-    let%test_unit "User_command: read and write" =
+    let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
       Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
-        user_command_gen ~f:(fun user_command ->
+        user_command_signed_gen ~f:(fun user_command ->
           let transaction_hash = Transaction_hash.hash_command user_command in
           match%map
             let open Deferred.Result.Let_syntax in
@@ -77,6 +138,39 @@ let%test_module "Archive node unit tests" =
             in
             let%map result =
               Processor.User_command.find conn ~transaction_hash
+              >>| function
+              | Some (`Signed_command_id signed_command_id) ->
+                  Some signed_command_id
+              | Some (`Zkapp_command_id _) | None ->
+                  None
+            in
+            [%test_result: int] ~expect:user_command_id
+              (Option.value_exn result)
+          with
+          | Ok () ->
+              ()
+          | Error e ->
+              failwith @@ Caqti_error.show e )
+
+    let%test_unit "User_command: read and write zkapp command" =
+      let conn = Lazy.force conn_lazy in
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
+        user_command_zkapp_gen ~f:(fun user_command ->
+          let transaction_hash = Transaction_hash.hash_command user_command in
+          match%map
+            let open Deferred.Result.Let_syntax in
+            let%bind user_command_id =
+              Processor.User_command.add_if_doesn't_exist conn user_command
+            in
+            let%map result =
+              Processor.User_command.find conn ~transaction_hash
+              >>| function
+              | Some (`Zkapp_command_id zkapp_command_id) ->
+                  Some zkapp_command_id
+              | Some (`Signed_command_id _) | None ->
+                  None
             in
             [%test_result: int] ~expect:user_command_id
               (Option.value_exn result)
@@ -109,7 +203,7 @@ let%test_module "Archive node unit tests" =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
             in
             let%map result =
-              Processor.Internal_command.find conn ~transaction_hash
+              Processor.Internal_command.find_opt conn ~transaction_hash
                 ~typ:(Processor.Fee_transfer.Kind.to_string kind)
             in
             [%test_result: int] ~expect:fee_transfer_id
@@ -133,7 +227,7 @@ let%test_module "Archive node unit tests" =
               Processor.Coinbase.add_if_doesn't_exist conn coinbase
             in
             let%map result =
-              Processor.Internal_command.find conn ~transaction_hash
+              Processor.Internal_command.find_opt conn ~transaction_hash
                 ~typ:Processor.Coinbase.coinbase_typ
             in
             [%test_result: int] ~expect:coinbase_id (Option.value_exn result)
@@ -170,14 +264,15 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added breadcrumb) )
+                  (Diff.Builder.breadcrumb_added ~precomputed_values ~logger
+                     breadcrumb ) )
               breadcrumbs
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
           let%bind () = processor_deferred_computation in
           match%map
-            Processor.deferred_result_list_fold breadcrumbs ~init:()
+            Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
                 Caqti_async.Pool.use
                   (fun conn ->
@@ -244,7 +339,7 @@ let%test_module "Archive node unit tests" =
             List.map
               ~f:(fun breadcrumb ->
                 Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added breadcrumb) )
+                  (Diff.Builder.breadcrumb_added ~logger breadcrumb) )
               breadcrumbs
           in
           let max_height =

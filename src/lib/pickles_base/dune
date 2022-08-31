@@ -4,7 +4,7 @@
  (public_name pickles_base)
  (flags -warn-error -22)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps h_list.ppx ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+ (preprocess (pps h_list.ppx ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (libraries
    ;; opam libraries
    base.base_internalhash_types
@@ -18,4 +18,6 @@
    snarky.backendless
    random_oracle_input
    pickles_types
+   pickles.one_hot_vector
+   ppx_version.runtime
 ))

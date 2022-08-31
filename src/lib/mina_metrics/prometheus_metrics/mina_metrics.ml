@@ -1019,6 +1019,10 @@ module Snark_work = struct
     in
     Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
 
+  let snark_work_failed_rpc : Counter.t =
+    let help = "# of snark work failures reported by snark workers" in
+    Counter.v "snark_work_failed_rpc" ~help ~namespace ~subsystem
+
   let snark_pool_size : Gauge.t =
     let help = "# of completed snark work bundles in the snark pool" in
     Gauge.v "snark_pool_size" ~help ~namespace ~subsystem

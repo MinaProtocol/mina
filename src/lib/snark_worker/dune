@@ -9,6 +9,7 @@
    sexplib0
    async_kernel
    base
+   base.caml
    async
    core
    core_kernel.hash_heap
@@ -24,6 +25,8 @@
    mina_metrics
    logger
    signature_lib
+   logger.file_system
+   mina_base.import
    cli_lib
    genesis_constants
    transaction_witness
@@ -31,18 +34,21 @@
    snark_work_lib
    currency
    mina_base
+   mina_transaction
    transaction_snark
    ledger_proof
+   mina_ledger
    transaction_snark_work
    error_json
    mina_compile_config
    mina_state
    transaction_protocol_state
+   ppx_version_runtime
  )
  (preprocess
   (pps
     ppx_bin_prot
-    ppx_coda
+    ppx_mina
     ppx_here
     ppx_custom_printf
     ppx_deriving_yojson

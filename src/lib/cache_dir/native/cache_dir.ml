@@ -32,15 +32,10 @@ let cache =
   ]
 
 let env_path =
-  (* TODO: remove deprecated variable, eventually *)
-  let mina_keys_path = "MINA_KEYS_PATH" in
-  let coda_keys_path = "CODA_KEYS_PATH" in
-  match (Sys.getenv mina_keys_path, Sys.getenv coda_keys_path) with
-  | Some path, _ ->
+  match Sys.getenv "MINA_KEYS_PATH" with
+  | Some path ->
       path
-  | None, Some path ->
-      path
-  | None, None ->
+  | None ->
       manual_install_path
 
 let possible_paths base =

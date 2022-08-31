@@ -23,6 +23,7 @@
    staged_ledger
    mina_state
    signature_lib
+   mina_ledger
    consensus
    genesis_constants
    mina_numbers
@@ -50,4 +51,4 @@
    mina_net2
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version ppx_compare ppx_deriving_yojson)))
+ (preprocess (pps ppx_jane ppx_mina ppx_version ppx_compare ppx_deriving_yojson)))

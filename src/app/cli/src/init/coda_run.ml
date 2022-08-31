@@ -157,7 +157,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   let mask_file = conf_dir ^/ "registered_masks.dot" in
   (* ledger visualization *)
   [%log debug] "%s" (Visualization_message.success "registered masks" mask_file) ;
-  Mina_base.Ledger.Debug.visualize ~filename:mask_file ;
+  Mina_ledger.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
       [%log warn]
@@ -360,9 +360,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 ~f:Or_error.return )
           |> Or_error.map ~f:(function
                | Genesis_epoch_ledger l ->
-                   Mina_base.Ledger.to_list l
+                   Mina_ledger.Ledger.to_list l
                | Ledger_db db ->
-                   Mina_base.Ledger.Db.to_list db )
+                   Mina_ledger.Ledger.Db.to_list db )
           |> Deferred.return )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
@@ -379,7 +379,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
-        (fun () filename -> return (Mina_base.Ledger.Debug.visualize ~filename))
+        (fun () filename ->
+          return (Mina_ledger.Ledger.Debug.visualize ~filename) )
     ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
           return
             (let cidr_str = Unix.Cidr.to_string cidr in
@@ -436,6 +437,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
           Deferred.return @@ Mina_lib.add_work coda work )
+    ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+        (fun
+          ()
+          ((_work_spec, _prover_pk) :
+            Snark_worker.Work.Spec.t * Signature_lib.Public_key.Compressed.t )
+        ->
+          [%str_log error] Snark_worker.Generating_snark_work_failed ;
+          Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
+          Deferred.unit )
     ]
   in
   let create_graphql_server ~bind_to_address ~schema ~server_description port =
@@ -497,7 +507,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 if insecure_rest_server then All_addresses else Localhost)
             ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
             rest_server_port ) ) ;
-  (*Second graphql server with limited queries exopsed*)
+  (*Second graphql server with limited queries exposed*)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_limited_graphql" (fun () ->
           create_graphql_server
@@ -648,7 +658,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
   Core.print_string message
 
 let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
-    ~node_error_url ~contact_info coda_ref =
+    coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
@@ -698,12 +708,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
            | _exn ->
                let error = Error.of_exn ~backtrace:`Get exn in
                let%bind () =
-                 match node_error_url with
-                 | Some node_error_url ->
-                     Node_error_service.send_report ~logger:top_logger
-                       ~node_error_url ~mina_ref:coda_ref ~error ~contact_info
-                 | None ->
-                     Deferred.unit
+                 Node_error_service.send_report ~logger:top_logger ~error
                in
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref

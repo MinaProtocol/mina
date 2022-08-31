@@ -15,6 +15,8 @@
    integers
    bin_prot.shape
    ;; local libraries
+   mina_base.util
+   kimchi_backend.pasta
    genesis_constants
    crypto_params
    random_oracle
@@ -39,19 +41,17 @@
    signature_lib
    currency
    hash_prefix_states
-   pasta
-   zexe_backend
-   bitstring_lib
-   marlin_plonk_bindings_pasta_pallas
-   marlin_plonk_bindings_pasta_fq
-   marlin_plonk_bindings_pasta_fp
-   marlin_plonk_bindings
+   kimchi_backend
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   ppx_version.runtime
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
-    ppx_coda
+    ppx_mina
     h_list.ppx
     ppx_assert
     ppx_compare

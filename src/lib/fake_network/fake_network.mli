@@ -3,6 +3,17 @@ open Core
 open Gadt_lib
 open Network_peer
 open Mina_base
+module Sync_ledger = Mina_ledger.Sync_ledger
+
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
 
 (* There must be at least 2 peers to create a network *)
 type 'n num_peers = 'n Peano.gt_1
@@ -11,21 +22,20 @@ type peer_state =
   { frontier : Transition_frontier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
   ; get_staged_ledger_aux_and_pending_coinbases_at_hash :
-         Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
+         Pasta_bindings.Fp.t Envelope.Incoming.t
       -> ( Staged_ledger.Scan_state.t
-         * Marlin_plonk_bindings_pasta_fp.t
+         * Pasta_bindings.Fp.t
          * Pending_coinbase.t
          * Mina_state.Protocol_state.value list )
          option
          Deferred.t
   ; get_some_initial_peers : unit Envelope.Incoming.t -> Peer.t list Deferred.t
   ; answer_sync_ledger_query :
-         (Marlin_plonk_bindings_pasta_fp.t * Sync_ledger.Query.t)
-         Envelope.Incoming.t
+         (Pasta_bindings.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
       -> (Sync_ledger.Answer.t, Error.t) result Deferred.t
   ; get_ancestry :
          ( Consensus.Data.Consensus_state.Value.t
-         , Marlin_plonk_bindings_pasta_fp.t )
+         , Pasta_bindings.Fp.t )
          With_hash.t
          Envelope.Incoming.t
       -> ( Mina_block.t
@@ -36,7 +46,7 @@ type peer_state =
   ; get_best_tip :
          unit Envelope.Incoming.t
       -> ( Mina_block.t
-         , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
+         , Pasta_bindings.Fp.t list * Mina_block.t )
          Proof_carrying_data.t
          option
          Deferred.t
@@ -45,16 +55,12 @@ type peer_state =
       -> (Mina_networking.Rpcs.Get_node_status.Node_status.t, Error.t) result
          Deferred.t
   ; get_transition_knowledge :
-         unit Envelope.Incoming.t
-      -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t
+      unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t
   ; get_transition_chain_proof :
-         Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
-      -> ( Marlin_plonk_bindings_pasta_fp.t
-         * Marlin_plonk_bindings_pasta_fp.t list )
-         option
-         Deferred.t
+         Pasta_bindings.Fp.t Envelope.Incoming.t
+      -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
   ; get_transition_chain :
-         Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
+         Pasta_bindings.Fp.t list Envelope.Incoming.t
       -> Mina_block.t list option Deferred.t
   }
 
@@ -71,10 +77,9 @@ type nonrec 'n t =
   constraint 'n = _ num_peers
 
 val setup :
-     logger:Logger.t
+     context:(module CONTEXT)
   -> ?trust_system:Trust_system.t
   -> ?time_controller:Block_time.Controller.t
-  -> precomputed_values:Precomputed_values.t
   -> (peer_state, 'n num_peers) Vect.t
   -> 'n num_peers t
 
@@ -82,8 +87,7 @@ module Generator : sig
   open Quickcheck
 
   type peer_config =
-       logger:Logger.t
-    -> precomputed_values:Precomputed_values.t
+       context:(module CONTEXT)
     -> verifier:Verifier.t
     -> max_frontier_length:int
     -> use_super_catchup:bool
@@ -91,9 +95,9 @@ module Generator : sig
 
   val fresh_peer_custom_rpc :
        ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
-         (   Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
+         (   Pasta_bindings.Fp.t Envelope.Incoming.t
           -> ( Staged_ledger.Scan_state.t
-             * Marlin_plonk_bindings_pasta_fp.t
+             * Pasta_bindings.Fp.t
              * Pending_coinbase.t
              * Mina_state.Protocol_state.value list )
              option
@@ -101,12 +105,11 @@ module Generator : sig
     -> ?get_some_initial_peers:
          (unit Envelope.Incoming.t -> Peer.t list Deferred.t)
     -> ?answer_sync_ledger_query:
-         (   (Marlin_plonk_bindings_pasta_fp.t * Sync_ledger.Query.t)
-             Envelope.Incoming.t
+         (   (Pasta_bindings.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
           -> (Sync_ledger.Answer.t, Error.t) result Deferred.t )
     -> ?get_ancestry:
          (   ( Consensus.Data.Consensus_state.Value.t
-             , Marlin_plonk_bindings_pasta_fp.t )
+             , Pasta_bindings.Fp.t )
              With_hash.t
              Envelope.Incoming.t
           -> ( Mina_block.t
@@ -117,7 +120,7 @@ module Generator : sig
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
           -> ( Mina_block.t
-             , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
+             , Pasta_bindings.Fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t )
@@ -128,16 +131,13 @@ module Generator : sig
              result
              Deferred.t )
     -> ?get_transition_knowledge:
-         (   unit Envelope.Incoming.t
-          -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t )
+         (unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t)
     -> ?get_transition_chain_proof:
-         (   Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
-          -> ( Marlin_plonk_bindings_pasta_fp.t
-             * Marlin_plonk_bindings_pasta_fp.t list )
-             option
-             Deferred.t )
+         (   Pasta_bindings.Fp.t Envelope.Incoming.t
+          -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
+         )
     -> ?get_transition_chain:
-         (   Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
+         (   Pasta_bindings.Fp.t list Envelope.Incoming.t
           -> Mina_block.t list option Deferred.t )
     -> peer_config
 
@@ -146,9 +146,9 @@ module Generator : sig
   val peer_with_branch_custom_rpc :
        frontier_branch_size:int
     -> ?get_staged_ledger_aux_and_pending_coinbases_at_hash:
-         (   Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
+         (   Pasta_bindings.Fp.t Envelope.Incoming.t
           -> ( Staged_ledger.Scan_state.t
-             * Marlin_plonk_bindings_pasta_fp.t
+             * Pasta_bindings.Fp.t
              * Pending_coinbase.t
              * Mina_state.Protocol_state.value list )
              option
@@ -156,12 +156,11 @@ module Generator : sig
     -> ?get_some_initial_peers:
          (unit Envelope.Incoming.t -> Peer.t list Deferred.t)
     -> ?answer_sync_ledger_query:
-         (   (Marlin_plonk_bindings_pasta_fp.t * Sync_ledger.Query.t)
-             Envelope.Incoming.t
+         (   (Pasta_bindings.Fp.t * Sync_ledger.Query.t) Envelope.Incoming.t
           -> (Sync_ledger.Answer.t, Error.t) result Deferred.t )
     -> ?get_ancestry:
          (   ( Consensus.Data.Consensus_state.Value.t
-             , Marlin_plonk_bindings_pasta_fp.t )
+             , Pasta_bindings.Fp.t )
              With_hash.t
              Envelope.Incoming.t
           -> ( Mina_block.t
@@ -172,7 +171,7 @@ module Generator : sig
     -> ?get_best_tip:
          (   unit Envelope.Incoming.t
           -> ( Mina_block.t
-             , Marlin_plonk_bindings_pasta_fp.t list * Mina_block.t )
+             , Pasta_bindings.Fp.t list * Mina_block.t )
              Proof_carrying_data.t
              option
              Deferred.t )
@@ -183,16 +182,13 @@ module Generator : sig
              result
              Deferred.t )
     -> ?get_transition_knowledge:
-         (   unit Envelope.Incoming.t
-          -> Marlin_plonk_bindings_pasta_fp.t list Deferred.t )
+         (unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t)
     -> ?get_transition_chain_proof:
-         (   Marlin_plonk_bindings_pasta_fp.t Envelope.Incoming.t
-          -> ( Marlin_plonk_bindings_pasta_fp.t
-             * Marlin_plonk_bindings_pasta_fp.t list )
-             option
-             Deferred.t )
+         (   Pasta_bindings.Fp.t Envelope.Incoming.t
+          -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
+         )
     -> ?get_transition_chain:
-         (   Marlin_plonk_bindings_pasta_fp.t list Envelope.Incoming.t
+         (   Pasta_bindings.Fp.t list Envelope.Incoming.t
           -> Mina_block.t list option Deferred.t )
     -> peer_config
 

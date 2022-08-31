@@ -14,7 +14,6 @@
    core_kernel
    base
    base.base_internalhash_types
-   core
    ;; local libraries
    bitstring_lib
    pickles
@@ -28,9 +27,10 @@
    snarky.backendless
    random_oracle_input
    random_oracle
+   ppx_version.runtime
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_hash ppx_let
-                  ppx_coda ppx_version ppx_deriving_yojson ppx_bin_prot ppx_compare ppx_sexp_conv ppx_compare ppx_optcomp
+                  ppx_mina ppx_version ppx_deriving_yojson ppx_bin_prot ppx_compare ppx_sexp_conv ppx_compare ppx_optcomp
                   ppx_inline_test))
  (synopsis "Block time"))
