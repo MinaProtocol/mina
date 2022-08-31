@@ -22,9 +22,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = "100_000"; timing = Untimed }
-        ; { balance = "100_000"; timing = Untimed }
-        ; { balance = "100_000"; timing = Untimed }
+        [ { balance = "8_000_000_000"; timing = Untimed }
+        ; { balance = "8_000_000_000"; timing = Untimed }
+        ; { balance = "100_000_000"; timing = Untimed }
         ]
     }
 
@@ -64,7 +64,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Node.must_send_payment ~logger node_c ~sender_pub_key
              ~receiver_pub_key
              ~amount:(Currency.Amount.of_int 1_000_000)
-             ~fee:(Currency.Fee.of_int 1_000)
+             ~fee:(Currency.Fee.of_int 10_000_000)
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier ~txn_hash
