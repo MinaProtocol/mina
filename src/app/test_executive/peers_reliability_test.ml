@@ -26,9 +26,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { balance = "100_000"; timing = Untimed }
         ; { balance = "100_000"; timing = Untimed }
         ]
-    ; extra_genesis_accounts = [ { balance = "9000"; timing = Untimed } ]
-    ; num_snark_workers = 2
-    ; snark_worker_fee = "0.0001"
     }
 
   let run network t =
@@ -59,7 +56,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            initial_connectivity_data )
     in
     (* a couple of transactions, so the persisted transition frontier is not trivial *)
-    let fish = List.hd_exn @@ Network.extra_genesis_keypairs network in
     let%bind () =
       section_hard "send a payment"
         (let%bind sender_pub_key = Util.pub_key_of_node node_a in
@@ -75,7 +71,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~node_included_in:(`Node node_c) ) )
     in
     let%bind () =
-      let open Mina_base in
       let wait_for_zkapp parties =
         let%map () =
           wait_for t
@@ -87,12 +82,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "send a zkApp to create an account"
         (let%bind parties_create_accounts =
            let amount = Currency.Amount.of_int 10_000_000_000 in
-           let nonce = Account.Nonce.zero in
+           let nonce = Mina_base.Account.Nonce.zero in
            let memo =
-             Signed_command_memo.create_from_string_exn "Zkapp create account"
+             Mina_base.Signed_command_memo.create_from_string_exn
+               "Zkapp create account"
            in
            let fee = Currency.Fee.of_int 20_000_000 in
-           let sender_kp = fish in
+           let sender_kp =
+             (Option.value_exn (Node.network_keypair node_a)).keypair
+           in
            let (parties_spec : Transaction_snark.For_tests.Spec.t) =
              { sender = (sender_kp, nonce)
              ; fee
@@ -102,8 +100,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ; zkapp_account_keypairs = [ Signature_lib.Keypair.create () ]
              ; memo
              ; new_zkapp_account = true
-             ; snapp_update = Party.Update.dummy
-             ; current_auth = Permissions.Auth_required.Signature
+             ; snapp_update = Mina_base.Party.Update.dummy
+             ; current_auth = Mina_base.Permissions.Auth_required.Signature
              ; call_data = Snark_params.Tick.Field.zero
              ; events = []
              ; sequence_events = []
