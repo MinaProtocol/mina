@@ -1038,6 +1038,12 @@ struct
         | Error e ->
             [%log' error t.logger] "Transaction verification error: $error"
               ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+            [%log' debug t.logger]
+              "Failed to batch verify $transaction_pool_diff"
+              ~metadata:
+                [ ( "transaction_pool_diff"
+                  , Diff_versioned.to_yojson (Envelope.Incoming.data diff) )
+                ] ;
             Deferred.return (Error (Error.tag e ~tag:"Internal_error"))
         | Ok (Error invalid) ->
             let msg = Verifier.invalid_to_string invalid in
@@ -1049,8 +1055,7 @@ struct
                 (Envelope.Incoming.sender diff)
                 ( Trust_system.Actions.Sent_useless_gossip
                 , Some
-                    ( "rejecting command because had invalid signature or was \
-                       malformed"
+                    ( "rejecting command because had invalid signature or proof"
                     , [] ) )
             in
             Error Error.(tag (of_string msg) ~tag:"Verification_failed")
@@ -1162,24 +1167,32 @@ struct
         let dropped_for_add =
           List.filter_map add_results ~f:(function
             | Ok (_, dropped) ->
-                Some dropped
+                Some (Sequence.to_list dropped)
             | Error _ ->
                 None )
-          |> Sequence.of_list |> Sequence.concat
+          |> List.concat
         in
         (* drop commands from the pool to retain max size *)
         let pool, dropped_for_size =
-          drop_until_below_max_size pool ~pool_max_size:t.config.pool_max_size
+          let pool, dropped =
+            drop_until_below_max_size pool ~pool_max_size:t.config.pool_max_size
+          in
+          (pool, Sequence.to_list dropped)
         in
         (* handle drops of locally generated commands *)
-        let all_dropped_cmds =
-          Sequence.to_list (Sequence.append dropped_for_add dropped_for_size)
-        in
+        let all_dropped_cmds = dropped_for_add @ dropped_for_size in
         let all_dropped_cmd_hashes =
           List.map all_dropped_cmds
             ~f:Transaction_hash.User_command_with_valid_signature.hash
           |> Transaction_hash.Set.of_list
         in
+        [%log' debug t.logger]
+          "Dropping $num_for_add commands from pool while adding new commands, \
+           and $num_for_size commands due to pool size"
+          ~metadata:
+            [ ("num_for_add", `Int (List.length dropped_for_add))
+            ; ("num_for_size", `Int (List.length dropped_for_size))
+            ] ;
         let locally_generated_dropped =
           List.filter all_dropped_cmds ~f:(fun cmd ->
               Hashtbl.find_and_remove t.locally_generated_uncommitted cmd

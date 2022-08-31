@@ -59,7 +59,7 @@ end)
     let reject accepted rejected =
       Fn.compose Deferred.return (function
         | Local f ->
-            f (Ok (`Broadcasted, accepted, rejected))
+            f (Ok (`Not_broadcasted, accepted, rejected))
         | External cb ->
             fire_if_not_already_fired cb `Reject )
 
