@@ -22,9 +22,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = "8_000_000_000"; timing = Untimed }
-        ; { balance = "8_000_000_000"; timing = Untimed }
-        ; { balance = "100_000_000"; timing = Untimed }
+        [ { balance = "80_000_000_000"; timing = Untimed }
+        ; { balance = "80_000_000_000"; timing = Untimed }
+        ; { balance = "100_000_000_000"; timing = Untimed }
         ]
     }
 
