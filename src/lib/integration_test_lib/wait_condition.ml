@@ -73,7 +73,7 @@ struct
     network_state ~id:Nodes_to_initialize
       ~description:
         ( nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
-        |> Printf.sprintf "[%s] to initialize" )
+        |> sprintf "[%s] to initialize" )
       ~f:(fun (state : Network_state.t) ->
         List.for_all nodes ~f:(fun node ->
             String.Map.find state.node_initialization (Node.id node)
@@ -102,7 +102,7 @@ struct
       (2 * n) + 1
     in
     { id = Blocks_to_be_produced
-    ; description = Printf.sprintf "%d blocks to be produced" n
+    ; description = sprintf "%d blocks to be produced" n
     ; predicate = Network_state_predicate (init, check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
@@ -117,8 +117,7 @@ struct
       else Predicate_continuation initial_height
     in
     let description =
-      Printf.sprintf "chain block height greater than equal to [%d] "
-        height_growth
+      sprintf "chain block height greater than equal to [%d] " height_growth
     in
     let soft_timeout_in_slots = (2 * height_growth) + 1 in
     { id = Block_height_growth
@@ -151,7 +150,7 @@ struct
       |> String.concat ~sep:", "
     in
     { id = Nodes_to_synchronize
-    ; description = Printf.sprintf "%s to synchronize" formatted_nodes
+    ; description = sprintf "%s to synchronize" formatted_nodes
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

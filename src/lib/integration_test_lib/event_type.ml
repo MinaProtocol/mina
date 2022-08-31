@@ -247,7 +247,7 @@ end
 module Persisted_frontier_loaded = struct
   type t = unit [@@deriving to_yojson]
 
-  let name = "persisted_frontier_loaded"
+  let name = "Persisted_frontier_loaded"
 
   let structured_event_id =
     Transition_frontier.persisted_frontier_loaded_structured_events_id
