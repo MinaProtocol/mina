@@ -46,6 +46,9 @@ module Failure = struct
         | Protocol_state_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
+        | Incorrect_verification_key of
+            [ `Expected_verification_key of
+              Side_loaded_verification_key.Stable.V2.t ]
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
       let to_latest = Fn.id
@@ -124,6 +127,10 @@ module Failure = struct
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
       ~invalid_fee_excess:add
+      ~incorrect_verification_key:(fun acc var ->
+        var.constructor
+          (`Expected_verification_key Side_loaded_verification_key.dummy)
+        :: acc )
 
   let gen = Quickcheck.Generator.of_list all
 
@@ -206,6 +213,10 @@ module Failure = struct
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
+    | Incorrect_verification_key (`Expected_verification_key expected_key) ->
+        (* TODO: how large is the verification key? is it ok to base58? *)
+        sprintf "Incorrect_verification_key_%s"
+          (Side_loaded_verification_key.to_base58_check expected_key)
 
   let of_string = function
     | "Predicate" ->
@@ -307,6 +318,13 @@ module Failure = struct
               , fun str ->
                   Account_app_state_precondition_unsatisfied (int_of_string str)
               )
+            ; ( "Incorrect_verification_key_"
+              , ""
+              , fun str ->
+                  let vk =
+                    Side_loaded_verification_key.of_base58_check_exn str
+                  in
+                  Incorrect_verification_key (`Expected_verification_key vk) )
             ]
         in
         match res with
@@ -415,6 +433,11 @@ module Failure = struct
         "Incorrect nonce"
     | Invalid_fee_excess ->
         "Fee excess from parties transaction more than the transaction fees"
+    | Incorrect_verification_key (`Expected_verification_key vk) ->
+        sprintf
+          "The party's account verification key did not match the verification \
+           key that the party's authorization proof was valid against (%s)"
+          (Side_loaded_verification_key.to_base58_check vk)
 end
 
 [%%versioned
