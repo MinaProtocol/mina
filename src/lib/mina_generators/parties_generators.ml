@@ -811,10 +811,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     let%bind list_len = Int.gen_uniform_incl 0 max_list_len in
     Quickcheck.Generator.list_with_length list_len array_gen
   in
-  (* TODO: are these lengths reasonable? *)
-  let%bind events = field_array_list_gen ~max_array_len:8 ~max_list_len:12 in
+  let%bind events = field_array_list_gen ~max_array_len:2 ~max_list_len:1 in
   let%bind sequence_events =
-    field_array_list_gen ~max_array_len:4 ~max_list_len:6
+    field_array_list_gen ~max_array_len:2 ~max_list_len:1
   in
   let%bind call_data = Snark_params.Tick.Field.gen in
   let first_use_of_account =
