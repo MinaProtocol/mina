@@ -117,14 +117,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () = send_zkapp ~logger node_c parties_create_accounts in
          wait_for_zkapp parties_create_accounts )
     in
-    let%bind _account_data =
-      let pk =
-        zkapp_account_keypair.public_key |> Signature_lib.Public_key.compress
-      in
-      let account_id =
-        Mina_base.Account_id.create pk Mina_base.Token_id.default
-      in
-      Node.must_get_account_data ~logger node_c ~account_id
+    let%bind () =
+      section "Checking for new zkApp account in node about to be stopped"
+        (let pk =
+           zkapp_account_keypair.public_key |> Signature_lib.Public_key.compress
+         in
+         let account_id =
+           Mina_base.Account_id.create pk Mina_base.Token_id.default
+         in
+         let%map _account_data =
+           Node.must_get_account_data ~logger node_c ~account_id
+         in
+         () )
     in
     [%log info] "zkApp account was created on node about to be stopped" ;
     let%bind () =
