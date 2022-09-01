@@ -6,22 +6,21 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
  (libraries
-   ;; opam libraries
-   ppx_inline_test.config
-   sexplib0
-   core_kernel
-   bin_prot.shape
-   base.caml
-   ;; local libraries
-   sponge
-   pickles_types
-   kimchi_backend.common
-   promise
-   kimchi_bindings
-   kimchi_types
-   pasta_bindings
-   snarkette
-   ppx_version.runtime
-))
+  ;; opam libraries
+  ppx_inline_test.config
+  sexplib0
+  core_kernel
+  bin_prot.shape
+  base.caml
+  ;; local libraries
+  sponge
+  pickles_types
+  kimchi_backend.common
+  promise
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  snarkette
+  ppx_version.runtime))

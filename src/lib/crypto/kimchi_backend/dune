@@ -8,21 +8,20 @@
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
  (libraries
-   ;; opam libraries
-   integers
-   core_kernel
-   ppx_inline_test.config
-   ;; local libraries
-   kimchi_bindings
-   kimchi_types
-   pasta_bindings
-   snarkette
-   snarky.backendless
-   key_cache
-   hex
-   kimchi_backend.common
-   kimchi_backend.pasta
-   pickles_types
-   sponge
-   snarky.intf
-))
+  ;; opam libraries
+  integers
+  core_kernel
+  ppx_inline_test.config
+  ;; local libraries
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  snarkette
+  snarky.backendless
+  key_cache
+  hex
+  kimchi_backend.common
+  kimchi_backend.pasta
+  pickles_types
+  sponge
+  snarky.intf))
