@@ -64,7 +64,7 @@ variable "gcloudsdk_download_url" {
   type = string
 
   description = "gcloud sdk tool archive download URL"
-  default = "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-296.0.1-linux-x86_64.tar.gz"
+  default = "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-400.0.0-linux-x86_64.tar.gz"
 }
 
 variable "artifact_upload_bin" {
