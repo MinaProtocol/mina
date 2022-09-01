@@ -950,56 +950,51 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
-let zkapps_limits_str =
-  let open Mina_compile_config in
-  sprintf
-    "limits are %d proof parties, %d parties, %d event elements, and %d \
-     sequence event elements"
-    max_proof_parties max_parties max_event_elements max_sequence_event_elements
-
 let add_full_transactions t user_commands =
-  let too_big_commands =
-    List.filter user_commands ~f:(fun cmd -> not @@ User_command.valid_size cmd)
-  in
-  if not @@ List.is_empty too_big_commands then
-    let err_str =
-      match user_commands with
-      | [ _ ] ->
-          sprintf "Transaction is too big; %s" zkapps_limits_str
-      | _ ->
-          sprintf
-            "List of transactions contain at least one too-big transaction; %s"
-            zkapps_limits_str
-    in
-    Deferred.Result.fail (Error.of_string err_str)
-  else
+  let add_all_txns () =
     let result_ivar = Ivar.create () in
     Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
       (user_commands, Ivar.fill result_ivar)
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
+  in
+  let too_big_err =
+    List.find_map user_commands ~f:(fun cmd ->
+        let size_validity =
+          User_command.valid_size
+            ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
+        in
+        match size_validity with Ok () -> None | Error err -> Some err )
+  in
+  match too_big_err with
+  | None ->
+      add_all_txns ()
+  | Some err ->
+      Deferred.Result.fail err
 
 let add_zkapp_transactions t (partiess : Parties.t list) =
-  let too_big_partiess =
-    List.filter partiess ~f:(fun parties -> not @@ Parties.valid_size parties)
-  in
-  if not @@ List.is_empty too_big_partiess then
-    let err_str =
-      match partiess with
-      | [ _ ] ->
-          sprintf "zkApp transaction is too big; %s" zkapps_limits_str
-      | _ ->
-          sprintf "List of zkApps contains at least one too-big zkApp; %s"
-            zkapps_limits_str
-    in
-    Deferred.Result.fail (Error.of_string err_str)
-  else
+  let add_all_txns () =
     let result_ivar = Ivar.create () in
     let cmd_inputs = Parties_command_inputs partiess in
     Strict_pipe.Writer.write t.pipes.user_command_input_writer
       (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
+  in
+  let too_big_err =
+    List.find_map partiess ~f:(fun parties ->
+        let size_validity =
+          Parties.valid_size
+            ~genesis_constants:t.config.precomputed_values.genesis_constants
+            parties
+        in
+        match size_validity with Ok () -> None | Error err -> Some err )
+  in
+  match too_big_err with
+  | None ->
+      add_all_txns ()
+  | Some err ->
+      Deferred.Result.fail err
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -1681,6 +1676,7 @@ let create ?wallets (config : Config.t) =
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
+              ~genesis_constants:config.precomputed_values.genesis_constants
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -1742,6 +1738,7 @@ let create ?wallets (config : Config.t) =
               ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
               ; time_controller = config.net_config.time_controller
               ; consensus_constants = config.net_config.consensus_constants
+              ; genesis_constants = config.precomputed_values.genesis_constants
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
@@ -1938,33 +1935,18 @@ let create ?wallets (config : Config.t) =
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
                 ~f:(fun cmds ->
-                  let valid_size_cmds, too_big_cmds =
-                    List.partition_tf cmds ~f:User_command.valid_size
-                  in
-                  if not @@ List.is_empty too_big_cmds then (
-                    [%log' warn config.logger]
-                      "Filtered %d too-big user commands from transaction pool \
-                       gossip"
-                      (List.length too_big_cmds) ;
-                    [%log' debug config.logger]
-                      "Filtered too-big user commands from transaction pool \
-                       gossip"
-                      ~metadata:
-                        [ ( "user_commands"
-                          , `List
-                              (List.map too_big_cmds ~f:User_command.to_yojson)
-                          )
-                        ] ) ;
+                  (* the commands had valid sizes when added to the transaction pool
+                     don't need to check sizes again for broadcast
+                  *)
                   let%bind () =
                     send_resource_pool_diff_or_wait ~rl
                       ~diff_score:
                         Network_pool.Transaction_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Transaction_pool.Resource_pool.Diff
-                        .max_per_15_seconds valid_size_cmds
+                        .max_per_15_seconds cmds
                   in
-                  Mina_networking.broadcast_transaction_pool_diff net
-                    valid_size_cmds ) ) ;
+                  Mina_networking.broadcast_transaction_pool_diff net cmds ) ) ;
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network

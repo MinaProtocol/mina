@@ -1430,15 +1430,10 @@ let dummy =
   }
 
 (* Parties transactions are filtered using this predicate
-   - in outgoing gossip
    - when adding to the transaction pool
    - in incoming blocks
-
-   Design note: a single predicate means we traverse the other parties only
-   once; the alternative would be to use separate predicates, so we could log
-   what bound is exceeded, at the expense of multiple traversals
 *)
-let valid_size t =
+let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
@@ -1462,11 +1457,59 @@ let valid_size t =
         , evs_size + party_evs_elements
         , seq_evs_size + party_seq_evs_elements ) )
   in
-  num_proof_parties <= Mina_compile_config.max_proof_parties
-  && num_parties <= Mina_compile_config.max_parties
-  && num_event_elements <= Mina_compile_config.max_event_elements
-  && num_sequence_event_elements
-     <= Mina_compile_config.max_sequence_event_elements
+  let max_proof_parties = genesis_constants.max_proof_parties in
+  let max_parties = genesis_constants.max_parties in
+  let max_event_elements = genesis_constants.max_event_elements in
+  let max_sequence_event_elements =
+    genesis_constants.max_sequence_event_elements
+  in
+  let valid_proof_parties = num_proof_parties <= max_proof_parties in
+  let valid_parties = num_parties <= max_parties in
+  let valid_event_elements = num_event_elements <= max_event_elements in
+  let valid_sequence_event_elements =
+    num_sequence_event_elements <= max_sequence_event_elements
+  in
+  if
+    valid_proof_parties && valid_parties && valid_event_elements
+    && valid_sequence_event_elements
+  then Ok ()
+  else
+    let proof_parties_err =
+      if valid_proof_parties then None
+      else
+        Some
+          (sprintf "too many proof parties (%d, max allowed is %d)"
+             num_proof_parties max_proof_parties )
+    in
+    let parties_err =
+      if valid_parties then None
+      else
+        Some
+          (sprintf "too many parties (%d, max allowed is %d)" num_parties
+             max_parties )
+    in
+    let events_err =
+      if valid_event_elements then None
+      else
+        Some
+          (sprintf "too many event elements (%d, max allowed is %d)"
+             num_event_elements max_event_elements )
+    in
+    let sequence_events_err =
+      if valid_sequence_event_elements then None
+      else
+        Some
+          (sprintf "too many sequence event elements (%d, max allowed is %d)"
+             num_sequence_event_elements max_sequence_event_elements )
+    in
+    let err_msg =
+      List.filter
+        [ proof_parties_err; parties_err; events_err; sequence_events_err ]
+        ~f:Option.is_some
+      |> List.map ~f:(fun opt -> Option.value_exn opt)
+      |> String.concat ~sep:"; "
+    in
+    Error (Error.of_string err_msg)
 
 let inner_query =
   lazy

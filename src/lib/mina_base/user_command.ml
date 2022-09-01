@@ -283,8 +283,8 @@ let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
   (*TODO: return Or_error*)
   Currency.Fee_rate.make_exn (fee user_command) (weight user_command)
 
-let valid_size = function
+let valid_size ~genesis_constants = function
   | Signed_command _ ->
-      true
+      Ok ()
   | Parties parties ->
-      Parties.valid_size parties
+      Parties.valid_size ~genesis_constants parties

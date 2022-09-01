@@ -278,8 +278,12 @@ struct
                  nodes with larger pools don't send nodes with smaller pools lots of
                  low fee transactions the smaller-pooled nodes consider useless and get
                  themselves banned.
+
+                 we offer this value separately from the one in genesis_constants, because
+                 we may wish a different value for testing
               *)
         ; verifier : (Verifier.t[@sexp.opaque])
+        ; genesis_constants : Genesis_constants.t
         }
       [@@deriving sexp_of, make]
     end
@@ -1125,8 +1129,8 @@ struct
         let is_sender_local = Envelope.Sender.(equal sender Local) in
         let diffs_are_valid () =
           List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
-              let is_valid = not (User_command.has_insufficient_fee cmd) in
-              if not is_valid then
+              let fee_valid = not (User_command.has_insufficient_fee cmd) in
+              if not fee_valid then
                 [%log' debug t.logger]
                   "Filtering user command with insufficient fee from \
                    transaction-pool diff $cmd from $sender"
@@ -1135,7 +1139,21 @@ struct
                     ; ( "sender"
                       , Envelope.(Sender.to_yojson (Incoming.sender diffs)) )
                     ] ;
-              is_valid )
+              let size_validity =
+                User_command.valid_size
+                  ~genesis_constants:t.config.genesis_constants cmd
+              in
+              Or_error.iter_error size_validity ~f:(fun err ->
+                  [%log' debug t.logger]
+                    "Filtering user command with too-big size from \
+                     transaction-pool diff $cmd from $sender"
+                    ~metadata:
+                      [ ("cmd", User_command.to_yojson cmd)
+                      ; ( "sender"
+                        , Envelope.(Sender.to_yojson (Incoming.sender diffs)) )
+                      ; ("size_violation", Error_json.error_to_yojson err)
+                      ] ) ;
+              fee_valid && Or_error.is_ok size_validity )
         in
         let h = Lru_cache.T.hash diffs.data in
         let (`Already_mem already_mem) = Lru_cache.add t.recently_seen h in
@@ -1878,6 +1896,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
+          ~genesis_constants:Genesis_constants.compiled
       in
       let expiry_ns = match expiry with None -> expiry_ns | Some t -> t in
       let pool_, _, _ =
@@ -2699,7 +2718,7 @@ let%test_module _ =
           let trust_system = Trust_system.null () in
           let config =
             Test.Resource_pool.make_config ~trust_system ~pool_max_size
-              ~verifier
+              ~verifier ~genesis_constants:Genesis_constants.compiled
           in
           let pool_, _, _ =
             Test.create ~config ~logger ~constraint_constants

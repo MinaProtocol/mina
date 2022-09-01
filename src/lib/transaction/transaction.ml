@@ -116,9 +116,9 @@ let fee_payer_pk (t : t) =
   | Coinbase cb ->
       Coinbase.fee_payer_pk cb
 
-let valid_size (t : t) =
+let valid_size ~genesis_constants (t : t) =
   match t with
   | Command cmd ->
-      User_command.valid_size cmd
+      User_command.valid_size ~genesis_constants cmd
   | Fee_transfer _ | Coinbase _ ->
-      true
+      Ok ()
