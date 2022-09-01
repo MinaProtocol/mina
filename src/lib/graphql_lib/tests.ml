@@ -3,7 +3,7 @@ open Async_kernel
 open Async_unix
 module Schema = Graphql_wrapper.Make (Graphql_async.Schema)
 
-module type TEST_UTILS = sig
+module type Test_Intf = sig
   type t
 
   val gen : t Base_quickcheck.Generator.t
@@ -41,7 +41,7 @@ let get_test_field = function
         (Yojson.Basic.to_string json)
         ()
 
-module Make_test (S : Scalars.Json_intf) (G : TEST_UTILS with type t = S.t) =
+module Make_test (S : Scalars.Json_intf) (G : Test_Intf with type t = S.t) =
 struct
   let query_server_and_compare value =
     let schema =
