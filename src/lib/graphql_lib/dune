@@ -21,6 +21,7 @@
    ppx_inline_test.config
    sexplib0
   ;; local libraries
+  genesis_constants
   graphql_wrapper
   (re_export mina_numbers_unix)
    mina_numbers

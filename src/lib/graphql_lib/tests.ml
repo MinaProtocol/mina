@@ -140,6 +140,16 @@ module FeeTransferType_gen = struct
   let gen = quickcheck_generator
 end
 
+module TransactionHash_gen = struct
+  include Mina_transaction.Transaction_hash
+
+  let gen =
+    Mina_base.Coinbase.Gen.gen
+      ~constraint_constants:
+        Genesis_constants.Constraint_constants.for_unit_tests
+    |> Quickcheck.Generator.map ~f:(fun (coinbase, _) -> hash_coinbase coinbase)
+end
+
 (* BASIC SCALARS *)
 let%test_module "UInt32" = (module Make_test (Scalars.UInt32) (UInt32_gen))
 
@@ -202,13 +212,11 @@ let%test_module "Slot" = (module Make_test (Scalars.Slot) (Slot_gen))
 let%test_module "FeeTransferType" =
   (module Make_test (Scalars.FeeTransferType) (FeeTransferType_gen))
 
+(* TRANSACTION HASH *)
+let%test_module "TransactionHash" =
+  (module Make_test (Scalars.TransactionHash) (TransactionHash_gen))
+
 (* TODO: add tests for the following graphql scalars *)
+
 (* let%test_module "PrecomputedBlockProof" =
    (module Make_test (Scalars.PrecomputedBlockProof) (Mina_block.Precomputed.Proof) ) *)
-
-(*
-   let%test_module "TransactionHash" =
-     ( module Make_test
-                (Scalars.TransactionHash)
-                (Mina_transaction.Transaction_hash) )
-*)
