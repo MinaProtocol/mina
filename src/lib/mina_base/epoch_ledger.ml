@@ -7,6 +7,9 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('ledger_hash, 'amount) t =
+            ( 'ledger_hash
+            , 'amount )
+            Mina_wire_types.Mina_base.Epoch_ledger.Poly.V1.t =
         { hash : 'ledger_hash; total_currency : 'amount }
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end

@@ -4,7 +4,10 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('u, 's) t = Signed_command of 'u | Parties of 's
+      type ('u, 's) t =
+            ('u, 's) Mina_wire_types.Mina_base.User_command.Poly.V2.t =
+        | Signed_command of 'u
+        | Parties of 's
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id

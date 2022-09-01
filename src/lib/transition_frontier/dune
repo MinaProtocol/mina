@@ -19,6 +19,7 @@
    ;;local libraries
    o1trace
    mina_metrics
+   mina_wire_types
    merkle_ledger
    staged_ledger
    mina_state
