@@ -97,10 +97,10 @@ module Span_gen = struct
 
   let compare x y =
     (* https://github.com/janestreet/core_kernel/blob/v0.14.1/src/float.ml#L61 *)
-    (* Note: We have to use a different tolerance than 
-       `Core_kernel.Time.Span.robustly_compare` does 
-       because spans are rounded to the millisecond when 
-       serialized through GraphQL. See the implementation 
+    (* Note: We have to use a different tolerance than
+       `Core_kernel.Time.Span.robustly_compare` does
+       because spans are rounded to the millisecond when
+       serialized through GraphQL. See the implementation
        of Span in the `Graphql_basic_scalars` module. *)
     let tolerance = 1E-3 in
     let diff = x - y in
