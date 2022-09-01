@@ -32,7 +32,8 @@ end
 
 module Global_state = struct
   type t =
-    { ledger : sparse_ledger
+    { fee_payment_ledger : sparse_ledger
+    ; parties_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
     }

@@ -10,7 +10,8 @@ module Parties_segment_witness = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { global_ledger : Sparse_ledger.Stable.V2.t
+        { global_fee_payment_ledger : Sparse_ledger.Stable.V2.t
+        ; global_parties_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V1.t
               , Parties.Call_forest.With_hashes.Stable.V1.t )

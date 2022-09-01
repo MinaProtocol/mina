@@ -460,7 +460,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~precomputed_values ~verifier ~parent_staged_ledger ~parent_protocol_state
     (t, validation) =
   let target_hash_of_ledger_proof =
-    Fn.compose Registers.ledger
+    Fn.compose Registers.parties_ledger
     @@ Fn.compose Ledger_proof.statement_target Ledger_proof.statement
   in
   let block = With_hash.data t in

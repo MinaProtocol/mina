@@ -286,7 +286,8 @@ module type S = sig
 
   module Global_state : sig
     type t =
-      { ledger : ledger
+      { fee_payment_ledger : ledger
+      ; parties_ledger : ledger
       ; fee_excess : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
@@ -922,15 +923,23 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   module Global_state = struct
     type t =
-      { ledger : L.t
+      { fee_payment_ledger : L.t
+      ; parties_ledger : L.t
       ; fee_excess : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       }
 
-    let ledger { ledger; _ } = L.create_masked ledger
+    let fee_payment_ledger { fee_payment_ledger; _ } =
+      L.create_masked fee_payment_ledger
 
-    let set_ledger ~should_update t ledger =
-      if should_update then L.apply_mask t.ledger ~masked:ledger ;
+    let set_fee_payment_ledger ~should_update t ledger =
+      if should_update then L.apply_mask t.fee_payment_ledger ~masked:ledger ;
+      t
+
+    let parties_ledger { parties_ledger; _ } = L.create_masked parties_ledger
+
+    let set_parties_ledger ~should_update t ledger =
+      if should_update then L.apply_mask t.parties_ledger ~masked:ledger ;
       t
 
     let fee_excess { fee_excess; _ } = fee_excess
@@ -1623,7 +1632,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         step_all (f user_acc states) states
     in
     let initial_state : Inputs.Global_state.t * _ Parties_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess }
+      (* TODO *)
+      ( { protocol_state = state_view
+        ; fee_payment_ledger = ledger
+        ; parties_ledger = ledger
+        ; fee_excess
+        }
       , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default

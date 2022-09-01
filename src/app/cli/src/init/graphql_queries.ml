@@ -104,8 +104,10 @@ module Pending_snark_work =
 query pendingSnarkWork {
   pendingSnarkWork {
     workBundle {
-      source_ledger_hash: sourceLedgerHash
-      target_ledger_hash: targetLedgerHash
+      source_fee_payment_ledger_hash: sourceFeePaymentLedgerHash
+      target_fee_payment_ledger_hash: targetFeePaymentLedgerHash
+      source_parties_ledger_hash: sourcePartiesLedgerHash
+      target_parties_ledger_hash: targetPartiesLedgerHash
       fee_excess: feeExcess {
         sign
         fee_magnitude: feeMagnitude

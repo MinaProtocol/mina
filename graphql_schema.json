@@ -6128,7 +6128,7 @@
             "Transition from a source ledger to a target ledger with some fee excess and increase in supply ",
           "fields": [
             {
-              "name": "sourceLedgerHash",
+              "name": "sourceFeePaymentLedgerHash",
               "description": "Base58Check-encoded hash of the source ledger",
               "args": [],
               "type": {
@@ -6144,7 +6144,39 @@
               "deprecationReason": null
             },
             {
-              "name": "targetLedgerHash",
+              "name": "targetFeePaymentLedgerHash",
+              "description": "Base58Check-encoded hash of the target ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sourcePartiesLedgerHash",
+              "description": "Base58Check-encoded hash of the source ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "targetPartiesLedgerHash",
               "description": "Base58Check-encoded hash of the target ledger",
               "args": [],
               "type": {

@@ -84,10 +84,19 @@ module T = Mina_transaction_logic.Make (L)
 let apply_parties_unchecked_with_states ~constraint_constants ~state_view
     ~fee_excess ledger c =
   let open T in
+  (* TODO *)
   apply_parties_unchecked_aux ~constraint_constants ~state_view ~fee_excess
     (ref ledger) c ~init:[]
-    ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
-      ( { GS.ledger = !ledger; fee_excess; protocol_state }
+    ~f:(fun
+         acc
+         ( { fee_payment_ledger; parties_ledger; fee_excess; protocol_state }
+         , local_state )
+       ->
+      ( { GS.fee_payment_ledger = !fee_payment_ledger
+        ; parties_ledger = !parties_ledger
+        ; fee_excess
+        ; protocol_state
+        }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
   |> Result.map ~f:(fun (party_applied, states) ->

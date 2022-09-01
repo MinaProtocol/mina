@@ -1057,12 +1057,18 @@ let pending_snark_work =
                                 (Currency.Amount.of_uint64 f.fee_magnitude)
                           ; supply_increase =
                               Currency.Amount.of_uint64 w.supply_increase
-                          ; source_ledger_hash =
+                          ; source_fee_payment_ledger_hash =
                               Mina_base.Epoch_seed.of_base58_check_exn
-                                w.source_ledger_hash
-                          ; target_ledger_hash =
+                                w.source_fee_payment_ledger_hash
+                          ; target_fee_payment_ledger_hash =
                               Mina_base.Epoch_seed.of_base58_check_exn
-                                w.target_ledger_hash
+                                w.target_fee_payment_ledger_hash
+                          ; source_parties_ledger_hash =
+                              Mina_base.Epoch_seed.of_base58_check_exn
+                                w.source_parties_ledger_hash
+                          ; target_parties_ledger_hash =
+                              Mina_base.Epoch_seed.of_base58_check_exn
+                                w.target_parties_ledger_hash
                           } ) )
                     response.pendingSnarkWork )
              in

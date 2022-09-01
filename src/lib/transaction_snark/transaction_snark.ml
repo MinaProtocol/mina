@@ -144,19 +144,23 @@ module Statement = struct
       end
     end]
 
-    let with_empty_local_state ~supply_increase ~fee_excess ~sok_digest ~source
-        ~target ~pending_coinbase_stack_state : _ t =
+    let with_empty_local_state ~supply_increase ~fee_excess ~sok_digest
+        ~source_fee_payment_ledger ~target_fee_payment_ledger
+        ~source_parties_ledger ~target_parties_ledger
+        ~pending_coinbase_stack_state : _ t =
       { supply_increase
       ; fee_excess
       ; sok_digest
       ; source =
-          { ledger = source
+          { fee_payment_ledger = source_fee_payment_ledger
+          ; parties_ledger = source_parties_ledger
           ; pending_coinbase_stack =
               pending_coinbase_stack_state.Pending_coinbase_stack_state.source
           ; local_state = Local_state.empty ()
           }
       ; target =
-          { ledger = target
+          { fee_payment_ledger = target_fee_payment_ledger
+          ; parties_ledger = target_parties_ledger
           ; pending_coinbase_stack = pending_coinbase_stack_state.target
           ; local_state = Local_state.empty ()
           }
@@ -167,7 +171,7 @@ module Statement = struct
       let registers =
         let open Registers in
         Tick.Typ.of_hlistable
-          [ ledger_hash; pending_coinbase; local_state_typ ]
+          [ ledger_hash; ledger_hash; pending_coinbase; local_state_typ ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
       in
@@ -341,7 +345,8 @@ module Statement = struct
           Pending_coinbase.Stack.connected ~first:t1 ~second:t2 ()
       end in
       Registers.Fields.to_list
-        ~ledger:(check (module Ledger_hash))
+        ~fee_payment_ledger:(check (module Ledger_hash))
+        ~parties_ledger:(check (module Ledger_hash))
         ~pending_coinbase_stack:(check (module PC))
         ~local_state:(check (module Local_state))
       |> Or_error.combine_errors_unit
@@ -925,7 +930,8 @@ module Base = struct
 
     module Global_state = struct
       type t =
-        { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
+        { fee_payment_ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
+        ; parties_ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
         ; fee_excess : Amount.Signed.var
         ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
         }
@@ -1858,11 +1864,21 @@ module Base = struct
 
           let set_fee_excess t fee_excess = { t with fee_excess }
 
-          let ledger { ledger; _ } = ledger
+          let fee_payment_ledger { fee_payment_ledger; _ } = fee_payment_ledger
 
-          let set_ledger ~should_update t ledger =
+          let parties_ledger { parties_ledger; _ } = parties_ledger
+
+          let set_fee_payment_ledger ~should_update t ledger =
             { t with
-              ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
+              fee_payment_ledger =
+                Ledger.if_ should_update ~then_:ledger
+                  ~else_:t.fee_payment_ledger
+            }
+
+          let set_parties_ledger ~should_update t ledger =
+            { t with
+              parties_ledger =
+                Ledger.if_ should_update ~then_:ledger ~else_:t.parties_ledger
             }
 
           let global_slot_since_genesis { protocol_state; _ } =
@@ -1999,9 +2015,12 @@ module Base = struct
           Global_state.t * _ Mina_transaction_logic.Parties_logic.Local_state.t
           =
         let g : Global_state.t =
-          { ledger =
-              ( statement.source.ledger
-              , V.create (fun () -> !witness.global_ledger) )
+          { fee_payment_ledger =
+              ( statement.source.fee_payment_ledger
+              , V.create (fun () -> !witness.global_fee_payment_ledger) )
+          ; parties_ledger =
+              ( statement.source.parties_ledger
+              , V.create (fun () -> !witness.global_parties_ledger) )
           ; fee_excess = Amount.Signed.(Checked.constant zero)
           ; protocol_state =
               Mina_state.Protocol_state.Body.view_checked state_body
@@ -2147,8 +2166,14 @@ module Base = struct
             } ) ;
       with_label __LOC__ (fun () ->
           run_checked
-            (Frozen_ledger_hash.assert_equal (fst global.ledger)
-               statement.target.ledger ) ) ;
+            (Frozen_ledger_hash.assert_equal
+               (fst global.fee_payment_ledger)
+               statement.target.fee_payment_ledger ) ) ;
+      with_label __LOC__ (fun () ->
+          run_checked
+            (Frozen_ledger_hash.assert_equal
+               (fst global.parties_ledger)
+               statement.target.parties_ledger ) ) ;
       with_label __LOC__ (fun () ->
           run_checked
             (Amount.Signed.Checked.assert_equal statement.supply_increase
@@ -2271,13 +2296,15 @@ module Base = struct
     Amount.Checked.if_ accumulate_burned_tokens ~then_:amt
       ~else_:acc_burned_tokens
 
+  (* TODO *)
   let%snarkydef apply_tagged_transaction
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root pending_coinbase_stack_init pending_coinbase_stack_before
-      pending_coinbase_after state_body
+      fee_payment_root parties_root pending_coinbase_stack_init
+      pending_coinbase_stack_before pending_coinbase_after state_body
       ({ signer; signature; payload } as txn : Transaction_union.var) =
+    let _TODO = parties_root in
     let tag = payload.body.tag in
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
@@ -2504,7 +2531,7 @@ module Base = struct
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
         (Frozen_ledger_hash.modify_account_send
-           ~depth:constraint_constants.ledger_depth root
+           ~depth:constraint_constants.ledger_depth fee_payment_root
            ~is_writeable:can_create_fee_payer_account fee_payer
            ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
@@ -3128,12 +3155,15 @@ module Base = struct
         (Mina_state.Protocol_state.Body.typ ~constraint_constants)
         ~request:(As_prover.return State_body)
     in
-    let%bind root_after, fee_excess, supply_increase =
+    let%bind fee_payment_root_after, fee_excess, supply_increase =
       apply_tagged_transaction ~constraint_constants
         (module Shifted)
-        statement.source.ledger pending_coinbase_init
-        statement.source.pending_coinbase_stack
+        statement.source.fee_payment_ledger statement.source.parties_ledger
+        pending_coinbase_init statement.source.pending_coinbase_stack
         statement.target.pending_coinbase_stack state_body t
+    in
+    let parties_root_after =
+      (* TODO: return from apply_tagged_transaction *) fee_payment_root_after
     in
     let%bind fee_excess =
       (* Use the default token for the fee excess if it is zero.
@@ -3164,8 +3194,12 @@ module Base = struct
                statement.target.local_state ) )
     in
     Checked.all_unit
-      [ [%with_label "equal roots"]
-          (Frozen_ledger_hash.assert_equal root_after statement.target.ledger)
+      [ [%with_label "equal fee payment roots"]
+          (Frozen_ledger_hash.assert_equal fee_payment_root_after
+             statement.target.fee_payment_ledger )
+      ; [%with_label "equal parties roots"]
+          (Frozen_ledger_hash.assert_equal parties_root_after
+             statement.target.parties_ledger )
       ; [%with_label "equal supply_increases"]
           (Currency.Amount.Signed.Checked.assert_equal supply_increase
              statement.supply_increase )
@@ -3283,12 +3317,24 @@ module Merge = struct
         ; [%with_label "equal supply increases"]
             (Amount.Signed.Checked.assert_equal supply_increase
                s.supply_increase )
-        ; [%with_label "equal source ledger hashes"]
-            (Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger)
-        ; [%with_label "equal target, source ledger hashes"]
-            (Frozen_ledger_hash.assert_equal s1.target.ledger s2.source.ledger)
-        ; [%with_label "equal target ledger hashes"]
-            (Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger)
+        ; [%with_label "equal source fee payment ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s.source.fee_payment_ledger
+               s1.source.fee_payment_ledger )
+        ; [%with_label "equal target, source fee payment ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s1.target.fee_payment_ledger
+               s2.source.fee_payment_ledger )
+        ; [%with_label "equal target fee payment ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s2.target.fee_payment_ledger
+               s.target.fee_payment_ledger )
+        ; [%with_label "equal source parties ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s.source.parties_ledger
+               s1.source.parties_ledger )
+        ; [%with_label "equal target, source parties ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s1.target.parties_ledger
+               s2.source.parties_ledger )
+        ; [%with_label "equal target parties ledger hashes"]
+            (Frozen_ledger_hash.assert_equal s2.target.parties_ledger
+               s.target.parties_ledger )
         ]
     in
     (s1, s2)
@@ -3415,7 +3461,8 @@ module type S = sig
 end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants
-    ~supply_increase sok_message source target init_stack
+    ~supply_increase ~source_fee_payment_ledger ~target_fee_payment_ledger
+    ~source_parties_ledger ~target_parties_ledger sok_message init_stack
     pending_coinbase_stack_state transaction state_body handler =
   if preeval then failwith "preeval currently disabled" ;
   let sok_digest = Sok_message.digest sok_message in
@@ -3423,8 +3470,9 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
     Base.transaction_union_handler handler transaction state_body init_stack
   in
   let statement : Statement.With_sok.t =
-    Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
-      ~pending_coinbase_stack_state
+    Statement.Poly.with_empty_local_state ~source_fee_payment_ledger
+      ~target_fee_payment_ledger ~source_parties_ledger ~target_parties_ledger
+      ~supply_increase ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~sok_digest
   in
@@ -3441,9 +3489,10 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
               handler ) )
       : unit )
 
-let check_transaction ?preeval ~constraint_constants ~sok_message ~source
-    ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
-    ~zkapp_account2:_ ~supply_increase
+let check_transaction ?preeval ~constraint_constants ~sok_message
+    ~source_fee_payment_ledger ~target_fee_payment_ledger ~source_parties_ledger
+    ~target_parties_ledger ~init_stack ~pending_coinbase_stack_state
+    ~zkapp_account1:_ ~zkapp_account2:_ ~supply_increase
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   let transaction =
@@ -3455,23 +3504,28 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
       failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
       check_transaction_union ?preeval ~constraint_constants ~supply_increase
-        sok_message source target init_stack pending_coinbase_stack_state
+        ~source_fee_payment_ledger ~target_fee_payment_ledger
+        ~source_parties_ledger ~target_parties_ledger sok_message init_stack
+        pending_coinbase_stack_state
         (Transaction_union.of_transaction t)
         state_body handler
 
-let check_user_command ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state ~supply_increase t_in_block
-    handler =
+let check_user_command ~constraint_constants ~sok_message
+    ~source_fee_payment_ledger ~target_fee_payment_ledger ~source_parties_ledger
+    ~target_parties_ledger ~init_stack ~pending_coinbase_stack_state
+    ~supply_increase t_in_block handler =
   let user_command = Transaction_protocol_state.transaction t_in_block in
-  check_transaction ~constraint_constants ~sok_message ~source ~target
-    ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:None
-    ~zkapp_account2:None ~supply_increase
+  check_transaction ~constraint_constants ~sok_message
+    ~source_fee_payment_ledger ~target_fee_payment_ledger ~source_parties_ledger
+    ~target_parties_ledger ~init_stack ~pending_coinbase_stack_state
+    ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
     { t_in_block with transaction = Command (Signed_command user_command) }
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
-    ~supply_increase sok_message source target transaction_in_block init_stack
-    pending_coinbase_stack_state handler =
+    ~supply_increase ~source_fee_payment_ledger ~target_fee_payment_ledger
+    ~source_parties_ledger ~target_parties_ledger sok_message
+    transaction_in_block init_stack pending_coinbase_stack_state handler =
   if preeval then failwith "preeval currently disabled" ;
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
@@ -3482,8 +3536,9 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     Base.transaction_union_handler handler transaction state_body init_stack
   in
   let statement : Statement.With_sok.t =
-    Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
-      ~pending_coinbase_stack_state
+    Statement.Poly.with_empty_local_state ~source_fee_payment_ledger
+      ~target_fee_payment_ledger ~source_parties_ledger ~target_parties_ledger
+      ~supply_increase ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.fee_excess transaction)
       ~sok_digest
   in
@@ -3494,8 +3549,9 @@ let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
     main statement
 
 let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
-    ~source ~target ~init_stack ~pending_coinbase_stack_state ~zkapp_account1:_
-    ~zkapp_account2:_ ~supply_increase
+    ~source_fee_payment_ledger ~target_fee_payment_ledger ~source_parties_ledger
+    ~target_parties_ledger ~init_stack ~pending_coinbase_stack_state
+    ~zkapp_account1:_ ~zkapp_account2:_ ~supply_increase
     (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
     handler =
   match
@@ -3507,7 +3563,8 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
       failwith "Called non-party transaction with parties transaction"
   | `Transaction t ->
       generate_transaction_union_witness ?preeval ~constraint_constants
-        ~supply_increase sok_message source target
+        ~supply_increase ~source_fee_payment_ledger ~target_fee_payment_ledger
+        ~source_parties_ledger ~target_parties_ledger sok_message
         { transaction_in_block with
           transaction = Transaction_union.of_transaction t
         }
@@ -3848,7 +3905,9 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           |> Or_error.ok_exn
         in
         let final_state = fst (List.last_exn states) in
-        (final_state.fee_excess, final_state.ledger, states :: statess_rev) )
+        ( final_state.fee_excess
+        , final_state.parties_ledger
+        , states :: statess_rev ) )
   in
   let states = List.rev states_rev in
   let states_rev =
@@ -3888,11 +3947,12 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
     match states_rev with
     | [] ->
         sparse_ledger
-    | { Parties_intermediate_state.state_after = { global = { ledger; _ }; _ }
+    | { Parties_intermediate_state.state_after =
+          { global = { parties_ledger; _ }; _ }
       ; _
       }
       :: _ ->
-        ledger
+        parties_ledger
   in
   ( List.fold_right states_rev ~init:[]
       ~f:(fun
@@ -4035,7 +4095,8 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
           }
         in
         let w : Parties_segment.Witness.t =
-          { global_ledger = source_global.ledger
+          { global_fee_payment_ledger = source_global.fee_payment_ledger
+          ; global_parties_ledger = source_global.parties_ledger
           ; local_state_init = source_local
           ; start_parties
           ; state_body
@@ -4079,7 +4140,10 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
             else Sparse_ledger.merkle_root source_local.ledger
           in
           { source =
-              { ledger = Sparse_ledger.merkle_root source_global.ledger
+              { fee_payment_ledger =
+                  Sparse_ledger.merkle_root source_global.fee_payment_ledger
+              ; parties_ledger =
+                  Sparse_ledger.merkle_root source_global.parties_ledger
               ; pending_coinbase_stack = pending_coinbase_stack_state.source
               ; local_state =
                   { source_local with
@@ -4090,7 +4154,10 @@ let parties_witnesses_exn ~constraint_constants ~state_body ~fee_excess ledger
                   }
               }
           ; target =
-              { ledger = Sparse_ledger.merkle_root target_global.ledger
+              { fee_payment_ledger =
+                  Sparse_ledger.merkle_root target_global.fee_payment_ledger
+              ; parties_ledger =
+                  Sparse_ledger.merkle_root target_global.parties_ledger
               ; pending_coinbase_stack = pending_coinbase_stack_state.target
               ; local_state =
                   { target_local with

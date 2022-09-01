@@ -242,8 +242,10 @@ module T = struct
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
+    (* TODO: we need to keep the end fee_payment_ledger around in order to construct this register correctly *)
     let registers_end : _ Mina_state.Registers.t =
-      { ledger
+      { fee_payment_ledger = ledger
+      ; parties_ledger = ledger
       ; local_state = Mina_state.Local_state.empty ()
       ; pending_coinbase_stack
       }
@@ -260,6 +262,7 @@ module T = struct
       ~constraint_constants ~pending_coinbase_collection =
     { ledger; scan_state; constraint_constants; pending_coinbase_collection }
 
+  (* TODO *)
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~verifier ~snarked_registers ~ledger ~scan_state
@@ -282,13 +285,15 @@ module T = struct
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty ()
-          ; ledger =
+          ; fee_payment_ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+          ; parties_ledger = failwith "TODO"
           ; pending_coinbase_stack
           }
     in
     return t
 
+  (* TODO *)
   let of_scan_state_and_ledger_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~snarked_registers ~ledger ~scan_state ~pending_coinbase_collection =
@@ -308,13 +313,15 @@ module T = struct
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty ()
-          ; ledger =
+          ; fee_payment_ledger =
               Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+          ; parties_ledger = failwith "TODO"
           ; pending_coinbase_stack
           }
     in
     return t
 
+  (* TODO *)
   let of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
       ~expected_merkle_root ~get_state f =
@@ -367,7 +374,8 @@ module T = struct
     in
     f ~constraint_constants
       ~snarked_registers:
-        ( { ledger = snarked_frozen_ledger_hash
+        ( { fee_payment_ledger = snarked_frozen_ledger_hash
+          ; parties_ledger = failwith "TODO"
           ; local_state = snarked_local_state
           ; pending_coinbase_stack
           }
@@ -498,6 +506,7 @@ module T = struct
         ~f:(fun x -> Ok x)
     else Ok constraint_constants.coinbase_amount
 
+  (* TODO *)
   let apply_transaction_and_get_statement ~constraint_constants ledger
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t) s
       txn_state_view =
@@ -539,12 +548,14 @@ module T = struct
     in
     ( applied_txn
     , { Transaction_snark.Statement.source =
-          { ledger = source_merkle_root
+          { fee_payment_ledger = source_merkle_root
+          ; parties_ledger = failwith "TODO"
           ; pending_coinbase_stack = pending_coinbase_stack_state.pc.source
           ; local_state = empty_local_state
           }
       ; target =
-          { ledger = target_merkle_root
+          { fee_payment_ledger = target_merkle_root
+          ; parties_ledger = failwith "TODO"
           ; pending_coinbase_stack = pending_coinbase_target
           ; local_state = empty_local_state
           }
@@ -557,6 +568,7 @@ module T = struct
       ; init_stack = new_init_stack
       } )
 
+  (* TODO *)
   let apply_transaction_and_get_witness ~constraint_constants ledger
       pending_coinbase_stack_state s status txn_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
@@ -573,7 +585,7 @@ module T = struct
           in
           Account_id.create c.receiver Token_id.default :: ft_receivers
     in
-    let ledger_witness =
+    let fee_payment_ledger_witness =
       O1trace.sync_thread "create_ledger_witness" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
@@ -602,7 +614,8 @@ module T = struct
     in
     ( { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn
       ; state_hash = state_and_body_hash
-      ; ledger_witness
+      ; fee_payment_ledger_witness
+      ; parties_ledger_witness = failwith "TODO"
       ; init_stack = Base pending_coinbase_stack_state.init_stack
       ; statement
       }
@@ -2275,7 +2288,9 @@ let%test_module "staged ledger tests" =
      fun stmts ->
       let prover_seed =
         One_or_two.fold stmts ~init:"P" ~f:(fun p stmt ->
-            p ^ Frozen_ledger_hash.to_bytes stmt.target.ledger )
+            p
+            ^ Frozen_ledger_hash.to_bytes stmt.target.fee_payment_ledger
+            ^ Frozen_ledger_hash.to_bytes stmt.target.parties_ledger )
       in
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen

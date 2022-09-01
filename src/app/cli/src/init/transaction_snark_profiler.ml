@@ -180,6 +180,7 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
 let format_time_span ts =
   sprintf !"Total time was: %{Time.Span.to_string_hum}" ts
 
+(* TODO *)
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
@@ -206,12 +207,15 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
             ~statement:
               { sok_digest = Sok_message.Digest.default
               ; source =
-                  { ledger = Sparse_ledger.merkle_root sparse_ledger
+                  { fee_payment_ledger = Sparse_ledger.merkle_root sparse_ledger
+                  ; parties_ledger = failwith "TODO"
                   ; pending_coinbase_stack = coinbase_stack_source
                   ; local_state = Mina_state.Local_state.empty ()
                   }
               ; target =
-                  { ledger = Sparse_ledger.merkle_root sparse_ledger'
+                  { fee_payment_ledger =
+                      Sparse_ledger.merkle_root sparse_ledger'
+                  ; parties_ledger = failwith "TODO"
                   ; pending_coinbase_stack = coinbase_stack_target
                   ; local_state = Mina_state.Local_state.empty ()
                   }
@@ -336,8 +340,12 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
           let () =
             Transaction_snark.check_transaction ?preeval ~constraint_constants
               ~sok_message
-              ~source:(Sparse_ledger.merkle_root sparse_ledger)
-              ~target:(Sparse_ledger.merkle_root sparse_ledger')
+              ~source_fee_payment_ledger:
+                (Sparse_ledger.merkle_root sparse_ledger)
+              ~target_fee_payment_ledger:
+                (Sparse_ledger.merkle_root sparse_ledger')
+              ~source_parties_ledger:(failwith "TODO")
+              ~target_parties_ledger:(failwith "TODO")
               ~init_stack:Pending_coinbase.Stack.empty
               ~pending_coinbase_stack_state:
                 { source = Pending_coinbase.Stack.empty
@@ -382,8 +390,12 @@ let generate_base_snarks_witness sparse_ledger0
           let () =
             Transaction_snark.generate_transaction_witness ?preeval
               ~constraint_constants ~sok_message
-              ~source:(Sparse_ledger.merkle_root sparse_ledger)
-              ~target:(Sparse_ledger.merkle_root sparse_ledger')
+              ~source_fee_payment_ledger:
+                (Sparse_ledger.merkle_root sparse_ledger)
+              ~target_fee_payment_ledger:
+                (Sparse_ledger.merkle_root sparse_ledger')
+              ~source_parties_ledger:(failwith "TODO")
+              ~target_parties_ledger:(failwith "TODO")
               ~init_stack:Pending_coinbase.Stack.empty
               ~pending_coinbase_stack_state:
                 { Transaction_snark.Pending_coinbase_stack_state.source =

@@ -795,9 +795,13 @@ module type Inputs_intf = sig
   module Global_state : sig
     type t
 
-    val ledger : t -> Ledger.t
+    val fee_payment_ledger : t -> Ledger.t
 
-    val set_ledger : should_update:Bool.t -> t -> Ledger.t -> t
+    val set_fee_payment_ledger : should_update:Bool.t -> t -> Ledger.t -> t
+
+    val parties_ledger : t -> Ledger.t
+
+    val set_parties_ledger : should_update:Bool.t -> t -> Ledger.t -> t
 
     val fee_excess : t -> Amount.Signed.t
 
@@ -973,10 +977,11 @@ module Make (Inputs : Inputs_intf) = struct
           is_start'
     in
     let local_state =
+      (* TODO *)
       { local_state with
         ledger =
           Inputs.Ledger.if_ is_start'
-            ~then_:(Inputs.Global_state.ledger global_state)
+            ~then_:(Inputs.Global_state.fee_payment_ledger global_state)
             ~else_:local_state.ledger
       }
     in
@@ -1590,8 +1595,9 @@ module Make (Inputs : Inputs_intf) = struct
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
     let global_state =
-      Global_state.set_ledger ~should_update:update_global_state global_state
-        local_state.ledger
+      (* TODO *)
+      Global_state.set_fee_payment_ledger ~should_update:update_global_state
+        global_state local_state.ledger
     in
     let local_state =
       (* Make sure to reset the local_state at the end of a transaction.
