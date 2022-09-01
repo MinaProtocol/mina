@@ -34,7 +34,10 @@ end)
 
     type t =
       | Local of
-          (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
+          (   ( [ `Broadcasted | `Not_broadcasted ]
+              * Resource_pool.Diff.t
+              * Resource_pool.Diff.rejected )
+              Or_error.t
            -> unit )
       | External of Mina_net2.Validation_callback.t
 
@@ -53,28 +56,27 @@ end)
         | External cb ->
             fire_if_not_already_fired cb `Reject )
 
+    let reject accepted rejected =
+      Fn.compose Deferred.return (function
+        | Local f ->
+            f (Ok (`Not_broadcasted, accepted, rejected))
+        | External cb ->
+            fire_if_not_already_fired cb `Reject )
+
     let drop accepted rejected =
       Fn.compose Deferred.return (function
         | Local f ->
-            f (Ok (accepted, rejected))
+            f (Ok (`Not_broadcasted, accepted, rejected))
         | External cb ->
             fire_if_not_already_fired cb `Ignore )
 
     let forward broadcast_pipe accepted rejected = function
       | Local f ->
-          f (Ok (accepted, rejected)) ;
+          f (Ok (`Broadcasted, accepted, rejected)) ;
           Linear_pipe.write broadcast_pipe accepted
       | External cb ->
           fire_if_not_already_fired cb `Accept ;
           Deferred.unit
-
-    let _replace broadcast_pipe accepted rejected = function
-      | Local f ->
-          f (Ok (accepted, rejected)) ;
-          Linear_pipe.write broadcast_pipe accepted
-      | External cb ->
-          fire_if_not_already_fired cb `Ignore ;
-          Linear_pipe.write broadcast_pipe accepted
   end
 
   module Remote_sink =
@@ -132,8 +134,10 @@ end)
     in
     O1trace.sync_thread apply_and_broadcast_thread_label (fun () ->
         match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
-        | Ok res ->
-            rebroadcast res
+        | Ok (`Accept, accepted, rejected) ->
+            rebroadcast (accepted, rejected)
+        | Ok (`Reject, accepted, rejected) ->
+            Broadcast_callback.reject accepted rejected cb
         | Error (`Locally_generated res) ->
             rebroadcast res
         | Error (`Other e) ->

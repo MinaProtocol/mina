@@ -83,7 +83,8 @@ type pipes =
       Strict_pipe.Writer.t
   ; user_command_input_writer :
       ( command_inputs
-        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+        * (   ( [ `Broadcasted | `Not_broadcasted ]
+              * Network_pool.Transaction_pool.Resource_pool.Diff.t
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit )
