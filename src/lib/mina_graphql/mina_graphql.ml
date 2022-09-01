@@ -3693,8 +3693,10 @@ module Mutations = struct
           Mina_lib.add_full_transactions mina
             [ User_command.Signed_command signed_command ]
         with
-        | Ok ([ (User_command.Signed_command signed_command as transaction) ], _)
-          ->
+        | Ok
+            ( `Broadcasted
+            , [ (User_command.Signed_command signed_command as transaction) ]
+            , _ ) ->
             Ok
               (Types.User_command.mk_user_command
                  { status = Enqueued
@@ -3705,7 +3707,7 @@ module Mutations = struct
                  } )
         | Error err ->
             Error (Error.to_string_hum err)
-        | Ok ([], [ (_, diff_error) ]) ->
+        | Ok (_, [], [ (_, diff_error) ]) ->
             let diff_error =
               Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
               .to_string_hum diff_error

@@ -50,7 +50,7 @@ module Auth_required = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Permissions.Auth_required.V2.t =
         | None
         | Either
         | Proof
@@ -317,6 +317,7 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type 'controller t =
+            'controller Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
         { edit_state : 'controller
         ; send : 'controller
         ; receive : 'controller

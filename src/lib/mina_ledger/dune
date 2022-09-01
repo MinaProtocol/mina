@@ -20,6 +20,7 @@
    core_kernel.uuid
    ppx_inline_test.config
    ;; local libraries
+   mina_wire_types
    sgn
    syncable_ledger
    snark_params

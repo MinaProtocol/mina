@@ -17,6 +17,7 @@
    ppx_inline_test.config
    async_unix
    ;; local libraries
+   mina_wire_types
    genesis_constants
    mina_base.import
    pickles.backend

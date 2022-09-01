@@ -20,7 +20,9 @@ module Closed_interval = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = { lower : 'a; upper : 'a }
+      type 'a t =
+            'a Mina_wire_types.Mina_base.Zkapp_precondition.Closed_interval.V1.t =
+        { lower : 'a; upper : 'a }
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
@@ -469,7 +471,7 @@ module Account = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
         ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
         ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
@@ -924,6 +926,16 @@ module Protocol_state = struct
              , 'amount
              , 'epoch_data )
              t =
+              ( 'snarked_ledger_hash
+              , 'time
+              , 'length
+              , 'vrf_output
+              , 'global_slot
+              , 'amount
+              , 'epoch_data )
+              Mina_wire_types.Mina_base.Zkapp_precondition.Protocol_state.Poly
+              .V1
+              .t =
           { (* TODO:
                We should include staged ledger hash again! It only changes once per
                block. *)

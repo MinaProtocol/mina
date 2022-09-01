@@ -24,6 +24,7 @@
    integers
    async_unix
    ;; local libraries
+   mina_wire_types
    with_hash
    snark_params
    crypto_params
