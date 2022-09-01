@@ -27,6 +27,7 @@
    parties_builder
    pickles
    pickles.backend
+   pickles_types
    mina_base.import
    o1trace
    rocksdb
