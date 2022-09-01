@@ -703,12 +703,12 @@ module Types = struct
         ; field "stagedLedgerPendingCoinbaseAux" ~typ:(non_null string)
             ~doc:
               "Base58Check-encoded hash of the staged ledger hash's \
-               pending_coinbase_aux"
+               pending_coinbase_hash"
             ~args:Arg.[]
             ~resolve:(fun _ t ->
               let staged_ledger_hash = staged_ledger_hash t in
               Pending_coinbase.Hash.to_base58_check
-              @@ Staged_ledger_hash.pending_coinbase_aux staged_ledger_hash )
+              @@ Staged_ledger_hash.pending_coinbase_hash staged_ledger_hash )
         ; field "stagedLedgerProofEmitted" ~typ:bool
             ~doc:
               "Block finished a staged ledger, and a proof was emitted from it \
@@ -735,7 +735,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ t ->
               let blockchain_state, _ = t in
-              Body_reference.to_hex
+              Consensus.Body_reference.to_hex
               @@ Mina_state.Blockchain_state.body_reference blockchain_state )
         ] )
 
