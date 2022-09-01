@@ -128,6 +128,8 @@ module type Data_hash_intf = sig
 
   val to_bits : t -> bool list
 
+  val to_base58_check : t -> string
+
   val gen : t Quickcheck.Generator.t
 end
 
