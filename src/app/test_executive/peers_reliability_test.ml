@@ -70,6 +70,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier ~txn_hash
               ~node_included_in:(`Node node_c) ) )
     in
+    let zkapp_account_keypair = Signature_lib.Keypair.create () in
     let%bind () =
       let wait_for_zkapp parties =
         let%map () =
@@ -97,7 +98,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ; fee_payer = None
              ; receivers = []
              ; amount
-             ; zkapp_account_keypairs = [ Signature_lib.Keypair.create () ]
+             ; zkapp_account_keypairs = [ zkapp_account_keypair ]
              ; memo
              ; new_zkapp_account = true
              ; snapp_update = Mina_base.Party.Update.dummy
@@ -116,6 +117,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () = send_zkapp ~logger node_c parties_create_accounts in
          wait_for_zkapp parties_create_accounts )
     in
+    let%bind _account_data =
+      let pk =
+        zkapp_account_keypair.public_key |> Signature_lib.Public_key.compress
+      in
+      let account_id =
+        Mina_base.Account_id.create pk Mina_base.Token_id.default
+      in
+      Node.must_get_account_data ~logger node_c ~account_id
+    in
+    [%log info] "zkApp account was created on node about to be stopped" ;
     let%bind () =
       section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
