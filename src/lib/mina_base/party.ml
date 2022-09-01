@@ -61,7 +61,7 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
+        type t = Mina_wire_types.Mina_base.Party.Update.Timing_info.V1.t =
           { initial_minimum_balance : Balance.Stable.V1.t
           ; cliff_time : Global_slot.Stable.V1.t
           ; cliff_amount : Amount.Stable.V1.t
@@ -216,7 +216,7 @@ module Update = struct
   module Stable = struct
     module V1 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Update.V1.t =
         { app_state :
             F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -507,7 +507,7 @@ module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Account_precondition.V1.t =
         | Full of Zkapp_precondition.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
@@ -650,7 +650,7 @@ module Preconditions = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Preconditions.V1.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account : Account_precondition.Stable.V1.t
         }
@@ -866,7 +866,7 @@ module Body = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Body.V1.t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V1.t
         ; update : Update.Stable.V1.t
@@ -960,7 +960,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
+        type t = Mina_wire_types.Mina_base.Party.Body.Fee_payer.V1.t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; fee : Fee.Stable.V1.t
           ; valid_until : Global_slot.Stable.V1.t option [@name "validUntil"]
@@ -1305,7 +1305,8 @@ module T = struct
   module Stable = struct
     module V1 = struct
       (** A party to a zkApp transaction *)
-      type t = { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
+      type t = Mina_wire_types.Mina_base.Party.V1.t =
+        { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
       let to_latest = Fn.id
@@ -1351,7 +1352,7 @@ module Fee_payer = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Party.Fee_payer.V1.t =
         { body : Body.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }

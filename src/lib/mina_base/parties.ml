@@ -43,6 +43,10 @@ module Call_forest = struct
     module Stable = struct
       module V1 = struct
         type ('party, 'party_digest, 'digest) t =
+              ( 'party
+              , 'party_digest
+              , 'digest )
+              Mina_wire_types.Mina_base.Parties.Call_forest.Tree.V1.t =
           { party : 'party
           ; party_digest : 'party_digest
           ; calls :
@@ -149,7 +153,7 @@ module Call_forest = struct
 
   type ('a, 'b, 'c) tree = ('a, 'b, 'c) Tree.t
 
-  module Digest : sig
+  module type Digest_intf = sig
     module Party : sig
       include Digest_intf.S
 
@@ -194,7 +198,18 @@ module Call_forest = struct
 
       val create : (_, Party.t, Forest.t) tree -> Tree.t
     end
-  end = struct
+  end
+
+  module Make_digest_sig (T : Mina_wire_types.Mina_base.Parties.Digest_types.S) =
+  struct
+    module type S =
+      Digest_intf
+        with type Party.Stable.V1.t = T.Party.V1.t
+         and type Forest.Stable.V1.t = T.Forest.V1.t
+  end
+
+  module Make_digest_str (T : Mina_wire_types.Mina_base.Parties.Digest_concrete) :
+    Make_digest_sig(T).S = struct
     module M = struct
       open Pickles.Impls.Step.Field
       module Checked = Pickles.Impls.Step.Field
@@ -282,6 +297,11 @@ module Call_forest = struct
           [| party_digest; stack_hash |]
     end
   end
+
+  module Digest =
+    Mina_wire_types.Mina_base.Parties.Digest_make
+      (Make_digest_sig)
+      (Make_digest_str)
 
   let fold = Tree.fold_forest
 
@@ -832,7 +852,7 @@ module T = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Parties.V1.t =
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
             ( Party.Stable.V1.t
@@ -1302,7 +1322,10 @@ module type Valid_intf = sig
   val forget : t -> T.t
 end
 
-module Valid : Valid_intf = struct
+module Valid :
+  Valid_intf
+    with type Stable.V1.t = Mina_wire_types.Mina_base.Parties.Valid.V1.t =
+struct
   module S = Stable
 
   module Verification_key_hash = struct
@@ -1320,7 +1343,7 @@ module Valid : Valid_intf = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Parties.Valid.V1.t =
         { parties : S.V1.t
         ; verification_keys :
             (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list

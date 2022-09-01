@@ -5,7 +5,7 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type 'command t =
+      type 'command t = 'command Mina_wire_types.Mina_transaction.Poly.V2.t =
         | Command of 'command
         | Fee_transfer of Fee_transfer.Stable.V2.t
         | Coinbase of Coinbase.Stable.V1.t

@@ -15,6 +15,7 @@
    base.caml
    result
    ;; local libraries
+   mina_wire_types
    crypto_params
    kimchi_backend.pasta
    random_oracle_input

@@ -1,0 +1,28 @@
+(include_subdirs no)
+
+(test
+  (name type_equalities)
+  (libraries
+    mina_wire_types
+    currency
+    snark_params
+    signature_lib
+    mina_base
+    mina_base.import
+    mina_numbers
+    block_time
+    one_or_two
+    mina_transaction
+    ; Necessary for the type equality
+    sgn
+    sgn_type
+    data_hash_lib
+    kimchi_backend.pasta
+    pickles
+    pickles.backend
+    pickles_base
+    pasta_bindings
+    )
+  (preprocess (pps ppx_version))
+  (instrumentation (backend bisect_ppx))
+  )
