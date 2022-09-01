@@ -2432,6 +2432,22 @@ module Data = struct
               ~args:Arg.[]
               ~resolve:(fun _ { Poly.curr_global_slot; _ } ->
                 Global_slot.epoch curr_global_slot )
+          ; field "superchargedCoinbase" ~typ:(non_null bool)
+              ~args:Arg.[]
+              ~resolve:(fun _ { Poly.supercharge_coinbase; _ } ->
+                supercharge_coinbase )
+          ; field "blockStakeWinner" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ { Poly.block_stake_winner; _ } ->
+                Public_key.Compressed.to_base58_check block_stake_winner )
+          ; field "blockCreator" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ { Poly.block_creator; _ } ->
+                Public_key.Compressed.to_base58_check block_creator )
+          ; field "coinbaseReceiever" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ { Poly.coinbase_receiver; _ } ->
+                Public_key.Compressed.to_base58_check coinbase_receiver )
           ] )
   end
 

@@ -9862,6 +9862,70 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "superchargedCoinbase",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockStakeWinner",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockCreator",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "coinbaseReceiever",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -9926,7 +9990,42 @@
             },
             {
               "name": "stagedLedgerHash",
-              "description": "Base58Check-encoded hash of the staged ledger",
+              "description":
+                "Base58Check-encoded hash of the staged ledger hash's main ledger hash",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stagedLedgerAuxHash",
+              "description":
+                "Base58Check-encoded hash of the staged ledger hash's aux_hash",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stagedLedgerPendingCoinbaseAux",
+              "description":
+                "Base58Check-encoded hash of the staged ledger hash's pending_coinbase_hash",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9946,6 +10045,23 @@
                 "Block finished a staged ledger, and a proof was emitted from it and included into this block's proof. If there is no transition frontier available or no block found, this will return null.",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bodyReference",
+              "description":
+                "A reference to how the block header refers to the body of the block as a hex-encoded string",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
