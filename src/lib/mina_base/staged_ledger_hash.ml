@@ -24,7 +24,9 @@ module Aux_hash = struct
           Base58_check.Version_bytes.staged_ledger_hash_aux_hash
       end)
 
-      let to_yojson s = `String (Base58_check.encode s)
+      let to_base58_check s = Base58_check.encode s
+
+      let to_yojson s = `String (to_base58_check s)
 
       let of_yojson = function
         | `String s -> (
