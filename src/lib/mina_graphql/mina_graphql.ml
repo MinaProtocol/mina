@@ -698,7 +698,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ t ->
               let staged_ledger_hash = staged_ledger_hash t in
-              Mina_base.Ledger_hash.to_base58_check
+              Staged_ledger_hash.Aux_hash.to_base58_check
               @@ Staged_ledger_hash.aux_hash staged_ledger_hash )
         ; field "stagedLedgerPendingCoinbaseAux" ~typ:(non_null string)
             ~doc:
@@ -707,7 +707,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ t ->
               let staged_ledger_hash = staged_ledger_hash t in
-              Mina_base.Ledger_hash.to_base58_check
+              Pending_coinbase.Hash.to_base58_check
               @@ Staged_ledger_hash.pending_coinbase_aux staged_ledger_hash )
         ; field "stagedLedgerProofEmitted" ~typ:bool
             ~doc:

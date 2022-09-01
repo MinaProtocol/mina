@@ -40,7 +40,7 @@ module Aux_hash = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+  [%%define_locally Stable.Latest.(to_yojson, of_yojson, to_base58_check)]
 
   let of_bytes = Fn.id
 
