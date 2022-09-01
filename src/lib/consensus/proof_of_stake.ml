@@ -2365,6 +2365,8 @@ module Data = struct
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
       let open Graphql_async in
+      let open Graphql_lib.Scalars in
+      let public_key = PublicKey.typ () in
       let open Schema in
       let uint32, uint64 =
         ( Graphql_basic_scalars.UInt32.typ ()
@@ -2433,21 +2435,26 @@ module Data = struct
               ~resolve:(fun _ { Poly.curr_global_slot; _ } ->
                 Global_slot.epoch curr_global_slot )
           ; field "superchargedCoinbase" ~typ:(non_null bool)
+              ~doc:
+                "Whether or not this coinbase was \"supercharged\", ie. \
+                 created by an account that has no locked tokens"
               ~args:Arg.[]
               ~resolve:(fun _ { Poly.supercharge_coinbase; _ } ->
                 supercharge_coinbase )
-          ; field "blockStakeWinner" ~typ:(non_null string)
+          ; field "blockStakeWinner" ~typ:(non_null public_key)
+              ~doc:
+                "The public key that is responsible for winning this block \
+                 (including delegations)"
               ~args:Arg.[]
               ~resolve:(fun _ { Poly.block_stake_winner; _ } ->
-                Public_key.Compressed.to_base58_check block_stake_winner )
-          ; field "blockCreator" ~typ:(non_null string)
+                block_stake_winner )
+          ; field "blockCreator" ~typ:(non_null public_key)
+              ~doc:"The block producer public key that created this block"
               ~args:Arg.[]
-              ~resolve:(fun _ { Poly.block_creator; _ } ->
-                Public_key.Compressed.to_base58_check block_creator )
-          ; field "coinbaseReceiever" ~typ:(non_null string)
+              ~resolve:(fun _ { Poly.block_creator; _ } -> block_creator)
+          ; field "coinbaseReceiever" ~typ:(non_null public_key)
               ~args:Arg.[]
-              ~resolve:(fun _ { Poly.coinbase_receiver; _ } ->
-                Public_key.Compressed.to_base58_check coinbase_receiver )
+              ~resolve:(fun _ { Poly.coinbase_receiver; _ } -> coinbase_receiver)
           ] )
   end
 
