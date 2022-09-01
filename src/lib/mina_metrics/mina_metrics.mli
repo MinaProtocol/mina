@@ -59,6 +59,10 @@ module Cryptography : sig
   val snark_work_merge_time_sec : Snark_work_histogram.t
 
   val snark_work_base_time_sec : Snark_work_histogram.t
+
+  val transaction_length : Gauge.t
+
+  val proof_parties : Gauge.t
 end
 
 module Bootstrap : sig
@@ -79,6 +83,10 @@ module Transaction_pool : sig
   val pool_size : Gauge.t
 
   val transactions_added_to_pool : Counter.t
+
+  val parties_transaction_size : Gauge.t
+
+  val parties_count : Gauge.t
 end
 
 module Network : sig
@@ -409,6 +417,8 @@ module Transition_frontier : sig
   val recently_finalized_staged_txns : Gauge.t
 
   val best_tip_user_txns : Gauge.t
+
+  val best_tip_zkapp_txns : Gauge.t
 
   val best_tip_coinbase : Gauge.t
 
