@@ -242,7 +242,7 @@ let%test_module "PrecomputedBlockProof" =
             ])
       in
       test_query schema () "{ test }" (fun response ->
-          assert (Poly.equal value (S.parse @@ get_test_field response) ) )
+          assert (Poly.equal value (S.parse @@ get_test_field response)) )
 
     let%test_unit "test" = List.iter examples ~f:query_server_and_compare
   end )
