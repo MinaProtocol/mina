@@ -219,6 +219,10 @@ module Network_config = struct
             { txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
             ; transaction_expiry_hr = None
+            ; max_proof_parties = None
+            ; max_parties = None
+            ; max_event_elements = None
+            ; max_sequence_event_elements = None
             }
       ; genesis =
           Some
@@ -443,7 +447,7 @@ module Network_manager = struct
           accum + (max_nodes * 3) )
       (*
         the max_node_count_by_node_pool is per zone.  us-west1 has 3 zones (we assume this never changes).
-          therefore to get the actual number of nodes a node_pool has, we multiply by 3.  
+          therefore to get the actual number of nodes a node_pool has, we multiply by 3.
           then we sum up the number of nodes in all our node_pools to get the actual total maximum number of nodes that we can scale up to *)
     in
     let nodes_available = max_nodes - num_kube_nodes in

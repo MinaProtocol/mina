@@ -1463,6 +1463,88 @@ let dummy =
   ; memo = Signed_command_memo.empty
   }
 
+(* Parties transactions are filtered using this predicate
+   - when adding to the transaction pool
+   - in incoming blocks
+*)
+let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
+  let events_elements events =
+    List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
+  in
+  let ( num_proof_parties
+      , num_parties
+      , num_event_elements
+      , num_sequence_event_elements ) =
+    Call_forest.fold t.other_parties ~init:(0, 0, 0, 0)
+      ~f:(fun (num_proof_parties, num_parties, evs_size, seq_evs_size) party ->
+        let num_proof_parties' =
+          if Control.(Tag.equal (tag party.authorization) Tag.Proof) then
+            num_proof_parties + 1
+          else num_proof_parties
+        in
+        let party_evs_elements = events_elements party.body.events in
+        let party_seq_evs_elements =
+          events_elements party.body.sequence_events
+        in
+        ( num_proof_parties'
+        , num_parties + 1
+        , evs_size + party_evs_elements
+        , seq_evs_size + party_seq_evs_elements ) )
+  in
+  let max_proof_parties = genesis_constants.max_proof_parties in
+  let max_parties = genesis_constants.max_parties in
+  let max_event_elements = genesis_constants.max_event_elements in
+  let max_sequence_event_elements =
+    genesis_constants.max_sequence_event_elements
+  in
+  let valid_proof_parties = num_proof_parties <= max_proof_parties in
+  let valid_parties = num_parties <= max_parties in
+  let valid_event_elements = num_event_elements <= max_event_elements in
+  let valid_sequence_event_elements =
+    num_sequence_event_elements <= max_sequence_event_elements
+  in
+  if
+    valid_proof_parties && valid_parties && valid_event_elements
+    && valid_sequence_event_elements
+  then Ok ()
+  else
+    let proof_parties_err =
+      if valid_proof_parties then None
+      else
+        Some
+          (sprintf "too many proof parties (%d, max allowed is %d)"
+             num_proof_parties max_proof_parties )
+    in
+    let parties_err =
+      if valid_parties then None
+      else
+        Some
+          (sprintf "too many parties (%d, max allowed is %d)" num_parties
+             max_parties )
+    in
+    let events_err =
+      if valid_event_elements then None
+      else
+        Some
+          (sprintf "too many event elements (%d, max allowed is %d)"
+             num_event_elements max_event_elements )
+    in
+    let sequence_events_err =
+      if valid_sequence_event_elements then None
+      else
+        Some
+          (sprintf "too many sequence event elements (%d, max allowed is %d)"
+             num_sequence_event_elements max_sequence_event_elements )
+    in
+    let err_msg =
+      List.filter
+        [ proof_parties_err; parties_err; events_err; sequence_events_err ]
+        ~f:Option.is_some
+      |> List.map ~f:(fun opt -> Option.value_exn opt)
+      |> String.concat ~sep:"; "
+    in
+    Error (Error.of_string err_msg)
+
 let inner_query =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"

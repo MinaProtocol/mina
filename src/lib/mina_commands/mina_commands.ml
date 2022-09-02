@@ -119,12 +119,12 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
-let setup_and_submit_snapp_command t (snapp_parties : Parties.t) =
+let setup_and_submit_snapp_command t (parties : Parties.t) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
   let open Deferred.Let_syntax in
-  let%map result = Mina_lib.add_snapp_transactions t [ snapp_parties ] in
+  let%map result = Mina_lib.add_zkapp_transactions t [ parties ] in
   txn_count := !txn_count + 1 ;
   match result with
   | Ok (_, [], [ failed_txn ]) ->
@@ -136,8 +136,8 @@ let setup_and_submit_snapp_command t (snapp_parties : Parties.t) =
               |> Yojson.Safe.to_string ) ) )
   | Ok (`Broadcasted, [ User_command.Parties txn ], []) ->
       [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("snapp_command", Parties.to_yojson txn) ]
-        "Scheduled Snapp command $snapp_command" ;
+        ~metadata:[ ("zkapp_command", Parties.to_yojson txn) ]
+        "Scheduled zkApp $zkapp_command" ;
       Ok txn
   | Ok (decision, valid_commands, invalid_commands) ->
       [%log' info (Mina_lib.top_level_logger t)]
@@ -151,7 +151,7 @@ let setup_and_submit_snapp_command t (snapp_parties : Parties.t) =
                     "not_broadcasted" ) )
           ; ( "valid_snapp_commands"
             , `List (List.map ~f:User_command.to_yojson valid_commands) )
-          ; ( "invalid_snapp_commands"
+          ; ( "invalid_zkapp_commands"
             , `List
                 (List.map
                    ~f:
@@ -161,9 +161,8 @@ let setup_and_submit_snapp_command t (snapp_parties : Parties.t) =
                         .to_yojson snd )
                    invalid_commands ) )
           ]
-        "Invalid result from scheduling a Snapp transaction" ;
-      Error
-        (Error.of_string "Internal error while scheduling a Snapp transaction")
+        "Invalid result from scheduling a zkApp command" ;
+      Error (Error.of_string "Internal error while scheduling a zkApp command")
   | Error e ->
       Error e
 
