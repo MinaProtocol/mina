@@ -34,6 +34,8 @@ val send_add_resource :
   -> t
   -> unit
 
+val send_heartbeat : peer_id:Network_peer.Peer.Id.t -> t -> unit
+
 val test_with_libp2p_helper :
      ?logger:Logger.t
   -> ?handle_push_message:
