@@ -619,8 +619,11 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       in
       let send_heartbeat peer =
         O1trace.thread "execute_heartbeat" (fun () ->
-            let%map net2 = !net2_ref in
-            Mina_net2.send_heartbeat net2 peer.Network_peer.Peer.peer_id )
+            let n_def = !net2_ref in
+            if Deferred.is_determined n_def then
+              let%map net2 = n_def in
+              Mina_net2.send_heartbeat net2 peer.Network_peer.Peer.peer_id
+            else Deferred.unit )
       in
       let do_ban (banned_peer, expiration) =
         O1trace.thread "execute_gossip_net_bans" (fun () ->
