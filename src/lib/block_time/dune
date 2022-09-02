@@ -2,6 +2,7 @@
  (name block_time)
  (public_name block_time)
  (library_flags -linkall)
+ (flags -w -22) ; Silence %versioned inside functor warning
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
  (libraries
@@ -15,6 +16,7 @@
    base
    base.base_internalhash_types
    ;; local libraries
+   mina_wire_types
    bitstring_lib
    pickles
    unsigned_extended
