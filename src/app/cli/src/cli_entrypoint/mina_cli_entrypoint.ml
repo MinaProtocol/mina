@@ -1728,6 +1728,7 @@ let mina_commands logger =
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("ledger", Client.ledger)
+  ; ("libp2p", Client.libp2p)
   ; ( "internal"
     , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)

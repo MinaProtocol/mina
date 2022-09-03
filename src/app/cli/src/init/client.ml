@@ -1587,7 +1587,7 @@ let generate_libp2p_keypair =
       (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
       let logger = Logger.null () in
       (* Using the helper only for keypair generation requires no state. *)
-      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
+      File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
               ~pids:(Child_processes.Termination.create_pid_table ())
@@ -2261,7 +2261,6 @@ let advanced =
     ; ("pooled-zkapp-commands", pooled_zkapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
-    ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
     ; ("node-status", node_status)
     ; ("visualization", Visualization.command_group)
@@ -2290,3 +2289,7 @@ let ledger =
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
     ]
+
+let libp2p =
+  Command.group ~summary:"Libp2p commands"
+    [ ("generate-keypair", generate_libp2p_keypair) ]
