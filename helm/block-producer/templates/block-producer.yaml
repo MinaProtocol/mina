@@ -197,7 +197,7 @@ spec:
           "-enable-flooding", "true",
           {{- end -}}
           {{- if $config.libp2pSecret }}
-          "-discovery-keypair", "/root/libp2p-keys/key",
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- end -}}
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},

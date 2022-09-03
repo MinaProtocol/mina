@@ -249,8 +249,7 @@ let setup_daemon logger =
          work in a block (default: true)"
       (optional bool)
   and libp2p_keypair =
-    flag "--discovery-keypair" ~aliases:[ "discovery-keypair" ]
-      (optional string)
+    flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (optional string)
       ~doc:
         "KEYFILE Keypair (generated from `mina advanced \
          generate-libp2p-keypair`) to use with libp2p discovery (default: \
@@ -555,8 +554,8 @@ let setup_daemon logger =
                 | Error _ ->
                     if String.contains s ',' then
                       [%log warn]
-                        "I think -discovery-keypair is in the old format, but \
-                         I failed to parse it! Using it as a path..." ;
+                        "I think -libp2p-keypair is in the old format, but I \
+                         failed to parse it! Using it as a path..." ;
                     None )
           in
           match libp2p_keypair_old_format with

@@ -436,7 +436,7 @@ fi
 
 # ----------
 
-spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} -seed -discovery-keypair ${SEED_PEER_KEY} ${ARCHIVE_ADDRESS_CLI_ARG}
+spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} -seed -libp2p-keypair ${SEED_PEER_KEY} ${ARCHIVE_ADDRESS_CLI_ARG}
 SEED_PID=$!
 
 echo 'Waiting for seed to go up...'
