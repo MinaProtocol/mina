@@ -67,8 +67,7 @@ inputs:
           default = null;
         };
         libp2p-keypair = lib.mkOption {
-          type = nullOr path;
-          default = null;
+          type = path;
         };
 
         waitForRpc = lib.mkOption {

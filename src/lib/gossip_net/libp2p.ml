@@ -49,7 +49,7 @@ module Config = struct
     ; pubsub_v1 : pubsub_topic_mode_t
     ; pubsub_v0 : pubsub_topic_mode_t
     ; validation_queue_size : int
-    ; mutable keypair : Mina_net2.Keypair.t option
+    ; mutable keypair : Mina_net2.Keypair.t
     ; all_peers_seen_metric : bool
     ; known_private_ip_nets : Core.Unix.Cidr.t list
     }
@@ -242,14 +242,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
-          (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
-          let%bind me =
-            match config.keypair with
-            | Some kp ->
-                return kp
-            | None ->
-                Mina_net2.generate_random_keypair net2
-          in
+          let me = config.keypair in
           let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
           Logger.append_to_global_metadata
             [ ("peer_id", `String my_peer_id)
@@ -532,7 +525,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           in
           match%map initializing_libp2p_result with
           | Ok pfs ->
-              (net2, pfs, me)
+              (net2, pfs)
           | Error e ->
               fail e )
       | Ok (Error e) ->
@@ -558,7 +551,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let%bind () =
         let rec on_libp2p_create res =
           net2_ref :=
-            Deferred.map res ~f:(fun (n, _, _) ->
+            Deferred.map res ~f:(fun (n, _) ->
                 ( match
                     Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_BASE"
                   with
@@ -584,7 +577,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                     () ) ;
                 n ) ;
           let pf_impl f msg =
-            let%bind _, pf, _ = res in
+            let%bind _, pf = res in
             f pf msg
           in
           pfs_ref :=
@@ -594,11 +587,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             ; publish_v1_snark_work =
                 pf_impl (fun pf -> pf.publish_v1_snark_work)
             } ;
-          upon res (fun (_, _, me) ->
-              (* This is a hack so that we keep the same keypair across restarts. *)
-              config.keypair <- Some me ;
-              let logger = config.logger in
-              [%log trace] ~metadata:[] "Successfully restarted libp2p" )
+          upon res (fun _ ->
+              [%log' trace config.logger] ~metadata:[]
+                "Successfully restarted libp2p" )
         and start_libp2p () =
           let libp2p =
             create_libp2p config rpc_handlers first_peer_ivar
