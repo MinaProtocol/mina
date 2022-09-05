@@ -18,4 +18,4 @@
    pickles
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson ppx_dhall_type ppx_version ppx_compare)))
+ (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson ppx_fields_conv ppx_dhall_type ppx_version ppx_compare)))

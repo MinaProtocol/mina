@@ -11,6 +11,7 @@
    core_kernel
    base.caml
    ;; local libraries
+   mina_wire_types
    kimchi_backend.pasta
    snarky.backendless
    pickles_types

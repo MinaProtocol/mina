@@ -16,6 +16,7 @@
    sexplib0
    integers
    ;; local libraries
+   mina_wire_types
    hex
    random_oracle_input
    mina_numbers

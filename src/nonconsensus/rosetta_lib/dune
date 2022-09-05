@@ -15,6 +15,7 @@
    base.caml
    result
    ;;local libraries
+   mina_wire_types
    rosetta_models
    random_oracle_input
    mina_numbers_nonconsensus

@@ -8,7 +8,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t =
+    type t = Mina_wire_types.Mina_base.Control.V2.t =
       | Proof of Pickles.Side_loaded.Proof.Stable.V2.t
       | Signature of Signature.Stable.V1.t
       | None_given
