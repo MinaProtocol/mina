@@ -150,6 +150,22 @@ module TransactionHash_gen = struct
     |> Quickcheck.Generator.map ~f:(fun (coinbase, _) -> hash_coinbase coinbase)
 end
 
+module PrecomputedBlockProof_gen = struct
+  include Mina_block.Precomputed.Proof
+  module Nat = Pickles_types.Nat
+
+  (* Sample gotten from: lib/prover/prover.ml *)
+
+  let compare = Poly.compare
+
+  let example : t =
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+
+  (* TODO: find better ways to generate `Mina_block.Precomputed.Proof.t` values *)
+  let gen =
+    Unit.quickcheck_generator |> Quickcheck.Generator.map ~f:(Fn.const example)
+end
+
 (* BASIC SCALARS *)
 let%test_module "UInt32" = (module Make_test (Scalars.UInt32) (UInt32_gen))
 
@@ -216,37 +232,5 @@ let%test_module "FeeTransferType" =
 let%test_module "TransactionHash" =
   (module Make_test (Scalars.TransactionHash) (TransactionHash_gen))
 
-(* Manual tests for Mina_block.Precomputed.Proof.t *)
 let%test_module "PrecomputedBlockProof" =
-  ( module struct
-    (* The type `t` from this module is equal to this *)
-    (* type t = (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t *)
-
-    module Nat = Pickles_types.Nat
-    module S = Scalars.PrecomputedBlockProof
-    module G = Mina_block.Precomputed.Proof
-
-    (* Sample gotten from: lib/prover/prover.ml *)
-    let examples : G.t list =
-      [ Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16 ]
-
-    (* From the `Make_test` functor *)
-    let query_server_and_compare value =
-      let schema =
-        Graphql_async.Schema.(
-          schema
-            [ field "test"
-                ~typ:(non_null @@ S.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ () -> value)
-            ])
-      in
-      test_query schema () "{ test }" (fun response ->
-          assert (Poly.equal value (S.parse @@ get_test_field response)) )
-
-    let%test_unit "test" = List.iter examples ~f:query_server_and_compare
-  end )
-
-(* TODO: add quickcheck tests tests for the following graphql scalars *)
-(* let%test_module "PrecomputedBlockProof" =
-   (module Make_test (Scalars.PrecomputedBlockProof) (Mina_block.Precomputed.Proof) ) *)
+  (module Make_test (Scalars.PrecomputedBlockProof) (PrecomputedBlockProof_gen))
