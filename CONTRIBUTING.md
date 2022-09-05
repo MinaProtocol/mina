@@ -43,7 +43,13 @@ labels.
 
 ## Pull Requests
 
-Our branching workflow is [documented on the wiki](https://minaprotocol.notion.site/minaprotocol/Compatible-vs-Develop-branch-management-31c845b2924b4c518740eb9da4514dcc).
+### Branching workflow
+
+Make sure to read about the [branching workflow](README-branching.md) to
+understand on which branch (`compatible` or `develop`) you should be working,
+and how to manage simultaneous PRs to both branches.
+
+### Continuous integration
 
 All pull requests go through Buildkite CI, which makes sure the code doesn't need to
 be reformatted, builds Mina in its various configurations, and runs all the
