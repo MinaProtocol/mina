@@ -28,11 +28,11 @@ let account_identifier_of_id pool account_identifier_id =
 
 let get_amount_bounds pool amount_id =
   let open Zkapp_basic in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%map amount_db_opt =
     Option.value_map amount_id ~default:(return None) ~f:(fun id ->
         let%map amount =
-          Mina_caqti.query pool ~f:(fun db ->
-              Processor.Zkapp_amount_bounds.load db id )
+          query_db ~f:(fun db -> Processor.Zkapp_amount_bounds.load db id)
         in
         Some amount )
   in
@@ -48,11 +48,11 @@ let get_amount_bounds pool amount_id =
 
 let get_global_slot_bounds pool id =
   let open Zkapp_basic in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%map bounds_opt =
     Option.value_map id ~default:(return None) ~f:(fun id ->
         let%map bounds =
-          Mina_caqti.query pool ~f:(fun db ->
-              Processor.Zkapp_global_slot_bounds.load db id )
+          query_db ~f:(fun db -> Processor.Zkapp_global_slot_bounds.load db id)
         in
         let slot_of_int64 int64 =
           int64 |> Unsigned.UInt32.of_int64
@@ -66,11 +66,11 @@ let get_global_slot_bounds pool id =
 
 let get_length_bounds pool id =
   let open Zkapp_basic in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%map bl_db_opt =
     Option.value_map id ~default:(return None) ~f:(fun id ->
         let%map ts =
-          Mina_caqti.query pool ~f:(fun db ->
-              Processor.Zkapp_length_bounds.load db id )
+          query_db ~f:(fun db -> Processor.Zkapp_length_bounds.load db id)
         in
         Some ts )
   in
@@ -85,6 +85,7 @@ let get_length_bounds pool id =
 
 let update_of_id pool update_id =
   let open Zkapp_basic in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let with_pool ~f arg =
     let open Caqti_async in
     Pool.use
@@ -100,8 +101,7 @@ let update_of_id pool update_id =
            ; timing_id
            ; voting_for_id
            } =
-    Mina_caqti.query pool ~f:(fun db ->
-        Processor.Zkapp_updates.load db update_id )
+    query_db ~f:(fun db -> Processor.Zkapp_updates.load db update_id)
   in
   let%bind app_state =
     let%bind { element0
@@ -113,7 +113,7 @@ let update_of_id pool update_id =
              ; element6
              ; element7
              } =
-      Mina_caqti.query pool ~f:(fun db ->
+      query_db ~f:(fun db ->
           Processor.Zkapp_states_nullable.load db app_state_id )
     in
     let field_ids =
@@ -131,8 +131,7 @@ let update_of_id pool update_id =
       Deferred.List.map field_ids ~f:(fun id_opt ->
           Option.value_map id_opt ~default:(return None) ~f:(fun id ->
               let%map field =
-                Mina_caqti.query pool ~f:(fun db ->
-                    Processor.Zkapp_state_data.load db id )
+                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id)
               in
               Some field ) )
     in
@@ -155,8 +154,7 @@ let update_of_id pool update_id =
     let%map vk_opt =
       Option.value_map verification_key_id ~default:(return None) ~f:(fun id ->
           let%map vk =
-            Mina_caqti.query pool ~f:(fun db ->
-                Processor.Zkapp_verification_keys.load db id )
+            query_db ~f:(fun db -> Processor.Zkapp_verification_keys.load db id)
           in
           Some vk )
     in
@@ -190,8 +188,7 @@ let update_of_id pool update_id =
                   ; increment_nonce
                   ; set_voting_for
                   } =
-            Mina_caqti.query pool ~f:(fun db ->
-                Processor.Zkapp_permissions.load db id )
+            query_db ~f:(fun db -> Processor.Zkapp_permissions.load db id)
           in
           (* same fields, different types *)
           Some
@@ -228,8 +225,7 @@ let update_of_id pool update_id =
                   ; vesting_period
                   ; vesting_increment
                   } =
-            Mina_caqti.query pool ~f:(fun db ->
-                Processor.Zkapp_timing_info.load db id )
+            query_db ~f:(fun db -> Processor.Zkapp_timing_info.load db id)
           in
           let initial_minimum_balance =
             Currency.Balance.of_string initial_minimum_balance
@@ -278,25 +274,25 @@ let update_of_id pool update_id =
 
 let staking_data_of_id pool id =
   let open Zkapp_basic in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%bind { epoch_ledger_id
            ; epoch_seed
            ; start_checkpoint
            ; lock_checkpoint
            ; epoch_length_id
            } =
-    Mina_caqti.query pool ~f:(fun db -> Processor.Zkapp_epoch_data.load db id)
+    query_db ~f:(fun db -> Processor.Zkapp_epoch_data.load db id)
   in
   let%bind ledger =
     let%bind { hash_id; total_currency_id } =
-      Mina_caqti.query pool ~f:(fun db ->
+      query_db ~f:(fun db ->
           Processor.Zkapp_epoch_ledger.load db epoch_ledger_id )
     in
     let%bind hash =
       let%map hash_opt =
         Option.value_map hash_id ~default:(return None) ~f:(fun id ->
             let%map hash_str =
-              Mina_caqti.query pool ~f:(fun db ->
-                  Processor.Snarked_ledger_hash.load db id )
+              query_db ~f:(fun db -> Processor.Snarked_ledger_hash.load db id)
             in
             Some (Frozen_ledger_hash.of_base58_check_exn hash_str) )
       in
@@ -327,6 +323,7 @@ let staking_data_of_id pool id =
 
 let protocol_state_precondition_of_id pool id =
   let open Zkapp_basic in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%bind ({ snarked_ledger_hash_id
             ; timestamp_id
             ; blockchain_length_id
@@ -338,16 +335,14 @@ let protocol_state_precondition_of_id pool id =
             ; next_epoch_data_id
             }
              : Processor.Zkapp_network_precondition.t ) =
-    Mina_caqti.query pool ~f:(fun db ->
-        Processor.Zkapp_network_precondition.load db id )
+    query_db ~f:(fun db -> Processor.Zkapp_network_precondition.load db id)
   in
   let%bind snarked_ledger_hash =
     let%map hash_opt =
       Option.value_map snarked_ledger_hash_id ~default:(return None)
         ~f:(fun id ->
           let%map hash =
-            Mina_caqti.query pool ~f:(fun db ->
-                Processor.Snarked_ledger_hash.load db id )
+            query_db ~f:(fun db -> Processor.Snarked_ledger_hash.load db id)
           in
           Some (Frozen_ledger_hash.of_base58_check_exn hash) )
     in
@@ -357,8 +352,7 @@ let protocol_state_precondition_of_id pool id =
     let%map ts_db_opt =
       Option.value_map timestamp_id ~default:(return None) ~f:(fun id ->
           let%map ts =
-            Mina_caqti.query pool ~f:(fun db ->
-                Processor.Zkapp_timestamp_bounds.load db id )
+            query_db ~f:(fun db -> Processor.Zkapp_timestamp_bounds.load db id)
           in
           Some ts )
     in
@@ -396,19 +390,20 @@ let protocol_state_precondition_of_id pool id =
     : Zkapp_precondition.Protocol_state.t )
 
 let load_events pool id =
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%map fields_list =
     (* each id refers to an item in 'zkapp_state_data_array' *)
     let%bind field_array_ids =
-      Mina_caqti.query pool ~f:(fun db -> Processor.Zkapp_events.load db id)
+      query_db ~f:(fun db -> Processor.Zkapp_events.load db id)
     in
     Deferred.List.map (Array.to_list field_array_ids) ~f:(fun array_id ->
         let%bind field_ids =
-          Mina_caqti.query pool ~f:(fun db ->
+          query_db ~f:(fun db ->
               Processor.Zkapp_state_data_array.load db array_id )
         in
         Deferred.List.map (Array.to_list field_ids) ~f:(fun field_id ->
             let%map field_str =
-              Mina_caqti.query pool ~f:(fun db ->
+              query_db ~f:(fun db ->
                   Processor.Zkapp_state_data.load db field_id )
             in
             Zkapp_basic.F.of_string field_str ) )
@@ -416,9 +411,9 @@ let load_events pool id =
   List.map fields_list ~f:Array.of_list
 
 let get_fee_payer_body ~pool body_id =
+  let query_db ~f = Mina_caqti.query ~f pool in
   let%bind { account_identifier_id; fee; valid_until; nonce } =
-    Mina_caqti.query pool ~f:(fun db ->
-        Processor.Zkapp_fee_payer_body.load db body_id )
+    query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
   in
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
   let public_key = Account_id.public_key account_id in
@@ -435,6 +430,7 @@ let get_fee_payer_body ~pool body_id =
 
 let get_other_party_body ~pool body_id =
   let open Zkapp_basic in
+  let query_db ~f = Mina_caqti.query ~f pool in
   let pk_of_id = pk_of_id pool in
   let%bind { account_identifier_id
            ; update_id
@@ -449,8 +445,7 @@ let get_other_party_body ~pool body_id =
            ; use_full_commitment
            ; caller
            } =
-    Mina_caqti.query pool ~f:(fun db ->
-        Processor.Zkapp_other_party_body.load db body_id )
+    query_db ~f:(fun db -> Processor.Zkapp_other_party_body.load db body_id)
   in
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
   let public_key = Account_id.public_key account_id in
@@ -472,8 +467,7 @@ let get_other_party_body ~pool body_id =
   let%bind sequence_events = load_events pool sequence_events_id in
   let%bind call_data =
     let%map field_str =
-      Mina_caqti.query pool ~f:(fun db ->
-          Processor.Zkapp_state_data.load db call_data_id )
+      query_db ~f:(fun db -> Processor.Zkapp_state_data.load db call_data_id)
     in
     Zkapp_basic.F.of_string field_str
   in
@@ -483,7 +477,7 @@ let get_other_party_body ~pool body_id =
   let%bind account_precondition =
     let%bind ({ kind; precondition_account_id; nonce }
                : Processor.Zkapp_account_precondition.t ) =
-      Mina_caqti.query pool ~f:(fun db ->
+      query_db ~f:(fun db ->
           Processor.Zkapp_account_precondition.load db
             zkapp_account_precondition_id )
     in
@@ -508,7 +502,7 @@ let get_other_party_body ~pool body_id =
                  ; proved_state
                  ; is_new
                  } =
-          Mina_caqti.query pool ~f:(fun db ->
+          query_db ~f:(fun db ->
               Processor.Zkapp_precondition_account.load db
                 (Option.value_exn precondition_account_id) )
         in
@@ -516,7 +510,7 @@ let get_other_party_body ~pool body_id =
           let%map balance_opt =
             Option.value_map balance_id ~default:(return None) ~f:(fun id ->
                 let%map { balance_lower_bound; balance_upper_bound } =
-                  Mina_caqti.query pool ~f:(fun db ->
+                  query_db ~f:(fun db ->
                       Processor.Zkapp_balance_bounds.load db id )
                 in
                 let lower = Currency.Balance.of_string balance_lower_bound in
@@ -529,7 +523,7 @@ let get_other_party_body ~pool body_id =
           let%map nonce_opt =
             Option.value_map nonce_id ~default:(return None) ~f:(fun id ->
                 let%map { nonce_lower_bound; nonce_upper_bound } =
-                  Mina_caqti.query pool ~f:(fun db ->
+                  query_db ~f:(fun db ->
                       Processor.Zkapp_nonce_bounds.load db id )
                 in
                 let balance_of_int64 int64 =
@@ -566,7 +560,7 @@ let get_other_party_body ~pool body_id =
                    ; element6
                    ; element7
                    } =
-            Mina_caqti.query pool ~f:(fun db ->
+            query_db ~f:(fun db ->
                 Processor.Zkapp_states_nullable.load db state_id )
           in
           let elements =
@@ -584,7 +578,7 @@ let get_other_party_body ~pool body_id =
             Deferred.List.map elements ~f:(fun id_opt ->
                 Option.value_map id_opt ~default:(return None) ~f:(fun id ->
                     let%map field_str =
-                      Mina_caqti.query pool ~f:(fun db ->
+                      query_db ~f:(fun db ->
                           Processor.Zkapp_state_data.load db id )
                     in
                     Some (Zkapp_basic.F.of_string field_str) ) )
@@ -596,8 +590,7 @@ let get_other_party_body ~pool body_id =
             Option.value_map sequence_state_id ~default:(return None)
               ~f:(fun id ->
                 let%map field_str =
-                  Mina_caqti.query pool ~f:(fun db ->
-                      Processor.Zkapp_state_data.load db id )
+                  query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id)
                 in
                 Some (Zkapp_basic.F.of_string field_str) )
           in
@@ -639,6 +632,7 @@ let get_other_party_body ~pool body_id =
 
 let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =
+  let query_db ~f = Mina_caqti.query ~f pool in
   let with_pool ~f arg =
     let open Caqti_async in
     Pool.use
@@ -664,14 +658,13 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     account
   in
   let%bind ({ public_key_id; token_id } : Processor.Account_identifiers.t) =
-    Mina_caqti.query pool ~f:(fun db ->
+    query_db ~f:(fun db ->
         Processor.Account_identifiers.load db account_identifier_id )
   in
   let%bind public_key = pk_of_id public_key_id in
   let%bind token_id = token_of_id token_id in
   let%bind token_symbol =
-    Mina_caqti.query pool ~f:(fun db ->
-        Processor.Token_symbols.load db token_symbol_id )
+    query_db ~f:(fun db -> Processor.Token_symbols.load db token_symbol_id)
   in
   let balance = Currency.Balance.of_string balance in
   let nonce = nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32 in
@@ -688,15 +681,13 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   in
   let%bind voting_for =
     let%map hash_str =
-      Mina_caqti.query pool ~f:(fun db ->
-          Processor.Voting_for.load db voting_for_id )
+      query_db ~f:(fun db -> Processor.Voting_for.load db voting_for_id)
     in
     State_hash.of_base58_check_exn hash_str
   in
   let%bind timing =
     match%map
-      Mina_caqti.query pool ~f:(fun db ->
-          Processor.Timing_info.load_opt db timing_id )
+      query_db ~f:(fun db -> Processor.Timing_info.load_opt db timing_id)
     with
     | None ->
         Account_timing.Untimed
@@ -752,8 +743,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; increment_nonce
             ; set_voting_for
             } =
-      Mina_caqti.query pool ~f:(fun db ->
-          Processor.Zkapp_permissions.load db permissions_id )
+      query_db ~f:(fun db -> Processor.Zkapp_permissions.load db permissions_id)
     in
     ( { edit_state
       ; send
@@ -794,8 +784,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                  ; element6
                  ; element7
                  } =
-          Mina_caqti.query pool ~f:(fun db ->
-              Processor.Zkapp_states.load db app_state_id )
+          query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
         in
         let elements =
           [ element0
@@ -811,8 +800,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%bind app_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
-                Mina_caqti.query pool ~f:(fun db ->
-                    Processor.Zkapp_state_data.load db id ) )
+                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Zkapp_state.V.of_list_exn fields
@@ -821,7 +809,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           Option.value_map verification_key_id ~default:(return None)
             ~f:(fun id ->
               let%map { verification_key; hash } =
-                Mina_caqti.query pool ~f:(fun db ->
+                query_db ~f:(fun db ->
                     Processor.Zkapp_verification_keys.load db id )
               in
               let data =
@@ -842,15 +830,14 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           |> Mina_numbers.Zkapp_version.of_uint32
         in
         let%bind { element0; element1; element2; element3; element4 } =
-          Mina_caqti.query pool ~f:(fun db ->
+          query_db ~f:(fun db ->
               Processor.Zkapp_sequence_states.load db sequence_state_id )
         in
         let elements = [ element0; element1; element2; element3; element4 ] in
         let%map sequence_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
-                Mina_caqti.query pool ~f:(fun db ->
-                    Processor.Zkapp_state_data.load db id ) )
+                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Pickles_types.Vector.Vector_5.of_list_exn fields
@@ -873,8 +860,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   let%bind zkapp_uri =
     Option.value_map zkapp_db ~default:(return "https://dummy.com")
       ~f:(fun zkapp ->
-        Mina_caqti.query pool ~f:(fun db ->
-            Processor.Zkapp_uri.load db zkapp.zkapp_uri_id ) )
+        query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp.zkapp_uri_id) )
   in
   (* TODO: token permissions is going away *)
   let account =
