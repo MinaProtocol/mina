@@ -162,8 +162,7 @@ module PrecomputedBlockProof_gen = struct
     Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
 
   (* TODO: find better ways to generate `Mina_block.Precomputed.Proof.t` values *)
-  let gen =
-    Unit.quickcheck_generator |> Quickcheck.Generator.map ~f:(Fn.const example)
+  let gen = Quickcheck.Generator.return example
 end
 
 (* BASIC SCALARS *)
