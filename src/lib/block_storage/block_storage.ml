@@ -191,7 +191,7 @@ let%test_module "Block storage tests" =
                   ~external_multiaddr:maddr ~network_id:"s"
                   ~unsafe_no_trust_ip:true ~flood:false ~direct_peers:[]
                   ~seed_peers:[] ~known_private_ip_nets:[] ~peer_exchange:true
-                  ~mina_peer_exchange:true ~min_connections:20
+                  ~peer_protection_ratio:0.2 ~min_connections:20
                   ~max_connections:40 ~validation_queue_size:250
                   ~gating_config:empty_libp2p_ipc_gating_config
                   ?metrics_port:None ~topic_config:[]

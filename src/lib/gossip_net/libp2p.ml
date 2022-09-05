@@ -41,7 +41,7 @@ module Config = struct
     ; flooding : bool
     ; direct_peers : Mina_net2.Multiaddr.t list
     ; peer_exchange : bool
-    ; mina_peer_exchange : bool
+    ; peer_protection_ratio : float
     ; seed_peer_list_url : Uri.t option
     ; min_connections : int
     ; time_controller : Block_time.Controller.t
@@ -304,7 +304,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip ~seed_peers
                 ~direct_peers:config.direct_peers
                 ~peer_exchange:config.peer_exchange
-                ~mina_peer_exchange:config.mina_peer_exchange
+                ~peer_protection_ratio:config.peer_protection_ratio
                 ~flooding:config.flooding
                 ~min_connections:config.min_connections
                 ~max_connections:config.max_connections
@@ -617,6 +617,14 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let ban_configuration =
         ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
       in
+      let send_heartbeat peer =
+        O1trace.thread "execute_heartbeat" (fun () ->
+            let n_def = !net2_ref in
+            if Deferred.is_determined n_def then
+              let%map net2 = n_def in
+              Mina_net2.send_heartbeat net2 peer.Network_peer.Peer.peer_id
+            else Deferred.unit )
+      in
       let do_ban (banned_peer, expiration) =
         O1trace.thread "execute_gossip_net_bans" (fun () ->
             don't_wait_for
@@ -649,12 +657,19 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           | _ ->
               Deferred.unit )
       in
+      let handle_trust_system_upcall upcall =
+        match upcall with
+        | `Ban u ->
+            do_ban u
+        | `Heartbeat peer ->
+            send_heartbeat peer
+      in
       let ban_reader, ban_writer = Linear_pipe.create () in
       don't_wait_for
         (let%map () =
            Strict_pipe.Reader.iter
-             (Trust_system.ban_pipe config.trust_system)
-             ~f:do_ban
+             (Trust_system.upcall_pipe config.trust_system)
+             ~f:handle_trust_system_upcall
          in
          Linear_pipe.close ban_writer ) ;
       let t =

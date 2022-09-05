@@ -36,17 +36,22 @@ final: prev: {
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
     doCheck = false; # TODO: tests hang
-    vendorSha256 =
+    vendorSha256 = let hashes = final.lib.importJSON ./libp2p_helper.json; in
       # sanity check, to make sure the fixed output drv doesn't keep working
       # when the inputs change
       if builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.mod
-      == "b61925da13e7b9d0e0581e3af0f423ecf5beb7ac56eb747b5af02d18fdfa3abc"
+      == hashes."go.mod"
       && builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.sum
-      == "27d929c6f62322fb01e84781456ce1fb986cc28d1b9fe7b338e4291f5e909baa" then
-        "sha256-WT6SmmtSctJ0Roq4EYKAl7LSzsjsjjS0xqN1RATxpqs="
+      == hashes."go.sum" then
+        hashes.vendorSha256
       else
         final.lib.warn
-        "Please update the hashes in ${__curPos.file}#${toString __curPos.line}"
+        ''
+          Below, you will find an error about a hash mismatch.
+          This is likely because you have updated go.mod and/or go.sum in libp2p_helper.
+          Please, locate the "got: " hash in the aforementioned error. If it's in SRI format ([35;1msha256-<...>[31;1m), copy the entire hash, including the `[35;1msha256-[31;1m'. Otherwise (if it's in the base32 format, like `[35;1msha256:<...>[31;1m'), copy only the base32 part, without `[35;1msha256:[31;1m'.
+          Then, run [37;1m./nix/update-libp2p-hashes.sh [35;1m"<got hash here>"[31;0m
+        ''
         final.lib.fakeHash;
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
