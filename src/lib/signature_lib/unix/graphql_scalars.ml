@@ -14,3 +14,8 @@ module PublicKey :
     Graphql_async.Schema.scalar "PublicKey"
       ~doc:"Base58Check-encoded public key string" ~coerce:serialize
 end
+
+let%test_module "PublicKey" =
+  ( module Graphql_basic_scalars.Make_test
+             (PublicKey)
+             (Signature_lib.Public_key.Compressed) )

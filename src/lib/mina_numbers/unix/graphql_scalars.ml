@@ -26,3 +26,13 @@ module Length =
 
       let doc = "length"
     end)
+
+(* TESTS *)
+let%test_module "GlobalSlot" =
+  (module Make_test (GlobalSlot) (Mina_numbers.Global_slot))
+
+let%test_module "AccountNonce" =
+  (module Make_test (AccountNonce) (Mina_numbers.Account_nonce))
+
+let%test_module "AccountNonce" =
+  (module Make_test (Length) (Mina_numbers.Length))

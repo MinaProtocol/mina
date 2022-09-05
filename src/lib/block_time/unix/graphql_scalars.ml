@@ -8,3 +8,6 @@ struct
 
   let typ () = Graphql_async.Schema.scalar "BlockTime" ~coerce:serialize
 end
+
+let%test_module "BlockTime" =
+  (module Graphql_basic_scalars.Make_test (BlockTime) (Block_time))
