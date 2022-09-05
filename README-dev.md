@@ -113,14 +113,9 @@ It also knows how to use Docker automatically.
 These are the most important `make` targets:
 
 - `build`: build everything
-- `test`: run the tests
 - `libp2p_helper`: build the libp2p helper
-- `web`: build the website, including the state explorer
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
-
-NOTE: all of the `test-*` targets (including `test-all`) won't run in the container.
-`test` wraps them in the container.
 
 ## Steps for adding a new dependency
 
