@@ -67,6 +67,9 @@ If you are PRing from the main remote, add `ci-build-me` label when you want to 
 Once a PR has been reviewed and approved, and all CI tests have passed, it can be merged
 by a maintainer (or by you, if you have this access).
 
+If you encounter problems with the CI, read [CI FAILURES](README-ci-failures.md)
+for common troubleshooting steps.
+
 ## Documentation
 
 There are three main pieces of Mina documentation:
@@ -76,8 +79,10 @@ There are three main pieces of Mina documentation:
 2. The `README.md` files in various directories. These explain the contents of that
    directory at a high level: the purpose of the library, design constraints, anything else
    specific to that directory.
-3. Inline code comments. There are very few of these, and we don't currently run ocamldoc
-   so they won't be exposed even as we write them. This should change eventually.
+3. Inline code comments. There are unfortunately very few of these currently,
+   but this will slowly change. We are now running `ocamldoc` and the generated
+   documentation is browsable
+   [online](https://mina-docs.storage.googleapis.com/index.html).
 
 Changes to the software should come with changes to the documentation.
 

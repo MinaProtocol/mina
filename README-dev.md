@@ -105,7 +105,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
 Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
 
-## Using the makefile
+## Using the Makefile
 
 The makefile contains phony targets for all the common tasks that need to be done.
 It also knows how to use Docker automatically. 
