@@ -4,7 +4,10 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('u, 's) t = Signed_command of 'u | Parties of 's
+      type ('u, 's) t =
+            ('u, 's) Mina_wire_types.Mina_base.User_command.Poly.V2.t =
+        | Signed_command of 'u
+        | Parties of 's
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -272,7 +275,7 @@ let filter_by_participant (commands : t list) public_key =
 
 (* A metric on user commands that should correspond roughly to resource costs
    for validation/application *)
-let weight : Stable.Latest.t -> int = function
+let weight : t -> int = function
   | Signed_command signed_command ->
       Signed_command.payload signed_command |> Signed_command_payload.weight
   | Parties parties ->
@@ -282,3 +285,9 @@ let weight : Stable.Latest.t -> int = function
 let fee_per_wu (user_command : Stable.Latest.t) : Currency.Fee_rate.t =
   (*TODO: return Or_error*)
   Currency.Fee_rate.make_exn (fee user_command) (weight user_command)
+
+let valid_size ~genesis_constants = function
+  | Signed_command _ ->
+      Ok ()
+  | Parties parties ->
+      Parties.valid_size ~genesis_constants parties

@@ -49,6 +49,16 @@ module UInt64 : Json_intf with type t = Unsigned.UInt64.t = struct
     unsigned_scalar_scalar ~to_string:Unsigned.UInt64.to_string "UInt64"
 end
 
+module Index : Json_intf with type t = int = struct
+  type t = int
+
+  let parse json = Yojson.Basic.Util.to_string json |> int_of_string
+
+  let serialize value = `String (Int.to_string value)
+
+  let typ () = scalar "Index" ~doc:"ocaml integer as a string" ~coerce:serialize
+end
+
 module JSON = struct
   type t = Yojson.Basic.t
 
@@ -134,3 +144,12 @@ end) : Json_intf with type t = T.t = struct
   let typ () =
     Graphql_async.Schema.scalar Scalar.name ~doc:Scalar.doc ~coerce:serialize
 end
+
+module InetAddr =
+  Make_scalar_using_to_string
+    (Core.Unix.Inet_addr)
+    (struct
+      let name = "InetAddr"
+
+      let doc = "network address"
+    end)

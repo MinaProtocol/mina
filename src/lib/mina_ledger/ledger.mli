@@ -214,6 +214,17 @@ val apply_transaction :
   -> Transaction.t
   -> Transaction_applied.t Or_error.t
 
+(** update sequence state, returned slot is new last sequence slot
+    made available here so we can use this logic in the Parties generators
+*)
+val update_sequence_state :
+     Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+  -> Zkapp_account.Sequence_events.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
+  -> last_sequence_slot:Mina_numbers.Global_slot.t
+  -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+     * Mina_numbers.Global_slot.t
+
 val apply_parties_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> state_view:Zkapp_precondition.Protocol_state.View.t
@@ -267,7 +278,7 @@ type init_state =
 [@@deriving sexp_of]
 
 (** Generate an initial ledger state. There can't be a regular Quickcheck
-    generator for this type because you need to detach a mask from it's parent
+    generator for this type because you need to detach a mask from its parent
     when you're done with it - the GC doesn't take care of that. *)
 val gen_initial_ledger_state : init_state Quickcheck.Generator.t
 

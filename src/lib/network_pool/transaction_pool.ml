@@ -270,8 +270,12 @@ struct
                  nodes with larger pools don't send nodes with smaller pools lots of
                  low fee transactions the smaller-pooled nodes consider useless and get
                  themselves banned.
+
+                 we offer this value separately from the one in genesis_constants, because
+                 we may wish a different value for testing
               *)
         ; verifier : (Verifier.t[@sexp.opaque])
+        ; genesis_constants : Genesis_constants.t
         }
       [@@deriving sexp_of, make]
     end
@@ -1008,9 +1012,42 @@ struct
                   ; ( "sender"
                     , Envelope.(Sender.to_yojson (Incoming.sender diff)) )
                   ] ) ;
-          ok_if_true
-            (List.is_empty cmds_with_insufficient_fees)
-            ~error:"Some commands have insufficient fee"
+          let too_big_cmds =
+            List.filter (Envelope.Incoming.data diff) ~f:(fun cmd ->
+                let size_validity =
+                  User_command.valid_size
+                    ~genesis_constants:t.config.genesis_constants cmd
+                in
+                match size_validity with
+                | Ok () ->
+                    false
+                | Error err ->
+                    [%log' debug t.logger] "User command is too big"
+                      ~metadata:
+                        [ ("cmd", User_command.to_yojson cmd)
+                        ; ( "sender"
+                          , Envelope.(Sender.to_yojson (Incoming.sender diff))
+                          )
+                        ; ("size_violation", Error_json.error_to_yojson err)
+                        ] ;
+                    true )
+          in
+          let sufficient_fees = List.is_empty cmds_with_insufficient_fees in
+          let valid_sizes = List.is_empty too_big_cmds in
+          match (sufficient_fees, valid_sizes) with
+          | true, true ->
+              Deferred.Or_error.return ()
+          | false, true ->
+              Deferred.Or_error.fail
+              @@ Error.of_string "Some commands have an insufficient fee"
+          | true, false ->
+              Deferred.Or_error.fail
+              @@ Error.of_string "Some commands are too big"
+          | false, false ->
+              Deferred.Or_error.fail
+              @@ Error.of_string
+                   "Some commands have an insufficient fee, and some are too \
+                    big"
         in
         (* TODO: batch `to_verifiable` (#11705) *)
         let%bind ledger =
@@ -1097,6 +1134,7 @@ struct
         let is_sender_local =
           Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
         in
+        let pool_size_before = Indexed_pool.size t.pool in
         (* preload fee payer accounts from the best tip ledger *)
         let%map ledger =
           match t.best_tip_ledger with
@@ -1224,10 +1262,13 @@ struct
                 () ) ;
         (* finalize the update to the pool *)
         t.pool <- pool ;
+        let pool_size_after = Indexed_pool.size pool in
         Mina_metrics.(
-          Gauge.set Transaction_pool.pool_size
-            (Float.of_int (Indexed_pool.size pool)) ;
-          Counter.inc_one Transaction_pool.transactions_added_to_pool) ;
+          Gauge.set Transaction_pool.pool_size (Float.of_int pool_size_after) ;
+          List.iter
+            (List.init (max 0 (pool_size_after - pool_size_before)) ~f:Fn.id)
+            ~f:(fun _ ->
+              Counter.inc_one Transaction_pool.transactions_added_to_pool )) ;
         (* partition the results *)
         let accepted, rejected =
           List.partition_map add_results ~f:(function
@@ -1655,6 +1696,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
+          ~genesis_constants:Genesis_constants.compiled
       in
       let expiry_ns = match expiry with None -> expiry_ns | Some t -> t in
       let pool_, _, _ =

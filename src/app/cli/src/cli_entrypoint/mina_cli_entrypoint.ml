@@ -273,13 +273,10 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
       (optional bool)
-  and mina_peer_exchange =
-    flag "--enable-mina-peer-exchange"
-      ~aliases:[ "enable-mina-peer-exchange" ]
-      ~doc:
-        "true|false Help keep the mesh connected when closing connections \
-         (default: true)"
-      (optional_with_default true bool)
+  and peer_protection_ratio =
+    flag "--peer-protection-rate" ~aliases:[ "peer-protection-rate" ]
+      ~doc:"float Proportion of peers to be marked as protected (default: 0.2)"
+      (optional_with_default 0.2 float)
   and min_connections =
     flag "--min-connections" ~aliases:[ "min-connections" ]
       ~doc:
@@ -1175,7 +1172,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; trust_system
               ; flooding = Option.value ~default:false enable_flooding
               ; direct_peers
-              ; mina_peer_exchange
+              ; peer_protection_ratio
               ; peer_exchange = Option.value ~default:false peer_exchange
               ; min_connections
               ; max_connections

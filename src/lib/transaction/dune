@@ -25,7 +25,9 @@
    snark_params
    snarky.backendless
    ppx_version.runtime
-   with_hash)
+   with_hash
+   mina_wire_types
+ )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess
