@@ -75,6 +75,7 @@
    mina_base.import
    ppx_version.runtime
    graphql_basic_scalars
+   signature_lib_unix
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess

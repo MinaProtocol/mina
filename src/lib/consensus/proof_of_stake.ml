@@ -2365,7 +2365,7 @@ module Data = struct
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
       let open Graphql_async in
-      let open Graphql_lib.Scalars in
+      let open Signature_lib_unix.Graphql_scalars in
       let public_key = PublicKey.typ () in
       let open Schema in
       let uint32, uint64 =
