@@ -21,6 +21,8 @@ struct
 
   let to_decimal_string (t : Field.t) = Field.to_string t
 
+  let of_decimal_string (s : string) = Field.of_string s
+
   let to_bytes t =
     Fold_lib.(Fold.bool_t_to_string (Fold.of_list (Field.unpack t)))
 
