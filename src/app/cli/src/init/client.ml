@@ -2052,7 +2052,11 @@ let chain_id_inputs =
        ~f:(fun port () ->
          let open Daemon_rpcs in
          match%map Client.dispatch Chain_id_inputs.rpc () port with
-         | Ok (genesis_state_hash, genesis_constants, snark_keys) ->
+         | Ok
+             ( genesis_state_hash
+             , genesis_constants
+             , snark_keys
+             , protocol_major_version ) ->
              let open Format in
              printf "Genesis state hash: %s@."
                (State_hash.to_base58_check genesis_state_hash) ;
@@ -2069,7 +2073,8 @@ let chain_id_inputs =
                | None ->
                    "None" ) ;
              printf "Snark keys:@." ;
-             List.iter snark_keys ~f:(printf "  %s@.")
+             List.iter snark_keys ~f:(printf "  %s@.") ;
+             printf "Protocol major version: %d@." protocol_major_version
          | Error err ->
              Format.eprintf "Could not get chain id inputs: %s@."
                (Error.to_string_hum err) ) )

@@ -70,7 +70,20 @@ ocaml_version:
 ocaml_word_size:
 	@if ! ocamlopt -config | grep "word_size:" | grep $(WORD_SIZE); then echo "invalid machine word size, expected $(WORD_SIZE)" ; exit 1; fi
 
-ocaml_checks: ocaml_version ocaml_word_size
+
+# Checks that the current opam switch contains the packages from opam.export at the same version.
+# This check is disabled in the pure nix environment (that does not use opam).
+check_opam_switch:
+ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
+    ifeq (, $(shell which check_opam_switch))
+	$(warning The check_opam_switch binary was not found in the PATH.)
+	$(error The current opam switch should likely be updated by running: "opam switch import opam.export")
+    else
+	check_opam_switch opam.export
+    endif
+endif
+
+ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
 	make -C src/app/libp2p_helper
@@ -284,7 +297,7 @@ genesis-ledger-ocaml:
 ## Tests
 
 test-ppx:
-	$(MAKE) -C src/lib/ppx_coda/tests
+	$(MAKE) -C src/lib/ppx_mina/tests
 
 web:
 	./scripts/web.sh

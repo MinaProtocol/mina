@@ -11,6 +11,14 @@ module Time = Block_time
 module Run = Snark_params.Tick.Run
 module Length = Mina_numbers.Length
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Constants.t
+end
+
 let make_checked t = Snark_params.Tick.Run.make_checked t
 
 let name = "proof_of_stake"
@@ -403,19 +411,22 @@ module Data = struct
       in
       Data.{ staking; next; genesis_state_hash }
 
-    let create_epoch_ledger ~location ~logger ~genesis_epoch_ledger
-        ~ledger_depth =
+    let create_epoch_ledger ~location ~context:(module Context : CONTEXT)
+        ~genesis_epoch_ledger =
+      let open Context in
       if Sys.file_exists location then (
         [%log info]
           ~metadata:[ ("location", `String location) ]
           "Loading epoch ledger from disk: $location" ;
         Snapshot.Ledger_snapshot.Ledger_db
           (Mina_ledger.Ledger.Db.create ~directory_name:location
-             ~depth:ledger_depth () ) )
+             ~depth:constraint_constants.ledger_depth () ) )
       else Genesis_epoch_ledger (Lazy.force genesis_epoch_ledger)
 
-    let create block_producer_pubkeys ~genesis_ledger ~genesis_epoch_data
-        ~epoch_ledger_location ~ledger_depth ~genesis_state_hash =
+    let create block_producer_pubkeys ~context:(module Context : CONTEXT)
+        ~genesis_ledger ~genesis_epoch_data ~epoch_ledger_location
+        ~genesis_state_hash =
+      let open Context in
       (* TODO: remove this duplicate of the genesis ledger *)
       let genesis_epoch_ledger_staking, genesis_epoch_ledger_next =
         Option.value_map genesis_epoch_data
@@ -426,7 +437,6 @@ module Data = struct
                   next.ledger ) ) )
       in
       let epoch_ledger_uuids_location = epoch_ledger_location ^ ".json" in
-      let logger = Logger.create () in
       let create_new_uuids () =
         let epoch_ledger_uuids =
           Data.
@@ -488,15 +498,17 @@ module Data = struct
         ledger_location epoch_ledger_uuids.staking
       in
       let staking_epoch_ledger =
-        create_epoch_ledger ~location:staking_epoch_ledger_location ~logger
-          ~genesis_epoch_ledger:genesis_epoch_ledger_staking ~ledger_depth
+        create_epoch_ledger ~location:staking_epoch_ledger_location
+          ~context:(module Context)
+          ~genesis_epoch_ledger:genesis_epoch_ledger_staking
       in
       let next_epoch_ledger_location =
         ledger_location epoch_ledger_uuids.next
       in
       let next_epoch_ledger =
-        create_epoch_ledger ~location:next_epoch_ledger_location ~logger
-          ~genesis_epoch_ledger:genesis_epoch_ledger_next ~ledger_depth
+        create_epoch_ledger ~location:next_epoch_ledger_location
+          ~context:(module Context)
+          ~genesis_epoch_ledger:genesis_epoch_ledger_next
       in
       ref
         { Data.staking_epoch_snapshot =
@@ -567,7 +579,9 @@ module Data = struct
       | Next_epoch_snapshot ->
           !t.next_epoch_snapshot <- v
 
-    let reset_snapshot (t : t) id ~sparse_ledger ~ledger_depth =
+    let reset_snapshot ~context:(module Context : CONTEXT) (t : t) id
+        ~sparse_ledger =
+      let open Context in
       let open Or_error.Let_syntax in
       let module Ledger_transfer =
         Mina_ledger.Ledger_transfer.From_sparse_ledger (Mina_ledger.Ledger.Db) in
@@ -583,7 +597,7 @@ module Data = struct
             ~location ;
           let ledger =
             Mina_ledger.Ledger.Db.create ~directory_name:location
-              ~depth:ledger_depth ()
+              ~depth:constraint_constants.ledger_depth ()
           in
           let%map (_ : Mina_ledger.Ledger.Db.t) =
             Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
@@ -598,7 +612,7 @@ module Data = struct
             ~location ;
           let ledger =
             Mina_ledger.Ledger.Db.create ~directory_name:location
-              ~depth:ledger_depth ()
+              ~depth:constraint_constants.ledger_depth ()
           in
           let%map (_ : Mina_ledger.Ledger.Db.t) =
             Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
@@ -817,11 +831,12 @@ module Data = struct
                       request ) )
     end
 
-    let check ~constraint_constants ~global_slot ~seed ~producer_private_key
-        ~producer_public_key ~total_stake ~logger
+    let check ~context:(module Context : CONTEXT) ~global_slot ~seed
+        ~producer_private_key ~producer_public_key ~total_stake
         ~(get_delegators :
               Public_key.Compressed.t
            -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
+      let open Context in
       let open Message in
       let open Interruptible.Let_syntax in
       let delegators =
@@ -2551,8 +2566,9 @@ module Hooks = struct
         include Register (T')
       end
 
-      let implementation ~logger ~local_state ~genesis_ledger_hash conn
-          ~version:_ ledger_hash =
+      let implementation ~context:(module Context : CONTEXT) ~local_state
+          ~genesis_ledger_hash conn ~version:_ ledger_hash =
+        let open Context in
         let open Mina_base in
         let open Local_state in
         let open Snapshot in
@@ -2653,12 +2669,14 @@ module Hooks = struct
       | Get_epoch_ledger, Rpc_handler { rpc = Get_epoch_ledger; f; _ } ->
           Some (do_ f)
 
-    let rpc_handlers ~logger ~local_state ~genesis_ledger_hash =
+    let rpc_handlers ~context:(module Context : CONTEXT) ~local_state
+        ~genesis_ledger_hash =
       [ Rpc_handler
           { rpc = Get_epoch_ledger
           ; f =
-              Get_epoch_ledger.implementation ~logger ~local_state
-                ~genesis_ledger_hash
+              Get_epoch_ledger.implementation
+                ~context:(module Context)
+                ~local_state ~genesis_ledger_hash
           ; cost = (fun _ -> 1)
           ; budget = (2, `Per Core.Time.Span.minute)
           }
@@ -2797,8 +2815,9 @@ module Hooks = struct
                  { next = next.expected_root; staking = staking.expected_root }
               ) )
 
-  let sync_local_state ~logger ~trust_system ~local_state ~random_peers
-      ~(query_peer : Rpcs.query) ~ledger_depth requested_syncs =
+  let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
+      ~local_state ~random_peers ~(query_peer : Rpcs.query) requested_syncs =
+    let open Context in
     let open Local_state in
     let open Snapshot in
     let open Deferred.Let_syntax in
@@ -2856,8 +2875,9 @@ module Hooks = struct
                 with
                 | Connected { data = Ok (Ok sparse_ledger); _ } -> (
                     match
-                      reset_snapshot local_state snapshot_id ~sparse_ledger
-                        ~ledger_depth
+                      reset_snapshot
+                        ~context:(module Context)
+                        local_state snapshot_id ~sparse_ledger
                     with
                     | Ok () ->
                         (*Don't fail if recording fails*)
@@ -2982,8 +3002,9 @@ module Hooks = struct
 
   type select_status = [ `Keep | `Take ] [@@deriving equal]
 
-  let select ~constants ~existing:existing_with_hash
-      ~candidate:candidate_with_hash ~logger =
+  let select ~context:(module Context : CONTEXT) ~existing:existing_with_hash
+      ~candidate:candidate_with_hash =
+    let open Context in
     let { With_hash.hash =
             { Mina_base.State_hash.State_hashes.state_hash = existing_hash; _ }
         ; data = existing
@@ -3055,7 +3076,7 @@ module Hooks = struct
           s.min_window_density
         else
           Min_window_density.update_min_window_density ~incr_window:false
-            ~constants ~prev_global_slot:s.curr_global_slot
+            ~constants:consensus_constants ~prev_global_slot:s.curr_global_slot
             ~next_global_slot:max_slot
             ~prev_sub_window_densities:s.sub_window_densities
             ~prev_min_window_density:s.min_window_density
@@ -3067,7 +3088,7 @@ module Hooks = struct
         ~compare:Length.compare ~condition:blockchain_length_is_longer
     in
     let precondition_msg, choice_msg, should_take =
-      if is_short_range existing candidate ~constants then
+      if is_short_range existing candidate ~constants:consensus_constants then
         ( "most recent finalized checkpoints are equal"
         , "candidate length is longer than existing length "
         , blockchain_length_is_longer )
@@ -3256,27 +3277,40 @@ module Hooks = struct
                 snarked_ledger
           } ) )
 
-  let should_bootstrap_len ~(constants : Constants.t) ~existing ~candidate =
+  let should_bootstrap_len ~context:(module Context : CONTEXT) ~existing
+      ~candidate =
+    let open Context in
     let open UInt32.Infix in
     UInt32.compare (candidate - existing)
-      ((UInt32.of_int 2 * constants.k) + (constants.delta + UInt32.of_int 1))
+      ( (UInt32.of_int 2 * consensus_constants.k)
+      + (consensus_constants.delta + UInt32.of_int 1) )
     > 0
 
-  let should_bootstrap ~(constants : Constants.t) ~existing ~candidate ~logger =
-    match select ~constants ~existing ~candidate ~logger with
+  let should_bootstrap ~context:(module Context : CONTEXT) ~existing ~candidate
+      =
+    match select ~context:(module Context) ~existing ~candidate with
     | `Keep ->
         false
     | `Take ->
-        should_bootstrap_len ~constants
+        should_bootstrap_len
+          ~context:(module Context)
           ~existing:
             (Consensus_state.blockchain_length (With_hash.data existing))
           ~candidate:
             (Consensus_state.blockchain_length (With_hash.data candidate))
 
   let%test "should_bootstrap is sane" =
+    let module Context = struct
+      let logger = Logger.create ()
+
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.for_unit_tests
+
+      let consensus_constants = Lazy.force Constants.for_unit_tests
+    end in
     (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
     should_bootstrap_len
-      ~constants:(Lazy.force Constants.for_unit_tests)
+      ~context:(module Context)
       ~existing:Length.zero
       ~candidate:(Length.of_int 100_000_000)
 
@@ -3565,6 +3599,14 @@ let%test_module "Proof of stake tests" =
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
+    module Context : CONTEXT = struct
+      let logger = Logger.null ()
+
+      let constraint_constants = constraint_constants
+
+      let consensus_constants = constants
+    end
+
     let test_update constraint_constants =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
@@ -3774,7 +3816,6 @@ let%test_module "Proof of stake tests" =
 
     let%test_unit "vrf win rate" =
       let constants = Lazy.force Constants.for_unit_tests in
-      let logger = Logger.null () in
       let constraint_constants =
         Genesis_constants.Constraint_constants.for_unit_tests
       in
@@ -3815,9 +3856,10 @@ let%test_module "Proof of stake tests" =
         let global_slot = UInt32.of_int i in
         let%map result =
           Interruptible.force
-            (Vrf.check ~constraint_constants ~global_slot ~seed
-               ~producer_private_key:private_key
-               ~producer_public_key:public_key_compressed ~total_stake ~logger
+            (Vrf.check
+               ~context:(module Context)
+               ~global_slot ~seed ~producer_private_key:private_key
+               ~producer_public_key:public_key_compressed ~total_stake
                ~get_delegators:(Local_state.Snapshot.delegators epoch_snapshot) )
         in
         match Result.ok_exn result with Some _ -> 1 | None -> 0
@@ -4402,17 +4444,13 @@ let%test_module "Proof of stake tests" =
       assert_consensus_state_set ~project:(fun (a, b, c) ->
           [ With_hash.data a; With_hash.data b; With_hash.data c ] )
 
-    let is_selected ?(log = false) (a, b) =
-      let logger = if log then Logger.create () else Logger.null () in
-      let constants = Lazy.force Constants.for_unit_tests in
+    let is_selected (a, b) =
       Hooks.equal_select_status `Take
-        (Hooks.select ~constants ~existing:a ~candidate:b ~logger)
+        (Hooks.select ~context:(module Context) ~existing:a ~candidate:b)
 
-    let is_not_selected ?(log = false) (a, b) =
-      let logger = if log then Logger.create () else Logger.null () in
-      let constants = Lazy.force Constants.for_unit_tests in
+    let is_not_selected (a, b) =
       Hooks.equal_select_status `Keep
-        (Hooks.select ~constants ~existing:a ~candidate:b ~logger)
+        (Hooks.select ~context:(module Context) ~existing:a ~candidate:b)
 
     let assert_selected =
       assert_hashed_consensus_state_pair ~assertion:"trigger selection"
@@ -4538,10 +4576,8 @@ let%test_module "Proof of stake tests" =
 
     let%test_unit "selection invariant: candidate selections are not \
                    commutative" =
-      let logger = Logger.null () in
-      let constants = Lazy.force Constants.for_unit_tests in
       let select existing candidate =
-        Hooks.select ~constants ~existing ~candidate ~logger
+        Hooks.select ~context:(module Context) ~existing ~candidate
       in
       Quickcheck.test gen_spot_pair
         ~f:
@@ -4568,10 +4604,8 @@ let%test_module "Proof of stake tests" =
      * work by extending an already generated consensus state with some relative constraints.
      *)
     let%test_unit "selection invariant: partial order transitivity" =
-      let logger = Logger.null () in
-      let constants = Lazy.force Constants.for_unit_tests in
       let select existing candidate =
-        Hooks.select ~constants ~existing ~candidate ~logger
+        Hooks.select ~context:(module Context) ~existing ~candidate
       in
       let ( <= ) a b =
         match (select a b, select b a) with

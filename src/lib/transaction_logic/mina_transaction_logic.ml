@@ -306,6 +306,13 @@ module type S = sig
     -> Signed_command.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
 
+  val update_sequence_state :
+       Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+    -> Zkapp_account.Sequence_events.t
+    -> txn_global_slot:Global_slot.t
+    -> last_sequence_slot:Global_slot.t
+    -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
+
   val apply_parties_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
@@ -1141,8 +1148,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let if_ = value_if
     end
 
-    module Events = struct
-      type t = Field.t array list
+    module Sequence_events = struct
+      type t = Zkapp_account.Sequence_events.t
 
       let is_empty = List.is_empty
 
@@ -1592,6 +1599,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   end
 
   module M = Parties_logic.Make (Inputs)
+
+  let update_sequence_state sequence_state sequence_events ~txn_global_slot
+      ~last_sequence_slot =
+    let sequence_state', last_sequence_slot' =
+      M.update_sequence_state sequence_state sequence_events ~txn_global_slot
+        ~last_sequence_slot
+    in
+    (sequence_state', last_sequence_slot')
 
   let apply_parties_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)

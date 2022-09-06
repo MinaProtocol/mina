@@ -94,7 +94,6 @@ module Command_error = struct
         | `Timestamp_predicate of string ]
         * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Token_id.t
-    | Verification_failed
   [@@deriving sexp, to_yojson]
 
   let grounds_for_diff_rejection : t -> bool = function
@@ -103,7 +102,7 @@ module Command_error = struct
     | Insufficient_funds _
     | Insufficient_replace_fee _ ->
         false
-    | Overflow | Bad_token | Unwanted_fee_token _ | Verification_failed ->
+    | Overflow | Bad_token | Unwanted_fee_token _ ->
         true
 end
 
@@ -313,6 +312,9 @@ let member : t -> Transaction_hash.User_command.t -> bool =
   Option.is_some
     (Map.find t.all_by_hash (Transaction_hash.User_command.hash cmd))
 
+let has_commands_for_fee_payer : t -> Account_id.t -> bool =
+ fun t account_id -> Map.mem t.all_by_sender account_id
+
 let all_from_account :
        t
     -> Account_id.t
@@ -509,6 +511,16 @@ module Update = struct
         let cmd_hash =
           Transaction_hash.User_command_with_valid_signature.hash cmd
         in
+        ( match Transaction_hash.User_command_with_valid_signature.data cmd with
+        | Parties p ->
+            let p = Parties.Valid.forget p in
+            Mina_metrics.Gauge.set
+              Mina_metrics.Transaction_pool.parties_transaction_size
+              (Parties.Stable.Latest.bin_size_t p |> Float.of_int) ;
+            Mina_metrics.Gauge.set Mina_metrics.Transaction_pool.parties_count
+              (List.length (Parties.to_simple p).other_parties |> Float.of_int)
+        | Signed_command _ ->
+            () ) ;
         { acc with
           all_by_fee =
             Map_set.insert
@@ -536,6 +548,74 @@ module Update = struct
 
   let empty : t = Empty
 end
+
+(* Returns a sequence of commands in the pool in descending fee order *)
+let transactions ~logger t =
+  let insert_applicable applicable_by_fee txn =
+    let fee =
+      User_command.fee_per_wu
+      @@ Transaction_hash.User_command_with_valid_signature.command txn
+    in
+    Map.update applicable_by_fee fee ~f:(function
+      | Some set ->
+          Set.add set txn
+      | None ->
+          Transaction_hash.User_command_with_valid_signature.Set.singleton txn )
+  in
+  Sequence.unfold
+    ~init:(t.applicable_by_fee, Map.map ~f:fst t.all_by_sender)
+    ~f:(fun (applicable_by_fee, all_by_sender) ->
+      if Map.is_empty applicable_by_fee then (
+        assert (Map.is_empty all_by_sender) ;
+        None )
+      else
+        let fee, set = Map.max_elt_exn applicable_by_fee in
+        assert (Set.length set > 0) ;
+        let txn = Set.min_elt_exn set in
+        let applicable_by_fee' =
+          let set' = Set.remove set txn in
+          if Set.is_empty set' then Map.remove applicable_by_fee fee
+          else Map.set applicable_by_fee ~key:fee ~data:set'
+        in
+        let applicable_by_fee'', all_by_sender' =
+          let sender =
+            User_command.fee_payer
+            @@ Transaction_hash.User_command_with_valid_signature.command txn
+          in
+          let sender_queue = Map.find_exn all_by_sender sender in
+          let head_txn, sender_queue' =
+            Option.value_exn (F_sequence.uncons sender_queue)
+          in
+          if
+            Transaction_hash.equal
+              (Transaction_hash.User_command_with_valid_signature.hash txn)
+              (Transaction_hash.User_command_with_valid_signature.hash head_txn)
+          then
+            match F_sequence.uncons sender_queue' with
+            | Some (next_txn, _) ->
+                ( insert_applicable applicable_by_fee' next_txn
+                , Map.set all_by_sender ~key:sender ~data:sender_queue' )
+            | None ->
+                (applicable_by_fee', Map.remove all_by_sender sender)
+          else (
+            (* the sender's queue is malformed *)
+            [%log error]
+              "Transaction pool \"applicable_by_fee\" index contained \
+               malformed entry for $sender ($head_applicable_by_fee != \
+               $head_sender_queue); skipping transactions from $sender during \
+               iteration"
+              ~metadata:
+                [ ("sender", Account_id.to_yojson sender)
+                ; ( "head_applicable_by_fee"
+                  , Transaction_hash.User_command_with_valid_signature.to_yojson
+                      txn )
+                ; ( "head_sender_queue"
+                  , Transaction_hash.User_command_with_valid_signature.to_yojson
+                      head_txn )
+                ] ;
+            (applicable_by_fee', Map.remove all_by_sender sender) )
+        in
+        Some (txn, (applicable_by_fee'', all_by_sender')) )
 
 let run :
     type a e.
@@ -669,79 +749,129 @@ let drop_until_sufficient_balance :
   in
   go queue currency_reserved Sequence.empty
 
-(* Iterate over all commands in the pool, removing them if they require too much
-   currency or have too low of a nonce.
+(* Iterate over commands in the pool, removing them if they require too much
+   currency or have too low of a nonce. An argument is provided to instruct
+   which commands require revalidation.
 *)
 let revalidate :
        t
+    -> logger:Logger.t
+    -> [ `Entire_pool | `Subset of Account_id.Set.t ]
     -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
     -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
- fun ({ config = { constraint_constants; _ }; _ } as t) f ->
+ fun ({ config = { constraint_constants; _ }; _ } as t) ~logger scope f ->
+  let requires_revalidation =
+    match scope with
+    | `Entire_pool ->
+        Fn.const true
+    | `Subset subset ->
+        Set.mem subset
+  in
   Map.fold t.all_by_sender ~init:(t, Sequence.empty)
     ~f:(fun
          ~key:sender
          ~data:(queue, currency_reserved)
          ((t', dropped_acc) as acc)
        ->
-      let current_nonce, current_balance = f sender in
-      let first_cmd = F_sequence.head_exn queue in
-      let first_nonce =
-        first_cmd |> Transaction_hash.User_command_with_valid_signature.command
-        |> User_command.applicable_at_nonce
-      in
-      if Account_nonce.(current_nonce < first_nonce) then
-        let dropped, t'' = remove_with_dependents_exn' t first_cmd in
-        (t'', Sequence.append dropped_acc dropped)
+      if not (requires_revalidation sender) then acc
       else
-        (* current_nonce >= first_nonce *)
-        let first_applicable_nonce_index =
-          F_sequence.findi queue ~f:(fun cmd' ->
-              let nonce =
-                Transaction_hash.User_command_with_valid_signature.command cmd'
-                |> User_command.applicable_at_nonce
+        let current_nonce, current_balance = f sender in
+        [%log debug]
+          "Revalidating account $account in transaction pool ($account_nonce, \
+           $account_balance)"
+          ~metadata:
+            [ ( "account"
+              , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
+            ; ("account_nonce", `Int (Account_nonce.to_int current_nonce))
+            ; ( "account_balance"
+              , `String (Currency.Amount.to_formatted_string current_balance) )
+            ] ;
+        let first_cmd = F_sequence.head_exn queue in
+        let first_nonce =
+          first_cmd
+          |> Transaction_hash.User_command_with_valid_signature.command
+          |> User_command.applicable_at_nonce
+        in
+        if Account_nonce.(current_nonce < first_nonce) then (
+          [%log debug]
+            "Current account nonce precedes first nonce in queue; dropping \
+             queue" ;
+          let dropped, t'' = remove_with_dependents_exn' t first_cmd in
+          (t'', Sequence.append dropped_acc dropped) )
+        else
+          (* current_nonce >= first_nonce *)
+          let first_applicable_nonce_index =
+            F_sequence.findi queue ~f:(fun cmd' ->
+                let nonce =
+                  Transaction_hash.User_command_with_valid_signature.command
+                    cmd'
+                  |> User_command.applicable_at_nonce
+                in
+                Account_nonce.equal nonce current_nonce )
+            |> Option.value ~default:(F_sequence.length queue)
+          in
+          [%log debug]
+            "Current account nonce succeeds first nonce in queue; splitting \
+             queue at $index"
+            ~metadata:[ ("index", `Int first_applicable_nonce_index) ] ;
+          let drop_queue, keep_queue =
+            F_sequence.split_at queue first_applicable_nonce_index
+          in
+          let currency_reserved' =
+            F_sequence.foldl
+              (fun c cmd ->
+                Option.value_exn
+                  Currency.Amount.(
+                    c
+                    - Option.value_exn
+                        (currency_consumed ~constraint_constants cmd)) )
+              currency_reserved drop_queue
+          in
+          let keep_queue', currency_reserved'', dropped_for_balance =
+            drop_until_sufficient_balance ~constraint_constants
+              (keep_queue, currency_reserved')
+              current_balance
+          in
+          let to_drop =
+            Sequence.append (F_sequence.to_seq drop_queue) dropped_for_balance
+          in
+          match Sequence.next to_drop with
+          | None ->
+              acc
+          | Some (head, tail) ->
+              let t'' =
+                Sequence.fold tail
+                  ~init:
+                    (remove_all_by_fee_and_hash_and_expiration_exn
+                       (remove_applicable_exn t' head)
+                       head )
+                  ~f:remove_all_by_fee_and_hash_and_expiration_exn
               in
-              Account_nonce.equal nonce current_nonce )
-          |> Option.value ~default:(F_sequence.length queue)
-        in
-        let drop_queue, keep_queue =
-          F_sequence.split_at queue first_applicable_nonce_index
-        in
-        let currency_reserved' =
-          F_sequence.foldl
-            (fun c cmd ->
-              Option.value_exn
-                Currency.Amount.(
-                  c
-                  - Option.value_exn
-                      (currency_consumed ~constraint_constants cmd)) )
-            currency_reserved drop_queue
-        in
-        let keep_queue', currency_reserved'', dropped_for_balance =
-          drop_until_sufficient_balance ~constraint_constants
-            (keep_queue, currency_reserved')
-            current_balance
-        in
-        let to_drop =
-          Sequence.append (F_sequence.to_seq drop_queue) dropped_for_balance
-        in
-        match Sequence.next to_drop with
-        | None ->
-            acc
-        | Some (head, tail) ->
-            let t'' =
-              Sequence.fold tail
-                ~init:
-                  (remove_all_by_fee_and_hash_and_expiration_exn
-                     (remove_applicable_exn t' head)
-                     head )
-                ~f:remove_all_by_fee_and_hash_and_expiration_exn
-            in
-            ( { t'' with
-                all_by_sender =
-                  Map.set t''.all_by_sender ~key:sender
-                    ~data:(keep_queue', currency_reserved'')
-              }
-            , Sequence.append dropped_acc to_drop ) )
+              let t''' =
+                match F_sequence.uncons keep_queue' with
+                | None ->
+                    { t'' with
+                      all_by_sender = Map.remove t''.all_by_sender sender
+                    }
+                | Some (first_kept, _) ->
+                    let first_kept_unchecked =
+                      Transaction_hash.User_command_with_valid_signature.command
+                        first_kept
+                    in
+                    { t'' with
+                      all_by_sender =
+                        Map.set t''.all_by_sender ~key:sender
+                          ~data:(keep_queue', currency_reserved'')
+                    ; applicable_by_fee =
+                        Map_set.insert
+                          ( module Transaction_hash
+                                   .User_command_with_valid_signature )
+                          t''.applicable_by_fee
+                          (User_command.fee_per_wu first_kept_unchecked)
+                          first_kept
+                    }
+              in
+              (t''', Sequence.append dropped_acc to_drop) )
 
 let expired_by_predicate (t : t) :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t =
@@ -798,135 +928,6 @@ let remove_expired t :
         let removed, t' = remove_with_dependents_exn' t cmd in
         (Sequence.append dropped_acc removed, t')
       else acc )
-
-let actual_target_nonce cmd ~application_status =
-  match cmd with
-  | User_command.Signed_command x ->
-      Account.Nonce.succ (Signed_command.nonce x)
-  | Parties p -> (
-      match application_status with
-      | None | Some (Transaction_status.Failed _) ->
-          User_command.expected_target_nonce cmd
-      | _ ->
-          Parties.target_nonce_on_success p )
-
-let handle_committed_txn :
-       t
-    -> Transaction_hash.User_command_with_valid_signature.t
-    -> application_status:Transaction_status.t option
-    -> fee_payer_balance:Currency.Amount.t
-    -> fee_payer_nonce:Mina_base.Account.Nonce.t
-    -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
-       , [ `Queued_txns_by_sender of
-           string
-           * Transaction_hash.User_command_with_valid_signature.t Sequence.t ]
-       )
-       Result.t =
- fun ({ config = { constraint_constants; _ }; _ } as t) committed
-     ~application_status ~fee_payer_balance ~fee_payer_nonce ->
-  let committed' =
-    Transaction_hash.User_command_with_valid_signature.command committed
-  in
-  let fee_payer = User_command.fee_payer committed' in
-  match Map.find t.all_by_sender fee_payer with
-  | None ->
-      Ok (t, Sequence.empty)
-  | Some (cmds, currency_reserved) ->
-      let first_cmd, rest_cmds = Option.value_exn (F_sequence.uncons cmds) in
-      let first_cmd' =
-        Transaction_hash.User_command_with_valid_signature.command first_cmd
-      in
-      let actual_target_nonce =
-        actual_target_nonce committed' ~application_status
-      in
-      if
-        Account_nonce.(
-          User_command.applicable_at_nonce committed'
-          <> User_command.applicable_at_nonce first_cmd')
-      then
-        Error
-          (`Queued_txns_by_sender
-            ( "Tried to handle a committed transaction in the pool but its \
-               nonce doesn't match the head of the queue for that sender"
-            , F_sequence.to_seq cmds ) )
-      else if
-        Account_nonce.(
-          actual_target_nonce <> User_command.expected_target_nonce first_cmd')
-      then
-        (*The committed transaction invalidates the rest of sequence*)
-        let dropped_cmds = F_sequence.to_seq cmds in
-        let t = remove_applicable_exn t first_cmd in
-        let t =
-          Sequence.fold dropped_cmds ~init:t
-            ~f:remove_all_by_fee_and_hash_and_expiration_exn
-        in
-        let t =
-          { t with all_by_sender = Map.remove t.all_by_sender fee_payer }
-        in
-        Ok (t, dropped_cmds)
-      else
-        let first_cmd_consumed =
-          (* safe since we checked this when we added it to the pool originally *)
-          Option.value_exn (currency_consumed ~constraint_constants first_cmd)
-        in
-        let currency_reserved' =
-          (* safe since the sum reserved must be >= reserved by any individual
-             command *)
-          Option.value_exn
-            Currency.Amount.(currency_reserved - first_cmd_consumed)
-        in
-        let t1 =
-          t
-          |> Fn.flip remove_applicable_exn first_cmd
-          |> Fn.flip remove_all_by_fee_and_hash_and_expiration_exn first_cmd
-        in
-        let new_queued_cmds, currency_reserved'', dropped_cmds =
-          (*removed the first cmd, check if there are anymore committed transactions from the fee payer*)
-          if Mina_base.Account.Nonce.(equal actual_target_nonce fee_payer_nonce)
-          then
-            (* remove user_commands that consume more currency than what the latest fee_payer_balance is*)
-            drop_until_sufficient_balance ~constraint_constants
-              (rest_cmds, currency_reserved')
-              fee_payer_balance
-          else
-            (* Don't check if the balance is sufficient, there are other committed user_commands in the pool from the current fee payer that has been accounted for in the fee_payer_balance*)
-            (rest_cmds, currency_reserved', Sequence.empty)
-        in
-        let t2 =
-          Sequence.fold dropped_cmds ~init:t1
-            ~f:remove_all_by_fee_and_hash_and_expiration_exn
-        in
-        let set_all_by_sender account_id commands currency_reserved t =
-          match F_sequence.uncons commands with
-          | None ->
-              { t with all_by_sender = Map.remove t.all_by_sender account_id }
-          | Some (head_cmd, _) ->
-              { t with
-                all_by_sender =
-                  Map.set t.all_by_sender ~key:account_id
-                    ~data:(commands, currency_reserved)
-              ; applicable_by_fee =
-                  Map_set.insert
-                    (module Transaction_hash.User_command_with_valid_signature)
-                    t.applicable_by_fee
-                    ( head_cmd
-                    |> Transaction_hash.User_command_with_valid_signature
-                       .command |> User_command.fee_per_wu )
-                    head_cmd
-              }
-        in
-        let t3 =
-          set_all_by_sender fee_payer new_queued_cmds currency_reserved'' t2
-        in
-        Ok
-          ( t3
-          , Sequence.append
-              ( if
-                Transaction_hash.User_command_with_valid_signature.equal
-                  committed first_cmd
-              then Sequence.empty
-              else Sequence.singleton first_cmd )
-              dropped_cmds )
 
 let remove_lowest_fee :
     t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
@@ -994,10 +995,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
 
   let rec add_from_gossip_exn :
          config:Config.t
-      -> verify:(User_command.Verifiable.t -> (User_command.Valid.t, _, _) M.t)
-      -> [ `Unchecked of
-           Transaction_hash.User_command.t * User_command.Verifiable.t
-         | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
+      -> Transaction_hash.User_command_with_valid_signature.t
       -> Account_nonce.t
       -> Currency.Amount.t
       -> Sender_local_state.t ref
@@ -1006,27 +1004,11 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
          , Update.single
          , Command_error.t )
          M.t =
-   fun ~config:({ constraint_constants; expiry_ns; _ } as config) ~verify cmd0
+   fun ~config:({ constraint_constants; expiry_ns; _ } as config) cmd
        current_nonce balance by_sender ->
     let open Command_error in
-    let unchecked_cmd =
-      match cmd0 with
-      | `Unchecked (x, _) ->
-          x
-      | `Checked x ->
-          Transaction_hash.User_command.of_checked x
-    in
+    let unchecked_cmd = Transaction_hash.User_command.of_checked cmd in
     let open M.Let_syntax in
-    let verified () =
-      match cmd0 with
-      | `Checked x ->
-          return x
-      | `Unchecked (_, unchecked) ->
-          let%map x = verify unchecked in
-          Transaction_hash.(
-            User_command_with_valid_signature.make x
-              (User_command.hash unchecked_cmd))
-    in
     let unchecked = Transaction_hash.User_command.data unchecked_cmd in
     let fee = User_command.fee unchecked in
     let fee_per_wu = User_command.fee_per_wu unchecked in
@@ -1081,7 +1063,6 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
               in
               ())
         in
-        let%bind cmd = verified () in
         let%map () =
           M.write
             (Update.Add
@@ -1107,22 +1088,18 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           (* this command goes on the end *)
           let%bind reserved_currency' =
             M.of_result
-              Result.Let_syntax.(
-                let%bind reserved_currency' =
-                  Currency.Amount.(consumed + reserved_currency)
-                  |> Result.of_option ~error:Overflow
-                  (* C4 *)
-                in
-                let%map () =
-                  Result.ok_if_true
-                    Currency.Amount.(balance >= reserved_currency')
-                    ~error:
-                      (Insufficient_funds (`Balance balance, reserved_currency'))
-                  (* C2 *)
-                in
-                reserved_currency')
+              ( Currency.Amount.(consumed + reserved_currency)
+              |> Result.of_option ~error:Overflow )
+            (* C4 *)
           in
-          let%bind cmd = verified () in
+          let%bind () =
+            M.of_result
+              (Result.ok_if_true
+                 Currency.Amount.(reserved_currency' <= balance)
+                 ~error:
+                   (Insufficient_funds (`Balance balance, reserved_currency')) )
+            (* C2 *)
+          in
           let new_state =
             (F_sequence.snoc queued_cmds cmd, reserved_currency')
           in
@@ -1191,12 +1168,10 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             Transaction_hash.User_command_with_valid_signature.t Sequence.t]
             dropped
             (F_sequence.to_seq drop_queue) ;
-          let%bind cmd = verified () in
           (* Add the new transaction *)
           let%bind cmd, _ =
             let%map v, dropped' =
-              add_from_gossip_exn ~config ~verify (`Checked cmd) current_nonce
-                balance by_sender
+              add_from_gossip_exn ~config cmd current_nonce balance by_sender
             in
             (* We've already removed them, so this should always be empty. *)
             assert (Sequence.is_empty dropped') ;
@@ -1235,19 +1210,18 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
                   let current_nonce = Account_nonce.succ current_nonce in
                   let by_sender_pre = !by_sender in
                   M.catch
-                    (add_from_gossip_exn ~config ~verify (`Checked cmd)
-                       current_nonce balance by_sender )
-                    ~f:(function
-                      | Ok ((_v, dropped_), ups) ->
-                          assert (Sequence.is_empty dropped_) ;
-                          let%bind () = M.write_all ups in
-                          go increment dropped' None current_nonce
-                      | Error _err ->
-                          by_sender := by_sender_pre ;
-                          (* Re-evaluate with the same [dropped] to calculate the new
-                             fee increment.
-                          *)
-                          go increment dropped (Some dropped') current_nonce )
+                    (add_from_gossip_exn ~config cmd current_nonce balance
+                       by_sender ) ~f:(function
+                    | Ok ((_v, dropped_), ups) ->
+                        assert (Sequence.is_empty dropped_) ;
+                        let%bind () = M.write_all ups in
+                        go increment dropped' None current_nonce
+                    | Error _err ->
+                        by_sender := by_sender_pre ;
+                        (* Re-evaluate with the same [dropped] to calculate the new
+                           fee increment.
+                        *)
+                        go increment dropped (Some dropped') current_nonce )
             in
             go increment drop_tail None current_nonce
           in
@@ -1270,47 +1244,14 @@ end
 
 module Add_from_gossip_exn0 = Add_from_gossip_exn (Writer_result)
 
-let add_from_gossip_exn t ~verify cmd0 nonce balance :
-    ( Transaction_hash.User_command_with_valid_signature.t
-      * t
-      * Transaction_hash.User_command_with_valid_signature.t Sequence.t
-    , Command_error.t )
-    Result.t =
-  let x =
-    Add_from_gossip_exn0.add_from_gossip_exn ~config:t.config
-      ~verify:(fun c ->
-        Result.of_option (verify c) ~error:Command_error.Verification_failed
-        |> Writer_result.of_result )
-      cmd0 nonce balance
+let add_from_gossip_exn t cmd nonce balance =
+  let open Result.Let_syntax in
+  let%map (c, cs), t =
+    run' t cmd
+      (Add_from_gossip_exn0.add_from_gossip_exn ~config:t.config cmd nonce
+         balance )
   in
-  Result.map
-    ~f:(fun ((c, cs), t) -> (c, t, cs))
-    ( match cmd0 with
-    | `Checked cmd ->
-        run' t cmd x
-    | `Unchecked (cmd, _) ->
-        run t
-          ~sender:
-            (User_command.fee_payer (Transaction_hash.User_command.command cmd))
-          x )
-
-module Add_from_gossip_exn_async = Add_from_gossip_exn (Writer_result.Deferred)
-
-let add_from_gossip_exn_async ~config
-    ~(sender_local_state : Sender_local_state.t) ~verify cmd0 nonce balance =
-  let open Async in
-  let r = ref sender_local_state in
-  let x =
-    Add_from_gossip_exn_async.add_from_gossip_exn ~config
-      ~verify:(fun c ->
-        Writer_result.Deferred.Deferred
-          (Deferred.map (verify c) ~f:(fun r ->
-               Result.of_option r ~error:Command_error.Verification_failed
-               |> Writer_result.of_result ) ) )
-      cmd0 nonce balance r
-  in
-  Deferred.Result.map (Writer_result.Deferred.run x) ~f:(fun ((c, cs), us) ->
-      ((c, Sequence.to_list cs), !r, us) )
+  (c, t, cs)
 
 (** Add back the commands that were removed due to a reorg*)
 let add_from_backtrack :
@@ -1437,14 +1378,11 @@ let%test_module _ =
 
     let%test_unit "empty invariants" = assert_invariants empty
 
-    let don't_verify _ = None
-
     let%test_unit "singleton properties" =
       Quickcheck.test (gen_cmd ()) ~f:(fun cmd ->
           let pool = empty in
           let add_res =
-            add_from_gossip_exn pool (`Checked cmd) Account_nonce.zero
-              ~verify:don't_verify
+            add_from_gossip_exn pool cmd Account_nonce.zero
               (Currency.Amount.of_int 500)
           in
           if
@@ -1485,8 +1423,7 @@ let%test_module _ =
               config = { empty.config with expiry_ns = Time_ns.Span.of_sec 5.0 }
             }
           in
-          add_from_gossip_exn pool (`Checked cmd) Account_nonce.zero
-            ~verify:don't_verify
+          add_from_gossip_exn pool cmd Account_nonce.zero
             (Currency.Amount.of_int 3000_000_000_000_000)
           |> function
           | Ok (_, pool', dropped) ->
@@ -1544,7 +1481,7 @@ let%test_module _ =
                 let account_id = User_command.fee_payer unchecked in
                 let pk = Account_id.public_key account_id in
                 let add_res =
-                  add_from_gossip_exn !pool (`Checked cmd) ~verify:don't_verify
+                  add_from_gossip_exn !pool cmd
                     (Hashtbl.find_exn nonces pk)
                     (Hashtbl.find_exn balances pk)
                 in
@@ -1582,9 +1519,6 @@ let%test_module _ =
                     failwith "Overflow."
                 | Error Bad_token ->
                     failwith "Token is incompatible with the command."
-                | Error Verification_failed ->
-                    failwith
-                      "Transaction had invalid proof/signature or was malformed"
                 | Error (Unwanted_fee_token fee_token) ->
                     failwithf
                       !"Bad fee token. The fees are paid in token %{sexp: \
@@ -1720,10 +1654,7 @@ let%test_module _ =
         ~f:(fun (init_nonce, init_balance, setup_cmds, replace_cmd) ->
           let t =
             List.fold_left setup_cmds ~init:empty ~f:(fun t cmd ->
-                match
-                  add_from_gossip_exn t (`Checked cmd) init_nonce init_balance
-                    ~verify:don't_verify
-                with
+                match add_from_gossip_exn t cmd init_nonce init_balance with
                 | Ok (_, t', removed) ->
                     [%test_eq:
                       Transaction_hash.User_command_with_valid_signature.t
@@ -1752,19 +1683,6 @@ let%test_module _ =
                 Account_nonce.compare replace_nonce cmd_nonce <= 0 )
             |> Option.value_exn
           in
-          let deprecated_replaced_idx =
-            Account_nonce.to_int
-              ( replace_cmd
-              |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.applicable_at_nonce )
-            - Account_nonce.to_int
-                ( List.hd_exn setup_cmds
-                |> Transaction_hash.User_command_with_valid_signature.command
-                |> User_command.applicable_at_nonce )
-          in
-          Printf.printf
-            !"replacement indices: new=%d, old=%d\n%!"
-            replaced_idx deprecated_replaced_idx ;
           let currency_consumed_pre_replace =
             List.fold_left
               (List.take setup_cmds (replaced_idx + 1))
@@ -1795,8 +1713,7 @@ let%test_module _ =
               Currency.Amount.(a + replacer_currency_consumed))
           in
           let add_res =
-            add_from_gossip_exn t (`Checked replace_cmd) init_nonce init_balance
-              ~verify:don't_verify
+            add_from_gossip_exn t replace_cmd init_nonce init_balance
           in
           if Currency.Amount.(currency_consumed_post_replace <= init_balance)
           then
@@ -1830,8 +1747,7 @@ let%test_module _ =
         , List.tl_exn cmds_sorted_by_fee_per_wu )
       in
       let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
+        add_from_gossip_exn pool cmd Account_nonce.zero
           (Currency.Amount.of_int (500 * 10_000_000))
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
@@ -1872,8 +1788,7 @@ let%test_module _ =
       in
       let max_by_fee_per_wu = List.max_elt ~compare cmds |> Option.value_exn in
       let insert_cmd pool cmd =
-        add_from_gossip_exn ~verify:don't_verify pool (`Checked cmd)
-          Account_nonce.zero
+        add_from_gossip_exn pool cmd Account_nonce.zero
           (Currency.Amount.of_int (500 * 10_000_000))
         |> Result.ok |> Option.value_exn
         |> fun (_, pool, _) -> pool
@@ -1885,121 +1800,281 @@ let%test_module _ =
       get_highest_fee pool |> Option.value_exn
       |> fun highest_fee -> assert (cmd_equal highest_fee max_by_fee_per_wu)
 
+    let dummy_state_view =
+      let state_body =
+        let consensus_constants =
+          let genesis_constants = Genesis_constants.for_unit_tests in
+          Consensus.Constants.create ~constraint_constants
+            ~protocol_constants:genesis_constants.protocol
+        in
+        let compile_time_genesis =
+          (*not using Precomputed_values.for_unit_test because of dependency cycle*)
+          Mina_state.Genesis_protocol_state.t
+            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+            ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
+            ~constraint_constants ~consensus_constants
+        in
+        compile_time_genesis.data |> Mina_state.Protocol_state.body
+      in
+      { (Mina_state.Protocol_state.Body.view state_body) with
+        global_slot_since_genesis = Mina_numbers.Global_slot.zero
+      }
+
+    let add_to_pool ~nonce ~balance pool cmd =
+      let _, pool', dropped =
+        add_from_gossip_exn pool cmd nonce balance
+        |> Result.map_error
+             ~f:(Fn.compose Sexp.to_string Command_error.sexp_of_t)
+        |> Result.ok_or_failwith
+      in
+      [%test_eq:
+        Transaction_hash.User_command_with_valid_signature.t Sequence.t] dropped
+        Sequence.empty ;
+      assert_invariants pool' ;
+      pool'
+
+    let init_permissionless_ledger ledger account_info =
+      let open Currency in
+      let open Mina_ledger.Ledger.Ledger_inner in
+      List.iter account_info ~f:(fun (public_key, amount) ->
+          let account_id =
+            Account_id.create (Public_key.compress public_key) Token_id.default
+          in
+          let balance = Balance.of_int @@ Amount.to_int amount in
+          let _tag, account, location =
+            Or_error.ok_exn (get_or_create ledger account_id)
+          in
+          set ledger location
+            { account with balance; permissions = Permissions.empty } )
+
+    let apply_to_ledger ledger cmd =
+      match Transaction_hash.User_command_with_valid_signature.command cmd with
+      | User_command.Signed_command c ->
+          let (`If_this_is_used_it_should_have_a_comment_justifying_it v) =
+            Signed_command.to_valid_unsafe c
+          in
+          ignore
+            ( Mina_ledger.Ledger.apply_user_command ~constraint_constants
+                ~txn_global_slot:Mina_numbers.Global_slot.zero ledger v
+              |> Or_error.ok_exn
+              : Mina_transaction_logic.Transaction_applied
+                .Signed_command_applied
+                .t )
+      | User_command.Parties p -> (
+          let applied, _ =
+            Mina_ledger.Ledger.apply_parties_unchecked ~constraint_constants
+              ~state_view:dummy_state_view ledger p
+            |> Or_error.ok_exn
+          in
+          match With_status.status applied.command with
+          | Transaction_status.Applied ->
+              ()
+          | Transaction_status.Failed failure ->
+              failwithf "failed to apply parties transaction to ledger: [%s]"
+                ( String.concat ~sep:", "
+                @@ List.bind
+                     ~f:(List.map ~f:Transaction_status.Failure.to_string)
+                     failure )
+                () )
+
+    let commit_to_pool ledger pool cmd expected_drops =
+      apply_to_ledger ledger cmd ;
+      let accounts_to_check =
+        Transaction_hash.User_command_with_valid_signature.command cmd
+        |> User_command.accounts_accessed |> Account_id.Set.of_list
+      in
+      let pool, dropped =
+        revalidate pool ~logger (`Subset accounts_to_check) (fun sender ->
+            match Mina_ledger.Ledger.location_of_account ledger sender with
+            | None ->
+                (Account.Nonce.zero, Currency.Amount.zero)
+            | Some loc ->
+                let acc =
+                  Option.value_exn
+                    ~message:
+                      "Somehow a public key has a location but no account"
+                    (Mina_ledger.Ledger.get ledger loc)
+                in
+                ( acc.nonce
+                , Account.liquid_balance_at_slot
+                    ~global_slot:Mina_numbers.Global_slot.zero acc
+                  |> Currency.Balance.to_amount ) )
+      in
+      let lower =
+        List.map ~f:Transaction_hash.User_command_with_valid_signature.hash
+      in
+      [%test_eq: Transaction_hash.t list]
+        (lower (Sequence.to_list dropped))
+        (lower expected_drops) ;
+      assert_invariants pool ;
+      pool
+
+    let make_parties_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
+        ~double_increment_sender ~increment_receiver ~amount ~fee nonce_int =
+      let open Currency in
+      let nonce = Account.Nonce.of_int nonce_int in
+      let sender_pk = Public_key.compress sender.public_key in
+      let receiver_pk = Public_key.compress receiver.public_key in
+      let parties_wire : Parties.Stable.Latest.Wire.t =
+        { fee_payer =
+            { Party.Fee_payer.body =
+                { public_key = sender_pk; fee; nonce; valid_until = None }
+                (* Real signature added in below *)
+            ; authorization = Signature.dummy
+            }
+        ; other_parties =
+            Parties.Call_forest.of_parties_list ~party_depth:(Fn.const 0)
+              [ { Party.Wire.body =
+                    { public_key = sender_pk
+                    ; update = Party.Update.noop
+                    ; token_id = Token_id.default
+                    ; balance_change =
+                        Amount.Signed.(negate @@ of_unsigned amount)
+                    ; increment_nonce = double_increment_sender
+                    ; events = []
+                    ; sequence_events = []
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; preconditions =
+                        { Party.Preconditions.network =
+                            Zkapp_precondition.Protocol_state.accept
+                        ; account =
+                            Party.Account_precondition.Nonce
+                              (Account.Nonce.succ nonce)
+                        }
+                    ; caller = Call
+                    ; use_full_commitment = not double_increment_sender
+                    }
+                ; authorization = None_given
+                }
+              ; { Party.Wire.body =
+                    { public_key = receiver_pk
+                    ; update = Party.Update.noop
+                    ; token_id = Token_id.default
+                    ; balance_change = Amount.Signed.of_unsigned amount
+                    ; increment_nonce = increment_receiver
+                    ; events = []
+                    ; sequence_events = []
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; preconditions =
+                        { Party.Preconditions.network =
+                            Zkapp_precondition.Protocol_state.accept
+                        ; account = Party.Account_precondition.Accept
+                        }
+                    ; caller = Call
+                    ; use_full_commitment = not increment_receiver
+                    }
+                ; authorization = None_given
+                }
+              ]
+        ; memo = Signed_command_memo.empty
+        }
+      in
+      let parties = Parties.of_wire parties_wire in
+      (* We skip signing the commitment and updating the authorization as it is not necessary to have a valid transaction for these tests. *)
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
+        User_command.to_valid_unsafe (User_command.Parties parties)
+      in
+      Transaction_hash.User_command_with_valid_signature.create cmd
+
     let%test_unit "support for parties commands" =
-      let open Mina_transaction_logic.For_tests in
+      let open Currency in
+      (* let open Mina_transaction_logic.For_tests in *)
       let fee = Mina_compile_config.minimum_user_command_fee in
-      let amount = Currency.(Amount.of_int @@ Fee.to_int fee) in
-      let balance = Option.value_exn (Currency.Amount.scale amount 100) in
+      let amount = Amount.of_int @@ Fee.to_int fee in
+      let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
         Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen
       in
       let kp2 =
         Quickcheck.random_value ~seed:(`Deterministic "orange") Keypair.gen
       in
-      let pk2 = Public_key.compress kp2.public_key in
-      let add_to_pool cmd pool =
-        let _, pool', dropped =
-          add_from_gossip_exn pool (`Checked cmd) ~verify:don't_verify
-            Account_nonce.zero balance
-          |> Result.map_error
-               ~f:(Fn.compose Sexp.to_string Command_error.sexp_of_t)
-          |> Result.ok_or_failwith
-        in
-        [%test_eq:
-          Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-          dropped Sequence.empty ;
-        assert_invariants pool' ;
-        pool'
-      in
-      let commit_to_pool cmd ~application_status ~fee_payer_balance
-          ~expected_drops pool =
-        let fee_payer_nonce =
-          User_command.expected_target_nonce
-          @@ Transaction_hash.User_command_with_valid_signature.command cmd
-        in
-        let pool, dropped =
-          handle_committed_txn pool cmd
-            ~application_status:(Some application_status) ~fee_payer_balance
-            ~fee_payer_nonce
-          |> Result.map_error ~f:(fun (`Queued_txns_by_sender (error, _)) ->
-                 error )
-          |> Result.ok_or_failwith
-        in
-        [%test_eq:
-          Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-          dropped expected_drops ;
-        assert_invariants pool ;
-        pool
-      in
-      let make_cmd ~double_increment nonce =
-        let (`If_this_is_used_it_should_have_a_comment_justifying_it c) =
-          User_command.to_valid_unsafe
-            (User_command.Parties
-               (party_send ~use_full_commitment:(not double_increment)
-                  ~double_sender_nonce:false ~constraint_constants
-                  { fee
-                  ; sender = (kp1, Account_nonce.of_int nonce)
-                  ; receiver = pk2
-                  ; amount
-                  ; receiver_is_new = false
-                  } ) )
-        in
-        Transaction_hash.User_command_with_valid_signature.create c
-      in
-      let balance_after_cmd n =
-        Option.value_exn
-          Currency.Amount.(sub balance (scale amount n |> Option.value_exn))
+      let add_cmd = add_to_pool ~nonce:Account_nonce.zero ~balance in
+      let make_cmd =
+        make_parties_payment ~sender:kp1 ~receiver:kp2 ~increment_receiver:false
+          ~amount ~fee
       in
       Mina_ledger.Ledger.with_ledger ~depth:4 ~f:(fun ledger ->
-          Init_ledger.init
-            (module Mina_ledger.Ledger.Ledger_inner)
-            [| (kp1, Int64.(of_int @@ Currency.Amount.to_int balance))
-             ; (kp2, 0L)
-            |]
-            ledger ;
-          let cmd1 = make_cmd ~double_increment:false 0 in
-          let cmd2 = make_cmd ~double_increment:false 1 in
-          let cmd3 = make_cmd ~double_increment:false 2 in
-          let cmd4 = make_cmd ~double_increment:false 3 in
-          let cmd5 = make_cmd ~double_increment:false 4 in
-          let cmd6 = make_cmd ~double_increment:false 5 in
-          let cmd7 = make_cmd ~double_increment:false 6 in
+          init_permissionless_ledger ledger
+            [ (kp1.public_key, balance); (kp2.public_key, Amount.zero) ] ;
+          let commit = commit_to_pool ledger in
+          let cmd1 = make_cmd ~double_increment_sender:false 0 in
+          let cmd2 = make_cmd ~double_increment_sender:false 1 in
+          let cmd3 = make_cmd ~double_increment_sender:false 2 in
+          let cmd4 = make_cmd ~double_increment_sender:false 3 in
           (* used to break the sequence *)
-          (* same as cmd3. should not drop anything*)
-          let cmd3' = make_cmd ~double_increment:false 2 in
-          (*command with multiple fee payer increments but failed. Equivalent to one fee payer increment, drops cmd4 because it is a different command but keeps the rest*)
-          let cmd4_failed = make_cmd ~double_increment:true 3 in
-          (*command with multiple fee payer increments but applied. drops cmd5 because it is different and invalidates the rest of the queue*)
-          let cmd5' = make_cmd ~double_increment:true 4 in
-          ignore
-            ( empty |> add_to_pool cmd1 |> add_to_pool cmd2 |> add_to_pool cmd3
-              |> add_to_pool cmd4 |> add_to_pool cmd5 |> add_to_pool cmd6
-              |> add_to_pool cmd7
-              |> commit_to_pool cmd1 ~application_status:Applied
-                   ~fee_payer_balance:(balance_after_cmd 1)
-                   ~expected_drops:Sequence.empty
-              |> commit_to_pool cmd2 ~application_status:Applied
-                   ~fee_payer_balance:(balance_after_cmd 2)
-                   ~expected_drops:Sequence.empty
-              |> commit_to_pool cmd3' ~application_status:Applied
-                   ~fee_payer_balance:(balance_after_cmd 3)
-                   ~expected_drops:Sequence.empty
-              |> commit_to_pool cmd4_failed
-                   ~application_status:
-                     (Failed
-                        Transaction_status.Failure.(
-                          Collection.of_single_failure
-                            Update_not_permitted_balance) )
-                   ~fee_payer_balance:(balance_after_cmd 4)
-                   ~expected_drops:(Sequence.singleton cmd4)
-              |> commit_to_pool cmd5' ~application_status:Applied
-                   ~fee_payer_balance:(balance_after_cmd 5)
-                   ~expected_drops:(Sequence.of_list [ cmd5; cmd6; cmd7 ])
-              : t )
-          (*
-          |> apply_to_pool (balance_after_cmd 0) cmd1
-          |> apply_to_pool (balance_after_cmd 1) cmd2
-          |> apply_to_pool (balance_after_cmd 2) cmd3
-          |> apply_to_pool (balance_after_cmd 3) cmd4
-          *) )
+          let cmd3' = make_cmd ~double_increment_sender:true 2 in
+          let pool =
+            List.fold_left [ cmd1; cmd2; cmd3; cmd4 ] ~init:empty ~f:add_cmd
+          in
+          let pool = commit pool cmd1 [ cmd1 ] in
+          let pool = commit pool cmd2 [ cmd2 ] in
+          let _pool = commit pool cmd3' [ cmd3; cmd4 ] in
+          () )
+
+    let%test_unit "nonce increment side effects from other parties are handled \
+                   properly" =
+      let open Currency in
+      let fee = Mina_compile_config.minimum_user_command_fee in
+      let amount = Amount.of_int @@ Fee.to_int fee in
+      let balance = Option.value_exn (Amount.scale amount 100) in
+      let kp1 =
+        Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen
+      in
+      let kp2 =
+        Quickcheck.random_value ~seed:(`Deterministic "orange") Keypair.gen
+      in
+      let add_cmd = add_to_pool ~nonce:Account_nonce.zero ~balance in
+      let make_cmd = make_parties_payment ~amount ~fee in
+      Mina_ledger.Ledger.with_ledger ~depth:4 ~f:(fun ledger ->
+          init_permissionless_ledger ledger
+            [ (kp1.public_key, balance); (kp2.public_key, balance) ] ;
+          let kp1_cmd1 =
+            make_cmd ~sender:kp1 ~receiver:kp2 ~double_increment_sender:false
+              ~increment_receiver:true 0
+          in
+          let kp2_cmd1 =
+            make_cmd ~sender:kp2 ~receiver:kp1 ~double_increment_sender:false
+              ~increment_receiver:false 0
+          in
+          let kp2_cmd2 =
+            make_cmd ~sender:kp2 ~receiver:kp1 ~double_increment_sender:false
+              ~increment_receiver:false 1
+          in
+          let pool =
+            List.fold_left
+              [ kp1_cmd1; kp2_cmd1; kp2_cmd2 ]
+              ~init:empty ~f:add_cmd
+          in
+          let _pool =
+            commit_to_pool ledger pool kp1_cmd1 [ kp2_cmd1; kp1_cmd1 ]
+          in
+          () )
+
+    let%test_unit "nonce invariant violations on committed transactions does \
+                   not trigger a crash" =
+      let open Currency in
+      let fee = Mina_compile_config.minimum_user_command_fee in
+      let amount = Amount.of_int @@ Fee.to_int fee in
+      let balance = Option.value_exn (Amount.scale amount 100) in
+      let kp1 =
+        Quickcheck.random_value ~seed:(`Deterministic "apple") Keypair.gen
+      in
+      let kp2 =
+        Quickcheck.random_value ~seed:(`Deterministic "orange") Keypair.gen
+      in
+      let add_cmd = add_to_pool ~nonce:Account_nonce.zero ~balance in
+      let make_cmd =
+        make_parties_payment ~sender:kp1 ~receiver:kp2
+          ~double_increment_sender:false ~increment_receiver:false ~amount ~fee
+      in
+      Mina_ledger.Ledger.with_ledger ~depth:4 ~f:(fun ledger ->
+          init_permissionless_ledger ledger
+            [ (kp1.public_key, balance); (kp2.public_key, Amount.zero) ] ;
+          let cmd1 = make_cmd 0 in
+          let cmd2 = make_cmd 1 in
+          let pool = List.fold_left [ cmd1; cmd2 ] ~init:empty ~f:add_cmd in
+          apply_to_ledger ledger cmd1 ;
+          let _pool = commit_to_pool ledger pool cmd2 [ cmd1; cmd2 ] in
+          () )
   end )

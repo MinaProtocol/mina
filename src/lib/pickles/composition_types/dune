@@ -3,7 +3,7 @@
  (public_name pickles.composition_types)
  (flags -warn-error -27)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
+ (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
  (libraries
    ;; opam libraries
    sexplib0
@@ -11,6 +11,7 @@
    core_kernel
    base.caml
    ;; local libraries
+   mina_wire_types
    kimchi_backend.pasta
    snarky.backendless
    pickles_types
