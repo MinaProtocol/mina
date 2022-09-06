@@ -24,6 +24,19 @@ spec:
         prometheus.io/port: {{ .Values.archive.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      initContainers:
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $.Values.mina.privkeyPass | quote }}
       containers:
 {{- if .Values.archive.enableLocalDaemon }}
       - name: mina
@@ -60,6 +73,7 @@ spec:
           {{- if .Values.mina.seedPeersURL }}
           "-peer-list-url", {{ .Values.mina.seedPeersURL | quote }},
           {{- end -}}
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
@@ -85,6 +99,8 @@ spec:
           value: {{ .Values.mina.ports.p2p | quote }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
+        - name: MINA_LIBP2P_PASS
+          value: {{ $.Values.mina.privkeyPass | quote }}
         ports:
         - name: client-port
           protocol: TCP 
@@ -110,6 +126,8 @@ spec:
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
 {{- end }}
       # Archive Process
       - name: archive
@@ -151,3 +169,5 @@ spec:
         configMap:
           name: "{{ template "archive-node.fullname" . }}-daemon-config"
       {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}
