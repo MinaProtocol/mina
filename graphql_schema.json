@@ -9865,7 +9865,8 @@
             },
             {
               "name": "superchargedCoinbase",
-              "description": null,
+              "description":
+                "Whether or not this coinbase was \"supercharged\", ie. created by an account that has no locked tokens",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -9881,14 +9882,15 @@
             },
             {
               "name": "blockStakeWinner",
-              "description": null,
+              "description":
+                "The public key that is responsible for winning this block (including delegations)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -9897,14 +9899,15 @@
             },
             {
               "name": "blockCreator",
-              "description": null,
+              "description":
+                "The block producer public key that created this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -9920,7 +9923,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
