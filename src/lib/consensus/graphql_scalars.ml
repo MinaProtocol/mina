@@ -30,3 +30,6 @@ end
 let%test_module "Epoch" = (module Make_test (Epoch_scalar) (Epoch))
 
 let%test_module "Slot" = (module Make_test (Slot_scalar) (Slot_gen))
+
+module Slot = Slot_scalar
+module Epoch = Epoch_scalar
