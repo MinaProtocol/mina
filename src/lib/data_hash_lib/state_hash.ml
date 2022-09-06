@@ -32,6 +32,8 @@ let to_bytes = `Use_to_base58_check_or_raw_hash_bytes
 
 let to_decimal_string = to_decimal_string
 
+let of_decimal_string = of_decimal_string
+
 (* Data hash versioned boilerplate below *)
 
 [%%versioned
