@@ -70,6 +70,8 @@ module type S = sig
 
     val to_bits : t -> bool list
 
+    val to_base58_check : t -> string
+
     val gen : t Quickcheck.Generator.t
   end
 
