@@ -4386,7 +4386,7 @@ module For_tests = struct
           | r :: rs ->
               interleave left rs `Left (r :: acc) )
 
-  let create_parties ?receiver_auth
+  let create_parties ?receiver_auth ?empty_sender
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
       ~update ~receiver_update =
     let { Spec.fee
@@ -4444,11 +4444,17 @@ module For_tests = struct
     in
 
     let sender_party : Party.Simple.t option =
+      let empty_sender = Option.value ~default:false empty_sender in
+      if empty_sender then assert (List.is_empty receivers) ;
+      let balance_change =
+        if empty_sender then Amount.Signed.zero
+        else Amount.(Signed.(negate (of_unsigned amount)))
+      in
       let sender_party_body : Party.Body.Simple.t =
         { public_key = sender_pk
         ; update = Party.Update.noop
         ; token_id = Token_id.default
-        ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
+        ; balance_change
         ; increment_nonce = true
         ; events = []
         ; sequence_events = []
@@ -4460,7 +4466,7 @@ module For_tests = struct
         }
       in
       Option.some_if
-        ((not (List.is_empty receivers)) || new_zkapp_account)
+        ((not (List.is_empty receivers)) || new_zkapp_account || empty_sender)
         ( { body = sender_party_body
           ; authorization =
               Control.Signature Signature.dummy (*To be updated later*)
@@ -4690,17 +4696,16 @@ module For_tests = struct
     in
     parties
 
-  let update_states ?receiver_auth ?zkapp_prover ~constraint_constants
-      (spec : Spec.t) =
+  let update_states ?receiver_auth ?zkapp_prover ?empty_sender
+      ~constraint_constants (spec : Spec.t) =
     let ( `Parties ({ Parties.fee_payer; memo; _ } as p)
         , `Sender_party sender_party
         , `Proof_parties snapp_parties
         , `Txn_commitment commitment
         , `Full_txn_commitment full_commitment ) =
       create_parties ~constraint_constants spec ~update:spec.snapp_update
-        ~receiver_update:Party.Update.noop ?receiver_auth
+        ~receiver_update:Party.Update.noop ?receiver_auth ?empty_sender
     in
-    assert (not @@ List.is_empty snapp_parties) ;
     let receivers = (Parties.to_simple p).other_parties in
     let snapp_parties =
       snapp_parties

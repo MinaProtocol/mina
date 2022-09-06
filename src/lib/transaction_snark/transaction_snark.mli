@@ -533,6 +533,7 @@ module For_tests : sig
          , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t) Async.Deferred.t
          )
          Pickles.Prover.t
+    -> ?empty_sender:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> Spec.t
     -> Parties.t Async.Deferred.t

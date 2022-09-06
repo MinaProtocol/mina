@@ -1033,6 +1033,32 @@ module Body = struct
     ; caller = Token_id.default
     }
 
+  let to_simple_fee_payer (t : Fee_payer.t) : Simple.t =
+    { public_key = t.public_key
+    ; token_id = Token_id.default
+    ; update = Update.noop
+    ; balance_change =
+        { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
+    ; increment_nonce = true
+    ; events = []
+    ; sequence_events = []
+    ; call_data = Field.zero
+    ; preconditions =
+        { Preconditions.network =
+            (let valid_until =
+               Option.value ~default:Global_slot.max_value t.valid_until
+             in
+             { Zkapp_precondition.Protocol_state.accept with
+               global_slot_since_genesis =
+                 Check { lower = Global_slot.zero; upper = valid_until }
+             } )
+        ; account = Account_precondition.Nonce t.nonce
+        }
+    ; use_full_commitment = true
+    ; caller = Call
+    ; call_depth = 0
+    }
+
   let to_fee_payer_exn (t : t) : Fee_payer.t =
     let { public_key
         ; token_id = _

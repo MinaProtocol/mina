@@ -120,10 +120,11 @@ let trivial_zkapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
-let check_parties_with_merges_exn ?expected_failure
+let check_parties_with_merges_exn ?expected_failure ?ignore_outside_snark
     ?(state_body = genesis_state_body) ledger partiess =
   let module T = (val Lazy.force snark_module) in
   (*TODO: merge multiple snapp transactions*)
+  let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   Async.Deferred.List.iter partiess ~f:(fun parties ->
@@ -151,12 +152,21 @@ let check_parties_with_merges_exn ?expected_failure
       | Ok (witnesses, _) -> (
           let open Async.Deferred.Let_syntax in
           let applied =
-            Ledger.apply_transaction ~constraint_constants
-              ~txn_state_view:state_view ledger
-              (Mina_transaction.Transaction.Command (Parties parties))
-            |> Or_error.ok_exn
+            if ignore_outside_snark then
+              Ledger.Transaction_applied.Varying.Command
+                (Parties
+                   { command = { With_status.status = Applied; data = parties }
+                   ; accounts = []
+                   ; new_accounts = []
+                   } )
+            else
+              ( Ledger.apply_transaction ~constraint_constants
+                  ~txn_state_view:state_view ledger
+                  (Mina_transaction.Transaction.Command (Parties parties))
+              |> Or_error.ok_exn )
+                .varying
           in
-          match applied.varying with
+          match applied with
           | Command (Parties { command; _ }) -> (
               match command.status with
               | Applied -> (
@@ -198,12 +208,13 @@ let check_parties_with_merges_exn ?expected_failure
                                 T.merge ~sok_digest prev curr )
                       in
                       let p = Or_error.ok_exn p in
-                      let target_ledger_root_snark =
-                        (Transaction_snark.statement p).target.ledger
-                      in
-                      let target_ledger_root = Ledger.merkle_root ledger in
-                      [%test_eq: Ledger_hash.t] target_ledger_root
-                        target_ledger_root_snark )
+                      if not ignore_outside_snark then
+                        let target_ledger_root_snark =
+                          (Transaction_snark.statement p).target.ledger
+                        in
+                        let target_ledger_root = Ledger.merkle_root ledger in
+                        [%test_eq: Ledger_hash.t] target_ledger_root
+                          target_ledger_root_snark )
               | Failed failure_tbl -> (
                   match expected_failure with
                   | None ->

@@ -106,9 +106,65 @@ let create_ledger_and_transactions num_transactions :
       in
       (ledger, [ Command (Signed_command a); Command (Signed_command b) ])
 
-let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties :
-    Mina_ledger.Ledger.t * Parties.t list =
-  let length =
+module Transaction_key = struct
+  module T = struct
+    type t = { proof_segments : int; signed_single : int; signed_pair : int }
+    [@@deriving hash, sexp, compare]
+  end
+
+  include Hashtbl.Make (T)
+
+  type t = T.t
+
+  include Comparable.Make (T)
+  include Hashable.Make (T)
+
+  let of_parties ~ledger (p : Parties.t) =
+    let segments, _ =
+      Transaction_snark.parties_witnesses_exn ~constraint_constants
+        ~state_body:Transaction_snark_tests.Util.genesis_state_body
+        ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+        [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
+          , `Pending_coinbase_of_statement
+              { Transaction_snark.Pending_coinbase_stack_state.source =
+                  Pending_coinbase.Stack.empty
+              ; target =
+                  Pending_coinbase.Stack.push_state
+                    Transaction_snark_tests.Util.genesis_state_body_hash
+                    Pending_coinbase.Stack.empty
+              }
+          , p )
+        ]
+    in
+    List.fold
+      ~init:({ proof_segments = 0; signed_single = 0; signed_pair = 0 } : t)
+      segments
+      ~f:(fun ({ proof_segments; signed_single; signed_pair } as acc)
+              (_, segment, _) ->
+        match segment with
+        | Transaction_snark.Parties_segment.Basic.Proved ->
+            { acc with proof_segments = proof_segments + 1 }
+        | Opt_signed ->
+            { acc with signed_single = signed_single + 1 }
+        | Opt_signed_opt_signed ->
+            { acc with signed_pair = signed_pair + 1 } )
+end
+
+module Time_values = struct
+  type t = { verification_time : Time.Span.t; proving_time : Time.Span.t }
+  [@@deriving hash, sexp, compare]
+
+  let empty =
+    { verification_time = Time.Span.of_sec 0.
+    ; proving_time = Time.Span.of_sec 0.
+    }
+end
+
+let transaction_combinations = Transaction_key.Table.create ()
+
+let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties:_
+    : Mina_ledger.Ledger.t * Parties.t list =
+  let _length =
     match num_transactions with
     | `Count length ->
         length
@@ -125,6 +181,13 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties :
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
         Account_id.create (Public_key.compress public_key) Token_id.default )
+  in
+  let keymap =
+    List.fold ~init:Public_key.Compressed.Map.empty keypairs_in_ledger
+      ~f:(fun m kp ->
+        Public_key.Compressed.Map.add_exn m
+          ~key:(Public_key.compress kp.public_key)
+          ~data:kp.private_key )
   in
   let balances =
     let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
@@ -218,48 +281,63 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties :
   in
   let amount = Currency.Amount.of_int 1_000_000_000 in
   let sender_parties = 1 in
-  let receiver_count =
-    if num_parties - num_proof_parties = 1 then 1
-      (*You need a sender for a single receiver*)
-    else max 0 (num_parties - num_proof_parties - sender_parties)
+  let test_spec nonce ~num_proof_parties :
+      bool * Transaction_snark.For_tests.Spec.t =
+    let receiver_count =
+      max 0 (num_parties - num_proof_parties - sender_parties)
+    in
+    let empty_sender = num_parties - num_proof_parties = 1 in
+    ( empty_sender
+    , { sender = (fee_payer_keypair, nonce)
+      ; fee
+      ; fee_payer = None
+      ; receivers =
+          List.map (List.take keypairs_in_ledger receiver_count) ~f:(fun kp ->
+              (kp, amount) )
+      ; amount =
+          ( if receiver_count > 0 then
+            Currency.Amount.scale amount receiver_count |> Option.value_exn
+          else Currency.Amount.zero )
+      ; zkapp_account_keypairs = List.take keypairs_in_ledger num_proof_parties
+      ; memo = Signed_command_memo.create_from_string_exn "blah"
+      ; new_zkapp_account = false
+      ; snapp_update
+      ; current_auth = Permissions.Auth_required.Proof
+      ; call_data = Snark_params.Tick.Field.zero
+      ; events = []
+      ; sequence_events
+      ; preconditions = None
+      } )
   in
-  let test_spec nonce : Transaction_snark.For_tests.Spec.t =
-    { sender = (fee_payer_keypair, nonce)
-    ; fee
-    ; fee_payer = None
-    ; receivers =
-        List.map (List.take keypairs_in_ledger receiver_count) ~f:(fun kp ->
-            (kp, amount) )
-    ; amount =
-        ( if receiver_count > 0 then
-          Currency.Amount.scale amount receiver_count |> Option.value_exn
-        else Currency.Amount.zero )
-    ; zkapp_account_keypairs = List.take keypairs_in_ledger num_proof_parties
-    ; memo = Signed_command_memo.create_from_string_exn "blah"
-    ; new_zkapp_account = false
-    ; snapp_update
-    ; current_auth = Permissions.Auth_required.Proof
-    ; call_data = Snark_params.Tick.Field.zero
-    ; events = []
-    ; sequence_events
-    ; preconditions = None
-    }
+  let rec permute proof_parties non_proof_parties current_perm acc =
+    match (proof_parties, non_proof_parties) with
+    | [], [] ->
+        List.rev current_perm :: acc
+    | [], _ ->
+        List.rev (List.rev non_proof_parties @ current_perm) :: acc
+    | _, [] ->
+        List.rev (List.rev proof_parties @ current_perm) :: acc
+    | p :: ps, np :: nps ->
+        let perm1 = permute ps non_proof_parties (p :: current_perm) acc in
+        let perm2 = permute proof_parties nps (np :: current_perm) acc in
+        perm1 @ perm2
   in
-  let rec generate_zkapp n acc nonce =
-    if n <= 0 then List.rev acc
+  let rec generate_zkapp num_proof_parties acc nonce =
+    if num_proof_parties > num_parties then List.rev acc
     else
       let start = Time.now () in
+      let empty_sender, spec = test_spec nonce ~num_proof_parties in
       let parties =
         Async.Thread_safe.block_on_async_exn (fun () ->
             Transaction_snark.For_tests.update_states ~zkapp_prover:prover
-              ~constraint_constants (test_spec nonce)
+              ~constraint_constants ~empty_sender spec
               ~receiver_auth:Control.Tag.Signature )
       in
-      let other_parties = Parties.other_parties_list parties in
-      let proof_count, signature_count, no_auths, next_nonce =
-        List.fold ~init:(0, 0, 0, nonce)
-          (Party.of_fee_payer parties.fee_payer :: other_parties)
-          ~f:(fun (pc, sc, na, nonce) (p : Party.t) ->
+      let simple_parties = Parties.to_simple parties in
+      let other_parties = simple_parties.other_parties in
+      let proof_parties, signature_parties, no_auths, _next_nonce =
+        List.fold ~init:([], [], [], nonce) other_parties
+          ~f:(fun (pc, sc, na, nonce) (p : Party.Simple.t) ->
             let nonce =
               if
                 Public_key.Compressed.equal p.body.public_key fee_payer_pk
@@ -269,22 +347,59 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties :
             in
             match p.authorization with
             | Proof _ ->
-                (pc + 1, sc, na, nonce)
+                (p :: pc, sc, na, nonce)
             | Signature _ ->
-                (pc, sc + 1, na, nonce)
+                (pc, p :: sc, na, nonce)
             | _ ->
-                (pc, sc, na + 1, nonce) )
+                (pc, sc, p :: na, nonce) )
       in
       printf
         !"Generated zkapp with %d parties of which %d signatures, %d proofs \
           and %d none in %f secs\n\
           %!"
         (List.length other_parties + 1)
-        signature_count proof_count no_auths
+        (List.length signature_parties + 1)
+        (List.length proof_parties)
+        (List.length no_auths)
         Time.(Span.to_sec (diff (now ()) start)) ;
-      generate_zkapp (n - 1) (parties :: acc) next_nonce
+      let permutations =
+        permute proof_parties (signature_parties @ no_auths) [] []
+        |> List.filter_mapi ~f:(fun i (other_parties : Party.Simple.t list) ->
+               let p =
+                 Parties.of_simple { simple_parties with other_parties }
+               in
+               let combination = Transaction_key.of_parties ~ledger p in
+               let perm_string =
+                 List.fold ~init:"S" other_parties
+                   ~f:(fun acc (p : Party.Simple.t) ->
+                     match p.authorization with
+                     | Proof _ ->
+                         acc ^ "P"
+                     | Signature _ ->
+                         acc ^ "S"
+                     | None_given ->
+                         acc ^ "N" )
+               in
+               if Transaction_key.Table.mem transaction_combinations combination
+               then (
+                 printf "Skipping %s\n" perm_string ;
+                 None )
+               else (
+                 printf
+                   !"Generated parties permutation %d: %s\n%!"
+                   i perm_string ;
+                 (*Update the authorizations*)
+                 let p =
+                   Async.Thread_safe.block_on_async_exn (fun () ->
+                       Parties_builder.replace_authorizations ~prover ~keymap p )
+                 in
+                 Transaction_key.Table.add_exn transaction_combinations
+                   ~key:combination ~data:(p, Time_values.empty) ;
+                 Some p ) )
+      in
+      generate_zkapp (num_proof_parties + 1) (permutations @ acc) nonce
   in
-  (ledger, generate_zkapp length [] Mina_base.Account.Nonce.zero)
+  (ledger, generate_zkapp 0 [] Mina_base.Account.Nonce.zero)
 
 let _create_ledger_and_zkapps_from_generator num_transactions :
     Mina_ledger.Ledger.t * Parties.t list =
@@ -504,10 +619,11 @@ let profile_zkapps ~verifier ledger partiess =
               | _ ->
                   (pc, sc) )
         in
+        let verification_time = Time.(diff (now ()) v_start_time) in
         printf
           !"Verifying zkapp with %d signatures and %d proofs took %f secs\n%!"
           signature_count proof_count
-          Time.(Span.to_sec (diff (now ()) v_start_time)) ;
+          (Time.Span.to_sec verification_time) ;
         let _a = Or_error.ok_exn res in
         let tm_zkapp0 = Core.Unix.gettimeofday () in
         (*verify*)
@@ -515,7 +631,7 @@ let profile_zkapps ~verifier ledger partiess =
           match%map
             Async_kernel.Monitor.try_with (fun () ->
                 Transaction_snark_tests.Util.check_parties_with_merges_exn
-                  ledger [ parties ] )
+                  ~ignore_outside_snark:true ledger [ parties ] )
           with
           | Ok () ->
               ()
@@ -527,10 +643,33 @@ let profile_zkapps ~verifier ledger partiess =
         in
         let tm_zkapp1 = Core.Unix.gettimeofday () in
         let zkapp_span = Time.Span.of_sec (tm_zkapp1 -. tm_zkapp0) in
+        let time_values =
+          { Time_values.verification_time; proving_time = zkapp_span }
+        in
+        let combination = Transaction_key.of_parties ~ledger parties in
+        Transaction_key.Table.change transaction_combinations combination
+          ~f:(fun data_opt ->
+            let data = Option.value_exn data_opt in
+            Some (fst data, time_values) ) ;
         printf
           !"Time for zkApp %d: %{Time.Span.to_string_hum}\n"
           (ndx + 1) zkapp_span )
   in
+  printf
+    "| No.| Proof parties| Non-proof pairs| Non-proof singles| Mempool \
+     verification time (sec)| Transaction proving time (sec)|\n\
+    \ |--|--|--|--|--|--|\n" ;
+  List.iteri
+    ( Transaction_key.Table.to_alist transaction_combinations
+    |> List.sort ~compare:(fun (k1, _) (k2, _) ->
+           if Int.compare k1.proof_segments k2.proof_segments = 0 then
+             Int.compare k1.signed_pair k2.signed_pair
+           else Int.compare k1.proof_segments k2.proof_segments ) )
+    ~f:(fun i (k, v) ->
+      printf "| %d| %d |%d |%d |%f| %f|\n" (i + 1) k.proof_segments
+        k.signed_pair k.signed_single
+        (Time.Span.to_sec (snd v).verification_time)
+        (Time.Span.to_sec (snd v).proving_time) ) ;
   let tm1 = Core.Unix.gettimeofday () in
   let total_time = Time.Span.of_sec (tm1 -. tm0) in
   format_time_span total_time
@@ -746,12 +885,12 @@ let command =
            "Number of account updates per transaction (excluding the fee \
             payer). Default:6"
          (optional int)
-     and num_proof_updates =
-       flag "--num-proof-updates" ~aliases:[ "-num-proof-updates" ]
-         ~doc:
-           "Number of updates out of total updates that are to be authorized \
-            by a proof. Default:6"
-         (optional int)
+       (*and num_proof_updates =
+         flag "--num-proof-updates" ~aliases:[ "-num-proof-updates" ]
+           ~doc:
+             "Number of updates out of total updates that are to be authorized \
+              by a proof. Default:6"
+           (optional int)*)
      in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
@@ -759,7 +898,8 @@ let command =
      in
      let num_parties = Option.value num_updates ~default:6 in
      let num_proof_parties =
-       Option.value num_proof_updates ~default:num_parties
+       num_parties
+       (*Option.value num_proof_updates ~default:num_parties*)
      in
      if use_zkapps then (
        let incompatible_flags = ref [] in
