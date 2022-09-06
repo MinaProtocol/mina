@@ -228,8 +228,7 @@ module String_gen = struct
   let gen = gen_nonempty
 end
 
-let%test_module "String_json" =
-  (module Make_test (String_json) (String_gen))
+let%test_module "String_json" = (module Make_test (String_json) (String_gen))
 
 module Span_gen = struct
   include Core_kernel.Time.Span

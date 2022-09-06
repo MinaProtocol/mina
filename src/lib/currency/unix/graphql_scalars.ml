@@ -31,5 +31,4 @@ let%test_module "Fee" = (module Make_test (Fee) (Currency.Fee))
 
 let%test_module "Amount" = (module Make_test (Amount) (Currency.Amount))
 
-let%test_module "Balance" =
-  (module Make_test (Balance) (Currency.Balance))
+let%test_module "Balance" = (module Make_test (Balance) (Currency.Balance))

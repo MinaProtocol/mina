@@ -9,11 +9,11 @@ module TransactionHash =
       let doc = "Base58Check-encoded transaction hash"
     end)
 
-
 (* TESTS *)
 module TransactionHash_gen = struct
   include Mina_transaction.Transaction_hash
   open Core_kernel
+
   let gen =
     Mina_base.Coinbase.Gen.gen
       ~constraint_constants:

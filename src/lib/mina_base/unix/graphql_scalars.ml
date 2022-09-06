@@ -46,8 +46,7 @@ module LedgerHash =
     end)
 
 (* TESTS *)
-let%test_module "TokenId" =
-  (module Make_test (TokenId) (Mina_base.Token_id))
+let%test_module "TokenId" = (module Make_test (TokenId) (Mina_base.Token_id))
 
 let%test_module "StateHash" =
   (module Make_test (StateHash) (Mina_base.State_hash))
