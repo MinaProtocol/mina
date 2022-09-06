@@ -22,6 +22,7 @@
    mina_numbers
    snark_params
    unsigned_extended
+   mina_wire_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps 

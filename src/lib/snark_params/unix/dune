@@ -1,19 +1,13 @@
 (library
- (name mina_base_unix)
- (public_name mina_base.unix)
+ (name snark_params_unix)
+ (public_name snark_params.unix)
  (libraries
    ;; opam libraries
    graphql-async
    yojson
-   result
-   core_kernel
-   base
    ;; local libraries
    graphql_basic_scalars
-   mina_base
-   pickles
-   pickles.backend
-   kimchi_backend.pasta
+   snark_params
  )
  (preprocess (pps ppx_version))
  (instrumentation (backend bisect_ppx))

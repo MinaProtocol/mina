@@ -55,15 +55,6 @@ final: prev: {
         final.lib.fakeHash;
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
-      # Yo dawg
-      # proxyVendor doesn't work (cannot find package "." in:)
-      # And runVend was removed from nixfinal
-      # So we vendor the vend package in yo repo
-      # So yo can vendor while u vendor
-      postBuild = ''
-        rm vendor -rf
-        ${final.vend}/bin/vend
-      '';
       # remove libp2p_ipc from go.mod, inject it back in postconfigure
       postConfigure = ''
         sed -i 's/.*libp2p_ipc.*//' go.mod
