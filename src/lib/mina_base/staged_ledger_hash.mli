@@ -52,9 +52,28 @@ module Aux_hash : sig
   val dummy : t
 end
 
+module Pending_coinbase_aux : sig
+  type t
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t
+      [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
+    end
+
+    module Latest : module type of V1
+  end
+
+  val to_base58_check : t -> string
+
+  val dummy : t
+end
+
 val ledger_hash : t -> Ledger_hash.t
 
 val aux_hash : t -> Aux_hash.t
+
+val pending_coinbase_aux : t -> Pending_coinbase_aux.t
 
 val pending_coinbase_hash : t -> Pending_coinbase.Hash.t
 

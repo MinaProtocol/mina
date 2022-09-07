@@ -70,7 +70,9 @@ module Pending_coinbase_aux = struct
           Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
       end)
 
-      let to_yojson s = `String (Base58_check.encode s)
+      let to_base58_check s = Base58_check.encode s
+
+      let to_yojson s = `String (to_base58_check s)
 
       let of_yojson = function
         | `String s -> (
@@ -86,7 +88,7 @@ module Pending_coinbase_aux = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+  [%%define_locally Stable.Latest.(to_yojson, of_yojson, to_base58_check)]
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
@@ -220,6 +222,9 @@ include Hashable.Make (Stable.Latest)
 let ledger_hash ({ non_snark; _ } : t) = Non_snark.ledger_hash non_snark
 
 let aux_hash ({ non_snark; _ } : t) = Non_snark.aux_hash non_snark
+
+let pending_coinbase_aux ({ non_snark; _ } : t) =
+  Non_snark.pending_coinbase_aux non_snark
 
 let pending_coinbase_hash ({ pending_coinbase_hash; _ } : t) =
   pending_coinbase_hash
