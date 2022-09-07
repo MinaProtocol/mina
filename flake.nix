@@ -261,10 +261,10 @@
         packages.snarky_js = nix-npm-buildPackage.buildNpmPackage {
           src = ./src/lib/snarky_js_bindings/snarkyjs;
           preBuild = ''
-            BINDINGS_PATH=./dist/node/node_bindings
+            BINDINGS_PATH=./src/node_bindings
             mkdir -p "$BINDINGS_PATH"
-            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* ./dist/node/node_bindings
-            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js ./dist/node/node_bindings
+            cp ${pkgs.plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
+            cp ${ocamlPackages.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
             chmod -R 777 "$BINDINGS_PATH"
 
             # TODO: deduplicate from ./scripts/build-snarkyjs-node.sh
@@ -275,7 +275,7 @@
             sed -i 's/function invalid_arg(s){throw \[0,Invalid_argument,s\]/function invalid_arg(s){throw joo_global_object.Error(s.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
             sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
           '';
-          npmBuild = "npm run build -- --bindings=./dist/node/node_bindings";
+          npmBuild = "npm run build";
           # TODO: add snarky-run
           # TODO
           # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
