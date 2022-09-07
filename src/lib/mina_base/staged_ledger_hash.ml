@@ -102,7 +102,7 @@ module Non_snark = struct
         ; aux_hash : Aux_hash.Stable.V1.t
         ; pending_coinbase_aux : Pending_coinbase_aux.Stable.V1.t
         }
-      [@@deriving sexp, equal, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson, fields]
 
       let to_latest = Fn.id
     end
