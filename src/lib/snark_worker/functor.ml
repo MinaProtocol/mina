@@ -164,9 +164,20 @@ module Make (Inputs : Intf.Inputs_intf) :
               match Option.value_exn single with
               | Mina_transaction.Transaction.Command
                   (Mina_base.User_command.Parties parties) ->
+                  let init =
+                    match
+                      (Mina_base.Party.of_fee_payer
+                         parties.Mina_base.Parties.fee_payer )
+                        .authorization
+                    with
+                    | Proof _ ->
+                        (1, 1)
+                    | _ ->
+                        (1, 0)
+                  in
                   let c, p =
                     Mina_base.Parties.Call_forest.fold
-                      parties.Mina_base.Parties.other_parties ~init:(1, 0)
+                      parties.Mina_base.Parties.other_parties ~init
                       ~f:(fun (count, proof_parties_count) party ->
                         ( count + 1
                         , if
@@ -185,8 +196,12 @@ module Make (Inputs : Intf.Inputs_intf) :
                   ("fee_transfer", 1, 0)
             in
             Mina_metrics.(
-              Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
+              Gauge.set Cryptography.snark_work_base_time_sec
+                (Time.Span.to_sec time) ;
+              Gauge.set Cryptography.transaction_length
+                (Float.of_int parties_count) ;
+              Gauge.set Cryptography.zkapp_proof_updates
+                (Float.of_int proof_parties_count)) ;
             [%str_log info]
               (Base_snark_generated
                  { time; transaction_type; parties_count; proof_parties_count }

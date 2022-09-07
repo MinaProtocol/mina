@@ -439,10 +439,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             Perf_histograms.add_span ~name:"snark_worker_transition_time" total ;
             Mina_metrics.(
               Cryptography.(
-                Snark_work_histogram.observe snark_work_base_time_sec
-                  (Time.Span.to_sec total) ;
+                Gauge.set snark_work_base_time_sec (Time.Span.to_sec total) ;
                 Gauge.set transaction_length (Float.of_int parties_count) ;
-                Gauge.set proof_parties (Float.of_int proof_parties_count))) )
+                Gauge.set zkapp_proof_updates (Float.of_int proof_parties_count)))
+        )
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->

@@ -58,11 +58,11 @@ module Cryptography : sig
 
   val snark_work_merge_time_sec : Snark_work_histogram.t
 
-  val snark_work_base_time_sec : Snark_work_histogram.t
+  val snark_work_base_time_sec : Gauge.t
 
   val transaction_length : Gauge.t
 
-  val proof_parties : Gauge.t
+  val zkapp_proof_updates : Gauge.t
 end
 
 module Bootstrap : sig
@@ -84,9 +84,11 @@ module Transaction_pool : sig
 
   val transactions_added_to_pool : Counter.t
 
-  val parties_transaction_size : Gauge.t
+  val zkapp_transaction_size : Gauge.t
 
-  val parties_count : Gauge.t
+  val zkapp_updates : Gauge.t
+
+  val zkapp_proof_updates : Gauge.t
 end
 
 module Network : sig

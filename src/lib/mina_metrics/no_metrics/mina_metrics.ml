@@ -68,11 +68,11 @@ module Cryptography = struct
 
   let snark_work_merge_time_sec : Snark_work_histogram.t = ()
 
-  let snark_work_base_time_sec : Snark_work_histogram.t = ()
+  let snark_work_base_time_sec : Gauge.t = ()
 
   let transaction_length : Gauge.t = ()
 
-  let proof_parties : Gauge.t = ()
+  let zkapp_proof_updates : Gauge.t = ()
 end
 
 module Bootstrap = struct
@@ -94,9 +94,11 @@ module Transaction_pool = struct
 
   let transactions_added_to_pool : Counter.t = ()
 
-  let parties_transaction_size : Gauge.t = ()
+  let zkapp_transaction_size : Gauge.t = ()
 
-  let parties_count : Gauge.t = ()
+  let zkapp_updates : Gauge.t = ()
+
+  let zkapp_proof_updates : Guage.t = ()
 end
 
 module Network = struct

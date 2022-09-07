@@ -514,11 +514,31 @@ module Update = struct
         ( match Transaction_hash.User_command_with_valid_signature.data cmd with
         | Parties p ->
             let p = Parties.Valid.forget p in
+            let updates, proof_updates =
+              let init =
+                match (Party.of_fee_payer p.fee_payer).authorization with
+                | Proof _ ->
+                    (1, 1)
+                | _ ->
+                    (1, 0)
+              in
+              Parties.Call_forest.fold p.Parties.other_parties ~init
+                ~f:(fun (count, proof_parties_count) party ->
+                  ( count + 1
+                  , if
+                      Control.(
+                        Tag.equal Proof (tag (Party.authorization party)))
+                    then proof_parties_count + 1
+                    else proof_parties_count ) )
+            in
             Mina_metrics.Gauge.set
-              Mina_metrics.Transaction_pool.parties_transaction_size
+              Mina_metrics.Transaction_pool.zkapp_transaction_size
               (Parties.Stable.Latest.bin_size_t p |> Float.of_int) ;
-            Mina_metrics.Gauge.set Mina_metrics.Transaction_pool.parties_count
-              (List.length (Parties.to_simple p).other_parties |> Float.of_int)
+            Mina_metrics.Gauge.set Mina_metrics.Transaction_pool.zkapp_updates
+              (Float.of_int updates) ;
+            Mina_metrics.Gauge.set
+              Mina_metrics.Transaction_pool.zkapp_proof_updates
+              (Float.of_int proof_updates)
         | Signed_command _ ->
             () ) ;
         { acc with
