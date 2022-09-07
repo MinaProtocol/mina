@@ -8,6 +8,6 @@ Current changes
 
 ### Breaking changes
 
-* #11718: The GraphQL API now uses more descriptive scalar types (such as `Fee` or `Amount` instead of `UInt64`).
+* #11696: The GraphQL API now uses more descriptive scalar types (such as `Fee` or `Amount` instead of `UInt64`).
   This enables GraphQL clients to automatically parse these scalars into the correct internal types.
   Even though the JSON shape of messages does not change, third party tools that make use of the GraphQL schema for parsing responses may have to be adapted to these new types.
