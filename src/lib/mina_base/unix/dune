@@ -9,7 +9,6 @@
    core_kernel
    sexplib0
    result
-   core_kernel
    base
    ;; local libraries
    graphql_basic_scalars
