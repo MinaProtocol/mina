@@ -1,0 +1,14 @@
+(library
+ (name snark_params_unix)
+ (public_name snark_params.unix)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   yojson
+   ;; local libraries
+   graphql_basic_scalars
+   snark_params
+ )
+ (preprocess (pps ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Utils that depends on the unix library"))

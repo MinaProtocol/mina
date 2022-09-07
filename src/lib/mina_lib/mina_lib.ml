@@ -71,8 +71,8 @@ type components =
 
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
-  | User_command_inputs of User_command_input.t list
-  | Snapp_command_inputs of Parties.t list
+  | Signed_command_inputs of User_command_input.t list
+  | Parties_command_inputs of Parties.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -83,7 +83,8 @@ type pipes =
       Strict_pipe.Writer.t
   ; user_command_input_writer :
       ( command_inputs
-        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+        * (   ( [ `Broadcasted | `Not_broadcasted ]
+              * Network_pool.Transaction_pool.Resource_pool.Diff.t
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit )
@@ -944,26 +945,57 @@ let get_current_nonce t aid =
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
-  let cmd_inputs = User_command_inputs uc_inputs in
+  let cmd_inputs = Signed_command_inputs uc_inputs in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
     (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
-let add_full_transactions t user_command =
-  let result_ivar = Ivar.create () in
-  Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
-    (user_command, Ivar.fill result_ivar)
-  |> Deferred.don't_wait_for ;
-  Ivar.read result_ivar
+let add_full_transactions t user_commands =
+  let add_all_txns () =
+    let result_ivar = Ivar.create () in
+    Network_pool.Transaction_pool.Local_sink.push t.pipes.tx_local_sink
+      (user_commands, Ivar.fill result_ivar)
+    |> Deferred.don't_wait_for ;
+    Ivar.read result_ivar
+  in
+  let too_big_err =
+    List.find_map user_commands ~f:(fun cmd ->
+        let size_validity =
+          User_command.valid_size
+            ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
+        in
+        match size_validity with Ok () -> None | Error err -> Some err )
+  in
+  match too_big_err with
+  | None ->
+      add_all_txns ()
+  | Some err ->
+      Deferred.Result.fail err
 
-let add_snapp_transactions t (snapp_txns : Parties.t list) =
-  let result_ivar = Ivar.create () in
-  let cmd_inputs = Snapp_command_inputs snapp_txns in
-  Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
-  |> Deferred.don't_wait_for ;
-  Ivar.read result_ivar
+let add_zkapp_transactions t (partiess : Parties.t list) =
+  let add_all_txns () =
+    let result_ivar = Ivar.create () in
+    let cmd_inputs = Parties_command_inputs partiess in
+    Strict_pipe.Writer.write t.pipes.user_command_input_writer
+      (cmd_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
+    |> Deferred.don't_wait_for ;
+    Ivar.read result_ivar
+  in
+  let too_big_err =
+    List.find_map partiess ~f:(fun parties ->
+        let size_validity =
+          Parties.valid_size
+            ~genesis_constants:t.config.precomputed_values.genesis_constants
+            parties
+        in
+        match size_validity with Ok () -> None | Error err -> Some err )
+  in
+  match too_big_err with
+  | None ->
+      add_all_txns ()
+  | Some err ->
+      Deferred.Result.fail err
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -1645,6 +1677,7 @@ let create ?wallets (config : Config.t) =
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
+              ~genesis_constants:config.precomputed_values.genesis_constants
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -1706,6 +1739,7 @@ let create ?wallets (config : Config.t) =
               ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
               ; time_controller = config.net_config.time_controller
               ; consensus_constants = config.net_config.consensus_constants
+              ; genesis_constants = config.precomputed_values.genesis_constants
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
@@ -1826,14 +1860,14 @@ let create ?wallets (config : Config.t) =
           Strict_pipe.Reader.iter user_command_input_reader
             ~f:(fun (inputs, result_cb, get_current_nonce, get_account) ->
               match inputs with
-              | User_command_inputs uc_inputs -> (
+              | Signed_command_inputs uc_inputs -> (
                   match%bind
                     User_command_input.to_user_commands ~get_current_nonce
                       ~get_account ~constraint_constants ~logger:config.logger
                       uc_inputs
                   with
-                  | Ok user_commands ->
-                      if List.is_empty user_commands then (
+                  | Ok signed_commands ->
+                      if List.is_empty signed_commands then (
                         result_cb
                           (Error (Error.of_string "No user commands to send")) ;
                         Deferred.unit )
@@ -1841,7 +1875,7 @@ let create ?wallets (config : Config.t) =
                         (*callback for the result from transaction_pool.apply_diff*)
                         Network_pool.Transaction_pool.Local_sink.push
                           tx_local_sink
-                          ( List.map user_commands ~f:(fun c ->
+                          ( List.map signed_commands ~f:(fun c ->
                                 User_command.Signed_command c )
                           , result_cb )
                   | Error e ->
@@ -1850,14 +1884,15 @@ let create ?wallets (config : Config.t) =
                         ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
                       result_cb (Error e) ;
                       Deferred.unit )
-              | Snapp_command_inputs snapp_txns ->
+              | Parties_command_inputs partiess ->
                   (* TODO: here, submit a Parties.t, which includes a nonce
                      allow the nonce to be omitted, and infer it, as done
                      for user command inputs
                   *)
+                  (* too-big Parties.t's were filtered when writing to the user command pipe *)
                   Network_pool.Transaction_pool.Local_sink.push tx_local_sink
-                    ( List.map snapp_txns ~f:(fun cmd ->
-                          User_command.Parties cmd )
+                    ( List.map partiess ~f:(fun parties ->
+                          User_command.Parties parties )
                     , result_cb ) )
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
@@ -1900,16 +1935,19 @@ let create ?wallets (config : Config.t) =
               log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
-                ~f:(fun x ->
+                ~f:(fun cmds ->
+                  (* the commands had valid sizes when added to the transaction pool
+                     don't need to check sizes again for broadcast
+                  *)
                   let%bind () =
                     send_resource_pool_diff_or_wait ~rl
                       ~diff_score:
                         Network_pool.Transaction_pool.Resource_pool.Diff.score
                       ~max_per_15_seconds:
                         Network_pool.Transaction_pool.Resource_pool.Diff
-                        .max_per_15_seconds x
+                        .max_per_15_seconds cmds
                   in
-                  Mina_networking.broadcast_transaction_pool_diff net x ) ) ;
+                  Mina_networking.broadcast_transaction_pool_diff net cmds ) ) ;
           O1trace.background_thread "broadcast_blocks" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
@@ -1980,8 +2018,7 @@ let create ?wallets (config : Config.t) =
                       in
                       let metadata =
                         [ ("state_hash", State_hash.to_yojson hash)
-                        ; ( "external_transition"
-                          , Mina_block.Validated.to_yojson transition )
+                        ; ("block", Mina_block.Validated.to_yojson transition)
                         ; ("timing", timing_error_json)
                         ]
                       in

@@ -938,6 +938,25 @@ module Make (Inputs : Inputs_intf) = struct
     in
     { party; party_forest; new_frame; new_call_stack }
 
+  let update_sequence_state (sequence_state : _ Pickles_types.Vector.t)
+      sequence_events ~txn_global_slot ~last_sequence_slot =
+    (* Push events to s1. *)
+    let [ s1'; s2'; s3'; s4'; s5' ] = sequence_state in
+    let is_empty = Sequence_events.is_empty sequence_events in
+    let s1_updated = Sequence_events.push_events s1' sequence_events in
+    let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
+    (* Shift along if not empty and last update wasn't this slot *)
+    let is_this_slot = Global_slot.equal txn_global_slot last_sequence_slot in
+    let is_empty_or_this_slot = Bool.(is_empty ||| is_this_slot) in
+    let s5 = Field.if_ is_empty_or_this_slot ~then_:s5' ~else_:s4' in
+    let s4 = Field.if_ is_empty_or_this_slot ~then_:s4' ~else_:s3' in
+    let s3 = Field.if_ is_empty_or_this_slot ~then_:s3' ~else_:s2' in
+    let s2 = Field.if_ is_empty_or_this_slot ~then_:s2' ~else_:s1' in
+    let last_sequence_slot =
+      Global_slot.if_ is_empty ~then_:last_sequence_slot ~else_:txn_global_slot
+    in
+    (([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t), last_sequence_slot)
+
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start : [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
       (h :
@@ -1298,25 +1317,14 @@ module Make (Inputs : Inputs_intf) = struct
     (* Update sequence state. *)
     let a, local_state =
       let sequence_events = Party.Update.sequence_events party in
-      let [ s1'; s2'; s3'; s4'; s5' ] = Account.sequence_state a in
       let last_sequence_slot = Account.last_sequence_slot a in
-      (* Push events to s1. *)
-      let is_empty = Sequence_events.is_empty sequence_events in
-      let s1_updated = Sequence_events.push_events s1' sequence_events in
-      let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
-      (* Shift along if not empty and last update wasn't this slot *)
-      let is_this_slot = Global_slot.equal txn_global_slot last_sequence_slot in
-      let is_empty_or_this_slot = Bool.(is_empty ||| is_this_slot) in
-      let s5 = Field.if_ is_empty_or_this_slot ~then_:s5' ~else_:s4' in
-      let s4 = Field.if_ is_empty_or_this_slot ~then_:s4' ~else_:s3' in
-      let s3 = Field.if_ is_empty_or_this_slot ~then_:s3' ~else_:s2' in
-      let s2 = Field.if_ is_empty_or_this_slot ~then_:s2' ~else_:s1' in
-      let last_sequence_slot =
-        Global_slot.if_ is_empty ~then_:last_sequence_slot
-          ~else_:txn_global_slot
+      let sequence_state, last_sequence_slot =
+        update_sequence_state (Account.sequence_state a) sequence_events
+          ~txn_global_slot ~last_sequence_slot
       in
-      let sequence_state =
-        ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
+      let is_empty =
+        (* also computed in update_sequence_state, but messy to return it *)
+        Sequence_events.is_empty sequence_events
       in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies

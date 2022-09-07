@@ -10,6 +10,7 @@
    sexplib0
    base64
    ;; local libraries
+   mina_wire_types
    mina_base.import
    random_oracle
    data_hash_lib

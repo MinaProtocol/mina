@@ -47,6 +47,10 @@ module Aux_hash : sig
 
   val to_bytes : t -> string
 
+  val to_base58_check : t -> string
+
+  val of_base58_check_exn : string -> t
+
   val dummy : t
 end
 
