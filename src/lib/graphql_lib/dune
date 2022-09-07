@@ -38,6 +38,9 @@
   (re_export filtered_external_transition_unix)
    filtered_external_transition
   (re_export mina_transaction_unix)
+  (re_export snark_params_unix)
+  (re_export data_hash_lib_unix)
+  (re_export pickles_unix)
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_compare ppx_deriving_yojson)))

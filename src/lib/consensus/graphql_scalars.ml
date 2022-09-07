@@ -33,3 +33,21 @@ let%test_module "Slot" = (module Make_test (Slot_scalar) (Slot_gen))
 
 module Slot = Slot_scalar
 module Epoch = Epoch_scalar
+
+module VrfScalar =
+  Make_scalar_using_to_string
+    (Consensus_vrf.Scalar)
+    (struct
+      let name = "VrfScalar"
+
+      let doc = "consensus vrf scalar"
+    end)
+
+module VrfOutputTruncated =
+  Make_scalar_using_base58_check
+    (Consensus_vrf.Output.Truncated)
+    (struct
+      let name = "VrfOutputTruncated"
+
+      let doc = "truncated vrf output"
+    end)

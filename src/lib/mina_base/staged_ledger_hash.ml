@@ -24,7 +24,9 @@ module Aux_hash = struct
           Base58_check.Version_bytes.staged_ledger_hash_aux_hash
       end)
 
-      let to_yojson s = `String (Base58_check.encode s)
+      let to_base58_check s = Base58_check.encode s
+
+      let to_yojson s = `String (to_base58_check s)
 
       let of_yojson = function
         | `String s -> (
@@ -40,7 +42,7 @@ module Aux_hash = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+  [%%define_locally Stable.Latest.(to_yojson, of_yojson, to_base58_check)]
 
   let of_bytes = Fn.id
 
