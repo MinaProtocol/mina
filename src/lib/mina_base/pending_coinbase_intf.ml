@@ -72,6 +72,8 @@ module type S = sig
 
     val to_base58_check : t -> string
 
+    val of_base58_check_exn : string -> t
+
     val gen : t Quickcheck.Generator.t
   end
 

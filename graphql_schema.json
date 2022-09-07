@@ -5566,16 +5566,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "EpochSeed",
-          "description": "Base58Check-encoded epoch seed",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "VrfMessage",
           "description": "The inputs to a vrf evaluation",
@@ -7274,16 +7264,6 @@
           ],
           "inputFields": null,
           "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "StateHash",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -9442,6 +9422,36 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Epoch",
+          "description": "epoch",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Globalslot",
+          "description": "globalslot",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Slot",
+          "description": "slot",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "NextEpochData",
           "description": null,
@@ -9471,7 +9481,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "EpochSeed",
                   "ofType": null
                 }
               },
@@ -9487,7 +9497,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "StateHash",
                   "ofType": null
                 }
               },
@@ -9519,7 +9529,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9529,6 +9539,36 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "StateHash",
+          "description": "Base58Check-encoded state hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "EpochSeed",
+          "description": "Base58Check-encoded epoch seed",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "LedgerHash",
+          "description": "Base58Check-encoded ledger hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -9546,7 +9586,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "LedgerHash",
                   "ofType": null
                 }
               },
@@ -9562,7 +9602,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -9605,7 +9645,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "EpochSeed",
                   "ofType": null
                 }
               },
@@ -9621,7 +9661,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "StateHash",
                   "ofType": null
                 }
               },
@@ -9653,7 +9693,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9663,6 +9703,26 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Amount",
+          "description": "amount",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Length",
+          "description": "length",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -9680,7 +9740,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9696,7 +9756,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9712,7 +9772,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9728,7 +9788,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9760,7 +9820,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -9824,7 +9884,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Slot",
                   "ofType": null
                 }
               },
@@ -9840,7 +9900,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -9856,7 +9916,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Epoch",
                   "ofType": null
                 }
               },
