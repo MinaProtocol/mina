@@ -5,11 +5,27 @@ open Tick
 open Signature_lib
 open Mina_base
 
+(* Timed accounts start with some amount of funds frozen and release them
+   gradually over time according to the vesting schedule. See
+   mina_base/account_timing.ml module for details.
+
+   This module tests that checked and unchecked computations for timed
+   accounts always yield the same results.*)
 let%test_module "account timing check" =
   ( module struct
     open Transaction_snark.Transaction_validator.For_tests
 
-    (* test that unchecked and checked calculations for timing agree *)
+    let account_with_default_vesting_schedule ?(token = Token_id.default)
+        ?(initial_minimum_balance = Balance.mina 10_000)
+        ?(cliff_amount = Amount.zero)
+        ?(cliff_time = Mina_numbers.Global_slot.of_int 1000)
+        ?(vesting_period = Mina_numbers.Global_slot.of_int 10)
+        ?(vesting_increment = Amount.mina 100) balance =
+      let pk = Public_key.Compressed.empty in
+      let account_id = Account_id.create pk token in
+      Or_error.ok_exn
+      @@ Account.create_timed account_id balance ~initial_minimum_balance
+           ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
 
     let checked_min_balance_and_timing account txn_amount txn_global_slot =
       let account = Account.var_of_t account in
@@ -31,19 +47,12 @@ let%test_module "account timing check" =
       in
       timing
 
-    let make_checked_min_balance_computation account txn_amount txn_global_slot
-        =
-      let%map min_balance, _timing =
-        checked_min_balance_and_timing account txn_amount txn_global_slot
-      in
-      min_balance
-
     let run_checked_timing_and_compare account txn_amount txn_global_slot
         unchecked_timing unchecked_min_balance =
       let equal_balances_computation =
         let open Snarky_backendless.Checked in
-        let%bind checked_timing =
-          make_checked_timing_computation account txn_amount txn_global_slot
+        let%bind checked_min_balance, checked_timing =
+          checked_min_balance_and_timing account txn_amount txn_global_slot
         in
         (* check agreement of timings produced by checked, unchecked validations *)
         let%bind () =
@@ -52,10 +61,6 @@ let%test_module "account timing check" =
               let%map checked_timing = read Account.Timing.typ checked_timing in
               assert (Account.Timing.equal checked_timing unchecked_timing))
         in
-        let%bind checked_min_balance =
-          make_checked_min_balance_computation account txn_amount
-            txn_global_slot
-        in
         let%map equal_balances_checked =
           Balance.Checked.equal checked_min_balance
             (Balance.var_of_t unchecked_min_balance)
@@ -63,10 +68,7 @@ let%test_module "account timing check" =
         Snarky_backendless.As_prover.read Tick.Boolean.typ
           equal_balances_checked
       in
-      let equal_balances =
-        Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation
-      in
-      equal_balances
+      Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation
 
     (* confirm the checked computation fails *)
     let checked_timing_should_fail account txn_amount txn_global_slot =
@@ -78,21 +80,19 @@ let%test_module "account timing check" =
       in
       Or_error.is_error @@ Tick.run_and_check checked_timing_computation
 
+    (* Funds above the current minimum balance may be spent.
+
+       Check a transaction of 100 mina from a timed account whose
+       cliff time has not yet passed, but which still has 20_000 mina
+       available. Since the deduced amount is less than available
+       funds, this transaction is expected to succeed. *)
     let%test "before_cliff_time" =
-      let pk = Public_key.Compressed.empty in
-      let account_id = Account_id.create pk Token_id.default in
-      let balance = Balance.mina 100_000 in
-      let initial_minimum_balance = Balance.mina 80_000 in
-      let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-      let cliff_amount = Amount.centimina 50 in
-      let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-      let vesting_increment = Amount.mina 1 in
       let txn_amount = Currency.Amount.mina 100 in
       let txn_global_slot = Mina_numbers.Global_slot.of_int 45 in
       let account =
-        Or_error.ok_exn
-        @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+        account_with_default_vesting_schedule
+          ~initial_minimum_balance:(Balance.mina 80_000)
+          ~cliff_amount:(Amount.centimina 50) (Balance.mina 100_000)
       in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
@@ -105,19 +105,20 @@ let%test_module "account timing check" =
       | _ ->
           false
 
+    (* Account remains timed until the vesting schedule is complete.
+
+       Set up an account with a vesting period of 10 slots and a cliff
+       time of 1,000 slots. The initial minimum balance is 10,000 mina
+       and at each vesting period 100 mina is released, which means
+       the account takes 100 vesting periods, i.e. 1,000 slots to
+       unlock all its funds. Verify that at slot 1,900, which is 90
+       vesting periods after the cliff time, the account is still
+       timed. The account's funds are far more than sufficient to make
+       a transaction of 100 mina, even disregarding the vesting
+       schedule. *)
     let%test "positive min balance" =
-      let pk = Public_key.Compressed.empty in
-      let account_id = Account_id.create pk Token_id.default in
-      let balance = Balance.mina 100_000 in
-      let initial_minimum_balance = Balance.mina 10_000 in
-      let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-      let cliff_amount = Amount.zero in
-      let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-      let vesting_increment = Amount.mina 100 in
       let account =
-        Or_error.ok_exn
-        @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+        account_with_default_vesting_schedule (Balance.mina 100_000)
       in
       let txn_amount = Currency.Amount.mina 100 in
       let txn_global_slot = Mina_numbers.Global_slot.of_int 1_900 in
@@ -126,10 +127,6 @@ let%test_module "account timing check" =
           ~txn_amount:(Currency.Amount.mina 100)
           ~txn_global_slot:(Mina_numbers.Global_slot.of_int 1_900)
       in
-      (* we're 900 slots past the cliff, which is 90 vesting periods
-          subtract 90 * 100 = 9,000 from init min balance of 10,000 to get 1000
-          so we should still be timed
-      *)
       match timing_with_min_balance with
       | Ok ((Timed _ as unchecked_timing), `Min_balance unchecked_min_balance)
         ->
@@ -138,29 +135,26 @@ let%test_module "account timing check" =
       | _ ->
           false
 
+    (* Account becomes untimed after vesting schedule is complete.
+
+       Create a timed account with cliff time of 1,000 slots and a
+       vesting period of 10 slots. Initial minimum balance is 10,000
+       mina and the account releases 0.9 mina at the cliff time and
+       additional 100 mina at each vesting period. This means all
+       funds should be released at slot 2,000. Verify that after slot
+       2,000 the account is untimed. The funds are far more than
+       sufficient to perform the transaction of 100 mina, even
+       disregarding the vesting schedule. *)
     let%test "curr min balance of zero" =
-      let pk = Public_key.Compressed.empty in
-      let account_id = Account_id.create pk Token_id.default in
-      let balance = Balance.mina 100_000 in
-      let initial_minimum_balance = Balance.mina 10_000 in
-      let cliff_time = Mina_numbers.Global_slot.of_int 1_000 in
-      let cliff_amount = Amount.centimina 90 in
-      let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-      let vesting_increment = Amount.mina 100 in
       let account =
-        Or_error.ok_exn
-        @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+        account_with_default_vesting_schedule
+          ~cliff_amount:(Amount.centimina 90) (Balance.mina 100_000)
       in
       let txn_amount = Currency.Amount.mina 100 in
       let txn_global_slot = Mina_numbers.Global_slot.of_int 2_000 in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
       in
-      (* we're 2_000 - 1_000 = 1_000 slots past the cliff, which is 100 vesting periods
-          subtract 100 * 100_000_000_000 = 10_000_000_000_000 from init min balance
-          of 10_000_000_000 to get zero, so we should be untimed now
-      *)
       match timing_with_min_balance with
       | Ok ((Untimed as unchecked_timing), `Min_balance unchecked_min_balance)
         ->
@@ -169,19 +163,16 @@ let%test_module "account timing check" =
       | _ ->
           false
 
+    (* Timed account's balance cannot fall below current minimum.
+
+       Vesting schedule begins at slot 1,000 and releases 100 mina
+       every 10 slots. With minimum initial balance of 10,000 mina and
+       the total balance of 10,000 mina also this means at slot 1,010
+       the account has only 100 mina available. Therefore a
+       transaction of 101 mina is expected to fail. *)
     let%test "below calculated min balance" =
-      let pk = Public_key.Compressed.empty in
-      let account_id = Account_id.create pk Token_id.default in
-      let balance = Balance.mina 10_000 in
-      let initial_minimum_balance = Balance.mina 10_000 in
-      let cliff_time = Mina_numbers.Global_slot.of_int 1_000 in
-      let cliff_amount = Amount.zero in
-      let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-      let vesting_increment = Amount.mina 100 in
       let account =
-        Or_error.ok_exn
-        @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+        account_with_default_vesting_schedule (Balance.mina 10_000)
       in
       let txn_amount = Currency.Amount.mina 101 in
       let txn_global_slot = Mina_numbers.Global_slot.of_int 1_010 in
@@ -196,22 +187,17 @@ let%test_module "account timing check" =
       | _ ->
           false
 
+    (* Balance cannot fall below 0.
+
+       From a timed account with balance of 100,000 mina make a transaction
+       of 100,001 mina. This cannot succeed, even if the vesting schedule was
+       over. *)
     let%test "insufficient balance" =
-      let pk = Public_key.Compressed.empty in
-      let account_id = Account_id.create pk Token_id.default in
-      let balance = Balance.mina 100_000 in
-      let initial_minimum_balance = Balance.mina 10_000 in
-      let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-      let cliff_amount = Amount.zero in
-      let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-      let vesting_increment = Amount.mina 100 in
       let account =
-        Or_error.ok_exn
-        @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+        account_with_default_vesting_schedule (Balance.mina 100_000)
       in
       let txn_amount = Currency.Amount.mina 100_001 in
-      let txn_global_slot = Mina_numbers.Global_slot.of_int 2000_000_000_000 in
+      let txn_global_slot = Mina_numbers.Global_slot.of_int 2_000_000_000_000 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
       | Error err ->
@@ -223,21 +209,17 @@ let%test_module "account timing check" =
       | _ ->
           false
 
+    (* When vesting schedule is complete, all funds may be spent freely.
+
+       Set up an account with initial minimum balance of 10,000 mina,
+       which releases 100 mina every 10 slots. Since cliff time is 1,000
+       slots, this means that all funds become available at slot 2,000.
+       Verify that at slot 3,000 all 100,000 mina of the account's balance
+       may be spent successfully. *)
     let%test "past full vesting" =
-      let pk = Public_key.Compressed.empty in
-      let account_id = Account_id.create pk Token_id.default in
-      let balance = Balance.mina 100_000 in
-      let initial_minimum_balance = Balance.mina 10_000 in
-      let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-      let cliff_amount = Amount.zero in
-      let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-      let vesting_increment = Amount.mina 100 in
       let account =
-        Or_error.ok_exn
-        @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+        account_with_default_vesting_schedule (Balance.mina 100_000)
       in
-      (* fully vested, curr min balance = 0, so we can spend the whole balance *)
       let txn_amount = Currency.Amount.mina 100_000 in
       let txn_global_slot = Mina_numbers.Global_slot.of_int 3000 in
       let timing_with_min_balance =
@@ -252,25 +234,21 @@ let%test_module "account timing check" =
           false
 
     let make_cliff_amount_test slot =
-      let pk = Public_key.Compressed.empty in
-      let account_id = Account_id.create pk Token_id.default in
-      let balance = Balance.mina 100_000 in
-      let initial_minimum_balance = Balance.mina 10_000 in
-      let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-      let cliff_amount =
-        Balance.to_uint64 initial_minimum_balance |> Amount.of_uint64
-      in
-      let vesting_period = Mina_numbers.Global_slot.of_int 1 in
-      let vesting_increment = Amount.zero in
       let account =
-        Or_error.ok_exn
-        @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+        account_with_default_vesting_schedule
+          ~cliff_amount:(Amount.mina 10_000)
+            (* The same as initial minimum balance. *)
+          ~vesting_period:(Mina_numbers.Global_slot.of_int 1)
+          ~vesting_increment:Amount.zero (Balance.mina 100_000)
       in
       let txn_amount = Currency.Amount.mina 100_000 in
       let txn_global_slot = Mina_numbers.Global_slot.of_int slot in
       (txn_amount, txn_global_slot, account)
 
+    (* Before the cliff, only the initial_minimum_balance matters.
+
+       Assert that before the cliff, the neither cliff_amount nor
+       any vesting increments are released from the timed account. *)
     let%test "before cliff, cliff_amount doesn't affect min balance" =
       let txn_amount, txn_global_slot, account = make_cliff_amount_test 999 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
@@ -284,6 +262,10 @@ let%test_module "account timing check" =
       | Ok _ ->
           false
 
+    (* Exactly at cliff_time, the cliff amount is released.
+
+       At the cliff_time slot, the cliff_amount and only the cliff_amount
+       is released and can be spent.*)
     let%test "at exactly cliff time, cliff amount allows spending" =
       let txn_amount, txn_global_slot, account = make_cliff_amount_test 1000 in
       let timing_with_min_balance =
@@ -443,8 +425,14 @@ let%test_module "account timing check" =
                     (Error.to_string_hum err) () )
           : unit list )
 
-    (* for tests where we expect payments to succeed, use real signature, fake otherwise *)
+    (* In tests below: where we expect payments to succeed, we use real
+       signatures (`Real). Otherwise we use fake signatures. *)
 
+    (* Before cliff time transactions succeed when there's enough funds.
+
+       Generate a bunch of transactions of 10 mina (see amount below) from accounts
+       with 10,000 mina balance and 50 mina minimum balance. Use real key pairs
+       to sign transactions (see ~sign_type:`Real below) so that they succeed. *)
     let%test_unit "user commands, before cliff time, sufficient balance" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -455,7 +443,7 @@ let%test_module "account timing check" =
               let (timing : Account_timing.t) =
                 Timed
                   { initial_minimum_balance = Currency.Balance.mina 50
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
                   ; cliff_amount = Currency.Amount.nanomina 100
                   ; vesting_period = Mina_numbers.Global_slot.of_int 1
                   ; vesting_increment = Currency.Amount.nanomina 10
@@ -494,6 +482,15 @@ let%test_module "account timing check" =
                 Mina_numbers.Global_slot.(succ zero)
                 user_commands ) )
 
+    (* Before cliff, transactions fail if they would have to violate minimum
+       balance.
+
+       Generate a bunch of transactions of 100 mina from accounts with
+       balance of 10,000 mina and initial minimum balance of 9,995
+       mina before their cliff time (5 mina is available for spending).
+       We expect these transactions to fail, so we use fake signatures,
+       but still we check the error to make sure transactions failed
+       because of the balance issue. *)
     let%test_unit "user command, before cliff time, min balance violation" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -557,6 +554,13 @@ let%test_module "account timing check" =
                            describe Source_minimum_balance_violation) )
                   then failwithf "Unexpected transaction error: %s" err_str () ) )
 
+    (* Just before cliff, transactions still fail if they'd violate minimum
+       balance.
+
+       Just as above create a bunch of transactions of 100 mina from accounts
+       having only 5 mina available. Because it's slot 9_999, while the cliff
+       time is 10,000, this results in
+       Source_minimum_balance_violation error. Using fake signatures. *)
     let%test_unit "user command, just before cliff time, insufficient balance" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -567,7 +571,7 @@ let%test_module "account timing check" =
               let (timing : Account_timing.t) =
                 Timed
                   { initial_minimum_balance = Currency.Balance.mina 9_995
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
                   ; cliff_amount = Currency.Amount.mina 9_995
                   ; vesting_period = Mina_numbers.Global_slot.of_int 1
                   ; vesting_increment = Currency.Amount.nanomina 10
@@ -610,6 +614,12 @@ let%test_module "account timing check" =
                            describe Source_minimum_balance_violation) )
                   then failwithf "Unexpected transaction error: %s" err_str () ) )
 
+    (* At cliff time, the cliff amount is released and may be immediately
+       spent.
+
+       Transactions of 100 mina from accounts having 10,000 mina, 9,995
+       of which is vested immediately at cliff time. Therefore these
+       transactions made at cliff slot are expected to succeed. *)
     let%test_unit "user command, at cliff time, sufficient balance" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -668,7 +678,7 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.nanomina init_min_bal_int
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
                   ; vesting_period = Mina_numbers.Global_slot.of_int 1
                   ; vesting_increment = Currency.Amount.nanomina 10
