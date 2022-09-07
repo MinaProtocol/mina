@@ -235,8 +235,8 @@ module Update = struct
     end
   end]
 
-  let gen ?(zkapp_account = false) ?vk ?permissions_auth () :
-      t Quickcheck.Generator.t =
+  let gen ?(token_account = false) ?(zkapp_account = false) ?vk
+      ?permissions_auth () : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind app_state =
       let%bind fields =
@@ -246,7 +246,10 @@ module Update = struct
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
     in
-    let%bind delegate = Set_or_keep.gen Public_key.Compressed.gen in
+    let%bind delegate =
+      if not token_account then Set_or_keep.gen Public_key.Compressed.gen
+      else return Set_or_keep.Keep
+    in
     let%bind verification_key =
       if zkapp_account then
         Set_or_keep.gen
