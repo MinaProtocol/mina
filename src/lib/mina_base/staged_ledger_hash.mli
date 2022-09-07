@@ -68,6 +68,8 @@ module Pending_coinbase_aux : sig
 
   val to_base58_check : t -> string
 
+  val of_base58_check_exn : string -> t
+
   val dummy : t
 end
 
