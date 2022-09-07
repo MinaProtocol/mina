@@ -162,8 +162,8 @@ end
 
 let transaction_combinations = Transaction_key.Table.create ()
 
-let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties:_
-    : Mina_ledger.Ledger.t * Parties.t list =
+let create_ledger_and_zkapps num_transactions ?(min_num_parties = 1)
+    ~max_num_parties : Mina_ledger.Ledger.t * Parties.t list =
   let _length =
     match num_transactions with
     | `Count length ->
@@ -174,9 +174,9 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties:_
   let `VK verification_key, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
   in
-  let num_keypairs = num_parties + 10 in
+  let num_keypairs = max_num_parties + 10 in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
-  let num_keypairs_in_ledger = num_parties + 1 in
+  let num_keypairs_in_ledger = max_num_parties + 1 in
   let keypairs_in_ledger = List.take keypairs num_keypairs_in_ledger in
   let account_ids =
     List.map keypairs_in_ledger ~f:(fun { public_key; _ } ->
@@ -281,7 +281,7 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties:_
   in
   let amount = Currency.Amount.of_int 1_000_000_000 in
   let sender_parties = 1 in
-  let test_spec nonce ~num_proof_parties :
+  let test_spec nonce ~num_parties ~num_proof_parties :
       bool * Transaction_snark.For_tests.Spec.t =
     let receiver_count =
       max 0 (num_parties - num_proof_parties - sender_parties)
@@ -322,11 +322,16 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties:_
         let perm2 = permute proof_parties nps (np :: current_perm) acc in
         perm1 @ perm2
   in
-  let rec generate_zkapp num_proof_parties acc nonce =
-    if num_proof_parties > num_parties then List.rev acc
+  let rec generate_zkapp ~num_proof_parties ~num_parties acc nonce =
+    if num_parties > max_num_parties then List.rev acc
+    else if num_proof_parties > num_parties then
+      generate_zkapp ~num_proof_parties:0 ~num_parties:(num_parties + 1) acc
+        nonce
     else
       let start = Time.now () in
-      let empty_sender, spec = test_spec nonce ~num_proof_parties in
+      let empty_sender, spec =
+        test_spec nonce ~num_proof_parties ~num_parties
+      in
       let parties =
         Async.Thread_safe.block_on_async_exn (fun () ->
             Transaction_snark.For_tests.update_states ~zkapp_prover:prover
@@ -354,13 +359,12 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties:_
                 (pc, sc, p :: na, nonce) )
       in
       printf
-        !"Generated zkapp with %d parties of which %d signatures, %d proofs \
-          and %d none in %f secs\n\
+        !"\n\n\
+          Generated zkapp transactions with %d parties and %d proof parties in \
+          %f secs\n\
           %!"
         (List.length other_parties + 1)
-        (List.length signature_parties + 1)
         (List.length proof_parties)
-        (List.length no_auths)
         Time.(Span.to_sec (diff (now ()) start)) ;
       let permutations =
         permute proof_parties (signature_parties @ no_auths) [] []
@@ -382,11 +386,13 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties:_
                in
                if Transaction_key.Table.mem transaction_combinations combination
                then (
-                 printf "Skipping %s\n" perm_string ;
+                 printf "Skipping %s\n%!" perm_string ;
                  None )
                else (
                  printf
-                   !"Generated parties permutation %d: %s\n%!"
+                   !"Generated parties permutation %d: %s\n\
+                     Updating authorizations...\n\
+                     %!"
                    i perm_string ;
                  (*Update the authorizations*)
                  let p =
@@ -394,12 +400,16 @@ let create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties:_
                        Parties_builder.replace_authorizations ~prover ~keymap p )
                  in
                  Transaction_key.Table.add_exn transaction_combinations
-                   ~key:combination ~data:(p, Time_values.empty) ;
+                   ~key:combination
+                   ~data:(p, Time_values.empty, perm_string) ;
                  Some p ) )
       in
-      generate_zkapp (num_proof_parties + 1) (permutations @ acc) nonce
+      generate_zkapp ~num_proof_parties:(num_proof_parties + 1) ~num_parties
+        (permutations @ acc) nonce
   in
-  (ledger, generate_zkapp 0 [] Mina_base.Account.Nonce.zero)
+  ( ledger
+  , generate_zkapp ~num_proof_parties:0 ~num_parties:min_num_parties []
+      Mina_base.Account.Nonce.zero )
 
 let _create_ledger_and_zkapps_from_generator num_transactions :
     Mina_ledger.Ledger.t * Parties.t list =
@@ -649,27 +659,40 @@ let profile_zkapps ~verifier ledger partiess =
         let combination = Transaction_key.of_parties ~ledger parties in
         Transaction_key.Table.change transaction_combinations combination
           ~f:(fun data_opt ->
-            let data = Option.value_exn data_opt in
-            Some (fst data, time_values) ) ;
+            let txn, _, perm_string = Option.value_exn data_opt in
+            Some (txn, time_values, perm_string) ) ;
         printf
           !"Time for zkApp %d: %{Time.Span.to_string_hum}\n"
           (ndx + 1) zkapp_span )
   in
   printf
     "| No.| Proof parties| Non-proof pairs| Non-proof singles| Mempool \
-     verification time (sec)| Transaction proving time (sec)|\n\
-    \ |--|--|--|--|--|--|\n" ;
+     verification time (sec)| Transaction proving time (sec)|Permutation|\n\
+    \ |--|--|--|--|--|--|--|\n" ;
   List.iteri
     ( Transaction_key.Table.to_alist transaction_combinations
     |> List.sort ~compare:(fun (k1, _) (k2, _) ->
-           if Int.compare k1.proof_segments k2.proof_segments = 0 then
+           let total_updates (k : Transaction_key.t) =
+             k.proof_segments + (2 * k.signed_pair) + k.signed_single
+           in
+           let total_compare =
+             Int.compare (total_updates k1) (total_updates k2)
+           in
+           let proof_compare =
+             Int.compare k1.proof_segments k2.proof_segments
+           in
+           let signed_pair_compare =
              Int.compare k1.signed_pair k2.signed_pair
-           else Int.compare k1.proof_segments k2.proof_segments ) )
-    ~f:(fun i (k, v) ->
-      printf "| %d| %d |%d |%d |%f| %f|\n" (i + 1) k.proof_segments
+           in
+           if total_compare <> 0 then total_compare
+           else if proof_compare <> 0 then proof_compare
+           else signed_pair_compare ) )
+    ~f:(fun i (k, (_, t, perm)) ->
+      printf "| %d| %d| %d| %d| %f| %f| %s|\n" (i + 1) k.proof_segments
         k.signed_pair k.signed_single
-        (Time.Span.to_sec (snd v).verification_time)
-        (Time.Span.to_sec (snd v).proving_time) ) ;
+        (Time.Span.to_sec t.verification_time)
+        (Time.Span.to_sec t.proving_time)
+        perm ) ;
   let tm1 = Core.Unix.gettimeofday () in
   let total_time = Time.Span.of_sec (tm1 -. tm0) in
   format_time_span total_time
@@ -766,13 +789,14 @@ let generate_base_snarks_witness sparse_ledger0
       : Sparse_ledger.t ) ;
   Async.Deferred.return "Base constraint system satisfied"
 
-let run ~user_command_profiler ~zkapp_profiler num_transactions ~num_parties
-    ~num_proof_parties repeats preeval use_zkapps : unit =
+let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_parties
+    ?min_num_parties repeats preeval use_zkapps : unit =
   let logger = Logger.null () in
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions =
-      create_ledger_and_zkapps num_transactions ~num_parties ~num_proof_parties
+      create_ledger_and_zkapps num_transactions ~max_num_parties
+        ?min_num_parties
     in
     Parallel.init_master () ;
     let verifier =
@@ -815,7 +839,7 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions ~num_parties
     in
     go repeats
 
-let main ~num_parties ~num_proof_parties num_transactions repeats preeval
+let main ~max_num_parties ?min_num_parties num_transactions repeats preeval
     use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
@@ -826,27 +850,27 @@ let main ~num_parties ~num_proof_parties num_transactions repeats preeval
       end) in
       run
         ~user_command_profiler:(profile_user_command (module T))
-        ~zkapp_profiler:profile_zkapps num_transactions ~num_parties
-        ~num_proof_parties repeats preeval use_zkapps )
+        ~zkapp_profiler:profile_zkapps num_transactions ~max_num_parties
+        ?min_num_parties repeats preeval use_zkapps )
 
-let dry ~num_parties ~num_proof_parties num_transactions repeats preeval
+let dry ~max_num_parties ?min_num_parties num_transactions repeats preeval
     use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't check base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
       run ~user_command_profiler:check_base_snarks ~zkapp_profiler
-        num_transactions ~num_parties ~num_proof_parties repeats preeval
+        num_transactions ~max_num_parties ?min_num_parties repeats preeval
         use_zkapps )
 
-let witness ~num_parties ~num_proof_parties num_transactions repeats preeval
+let witness ~max_num_parties ?min_num_parties num_transactions repeats preeval
     use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't generate witnesses for base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
       run ~user_command_profiler:generate_base_snarks_witness ~zkapp_profiler
-        num_transactions ~num_parties ~num_proof_parties repeats preeval
+        num_transactions ~max_num_parties ?min_num_parties repeats preeval
         use_zkapps )
 
 let command =
@@ -879,11 +903,17 @@ let command =
      and use_zkapps =
        flag "--zkapps" ~aliases:[ "-zkapps" ]
          ~doc:"Use zkApp transactions instead of payments" no_arg
-     and num_updates =
-       flag "--num-updates" ~aliases:[ "-num-updates" ]
+     and max_num_updates =
+       flag "--max-num-updates" ~aliases:[ "-max-num-updates" ]
          ~doc:
-           "Number of account updates per transaction (excluding the fee \
-            payer). Default:6"
+           "Maximum number of account updates per transaction (excluding the \
+            fee payer). Default:6"
+         (optional int)
+     and min_num_parties =
+       flag "--min-num-updates" ~aliases:[ "-min-num-updates" ]
+         ~doc:
+           "Minimum number of account updates per transaction (excluding the \
+            fee payer). It should be at least 1. Default:1 "
          (optional int)
        (*and num_proof_updates =
          flag "--num-proof-updates" ~aliases:[ "-num-proof-updates" ]
@@ -896,11 +926,11 @@ let command =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
        |> Option.value ~default:`Two_from_same
      in
-     let num_parties = Option.value num_updates ~default:6 in
-     let num_proof_parties =
-       num_parties
-       (*Option.value num_proof_updates ~default:num_parties*)
-     in
+     let max_num_parties = Option.value max_num_updates ~default:6 in
+     Option.value_map ~default:() min_num_parties ~f:(fun m ->
+         if m > max_num_parties then
+           failwith
+             "min-num-updates should be less than or equal to max-num-updates" ) ;
      if use_zkapps then (
        let incompatible_flags = ref [] in
        let add_incompatible_flag flag =
@@ -919,11 +949,11 @@ let command =
          exit 1 ) ) ;
      let repeats = Option.value repeats ~default:1 in
      if witness_only then
-       witness ~num_parties ~num_proof_parties num_transactions repeats preeval
-         use_zkapps
+       witness ~max_num_parties ?min_num_parties num_transactions repeats
+         preeval use_zkapps
      else if check_only then
-       dry ~num_parties ~num_proof_parties num_transactions repeats preeval
+       dry ~max_num_parties ?min_num_parties num_transactions repeats preeval
          use_zkapps
      else
-       main ~num_parties ~num_proof_parties num_transactions repeats preeval
+       main ~max_num_parties ?min_num_parties num_transactions repeats preeval
          use_zkapps )
