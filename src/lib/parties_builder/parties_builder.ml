@@ -50,14 +50,12 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
   { fee_payer
   ; memo
   ; other_parties =
-      (let foo =
-         other_parties
-         |> Parties.Call_forest.map
-              ~f:(fun (p : Party.Body.Simple.t) : Party.Simple.t ->
-                { body = p; authorization = Signature Signature.dummy } )
-       in
-       foo |> Parties.Call_forest.add_callers_simple
-       |> Parties.Call_forest.accumulate_hashes_predicated )
+      other_parties
+      |> Parties.Call_forest.map
+           ~f:(fun (p : Party.Body.Simple.t) : Party.Simple.t ->
+             { body = p; authorization = Signature Signature.dummy } )
+      |> Parties.Call_forest.add_callers_simple
+      |> Parties.Call_forest.accumulate_hashes_predicated
   }
 
 let get_transaction_commitments (parties : Parties.t) =

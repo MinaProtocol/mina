@@ -1845,8 +1845,9 @@ let%test_module _ =
           let%bind cmd =
             let fee_payer_keypair = test_keys.(n) in
             let%map (parties : Parties.t) =
-              Mina_generators.Parties_generators.gen_parties_from ~keymap
-                ~account_state_tbl ~fee_payer_keypair ~ledger:best_tip_ledger ()
+              Mina_generators.Parties_generators.gen_parties_from
+                ~max_token_parties:1 ~keymap ~account_state_tbl
+                ~fee_payer_keypair ~ledger:best_tip_ledger ()
             in
             let parties =
               { parties with

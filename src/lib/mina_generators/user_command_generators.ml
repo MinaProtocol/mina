@@ -14,8 +14,8 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 [%%inject "ledger_depth", ledger_depth]
 
-let parties_with_ledger ?num_keypairs ?max_other_parties ?account_state_tbl ?vk
-    ?failure () =
+let parties_with_ledger ?num_keypairs ?max_other_parties ?max_token_parties
+    ?account_state_tbl ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -28,8 +28,12 @@ let parties_with_ledger ?num_keypairs ?max_other_parties ?account_state_tbl ?vk
   let max_other_parties =
     Option.value max_other_parties ~default:Parties_generators.max_other_parties
   in
+  let max_token_parties =
+    Option.value max_token_parties ~default:Parties_generators.max_token_parties
+  in
   let num_keypairs =
-    Option.value num_keypairs ~default:((max_other_parties * 2) + 2)
+    Option.value num_keypairs
+      ~default:((max_other_parties * 2) + (max_token_parties * 3) + 2)
   in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let keymap =
@@ -123,8 +127,8 @@ let parties_with_ledger ?num_keypairs ?max_other_parties ?account_state_tbl ?vk
     Option.value account_state_tbl ~default:(Account_id.Table.create ())
   in
   let%bind parties =
-    Parties_generators.gen_parties_from ~max_other_parties ~fee_payer_keypair
-      ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
+    Parties_generators.gen_parties_from ~max_other_parties ~max_token_parties
+      ~fee_payer_keypair ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
   in
   let parties =
     Option.value_exn
@@ -134,7 +138,8 @@ let parties_with_ledger ?num_keypairs ?max_other_parties ?account_state_tbl ?vk
   (* include generated ledger in result *)
   return (User_command.Parties parties, fee_payer_keypair, keymap, ledger)
 
-let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
+let sequence_parties_with_ledger ?max_other_parties ?max_token_parties ?length
+    ?vk ?failure () =
   let open Quickcheck.Let_syntax in
   let%bind length =
     match length with
@@ -146,12 +151,17 @@ let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
   let max_other_parties =
     Option.value max_other_parties ~default:Parties_generators.max_other_parties
   in
-  let num_keypairs = length * max_other_parties * 2 in
+  let max_token_parties =
+    Option.value max_token_parties ~default:Parties_generators.max_token_parties
+  in
+  let num_keypairs =
+    (length * max_other_parties * 2) + (max_token_parties * 3)
+  in
   (* Keep track of account states across multiple parties transaction *)
   let account_state_tbl = Account_id.Table.create () in
   let%bind parties, fee_payer_keypair, keymap, ledger =
-    parties_with_ledger ~num_keypairs ~max_other_parties ~account_state_tbl ?vk
-      ?failure ()
+    parties_with_ledger ~num_keypairs ~max_other_parties ~max_token_parties
+      ~account_state_tbl ?vk ?failure ()
   in
   let rec go parties_and_fee_payer_keypairs n =
     if n <= 1 then
@@ -162,7 +172,8 @@ let sequence_parties_with_ledger ?max_other_parties ?length ?vk ?failure () =
     else
       let%bind parties =
         Parties_generators.gen_parties_from ~max_other_parties
-          ~fee_payer_keypair ~keymap ~ledger ~account_state_tbl ?vk ?failure ()
+          ~max_token_parties ~fee_payer_keypair ~keymap ~ledger
+          ~account_state_tbl ?vk ?failure ()
       in
       let valid_parties =
         Option.value_exn

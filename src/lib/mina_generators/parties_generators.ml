@@ -16,7 +16,8 @@ type failure =
       | `Token_symbol
       | `Balance ]
 
-type role = [ `Fee_payer | `New_account | `Ordinary_participant ]
+type role =
+  [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
 let gen_account_precondition_from_account ?failure ~first_use_of_account account
     =
@@ -691,12 +692,10 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
   assert (not (is_fee_payer && new_account)) ;
+  let token_account = match token_id with None -> false | Some _ -> true in
   let%bind update =
     match update with
     | None ->
-        let token_account =
-          match token_id with None -> false | Some _ -> true
-        in
         Party.Update.gen ?permissions_auth ?vk ~zkapp_account ~token_account ()
     | Some update ->
         return update
@@ -767,7 +766,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
             match Account_id.Table.find account_state_tbl zkapp_account_id with
             | None ->
                 failwith "gen_party_body: fail to find zkapp account"
-            | Some (_, `Fee_payer) | Some (_, `New_account) ->
+            | Some (_, `Fee_payer)
+            | Some (_, `New_account)
+            | Some (_, `New_token_account) ->
                 failwith
                   "gen_party_body: all zkapp accounts were new accounts or \
                    used as fee_payer accounts"
@@ -781,6 +782,8 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
                   | _, `Fee_payer ->
                       false
                   | Control.Tag.Proof, `New_account ->
+                      false
+                  | _, `New_token_account ->
                       false
                   | _, `New_account ->
                       (* `required_balance_change` is only for balancing party. Newly created account
@@ -957,7 +960,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
            ; delegate = delegate account
            ; zkapp = zkapp account
            }
-         , `New_account )
+         , if token_account then `New_token_account else `New_account )
      | Some (updated_account, role) ->
          (* update entry in table *)
          ( { updated_account with
@@ -1079,7 +1082,10 @@ let gen_fee_payer ?failure ?permissions_auth ~account_id ?protocol_state_view
 *)
 let max_other_parties = 2
 
+let max_token_parties = 2
+
 let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
+    ?(max_token_parties = max_token_parties)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(keymap :
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t )
@@ -1150,7 +1156,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
   let zkapp_account_ids =
     Account_id.Table.filteri account_state_tbl ~f:(fun ~key:_ ~data:(a, role) ->
         match role with
-        | `Fee_payer | `New_account ->
+        | `Fee_payer | `New_account | `New_token_account ->
             false
         | `Ordinary_participant ->
             Option.is_some a.zkapp )
@@ -1392,7 +1398,6 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
       ~available_public_keys ~account_state_tbl
       ~required_balance_change:balance_change ?protocol_state_view ?vk ()
   in
-  let other_parties = other_parties0 @ [ mk_node balancing_party [] ] in
   let gen_parties_with_token_accounts ~num_parties =
     let authorization = Control.Signature Signature.dummy in
     let permissions_auth = Control.Tag.Signature in
@@ -1429,11 +1434,13 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     in
     gen_tree [] num_parties
   in
-  let%bind num_new_token_parties = Int.gen_uniform_incl 1 max_other_parties in
+  let%bind num_new_token_parties = Int.gen_uniform_incl 1 max_token_parties in
   let%bind new_token_parties =
     gen_parties_with_token_accounts ~num_parties:num_new_token_parties
   in
-  let other_parties = other_parties @ new_token_parties in
+  let other_parties =
+    other_parties0 @ [ mk_node balancing_party [] ] @ new_token_parties
+  in
   let%map memo = Signed_command_memo.gen in
   let parties_dummy_authorizations : Parties.t =
     let other_parties = mk_forest other_parties in
@@ -1484,7 +1491,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
           () ) ;
   parties_dummy_authorizations
 
-let gen_list_of_parties_from ?failure ?max_other_parties
+let gen_list_of_parties_from ?failure ?max_other_parties ?max_token_parties
     ~(fee_payer_keypairs : Signature_lib.Keypair.t list) ~keymap
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?length () =
   (* Since when generating multiple parties the fee payer's nonce should only
@@ -1528,8 +1535,9 @@ let gen_list_of_parties_from ?failure ?max_other_parties
         Quickcheck.Generator.of_list fee_payer_keypairs
       in
       let%bind new_parties =
-        gen_parties_from ?failure ?max_other_parties ~fee_payer_keypair ~keymap
-          ~account_state_tbl ~ledger ?protocol_state_view ?vk ()
+        gen_parties_from ?failure ?max_other_parties ?max_token_parties
+          ~fee_payer_keypair ~keymap ~account_state_tbl ~ledger
+          ?protocol_state_view ?vk ()
       in
       go (n - 1) (new_parties :: acc)
     else return (List.rev acc)

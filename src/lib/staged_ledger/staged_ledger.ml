@@ -2522,7 +2522,7 @@ let%test_module "staged ledger tests" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind parties_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators.sequence_parties_with_ledger
-          ~length:num_zkapps ~vk ?failure ()
+          ~max_token_parties:1 ~length:num_zkapps ~vk ?failure ()
       in
       let zkapps =
         List.map parties_and_fee_payer_keypairs ~f:(function
