@@ -43,7 +43,7 @@ spec:
         command:
         - bash
         - -c
-        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
         volumeMounts:
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
