@@ -733,7 +733,7 @@ module Node = struct
             |> Yojson.Safe.to_string )
     in
     let zkapp_id =
-      Mina_base.Parties.to_base58_check
+      Mina_base.Zkapp_command.to_base58_check
         sent_zkapp_obj.internalSendZkapp.zkapp.id
     in
     [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
