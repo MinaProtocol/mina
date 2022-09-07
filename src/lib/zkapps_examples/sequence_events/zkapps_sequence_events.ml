@@ -5,7 +5,7 @@ open Zkapps_examples
 
 let initialize public_key =
   Zkapps_examples.wrap_main (fun () ->
-      Party_under_construction.In_circuit.create
+      AccountUpdate_under_construction.In_circuit.create
         ~public_key:(Public_key.Compressed.var_of_t public_key)
         ~token_id:Token_id.(Checked.constant default)
         () )
@@ -29,8 +29,8 @@ let event_length = 13
 
 let update_sequence_events public_key =
   Zkapps_examples.wrap_main (fun () ->
-      let party =
-        Party_under_construction.In_circuit.create
+      let account_update =
+        AccountUpdate_under_construction.In_circuit.create
           ~public_key:(Public_key.Compressed.var_of_t public_key)
           ~token_id:Token_id.(Checked.constant default)
           ()
@@ -41,8 +41,8 @@ let update_sequence_events public_key =
           (Typ.list ~length:num_events
              (Typ.array ~length:event_length Field.typ) )
       in
-      Party_under_construction.In_circuit.add_sequence_events sequence_events
-        party )
+      AccountUpdate_under_construction.In_circuit.add_sequence_events
+        sequence_events account_update )
 
 let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize zkApp"

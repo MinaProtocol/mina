@@ -15,8 +15,8 @@ let%test_module "Fee payer tests" =
 
     let constraint_constants = U.constraint_constants
 
-    let snapp_update : Party.Update.t =
-      { Party.Update.dummy with
+    let snapp_update : Account_update.Update.t =
+      { Account_update.Update.dummy with
         app_state =
           Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
               Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
@@ -160,7 +160,7 @@ let%test_module "Fee payer tests" =
                 ; preconditions = None
                 }
               in
-              let parties =
+              let zkapp_command =
                 Transaction_snark.For_tests.deploy_snapp test_spec
                   ~constraint_constants
               in
@@ -171,7 +171,7 @@ let%test_module "Fee payer tests" =
                   Ledger.apply_transaction ledger0 ~constraint_constants
                     ~txn_state_view:
                       (Mina_state.Protocol_state.Body.view U.genesis_state_body)
-                    (Transaction.Command (Parties parties))
+                    (Transaction.Command (Zkapp_command zkapp_command))
                 with
               | Error _ ->
                   (*TODO : match on exact error*) ()
@@ -180,14 +180,14 @@ let%test_module "Fee payer tests" =
               (*Sparse ledger application fails*)
               match
                 Or_error.try_with (fun () ->
-                    Transaction_snark.parties_witnesses_exn
+                    Transaction_snark.zkapp_command_witnesses_exn
                       ~constraint_constants ~state_body:U.genesis_state_body
                       ~fee_excess:Amount.Signed.zero (`Ledger ledger)
                       [ ( `Pending_coinbase_init_stack U.init_stack
                         , `Pending_coinbase_of_statement
                             (U.pending_coinbase_state_stack
                                ~state_body_hash:U.genesis_state_body_hash )
-                        , parties )
+                        , zkapp_command )
                       ] )
               with
               | Ok _a ->

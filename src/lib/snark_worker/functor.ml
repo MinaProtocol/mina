@@ -46,14 +46,15 @@ type Structured_log_events.t +=
   | Base_snark_generated of
       { time : Time_span_with_json.t
       ; transaction_type : String_with_json.t
-      ; parties_count : Int_with_json.t
-      ; proof_parties_count : Int_with_json.t
+      ; zkapp_command_count : Int_with_json.t
+      ; proof_zkapp_command_count : Int_with_json.t
       }
   [@@deriving
     register_event
       { msg =
           "Base SNARK generated in $time for $transaction_type transaction \
-           with $parties_count parties and $proof_parties_count proof parties"
+           with $zkapp_command_count zkapp_command and \
+           $proof_zkapp_command_count proof zkapp_command"
       }]
 
 module Make (Inputs : Intf.Inputs_intf) :
@@ -159,24 +160,29 @@ module Make (Inputs : Intf.Inputs_intf) :
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
             [%str_log info] (Merge_snark_generated { time })
         | `Transition ->
-            let transaction_type, parties_count, proof_parties_count =
+            let transaction_type, zkapp_command_count, proof_zkapp_command_count
+                =
               (*should be Some in the case of `Transition*)
               match Option.value_exn single with
               | Mina_transaction.Transaction.Command
-                  (Mina_base.User_command.Parties parties) ->
+                  (Mina_base.User_command.Zkapp_command zkapp_command) ->
                   let c, p =
-                    Mina_base.Parties.Call_forest.fold
-                      parties.Mina_base.Parties.other_parties ~init:(1, 0)
-                      ~f:(fun (count, proof_parties_count) party ->
+                    Mina_base.Zkapp_command.Call_forest.fold
+                      zkapp_command.Mina_base.Zkapp_command.account_updates
+                      ~init:(1, 0)
+                      ~f:(fun (count, proof_zkapp_command_count) account_update
+                         ->
                         ( count + 1
                         , if
                             Mina_base.Control.(
                               Tag.equal Proof
-                                (tag (Mina_base.Party.authorization party)))
-                          then proof_parties_count + 1
-                          else proof_parties_count ) )
+                                (tag
+                                   (Mina_base.Account_update.authorization
+                                      account_update ) ))
+                          then proof_zkapp_command_count + 1
+                          else proof_zkapp_command_count ) )
                   in
-                  ("parties", c, p)
+                  ("zkapp_command", c, p)
               | Command (Signed_command _) ->
                   ("signed command", 1, 0)
               | Coinbase _ ->
@@ -189,8 +195,11 @@ module Make (Inputs : Intf.Inputs_intf) :
                 Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
             [%str_log info]
               (Base_snark_generated
-                 { time; transaction_type; parties_count; proof_parties_count }
-              ) )
+                 { time
+                 ; transaction_type
+                 ; zkapp_command_count
+                 ; proof_zkapp_command_count
+                 } ) )
 
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S

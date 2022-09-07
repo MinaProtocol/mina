@@ -56,11 +56,11 @@ let create_zkapp_account =
   let create_command ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce ~memo ()
       =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       create_zkapp_account ~debug ~keyfile ~fee ~zkapp_keyfile ~amount ~nonce
         ~memo
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction zkapp_command ;
     ()
   in
   Command.(
@@ -85,11 +85,11 @@ let upgrade_zkapp =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~verification_key ~zkapp_uri ~auth () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~verification_key ~zkapp_uri ~auth
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction zkapp_command ;
     ()
   in
   Command.(
@@ -128,10 +128,10 @@ let upgrade_zkapp =
 let transfer_funds =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction zkapp_command ;
     ()
   in
   let read_key_and_amount count =
@@ -194,10 +194,10 @@ let update_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
       () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction zkapp_command ;
     ()
   in
   Command.(
@@ -228,11 +228,11 @@ let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
       ~auth () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
         ~zkapp_uri ~auth
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction zkapp_command ;
     ()
   in
   Command.(
@@ -268,11 +268,11 @@ let update_sequence_state =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~sequence_state () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~sequence_state
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction zkapp_command ;
     ()
   in
   Command.(
@@ -334,11 +334,11 @@ let update_token_symbol =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
       ~token_symbol ~auth () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
         ~token_symbol ~auth
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction zkapp_command ;
     ()
   in
   Command.(
@@ -374,11 +374,11 @@ let update_permissions =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~permissions ~current_auth () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~permissions ~current_auth
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction zkapp_command ;
     ()
   in
   Command.(

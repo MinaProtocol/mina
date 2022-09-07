@@ -72,15 +72,15 @@ module Internal_command = struct
   end]
 end
 
-(* for fee payer, other parties, authorizations are omitted; signatures, proofs not in archive db *)
+(* for fee payer, other zkapp_command, authorizations are omitted; signatures, proofs not in archive db *)
 module Zkapp_command = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         { sequence_no : int
-        ; fee_payer : Party.Body.Fee_payer.Stable.V1.t
-        ; other_parties : Party.Body.Simple.Stable.V1.t list
+        ; fee_payer : Account_update.Body.Fee_payer.Stable.V1.t
+        ; account_updates : Account_update.Body.Simple.Stable.V1.t list
         ; memo : Signed_command_memo.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]

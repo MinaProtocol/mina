@@ -1,58 +1,72 @@
 open Core_kernel
 
-(* Same as the type of the field other_parties in Mina_base.Parties.t *)
+(* Same as the type of the field account_updates in Mina_base.Zkapp_command.t *)
 type t =
-  ( Party.t
-  , Parties.Digest.Party.t
-  , Parties.Digest.Forest.t )
-  Parties.Call_forest.t
+  ( Account_update.t
+  , Zkapp_command.Digest.Account_update.t
+  , Zkapp_command.Digest.Forest.t )
+  Zkapp_command.Call_forest.t
 
 let empty () = []
 
-let if_ = Parties.value_if
+let if_ = Zkapp_command.value_if
 
 let is_empty = List.is_empty
 
-let pop_exn : t -> (Party.t * t) * t = function
-  | { stack_hash = _; elt = { party; calls; party_digest = _ } } :: xs ->
-      ((party, calls), xs)
+let pop_exn : t -> (Account_update.t * t) * t = function
+  | { stack_hash = _
+    ; elt = { account_update; calls; account_update_digest = _ }
+    }
+    :: xs ->
+      ((account_update, calls), xs)
   | _ ->
       failwith "pop_exn"
 
-let push ~party ~calls t = Parties.Call_forest.cons ~calls party t
+let push ~account_update ~calls t =
+  Zkapp_command.Call_forest.cons ~calls account_update t
 
-let hash (t : t) = Parties.Call_forest.hash t
+let hash (t : t) = Zkapp_command.Call_forest.hash t
 
 open Snark_params.Tick.Run
 
 module Checked = struct
-  module F = Parties.Digest.Forest.Checked
+  module F = Zkapp_command.Digest.Forest.Checked
   module V = Prover_value
 
-  type party =
-    { party : (Party.Body.Checked.t, Parties.Digest.Party.Checked.t) With_hash.t
+  type account_update =
+    { account_update :
+        ( Account_update.Body.Checked.t
+        , Zkapp_command.Digest.Account_update.Checked.t )
+        With_hash.t
     ; control : Control.t Prover_value.t
     }
 
-  let party_typ () :
-      (party, (Party.t, Parties.Digest.Party.t) With_hash.t) Typ.t =
-    Typ.(Party.Body.typ () * Prover_value.typ () * Parties.Digest.Party.typ)
+  let account_update_typ () :
+      ( account_update
+      , (Account_update.t, Zkapp_command.Digest.Account_update.t) With_hash.t
+      )
+      Typ.t =
+    Typ.(
+      Account_update.Body.typ () * Prover_value.typ ()
+      * Zkapp_command.Digest.Account_update.typ)
     |> Typ.transport
          ~back:(fun ((body, authorization), hash) ->
-           { With_hash.data = { Party.body; authorization }; hash } )
-         ~there:(fun { With_hash.data = { Party.body; authorization }; hash } ->
-           ((body, authorization), hash) )
+           { With_hash.data = { Account_update.body; authorization }; hash } )
+         ~there:(fun { With_hash.data = { Account_update.body; authorization }
+                     ; hash
+                     } -> ((body, authorization), hash) )
     |> Typ.transport_var
-         ~back:(fun ((party, control), hash) ->
-           { party = { hash; data = party }; control } )
-         ~there:(fun { party = { hash; data = party }; control } ->
-           ((party, control), hash) )
+         ~back:(fun ((account_update, control), hash) ->
+           { account_update = { hash; data = account_update }; control } )
+         ~there:(fun { account_update = { hash; data = account_update }
+                     ; control
+                     } -> ((account_update, control), hash) )
 
   type t =
-    ( ( Party.t
-      , Parties.Digest.Party.t
-      , Parties.Digest.Forest.t )
-      Parties.Call_forest.t
+    ( ( Account_update.t
+      , Zkapp_command.Digest.Account_update.t
+      , Zkapp_command.Digest.Forest.t )
+      Zkapp_command.Call_forest.t
       V.t
     , F.t )
     With_hash.t
@@ -63,74 +77,90 @@ module Checked = struct
     }
 
   let empty =
-    Parties.Digest.Forest.constant Parties.Call_forest.With_hashes.empty
+    Zkapp_command.Digest.Forest.constant
+      Zkapp_command.Call_forest.With_hashes.empty
 
   let is_empty ({ hash = x; _ } : t) = F.equal empty x
 
   let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
-  let pop_exn ({ hash = h; data = r } : t) : (party * t) * t =
+  let pop_exn ({ hash = h; data = r } : t) : (account_update * t) * t =
     with_label "Zkapp_call_forest.pop_exn" (fun () ->
         let hd_r =
           V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
         in
-        let party = V.create (fun () -> (V.get hd_r).party) in
-        let auth = V.(create (fun () -> (V.get party).authorization)) in
-        let party =
-          exists (Party.Body.typ ()) ~compute:(fun () -> (V.get party).body)
+        let account_update = V.create (fun () -> (V.get hd_r).account_update) in
+        let auth =
+          V.(create (fun () -> (V.get account_update).authorization))
         in
-        let party =
-          With_hash.of_data party ~hash_data:Parties.Digest.Party.Checked.create
+        let account_update =
+          exists (Account_update.Body.typ ()) ~compute:(fun () ->
+              (V.get account_update).body )
+        in
+        let account_update =
+          With_hash.of_data account_update
+            ~hash_data:Zkapp_command.Digest.Account_update.Checked.create
         in
         let subforest : t =
           let subforest = V.create (fun () -> (V.get hd_r).calls) in
           let subforest_hash =
-            exists Parties.Digest.Forest.typ ~compute:(fun () ->
-                Parties.Call_forest.hash (V.get subforest) )
+            exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
+                Zkapp_command.Call_forest.hash (V.get subforest) )
           in
           { hash = subforest_hash; data = subforest }
         in
         let tl_hash =
-          exists Parties.Digest.Forest.typ ~compute:(fun () ->
-              V.get r |> List.tl_exn |> Parties.Call_forest.hash )
+          exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
+              V.get r |> List.tl_exn |> Zkapp_command.Call_forest.hash )
         in
         let tree_hash =
-          Parties.Digest.Tree.Checked.create ~party:party.hash
-            ~calls:subforest.hash
+          Zkapp_command.Digest.Tree.Checked.create
+            ~account_update:account_update.hash ~calls:subforest.hash
         in
-        let hash_cons = Parties.Digest.Forest.Checked.cons tree_hash tl_hash in
+        let hash_cons =
+          Zkapp_command.Digest.Forest.Checked.cons tree_hash tl_hash
+        in
         F.Assert.equal hash_cons h ;
-        ( ( ({ party; control = auth }, subforest)
+        ( ( ({ account_update; control = auth }, subforest)
           , { hash = tl_hash
             ; data = V.(create (fun () -> List.tl_exn (get r)))
             } )
-          : (party * t) * t ) )
+          : (account_update * t) * t ) )
 
   let push
-      ~party:{ party = { hash = party_hash; data = party }; control = auth }
-      ~calls:({ hash = calls_hash; data = calls } : t)
+      ~account_update:
+        { account_update = { hash = account_update_hash; data = account_update }
+        ; control = auth
+        } ~calls:({ hash = calls_hash; data = calls } : t)
       ({ hash = tl_hash; data = tl_data } : t) : t =
     with_label "Zkapp_call_forest.push" (fun () ->
         let tree_hash =
-          Parties.Digest.Tree.Checked.create ~party:party_hash ~calls:calls_hash
+          Zkapp_command.Digest.Tree.Checked.create
+            ~account_update:account_update_hash ~calls:calls_hash
         in
-        let hash_cons = Parties.Digest.Forest.Checked.cons tree_hash tl_hash in
+        let hash_cons =
+          Zkapp_command.Digest.Forest.Checked.cons tree_hash tl_hash
+        in
         let data =
           V.create (fun () ->
-              let body = As_prover.read (Party.Body.typ ()) party in
+              let body =
+                As_prover.read (Account_update.Body.typ ()) account_update
+              in
               let authorization = V.get auth in
               let tl = V.get tl_data in
-              let party : Party.t = { body; authorization } in
+              let account_update : Account_update.t = { body; authorization } in
               let calls = V.get calls in
-              let res = Parties.Call_forest.cons ~calls party tl in
+              let res =
+                Zkapp_command.Call_forest.cons ~calls account_update tl
+              in
               (* Sanity check; we're re-hashing anyway, might as well make sure it's
                  consistent.
               *)
               assert (
-                Parties.Digest.Forest.(
+                Zkapp_command.Digest.Forest.(
                   equal
                     (As_prover.read typ hash_cons)
-                    (Parties.Call_forest.hash res)) ) ;
+                    (Zkapp_command.Call_forest.hash res)) ) ;
               res )
         in
         ({ hash = hash_cons; data } : t) )
@@ -139,13 +169,17 @@ module Checked = struct
 end
 
 let typ : (Checked.t, t) Typ.t =
-  Typ.(Parties.Digest.Forest.typ * Prover_value.typ ())
+  Typ.(Zkapp_command.Digest.Forest.typ * Prover_value.typ ())
   |> Typ.transport
        ~back:(fun (_digest, forest) ->
-         Parties.Call_forest.map ~f:(fun party -> party) forest )
+         Zkapp_command.Call_forest.map
+           ~f:(fun account_update -> account_update)
+           forest )
        ~there:(fun forest ->
-         ( Parties.Call_forest.hash forest
-         , Parties.Call_forest.map ~f:(fun party -> party) forest ) )
+         ( Zkapp_command.Call_forest.hash forest
+         , Zkapp_command.Call_forest.map
+             ~f:(fun account_update -> account_update)
+             forest ) )
   |> Typ.transport_var
        ~back:(fun (digest, forest) -> { With_hash.hash = digest; data = forest })
        ~there:(fun { With_hash.hash = digest; data = forest } ->

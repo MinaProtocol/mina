@@ -144,8 +144,13 @@ module Mina_base = struct
       (O.Signed_command.With_valid_signature.Stable)
       (W.Signed_command.With_valid_signature)
   include
-    Assert_equal0V1 (O.Party.Body.Fee_payer.Stable) (W.Party.Body.Fee_payer)
-  include Assert_equal0V1 (O.Party.Fee_payer.Stable) (W.Party.Fee_payer)
+    Assert_equal0V1
+      (O.Account_update.Body.Fee_payer.Stable)
+      (W.Account_update.Body.Fee_payer)
+  include
+    Assert_equal0V1
+      (O.Account_update.Fee_payer.Stable)
+      (W.Account_update.Fee_payer)
   include Assert_equal0V1 (O.Account_id.Digest.Stable) (W.Account_id.Digest)
   include Assert_equal0V2 (O.Account_id.Stable) (W.Account_id)
   include Assert_equal0V1 (O.Token_id.Stable) (W.Token_id)
@@ -160,23 +165,29 @@ module Mina_base = struct
     Assert_equal0V1 (O.Account.Token_symbol.Stable) (W.Account.Token_symbol)
   include
     Assert_equal0V1
-      (O.Party.Update.Timing_info.Stable)
-      (W.Party.Update.Timing_info)
-  include Assert_equal0V1 (O.Party.Update.Stable) (W.Party.Update)
-  include Assert_equal0V1 (O.Party.Body.Events'.Stable) (W.Party.Body.Events')
+      (O.Account_update.Update.Timing_info.Stable)
+      (W.Account_update.Update.Timing_info)
+  include
+    Assert_equal0V1 (O.Account_update.Update.Stable) (W.Account_update.Update)
+  include
+    Assert_equal0V1
+      (O.Account_update.Body.Events'.Stable)
+      (W.Account_update.Body.Events')
   include Assert_equal0V1 (O.Ledger_hash.Stable) (W.Ledger_hash)
   include
     Assert_equal0V1
-      (O.Parties.Valid.Verification_key_hash.Stable)
-      (W.Parties.Valid.Verification_key_hash)
+      (O.Zkapp_command.Valid.Verification_key_hash.Stable)
+      (W.Zkapp_command.Valid.Verification_key_hash)
+
   include
     Assert_equal0V1
-      (O.Parties.Call_forest.Digest.Party.Stable)
-      (W.Parties.Call_forest.Digest.Party)
+      (O.Zkapp_command.Call_forest.Digest.Account_update.Stable)
+      (W.Zkapp_command.Call_forest.Digest.AccountUpdate)
+
   include
     Assert_equal0V1
-      (O.Parties.Call_forest.Digest.Forest.Stable)
-      (W.Parties.Call_forest.Digest.Forest)
+      (O.Zkapp_command.Call_forest.Digest.Forest.Stable)
+      (W.Zkapp_command.Call_forest.Digest.Forest)
   include Assert_equal0V1 (O.Ledger_hash.Stable) (W.Ledger_hash)
   include
     Assert_equal0V1
@@ -192,10 +203,13 @@ module Mina_base = struct
       (W.Zkapp_precondition.Account)
   include
     Assert_equal0V1
-      (O.Party.Account_precondition.Stable)
-      (W.Party.Account_precondition)
-  include Assert_equal0V1 (O.Party.Preconditions.Stable) (W.Party.Preconditions)
-  include Assert_equal0V1 (O.Party.Body.Stable) (W.Party.Body)
+      (O.Account_update.Account_precondition.Stable)
+      (W.Account_update.Account_precondition)
+  include
+    Assert_equal0V1
+      (O.Account_update.Preconditions.Stable)
+      (W.Account_update.Preconditions)
+  include Assert_equal0V1 (O.Account_update.Body.Stable) (W.Account_update.Body)
   include Assert_equal0V2 (O.Fee_transfer.Single.Stable) (W.Fee_transfer.Single)
   include Assert_equal0V2 (O.Fee_transfer.Stable) (W.Fee_transfer)
   include
@@ -204,13 +218,16 @@ module Mina_base = struct
   include Assert_equal2V1 (O.With_stack_hash.Stable) (W.With_stack_hash)
   include
     Assert_equal3V1
-      (O.Parties.Call_forest.Tree.Stable)
-      (W.Parties.Call_forest.Tree)
-  include Assert_equal3V1 (O.Parties.Call_forest.Stable) (W.Parties.Call_forest)
+      (O.Zkapp_command.Call_forest.Tree.Stable)
+      (W.Zkapp_command.Call_forest.Tree)
+  include
+    Assert_equal3V1
+      (O.Zkapp_command.Call_forest.Stable)
+      (W.Zkapp_command.Call_forest)
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
-  include Assert_equal0V1 (O.Party.Stable) (W.Party)
-  include Assert_equal0V1 (O.Parties.Stable) (W.Parties)
-  include Assert_equal0V1 (O.Parties.Valid.Stable) (W.Parties.Valid)
+  include Assert_equal0V1 (O.Account_update.Stable) (W.AccountUpdate)
+  include Assert_equal0V1 (O.Zkapp_command.Stable) (W.Zkapp_command)
+  include Assert_equal0V1 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
   include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
   include Assert_equal0V2 (O.User_command.Valid.Stable) (W.User_command.Valid)
 end

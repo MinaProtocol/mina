@@ -72,7 +72,7 @@ module Cryptography = struct
 
   let transaction_length : Gauge.t = ()
 
-  let proof_parties : Gauge.t = ()
+  let proof_zkapp_command : Gauge.t = ()
 end
 
 module Bootstrap = struct
@@ -94,9 +94,9 @@ module Transaction_pool = struct
 
   let transactions_added_to_pool : Counter.t = ()
 
-  let parties_transaction_size : Gauge.t = ()
+  let zkapp_command_transaction_size : Gauge.t = ()
 
-  let parties_count : Gauge.t = ()
+  let zkapp_command_count : Gauge.t = ()
 end
 
 module Network = struct

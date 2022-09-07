@@ -667,7 +667,7 @@
         {
           "kind": "SCALAR",
           "name": "SendTestZkappInput",
-          "description": "Parties for a test zkApp",
+          "description": "Zkapp_command for a test zkApp",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -676,7 +676,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "FeePayerPartyBodyInput",
+          "name": "FeePayerAccountUpdateBodyInput",
           "description": null,
           "fields": [
             {
@@ -784,7 +784,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ZkappPartyFeePayerInput",
+          "name": "ZkappAccountUpdateFeePayerInput",
           "description": null,
           "fields": [
             {
@@ -796,7 +796,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "FeePayerPartyBodyInput",
+                  "name": "FeePayerAccountUpdateBodyInput",
                   "ofType": null
                 }
               },
@@ -829,7 +829,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "FeePayerPartyBodyInput",
+                  "name": "FeePayerAccountUpdateBodyInput",
                   "ofType": null
                 }
               },
@@ -1432,7 +1432,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "PartyUpdateInput",
+          "name": "AccountUpdateUpdateInput",
           "description": null,
           "fields": [
             {
@@ -2740,7 +2740,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "PartyBodyInput",
+          "name": "AccountUpdateBodyInput",
           "description": null,
           "fields": [
             {
@@ -2784,7 +2784,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyUpdateInput",
+                  "name": "AccountUpdateUpdateInput",
                   "ofType": null
                 }
               },
@@ -3001,7 +3001,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyUpdateInput",
+                  "name": "AccountUpdateUpdateInput",
                   "ofType": null
                 }
               },
@@ -3224,8 +3224,8 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ZkappPartyInput",
-          "description": "A party to a zkApp transaction",
+          "name": "ZkappAccountUpdateInput",
+          "description": "A account_update to a zkApp transaction",
           "fields": [
             {
               "name": "body",
@@ -3236,7 +3236,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyInput",
+                  "name": "AccountUpdateBodyInput",
                   "ofType": null
                 }
               },
@@ -3269,7 +3269,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartyBodyInput",
+                  "name": "AccountUpdateBodyInput",
                   "ofType": null
                 }
               },
@@ -3296,7 +3296,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "PartiesInput",
+          "name": "Zkapp_commandInput",
           "description": null,
           "fields": [
             {
@@ -3308,7 +3308,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyFeePayerInput",
+                  "name": "ZkappAccountUpdateFeePayerInput",
                   "ofType": null
                 }
               },
@@ -3316,7 +3316,7 @@
               "deprecationReason": null
             },
             {
-              "name": "otherParties",
+              "name": "accountUpdates",
               "description": null,
               "args": [],
               "type": {
@@ -3330,7 +3330,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "ZkappPartyInput",
+                      "name": "ZkappAccountUpdateInput",
                       "ofType": null
                     }
                   }
@@ -3365,14 +3365,14 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappPartyFeePayerInput",
+                  "name": "ZkappAccountUpdateFeePayerInput",
                   "ofType": null
                 }
               },
               "defaultValue": null
             },
             {
-              "name": "otherParties",
+              "name": "accountUpdates",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -3385,7 +3385,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "ZkappPartyInput",
+                      "name": "ZkappAccountUpdateInput",
                       "ofType": null
                     }
                   }
@@ -3418,15 +3418,16 @@
           "description": null,
           "fields": [
             {
-              "name": "parties",
-              "description": "Parties structure representing the transaction",
+              "name": "zkapp_command",
+              "description":
+                "Zkapp_command structure representing the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartiesInput",
+                  "name": "Zkapp_commandInput",
                   "ofType": null
                 }
               },
@@ -3436,14 +3437,15 @@
           ],
           "inputFields": [
             {
-              "name": "parties",
-              "description": "Parties structure representing the transaction",
+              "name": "zkapp_command",
+              "description":
+                "Zkapp_command structure representing the transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "PartiesInput",
+                  "name": "Zkapp_commandInput",
                   "ofType": null
                 }
               },
@@ -4806,7 +4808,7 @@
               "description": "Send a zkApp (for internal testing purposes)",
               "args": [
                 {
-                  "name": "parties",
+                  "name": "zkapp_command",
                   "description": null,
                   "type": {
                     "kind": "NON_NULL",
@@ -6529,12 +6531,12 @@
         },
         {
           "kind": "OBJECT",
-          "name": "PartiesFailureReason",
+          "name": "ZkappCommandFailureReason",
           "description": null,
           "fields": [
             {
               "name": "index",
-              "description": "List index of the party that failed",
+              "description": "List index of the account update that failed",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Index", "ofType": null },
               "isDeprecated": false,
@@ -6543,7 +6545,7 @@
             {
               "name": "failures",
               "description":
-                "Failure reason for the party or any nested parties",
+                "Failure reason for the account update or any nested zkapp command",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7659,7 +7661,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "PartyUpdate",
+          "name": "AccountUpdateUpdate",
           "description": null,
           "fields": [
             {
@@ -7762,7 +7764,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "PartyBody",
+          "name": "AccountUpdateBody",
           "description": null,
           "fields": [
             {
@@ -7806,7 +7808,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "PartyUpdate",
+                  "name": "AccountUpdateUpdate",
                   "ofType": null
                 }
               },
@@ -7993,8 +7995,8 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ZkappParty",
-          "description": "A party to a zkApp transaction",
+          "name": "ZkappAccountUpdate",
+          "description": "A account_update to a zkApp transaction",
           "fields": [
             {
               "name": "body",
@@ -8005,7 +8007,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "PartyBody",
+                  "name": "AccountUpdateBody",
                   "ofType": null
                 }
               },
@@ -8046,7 +8048,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "FeePayerPartyBody",
+          "name": "FeePayerAccountUpdateBody",
           "description": null,
           "fields": [
             {
@@ -8109,7 +8111,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ZkappPartyFeePayer",
+          "name": "ZkappAccountUpdateFeePayer",
           "description": null,
           "fields": [
             {
@@ -8121,7 +8123,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "FeePayerPartyBody",
+                  "name": "FeePayerAccountUpdateBody",
                   "ofType": null
                 }
               },
@@ -8152,7 +8154,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "Parties",
+          "name": "Zkapp_command",
           "description": null,
           "fields": [
             {
@@ -8164,7 +8166,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ZkappPartyFeePayer",
+                  "name": "ZkappAccountUpdateFeePayer",
                   "ofType": null
                 }
               },
@@ -8172,7 +8174,7 @@
               "deprecationReason": null
             },
             {
-              "name": "otherParties",
+              "name": "accountUpdates",
               "description": null,
               "args": [],
               "type": {
@@ -8186,7 +8188,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "ZkappParty",
+                      "name": "ZkappAccountUpdate",
                       "ofType": null
                     }
                   }
@@ -8219,7 +8221,7 @@
         },
         {
           "kind": "SCALAR",
-          "name": "PartiesBase58",
+          "name": "ZkappCommandBase58",
           "description": "A Base58Check string representing the command",
           "fields": null,
           "inputFields": null,
@@ -8241,7 +8243,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "PartiesBase58",
+                  "name": "ZkappCommandBase58",
                   "ofType": null
                 }
               },
@@ -8265,15 +8267,15 @@
               "deprecationReason": null
             },
             {
-              "name": "parties",
-              "description": "Parties representing the transaction",
+              "name": "zkappCommand",
+              "description": "zkApp command representing the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "Parties",
+                  "name": "Zkapp_command",
                   "ofType": null
                 }
               },
@@ -8290,7 +8292,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "PartiesFailureReason",
+                  "name": "ZkappCommandFailureReason",
                   "ofType": null
                 }
               },

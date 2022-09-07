@@ -1,7 +1,7 @@
 open Ppxlib
 open Core_kernel
 
-module Parties_templates = struct
+module Zkapp_command_templates = struct
   let pooled_zkapp_commands =
     Printf.sprintf
       {graphql|
@@ -13,34 +13,34 @@ module Parties_templates = struct
                          index
                          failures
                        }
-        parties %s
+        zkappCommand %s
       }
     }|graphql}
 
   let internal_send_zkapp =
     Printf.sprintf
       {|
-         mutation ($parties: SendTestZkappInput!) {
-            internalSendZkapp(parties: $parties) {
+         mutation ($zkapp_command: SendTestZkappInput!) {
+            internalSendZkapp(zkapp_command: $zkapp_command) {
                zkapp { id
                        hash
                        failureReason {
                          index
                          failures
                        }
-                       parties %s
+                       zkappCommand %s
                      }
              }
          }
       |}
 end
 
-let party_query_expr template ~loc =
+let account_update_query_expr template ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
-  estring @@ template (Lazy.force Mina_base.Parties.inner_query)
+  estring @@ template (Lazy.force Mina_base.Zkapp_command.inner_query)
 
 let structure ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -48,12 +48,12 @@ let structure ~loc =
   end) in
   let open E in
   let node_builder f =
-    let exp = party_query_expr f ~loc in
+    let exp = account_update_query_expr f ~loc in
     let str = [ E.pstr_eval exp [] ] in
     E.pmod_extension (E.Located.mk "graphql", PStr str)
   in
-  let m1_node = node_builder Parties_templates.pooled_zkapp_commands in
-  let m2_node = node_builder Parties_templates.internal_send_zkapp in
+  let m1_node = node_builder Zkapp_command_templates.pooled_zkapp_commands in
+  let m2_node = node_builder Zkapp_command_templates.internal_send_zkapp in
   let modname s = E.Located.mk (Some s) in
   E.
     [ module_binding ~name:(modname "Pooled_zkapp_commands") ~expr:m1_node

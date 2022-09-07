@@ -498,7 +498,7 @@ module Node = struct
     | None ->
         fail (Error.of_string "Could not get account from ledger")
 
-  (* return a Party.Update.t with all fields `Set` to the
+  (* return a Account_update.Update.t with all fields `Set` to the
      value in the account, or `Keep` if value unavailable,
      as if this update had been applied to the account
   *)
@@ -614,7 +614,7 @@ module Node = struct
                      ; vesting_period
                      ; vesting_increment
                      }
-                     : Mina_base.Party.Update.Timing_info.t ) )
+                     : Mina_base.Account_update.Update.Timing_info.t ) )
           | _ ->
               fail (Error.of_string "Some pieces of account timing are missing")
         in
@@ -635,7 +635,7 @@ module Node = struct
             ; timing
             ; voting_for
             }
-            : Mina_base.Party.Update.t )
+            : Mina_base.Account_update.Update.t )
     | None ->
         fail (Error.of_string "Could not get account from ledger")
 
@@ -696,19 +696,20 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_zkapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
+  let send_zkapp ~logger (t : t) ~(zkapp_command : Mina_base.Zkapp_command.t) =
     [%log info] "Sending a zkapp"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
         ] ;
     let open Deferred.Or_error.Let_syntax in
-    let parties_json =
-      Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
+    let zkapp_command_json =
+      Mina_base.Zkapp_command.to_json zkapp_command |> Yojson.Safe.to_basic
     in
     let send_zkapp_graphql () =
       let send_zkapp_obj =
-        Graphql.Send_test_zkapp.(make @@ makeVariables ~parties:parties_json ())
+        Graphql.Send_test_zkapp.(
+          make @@ makeVariables ~zkapp_command:zkapp_command_json ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
         send_zkapp_obj

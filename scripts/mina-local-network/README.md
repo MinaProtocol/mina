@@ -82,7 +82,7 @@
   - [http://localhost:4001/graphql](http://localhost:4001/graphql)
   - [http://localhost:4006/graphql](http://localhost:4006/graphql)
   - Etc.
-  - Depending on you environment configuration (amount of parties, starting port of ranges, etc.)
+  - Depending on you environment configuration (amount of zkapp_command, starting port of ranges, etc.)
 - You might want to get `encoded private key` instead of the raw data generated for you. You can do this using the following command:
 
   ```shell

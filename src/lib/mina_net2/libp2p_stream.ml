@@ -15,7 +15,7 @@ type state =
   | HalfClosed of participant
       (** Streams move from [FullyOpen] to [HalfClosed `Us] when the write pipe is closed. Streams move from [FullyOpen] to [HalfClosed `Them] when [Stream.reset] is called or the remote host closes their write stream. *)
   | FullyClosed
-      (** Streams move from [HalfClosed peer] to FullyClosed once the party that isn't peer has their "close write" event. Once a stream is FullyClosed, its resources are released. *)
+      (** Streams move from [HalfClosed peer] to FullyClosed once the account_update that isn't peer has their "close write" event. Once a stream is FullyClosed, its resources are released. *)
 [@@deriving equal, show]
 
 type t =
@@ -97,10 +97,10 @@ let stream_closed ~logger ~who_closed t =
   if equal_participant who_closed Them then Pipe.close t.incoming_w ;
   let new_state =
     let log_double_close () =
-      [%log error] "stream with index $index closed twice by $party"
+      [%log error] "stream with index $index closed twice by $account_update"
         ~metadata:
           [ ("index", `String (Libp2p_ipc.stream_id_to_string t.id))
-          ; ("party", `String (name_of_participant who_closed))
+          ; ("account_update", `String (name_of_participant who_closed))
           ]
     in
     match t.state with

@@ -1,17 +1,19 @@
-(* parties_builder.ml -- combinators to build Parties.t for tests *)
+(* zkapp_command_builder.ml -- combinators to build Zkapp_command.t for tests *)
 
 open Core_kernel
 open Mina_base
 
-let mk_forest ps : (Party.Body.Simple.t, unit, unit) Parties.Call_forest.t =
+let mk_forest ps :
+    (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t =
   List.map ps ~f:(fun p -> { With_stack_hash.elt = p; stack_hash = () })
 
-let mk_node party calls =
-  { Parties.Call_forest.Tree.party; party_digest = (); calls = mk_forest calls }
+let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
+  { account_update; account_update_digest = (); calls = mk_forest calls }
 
-let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
+let mk_account_update_body caller kp token_id balance_change :
+    Account_update.Body.Simple.t =
   let open Signature_lib in
-  { update = Party.Update.noop
+  { update = Account_update.Update.noop
   ; public_key = Public_key.compress kp.Keypair.public_key
   ; token_id
   ; balance_change =
@@ -25,15 +27,15 @@ let mk_party_body caller kp token_id balance_change : Party.Body.Simple.t =
   ; call_depth = 0
   ; preconditions =
       { network = Zkapp_precondition.Protocol_state.accept
-      ; account = Party.Account_precondition.Accept
+      ; account = Account_update.Account_precondition.Accept
       }
   ; use_full_commitment = true
   ; caller
   }
 
-let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
-    other_parties : Parties.t =
-  let fee_payer : Party.Fee_payer.t =
+let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
+    Zkapp_command.t =
+  let fee_payer : Account_update.Fee_payer.t =
     { body =
         { public_key = fee_payer_pk
         ; fee = Currency.Fee.of_int fee
@@ -49,39 +51,40 @@ let mk_parties_transaction ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
   in
   { fee_payer
   ; memo
-  ; other_parties =
-      other_parties
-      |> Parties.Call_forest.map
-           ~f:(fun (p : Party.Body.Simple.t) : Party.Simple.t ->
-             { body = p; authorization = Signature Signature.dummy } )
-      |> Parties.Call_forest.add_callers_simple
-      |> Parties.Call_forest.accumulate_hashes_predicated
+  ; account_updates =
+      account_updates
+      |> Zkapp_command.Call_forest.map
+           ~f:(fun (p : Account_update.Body.Simple.t) : Account_update.Simple.t
+              -> { body = p; authorization = Signature Signature.dummy } )
+      |> Zkapp_command.Call_forest.add_callers_simple
+      |> Zkapp_command.Call_forest.accumulate_hashes_predicated
   }
 
-let get_transaction_commitments (parties : Parties.t) =
-  let memo_hash = Signed_command_memo.hash parties.memo in
+let get_transaction_commitments (zkapp_command : Zkapp_command.t) =
+  let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =
-    Party.of_fee_payer parties.fee_payer |> Parties.Digest.Party.create
+    Account_update.of_fee_payer zkapp_command.fee_payer
+    |> Zkapp_command.Digest.Account_update.create
   in
-  let other_parties_hash = Parties.other_parties_hash parties in
+  let account_updates_hash = Zkapp_command.account_updates_hash zkapp_command in
   let txn_commitment =
-    Parties.Transaction_commitment.create ~other_parties_hash
+    Zkapp_command.Transaction_commitment.create ~account_updates_hash
   in
   let full_txn_commitment =
-    Parties.Transaction_commitment.create_complete txn_commitment ~memo_hash
-      ~fee_payer_hash
+    Zkapp_command.Transaction_commitment.create_complete txn_commitment
+      ~memo_hash ~fee_payer_hash
   in
   (txn_commitment, full_txn_commitment)
 
-(* replace dummy signatures, proofs with valid ones for fee payer, other parties
+(* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
    [keymap] maps compressed public keys to private keys
 *)
-let replace_authorizations ?prover ~keymap (parties : Parties.t) :
-    Parties.t Async_kernel.Deferred.t =
+let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
+    Zkapp_command.t Async_kernel.Deferred.t =
   let txn_commitment, full_txn_commitment =
-    get_transaction_commitments parties
+    get_transaction_commitments zkapp_command
   in
-  let sign_for_party ~use_full_commitment sk =
+  let sign_for_account_update ~use_full_commitment sk =
     let commitment =
       if use_full_commitment then full_txn_commitment else txn_commitment
     in
@@ -90,18 +93,18 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) :
   in
   let fee_payer_sk =
     Signature_lib.Public_key.Compressed.Map.find_exn keymap
-      parties.fee_payer.body.public_key
+      zkapp_command.fee_payer.body.public_key
   in
   let fee_payer_signature =
-    sign_for_party ~use_full_commitment:true fee_payer_sk
+    sign_for_account_update ~use_full_commitment:true fee_payer_sk
   in
   let fee_payer_with_valid_signature =
-    { parties.fee_payer with authorization = fee_payer_signature }
+    { zkapp_command.fee_payer with authorization = fee_payer_signature }
   in
   let open Async_kernel.Deferred.Let_syntax in
-  let%map other_parties_with_valid_signatures =
-    Parties.Call_forest.deferred_mapi parties.other_parties
-      ~f:(fun _ndx ({ body; authorization } : Party.t) tree ->
+  let%map account_updates_with_valid_signatures =
+    Zkapp_command.Call_forest.deferred_mapi zkapp_command.account_updates
+      ~f:(fun _ndx ({ body; authorization } : Account_update.t) tree ->
         let%map authorization_with_valid_signature =
           match authorization with
           | Control.Signature _dummy ->
@@ -119,7 +122,7 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) :
                       ()
               in
               let use_full_commitment = body.use_full_commitment in
-              let signature = sign_for_party ~use_full_commitment sk in
+              let signature = sign_for_account_update ~use_full_commitment sk in
               return (Control.Signature signature)
           | Proof _ -> (
               match prover with
@@ -138,9 +141,11 @@ let replace_authorizations ?prover ~keymap (parties : Parties.t) :
           | None_given ->
               return authorization
         in
-        { Party.body; authorization = authorization_with_valid_signature } )
+        { Account_update.body
+        ; authorization = authorization_with_valid_signature
+        } )
   in
-  { parties with
+  { zkapp_command with
     fee_payer = fee_payer_with_valid_signature
-  ; other_parties = other_parties_with_valid_signatures
+  ; account_updates = account_updates_with_valid_signatures
   }

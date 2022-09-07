@@ -40,14 +40,14 @@ export type Payment = {
   readonly validUntil?: UInt32;
 };
 
-export type OtherParties = {
+export type OtherZkapp_command = {
   body: any;
   authorization: any;
 }[];
 
-export type Party = {
-  readonly parties: {
-    otherParties: OtherParties;
+export type AccountUpdate = {
+  readonly zkapp_command: {
+    accountUpdates: OtherZkapp_command;
   };
 
   readonly feePayer: {
@@ -58,7 +58,7 @@ export type Party = {
   };
 };
 
-export type SignableData = Message | StakeDelegation | Payment | Party;
+export type SignableData = Message | StakeDelegation | Payment | AccountUpdate;
 
 export type Signed<SignableData> = {
   readonly signature: Signature;

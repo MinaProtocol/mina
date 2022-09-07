@@ -1,6 +1,6 @@
 import {
   isReady,
-  Party,
+  AccountUpdate,
   PrivateKey,
   Types,
   Field,
@@ -19,13 +19,13 @@ await isReady;
 
 let { asFieldsAndAux, jsLayout, packToFields } = Experimental;
 
-let party = Party.defaultParty(PrivateKey.random().toPublicKey());
+let account_update = Account_update.defaultAccountUpdate(PrivateKey.random().toPublicKey());
 
 // timing
 let Timing = asFieldsAndAux(
-  jsLayout.Party.entries.body.entries.update.entries.timing.inner
+  jsLayout.Account_update.entries.body.entries.update.entries.timing.inner
 );
-let timing = party.body.update.timing.value;
+let timing = account_update.body.update.timing.value;
 timing.initialMinimumBalance = UInt64.one;
 timing.vestingPeriod = UInt32.one;
 timing.vestingIncrement = UInt64.from(2);
@@ -33,9 +33,9 @@ testInput(Timing, Ledger.hashInputFromJson.timing, timing);
 
 // permissions
 let Permissions_ = asFieldsAndAux(
-  jsLayout.Party.entries.body.entries.update.entries.permissions.inner
+  jsLayout.Account_update.entries.body.entries.update.entries.permissions.inner
 );
-let permissions = party.body.update.permissions;
+let permissions = account_update.body.update.permissions;
 permissions.isSome = Bool(true);
 permissions.value = {
   ...Permissions.default(),
@@ -50,8 +50,8 @@ testInput(
 );
 
 // update
-let Update = asFieldsAndAux(jsLayout.Party.entries.body.entries.update);
-let update = party.body.update;
+let Update = asFieldsAndAux(jsLayout.Account_update.entries.body.entries.update);
+let update = account_update.body.update;
 
 update.timing.isSome = Bool(true);
 update.appState[0].isSome = Bool(true);
@@ -60,17 +60,17 @@ update.delegate.isSome = Bool(true);
 let delegate = PrivateKey.random().toPublicKey();
 update.delegate.value = delegate;
 
-party.tokenSymbol.set("BLABLA");
+account_update.tokenSymbol.set("BLABLA");
 testInput(Update, Ledger.hashInputFromJson.update, update);
 
 // account precondition
 let AccountPrecondition = asFieldsAndAux(
-  jsLayout.Party.entries.body.entries.preconditions.entries.account
+  jsLayout.Account_update.entries.body.entries.preconditions.entries.account
 );
-let account = party.body.preconditions.account;
-party.account.balance.assertEquals(UInt64.from(1e9));
-party.account.isNew.assertEquals(Bool(true));
-party.account.delegate.assertEquals(delegate);
+let account = account_update.body.preconditions.account;
+account_update.account.balance.assertEquals(UInt64.from(1e9));
+account_update.account.isNew.assertEquals(Bool(true));
+account_update.account.delegate.assertEquals(delegate);
 account.state[0].isSome = Bool(true);
 account.state[0].value = Field(9);
 testInput(
@@ -81,11 +81,11 @@ testInput(
 
 // network precondition
 let NetworkPrecondition = asFieldsAndAux(
-  jsLayout.Party.entries.body.entries.preconditions.entries.network
+  jsLayout.Account_update.entries.body.entries.preconditions.entries.network
 );
-let network = party.body.preconditions.network;
-party.network.stakingEpochData.ledger.hash.assertEquals(Field.random());
-party.network.nextEpochData.lockCheckpoint.assertEquals(Field.random());
+let network = account_update.body.preconditions.network;
+account_update.network.stakingEpochData.ledger.hash.assertEquals(Field.random());
+account_update.network.nextEpochData.lockCheckpoint.assertEquals(Field.random());
 
 testInput(
   NetworkPrecondition,
@@ -94,8 +94,8 @@ testInput(
 );
 
 // body
-let Body = asFieldsAndAux(jsLayout.Party.entries.body);
-let body = party.body;
+let Body = asFieldsAndAux(jsLayout.Account_update.entries.body);
+let body = account_update.body;
 body.balanceChange.magnitude = UInt64.from(14197832);
 body.balanceChange.sgn = Sign.minusOne;
 body.callData = Field.random();
@@ -106,12 +106,12 @@ body.tokenId = new Token({ tokenOwner }).id;
 body.caller = body.tokenId;
 testInput(Body, Ledger.hashInputFromJson.body, body);
 
-// party (should be same as body)
+// account_update (should be same as body)
 testInput(
-  Types.Party,
-  (partyJson) =>
-    Ledger.hashInputFromJson.body(JSON.stringify(JSON.parse(partyJson).body)),
-  party
+  Types.AccountUpdate,
+  (account_updateJson) =>
+    Ledger.hashInputFromJson.body(JSON.stringify(JSON.parse(account_updateJson).body)),
+  account_update
 );
 
 console.log("all hash inputs are consistent! 🎉");

@@ -2,7 +2,7 @@ import type {
   Payment,
   StakeDelegation,
   Message,
-  Party,
+  AccountUpdate,
   SignableData,
 } from "./TSTypes";
 
@@ -15,8 +15,8 @@ function hasCommonProperties(data: SignableData) {
   );
 }
 
-export function isParty(p: Party): p is Party {
-  return p.hasOwnProperty("parties") && p.hasOwnProperty("feePayer");
+export function isAccountUpdate(p: AccountUpdate): p is AccountUpdate {
+  return p.hasOwnProperty("zkapp_command") && p.hasOwnProperty("feePayer");
 }
 
 export function isPayment(p: SignableData): p is Payment {

@@ -61,7 +61,8 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Mina_wire_types.Mina_base.Party.Update.Timing_info.V1.t =
+        type t =
+              Mina_wire_types.Mina_base.Account_update.Update.Timing_info.V1.t =
           { initial_minimum_balance : Balance.Stable.V1.t
           ; cliff_time : Global_slot.Stable.V1.t
           ; cliff_amount : Amount.Stable.V1.t
@@ -216,7 +217,7 @@ module Update = struct
   module Stable = struct
     module V1 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
-      type t = Mina_wire_types.Mina_base.Party.Update.V1.t =
+      type t = Mina_wire_types.Mina_base.Account_update.Update.V1.t =
         { app_state :
             F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -287,7 +288,7 @@ module Update = struct
       Set_or_keep.gen token_gen
     in
     let%bind voting_for = Set_or_keep.gen Field.gen in
-    (* a new account for the Party.t is in the ledger when we use
+    (* a new account for the Account_update.t is in the ledger when we use
        this generated update in tests, so the timing must be Keep
     *)
     let timing = Set_or_keep.Keep in
@@ -457,7 +458,7 @@ module Update = struct
         ~checked:(js_only (Js_layout.leaf_type (Custom "TokenSymbol")))
         ~name:"TokenSymbol" string
     in
-    finish "PartyUpdate" ~t_toplevel_annots
+    finish "AccountUpdateUpdate" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
@@ -507,7 +508,8 @@ module Account_precondition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Party.Account_precondition.V1.t =
+      type t =
+            Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t =
         | Full of Zkapp_precondition.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
@@ -615,7 +617,8 @@ module Account_precondition = struct
   let digest (t : t) =
     let digest x =
       Random_oracle.(
-        hash ~init:Hash_prefix_states.party_account_precondition (pack_input x))
+        hash ~init:Hash_prefix_states.account_update_account_precondition
+          (pack_input x))
     in
     to_full t |> Zkapp_precondition.Account.to_input |> digest
 
@@ -625,7 +628,7 @@ module Account_precondition = struct
     let digest (t : t) =
       let digest x =
         Random_oracle.Checked.(
-          hash ~init:Hash_prefix_states.party_account_precondition
+          hash ~init:Hash_prefix_states.account_update_account_precondition
             (pack_input x))
       in
       Zkapp_precondition.Account.Checked.to_input t |> digest
@@ -650,7 +653,7 @@ module Preconditions = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Party.Preconditions.V1.t =
+      type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account : Account_precondition.Stable.V1.t
         }
@@ -819,7 +822,7 @@ module Body = struct
         ~sequence_events:!.Sequence_events.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
         ~caller:!.Token_id.deriver ~call_depth:!.int
-      |> finish "PartyBody" ~t_toplevel_annots
+      |> finish "AccountUpdateBody" ~t_toplevel_annots
 
     let dummy : t =
       { public_key = Public_key.Compressed.empty
@@ -866,7 +869,7 @@ module Body = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Party.Body.V1.t =
+      type t = Mina_wire_types.Mina_base.Account_update.Body.V1.t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V1.t
         ; update : Update.Stable.V1.t
@@ -960,7 +963,7 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Mina_wire_types.Mina_base.Party.Body.Fee_payer.V1.t =
+        type t = Mina_wire_types.Mina_base.Account_update.Body.Fee_payer.V1.t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; fee : Fee.Stable.V1.t
           ; valid_until : Global_slot.Stable.V1.t option [@name "validUntil"]
@@ -999,7 +1002,7 @@ module Body = struct
           !.Fields_derivers_zkapps.Derivers.(
               option ~js_type:`Or_undefined @@ uint32 @@ o ())
         ~nonce:!.uint32
-      |> finish "FeePayerPartyBody" ~t_toplevel_annots
+      |> finish "FeePayerAccountUpdateBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
       let open Fields_derivers_zkapps.Derivers in
@@ -1239,7 +1242,7 @@ module T = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        (** A party to a zkApp transaction *)
+        (** A account_update to a zkApp transaction *)
         type t =
           { body : Body.Graphql_repr.Stable.V1.t
           ; authorization : Control.Stable.V2.t
@@ -1256,7 +1259,7 @@ module T = struct
       Fields.make_creator obj
         ~body:!.Body.Graphql_repr.deriver
         ~authorization:!.Control.deriver
-      |> finish "ZkappParty" ~t_toplevel_annots
+      |> finish "ZkappAccountUpdate" ~t_toplevel_annots
   end
 
   module Simple = struct
@@ -1304,8 +1307,8 @@ module T = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (** A party to a zkApp transaction *)
-      type t = Mina_wire_types.Mina_base.Party.V1.t =
+      (** A account_update to a zkApp transaction *)
+      type t = Mina_wire_types.Mina_base.Account_update.V1.t =
         { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
@@ -1352,7 +1355,7 @@ module Fee_payer = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Party.Fee_payer.V1.t =
+      type t = Mina_wire_types.Mina_base.Account_update.Fee_payer.V1.t =
         { body : Body.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
@@ -1379,7 +1382,7 @@ module Fee_payer = struct
   let account_id (t : t) : Account_id.t =
     Account_id.create t.body.public_key Token_id.default
 
-  let to_party (t : t) : T.t =
+  let to_account_update (t : t) : T.t =
     { authorization = Control.Signature t.authorization
     ; body = Body.of_fee_payer t.body
     }
@@ -1389,7 +1392,7 @@ module Fee_payer = struct
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
-    |> finish "ZkappPartyFeePayer" ~t_toplevel_annots
+    |> finish "ZkappAccountUpdateFeePayer" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let dummy : t =
@@ -1409,11 +1412,11 @@ let account_id (t : t) : Account_id.t =
 let of_fee_payer ({ body; authorization } : Fee_payer.t) : t =
   { authorization = Signature authorization; body = Body.of_fee_payer body }
 
-(** The change in balance to apply to the target account of this party.
+(** The change in balance to apply to the target account of this account_update.
       When this is negative, the amount will be withdrawn from the account and
-      made available to later parties in the same transaction.
+      made available to later zkapp_command in the same transaction.
       When this is positive, the amount will be deposited into the account from
-      the funds made available by previous parties in the same transaction.
+      the funds made available by previous zkapp_command in the same transaction.
 *)
 let balance_change (t : t) : Amount.Signed.t = t.body.balance_change
 
