@@ -656,6 +656,10 @@ module Types = struct
       ( 'context
       , (Mina_state.Blockchain_state.Value.t * State_hash.t) option )
       typ =
+    let staged_ledger_hash t =
+      let blockchain_state, _ = t in
+      Mina_state.Blockchain_state.staged_ledger_hash blockchain_state
+    in
     obj "BlockchainState" ~fields:(fun _ ->
         [ field "date" ~typ:(non_null block_time) ~doc:(Doc.date "date")
             ~args:Arg.[]
@@ -685,11 +689,27 @@ module Types = struct
               Mina_state.Blockchain_state.snarked_ledger_hash blockchain_state
               )
         ; field "stagedLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the staged ledger"
+            ~doc:
+              "Base58Check-encoded hash of the staged ledger hash's main \
+               ledger hash"
             ~args:Arg.[]
-            ~resolve:(fun _ (blockchain_state, _) ->
-              blockchain_state |> Mina_state.Blockchain_state.staged_ledger_hash
-              |> Staged_ledger_hash.ledger_hash )
+            ~resolve:(fun _ t ->
+              let staged_ledger_hash = staged_ledger_hash t in
+              Staged_ledger_hash.ledger_hash staged_ledger_hash )
+        ; field "stagedLedgerAuxHash"
+            ~typ:(non_null @@ Graphql_lib.Scalars.StagedLedgerAuxHash.typ ())
+            ~doc:"Base58Check-encoded hash of the staged ledger hash's aux_hash"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              Staged_ledger_hash.aux_hash (staged_ledger_hash t) )
+        ; field "stagedLedgerPendingCoinbaseAux"
+            ~typ:(non_null @@ Graphql_lib.Scalars.PendingCoinbaseHash.typ ())
+            ~doc:
+              "Base58Check-encoded hash of the staged ledger hash's \
+               pending_coinbase_hash"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              Staged_ledger_hash.pending_coinbase_hash (staged_ledger_hash t) )
         ; field "stagedLedgerProofEmitted" ~typ:bool
             ~doc:
               "Block finished a staged ledger, and a proof was emitted from it \
@@ -709,6 +729,15 @@ module Types = struct
               | Some b ->
                   Some (Transition_frontier.Breadcrumb.just_emitted_a_proof b)
               )
+        ; field "bodyReference"
+            ~typ:(non_null @@ Graphql_lib.Scalars.BodyReference.typ ())
+            ~doc:
+              "A reference to how the block header refers to the body of the \
+               block as a hex-encoded string"
+            ~args:Arg.[]
+            ~resolve:(fun _ t ->
+              let blockchain_state, _ = t in
+              Mina_state.Blockchain_state.body_reference blockchain_state )
         ] )
 
   let protocol_state :
