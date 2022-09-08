@@ -12,6 +12,9 @@
   integers
   core_kernel
   ppx_inline_test.config
+  sexplib0
+  bin_prot.shape
+  base.base_internalhash_types
   ;; local libraries
   kimchi_bindings
   kimchi_types
