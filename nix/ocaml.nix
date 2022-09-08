@@ -222,6 +222,11 @@ let
         extraArgs = {
           MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir -p $out/coverage
+              find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
+          '';
         };
         extraInputs = [ pkgs.ephemeralpg ];
       } ''
@@ -231,11 +236,31 @@ let
         psql "$MINA_TEST_POSTGRES" < create_schema.sql
         popd
         # TODO: investigate failing tests, ideally we should run all tests in src/
-        dune runtest src/app/archive src/lib/command_line_tests --display=short
+
+        # The compiler needs a bigger stack to compile some modules
+        # which are too big when intrumented with bisect_ppx
+        ulimit -s 10000
+
+        dune runtest src/app/archive src/lib src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short
       '';
 
       mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
+      '';
+
+      mina_coverage = runMinaCheck {
+        name = "build-coverage";
+        extraArgs = {
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir $out
+              mv _coverage $out/html
+              mv summary $out/summary
+          '';
+        };
+      } ''
+        bisect-ppx-report html --coverage-path=${self.mina_tests}/coverage --tree --ignore-missing-files
+        bisect-ppx-report summary --coverage-path=${self.mina_tests}/coverage --per-file > summary
       '';
 
       mina_client_sdk = self.mina-dev.overrideAttrs (_: {

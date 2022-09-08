@@ -297,6 +297,7 @@
         inherit ocamlPackages;
         packages.mina = ocamlPackages.mina;
         packages.mina_tests = ocamlPackages.mina_tests;
+        packages.mina_coverage = ocamlPackages.mina_coverage;
         packages.mina_ocaml_format = ocamlPackages.mina_ocaml_format;
         packages.mina_client_sdk_binding = ocamlPackages.mina_client_sdk;
         packages.mina-docker = pkgs.dockerTools.buildImage {
