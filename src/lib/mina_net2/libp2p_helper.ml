@@ -332,6 +332,9 @@ let send_add_resource ~tag ~body =
   let data = Body.to_binio_bigstring body |> Bigstring.to_string in
   send_push ~msg:(Libp2p_ipc.create_add_resource_push_message ~tag ~data)
 
+let send_heartbeat ~peer_id =
+  send_push ~msg:(Libp2p_ipc.create_heartbeat_peer_push_message ~peer_id)
+
 let test_with_libp2p_helper ?(logger = Logger.null ())
     ?(handle_push_message = fun _ -> assert false) f =
   let pids = Pid.Table.create () in
