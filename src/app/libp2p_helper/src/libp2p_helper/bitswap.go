@@ -197,8 +197,12 @@ func (bs *BitswapCtx) DeleteBlocks(keys [][32]byte) error {
 func (bs *BitswapCtx) ViewBlock(key [32]byte, callback func([]byte) error) error {
 	return bs.storage.ViewBlock(bs.ctx, key, callback)
 }
-func (bs *BitswapCtx) StoreBlock(block blocks.Block) error {
-	return bs.storage.StoreBlocks(bs.ctx, []blocks.Block{block})
+func (bs *BitswapCtx) StoreDownloadedBlock(block blocks.Block) error {
+	err := bs.storage.StoreBlocks(bs.ctx, []blocks.Block{block})
+	if err != nil {
+		return err
+	}
+	return bs.engine.Server.NotifyNewBlocks(bs.ctx, block)
 }
 
 type BitswapBlockRequester struct {

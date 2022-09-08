@@ -10,7 +10,7 @@ module Get_all_transactions =
         chainId
       }
       pooledUserCommands(publicKey: null) {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
     }
 |}]
@@ -25,7 +25,7 @@ module Get_transactions_by_hash =
         peers { host }
       }
       pooledUserCommands(hashes: $hashes) {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
         amount @ppxCustom(module: "Scalars.UInt64")
         fee @ppxCustom(module: "Scalars.UInt64")
         kind

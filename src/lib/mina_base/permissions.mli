@@ -7,7 +7,12 @@ module Auth_required : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t = None | Either | Proof | Signature | Impossible
+      type t = Mina_wire_types.Mina_base.Permissions.Auth_required.V2.t =
+        | None
+        | Either
+        | Proof
+        | Signature
+        | Impossible
       [@@deriving sexp, equal, compare, hash, yojson, enum]
     end
   end]
@@ -47,6 +52,7 @@ module Poly : sig
   module Stable : sig
     module V2 : sig
       type 'controller t =
+            'controller Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
         { edit_state : 'controller
         ; send : 'controller
         ; receive : 'controller (* TODO: Consider having fee *)

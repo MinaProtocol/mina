@@ -43,6 +43,10 @@ module Call_forest = struct
     module Stable = struct
       module V1 = struct
         type ('party, 'party_digest, 'digest) t =
+              ( 'party
+              , 'party_digest
+              , 'digest )
+              Mina_wire_types.Mina_base.Parties.Call_forest.Tree.V1.t =
           { party : 'party
           ; party_digest : 'party_digest
           ; calls :
@@ -149,7 +153,7 @@ module Call_forest = struct
 
   type ('a, 'b, 'c) tree = ('a, 'b, 'c) Tree.t
 
-  module Digest : sig
+  module type Digest_intf = sig
     module Party : sig
       include Digest_intf.S
 
@@ -194,7 +198,18 @@ module Call_forest = struct
 
       val create : (_, Party.t, Forest.t) tree -> Tree.t
     end
-  end = struct
+  end
+
+  module Make_digest_sig (T : Mina_wire_types.Mina_base.Parties.Digest_types.S) =
+  struct
+    module type S =
+      Digest_intf
+        with type Party.Stable.V1.t = T.Party.V1.t
+         and type Forest.Stable.V1.t = T.Forest.V1.t
+  end
+
+  module Make_digest_str (T : Mina_wire_types.Mina_base.Parties.Digest_concrete) :
+    Make_digest_sig(T).S = struct
     module M = struct
       open Pickles.Impls.Step.Field
       module Checked = Pickles.Impls.Step.Field
@@ -282,6 +297,11 @@ module Call_forest = struct
           [| party_digest; stack_hash |]
     end
   end
+
+  module Digest =
+    Mina_wire_types.Mina_base.Parties.Digest_make
+      (Make_digest_sig)
+      (Make_digest_str)
 
   let fold = Tree.fold_forest
 
@@ -832,7 +852,7 @@ module T = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Parties.V1.t =
         { fee_payer : Party.Fee_payer.Stable.V1.t
         ; other_parties :
             ( Party.Stable.V1.t
@@ -1302,7 +1322,10 @@ module type Valid_intf = sig
   val forget : t -> T.t
 end
 
-module Valid : Valid_intf = struct
+module Valid :
+  Valid_intf
+    with type Stable.V1.t = Mina_wire_types.Mina_base.Parties.Valid.V1.t =
+struct
   module S = Stable
 
   module Verification_key_hash = struct
@@ -1320,7 +1343,7 @@ module Valid : Valid_intf = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Parties.Valid.V1.t =
         { parties : S.V1.t
         ; verification_keys :
             (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
@@ -1439,6 +1462,88 @@ let dummy =
   ; other_parties = Call_forest.cons party []
   ; memo = Signed_command_memo.empty
   }
+
+(* Parties transactions are filtered using this predicate
+   - when adding to the transaction pool
+   - in incoming blocks
+*)
+let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
+  let events_elements events =
+    List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
+  in
+  let ( num_proof_parties
+      , num_parties
+      , num_event_elements
+      , num_sequence_event_elements ) =
+    Call_forest.fold t.other_parties ~init:(0, 0, 0, 0)
+      ~f:(fun (num_proof_parties, num_parties, evs_size, seq_evs_size) party ->
+        let num_proof_parties' =
+          if Control.(Tag.equal (tag party.authorization) Tag.Proof) then
+            num_proof_parties + 1
+          else num_proof_parties
+        in
+        let party_evs_elements = events_elements party.body.events in
+        let party_seq_evs_elements =
+          events_elements party.body.sequence_events
+        in
+        ( num_proof_parties'
+        , num_parties + 1
+        , evs_size + party_evs_elements
+        , seq_evs_size + party_seq_evs_elements ) )
+  in
+  let max_proof_parties = genesis_constants.max_proof_parties in
+  let max_parties = genesis_constants.max_parties in
+  let max_event_elements = genesis_constants.max_event_elements in
+  let max_sequence_event_elements =
+    genesis_constants.max_sequence_event_elements
+  in
+  let valid_proof_parties = num_proof_parties <= max_proof_parties in
+  let valid_parties = num_parties <= max_parties in
+  let valid_event_elements = num_event_elements <= max_event_elements in
+  let valid_sequence_event_elements =
+    num_sequence_event_elements <= max_sequence_event_elements
+  in
+  if
+    valid_proof_parties && valid_parties && valid_event_elements
+    && valid_sequence_event_elements
+  then Ok ()
+  else
+    let proof_parties_err =
+      if valid_proof_parties then None
+      else
+        Some
+          (sprintf "too many proof parties (%d, max allowed is %d)"
+             num_proof_parties max_proof_parties )
+    in
+    let parties_err =
+      if valid_parties then None
+      else
+        Some
+          (sprintf "too many parties (%d, max allowed is %d)" num_parties
+             max_parties )
+    in
+    let events_err =
+      if valid_event_elements then None
+      else
+        Some
+          (sprintf "too many event elements (%d, max allowed is %d)"
+             num_event_elements max_event_elements )
+    in
+    let sequence_events_err =
+      if valid_sequence_event_elements then None
+      else
+        Some
+          (sprintf "too many sequence event elements (%d, max allowed is %d)"
+             num_sequence_event_elements max_sequence_event_elements )
+    in
+    let err_msg =
+      List.filter
+        [ proof_parties_err; parties_err; events_err; sequence_events_err ]
+        ~f:Option.is_some
+      |> List.map ~f:(fun opt -> Option.value_exn opt)
+      |> String.concat ~sep:"; "
+    in
+    Error (Error.of_string err_msg)
 
 let inner_query =
   lazy
