@@ -241,7 +241,46 @@ let
         # which are too big when intrumented with bisect_ppx
         ulimit -s 10000
 
-        dune runtest src/app/archive src/lib src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short
+        # dune runtest src/app/archive src/lib src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short
+        dune runtest src/app/archive --instrument-with bisect_ppx --display=short
+      '';
+
+      mina_tests_src_lib = runMinaCheck {
+        name = "tests_src_lib";
+        extraArgs = {
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir -p $out/coverage
+              find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
+          '';
+        };
+      } ''
+        # The compiler needs a bigger stack to compile some modules
+        # which are too big when intrumented with bisect_ppx
+        ulimit -s 10000
+
+        dune runtest src/lib --instrument-with bisect_ppx --display=short
+      '';
+
+      mina_tests_zkapp_test_transaction = runMinaCheck {
+        name = "tests_zkapp_test_transaction";
+        extraArgs = {
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+          outputs = [ "out" ];
+          installPhase = ''
+              mkdir -p $out/coverage
+              find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
+          '';
+        };
+      } ''
+        # The compiler needs a bigger stack to compile some modules
+        # which are too big when intrumented with bisect_ppx
+        ulimit -s 10000
+
+        dune runtest src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short
       '';
 
       mina_ocaml_format = runMinaCheck { name = "ocaml-format"; } ''
@@ -259,8 +298,13 @@ let
           '';
         };
       } ''
-        bisect-ppx-report html --coverage-path=${self.mina_tests}/coverage --tree --ignore-missing-files
-        bisect-ppx-report summary --coverage-path=${self.mina_tests}/coverage --per-file > summary
+        mkdir coverage_files
+        #TODO can coverage files have the same names ?
+        cp ${self.mina_tests}/coverage/* coverage_files
+        cp ${self.mina_tests_zkapp_test_transaction}/coverage/* coverage_files
+        cp ${self.mina_tests_src_lib}/coverage/* coverage_files
+        bisect-ppx-report html --coverage-path=coverage_files --tree --ignore-missing-files
+        bisect-ppx-report summary --coverage-path=coverage_files --per-file > summary
       '';
 
       mina_client_sdk = self.mina-dev.overrideAttrs (_: {
