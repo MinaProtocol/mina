@@ -347,6 +347,7 @@ module type Transaction_resource_pool_intf = sig
        trust_system:Trust_system.t
     -> pool_max_size:int
     -> verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> Config.t
 
   val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool

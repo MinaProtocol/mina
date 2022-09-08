@@ -86,7 +86,6 @@ module Constants = struct
 end
 
 let setup (type n) ~context:(module Context : CONTEXT)
-    ?(trust_system = Trust_system.null ())
     ?(time_controller = Block_time.Controller.basic ~logger:Context.logger)
     (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
   let open Context in
@@ -109,7 +108,12 @@ let setup (type n) ~context:(module Context : CONTEXT)
     Gossip_net.Fake.create_network (Vect.to_list peers)
   in
   let config peer consensus_local_state =
+    let trust_system = Trust_system.null () in
     let open Mina_networking.Config in
+    don't_wait_for
+      (Pipe_lib.Strict_pipe.Reader.iter
+         (Trust_system.upcall_pipe trust_system)
+         ~f:(const Deferred.unit) ) ;
     { logger
     ; trust_system
     ; time_controller

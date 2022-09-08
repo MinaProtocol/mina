@@ -32,6 +32,7 @@
    perf_histograms
    mina_metrics
    mina_block
+   mina_transaction
    network_peer
    with_hash
    logger

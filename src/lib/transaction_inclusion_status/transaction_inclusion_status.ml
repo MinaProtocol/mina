@@ -106,7 +106,7 @@ let%test_module "transaction_status" =
       Transition_frontier.For_tests.gen ~logger ~precomputed_values ~verifier
         ~trust_system ~max_length ~size:frontier_size ()
 
-    (*TODO: Generate snapp txns*)
+    (* TODO: Generate zkApps txns *)
     let gen_user_command =
       Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
@@ -114,7 +114,7 @@ let%test_module "transaction_status" =
     let create_pool ~frontier_broadcast_pipe =
       let config =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
-          ~verifier
+          ~verifier ~genesis_constants:precomputed_values.genesis_constants
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config

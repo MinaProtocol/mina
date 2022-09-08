@@ -811,10 +811,9 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
     let%bind list_len = Int.gen_uniform_incl 0 max_list_len in
     Quickcheck.Generator.list_with_length list_len array_gen
   in
-  (* TODO: are these lengths reasonable? *)
-  let%bind events = field_array_list_gen ~max_array_len:8 ~max_list_len:12 in
+  let%bind events = field_array_list_gen ~max_array_len:2 ~max_list_len:1 in
   let%bind sequence_events =
-    field_array_list_gen ~max_array_len:4 ~max_list_len:6
+    field_array_list_gen ~max_array_len:2 ~max_list_len:1
   in
   let%bind call_data = Snark_params.Tick.Field.gen in
   let first_use_of_account =
@@ -888,8 +887,6 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
        | None ->
            None
        | Some zk ->
-           (*TODO: Deduplicate this from what's in parties logic to get the
-              account precondition right*)
            let app_state =
              let account_app_state = zk.app_state in
              List.zip_exn
@@ -900,14 +897,7 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
              |> Zkapp_state.V.of_list_exn
            in
            let sequence_state =
-             let [ s1'; s2'; s3'; s4'; s5' ] = zk.sequence_state in
              let last_sequence_slot = zk.last_sequence_slot in
-             (* Push events to s1. *)
-             let is_empty = List.is_empty sequence_events in
-             let s1_updated =
-               Party.Sequence_events.push_events s1' sequence_events
-             in
-             let s1 = if is_empty then s1' else s1_updated in
              let txn_global_slot =
                Option.value_map protocol_state_view ~default:last_sequence_slot
                  ~f:(fun ps ->
@@ -915,16 +905,11 @@ let gen_party_body_components (type a b c d) ?(update = None) ?account_id
                      .Zkapp_precondition.Protocol_state.Poly
                       .global_slot_since_genesis )
              in
-             (* Shift along if last update wasn't this slot  *)
-             let is_this_slot =
-               Mina_numbers.Global_slot.equal txn_global_slot last_sequence_slot
+             let sequence_state, _last_sequence_slot =
+               Mina_ledger.Ledger.update_sequence_state zk.sequence_state
+                 sequence_events ~txn_global_slot ~last_sequence_slot
              in
-             let is_full_and_different_slot = (not is_empty) && is_this_slot in
-             let s5 = if is_full_and_different_slot then s5' else s4' in
-             let s4 = if is_full_and_different_slot then s4' else s3' in
-             let s3 = if is_full_and_different_slot then s3' else s2' in
-             let s2 = if is_full_and_different_slot then s2' else s1' in
-             ([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t)
+             sequence_state
            in
            let proved_state =
              let keeping_app_state =
