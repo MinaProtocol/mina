@@ -102,7 +102,7 @@ let%test_module "Zkapp tokens tests" =
                                (10 * account_creation_fee) )
                             []
                         ]
-                      |> mk_zkapp_command_transaction ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
@@ -130,7 +130,7 @@ let%test_module "Zkapp tokens tests" =
                                 []
                             ]
                         ]
-                      |> mk_zkapp_command_transaction ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
@@ -159,7 +159,7 @@ let%test_module "Zkapp tokens tests" =
                                 ]
                             ]
                         ]
-                      |> mk_zkapp_command_transaction ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
@@ -224,7 +224,7 @@ let%test_module "Zkapp tokens tests" =
                                 ]
                             ]
                         ]
-                      |> mk_zkapp_command_transaction ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures

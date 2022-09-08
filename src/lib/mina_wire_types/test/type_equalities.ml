@@ -182,7 +182,7 @@ module Mina_base = struct
   include
     Assert_equal0V1
       (O.Zkapp_command.Call_forest.Digest.Account_update.Stable)
-      (W.Zkapp_command.Call_forest.Digest.AccountUpdate)
+      (W.Zkapp_command.Call_forest.Digest.Account_update)
 
   include
     Assert_equal0V1
@@ -225,7 +225,7 @@ module Mina_base = struct
       (O.Zkapp_command.Call_forest.Stable)
       (W.Zkapp_command.Call_forest)
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
-  include Assert_equal0V1 (O.Account_update.Stable) (W.AccountUpdate)
+  include Assert_equal0V1 (O.Account_update.Stable) (W.Account_update)
   include Assert_equal0V1 (O.Zkapp_command.Stable) (W.Zkapp_command)
   include Assert_equal0V1 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
   include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
