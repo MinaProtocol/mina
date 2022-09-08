@@ -226,7 +226,7 @@ type Helper struct {
 	MsgStats          *MessageStats
 	Seeds             []peer.AddrInfo
 	NodeStatus        []byte
-	HeartbeatPeer func(peer.ID)
+	HeartbeatPeer     func(peer.ID)
 }
 
 type MessageStats struct {
@@ -700,7 +700,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		return nil, err
 	}
 	bitswapNetwork := bitnet.NewFromIpfsHost(host, kad, bitnet.Prefix(BitSwapExchange))
-	bs := bitswap.New(context.Background(), bitswapNetwork, bstore.Blockstore()).(*bitswap.Bitswap)
+	bs := bitswap.New(context.Background(), bitswapNetwork, bstore.Blockstore())
 
 	// nil fields are initialized by beginAdvertising
 	h := &Helper{

@@ -5,7 +5,7 @@ go 1.18
 require (
 	capnproto.org/go/capnp/v3 v3.0.0-alpha.5
 	github.com/go-errors/errors v1.4.2
-	github.com/ipfs/go-bitswap v0.8.0
+	github.com/ipfs/go-bitswap v0.9.0
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-cid v0.2.0
 	github.com/ipfs/go-ds-badger v0.3.0
