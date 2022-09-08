@@ -2,27 +2,50 @@ open Core_kernel
 
 (* This module implements snarky functions for a sponge that can *conditionally* absorb input,
    while branching minimally. Specifically, if absorbing N field elements, this sponge can absorb
-   a variable subset of N field elements, while performing N + 1 invocations of the sponge's
-   underlying permutation. *)
+   a variable subset of N field elements, while performing ceildiv(N, 2) + 1 invocations of the sponge's
+   underlying permutation. That is, we only invoke the permutation one more time than we would if not
+   doing optional absorption.
+*)
 
+(* The state size of our sponge *)
 let m = 3
 
 let capacity = 1
 
+(* rate = 2, meaning we can absorb 2 elements per invocation of the permutation *)
 let rate = m - capacity
 
+(* An index into the 2 absorbing positions in the 3-element state of Poseidon.
+   Such an index is either 0 or 1 and so we represent it using a boolean. *)
+type 'f absorb_position_index = 'f Snarky_backendless.Boolean.t
+
+(* This indicates whether we are in an absorbing or squeezing state, plus some
+   additional data in each case. *)
 type 'f sponge_state =
   | Absorbing of
-      { next_index : 'f Snarky_backendless.Boolean.t
+      { next_index : 'f absorb_position_index
+            (* The next index in our 3-element state we should absorb into (either 0 or 1) *)
       ; xs : ('f Snarky_backendless.Boolean.t * 'f) list
+            (* The list of (should actually absorb, field element) pairs that we've conditionally
+               absorbed so far, in reverse order so that we can "append" to the front.
+
+               Our strategy is kind of lazy. We defer doing any actual computation until [squeeze]
+               is called and absorb by simply consing onto this list.
+            *)
       }
   | Squeezed of int
+(* How many elements have we squeezed from the sponge. *)
 
 type 'f t =
-  { mutable state : 'f array
+  { mutable state : 'f array (* The underlying Poseidon state *)
   ; params : 'f Sponge.Params.t
+        (* Poseidon parameters (round constants and MDS matrix) *)
   ; needs_final_permute_if_empty : bool
+        (* A flag indicating that the sponge needs to be permuted even when none of the
+           optional inputs are absorbed. This is the case if we create an opt-sponge from
+           a standard sponge that has already absorbed some inputs. *)
   ; mutable sponge_state : 'f sponge_state
+        (* The absorption state of the sponge. *)
   }
 
 module Make
@@ -43,8 +66,9 @@ struct
     ; needs_final_permute_if_empty
     }
 
-  let initial_state = Array.init m ~f:(fun _ -> Field.zero)
+  type absorb_position_index = Boolean.var
 
+  (* Create an opt-sponge from a normal sponge *)
   let of_sponge { Sponge.state; params; sponge_state } =
     match sponge_state with
     | Squeezed n ->
@@ -75,6 +99,9 @@ struct
         | _ ->
             assert false )
 
+  let initial_state = Array.init m ~f:(fun _ -> Field.zero)
+
+  (* Create an opt-sponge from a set of parameters and an optional initial state. *)
   let create ?(init = initial_state) params =
     { params
     ; state = Array.copy init
@@ -84,6 +111,10 @@ struct
 
   let () = assert (rate = 2)
 
+  (* Given an array of field element variables [a] of length 2, a variable index [i] (which is a [Boolean.var])
+     and a field element variable [x], set [a.(i)] to [a.(i) + x].
+
+     Note that the trickiness is that [i] is a variable and not an [int]. *)
   let add_in a i x =
     let i_equals_0 = Boolean.not i in
     let i_equals_1 = i in
@@ -104,7 +135,16 @@ struct
         assert_r1cs x (i_equals_j :> Field.t) Field.(a_j' - a.(j)) ;
         a.(j) <- a_j' )
 
-  let consume ~needs_final_permute_if_empty ~params ~start_pos input state =
+  (* Absorb an array of optional inputs [input: (absorb_position_index * Field.t) array]
+     into the sponge with state [state : Field.t array], starting to absorb at
+     index [start_pos : absorb_position_index].
+
+     And, if [needs_final_permute_if_empty], apply the permutation a final time
+     at the end if all of the optional inputs were not present. *)
+  let consume ~(params : Field.t Sponge.Params.t)
+      ~(needs_final_permute_if_empty : bool)
+      ~(start_pos : absorb_position_index) (state : Field.t array)
+      (input : (absorb_position_index * Field.t) array) =
     assert (Array.length state = m) ;
     let n = Array.length input in
     let pos = ref start_pos in
@@ -181,6 +221,7 @@ struct
       cond_permute permute ;
       add_in state p' Field.(y * (add_in_y_after_perm :> t))
     done ;
+    (* True iff all of the inputs are "None", i.e., if all the flags are false. *)
     let empty_imput =
       Boolean.not (Boolean.Array.any (Array.map input ~f:fst))
     in
@@ -201,6 +242,8 @@ struct
     in
     cond_permute should_permute
 
+  (* Absorb a value into the opt-sponge. This we do by simply prepending to
+     a list, deferring the actual computation until "squeeze" is called. *)
   let absorb (t : t) x =
     match t.sponge_state with
     | Absorbing { next_index; xs } ->
@@ -208,6 +251,7 @@ struct
     | Squeezed _ ->
         t.sponge_state <- Absorbing { next_index = Boolean.false_; xs = [ x ] }
 
+  (* Squeeze a value from the opt-sponge. *)
   let squeeze (t : t) =
     match t.sponge_state with
     | Squeezed n ->
@@ -220,7 +264,7 @@ struct
           t.state.(n) )
     | Absorbing { next_index; xs } ->
         consume ~needs_final_permute_if_empty:t.needs_final_permute_if_empty
-          ~start_pos:next_index ~params:t.params (Array.of_list_rev xs) t.state ;
+          ~start_pos:next_index ~params:t.params t.state (Array.of_list_rev xs) ;
         t.sponge_state <- Squeezed 1 ;
         t.state.(0)
 
