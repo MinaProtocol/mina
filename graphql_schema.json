@@ -466,11 +466,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -5520,6 +5516,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "VrfOutputTruncated",
+          "description": "truncated vrf output",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "VrfThreshold",
           "description":
@@ -5535,7 +5541,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Balance",
                   "ofType": null
                 }
               },
@@ -5552,7 +5558,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -5567,8 +5573,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "EpochSeed",
-          "description": "Base58Check-encoded epoch seed",
+          "name": "VrfScalar",
+          "description": "consensus vrf scalar",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -5589,7 +5595,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -5678,7 +5684,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "VrfScalar",
                   "ofType": null
                 }
               },
@@ -5694,7 +5700,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "VrfScalar",
                   "ofType": null
                 }
               },
@@ -5743,7 +5749,11 @@
               "description":
                 "The vrf output derived from the evaluation witness. If null, the vrf witness was invalid.",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "VrfOutputTruncated",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -5833,6 +5843,17 @@
               "defaultValue": null
             }
           ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "UInt64",
+          "description":
+            "String or Integer representation of a uint64 number. If the input is a string, it must represent the number in base 10",
+          "fields": null,
+          "inputFields": null,
           "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
@@ -6027,11 +6048,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -6046,7 +6063,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -6108,7 +6125,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -6136,7 +6153,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "LedgerHash",
                   "ofType": null
                 }
               },
@@ -6152,7 +6169,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "LedgerHash",
                   "ofType": null
                 }
               },
@@ -6185,7 +6202,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -6286,7 +6303,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "InetAddr",
                   "ofType": null
                 }
               },
@@ -6329,7 +6346,7 @@
               "name": "bannedStatus",
               "description": "Banned status",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Time", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -6398,11 +6415,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -6438,6 +6451,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "FeeTransferType",
+          "description": "fee transfer type",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "FeeTransfer",
           "description": null,
@@ -6466,11 +6489,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -6485,7 +6504,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "FeeTransferType",
                   "ofType": null
                 }
               },
@@ -6499,6 +6518,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Index",
+          "description": "ocaml integer as a string",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "PartiesFailureReason",
           "description": null,
@@ -6507,7 +6536,7 @@
               "name": "index",
               "description": "List index of the party that failed",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Index", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -6527,7 +6556,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "SCALAR",
-                      "name": "String",
+                      "name": "TransactionStatusFailure",
                       "ofType": null
                     }
                   }
@@ -6961,16 +6990,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "BlockTime",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "BlockTimeInterval",
           "description": null,
@@ -7234,16 +7253,6 @@
         },
         {
           "kind": "SCALAR",
-          "name": "StateHash",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
           "name": "CurrencyAmount",
           "description": null,
           "fields": null,
@@ -7255,16 +7264,6 @@
         {
           "kind": "SCALAR",
           "name": "GlobalSlot",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "Balance",
           "description": null,
           "fields": null,
           "inputFields": null,
@@ -7557,16 +7556,6 @@
           ],
           "inputFields": null,
           "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
-          "name": "VerificationKey",
-          "description": "Verification key in Base58Check format",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -8056,16 +8045,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "Fee",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "FeePayerPartyBody",
           "description": null,
@@ -8239,6 +8218,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "PartiesBase58",
+          "description": "A Base58Check string representing the command",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "ZkappCommand",
           "description": null,
@@ -8250,7 +8239,11 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": { "kind": "SCALAR", "name": "ID", "ofType": null }
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PartiesBase58",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8264,7 +8257,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "TransactionHash",
                   "ofType": null
                 }
               },
@@ -8336,7 +8329,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "TransactionHash",
                   "ofType": null
                 }
               },
@@ -8430,7 +8423,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -8463,7 +8456,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -8494,11 +8487,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8606,7 +8595,11 @@
               "description":
                 "null is no failure or status unknown, reason for failure otherwise.",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "TransactionStatusFailure",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -8620,8 +8613,28 @@
         },
         {
           "kind": "SCALAR",
+          "name": "TransactionStatusFailure",
+          "description": "transaction status failure",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "UserCommandKind",
           "description": "The kind of user command",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "TransactionHash",
+          "description": "Base58Check-encoded transaction hash",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -8696,7 +8709,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "TransactionHash",
                   "ofType": null
                 }
               },
@@ -8790,7 +8803,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -8823,7 +8836,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -8854,11 +8867,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8966,7 +8975,11 @@
               "description":
                 "null is no failure or status unknown, reason for failure otherwise.",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "TransactionStatusFailure",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -9004,7 +9017,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "TransactionHash",
                   "ofType": null
                 }
               },
@@ -9098,7 +9111,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -9131,7 +9144,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -9162,11 +9175,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -9273,7 +9282,11 @@
               "description":
                 "null is no failure, reason for failure otherwise.",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "TransactionStatusFailure",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -9382,7 +9395,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -9415,6 +9428,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "PrecomputedBlockProof",
+          "description": "Base-64 encoded proof",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "protocolStateProof",
           "description": null,
@@ -9423,7 +9446,11 @@
               "name": "base64",
               "description": "Base-64 encoded proof",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "PrecomputedBlockProof",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -9438,6 +9465,26 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Epoch",
+          "description": "epoch",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Slot",
+          "description": "slot",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -9471,7 +9518,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "EpochSeed",
                   "ofType": null
                 }
               },
@@ -9487,7 +9534,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "StateHash",
                   "ofType": null
                 }
               },
@@ -9519,7 +9566,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9529,6 +9576,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "EpochSeed",
+          "description": "Base58Check-encoded epoch seed",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -9546,7 +9603,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "LedgerHash",
                   "ofType": null
                 }
               },
@@ -9562,7 +9619,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -9605,7 +9662,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "EpochSeed",
                   "ofType": null
                 }
               },
@@ -9621,7 +9678,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "StateHash",
                   "ofType": null
                 }
               },
@@ -9653,7 +9710,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9680,7 +9737,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9696,7 +9753,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9712,7 +9769,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9728,7 +9785,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -9760,7 +9817,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Amount",
                   "ofType": null
                 }
               },
@@ -9824,7 +9881,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Slot",
                   "ofType": null
                 }
               },
@@ -9840,7 +9897,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -9856,7 +9913,74 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Epoch",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "superchargedCoinbase",
+              "description":
+                "Whether or not this coinbase was \"supercharged\", ie. created by an account that has no locked tokens",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockStakeWinner",
+              "description":
+                "The public key that is responsible for winning this block (including delegations)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockCreator",
+              "description":
+                "The block producer public key that created this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "coinbaseReceiever",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
                   "ofType": null
                 }
               },
@@ -9866,6 +9990,49 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "BodyReference",
+          "description":
+            "A reference to how the block header refers to the body of the block as a hex-encoded string",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "PendingCoinbaseHash",
+          "description":
+            "Base58Check-encoded hash of a pending coinbase hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "StagedLedgerAuxHash",
+          "description":
+            "Base58Check-encoded hash of the staged ledger hash's aux_hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "LedgerHash",
+          "description": "Base58Check-encoded ledger hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -9884,7 +10051,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "BlockTime",
                   "ofType": null
                 }
               },
@@ -9901,7 +10068,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "BlockTime",
                   "ofType": null
                 }
               },
@@ -9917,7 +10084,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "LedgerHash",
                   "ofType": null
                 }
               },
@@ -9926,14 +10093,49 @@
             },
             {
               "name": "stagedLedgerHash",
-              "description": "Base58Check-encoded hash of the staged ledger",
+              "description":
+                "Base58Check-encoded hash of the staged ledger hash's main ledger hash",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "LedgerHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stagedLedgerAuxHash",
+              "description":
+                "Base58Check-encoded hash of the staged ledger hash's aux_hash",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "StagedLedgerAuxHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stagedLedgerPendingCoinbaseAux",
+              "description":
+                "Base58Check-encoded hash of the staged ledger hash's pending_coinbase_hash",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PendingCoinbaseHash",
                   "ofType": null
                 }
               },
@@ -9946,6 +10148,23 @@
                 "Block finished a staged ledger, and a proof was emitted from it and included into this block's proof. If there is no transition frontier available or no block found, this will return null.",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bodyReference",
+              "description":
+                "A reference to how the block header refers to the body of the block as a hex-encoded string",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "BodyReference",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -9969,7 +10188,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "StateHash",
                   "ofType": null
                 }
               },
@@ -10013,6 +10232,17 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "StateHashAsDecimal",
+          "description":
+            "Experimental: Bigint field-element representation of stateHash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -10079,7 +10309,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "StateHash",
                   "ofType": null
                 }
               },
@@ -10096,7 +10326,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "StateHashAsDecimal",
                   "ofType": null
                 }
               },
@@ -10195,6 +10425,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Fee",
+          "description": "fee",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "SnarkWorker",
           "description": null,
@@ -10239,11 +10479,7 @@
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
-                  "ofType": null
-                }
+                "ofType": { "kind": "SCALAR", "name": "Fee", "ofType": null }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -10298,6 +10534,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "InetAddr",
+          "description": "network address",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "NetworkPeerPayload",
           "description": null,
@@ -10327,7 +10573,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "InetAddr",
                   "ofType": null
                 }
               },
@@ -10438,7 +10684,11 @@
               "name": "left",
               "description": null,
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "FieldElem",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -10446,13 +10696,47 @@
               "name": "right",
               "description": null,
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "FieldElem",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "SequenceEvent",
+          "description": "sequence event",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "VerificationKeyHash",
+          "description": "Hash of verification key",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "VerificationKey",
+          "description": "verification key in Base58Check format",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -10470,7 +10754,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "VerificationKey",
                   "ofType": null
                 }
               },
@@ -10486,7 +10770,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "VerificationKeyHash",
                   "ofType": null
                 }
               },
@@ -10733,8 +11017,58 @@
         },
         {
           "kind": "SCALAR",
+          "name": "FieldElem",
+          "description": "field element",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
           "name": "Boolean",
           "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "ChainHash",
+          "description": "Base58Check-encoded chain hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "AccountNonce",
+          "description": "account nonce",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "StateHash",
+          "description": "Base58Check-encoded state hash",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Length",
+          "description": "length",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -10756,7 +11090,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Balance",
                   "ofType": null
                 }
               },
@@ -10773,7 +11107,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt64",
+                  "name": "Balance",
                   "ofType": null
                 }
               },
@@ -10785,7 +11119,7 @@
               "description":
                 "The amount of MINA owned by the account which is currently available. Can be null if bootstrapping.",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Balance", "ofType": null },
               "isDeprecated": true,
               "deprecationReason": null
             },
@@ -10794,7 +11128,7 @@
               "description":
                 "The amount of MINA owned by the account which is currently locked. Can be null if bootstrapping.",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Balance", "ofType": null },
               "isDeprecated": true,
               "deprecationReason": null
             },
@@ -10807,7 +11141,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Length",
                   "ofType": null
                 }
               },
@@ -10819,7 +11153,11 @@
               "description":
                 "Hash of block at which balance was measured. Can be null if bootstrapping. Guaranteed to be non-null for direct account lookup queries when not bootstrapping. Can also be null when accessed as nested properties (eg. via delegators). ",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "StateHash",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -10831,8 +11169,18 @@
         },
         {
           "kind": "SCALAR",
-          "name": "UInt64",
-          "description": "String representing a uint64 number in base 10",
+          "name": "Amount",
+          "description": "amount",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Balance",
+          "description": "balance",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -10849,7 +11197,7 @@
               "description":
                 "The initial minimum balance for a time-locked account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Balance", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -10857,7 +11205,11 @@
               "name": "cliffTime",
               "description": "The cliff time for a time-locked account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "Globalslot",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -10865,7 +11217,7 @@
               "name": "cliffAmount",
               "description": "The cliff amount for a time-locked account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Amount", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -10873,7 +11225,11 @@
               "name": "vestingPeriod",
               "description": "The vesting period for a time-locked account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt32", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "Globalslot",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -10882,7 +11238,7 @@
               "description":
                 "The vesting increment for a time-locked account",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "UInt64", "ofType": null },
+              "type": { "kind": "SCALAR", "name": "Amount", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -10987,7 +11343,11 @@
               "description":
                 "A natural number that increases with each transaction (stringified uint32)",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "AccountNonce",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -10996,7 +11356,11 @@
               "description":
                 "Like the `nonce` field, except it includes the scheduled transactions (transactions not yet included in a block) (stringified uint32)",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "AccountNonce",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -11013,7 +11377,11 @@
               "name": "receiptChainHash",
               "description": "Top hash of the receipt chain merkle-list",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "ChainHash",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -11086,7 +11454,11 @@
               "description":
                 "The previous epoch lock hash of the chain which you are voting for",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "ChainHash",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -11180,7 +11552,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "String",
+                    "name": "FieldElem",
                     "ofType": null
                   }
                 }
@@ -11233,7 +11605,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "String",
+                    "name": "SequenceEvent",
                     "ofType": null
                   }
                 }
@@ -11246,7 +11618,11 @@
               "description":
                 "The base58Check-encoded hash of this account to bootstrap the merklePath",
               "args": [],
-              "type": { "kind": "SCALAR", "name": "String", "ofType": null },
+              "type": {
+                "kind": "SCALAR",
+                "name": "FieldElem",
+                "ofType": null
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -11436,6 +11812,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "Time",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "ConsensusConfiguration",
           "description": null,
@@ -11509,7 +11895,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "Time",
                   "ofType": null
                 }
               },
@@ -11566,7 +11952,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -11624,7 +12010,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "SCALAR",
-                      "name": "UInt32",
+                      "name": "Globalslot",
                       "ofType": null
                     }
                   }
@@ -11653,6 +12039,26 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "BlockTime",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Globalslot",
+          "description": "globalslot",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -11712,7 +12118,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "UInt32",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -11728,7 +12134,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "BlockTime",
                   "ofType": null
                 }
               },
@@ -11744,7 +12150,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "BlockTime",
                   "ofType": null
                 }
               },
@@ -11754,6 +12160,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Span",
+          "description": "span",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -11771,7 +12187,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "Span",
                   "ofType": null
                 }
               },
@@ -11787,7 +12203,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "Span",
                   "ofType": null
                 }
               },

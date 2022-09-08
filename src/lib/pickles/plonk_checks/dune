@@ -2,7 +2,7 @@
  (name plonk_checks)
  (public_name pickles.plonk_checks)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (libraries
    ;; opam libraries
    sexplib0

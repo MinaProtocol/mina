@@ -3,6 +3,9 @@ open Mina_base_import
 
 module Poly : sig
   type ('public_key, 'amount) t =
+        ( 'public_key
+        , 'amount )
+        Mina_wire_types.Mina_base.Payment_payload.Poly.V2.t =
     { source_pk : 'public_key; receiver_pk : 'public_key; amount : 'amount }
   [@@deriving equal, sexp, hash, yojson]
 

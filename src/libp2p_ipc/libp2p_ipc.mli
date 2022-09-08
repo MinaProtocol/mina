@@ -65,7 +65,7 @@ val create_libp2p_config :
   -> seed_peers:multiaddr list
   -> known_private_ip_nets:string list
   -> peer_exchange:bool
-  -> mina_peer_exchange:bool
+  -> peer_protection_ratio:float
   -> min_connections:int
   -> max_connections:int
   -> validation_queue_size:int
@@ -88,10 +88,14 @@ val rpc_response_to_or_error : rpc_response -> rpc_response_body Or_error.t
 
 val rpc_request_to_outgoing_message : rpc_request -> outgoing_message
 
-val create_push_message :
+val create_validation_push_message :
      validation_id:validation_id
   -> validation_result:validation_result
   -> push_message
+
+val create_add_resource_push_message : tag:int -> data:string -> push_message
+
+val create_heartbeat_peer_push_message : peer_id:Peer.Id.t -> push_message
 
 val push_message_to_outgoing_message : push_message -> outgoing_message
 

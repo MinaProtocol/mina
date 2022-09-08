@@ -2305,7 +2305,10 @@ module Ledger = struct
 
   type private_key = < s : scalar_class Js.t Js.prop > Js.t
 
-  type public_key = < g : group_class Js.t Js.readonly_prop > Js.t
+  type public_key =
+    < x : field_class Js.t Js.readonly_prop
+    ; isOdd : bool_class Js.t Js.readonly_prop >
+    Js.t
 
   type zkapp_account =
     < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
@@ -2450,13 +2453,11 @@ module Ledger = struct
 
   let public_key_checked (pk : public_key) :
       Signature_lib.Public_key.Compressed.var =
-    let x = pk##.g##.x##.value in
-    let y = pk##.g##.y##.value in
-    Signature_lib.Public_key.compress_var (x, y) |> Impl.run_checked
+    { x = pk##.x##.value; is_odd = pk##.isOdd##.value }
 
   let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
-    { x = to_unchecked pk##.g##.x##.value
-    ; is_odd = Bigint.(test_bit (of_field (to_unchecked pk##.g##.y##.value)) 0)
+    { x = to_unchecked pk##.x##.value
+    ; is_odd = pk##.isOdd##.value |> bool_constant |> Option.value_exn
     }
 
   let private_key (key : private_key) : Signature_lib.Private_key.t =
@@ -2538,9 +2539,14 @@ module Ledger = struct
           Unsigned.UInt64.to_string n |> Field.Constant.of_string |> field
       end
 
-    let public_key (pk : Signature_lib.Public_key.Compressed.t) =
-      let x, y = Signature_lib.Public_key.decompress_exn pk in
-      to_js_group (Field.constant x) (Field.constant y)
+    let public_key (pk : Signature_lib.Public_key.Compressed.t) : public_key =
+      object%js
+        val x = to_js_field_unchecked pk.x
+
+        val isOdd =
+          new%js bool_constr
+            (As_bool.of_boolean @@ Boolean.var_of_value pk.is_odd)
+      end
 
     let token_id (token_id : Mina_base.Token_id.t) =
       token_id |> Mina_base.Token_id.to_field_unsafe |> field
@@ -2590,13 +2596,8 @@ module Ledger = struct
       end
 
     let account (a : Mina_base.Account.t) : account =
-      let to_public_key pk =
-        object%js
-          val g = public_key pk
-        end
-      in
       object%js
-        val publicKey = to_public_key a.public_key
+        val publicKey = public_key a.public_key
 
         val tokenId = token_id a.token_id
 
@@ -2608,7 +2609,7 @@ module Ledger = struct
 
         val receiptChainHash = field (a.receipt_chain_hash :> Impl.field)
 
-        val delegate = option to_public_key a.delegate
+        val delegate = option public_key a.delegate
 
         val votingFor = field (a.voting_for :> Impl.field)
 
@@ -2793,7 +2794,7 @@ module Ledger = struct
     pk |> public_key |> Signature_lib.Public_key.Compressed.to_base58_check
     |> Js.string
 
-  let public_key_of_string (pk_base58 : Js.js_string Js.t) : group_class Js.t =
+  let public_key_of_string (pk_base58 : Js.js_string Js.t) : public_key =
     pk_base58 |> Js.to_string
     |> Signature_lib.Public_key.Compressed.of_base58_check_exn
     |> To_js.public_key
@@ -2870,36 +2871,23 @@ module Ledger = struct
   let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
     add_account_exn l##.value pk (Js.to_string balance)
 
-  let dummy_state_view : Mina_base.Zkapp_precondition.Protocol_state.View.t =
-    let epoch_data =
-      { Mina_base.Zkapp_precondition.Protocol_state.Epoch_data.Poly.ledger =
-          { Mina_base.Epoch_ledger.Poly.hash = Field.Constant.zero
-          ; total_currency = Currency.Amount.zero
-          }
-      ; seed = Field.Constant.zero
-      ; start_checkpoint = Field.Constant.zero
-      ; lock_checkpoint = Field.Constant.zero
-      ; epoch_length = Mina_numbers.Length.zero
-      }
+  let protocol_state_of_json =
+    let deriver =
+      Mina_base.Zkapp_precondition.Protocol_state.View.deriver
+      @@ Fields_derivers_zkapps.o ()
     in
-    { snarked_ledger_hash = Field.Constant.zero
-    ; timestamp = Block_time.zero
-    ; blockchain_length = Mina_numbers.Length.zero
-    ; min_window_density = Mina_numbers.Length.zero
-    ; last_vrf_output = ()
-    ; total_currency = Currency.Amount.zero
-    ; global_slot_since_hard_fork = Mina_numbers.Global_slot.zero
-    ; global_slot_since_genesis = Mina_numbers.Global_slot.zero
-    ; staking_epoch_data = epoch_data
-    ; next_epoch_data = epoch_data
-    }
+    let of_json = Fields_derivers_zkapps.of_json deriver in
+    fun (json : Js.js_string Js.t) :
+        Mina_base.Zkapp_precondition.Protocol_state.View.t ->
+      json |> Js.to_string |> Yojson.Safe.from_string |> of_json
 
   let apply_parties_transaction l (txn : Parties.t)
-      (account_creation_fee : string) =
+      (account_creation_fee : string)
+      (network_state : Mina_base.Zkapp_precondition.Protocol_state.View.t) =
     check_party_signatures txn ;
     let ledger = l##.value in
     let applied_exn =
-      T.apply_parties_unchecked ~state_view:dummy_state_view
+      T.apply_parties_unchecked ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee
@@ -2925,11 +2913,15 @@ module Ledger = struct
     Js.array @@ Array.of_list account_list
 
   let apply_json_transaction l (tx_json : Js.js_string Js.t)
-      (account_creation_fee : Js.js_string Js.t) =
+      (account_creation_fee : Js.js_string Js.t)
+      (network_json : Js.js_string Js.t) =
     let txn =
       Parties.of_json @@ Yojson.Safe.from_string @@ Js.to_string tx_json
     in
-    apply_parties_transaction l txn (Js.to_string account_creation_fee)
+    let network_state = protocol_state_of_json network_json in
+    apply_parties_transaction l txn
+      (Js.to_string account_creation_fee)
+      network_state
 
   let create_token_account pk token =
     account_id pk token |> Mina_base.Account_id.public_key

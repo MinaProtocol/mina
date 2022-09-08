@@ -5,6 +5,16 @@ open Cache_lib
 open Mina_base
 open Network_peer
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 module type Transition_handler_validator_intf = sig
   type unprocessed_transition_cache
 
@@ -151,10 +161,14 @@ end
 (** Interface that allows a peer to prove their best_tip in the
     transition_frontier *)
 module type Best_tip_prover_intf = sig
+  module type CONTEXT = sig
+    val logger : Logger.t
+  end
+
   type transition_frontier
 
   val prove :
-       logger:Logger.t
+       context:(module CONTEXT)
     -> transition_frontier
     -> ( Mina_block.t State_hash.With_state_hashes.t
        , State_body_hash.t list * Mina_block.t )
@@ -180,8 +194,7 @@ module type Consensus_best_tip_prover_intf = sig
   type transition_frontier
 
   val prove :
-       logger:Logger.t
-    -> consensus_constants:Consensus.Constants.t
+       context:(module CONTEXT)
     -> frontier:transition_frontier
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
     -> ( Mina_block.t
@@ -190,11 +203,9 @@ module type Consensus_best_tip_prover_intf = sig
        option
 
   val verify :
-       logger:Logger.t
+       context:(module CONTEXT)
     -> verifier:Verifier.t
-    -> consensus_constants:Consensus.Constants.t
     -> genesis_constants:Genesis_constants.t
-    -> precomputed_values:Precomputed_values.t
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
     -> ( Mina_block.t
        , State_body_hash.t list * Mina_block.t )
@@ -311,7 +322,7 @@ module type Transition_router_intf = sig
   type network
 
   val run :
-       logger:Logger.t
+       context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
@@ -333,7 +344,6 @@ module type Transition_router_intf = sig
     -> most_recent_valid_block:
          Mina_block.initial_valid_block Broadcast_pipe.Reader.t
          * Mina_block.initial_valid_block Broadcast_pipe.Writer.t
-    -> precomputed_values:Precomputed_values.t
     -> catchup_mode:[ `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
     -> ( [ `Transition of Mina_block.Validated.t ]

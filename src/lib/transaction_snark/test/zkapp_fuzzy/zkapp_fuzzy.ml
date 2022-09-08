@@ -5,6 +5,8 @@ module U = Transaction_snark_tests.Util
 
 let logger = Logger.create ()
 
+let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
+
 let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let fee_payer_keypairs =
     Array.init num_of_fee_payers ~f:(fun _ -> Keypair.create ())
@@ -45,7 +47,41 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
         fee_payer_account
       |> Or_error.ok_exn
       |> fun _ -> () ) ;
-  let keys = List.init 1000 ~f:(fun _ -> Keypair.create ()) in
+  let normal_keys = List.init 200 ~f:(fun _ -> Keypair.create ()) in
+  let zkapp_keys = List.init 200 ~f:(fun _ -> Keypair.create ()) in
+  let extra_keys = List.init 200 ~f:(fun _ -> Keypair.create ()) in
+  let normal_account_ids =
+    List.map normal_keys ~f:(fun key ->
+        Account_id.create
+          (Signature_lib.Public_key.compress key.public_key)
+          Token_id.default )
+  in
+  let zkapp_account_ids =
+    List.map zkapp_keys ~f:(fun key ->
+        Account_id.create
+          (Signature_lib.Public_key.compress key.public_key)
+          Token_id.default )
+  in
+  let normal_accounts =
+    List.map normal_account_ids ~f:(fun id ->
+        Account.create id initial_balance )
+  in
+  let zkapp_accounts =
+    List.map zkapp_account_ids ~f:(fun id ->
+        let account = Account.create id initial_balance in
+        let verification_key = Some vk in
+        let zkapp = Some { Zkapp_account.default with verification_key } in
+        { account with zkapp } )
+  in
+  List.iter
+    (List.zip_exn
+       (normal_account_ids @ zkapp_account_ids)
+       (normal_accounts @ zkapp_accounts) )
+    ~f:(fun (account_id, account) ->
+      Mina_ledger.Ledger.get_or_create_account ledger account_id account
+      |> Or_error.ok_exn
+      |> fun _ -> () ) ;
+  let keys = normal_keys @ zkapp_keys @ extra_keys in
   let keymap =
     List.map
       (Array.to_list fee_payer_keypairs @ keys)
@@ -55,21 +91,20 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   in
   (ledger, fee_payer_keypairs, keymap)
 
-let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
-
-let generate_parties_and_apply_them_consecutively () =
+let generate_parties_and_apply_them_consecutively ~trials ~max_other_parties ()
+    =
   let num_of_fee_payers = 5 in
-  let trials = 6 in
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers ()
   in
+  let account_state_tbl = Account_id.Table.create () in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         Quickcheck.test ~trials:1
           (Mina_generators.Parties_generators.gen_parties_from
-             ~protocol_state_view:U.genesis_state_view
+             ~protocol_state_view:U.genesis_state_view ~account_state_tbl
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk () )
+             ~max_other_parties ~keymap ~ledger ~vk () )
           ~f:(fun parties_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -98,9 +133,8 @@ let generate_parties_and_apply_them_consecutively () =
         test i
       done )
 
-let generate_parties_and_apply_them_freshly () =
+let generate_parties_and_apply_them_freshly ~trials ~max_other_parties () =
   let num_of_fee_payers = 5 in
-  let trials = 6 in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         let ledger, fee_payer_keypairs, keymap =
@@ -110,7 +144,7 @@ let generate_parties_and_apply_them_freshly () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk () )
+             ~max_other_parties ~keymap ~ledger ~vk () )
           ~f:(fun parties_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -124,8 +158,8 @@ let generate_parties_and_apply_them_freshly () =
         test i
       done )
 
-let mk_invalid_test ~num_of_fee_payers ~trials ~type_of_failure
-    ~expected_failure_status =
+let mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
+    ~type_of_failure ~expected_failure_status =
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         let ledger, fee_payer_keypairs, keymap =
@@ -135,7 +169,7 @@ let mk_invalid_test ~num_of_fee_payers ~trials ~type_of_failure
           (Mina_generators.Parties_generators.gen_parties_from
              ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk () )
+             ~max_other_parties ~keymap ~ledger ~vk () )
           ~f:(fun parties_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -154,9 +188,8 @@ let mk_invalid_test ~num_of_fee_payers ~trials ~type_of_failure
         test i
       done )
 
-let test_timed_account () =
+let test_timed_account ~trials ~max_other_parties () =
   let num_of_fee_payers = 5 in
-  let trials = 1 in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         let ledger, fee_payer_keypairs, keymap =
@@ -166,7 +199,7 @@ let test_timed_account () =
           (Mina_generators.Parties_generators.gen_parties_from
              ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i / 2)
-             ~keymap ~ledger ~vk () )
+             ~max_other_parties ~keymap ~ledger ~vk () )
           ~f:(fun parties_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -197,29 +230,31 @@ let () =
        in
        fun () ->
          let num_of_fee_payers = 5 in
-         generate_parties_and_apply_them_consecutively () ;
-         generate_parties_and_apply_them_freshly () ;
+         let max_other_parties = 3 in
+         generate_parties_and_apply_them_consecutively ~trials
+           ~max_other_parties () ;
+         generate_parties_and_apply_them_freshly ~trials ~max_other_parties () ;
          let open Mina_generators.Parties_generators in
          let open Transaction_status.Failure in
-         mk_invalid_test ~num_of_fee_payers ~trials
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
            ~type_of_failure:Invalid_protocol_state_precondition
            ~expected_failure_status:Protocol_state_precondition_unsatisfied ;
-         mk_invalid_test ~num_of_fee_payers ~trials
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
            ~type_of_failure:(Update_not_permitted `App_state)
            ~expected_failure_status:Update_not_permitted_app_state ;
-         mk_invalid_test ~num_of_fee_payers ~trials
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
            ~type_of_failure:(Update_not_permitted `Verification_key)
            ~expected_failure_status:Update_not_permitted_verification_key ;
-         mk_invalid_test ~num_of_fee_payers ~trials
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
            ~type_of_failure:(Update_not_permitted `Zkapp_uri)
            ~expected_failure_status:Update_not_permitted_zkapp_uri ;
-         mk_invalid_test ~num_of_fee_payers ~trials
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
            ~type_of_failure:(Update_not_permitted `Token_symbol)
            ~expected_failure_status:Update_not_permitted_token_symbol ;
-         mk_invalid_test ~num_of_fee_payers ~trials
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
            ~type_of_failure:(Update_not_permitted `Voting_for)
            ~expected_failure_status:Update_not_permitted_voting_for ;
-         mk_invalid_test ~num_of_fee_payers ~trials
+         mk_invalid_test ~num_of_fee_payers ~trials ~max_other_parties
            ~type_of_failure:(Update_not_permitted `Balance)
            ~expected_failure_status:Update_not_permitted_balance ;
-         test_timed_account ())
+         test_timed_account ~trials ~max_other_parties ())

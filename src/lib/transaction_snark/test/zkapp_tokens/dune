@@ -28,5 +28,5 @@
   (library_flags -linkall)
   (inline_tests)
   (preprocess
-    (pps ppx_snarky ppx_version ppx_jane ppx_coda))
+    (pps ppx_snarky ppx_version ppx_jane ppx_mina))
   (instrumentation (backend bisect_ppx)))
