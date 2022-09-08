@@ -106,10 +106,13 @@ module Checked = struct
       (let module S = Tock_field_sponge.Field in
       let full_state s = (S.state s, s.sponge_state) in
       let sponge = S.create Tock_field_sponge.params in
+      (* s0 is the state resulting from absorbing 0 challenge vectors *)
       let s0 = full_state sponge in
       Vector.iter ~f:(S.absorb sponge) Dummy.Ipa.Wrap.challenges_computed ;
+      (* s1 is the state resulting from absorbing 1 challenge vector *)
       let s1 = full_state sponge in
       Vector.iter ~f:(S.absorb sponge) Dummy.Ipa.Wrap.challenges_computed ;
+      (* s2 is the state resulting from absorbing 2 challenge vectors *)
       let s2 = full_state sponge in
       [| s0; s1; s2 |] )
 
@@ -130,10 +133,9 @@ module Checked = struct
       (* The sponge states we would reach if we absorbed the padding challenges *)
       let s = Sponge.create sponge_params in
       let state, sponge_state =
-        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(2
-                                                                       - Nat
-                                                                         .to_int
-                                                                           max_proofs_verified)
+        let non_dummies = Nat.to_int max_proofs_verified in
+        let dummies = 2 - non_dummies in
+        (Lazy.force dummy_messages_for_next_wrap_proof_sponge_states).(dummies)
       in
       { s with
         state = Array.map state ~f:Impls.Wrap.Field.constant
