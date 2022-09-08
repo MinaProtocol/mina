@@ -1242,7 +1242,7 @@ module T = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        (** A account_update to a zkApp transaction *)
+        (** An account update in a zkApp transaction *)
         type t =
           { body : Body.Graphql_repr.Stable.V1.t
           ; authorization : Control.Stable.V2.t
