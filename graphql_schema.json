@@ -3225,7 +3225,7 @@
         {
           "kind": "INPUT_OBJECT",
           "name": "ZkappAccountUpdateInput",
-          "description": "A account_update to a zkApp transaction",
+          "description": "An account update in a zkApp transaction",
           "fields": [
             {
               "name": "body",
@@ -7996,7 +7996,7 @@
         {
           "kind": "OBJECT",
           "name": "ZkappAccountUpdate",
-          "description": "A account_update to a zkApp transaction",
+          "description": "An account update in a zkApp transaction",
           "fields": [
             {
               "name": "body",
