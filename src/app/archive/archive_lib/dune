@@ -42,6 +42,7 @@
    one_or_two
    mina_caqti
    mina_generators
+   parties_builder
    mina_base
    mina_ledger
    mina_block
