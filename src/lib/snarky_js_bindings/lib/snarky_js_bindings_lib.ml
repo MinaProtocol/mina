@@ -151,13 +151,6 @@ let field_constr = As_field.field_constr
 
 open Core_kernel
 
-let bool_constant (b : Impl.Boolean.var) =
-  match (b :> Impl.Field.t) with
-  | Constant b ->
-      Some Impl.Field.Constant.(equal one b)
-  | _ ->
-      None
-
 module As_bool = struct
   (* boolean | bool_class | Boolean.var *)
   type t
@@ -270,6 +263,9 @@ let to_unchecked (x : Field.t) =
   match x with Constant y -> y | y -> Impl.As_prover.read_var y
 
 let of_js_field_unchecked (x : field_class Js.t) = to_unchecked @@ of_js_field x
+
+let bool_to_unchecked (x : Boolean.var) =
+  (x :> Field.t) |> to_unchecked |> Field.Constant.(equal one)
 
 let () =
   let method_ name (f : field_class Js.t -> _) = method_ field_class name f in
@@ -2457,7 +2453,7 @@ module Ledger = struct
 
   let public_key (pk : public_key) : Signature_lib.Public_key.Compressed.t =
     { x = to_unchecked pk##.x##.value
-    ; is_odd = pk##.isOdd##.value |> bool_constant |> Option.value_exn
+    ; is_odd = bool_to_unchecked pk##.isOdd##.value
     }
 
   let private_key (key : private_key) : Signature_lib.Private_key.t =
