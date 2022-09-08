@@ -1434,7 +1434,7 @@ let gen_parties_from ?failure ?(max_other_parties = max_other_parties)
     in
     gen_tree [] num_parties
   in
-  let%bind num_new_token_parties = Int.gen_uniform_incl 1 max_token_parties in
+  let%bind num_new_token_parties = Int.gen_uniform_incl 0 max_token_parties in
   let%bind new_token_parties =
     gen_parties_with_token_accounts ~num_parties:num_new_token_parties
   in

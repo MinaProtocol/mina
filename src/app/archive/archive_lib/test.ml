@@ -109,8 +109,9 @@ let%test_module "Archive node unit tests" =
           |> Or_error.ok_exn )
       |> fun _ ->
       let%map (parties : Parties.t) =
-        Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
-          ~keymap ~ledger ~protocol_state_view:genesis_state_view ()
+        Mina_generators.Parties_generators.gen_parties_from ~max_token_parties:0
+          ~fee_payer_keypair ~keymap ~ledger
+          ~protocol_state_view:genesis_state_view ()
       in
       User_command.Parties parties
 
@@ -151,77 +152,6 @@ let%test_module "Archive node unit tests" =
               ()
           | Error e ->
               failwith @@ Caqti_error.show e )
-
-    let%test_unit "User_command: read and write zkapp command with token \
-                   accounts" =
-      let conn = Lazy.force conn_lazy in
-      Thread_safe.block_on_async_exn
-      @@ fun () ->
-      let account_creation_fee =
-        Currency.Fee.to_int
-          Genesis_constants.Constraint_constants.compiled.account_creation_fee
-      in
-      let fee_payer_keypair = Keypair.create () in
-      let fee_payer_pk =
-        Signature_lib.Public_key.compress fee_payer_keypair.public_key
-      in
-      let token_owner = Keypair.create () in
-      let token_accounts = Array.init 4 ~f:(fun _ -> Keypair.create ()) in
-
-      let custom_token_id =
-        Account_id.derive_token_id
-          ~owner:
-            (Account_id.create
-               (Public_key.compress token_owner.public_key)
-               Token_id.default )
-      in
-      let keymap =
-        List.fold
-          ([ fee_payer_keypair; token_owner ] @ Array.to_list token_accounts)
-          ~init:Public_key.Compressed.Map.empty
-          ~f:(fun map { private_key; public_key } ->
-            Public_key.Compressed.Map.add_exn map
-              ~key:(Public_key.compress public_key)
-              ~data:private_key )
-      in
-      let%bind mint_token_parties =
-        let open Parties_builder in
-        let nonce = Mina_numbers.Account_nonce.zero in
-        let with_dummy_signatures =
-          mk_forest
-            [ mk_node
-                (mk_party_body Call token_owner Token_id.default
-                   (-account_creation_fee) )
-                [ mk_node
-                    (mk_party_body Call token_accounts.(0) custom_token_id 100)
-                    []
-                ]
-            ]
-          |> mk_parties_transaction ~fee:7 ~fee_payer_pk ~fee_payer_nonce:nonce
-        in
-        replace_authorizations ~keymap with_dummy_signatures
-      in
-      let user_command = User_command.Parties mint_token_parties in
-      let transaction_hash = Transaction_hash.hash_command user_command in
-      match%map
-        let open Deferred.Result.Let_syntax in
-        let%bind user_command_id =
-          Processor.User_command.add_if_doesn't_exist conn user_command
-        in
-        let%map result =
-          Processor.User_command.find conn ~transaction_hash
-          >>| function
-          | Some (`Zkapp_command_id zkapp_command_id) ->
-              Some zkapp_command_id
-          | Some (`Signed_command_id _) | None ->
-              None
-        in
-        [%test_result: int] ~expect:user_command_id (Option.value_exn result)
-      with
-      | Ok () ->
-          ()
-      | Error e ->
-          failwith @@ Caqti_error.show e
 
     let%test_unit "User_command: read and write zkapp command" =
       let conn = Lazy.force conn_lazy in
