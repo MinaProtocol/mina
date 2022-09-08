@@ -11,12 +11,12 @@ import type {
   Payment,
   StakeDelegation,
   Message,
-  AccountUpdate,
-  OtherZkapp_command,
+  ZkappCommand,
+  AccountUpdates,
   SignableData,
 } from "./TSTypes";
 
-import { isPayment, isMessage, isStakeDelegation, isAccountUpdate } from "./Utils";
+import { isPayment, isMessage, isStakeDelegation, isZkappCommand } from "./Utils";
 
 const defaultValidUntil = "4294967295";
 
@@ -330,31 +330,31 @@ class Client {
   }
 
   /**
-   * Sign a zkapp_command transaction using a private key.
+   * Sign a zkapp command transaction using a private key.
    *
    * This type of transaction allows a user to update state on a given
    * Smart Contract running on Mina.
    *
-   * @param accountUpdate A object representing a Zkapp_command tx
+   * @param zkappCommand A object representing a zkApp command tx
    * @param privateKey The fee payer private key
-   * @returns Signed zkapp_command
+   * @returns Signed ZkappCommand
    */
-  public signAccountUpdate(accountUpdate: AccountUpdate, privateKey: PrivateKey): Signed<AccountUpdate> {
-    const zkapp_command = JSON.stringify(accountUpdate.zkapp_command.accountUpdates);
+  public signZkappCommand(zkappCommand: ZkappCommand, privateKey: PrivateKey): Signed<ZkappCommand> {
+    const account_updates = JSON.stringify(zkappCommand.zkappCommand.accountUpdates);
     if (
-      accountUpdate.feePayer.fee === undefined ||
-      accountUpdate.feePayer.fee < this.getAccountUpdateMinimumFee(accountUpdate.zkapp_command.accountUpdates)
+      zkappCommand.feePayer.fee === undefined ||
+      zkappCommand.feePayer.fee < this.getAccountUpdateMinimumFee(zkappCommand.zkappCommand.accountUpdates)
     ) {
       throw `Fee must be greater than ${this.getAccountUpdateMinimumFee(
-        accountUpdate.zkapp_command.accountUpdates
+        zkappCommand.zkappCommand.accountUpdates
       )}`;
     }
-    const memo = accountUpdate.feePayer.memo ?? "";
-    const fee = String(accountUpdate.feePayer.fee);
-    const nonce = String(accountUpdate.feePayer.nonce);
-    const feePayer = String(accountUpdate.feePayer.feePayer);
-    const signedZkapp_command = minaSDK.signAccountUpdate(
-      zkapp_command,
+    const memo = zkappCommand.feePayer.memo ?? "";
+    const fee = String(zkappCommand.feePayer.fee);
+    const nonce = String(zkappCommand.feePayer.nonce);
+    const feePayer = String(zkappCommand.feePayer.feePayer);
+    const signedZkappCommand = minaSDK.signZkappCommand(
+      account_updates,
       {
         feePayer,
         fee,
@@ -364,9 +364,9 @@ class Client {
       privateKey
     );
     return {
-      signature: JSON.parse(signedZkapp_command).feePayer.authorization,
+      signature: JSON.parse(signedZkappCommand).feePayer.authorization,
       data: {
-        zkapp_command: signedZkapp_command,
+        zkappCommand: signedZkappCommand,
         feePayer: {
           feePayer,
           fee,
@@ -404,7 +404,7 @@ class Client {
 
   /**
    * Signs an arbitrary payload using a private key. This function can sign messages,
-   * payments, stake delegations, and zkapp_command. If the payload is unrecognized, an Error
+   * payments, stake delegations, and zkapp commands. If the payload is unrecognized, an Error
    * is thrown.
    *
    * @param payload A signable payload
@@ -415,7 +415,8 @@ class Client {
     payload: SignableData,
     privateKey: PrivateKey
   ): Signed<SignableData> {
-    if (isMessage(payload)) {
+     console.log (payload);
+     if (isMessage(payload)) {
       return this.signMessage(payload.message, {
         publicKey: payload.publicKey,
         privateKey,
@@ -427,22 +428,22 @@ class Client {
     if (isStakeDelegation(payload)) {
       return this.signStakeDelegation(payload, privateKey);
     }
-    if (isAccountUpdate(payload)) {
-      return this.signAccountUpdate(payload, privateKey);
+    if (isZkappCommand(payload)) {
+      return this.signZkappCommand(payload, privateKey);
     } else {
       throw new Error(`Expected signable payload, got '${payload}'.`);
     }
   }
 
   /**
-   * Calculates the minimum fee of an accountUpdate transaction. A fee for a accountUpdate transaction is
-   * the sum of all zkapp_command plus the specified fee amount. If no fee is passed in, `0.001`
+   * Calculates the minimum fee of a zkapp command transaction. A fee for a zkapp command transaction is
+   * the sum of all account updates plus the specified fee amount. If no fee is passed in, `0.001`
    * is used (according to the Mina spec) by default.
-   * @param p An accountUpdate object
+   * @param p An accountUpdates object
    * @param fee The fee per accountUpdate amount
    * @returns  The fee to be paid by the fee payer accountUpdate
    */
-  public getAccountUpdateMinimumFee(p: OtherZkapp_command, fee: number = 0.001) {
+  public getAccountUpdateMinimumFee(p: AccountUpdates, fee: number = 0.001) {
     return p.reduce((accumulatedFee, _) => accumulatedFee + fee, 0);
   }
 }

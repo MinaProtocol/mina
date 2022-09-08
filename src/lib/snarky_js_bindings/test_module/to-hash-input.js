@@ -19,11 +19,11 @@ await isReady;
 
 let { asFieldsAndAux, jsLayout, packToFields } = Experimental;
 
-let account_update = Account_update.defaultAccountUpdate(PrivateKey.random().toPublicKey());
+let account_update = AccountUpdate.defaultAccountUpdate(PrivateKey.random().toPublicKey());
 
 // timing
 let Timing = asFieldsAndAux(
-  jsLayout.Account_update.entries.body.entries.update.entries.timing.inner
+  jsLayout.AccountUpdate.entries.body.entries.update.entries.timing.inner
 );
 let timing = account_update.body.update.timing.value;
 timing.initialMinimumBalance = UInt64.one;
@@ -33,7 +33,7 @@ testInput(Timing, Ledger.hashInputFromJson.timing, timing);
 
 // permissions
 let Permissions_ = asFieldsAndAux(
-  jsLayout.Account_update.entries.body.entries.update.entries.permissions.inner
+  jsLayout.AccountUpdate.entries.body.entries.update.entries.permissions.inner
 );
 let permissions = account_update.body.update.permissions;
 permissions.isSome = Bool(true);
@@ -50,7 +50,7 @@ testInput(
 );
 
 // update
-let Update = asFieldsAndAux(jsLayout.Account_update.entries.body.entries.update);
+let Update = asFieldsAndAux(jsLayout.AccountUpdate.entries.body.entries.update);
 let update = account_update.body.update;
 
 update.timing.isSome = Bool(true);
@@ -65,7 +65,7 @@ testInput(Update, Ledger.hashInputFromJson.update, update);
 
 // account precondition
 let AccountPrecondition = asFieldsAndAux(
-  jsLayout.Account_update.entries.body.entries.preconditions.entries.account
+  jsLayout.AccountUpdate.entries.body.entries.preconditions.entries.account
 );
 let account = account_update.body.preconditions.account;
 account_update.account.balance.assertEquals(UInt64.from(1e9));
@@ -81,7 +81,7 @@ testInput(
 
 // network precondition
 let NetworkPrecondition = asFieldsAndAux(
-  jsLayout.Account_update.entries.body.entries.preconditions.entries.network
+  jsLayout.AccountUpdate.entries.body.entries.preconditions.entries.network
 );
 let network = account_update.body.preconditions.network;
 account_update.network.stakingEpochData.ledger.hash.assertEquals(Field.random());
@@ -94,7 +94,7 @@ testInput(
 );
 
 // body
-let Body = asFieldsAndAux(jsLayout.Account_update.entries.body);
+let Body = asFieldsAndAux(jsLayout.AccountUpdate.entries.body);
 let body = account_update.body;
 body.balanceChange.magnitude = UInt64.from(14197832);
 body.balanceChange.sgn = Sign.minusOne;

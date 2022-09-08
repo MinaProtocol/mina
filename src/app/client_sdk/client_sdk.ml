@@ -33,12 +33,12 @@ let _ =
            val publicKey = pk_str_js
          end
 
-       (** generate a zkapp_command fee payer and sign other zkapp_command with the fee payer account *)
-       method signAccountUpdate (zkapp_command_js : string_js)
+       (** generate a zkapp command fee payer and sign account updates with the fee payer account *)
+       method signZkappCommand (account_updates_js : string_js)
            (fee_payer_js : payload_fee_payer_js) (sk_base58_check_js : string_js)
            =
          let account_updates_json =
-           zkapp_command_js |> Js.to_string |> Yojson.Safe.from_string
+           account_updates_js |> Js.to_string |> Yojson.Safe.from_string
          in
          let account_updates =
            Zkapp_command.account_updates_of_json account_updates_json

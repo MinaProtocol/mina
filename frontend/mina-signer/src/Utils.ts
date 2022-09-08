@@ -2,7 +2,7 @@ import type {
   Payment,
   StakeDelegation,
   Message,
-  AccountUpdate,
+  ZkappCommand,
   SignableData,
 } from "./TSTypes";
 
@@ -15,8 +15,8 @@ function hasCommonProperties(data: SignableData) {
   );
 }
 
-export function isAccountUpdate(p: AccountUpdate): p is AccountUpdate {
-  return p.hasOwnProperty("zkapp_command") && p.hasOwnProperty("feePayer");
+export function isZkappCommand(p: ZkappCommand): p is ZkappCommand {
+  return p.hasOwnProperty("zkappCommand") && p.hasOwnProperty("feePayer");
 }
 
 export function isPayment(p: SignableData): p is Payment {
