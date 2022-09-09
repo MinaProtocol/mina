@@ -9,6 +9,7 @@ module Sc =
     (Pickles.Endo.Step_inner_curve)
 module Js = Js_of_ocaml.Js
 
+
 let console_log_string s = Js_of_ocaml.Firebug.console##log (Js.string s)
 
 let console_log s = Js_of_ocaml.Firebug.console##log s
@@ -2320,8 +2321,12 @@ module Ledger = struct
     ; provedState : bool_class Js.t Js.readonly_prop >
     Js.t
 
+  type permissions =
+    < editState : Mina_base.Permissions.Auth_required.t Js.readonly_prop > 
+    Js.t
+
   type account =
-    (* TODO: permissions, timing *)
+    (* TODO: timing *)
     < publicKey : public_key Js.readonly_prop
     ; tokenId : field_class Js.t Js.readonly_prop
     ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
@@ -2330,7 +2335,9 @@ module Ledger = struct
     ; receiptChainHash : field_class Js.t Js.readonly_prop
     ; delegate : public_key Js.optdef Js.readonly_prop
     ; votingFor : field_class Js.t Js.readonly_prop
-    ; zkapp : zkapp_account Js.optdef Js.readonly_prop >
+    ; zkapp : zkapp_account Js.optdef Js.readonly_prop 
+    ; permissions : permissions Js.readonly_prop 
+    >
     Js.t
 
   let ledger_class : < .. > Js.t =
@@ -2572,6 +2579,11 @@ module Ledger = struct
         val hash = field (With_hash.hash vk)
 
         val data = With_hash.data vk
+      end 
+
+    let permissions (p : Mina_base.Permissions.t) : permissions =
+      object%js
+        val editState = p.edit_state (* I would like to get the type of p.edit_state and derive a string from it *)
       end
 
     let zkapp_account (a : Mina_base.Zkapp_account.t) : zkapp_account =
@@ -2610,6 +2622,8 @@ module Ledger = struct
         val votingFor = field (a.voting_for :> Impl.field)
 
         val zkapp = option zkapp_account a.zkapp
+
+        val permissions = permissions a.permissions
       end
   end
 
@@ -2862,7 +2876,8 @@ module Ledger = struct
       account Js.optdef =
     let loc = L.location_of_account l##.value (account_id pk token) in
     let account = Option.bind loc ~f:(L.get l##.value) in
-    To_js.option To_js.account account
+    let acc = To_js.option To_js.account account in
+    acc
 
   let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
     add_account_exn l##.value pk (Js.to_string balance)
