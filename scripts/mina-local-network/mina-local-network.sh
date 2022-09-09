@@ -14,6 +14,7 @@ ARCHIVE_EXE=_build/default/src/app/archive/archive.exe
 LOGPROC_EXE=_build/default/src/app/logproc/logproc.exe
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
+export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
 SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
 
 # ================================================
@@ -121,6 +122,10 @@ clean-dir() {
 
 generate-keypair() {
   ${MINA_EXE} advanced generate-keypair -privkey-path ${1}
+}
+
+generate-libp2p-keypair() {
+  ${MINA_EXE} libp2p generate-keypair -privkey-path ${1}
 }
 
 # Executes the Mina Daemon, exposing all 5 ports in
@@ -351,16 +356,24 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   clean-dir ${LEDGER_FOLDER}/offline_fish_keys
   clean-dir ${LEDGER_FOLDER}/online_whale_keys
   clean-dir ${LEDGER_FOLDER}/online_fish_keys
+  clean-dir ${LEDGER_FOLDER}/libp2p_keys
   clean-dir ${LEDGER_FOLDER}/service-keys
 
   generate-keypair ${LEDGER_FOLDER}/snark_worker_keys/snark_worker_account
   for ((i = 0; i < ${FISH}; i++)); do
     generate-keypair ${LEDGER_FOLDER}/offline_fish_keys/offline_fish_account_${i}
     generate-keypair ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
+    generate-libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/fish_${i}
   done
   for ((i = 0; i < ${WHALES}; i++)); do
     generate-keypair ${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_${i}
     generate-keypair ${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
+    generate-libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/whale_${i}
+  done
+  for ((i = 0; i < ${NODES}; i++)); do
+    generate-keypair ${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_${i}
+    generate-keypair ${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
+    generate-libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/node_${i}
   done
 
   if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
@@ -372,6 +385,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
       sudo chown -R ${USER} ${LEDGER_FOLDER}/online_fish_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/offline_whale_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/online_whale_keys
+      sudo chown -R ${USER} ${LEDGER_FOLDER}/libp2p_keys
     fi
   fi
 
@@ -379,6 +393,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   chmod -R 0700 ${LEDGER_FOLDER}/online_fish_keys
   chmod -R 0700 ${LEDGER_FOLDER}/offline_whale_keys
   chmod -R 0700 ${LEDGER_FOLDER}/online_whale_keys
+  chmod -R 0700 ${LEDGER_FOLDER}/libp2p_keys
 
   python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
     --num-whale-accounts ${WHALES} \
@@ -454,7 +469,8 @@ for ((i = 0; i < ${WHALES}; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
   mkdir -p ${FOLDER}
-  spawn-node ${FOLDER} $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} ${SNARK_WORKER_FLAGS} ${ARCHIVE_ADDRESS_CLI_ARG}
+  spawn-node ${FOLDER} $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
+    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/whale_${i} ${SNARK_WORKER_FLAGS} ${ARCHIVE_ADDRESS_CLI_ARG}
   WHALE_PIDS[${i}]=$!
 done
 
@@ -464,7 +480,8 @@ for ((i = 0; i < ${FISH}; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
   mkdir -p ${FOLDER}
-  spawn-node ${FOLDER} $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} ${SNARK_WORKER_FLAGS} ${ARCHIVE_ADDRESS_CLI_ARG}
+  spawn-node ${FOLDER} $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
+    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/fish_${i} ${SNARK_WORKER_FLAGS} ${ARCHIVE_ADDRESS_CLI_ARG}
   FISH_PIDS[${i}]=$!
 done
 
@@ -473,7 +490,8 @@ done
 for ((i = 0; i < ${NODES}; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
   mkdir -p ${FOLDER}
-  spawn-node ${FOLDER} $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} ${ARCHIVE_ADDRESS_CLI_ARG}
+  spawn-node ${FOLDER} $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
+    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/node_${i} ${ARCHIVE_ADDRESS_CLI_ARG}
   NODE_PIDS[${i}]=$!
 done
 
