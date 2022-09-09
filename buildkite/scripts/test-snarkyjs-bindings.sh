@@ -7,6 +7,7 @@ echo "Node version:"
 node --version
 
 echo "Build SnarkyJS..."
+rm -rf node_modules/
 make snarkyjs
 
 echo "Run SnarkyJS bindings unit tests..."
