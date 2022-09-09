@@ -241,7 +241,6 @@ let
         # which are too big when intrumented with bisect_ppx
         ulimit -s 10000
 
-        # dune runtest src/app/archive src/lib src/app/zkapp_test_transaction --instrument-with bisect_ppx --display=short
         dune runtest src/app/archive --instrument-with bisect_ppx --display=short || echo "failed"
       '';
 
@@ -261,7 +260,21 @@ let
         # which are too big when intrumented with bisect_ppx
         ulimit -s 10000
 
-        dune runtest src/lib --instrument-with bisect_ppx --display=short || echo "failed"
+        # We disable testing for some folders of src/lib
+        # mina_net2:
+        #   fails with error "libp2p error: no supported interface",
+        #   which may be because networking is disallowed in the sandbox.
+        # crypto/proof-systems/ocaml/tests/src:
+        #    fails because it makes a call to cargo, which is not available here.
+
+        LIBRARIES_TO_TEST=$(
+          find src/lib -name "dune" |
+          sed 's#/dune$##' |
+          grep -v 'mina_net2' |
+          grep -v 'crypto/proof-systems/ocaml/tests/src' |
+          tr '\n' ' '
+        )
+        dune runtest $LIBRARIES_TO_TEST --instrument-with bisect_ppx || echo "failed"
       '';
 
       mina_tests_zkapp_test_transaction = runMinaCheck {
