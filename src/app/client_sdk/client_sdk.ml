@@ -44,7 +44,7 @@ let _ =
            Zkapp_command.account_updates_of_json account_updates_json
          in
          let account_updates =
-           Zkapp_command.Call_forest.of_zkapp_command_list
+           Zkapp_command.Call_forest.of_account_updates
              ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
                p.body.call_depth )
              account_updates
