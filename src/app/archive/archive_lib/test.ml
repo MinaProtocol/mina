@@ -109,9 +109,8 @@ let%test_module "Archive node unit tests" =
           |> Or_error.ok_exn )
       |> fun _ ->
       let%map (parties : Parties.t) =
-        Mina_generators.Parties_generators.gen_parties_from ~max_token_parties:0
-          ~fee_payer_keypair ~keymap ~ledger
-          ~protocol_state_view:genesis_state_view ()
+        Mina_generators.Parties_generators.gen_parties_from ~fee_payer_keypair
+          ~keymap ~ledger ~protocol_state_view:genesis_state_view ()
       in
       User_command.Parties parties
 
@@ -160,26 +159,48 @@ let%test_module "Archive node unit tests" =
       Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
         user_command_zkapp_gen ~f:(fun user_command ->
           let transaction_hash = Transaction_hash.hash_command user_command in
-          match%map
-            let open Deferred.Result.Let_syntax in
-            let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn user_command
-            in
-            let%map result =
-              Processor.User_command.find conn ~transaction_hash
-              >>| function
-              | Some (`Zkapp_command_id zkapp_command_id) ->
-                  Some zkapp_command_id
-              | Some (`Signed_command_id _) | None ->
-                  None
-            in
-            [%test_result: int] ~expect:user_command_id
-              (Option.value_exn result)
-          with
-          | Ok () ->
-              ()
-          | Error e ->
-              failwith @@ Caqti_error.show e )
+          match user_command with
+          | Signed_command _ ->
+              failwith "zkapp_gen failed"
+          | Parties p -> (
+              let rec add_token_owners
+                  (forest :
+                    ( Party.t
+                    , Parties.Digest.Party.t
+                    , Parties.Digest.Forest.t )
+                    Parties.Call_forest.t ) =
+                List.iter forest ~f:(fun { With_stack_hash.elt = tree; _ } ->
+                    if List.is_empty tree.calls then ()
+                    else
+                      let acct_id = Party.account_id tree.party in
+                      let token_id =
+                        Account_id.derive_token_id ~owner:acct_id
+                      in
+                      Processor.Token_owners.add_if_doesn't_exist token_id
+                        acct_id ;
+                      add_token_owners tree.calls )
+              in
+              add_token_owners p.other_parties ;
+              match%map
+                let open Deferred.Result.Let_syntax in
+                let%bind user_command_id =
+                  Processor.User_command.add_if_doesn't_exist conn user_command
+                in
+                let%map result =
+                  Processor.User_command.find conn ~transaction_hash
+                  >>| function
+                  | Some (`Zkapp_command_id zkapp_command_id) ->
+                      Some zkapp_command_id
+                  | Some (`Signed_command_id _) | None ->
+                      None
+                in
+                [%test_result: int] ~expect:user_command_id
+                  (Option.value_exn result)
+              with
+              | Ok () ->
+                  ()
+              | Error e ->
+                  failwith @@ Caqti_error.show e ) )
 
     let%test_unit "Fee_transfer: read and write" =
       let kind_gen =
