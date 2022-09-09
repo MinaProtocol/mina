@@ -10,9 +10,7 @@ import sys
 
 from compare_versioned_items import run_comparison
 
-error_msg = 
-    """Please see this issue https://github.com/MinaProtocol/mina/issues/11780 for pointers on how to fix this error. 
-       It might be also helpful to look in this file: `scripts/compare_verioned_types.py"""
+error_msg = "Please see this issue https://github.com/MinaProtocol/mina/issues/11780 for pointers on how to fix this error. It might be also helpful to look in this file: `scripts/compare_verioned_types.py"
 
 # This is the list of file while has never been changed before
 # and they haven't run through the CI before, and then fail 
