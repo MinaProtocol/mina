@@ -2924,8 +2924,7 @@ module Ledger = struct
       account Js.optdef =
     let loc = L.location_of_account l##.value (account_id pk token) in
     let account = Option.bind loc ~f:(L.get l##.value) in
-    let acc = To_js.option To_js.account account in
-    acc
+    To_js.option To_js.account account
 
   let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
     add_account_exn l##.value pk (Js.to_string balance)
