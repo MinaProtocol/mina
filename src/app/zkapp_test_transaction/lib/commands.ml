@@ -14,7 +14,7 @@ let graphql_zkapp_command (zkapp_command : Zkapp_command.t) =
     {|
 mutation MyMutation {
   __typename
-  sendZkapp(input: { zkapp_command: %s })
+  sendZkapp(input: { zkappCommand: %s })
 }
     |}
     (Zkapp_command.arg_query_string zkapp_command)
