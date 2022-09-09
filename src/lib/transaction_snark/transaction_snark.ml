@@ -4730,7 +4730,7 @@ module For_tests = struct
       |> Zkapp_command.Call_forest.With_hashes_and_data
          .of_zkapp_command_simple_list
       |> Zkapp_statement.zkapp_statements_of_forest
-      |> Zkapp_command.Call_forest.to_zkapp_command_list
+      |> Zkapp_command.Call_forest.to_account_updates
     in
     let snapp_zkapp_command_keypairs =
       List.zip_exn snapp_zkapp_command spec.zkapp_account_keypairs

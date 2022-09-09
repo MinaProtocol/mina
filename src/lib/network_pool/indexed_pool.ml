@@ -1931,7 +1931,7 @@ let%test_module _ =
             ; authorization = Signature.dummy
             }
         ; account_updates =
-            Zkapp_command.Call_forest.of_zkapp_command_list
+            Zkapp_command.Call_forest.of_account_updates
               ~account_update_depth:(Fn.const 0)
               [ { Account_update.Wire.body =
                     { public_key = sender_pk

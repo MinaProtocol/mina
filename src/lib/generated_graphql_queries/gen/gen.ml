@@ -3,25 +3,25 @@ open Core_kernel
 
 module Zkapp_command_templates = struct
   let pooled_zkapp_commands =
-    Printf.sprintf
+    sprintf
       {graphql|
     query zkapp_commands($public_key: PublicKey) {
       pooledZkappCommands(publicKey: $public_key) {
         id
         hash
         failureReason {
-                         index
-                         failures
-                       }
+          index
+          failures
+        }
         zkappCommand %s
       }
     }|graphql}
 
   let internal_send_zkapp =
-    Printf.sprintf
-      {|
+    sprintf
+      {graphql|
          mutation ($zkapp_command: SendTestZkappInput!) {
-            internalSendZkapp(zkapp_command: $zkapp_command) {
+            internalSendZkapp(zkappCommand: $zkapp_command) {
                zkapp { id
                        hash
                        failureReason {
@@ -32,7 +32,7 @@ module Zkapp_command_templates = struct
                      }
              }
          }
-      |}
+      |graphql}
 end
 
 let account_update_query_expr template ~loc =
@@ -62,8 +62,9 @@ let structure ~loc =
   |> List.map ~f:E.pstr_module
 
 let main () =
-  Out_channel.with_file "generated_graphql_queries.ml" ~f:(fun ml_file ->
-      let fmt = Format.formatter_of_out_channel ml_file in
-      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none)) )
+  Out_channel.with_file "generated_graphql_queries.ml" ~f:(fun oc ->
+      let fmt = Format.formatter_of_out_channel oc in
+      Pprintast.toplevel_phrase fmt
+        (Ptop_def (structure ~loc:Ppxlib.Location.none)) )
 
 let () = main ()

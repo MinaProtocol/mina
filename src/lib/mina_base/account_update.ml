@@ -1002,7 +1002,7 @@ module Body = struct
           !.Fields_derivers_zkapps.Derivers.(
               option ~js_type:`Or_undefined @@ uint32 @@ o ())
         ~nonce:!.uint32
-      |> finish "FeePayerAccountUpdateBody" ~t_toplevel_annots
+      |> finish "FeePayerBody" ~t_toplevel_annots
 
     let%test_unit "json roundtrip" =
       let open Fields_derivers_zkapps.Derivers in
@@ -1373,7 +1373,7 @@ module Fee_payer = struct
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
 
-  let quickcheck_obserber : t Quickcheck.Observer.t =
+  let quickcheck_observer : t Quickcheck.Observer.t =
     Quickcheck.Observer.of_hash (module Stable.Latest)
 
   let quickcheck_shrinker : t Quickcheck.Shrinker.t =

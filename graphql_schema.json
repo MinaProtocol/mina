@@ -667,7 +667,7 @@
         {
           "kind": "SCALAR",
           "name": "SendTestZkappInput",
-          "description": "Zkapp_command for a test zkApp",
+          "description": "zkApp command for a test zkApp",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -676,7 +676,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "FeePayerAccountUpdateBodyInput",
+          "name": "FeePayerBodyInput",
           "description": null,
           "fields": [
             {
@@ -784,7 +784,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "ZkappAccountUpdateFeePayerInput",
+          "name": "ZkappFeePayerInput",
           "description": null,
           "fields": [
             {
@@ -796,7 +796,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "FeePayerAccountUpdateBodyInput",
+                  "name": "FeePayerBodyInput",
                   "ofType": null
                 }
               },
@@ -829,7 +829,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "FeePayerAccountUpdateBodyInput",
+                  "name": "FeePayerBodyInput",
                   "ofType": null
                 }
               },
@@ -1432,7 +1432,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "AccountUpdateUpdateInput",
+          "name": "AccountUpdateModificationInput",
           "description": null,
           "fields": [
             {
@@ -2784,7 +2784,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "AccountUpdateUpdateInput",
+                  "name": "AccountUpdateModificationInput",
                   "ofType": null
                 }
               },
@@ -3001,7 +3001,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "AccountUpdateUpdateInput",
+                  "name": "AccountUpdateModificationInput",
                   "ofType": null
                 }
               },
@@ -3296,7 +3296,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "Zkapp_commandInput",
+          "name": "ZkappCommandInput",
           "description": null,
           "fields": [
             {
@@ -3308,7 +3308,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappAccountUpdateFeePayerInput",
+                  "name": "ZkappFeePayerInput",
                   "ofType": null
                 }
               },
@@ -3365,7 +3365,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "ZkappAccountUpdateFeePayerInput",
+                  "name": "ZkappFeePayerInput",
                   "ofType": null
                 }
               },
@@ -3418,16 +3418,16 @@
           "description": null,
           "fields": [
             {
-              "name": "zkapp_command",
+              "name": "zkappCommand",
               "description":
-                "Zkapp_command structure representing the transaction",
+                "zkApp command structure representing the transaction",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Zkapp_commandInput",
+                  "name": "ZkappCommandInput",
                   "ofType": null
                 }
               },
@@ -3437,15 +3437,15 @@
           ],
           "inputFields": [
             {
-              "name": "zkapp_command",
+              "name": "zkappCommand",
               "description":
-                "Zkapp_command structure representing the transaction",
+                "zkApp command structure representing the transaction",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "Zkapp_commandInput",
+                  "name": "ZkappCommandInput",
                   "ofType": null
                 }
               },
@@ -3470,7 +3470,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ZkappCommand",
+                  "name": "ZkappCommandResult",
                   "ofType": null
                 }
               },
@@ -4808,7 +4808,7 @@
               "description": "Send a zkApp (for internal testing purposes)",
               "args": [
                 {
-                  "name": "zkapp_command",
+                  "name": "zkappCommand",
                   "description": null,
                   "type": {
                     "kind": "NON_NULL",
@@ -7661,7 +7661,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "AccountUpdateUpdate",
+          "name": "AccountUpdateModification",
           "description": null,
           "fields": [
             {
@@ -7808,7 +7808,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "AccountUpdateUpdate",
+                  "name": "AccountUpdateModification",
                   "ofType": null
                 }
               },
@@ -8048,7 +8048,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "FeePayerAccountUpdateBody",
+          "name": "FeePayerBody",
           "description": null,
           "fields": [
             {
@@ -8111,7 +8111,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ZkappAccountUpdateFeePayer",
+          "name": "ZkappFeePayer",
           "description": null,
           "fields": [
             {
@@ -8123,7 +8123,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "FeePayerAccountUpdateBody",
+                  "name": "FeePayerBody",
                   "ofType": null
                 }
               },
@@ -8154,7 +8154,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "Zkapp_command",
+          "name": "ZkappCommand",
           "description": null,
           "fields": [
             {
@@ -8166,7 +8166,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ZkappAccountUpdateFeePayer",
+                  "name": "ZkappFeePayer",
                   "ofType": null
                 }
               },
@@ -8231,7 +8231,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ZkappCommand",
+          "name": "ZkappCommandResult",
           "description": null,
           "fields": [
             {
@@ -8275,7 +8275,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "Zkapp_command",
+                  "name": "ZkappCommand",
                   "ofType": null
                 }
               },
@@ -9354,7 +9354,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "ZkappCommand",
+                      "name": "ZkappCommandResult",
                       "ofType": null
                     }
                   }
@@ -13565,7 +13565,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "ZkappCommand",
+                      "name": "ZkappCommandResult",
                       "ofType": null
                     }
                   }

@@ -1734,7 +1734,7 @@ module Types = struct
           : (Mina_lib.t, Zkapp_command.t) typ =
         Obj.magic x
       in
-      obj "ZkappCommand" ~fields:(fun _ ->
+      obj "ZkappCommandResult" ~fields:(fun _ ->
           [ field_no_status "id"
               ~doc:"A Base58Check string representing the command"
               ~typ:
@@ -4317,13 +4317,13 @@ module Queries = struct
         let deserialize_txn serialized_txn =
           let res =
             match serialized_txn with
-            | `Signed_command x ->
+            | `Signed_command cmd ->
                 Or_error.(
-                  Signed_command.of_base58_check x
+                  Signed_command.of_base58_check cmd
                   >>| fun c -> User_command.Signed_command c)
-            | `Zkapp_command ps ->
+            | `Zkapp_command cmd ->
                 Or_error.(
-                  Zkapp_command.of_base58_check ps
+                  Zkapp_command.of_base58_check cmd
                   >>| fun c -> User_command.Zkapp_command c)
           in
           result_of_or_error res ~error:"Invalid transaction provided"
