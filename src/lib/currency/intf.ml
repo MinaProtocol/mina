@@ -50,6 +50,18 @@ module type Basic = sig
 
   val of_uint64 : uint64 -> t
 
+  val mina : int -> t
+
+  val centimina : int -> t
+
+  val nanomina : int -> t
+
+  val int_of_mina : t -> int
+
+  val int_of_centimina : t -> int
+
+  val int_of_nanomina : t -> int
+
   [%%ifdef consensus_mechanism]
 
   type var
