@@ -2675,7 +2675,7 @@ module Ledger = struct
           true
       | Other_account_update i ->
           (List.nth_exn
-             (Zkapp_command.Call_forest.to_zkapp_command_list account_updates)
+             (Zkapp_command.Call_forest.to_account_updates account_updates)
              i )
             .body
             .use_full_commitment
@@ -2786,7 +2786,7 @@ module Ledger = struct
 
     check_signature "fee payer" fee_payer.authorization
       fee_payer.body.public_key full_tx_commitment ;
-    List.iteri (Zkapp_command.Call_forest.to_zkapp_command_list account_updates)
+    List.iteri (Zkapp_command.Call_forest.to_account_updates account_updates)
       ~f:(fun i p ->
         let commitment =
           if p.body.use_full_commitment then full_tx_commitment

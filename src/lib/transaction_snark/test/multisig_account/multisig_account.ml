@@ -372,7 +372,7 @@ let%test_module "multisig_account" =
               in
               let memo = Signed_command_memo.empty in
               let ps =
-                Zkapp_command.Call_forest.of_zkapp_command_list
+                Zkapp_command.Call_forest.of_account_updates
                   ~account_update_depth:(fun (p : Account_update.Simple.t) ->
                     p.body.call_depth )
                   [ sender_account_update_data; snapp_account_update_data ]
