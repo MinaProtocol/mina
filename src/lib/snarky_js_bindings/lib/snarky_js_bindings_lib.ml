@@ -2124,7 +2124,6 @@ let pickles_digest (choices : pickles_rule_js Js.js_array Js.t)
         ~auxiliary_typ:Typ.unit
         ~branches:(module Branches)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
-          (* ^ TODO make max_branching configurable -- needs refactor in account_update types *)
         ~name ~constraint_constants
     in
     failwith "Unexpected: The exception will always fire"
@@ -2148,7 +2147,6 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
       ~auxiliary_typ:Typ.unit
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
-        (* ^ TODO make max_branching configurable -- needs refactor in account_update types *)
       ~name ~constraint_constants
   in
   let module Proof = (val p) in
@@ -2709,7 +2707,7 @@ module Ledger = struct
     in
     let account_update = List.nth_exn tx.account_updates account_update_index in
     object%js
-      val account_update =
+      val accountUpdate =
         to_js_field_unchecked
           (account_update.elt.account_update_digest :> Impl.field)
 
