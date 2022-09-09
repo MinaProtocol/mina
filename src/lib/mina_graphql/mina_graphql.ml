@@ -2370,7 +2370,7 @@ module Types = struct
       type input = Mina_base.Zkapp_command.t
 
       let arg_typ =
-        scalar "SendTestZkappInput" ~doc:"Zkapp_command for a test zkApp"
+        scalar "SendTestZkappInput" ~doc:"zkApp command for a test zkApp"
           ~coerce:(fun json ->
             let json = to_yojson json in
             Result.try_with (fun () -> Mina_base.Zkapp_command.of_json json)
@@ -2732,8 +2732,8 @@ module Types = struct
         obj "SendZkappInput" ~coerce:Fn.id
           ~split:(fun f (x : input) -> f x)
           ~fields:
-            [ arg "zkapp_command"
-                ~doc:"Zkapp_command structure representing the transaction"
+            [ arg "zkappCommand"
+                ~doc:"zkApp command structure representing the transaction"
                 ~typ:arg_typ
             ]
     end
@@ -3658,7 +3658,7 @@ module Mutations = struct
       ~doc:"Send a zkApp (for internal testing purposes)"
       ~args:
         Arg.
-          [ arg "zkapp_command"
+          [ arg "zkappCommand"
               ~typ:(non_null Types.Input.SendTestZkappInput.arg_typ)
           ]
       ~typ:(non_null Types.Payload.send_zkapp)

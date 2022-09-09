@@ -393,10 +393,10 @@ module Call_forest = struct
         ; stack_hash = ()
         } )
 
-  let rec of_zkapp_command_list_map ~(f : 'p1 -> 'p2)
-      ~(account_update_depth : 'p1 -> int) (zkapp_command : 'p1 list) :
+  let rec of_account_updates_map ~(f : 'p1 -> 'p2)
+      ~(account_update_depth : 'p1 -> int) (account_updates : 'p1 list) :
       ('p2, unit, unit) t =
-    match zkapp_command with
+    match account_updates with
     | [] ->
         []
     | p :: ps ->
@@ -407,17 +407,16 @@ module Call_forest = struct
         { With_stack_hash.elt =
             { Tree.account_update = f p
             ; account_update_digest = ()
-            ; calls =
-                of_zkapp_command_list_map ~f ~account_update_depth children
+            ; calls = of_account_updates_map ~f ~account_update_depth children
             }
         ; stack_hash = ()
         }
-        :: of_zkapp_command_list_map ~f ~account_update_depth siblings
+        :: of_account_updates_map ~f ~account_update_depth siblings
 
-  let of_zkapp_command_list ~account_update_depth zkapp_command =
-    of_zkapp_command_list_map ~f:Fn.id ~account_update_depth zkapp_command
+  let of_account_updates ~account_update_depth account_updates =
+    of_account_updates_map ~f:Fn.id ~account_update_depth account_updates
 
-  let to_zkapp_command_list_map ~f (xs : _ t) =
+  let to_account_updates_map ~f (xs : _ t) =
     let rec collect depth (xs : _ t) acc =
       match xs with
       | [] ->
@@ -432,10 +431,8 @@ module Call_forest = struct
     in
     List.rev (collect 0 xs [])
 
-  let to_zkapp_command_list xs =
-    to_zkapp_command_list_map
-      ~f:(fun ~depth:_ account_update -> account_update)
-      xs
+  let to_account_updates xs =
+    to_account_updates_map ~f:(fun ~depth:_ account_update -> account_update) xs
 
   let hd_account_update (xs : _ t) =
     match xs with
@@ -469,19 +466,19 @@ module Call_forest = struct
     in
     let f_index = mapi ~f:(fun i _p -> i) in
     [%test_eq: (int, unit, unit) t]
-      (of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_1)
+      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1)
       zkapp_command_list_1_res ;
     let zkapp_command_list1_index : (int, unit, unit) t =
       let n i = node i [] in
       [ n 0; n 1; n 2; n 3 ]
     in
     [%test_eq: (int, unit, unit) t]
-      ( of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_1
+      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1
       |> f_index )
       zkapp_command_list1_index ;
     [%test_eq: int list]
-      (to_zkapp_command_list
-         (of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_1) )
+      (to_account_updates
+         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_1) )
       zkapp_command_list_1 ;
     let zkapp_command_list_2 = [ 0; 0; 1; 1 ] in
     let zkapp_command_list_2_res =
@@ -491,15 +488,15 @@ module Call_forest = struct
       [ node 0 []; node 1 [ node 2 []; node 3 [] ] ]
     in
     [%test_eq: (int, unit, unit) t]
-      (of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_2)
+      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2)
       zkapp_command_list_2_res ;
     [%test_eq: (int, unit, unit) t]
-      ( of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_2
+      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2
       |> f_index )
       zkapp_command_list_2_index ;
     [%test_eq: int list]
-      (to_zkapp_command_list
-         (of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_2) )
+      (to_account_updates
+         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_2) )
       zkapp_command_list_2 ;
     let zkapp_command_list_3 = [ 0; 0; 1; 0 ] in
     let zkapp_command_list_3_res =
@@ -509,15 +506,15 @@ module Call_forest = struct
       [ node 0 []; node 1 [ node 2 [] ]; node 3 [] ]
     in
     [%test_eq: (int, unit, unit) t]
-      (of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_3)
+      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3)
       zkapp_command_list_3_res ;
     [%test_eq: (int, unit, unit) t]
-      ( of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_3
+      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3
       |> f_index )
       zkapp_command_list_3_index ;
     [%test_eq: int list]
-      (to_zkapp_command_list
-         (of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_3) )
+      (to_account_updates
+         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_3) )
       zkapp_command_list_3 ;
     let zkapp_command_list_4 = [ 0; 1; 2; 3; 2; 1; 0 ] in
     let zkapp_command_list_4_res =
@@ -531,15 +528,15 @@ module Call_forest = struct
       ]
     in
     [%test_eq: (int, unit, unit) t]
-      (of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_4)
+      (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4)
       zkapp_command_list_4_res ;
     [%test_eq: (int, unit, unit) t]
-      ( of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_4
+      ( of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4
       |> f_index )
       zkapp_command_list_4_index ;
     [%test_eq: int list]
-      (to_zkapp_command_list
-         (of_zkapp_command_list ~account_update_depth:Fn.id zkapp_command_list_4) )
+      (to_account_updates
+         (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4) )
       zkapp_command_list_4
 
   let to_zkapp_command_with_hashes_list (xs : _ t) =
@@ -808,7 +805,7 @@ module Call_forest = struct
 
     let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list)
         : _ t =
-      of_zkapp_command_list xs
+      of_account_updates xs
         ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
           p.body.call_depth )
       |> add_callers
@@ -821,21 +818,21 @@ module Call_forest = struct
              )
       |> accumulate_hashes
 
-    let of_zkapp_command_list (xs : (Account_update.Graphql_repr.t * 'a) list) :
+    let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) :
         _ t =
-      of_zkapp_command_list_map
+      of_account_updates_map
         ~account_update_depth:(fun ((p : Account_update.Graphql_repr.t), _) ->
           p.body.call_depth )
         ~f:(fun (p, x) -> (Account_update.of_graphql_repr p, x))
         xs
       |> accumulate_hashes
 
-    let to_zkapp_command_list (x : _ t) = to_zkapp_command_list x
+    let to_account_updates (x : _ t) = to_account_updates x
 
     let to_zkapp_command_with_hashes_list (x : _ t) =
       to_zkapp_command_with_hashes_list x
 
-    let account_updates_hash' xs = of_zkapp_command_list xs |> hash
+    let account_updates_hash' xs = of_account_updates xs |> hash
 
     let account_updates_hash xs =
       List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash'
@@ -864,7 +861,7 @@ module Call_forest = struct
     let accumulate_hashes xs : t = accumulate_hashes ~hash_account_update xs
 
     let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) : t =
-      of_zkapp_command_list xs
+      of_account_updates xs
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
       |> add_callers
@@ -877,20 +874,20 @@ module Call_forest = struct
              )
       |> accumulate_hashes
 
-    let of_zkapp_command_list (xs : Account_update.Graphql_repr.t list) : t =
-      of_zkapp_command_list_map
+    let of_account_updates (xs : Account_update.Graphql_repr.t list) : t =
+      of_account_updates_map
         ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
           p.body.call_depth )
         ~f:(fun p -> Account_update.of_graphql_repr p)
         xs
       |> accumulate_hashes
 
-    let to_zkapp_command_list (x : t) = to_zkapp_command_list x
+    let to_account_updates (x : t) = to_account_updates x
 
     let to_zkapp_command_with_hashes_list (x : t) =
       to_zkapp_command_with_hashes_list x
 
-    let account_updates_hash' xs = of_zkapp_command_list xs |> hash
+    let account_updates_hash' xs = of_account_updates xs |> hash
 
     let account_updates_hash xs =
       List.map ~f:(fun x -> x) xs |> account_updates_hash'
@@ -992,7 +989,7 @@ module T = struct
           { fee_payer = t.fee_payer
           ; memo = t.memo
           ; account_updates =
-              Call_forest.of_zkapp_command_list_map t.account_updates
+              Call_forest.of_account_updates_map t.account_updates
                 ~f:Account_update.of_graphql_repr
                 ~account_update_depth:(fun (p : Account_update.Graphql_repr.t)
                                       -> p.body.call_depth )
@@ -1015,7 +1012,7 @@ module T = struct
                      Account_id.(
                        derive_token_id
                          ~owner:(create p.body.public_key p.body.token_id)) )
-              |> Call_forest.to_zkapp_command_list_map
+              |> Call_forest.to_account_updates_map
                    ~f:(fun ~depth account_update ->
                      Account_update.to_graphql_repr account_update
                        ~call_depth:depth )
@@ -1120,7 +1117,7 @@ let of_simple (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
-      Call_forest.of_zkapp_command_list w.account_updates
+      Call_forest.of_account_updates w.account_updates
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
       |> Call_forest.add_callers
@@ -1161,7 +1158,7 @@ let to_simple (t : t) : Simple.t =
         ~null_id:Token_id.default
         ~account_update_caller:(fun (p : Account_update.t) -> p.body.caller)
         t.account_updates
-      |> Call_forest.to_zkapp_command_list_map
+      |> Call_forest.to_account_updates_map
            ~f:(fun ~depth (p : Account_update.Simple.t) ->
              { p with body = { p.body with call_depth = depth } } )
   }
@@ -1527,7 +1524,7 @@ type account_updates =
 let account_updates_deriver obj =
   let of_zkapp_command_with_depth (ps : Account_update.Graphql_repr.t list) :
       account_updates =
-    Call_forest.of_zkapp_command_list ps
+    Call_forest.of_account_updates ps
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
     |> Call_forest.map ~f:Account_update.of_graphql_repr
@@ -1535,7 +1532,7 @@ let account_updates_deriver obj =
   and to_zkapp_command_with_depth (ps : account_updates) :
       Account_update.Graphql_repr.t list =
     ps
-    |> Call_forest.to_zkapp_command_list_map ~f:(fun ~depth p ->
+    |> Call_forest.to_account_updates_map ~f:(fun ~depth p ->
            Account_update.to_graphql_repr ~call_depth:depth p )
   in
   let open Fields_derivers_zkapps.Derivers in
@@ -1550,7 +1547,7 @@ let deriver obj =
     ~fee_payer:!.Account_update.Fee_payer.deriver
     ~account_updates:!.account_updates_deriver
     ~memo:!.Signed_command_memo.deriver
-  |> finish "Zkapp_command" ~t_toplevel_annots
+  |> finish "ZkappCommand" ~t_toplevel_annots
 
 let arg_typ () = Fields_derivers_zkapps.(arg_typ (deriver @@ Derivers.o ()))
 
@@ -1596,8 +1593,8 @@ let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let ( num_proof_zkapp_command
-      , num_zkapp_command
+  let ( num_proof_updates
+      , num_updates
       , num_event_elements
       , num_sequence_event_elements ) =
     Call_forest.fold t.account_updates ~init:(0, 0, 0, 0)
@@ -1628,9 +1625,9 @@ let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
     genesis_constants.max_sequence_event_elements
   in
   let valid_proof_zkapp_command =
-    num_proof_zkapp_command <= max_proof_zkapp_command
+    num_proof_updates <= max_proof_zkapp_command
   in
-  let valid_zkapp_command = num_zkapp_command <= max_zkapp_command in
+  let valid_zkapp_command = num_updates <= max_zkapp_command in
   let valid_event_elements = num_event_elements <= max_event_elements in
   let valid_sequence_event_elements =
     num_sequence_event_elements <= max_sequence_event_elements
@@ -1645,14 +1642,14 @@ let valid_size ~(genesis_constants : Genesis_constants.t) t : unit Or_error.t =
       else
         Some
           (sprintf "too many proof zkapp_command (%d, max allowed is %d)"
-             num_proof_zkapp_command max_proof_zkapp_command )
+             num_proof_updates max_proof_zkapp_command )
     in
     let zkapp_command_err =
       if valid_zkapp_command then None
       else
         Some
-          (sprintf "too many zkapp_command (%d, max allowed is %d)"
-             num_zkapp_command max_zkapp_command )
+          (sprintf "too many zkapp_command (%d, max allowed is %d)" num_updates
+             max_zkapp_command )
     in
     let events_err =
       if valid_event_elements then None

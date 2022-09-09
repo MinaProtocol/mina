@@ -458,7 +458,7 @@ module Update = struct
         ~checked:(js_only (Js_layout.leaf_type (Custom "TokenSymbol")))
         ~name:"TokenSymbol" string
     in
-    finish "AccountUpdateUpdate" ~t_toplevel_annots
+    finish "AccountUpdateModification" ~t_toplevel_annots
     @@ Fields.make_creator
          ~app_state:!.(Zkapp_state.deriver @@ Set_or_keep.deriver field)
          ~delegate:!.(Set_or_keep.deriver public_key)
@@ -1392,7 +1392,7 @@ module Fee_payer = struct
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
-    |> finish "ZkappAccountUpdateFeePayer" ~t_toplevel_annots
+    |> finish "ZkappFeePayer" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
     let dummy : t =
