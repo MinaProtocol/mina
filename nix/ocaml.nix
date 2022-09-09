@@ -199,8 +199,9 @@ let
         cp -R ${self.mina-dev.${output}} ${placeholder output}
         chmod 700 ${placeholder output} -R
         for i in $(find "${placeholder output}/bin" -type f); do
-          sed 's/__commit_sha1___________________________/${commit_sha1}/' -i "$i"
-          sed 's/__commit_date_/${commit_date}/' -i "$i"
+          if [[ "$(basename "$i")" == mina ]]; then
+            sed -e 's/__commit_sha1___________________________/${commit_sha1}/' -e 's/__commit_date_/${commit_date}/' -i "$i"
+          fi
           wrapProgram "$i" \
             --prefix PATH : ${makeBinPath [ pkgs.gnutar pkgs.gzip ]} \
             --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper
