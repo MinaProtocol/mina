@@ -92,11 +92,7 @@ let signedDeploySnarkyJs = signFeePayer(partiesJsonDeploy, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
-if (
-  JSON.parse(signedDeploySnarkyJs).feePayer.authorization !==
-  JSON.parse(signedDeploy.data.parties).feePayer.authorization
-)
-  throw Error("Inconsistent fee payer signature");
+checkSignatureConsistency(signedDeploySnarkyJs, signedDeploy.data.parties);
 toc();
 
 feePayerNonce++;
@@ -122,13 +118,19 @@ let signedUpdateSnarkyJs = signFeePayer(partiesJsonUpdate, feePayerKey, {
   transactionFee,
   feePayerNonce,
 });
-if (
-  JSON.parse(signedUpdateSnarkyJs).feePayer.authorization !==
-  JSON.parse(signedUpdate.data.parties).feePayer.authorization
-)
-  throw Error("Inconsistent fee payer signature");
+checkSignatureConsistency(signedUpdateSnarkyJs, signedUpdate.data.parties);
 toc();
 
 console.log("success! created and signed two transactions.");
 
 shutdown();
+
+function checkSignatureConsistency(tx1, tx2) {
+  let auth1 = JSON.parse(tx1).feePayer.authorization;
+  let auth2 = JSON.parse(tx2).feePayer.authorization;
+  if (JSON.stringify(auth1) !== JSON.stringify(auth2)) {
+    console.log(auth1);
+    console.log(auth2);
+    throw Error("Inconsistent fee payer signature");
+  }
+}
