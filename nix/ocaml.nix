@@ -255,6 +255,9 @@ let
               find _build -name "*.coverage" | xargs -i -t cp {} $out/coverage
           '';
         };
+
+        # git is used in src/lib/crypto/kimchi_backend/common/gen_version.sh
+        extraInputs = [ pkgs.git ];
       } ''
         # The compiler needs a bigger stack to compile some modules
         # which are too big when intrumented with bisect_ppx
