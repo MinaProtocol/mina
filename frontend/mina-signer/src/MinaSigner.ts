@@ -16,7 +16,12 @@ import type {
   SignableData,
 } from "./TSTypes";
 
-import { isPayment, isMessage, isStakeDelegation, isZkappCommand } from "./Utils";
+import {
+  isPayment,
+  isMessage,
+  isStakeDelegation,
+  isZkappCommand,
+} from "./Utils";
 
 const defaultValidUntil = "4294967295";
 
@@ -339,11 +344,19 @@ class Client {
    * @param privateKey The fee payer private key
    * @returns Signed ZkappCommand
    */
-  public signZkappCommand(zkappCommand: ZkappCommand, privateKey: PrivateKey): Signed<ZkappCommand> {
-    const account_updates = JSON.stringify(zkappCommand.zkappCommand.accountUpdates);
+  public signZkappCommand(
+    zkappCommand: ZkappCommand,
+    privateKey: PrivateKey
+  ): Signed<ZkappCommand> {
+    const account_updates = JSON.stringify(
+      zkappCommand.zkappCommand.accountUpdates
+    );
     if (
       zkappCommand.feePayer.fee === undefined ||
-      zkappCommand.feePayer.fee < this.getAccountUpdateMinimumFee(zkappCommand.zkappCommand.accountUpdates)
+      zkappCommand.feePayer.fee <
+        this.getAccountUpdateMinimumFee(
+          zkappCommand.zkappCommand.accountUpdates
+        )
     ) {
       throw `Fee must be greater than ${this.getAccountUpdateMinimumFee(
         zkappCommand.zkappCommand.accountUpdates
@@ -415,8 +428,7 @@ class Client {
     payload: SignableData,
     privateKey: PrivateKey
   ): Signed<SignableData> {
-     console.log (payload);
-     if (isMessage(payload)) {
+    if (isMessage(payload)) {
       return this.signMessage(payload.message, {
         publicKey: payload.publicKey,
         privateKey,
