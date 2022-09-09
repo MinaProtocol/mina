@@ -64,4 +64,4 @@ def run_comparison (printer,item_kind,original,modified) :
     orig_items = create_items_file (printer,original,'original')
     mod_items = create_items_file (printer,modified,'modified')
     compare_items (item_kind,modified,orig_items,mod_items)
-    sys.exit (exit_code)
+    return exit_code

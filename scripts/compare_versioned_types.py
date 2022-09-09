@@ -10,9 +10,13 @@ import sys
 
 from compare_versioned_items import run_comparison
 
+error_msg = 
+    """Please see this issue https://github.com/MinaProtocol/mina/issues/11780 for pointers on how to fix this error. 
+       It might be also helpful to look in this file: `scripts/compare_verioned_types.py"""
+
 # This is the list of file while has never been changed before
 # and they haven't run through the CI before, and then fail 
-# when modified.
+# when modified. To add new files, just add them to this list.
 skip_list = ["src/nonconsensus/snark_params/tick.ml"]
 
 def skip(original, modified):
@@ -28,4 +32,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if not (skip (sys.argv[1], sys.argv[2])):  
-        run_comparison('_build/default/src/lib/ppx_version/tools/print_versioned_types.exe','Versioned types',sys.argv[1],sys.argv[2])
+        status_code = run_comparison('_build/default/src/lib/ppx_version/tools/print_versioned_types.exe','Versioned types',sys.argv[1],sys.argv[2])
+        if status_code != 0:
+            print(error_msg)
+            sys.exit(status_code)
