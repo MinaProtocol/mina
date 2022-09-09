@@ -2,7 +2,7 @@ open Core
 open Async
 open Network_peer
 open Pipe_lib
-open Mina_base.Rpc_intf
+open Network_peer.Rpc_intf
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -41,7 +41,7 @@ module Config = struct
     ; flooding : bool
     ; direct_peers : Mina_net2.Multiaddr.t list
     ; peer_exchange : bool
-    ; mina_peer_exchange : bool
+    ; peer_protection_ratio : float
     ; seed_peer_list_url : Uri.t option
     ; min_connections : int
     ; time_controller : Block_time.Controller.t
@@ -120,7 +120,7 @@ let on_gossip_decode_failure (config : Config.t) envelope (err : Error.t) =
   |> don't_wait_for ;
   ()
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 
@@ -304,7 +304,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip ~seed_peers
                 ~direct_peers:config.direct_peers
                 ~peer_exchange:config.peer_exchange
-                ~mina_peer_exchange:config.mina_peer_exchange
+                ~peer_protection_ratio:config.peer_protection_ratio
                 ~flooding:config.flooding
                 ~min_connections:config.min_connections
                 ~max_connections:config.max_connections
@@ -418,9 +418,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             let snark_bin_prot =
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
-            let block_bin_prot =
-              Mina_block.External_transition.Raw.Stable.Latest.bin_t
-            in
+            let block_bin_prot = Mina_block.Stable.Latest.bin_t in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
               match config.pubsub_v1 with
@@ -445,19 +443,15 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               publish_v1_impl
                 (fun (env, vc) ->
                   Sinks.Block_sink.push sink_block
-                    ( `Transition
-                        (Envelope.Incoming.map
-                           ~f:Mina_block.External_transition.decompose env )
+                    ( `Transition env
                     , `Time_received (Block_time.now config.time_controller)
                     , `Valid_cb vc ) )
                 block_bin_prot v1_topic_block
-              >>| Fn.flip Fn.compose Mina_block.External_transition.compose
             in
             let map_v0_msg msg =
               match msg with
               | Message.New_state state ->
-                  Message.Latest.T.New_state
-                    (Mina_block.External_transition.compose state)
+                  Message.Latest.T.New_state state
               | Message.Transaction_pool_diff diff ->
                   Message.Latest.T.Transaction_pool_diff diff
               | Message.Snark_pool_diff diff ->
@@ -470,11 +464,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                   | Message.Latest.T.New_state state ->
                       Sinks.Block_sink.push sink_block
                         ( `Transition
-                            (Envelope.Incoming.map
-                               ~f:(fun _ ->
-                                 Mina_block.External_transition.decompose state
-                                 )
-                               env )
+                            (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
                   | Message.Latest.T.Transaction_pool_diff diff ->
@@ -627,6 +617,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let ban_configuration =
         ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
       in
+      let send_heartbeat peer =
+        O1trace.thread "execute_heartbeat" (fun () ->
+            let n_def = !net2_ref in
+            if Deferred.is_determined n_def then
+              let%map net2 = n_def in
+              Mina_net2.send_heartbeat net2 peer.Network_peer.Peer.peer_id
+            else Deferred.unit )
+      in
       let do_ban (banned_peer, expiration) =
         O1trace.thread "execute_gossip_net_bans" (fun () ->
             don't_wait_for
@@ -659,12 +657,19 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           | _ ->
               Deferred.unit )
       in
+      let handle_trust_system_upcall upcall =
+        match upcall with
+        | `Ban u ->
+            do_ban u
+        | `Heartbeat peer ->
+            send_heartbeat peer
+      in
       let ban_reader, ban_writer = Linear_pipe.create () in
       don't_wait_for
         (let%map () =
            Strict_pipe.Reader.iter
-             (Trust_system.ban_pipe config.trust_system)
-             ~f:do_ban
+             (Trust_system.upcall_pipe config.trust_system)
+             ~f:handle_trust_system_upcall
          in
          Linear_pipe.close ban_writer ) ;
       let t =

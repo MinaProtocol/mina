@@ -4,7 +4,7 @@
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_custom_printf ppx_coda ppx_version ppx_snarky ppx_optcomp ppx_bin_prot ppx_compare ppx_sexp_conv ppx_hash ppx_fields_conv ppx_let ppx_inline_test ppx_assert ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+ (preprocess (pps ppx_custom_printf ppx_mina ppx_version ppx_snarky ppx_optcomp ppx_bin_prot ppx_compare ppx_sexp_conv ppx_hash ppx_fields_conv ppx_let ppx_inline_test ppx_assert ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -25,6 +25,7 @@
    genesis_constants
    block_time
    mina_base
+   mina_transaction_logic
    snark_params
    consensus
    bitstring_lib
@@ -38,7 +39,13 @@
    visualization
    linked_tree
    mina_numbers
+   kimchi_backend.pasta
+   kimchi_backend
+   mina_base.util
+   mina_ledger
    unsigned_extended
-   pasta
-   )
+   sgn
+   blake2
+   ppx_version.runtime
+ )
 )

@@ -1,0 +1,18 @@
+(library
+ (name mina_caqti)
+ (public_name mina_caqti)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   async
+   caqti-async
+   caqti
+   async_kernel
+   ;; local libraries
+   mina_base
+   )
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane ppx_custom_printf h_list.ppx))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Helpers for the Caqti database bindings"))

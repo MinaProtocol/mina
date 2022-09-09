@@ -86,7 +86,6 @@ _opam
 
 target
 release
-Cargo.lock
 .vscode
 
 ### IntelliJ IDEA ###
@@ -99,3 +98,7 @@ Cargo.lock
 .env
 .envrc
 .direnv/
+
+# pipenv
+Pipfile
+Pipfile.lock

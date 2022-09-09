@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Snark_params.Tick
 
 type t [@@deriving sexp, equal, compare, hash, yojson]
@@ -13,9 +13,9 @@ val var_of_t : t -> var
 
 val typ : (var, t) Typ.t
 
-val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
-val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
 val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
@@ -46,6 +46,10 @@ module Aux_hash : sig
   val of_bytes : string -> t
 
   val to_bytes : t -> string
+
+  val to_base58_check : t -> string
+
+  val of_base58_check_exn : string -> t
 
   val dummy : t
 end

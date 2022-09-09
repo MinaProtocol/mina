@@ -13,6 +13,7 @@
    base.base_internalhash_types
    async_kernel
    integers
+   result
    ;; local libraries
    error_json
    data_hash_lib
@@ -31,6 +32,7 @@
    perf_histograms
    mina_metrics
    mina_block
+   mina_transaction
    network_peer
    with_hash
    logger
@@ -43,8 +45,7 @@
    non_empty_list
    network_pool
    mina_net2
-   result
    mina_numbers
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane)))

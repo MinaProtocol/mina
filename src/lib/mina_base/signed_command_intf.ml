@@ -2,7 +2,7 @@
 
 [%%import "/src/config.mlh"]
 
-open Import
+open Mina_base_import
 open Core_kernel
 open Snark_params.Tick
 open Mina_numbers
@@ -12,36 +12,34 @@ module type Gen_intf = sig
 
   module Gen : sig
     (** Generate a single transaction between
-    * Generate random keys for sender and receiver
-    * for fee $\in [Mina_compile_config.minimum_user_command_fee,
-    * Mina_compile_config.minimum_user_command_fee+fee_range]$
-    * and an amount $\in [1,max_amount]$
+     * Generate random keys for sender and receiver
+     * for fee $\in [Mina_compile_config.minimum_user_command_fee,
+     * Mina_compile_config.minimum_user_command_fee+fee_range]$
+     * and an amount $\in [1,max_amount]$
     *)
     val payment :
          ?sign_type:[ `Fake | `Real ]
       -> key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
+      -> ?min_amount:int
       -> max_amount:int
-      -> ?fee_token:Token_id.t
-      -> ?payment_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
 
     (** Generate a single transaction between
-    * $a, b \in keys$
-    * for fee $\in [Mina_compile_config.minimum_user_command_fee,
-    * Mina_compile_config.minimum_user_command_fee+fee_range]$
-    * and an amount $\in [1,max_amount]$
+     * $a, b \in keys$
+     * for fee $\in [Mina_compile_config.minimum_user_command_fee,
+     * Mina_compile_config.minimum_user_command_fee+fee_range]$
+     * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
          ?sign_type:[ `Fake | `Real ]
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
+      -> ?min_amount:int
       -> max_amount:int
-      -> ?fee_token:Token_id.t
-      -> ?payment_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -50,7 +48,6 @@ module type Gen_intf = sig
          key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
-      -> ?fee_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -58,7 +55,6 @@ module type Gen_intf = sig
     val stake_delegation_with_random_participants :
          keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
-      -> ?fee_token:Token_id.t
       -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -105,11 +101,13 @@ module type S = sig
 
   val source_pk : t -> Public_key.Compressed.t
 
-  val source : next_available_token:Token_id.t -> t -> Account_id.t
+  val source : t -> Account_id.t
 
   val receiver_pk : t -> Public_key.Compressed.t
 
-  val receiver : next_available_token:Token_id.t -> t -> Account_id.t
+  val receiver : t -> Account_id.t
+
+  val public_keys : t -> Public_key.Compressed.t list
 
   val amount : t -> Currency.Amount.t option
 
@@ -126,28 +124,21 @@ module type S = sig
 
   val tag_string : t -> string
 
-  val next_available_token : t -> Token_id.t -> Token_id.t
-
-  val to_input :
-    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.t
-
-  (** Check that the command is used with compatible tokens. This check is fast
-      and cheap, to be used for filtering.
-  *)
-  val check_tokens : t -> bool
+  val to_input_legacy :
+    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.Legacy.t
 
   include Gen_intf with type t := t
 
   module With_valid_signature : sig
     module Stable : sig
       module Latest : sig
-        type nonrec t = private t
+        type nonrec t
         [@@deriving sexp, equal, bin_io, yojson, version, compare, hash]
 
         include Gen_intf with type t := t
       end
 
-      module V1 = Latest
+      module V2 = Latest
     end
 
     type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]
@@ -178,6 +169,8 @@ module type S = sig
     -> Signed_command_payload.t
     -> With_valid_signature.t option
 
+  val check_valid_keys : t -> bool
+
   module For_tests : sig
     (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
@@ -187,7 +180,10 @@ module type S = sig
       -> With_valid_signature.t
   end
 
+  (** checks signature and keys *)
   val check : t -> With_valid_signature.t option
+
+  val check_only_for_signature : t -> With_valid_signature.t option
 
   val to_valid_unsafe :
        t
@@ -197,10 +193,52 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  val accounts_accessed :
-    next_available_token:Token_id.t -> t -> Account_id.t list
+  val accounts_accessed : t -> Account_id.t list
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 
   include Codable.Base58_check_intf with type t := t
+end
+
+module type Full = sig
+  module Payload = Signed_command_payload
+
+  module Poly : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type ('payload, 'pk, 'signature) t =
+              ( 'payload
+              , 'pk
+              , 'signature )
+              Mina_wire_types.Mina_base.Signed_command.Poly.V1.t =
+          { payload : 'payload; signer : 'pk; signature : 'signature }
+        [@@deriving sexp, hash, yojson, equal, compare]
+      end
+    end]
+  end
+
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V2 : sig
+      type t =
+        ( Payload.Stable.V2.t
+        , Public_key.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, hash, yojson, version]
+
+      val version_byte : char (* for base58_check *)
+
+      include Comparable.S with type t := t
+
+      include Hashable.S with type t := t
+
+      val accounts_accessed : t -> Account_id.t list
+    end
+  end]
+
+  include S with type t = Stable.V2.t
 end

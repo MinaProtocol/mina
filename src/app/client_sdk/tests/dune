@@ -10,6 +10,7 @@
    base
    core_kernel
    ;; local libraries
+   mina_wire_types
    pickles.backend
    string_sign
    snark_params
@@ -17,9 +18,10 @@
    currency
    mina_numbers
    mina_base
+   mina_base.import
    mina_signature_kind
+   kimchi_backend.pasta
    pickles
-   pasta
  )
  (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
@@ -38,7 +40,7 @@
    base
    sexplib0
    ;; local libraries
-   ;mina_base_nonconsensus
+   mina_base_nonconsensus.import
    mina_signature_kind
    mina_base_nonconsensus
    mina_numbers_nonconsensus

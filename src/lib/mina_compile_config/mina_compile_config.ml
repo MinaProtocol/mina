@@ -48,3 +48,15 @@ let rpc_heartbeat_timeout_sec = 60.0
 let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 
 [%%inject "generate_genesis_proof", generate_genesis_proof]
+
+let transaction_expiry_hr = 2
+
+(* limits on Parties.t size *)
+
+let max_proof_parties = 4
+
+let max_parties = 8
+
+let max_event_elements = 16
+
+let max_sequence_event_elements = 16

@@ -62,8 +62,6 @@ module Make
     | Empty ->
         1
 
-  let verified_size _ = 1
-
   let max_per_15_seconds = 20
 
   let summary = function
@@ -79,8 +77,7 @@ module Make
 
   let of_result
       (res :
-        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
-          Snark_work_lib.Work.Spec.t
+        ( (_, _) Snark_work_lib.Work.Single.Spec.t Snark_work_lib.Work.Spec.t
         , Ledger_proof.t )
         Snark_work_lib.Work.Result.t ) =
     Add_solved_work
@@ -152,7 +149,10 @@ module Make
         in
         match has_lower_fee pool work ~fee:fee.fee ~sender with
         | Ok () ->
-            Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+            let%map.Deferred.Result accepted, rejected =
+              Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
+            in
+            (`Accept, accepted, rejected)
         | Error e ->
             Deferred.return
               ( if is_local then Error (`Locally_generated (diff, ()))

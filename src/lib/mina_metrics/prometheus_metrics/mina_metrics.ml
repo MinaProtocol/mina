@@ -279,6 +279,19 @@ module Cryptography = struct
     Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
       ~subsystem
 
+  let transaction_length =
+    let help =
+      "Number of parties in a parties transaction (1 for simple transactions)"
+    in
+    Gauge.v "transaction_length" ~help ~namespace ~subsystem
+
+  let proof_parties =
+    let help =
+      "Number of parties with proof authorization in a parties transaction (0 \
+       for simple transactions)"
+    in
+    Gauge.v "proof_parties" ~help ~namespace ~subsystem
+
   (* TODO:
      let transaction_proving_time_ms =
        let help = "time elapsed while proving most recently generated transaction snark" in
@@ -330,6 +343,14 @@ module Transaction_pool = struct
       "Number of transactions added to the pool since the node start"
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
+
+  let parties_transaction_size : Gauge.t =
+    let help = "Size of valid parties transaction received (bin_size_t)" in
+    Gauge.v "parties_transaction_size" ~help ~namespace ~subsystem
+
+  let parties_count : Gauge.t =
+    let help = "Number of parties in a valid transaction received" in
+    Gauge.v "parties_count" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -1019,6 +1040,10 @@ module Snark_work = struct
     in
     Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
 
+  let snark_work_failed_rpc : Counter.t =
+    let help = "# of snark work failures reported by snark workers" in
+    Counter.v "snark_work_failed_rpc" ~help ~namespace ~subsystem
+
   let snark_pool_size : Gauge.t =
     let help = "# of completed snark work bundles in the snark pool" in
     Gauge.v "snark_pool_size" ~help ~namespace ~subsystem
@@ -1252,6 +1277,10 @@ module Transition_frontier = struct
   let best_tip_user_txns : Gauge.t =
     let help = "# of transactions in the current best tip" in
     Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
+
+  let best_tip_zkapp_txns : Gauge.t =
+    let help = "# of transactions in the current best tip" in
+    Gauge.v "best_tip_zkapp_txns" ~help ~namespace ~subsystem
 
   let best_tip_coinbase : Gauge.t =
     let help =
