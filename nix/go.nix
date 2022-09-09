@@ -1,6 +1,8 @@
 # An overlay defining Go parts&dependencies of Mina
 final: prev: {
-  go-capnproto2 = final.buildGoModule rec {
+  vend = final.callPackage ./vend { };
+
+  go-capnproto2 = final.buildGo118Module rec {
     pname = "capnpc-go";
     version = "v3.0.0-alpha.1";
     vendorSha256 = "sha256-jbX/nnlnQoItFXFL/MZZKe4zAjM/EA3q+URJG8I3hok=";
@@ -27,11 +29,10 @@ final: prev: {
   };
 
   # Jobs/Test/Libp2pUnitTest
-  libp2p_helper = final.buildGoModule {
+  libp2p_helper = final.buildGo118Module {
     pname = "libp2p_helper";
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
-    runVend = true; # missing some schema files
     doCheck = false; # TODO: tests hang
     vendorSha256 =
       # sanity check, to make sure the fixed output drv doesn't keep working
@@ -47,6 +48,15 @@ final: prev: {
         final.lib.fakeHash;
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
+      # Yo dawg
+      # proxyVendor doesn't work (cannot find package "." in:)
+      # And runVend was removed from nixpkgs
+      # So we vendor the vend package in yo repo
+      # So yo can vendor while u vendor
+      postBuild = ''
+        rm vendor -rf
+        ${final.vend}/bin/vend
+      '';
       # remove libp2p_ipc from go.mod, inject it back in postconfigure
       postConfigure = ''
         sed -i 's/.*libp2p_ipc.*//' go.mod
